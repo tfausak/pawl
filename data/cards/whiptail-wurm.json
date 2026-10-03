@@ -17,6 +17,7 @@
         }
       ],
       "name": "Whiptail Wurm",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 8

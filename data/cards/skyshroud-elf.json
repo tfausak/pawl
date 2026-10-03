@@ -113,6 +113,7 @@
         }
       ],
       "name": "Skyshroud Elf",
+      "oracleText": "{T}: Add {G}.\n{1}: Add {R} or {W}.",
       "power": {
         "type": "Literal",
         "value": 1

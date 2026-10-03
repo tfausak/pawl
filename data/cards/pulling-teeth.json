@@ -17,6 +17,7 @@
         }
       ],
       "name": "Pulling Teeth",
+      "oracleText": "Clash with an opponent. If you win, target player discards two cards. Otherwise, that player discards a card. (Each clashing player reveals the top card of their library, then puts that card on their choice of the top or bottom. A player wins if their card had a greater mana value.)",
       "spell": {
         "modes": [
           {

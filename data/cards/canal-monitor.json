@@ -17,6 +17,7 @@
         }
       ],
       "name": "Canal Monitor",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 5

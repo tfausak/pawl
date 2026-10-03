@@ -2,6 +2,7 @@
   "faces": [
     {
       "name": "Mountain",
+      "oracleText": "({T}: Add {R}.)",
       "typeLine": {
         "subtypes": [
           {

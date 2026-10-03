@@ -87,6 +87,7 @@
         }
       ],
       "name": "Cursecloth Wrappings",
+      "oracleText": "Zombies you control get +1/+1.\n{T}: Target creature card in your graveyard gains embalm until end of turn. The embalm cost is equal to its mana cost. (Exile that card and pay its embalm cost: Create a token that's a copy of it, except it's a white Zombie in addition to its other types and has no mana cost. Embalm only as a sorcery.)",
       "staticAbilities": [
         {
           "affected": {

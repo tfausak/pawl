@@ -26,6 +26,7 @@
         }
       ],
       "name": "Bogstomper",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 6

@@ -25,6 +25,7 @@
         }
       ],
       "name": "Sentinels of Glen Elendra",
+      "oracleText": "Flash\nFlying",
       "power": {
         "type": "Literal",
         "value": 2

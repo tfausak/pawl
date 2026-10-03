@@ -26,6 +26,7 @@
         }
       ],
       "name": "Cowl Prowler",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 6

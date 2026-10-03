@@ -26,6 +26,7 @@
         }
       ],
       "name": "Moss Monster",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

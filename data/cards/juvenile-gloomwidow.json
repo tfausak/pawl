@@ -30,6 +30,7 @@
         }
       ],
       "name": "Juvenile Gloomwidow",
+      "oracleText": "Reach (This creature can block creatures with flying.)\nWither (This deals damage to creatures in the form of -1/-1 counters.)",
       "power": {
         "type": "Literal",
         "value": 1

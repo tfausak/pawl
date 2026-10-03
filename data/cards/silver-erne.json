@@ -25,6 +25,7 @@
         }
       ],
       "name": "Silver Erne",
+      "oracleText": "Flying, trample",
       "power": {
         "type": "Literal",
         "value": 2

@@ -18,6 +18,7 @@
         }
       ],
       "name": "Defiant Elf",
+      "oracleText": "Trample",
       "power": {
         "type": "Literal",
         "value": 1

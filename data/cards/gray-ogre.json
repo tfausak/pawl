@@ -17,6 +17,7 @@
         }
       ],
       "name": "Gray Ogre",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

@@ -39,6 +39,7 @@
         }
       ],
       "name": "Marisi's Twinclaws",
+      "oracleText": "Double strike",
       "power": {
         "type": "Literal",
         "value": 2

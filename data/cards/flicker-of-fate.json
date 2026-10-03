@@ -17,6 +17,7 @@
         }
       ],
       "name": "Flicker of Fate",
+      "oracleText": "Exile target creature or enchantment, then return it to the battlefield under its owner's control.",
       "spell": {
         "modes": [
           {

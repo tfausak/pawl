@@ -22,6 +22,7 @@
         }
       ],
       "name": "Argothian Swine",
+      "oracleText": "Trample",
       "power": {
         "type": "Literal",
         "value": 3

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Fertilid's Favor",
+      "oracleText": "Target player searches their library for a basic land card, puts it onto the battlefield tapped, then shuffles. Put two +1/+1 counters on up to one target artifact or creature.",
       "spell": {
         "modes": [
           {

@@ -34,6 +34,7 @@
         }
       ],
       "name": "Rakdos Ragemutt",
+      "oracleText": "Lifelink, haste",
       "power": {
         "type": "Literal",
         "value": 3

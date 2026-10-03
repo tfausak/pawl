@@ -22,6 +22,7 @@
         }
       ],
       "name": "Mosscoat Goriak",
+      "oracleText": "Vigilance",
       "power": {
         "type": "Literal",
         "value": 2

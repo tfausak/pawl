@@ -100,6 +100,7 @@
         }
       ],
       "name": "Arrest",
+      "oracleText": "Enchant creature\nEnchanted creature can't attack or block, and its activated abilities can't be activated.",
       "typeLine": {
         "subtypes": [
           {

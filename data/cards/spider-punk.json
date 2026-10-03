@@ -22,6 +22,7 @@
         }
       ],
       "name": "Spider-Punk",
+      "oracleText": "Riot (This creature enters with your choice of a +1/+1 counter or haste.)\nOther Spiders you control have riot.\nSpells and abilities can't be countered.\nDamage can't be prevented.",
       "playerAbilities": [
         {
           "effect": {

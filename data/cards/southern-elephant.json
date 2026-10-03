@@ -17,6 +17,7 @@
         }
       ],
       "name": "Southern Elephant",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

@@ -34,6 +34,7 @@
         }
       ],
       "name": "Soul of the Rapids",
+      "oracleText": "Flying\nHexproof (This creature can't be the target of spells or abilities your opponents control.)",
       "power": {
         "type": "Literal",
         "value": 3

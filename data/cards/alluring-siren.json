@@ -78,6 +78,7 @@
         }
       ],
       "name": "Alluring Siren",
+      "oracleText": "{T}: Target creature an opponent controls attacks you this turn if able.",
       "power": {
         "type": "Literal",
         "value": 1

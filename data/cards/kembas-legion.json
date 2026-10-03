@@ -74,6 +74,7 @@
         }
       ],
       "name": "Kemba's Legion",
+      "oracleText": "Vigilance\nThis creature can block an additional creature each combat for each Equipment attached to this creature.",
       "power": {
         "type": "Literal",
         "value": 4

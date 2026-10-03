@@ -17,6 +17,7 @@
         }
       ],
       "name": "Terror of the Fairgrounds",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 5

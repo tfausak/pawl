@@ -17,6 +17,7 @@
         }
       ],
       "name": "Feral Krushok",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 5

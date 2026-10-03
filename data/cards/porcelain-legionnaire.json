@@ -19,6 +19,7 @@
         }
       ],
       "name": "Porcelain Legionnaire",
+      "oracleText": "({W/P} can be paid with either {W} or 2 life.)\nFirst strike",
       "power": {
         "type": "Literal",
         "value": 3

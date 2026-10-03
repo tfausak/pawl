@@ -22,6 +22,7 @@
         }
       ],
       "name": "Murmuring Phantasm",
+      "oracleText": "Defender",
       "power": {
         "type": "Literal",
         "value": 0

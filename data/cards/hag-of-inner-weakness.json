@@ -17,6 +17,7 @@
         }
       ],
       "name": "Hag of Inner Weakness",
+      "oracleText": "At the beginning of your upkeep, target creature an opponent controls gets -2/-1 until your next turn.",
       "power": {
         "type": "Literal",
         "value": 2

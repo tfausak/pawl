@@ -17,6 +17,7 @@
         }
       ],
       "name": "Bane Alley Blackguard",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 1

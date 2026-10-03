@@ -50,6 +50,7 @@
         }
       ],
       "name": "Avenger of the Fallen",
+      "oracleText": "Deathtouch\nMobilize X, where X is the number of creature cards in your graveyard. (Whenever this creature attacks, create X tapped and attacking 1/1 red Warrior creature tokens. Sacrifice them at the beginning of the next end step.)",
       "power": {
         "type": "Literal",
         "value": 2

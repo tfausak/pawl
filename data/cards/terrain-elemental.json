@@ -17,6 +17,7 @@
         }
       ],
       "name": "Terrain Elemental",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

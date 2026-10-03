@@ -81,6 +81,7 @@
         }
       ],
       "name": "Cabal Coffers",
+      "oracleText": "{2}, {T}: Add {B} for each Swamp you control.",
       "typeLine": {
         "types": [
           {

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Barbary Apes",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

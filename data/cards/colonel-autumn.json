@@ -34,6 +34,7 @@
         }
       ],
       "name": "Colonel Autumn",
+      "oracleText": "Lifelink\nExploit (When this creature enters, you may sacrifice a creature.)\nOther legendary creatures you control have exploit.\nWhenever a creature you control exploits a creature, put a +1/+1 counter on each creature you control.",
       "power": {
         "type": "Literal",
         "value": 2

@@ -68,6 +68,7 @@
         }
       ],
       "name": "Samite Ministration",
+      "oracleText": "Prevent all damage that would be dealt to you this turn by a source of your choice. Whenever damage from a black or red source is prevented this way this turn, you gain that much life.",
       "spell": {
         "modes": [
           {

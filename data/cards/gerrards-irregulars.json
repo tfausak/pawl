@@ -25,6 +25,7 @@
         }
       ],
       "name": "Gerrard's Irregulars",
+      "oracleText": "Trample, haste",
       "power": {
         "type": "Literal",
         "value": 4

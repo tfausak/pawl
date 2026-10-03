@@ -17,6 +17,7 @@
         }
       ],
       "name": "Rampant Growth",
+      "oracleText": "Search your library for a basic land card, put that card onto the battlefield tapped, then shuffle.",
       "spell": {
         "modes": [
           {

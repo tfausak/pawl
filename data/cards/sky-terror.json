@@ -30,6 +30,7 @@
         }
       ],
       "name": "Sky Terror",
+      "oracleText": "Flying, menace",
       "power": {
         "type": "Literal",
         "value": 2

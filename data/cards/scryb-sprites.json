@@ -18,6 +18,7 @@
         }
       ],
       "name": "Scryb Sprites",
+      "oracleText": "Flying",
       "power": {
         "type": "Literal",
         "value": 1

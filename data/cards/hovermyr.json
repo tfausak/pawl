@@ -16,6 +16,7 @@
         }
       ],
       "name": "Hovermyr",
+      "oracleText": "Flying, vigilance",
       "power": {
         "type": "Literal",
         "value": 1

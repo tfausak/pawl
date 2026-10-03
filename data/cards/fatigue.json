@@ -17,6 +17,7 @@
         }
       ],
       "name": "Fatigue",
+      "oracleText": "Target player skips their next draw step.",
       "spell": {
         "modes": [
           {

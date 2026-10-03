@@ -33,6 +33,7 @@
         }
       ],
       "name": "Mischievous Sneakling",
+      "oracleText": "Changeling (This card is every creature type.)\nFlash",
       "power": {
         "type": "Literal",
         "value": 2

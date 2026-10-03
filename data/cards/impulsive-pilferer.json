@@ -35,6 +35,7 @@
         }
       ],
       "name": "Impulsive Pilferer",
+      "oracleText": "When this creature dies, create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")\nEncore {3}{R} ({3}{R}, Exile this card from your graveyard: For each opponent, create a token copy that attacks that opponent this turn if able. They gain haste. Sacrifice them at the beginning of the next end step. Activate only as a sorcery.)",
       "power": {
         "type": "Literal",
         "value": 1

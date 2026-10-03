@@ -38,6 +38,7 @@
         }
       ],
       "name": "Goblin Brawler",
+      "oracleText": "First strike\nThis creature can't be equipped.",
       "power": {
         "type": "Literal",
         "value": 2

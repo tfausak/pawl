@@ -21,6 +21,7 @@
         }
       ],
       "name": "Battlefield Raptor",
+      "oracleText": "Flying, first strike",
       "power": {
         "type": "Literal",
         "value": 1

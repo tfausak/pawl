@@ -26,6 +26,7 @@
         }
       ],
       "name": "Silverback Ape",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 5

@@ -22,6 +22,7 @@
         }
       ],
       "name": "Nimble Pilferer",
+      "oracleText": "Flash",
       "power": {
         "type": "Literal",
         "value": 2

@@ -103,6 +103,7 @@
         }
       ],
       "name": "Abomination of Llanowar",
+      "oracleText": "Vigilance; menace (This creature can't be blocked except by two or more creatures.)\nAbomination of Llanowar's power and toughness are each equal to the number of Elves you control plus the number of Elf cards in your graveyard.",
       "power": {
         "type": "Star"
       },

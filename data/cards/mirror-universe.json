@@ -74,6 +74,7 @@
         }
       ],
       "name": "Mirror Universe",
+      "oracleText": "{T}, Sacrifice this artifact: Exchange life totals with target opponent. Activate only during your upkeep.",
       "typeLine": {
         "types": [
           {

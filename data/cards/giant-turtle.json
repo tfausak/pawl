@@ -60,6 +60,7 @@
         }
       ],
       "name": "Giant Turtle",
+      "oracleText": "This creature can't attack if it attacked during your last turn.",
       "power": {
         "type": "Literal",
         "value": 2

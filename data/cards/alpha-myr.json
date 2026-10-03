@@ -8,6 +8,7 @@
         }
       ],
       "name": "Alpha Myr",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

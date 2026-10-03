@@ -34,6 +34,7 @@
         }
       ],
       "name": "Brassclaw Orcs",
+      "oracleText": "This creature can't block creatures with power 2 or greater.",
       "power": {
         "type": "Literal",
         "value": 3

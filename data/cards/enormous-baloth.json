@@ -17,6 +17,7 @@
         }
       ],
       "name": "Enormous Baloth",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 7

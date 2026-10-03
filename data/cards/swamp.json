@@ -2,6 +2,7 @@
   "faces": [
     {
       "name": "Swamp",
+      "oracleText": "({T}: Add {B}.)",
       "typeLine": {
         "subtypes": [
           {

@@ -21,6 +21,7 @@
         }
       ],
       "name": "Bonded Construct",
+      "oracleText": "This creature can't attack alone.",
       "power": {
         "type": "Literal",
         "value": 2

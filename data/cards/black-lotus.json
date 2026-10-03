@@ -42,6 +42,7 @@
       ],
       "manaCost": [],
       "name": "Black Lotus",
+      "oracleText": "{T}, Sacrifice this artifact: Add three mana of any one color.",
       "typeLine": {
         "types": [
           {

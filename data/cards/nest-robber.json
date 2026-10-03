@@ -22,6 +22,7 @@
         }
       ],
       "name": "Nest Robber",
+      "oracleText": "Haste",
       "power": {
         "type": "Literal",
         "value": 2

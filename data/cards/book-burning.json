@@ -17,6 +17,7 @@
         }
       ],
       "name": "Book Burning",
+      "oracleText": "Any player may have Book Burning deal 6 damage to them. If no one does, target player mills six cards.",
       "spell": {
         "modes": [
           {

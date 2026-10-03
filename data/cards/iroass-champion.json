@@ -31,6 +31,7 @@
         }
       ],
       "name": "Iroas's Champion",
+      "oracleText": "Double strike (This creature deals both first-strike and regular combat damage.)",
       "power": {
         "type": "Literal",
         "value": 2

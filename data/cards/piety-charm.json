@@ -13,6 +13,7 @@
         }
       ],
       "name": "Piety Charm",
+      "oracleText": "Choose one —\n• Destroy target Aura attached to a creature.\n• Target Soldier creature gets +2/+2 until end of turn.\n• Creatures you control gain vigilance until end of turn.",
       "spell": {
         "modes": [
           {

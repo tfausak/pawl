@@ -17,6 +17,7 @@
         }
       ],
       "name": "Tolarian Scholar",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

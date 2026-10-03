@@ -22,6 +22,7 @@
         }
       ],
       "name": "Wear",
+      "oracleText": "Destroy target artifact.\nFuse (You may cast one or both halves of this card from your hand.)",
       "spell": {
         "modes": [
           {
@@ -85,6 +86,7 @@
         }
       ],
       "name": "Tear",
+      "oracleText": "Destroy target enchantment.\nFuse (You may cast one or both halves of this card from your hand.)",
       "spell": {
         "modes": [
           {

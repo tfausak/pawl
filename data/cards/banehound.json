@@ -21,6 +21,7 @@
         }
       ],
       "name": "Banehound",
+      "oracleText": "Lifelink, haste",
       "power": {
         "type": "Literal",
         "value": 1

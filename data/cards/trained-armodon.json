@@ -26,6 +26,7 @@
         }
       ],
       "name": "Trained Armodon",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

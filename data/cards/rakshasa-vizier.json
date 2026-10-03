@@ -35,6 +35,7 @@
         }
       ],
       "name": "Rakshasa Vizier",
+      "oracleText": "Whenever one or more cards are put into exile from your graveyard, put that many +1/+1 counters on this creature.",
       "power": {
         "type": "Literal",
         "value": 4

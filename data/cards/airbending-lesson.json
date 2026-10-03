@@ -17,6 +17,7 @@
         }
       ],
       "name": "Airbending Lesson",
+      "oracleText": "Airbend target nonland permanent. (Exile it. While it's exiled, its owner may cast it for {2} rather than its mana cost.)\nDraw a card.",
       "spell": {
         "modes": [
           {

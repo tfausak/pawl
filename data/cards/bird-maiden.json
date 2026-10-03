@@ -22,6 +22,7 @@
         }
       ],
       "name": "Bird Maiden",
+      "oracleText": "Flying",
       "power": {
         "type": "Literal",
         "value": 1

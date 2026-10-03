@@ -22,6 +22,7 @@
         }
       ],
       "name": "Angelic Sleuth",
+      "oracleText": "Flying\nWhenever another permanent you control leaves the battlefield, if it had counters on it, investigate. (Create a Clue token. It's an artifact with \"{2}, Sacrifice this token: Draw a card.\")",
       "power": {
         "type": "Literal",
         "value": 2

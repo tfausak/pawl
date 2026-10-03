@@ -52,6 +52,7 @@
         }
       ],
       "name": "Serum Powder",
+      "oracleText": "{T}: Add {C}.\nAny time you could mulligan and this card is in your hand, you may exile all the cards from your hand, then draw that many cards. (You can do this in addition to taking mulligans.)",
       "typeLine": {
         "types": [
           {

@@ -13,6 +13,7 @@
         }
       ],
       "name": "Spiteful Hexmage",
+      "oracleText": "When this creature enters, create a Cursed Role token attached to target creature you control. (If you control another Role on it, put that one into the graveyard. Enchanted creature is 1/1.)",
       "power": {
         "type": "Literal",
         "value": 3

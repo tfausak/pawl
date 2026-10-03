@@ -30,6 +30,7 @@
         }
       ],
       "name": "Rubble Slinger",
+      "oracleText": "Reach",
       "power": {
         "type": "Literal",
         "value": 2

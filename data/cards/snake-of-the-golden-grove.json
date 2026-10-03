@@ -23,6 +23,7 @@
         }
       ],
       "name": "Snake of the Golden Grove",
+      "oracleText": "Tribute 3 (As this creature enters, an opponent of your choice may put three +1/+1 counters on it.)\nWhen this creature enters, if tribute wasn't paid, you gain 4 life.",
       "power": {
         "type": "Literal",
         "value": 4

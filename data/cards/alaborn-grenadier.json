@@ -27,6 +27,7 @@
         }
       ],
       "name": "Alaborn Grenadier",
+      "oracleText": "Vigilance",
       "power": {
         "type": "Literal",
         "value": 2

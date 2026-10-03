@@ -46,6 +46,7 @@
         }
       ],
       "name": "Fleetfoot Dancer",
+      "oracleText": "Trample, lifelink, haste",
       "power": {
         "type": "Literal",
         "value": 4

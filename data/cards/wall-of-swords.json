@@ -25,6 +25,7 @@
         }
       ],
       "name": "Wall of Swords",
+      "oracleText": "Defender (This creature can't attack.)\nFlying",
       "power": {
         "type": "Literal",
         "value": 3

@@ -33,6 +33,7 @@
         }
       ],
       "name": "Confiscate",
+      "oracleText": "Enchant permanent\nYou control enchanted permanent.",
       "staticAbilities": [
         {
           "affected": {

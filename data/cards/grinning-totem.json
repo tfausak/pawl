@@ -170,6 +170,7 @@
         }
       ],
       "name": "Grinning Totem",
+      "oracleText": "{2}, {T}, Sacrifice this artifact: Search target opponent's library for a card and exile it. Then that player shuffles. Until the beginning of your next upkeep, you may play that card. At the beginning of your next upkeep, if you haven't played it, put it into its owner's graveyard.",
       "typeLine": {
         "types": [
           {

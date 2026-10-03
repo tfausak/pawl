@@ -25,6 +25,7 @@
         }
       ],
       "name": "Angel of Light",
+      "oracleText": "Flying, vigilance",
       "power": {
         "type": "Literal",
         "value": 3

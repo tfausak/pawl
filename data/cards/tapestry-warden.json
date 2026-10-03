@@ -22,6 +22,7 @@
         }
       ],
       "name": "Tapestry Warden",
+      "oracleText": "Vigilance\nEach creature you control with toughness greater than its power assigns combat damage equal to its toughness rather than its power.\nEach creature you control with toughness greater than its power stations permanents using its toughness rather than its power.",
       "power": {
         "type": "Literal",
         "value": 3

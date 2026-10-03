@@ -63,6 +63,7 @@
         }
       ],
       "name": "Boggart Ram-Gang",
+      "oracleText": "Haste\nWither (This deals damage to creatures in the form of -1/-1 counters.)",
       "power": {
         "type": "Literal",
         "value": 3

@@ -51,6 +51,7 @@
         }
       ],
       "name": "Nightveil Predator",
+      "oracleText": "Flying, deathtouch\nHexproof (This creature can't be the target of spells or abilities your opponents control.)",
       "power": {
         "type": "Literal",
         "value": 3

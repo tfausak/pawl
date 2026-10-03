@@ -22,6 +22,7 @@
         }
       ],
       "name": "Thundermane Dragon",
+      "oracleText": "Flying\nYou may look at the top card of your library any time.\nYou may cast creature spells with power 4 or greater from the top of your library. If you cast a creature spell this way, it gains haste until end of turn.",
       "playerAbilities": [
         {
           "effect": {

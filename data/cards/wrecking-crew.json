@@ -25,6 +25,7 @@
         }
       ],
       "name": "Wrecking Crew",
+      "oracleText": "Reach (This creature can block creatures with flying.)\nTrample (This creature can deal excess combat damage to the player or planeswalker it's attacking.)",
       "power": {
         "type": "Literal",
         "value": 4

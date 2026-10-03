@@ -18,6 +18,7 @@
         }
       ],
       "name": "Aven Envoy",
+      "oracleText": "Flying",
       "power": {
         "type": "Literal",
         "value": 0

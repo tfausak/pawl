@@ -26,6 +26,7 @@
         }
       ],
       "name": "Orazca Raptor",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

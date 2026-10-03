@@ -22,6 +22,7 @@
         }
       ],
       "name": "Rise",
+      "oracleText": "Return target creature card from a graveyard and target creature on the battlefield to their owners' hands.",
       "spell": {
         "modes": [
           {
@@ -112,6 +113,7 @@
         }
       ],
       "name": "Fall",
+      "oracleText": "Target player reveals two cards at random from their hand, then discards each nonland card revealed this way.",
       "spell": {
         "modes": [
           {

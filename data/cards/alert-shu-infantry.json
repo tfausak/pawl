@@ -22,6 +22,7 @@
         }
       ],
       "name": "Alert Shu Infantry",
+      "oracleText": "Vigilance",
       "power": {
         "type": "Literal",
         "value": 2

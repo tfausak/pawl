@@ -22,6 +22,7 @@
         }
       ],
       "name": "Carrion Screecher",
+      "oracleText": "Flying",
       "power": {
         "type": "Literal",
         "value": 3

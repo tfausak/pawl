@@ -68,6 +68,7 @@
         }
       ],
       "name": "Kiora, Behemoth Beckoner",
+      "oracleText": "Whenever a creature you control with power 4 or greater enters, draw a card.\n[−1]: Untap target permanent.",
       "triggeredAbilities": [
         {
           "condition": {

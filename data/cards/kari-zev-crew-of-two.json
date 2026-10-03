@@ -111,6 +111,7 @@
         }
       ],
       "name": "Kari Zev, Crew of Two",
+      "oracleText": "Menace, Haste\nWhenever Kari Zev attacks while you don't control a legendary Monkey, conjure a card named Ragavan, Nimble Pilferer onto the battlefield tapped and attacking. At the beginning of the next end step, if that card is on the battlefield, return it to its owner's hand.",
       "power": {
         "type": "Literal",
         "value": 3

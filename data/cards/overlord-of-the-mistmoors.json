@@ -60,6 +60,7 @@
         }
       ],
       "name": "Overlord of the Mistmoors",
+      "oracleText": "Impending 4—{2}{W}{W} (If you cast this spell for its impending cost, it enters with four time counters and isn't a creature until the last is removed. At the beginning of your end step, remove a time counter from it.)\nWhenever this permanent enters or attacks, create two 2/1 white Insect creature tokens with flying.",
       "power": {
         "type": "Literal",
         "value": 6

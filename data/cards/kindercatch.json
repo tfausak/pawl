@@ -35,6 +35,7 @@
         }
       ],
       "name": "Kindercatch",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 6

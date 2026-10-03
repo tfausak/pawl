@@ -17,6 +17,7 @@
         }
       ],
       "name": "Knight of New Benalia",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

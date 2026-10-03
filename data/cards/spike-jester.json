@@ -27,6 +27,7 @@
         }
       ],
       "name": "Spike Jester",
+      "oracleText": "Haste",
       "power": {
         "type": "Literal",
         "value": 3

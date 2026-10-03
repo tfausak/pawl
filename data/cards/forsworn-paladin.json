@@ -232,6 +232,7 @@
         }
       ],
       "name": "Forsworn Paladin",
+      "oracleText": "Menace\n{1}{B}, {T}, Pay 1 life: Create a Treasure token.\n{2}{B}: Target creature gets +2/+0 until end of turn. If mana from a Treasure was spent to activate this ability, that creature also gains deathtouch until end of turn.",
       "power": {
         "type": "Literal",
         "value": 1

@@ -33,6 +33,7 @@
         }
       ],
       "name": "Empyrial Armor",
+      "oracleText": "Enchant creature\nEnchanted creature gets +1/+1 for each card in your hand.",
       "staticAbilities": [
         {
           "affected": {

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Victimize",
+      "oracleText": "Choose two target creature cards in your graveyard. Sacrifice a creature. If you do, return the chosen cards to the battlefield tapped.",
       "spell": {
         "modes": [
           {

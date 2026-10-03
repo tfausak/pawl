@@ -17,6 +17,7 @@
         }
       ],
       "name": "Amphin Cutthroat",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

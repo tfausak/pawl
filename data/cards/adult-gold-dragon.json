@@ -37,6 +37,7 @@
         }
       ],
       "name": "Adult Gold Dragon",
+      "oracleText": "Flying, lifelink, haste",
       "power": {
         "type": "Literal",
         "value": 4

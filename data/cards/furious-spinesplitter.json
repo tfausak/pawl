@@ -47,6 +47,7 @@
         }
       ],
       "name": "Furious Spinesplitter",
+      "oracleText": "Trample\nAt the beginning of your end step, put a +1/+1 counter on this creature for each opponent who was dealt damage this turn.",
       "power": {
         "type": "Literal",
         "value": 3

@@ -13,6 +13,7 @@
         }
       ],
       "name": "Lumengrid Gargoyle",
+      "oracleText": "Flying",
       "power": {
         "type": "Literal",
         "value": 4

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Femeref Scouts",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 1

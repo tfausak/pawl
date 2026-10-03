@@ -22,6 +22,7 @@
         }
       ],
       "name": "Shrine Keeper",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

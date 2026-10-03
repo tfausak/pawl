@@ -22,6 +22,7 @@
         }
       ],
       "name": "Netcaster Spider",
+      "oracleText": "Reach (This creature can block creatures with flying.)\nWhenever this creature blocks a creature with flying, this creature gets +2/+0 until end of turn.",
       "power": {
         "type": "Literal",
         "value": 2

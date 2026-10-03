@@ -8,6 +8,7 @@
         }
       ],
       "name": "Leveler",
+      "oracleText": "When this creature enters, exile all cards from your library.",
       "power": {
         "type": "Literal",
         "value": 10

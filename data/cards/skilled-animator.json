@@ -17,6 +17,7 @@
         }
       ],
       "name": "Skilled Animator",
+      "oracleText": "When this creature enters, target artifact you control becomes an artifact creature with base power and toughness 5/5 for as long as this creature remains on the battlefield.",
       "power": {
         "type": "Literal",
         "value": 1

@@ -22,6 +22,7 @@
         }
       ],
       "name": "Goliath Beetle",
+      "oracleText": "Trample",
       "power": {
         "type": "Literal",
         "value": 3

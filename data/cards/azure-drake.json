@@ -22,6 +22,7 @@
         }
       ],
       "name": "Azure Drake",
+      "oracleText": "Flying",
       "power": {
         "type": "Literal",
         "value": 2

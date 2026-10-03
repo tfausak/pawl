@@ -47,6 +47,7 @@
         }
       ],
       "name": "Harvest Gwyllion",
+      "oracleText": "Wither (This deals damage to creatures in the form of -1/-1 counters.)",
       "power": {
         "type": "Literal",
         "value": 2

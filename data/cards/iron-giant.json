@@ -19,6 +19,7 @@
         }
       ],
       "name": "Iron Giant",
+      "oracleText": "Reach, vigilance, trample",
       "power": {
         "type": "Literal",
         "value": 6

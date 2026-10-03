@@ -17,6 +17,7 @@
         }
       ],
       "name": "Goblin Roughrider",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

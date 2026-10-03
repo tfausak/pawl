@@ -37,6 +37,7 @@
         }
       ],
       "name": "Venomthrope",
+      "oracleText": "Flying, deathtouch, hexproof",
       "power": {
         "type": "Literal",
         "value": 2

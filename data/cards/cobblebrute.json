@@ -17,6 +17,7 @@
         }
       ],
       "name": "Cobblebrute",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 5

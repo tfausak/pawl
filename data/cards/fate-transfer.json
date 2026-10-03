@@ -25,6 +25,7 @@
         }
       ],
       "name": "Fate Transfer",
+      "oracleText": "Move all counters from target creature onto another target creature.",
       "spell": {
         "modes": [
           {

@@ -26,6 +26,7 @@
         }
       ],
       "name": "Lady Orca",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 7

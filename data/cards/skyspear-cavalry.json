@@ -34,6 +34,7 @@
         }
       ],
       "name": "Skyspear Cavalry",
+      "oracleText": "Flying\nDouble strike (This creature deals both first-strike and regular combat damage.)",
       "power": {
         "type": "Literal",
         "value": 2

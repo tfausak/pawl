@@ -26,6 +26,7 @@
         }
       ],
       "name": "Nyxborn Seaguard",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

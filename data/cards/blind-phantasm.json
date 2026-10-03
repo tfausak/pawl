@@ -17,6 +17,7 @@
         }
       ],
       "name": "Blind Phantasm",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

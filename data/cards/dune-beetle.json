@@ -17,6 +17,7 @@
         }
       ],
       "name": "Dune Beetle",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 1

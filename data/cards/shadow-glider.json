@@ -22,6 +22,7 @@
         }
       ],
       "name": "Shadow Glider",
+      "oracleText": "Flying",
       "power": {
         "type": "Literal",
         "value": 2

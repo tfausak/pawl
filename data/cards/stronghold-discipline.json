@@ -26,6 +26,7 @@
         }
       ],
       "name": "Stronghold Discipline",
+      "oracleText": "Each player loses 1 life for each creature they control.",
       "spell": {
         "modes": [
           {

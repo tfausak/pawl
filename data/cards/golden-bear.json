@@ -17,6 +17,7 @@
         }
       ],
       "name": "Golden Bear",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 4

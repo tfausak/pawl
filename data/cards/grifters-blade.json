@@ -27,6 +27,7 @@
         }
       ],
       "name": "Grifter's Blade",
+      "oracleText": "Flash\nAs this Equipment enters, choose a creature you control it could be attached to. If you do, it enters attached to that creature.\nEquipped creature gets +1/+1.\nEquip {1}",
       "replacementEffects": [
         {
           "effect": {

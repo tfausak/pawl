@@ -17,6 +17,7 @@
         }
       ],
       "name": "Act on Impulse",
+      "oracleText": "Exile the top three cards of your library. Until end of turn, you may play those cards. (If you cast a spell this way, you still pay its costs. You can play a land this way only if you have an available land play remaining.)",
       "spell": {
         "modes": [
           {

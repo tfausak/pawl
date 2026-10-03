@@ -58,6 +58,7 @@
         }
       ],
       "name": "Benevolent River Spirit",
+      "oracleText": "As an additional cost to cast this spell, waterbend {5}. (While paying a waterbend cost, you can tap your artifacts and creatures to help. Each one pays for {1}.)\nFlying, ward {2} (Whenever this creature becomes the target of a spell or ability an opponent controls, counter it unless that player pays {2}.)\nWhen this creature enters, scry 2.",
       "power": {
         "type": "Literal",
         "value": 4

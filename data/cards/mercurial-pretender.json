@@ -17,6 +17,7 @@
         }
       ],
       "name": "Mercurial Pretender",
+      "oracleText": "You may have this creature enter as a copy of a creature you control, except it has \"{2}{U}{U}: Return this creature to its owner's hand.\"",
       "power": {
         "type": "Literal",
         "value": 0

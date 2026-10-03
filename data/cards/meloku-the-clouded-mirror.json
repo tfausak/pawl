@@ -117,6 +117,7 @@
         }
       ],
       "name": "Meloku the Clouded Mirror",
+      "oracleText": "Flying\n{1}, Return a land you control to its owner's hand: Create a 1/1 blue Illusion creature token with flying.",
       "power": {
         "type": "Literal",
         "value": 2

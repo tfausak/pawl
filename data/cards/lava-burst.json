@@ -16,6 +16,7 @@
         }
       ],
       "name": "Lava Burst",
+      "oracleText": "Lava Burst deals X damage to any target. If Lava Burst would deal damage to a creature, that damage can't be prevented or dealt instead to another permanent or player.",
       "spell": {
         "modes": [
           {

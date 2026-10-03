@@ -22,6 +22,7 @@
         }
       ],
       "name": "Super Shredder",
+      "oracleText": "Menace\nWhenever another permanent leaves the battlefield, put a +1/+1 counter on Super Shredder.",
       "power": {
         "type": "Literal",
         "value": 1

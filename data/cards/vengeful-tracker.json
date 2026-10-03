@@ -17,6 +17,7 @@
         }
       ],
       "name": "Vengeful Tracker",
+      "oracleText": "Whenever an opponent sacrifices an artifact, this creature deals 2 damage to them.",
       "power": {
         "type": "Literal",
         "value": 2

@@ -16,6 +16,7 @@
         }
       ],
       "name": "Clash of Wills",
+      "oracleText": "Counter target spell unless its controller pays {X}.",
       "spell": {
         "modes": [
           {

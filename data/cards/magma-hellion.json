@@ -28,6 +28,7 @@
         }
       ],
       "name": "Magma Hellion",
+      "oracleText": "Assist (Another player can pay up to {6} of this spell's cost.)\nTrample, haste",
       "power": {
         "type": "Literal",
         "value": 5

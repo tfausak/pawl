@@ -16,6 +16,7 @@
         }
       ],
       "name": "Pilgrim of the Fires",
+      "oracleText": "First strike, trample",
       "power": {
         "type": "Literal",
         "value": 6

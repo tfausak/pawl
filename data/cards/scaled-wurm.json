@@ -17,6 +17,7 @@
         }
       ],
       "name": "Scaled Wurm",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 7

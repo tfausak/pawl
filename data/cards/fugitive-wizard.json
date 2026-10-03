@@ -13,6 +13,7 @@
         }
       ],
       "name": "Fugitive Wizard",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 1

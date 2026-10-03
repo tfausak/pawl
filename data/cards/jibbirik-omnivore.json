@@ -17,6 +17,7 @@
         }
       ],
       "name": "Jibbirik Omnivore",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

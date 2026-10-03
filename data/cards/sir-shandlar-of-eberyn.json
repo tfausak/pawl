@@ -26,6 +26,7 @@
         }
       ],
       "name": "Sir Shandlar of Eberyn",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 4

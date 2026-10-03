@@ -84,6 +84,7 @@
         }
       ],
       "name": "Sorrow's Path",
+      "oracleText": "{T}: Choose two target blocking creatures controlled by the same opponent. If each of those creatures could block all creatures that the other is blocking, remove both of them from combat. Each one then blocks all creatures the other was blocking.\nWhenever this land becomes tapped, it deals 2 damage to you and each creature you control.",
       "triggeredAbilities": [
         {
           "condition": {

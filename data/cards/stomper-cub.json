@@ -31,6 +31,7 @@
         }
       ],
       "name": "Stomper Cub",
+      "oracleText": "Trample",
       "power": {
         "type": "Literal",
         "value": 5

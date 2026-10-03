@@ -22,6 +22,7 @@
         }
       ],
       "name": "Ori, Keeper of Songs",
+      "oracleText": "Storied (If you control three or more artifacts, legendaries, and/or Sagas, you have an enduring story for the rest of the game.)\nAs long as you have an enduring story, Ori gets +1/+0 and has vigilance.",
       "power": {
         "type": "Literal",
         "value": 3

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Last Rites",
+      "oracleText": "Discard any number of cards. Target player reveals their hand, then you choose a nonland card from it for each card discarded this way. That player discards those cards.",
       "spell": {
         "modes": [
           {

@@ -25,6 +25,7 @@
         }
       ],
       "name": "Ambush Viper",
+      "oracleText": "Flash\nDeathtouch",
       "power": {
         "type": "Literal",
         "value": 2

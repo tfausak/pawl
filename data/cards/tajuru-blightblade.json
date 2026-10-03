@@ -18,6 +18,7 @@
         }
       ],
       "name": "Tajuru Blightblade",
+      "oracleText": "Deathtouch",
       "power": {
         "type": "Literal",
         "value": 1

@@ -31,6 +31,7 @@
         }
       ],
       "name": "Grazing Whiptail",
+      "oracleText": "Reach",
       "power": {
         "type": "Literal",
         "value": 3

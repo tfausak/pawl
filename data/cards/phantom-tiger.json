@@ -17,6 +17,7 @@
         }
       ],
       "name": "Phantom Tiger",
+      "oracleText": "This creature enters with two +1/+1 counters on it.\nIf damage would be dealt to this creature, prevent that damage. Remove a +1/+1 counter from this creature.",
       "power": {
         "type": "Literal",
         "value": 1

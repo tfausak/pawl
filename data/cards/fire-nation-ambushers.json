@@ -22,6 +22,7 @@
         }
       ],
       "name": "Fire Nation Ambushers",
+      "oracleText": "Flash (You may cast this spell any time you could cast an instant.)",
       "power": {
         "type": "Literal",
         "value": 3

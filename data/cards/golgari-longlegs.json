@@ -42,6 +42,7 @@
         }
       ],
       "name": "Golgari Longlegs",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 5

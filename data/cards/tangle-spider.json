@@ -34,6 +34,7 @@
         }
       ],
       "name": "Tangle Spider",
+      "oracleText": "Flash (You may cast this spell any time you could cast an instant.)\nReach (This creature can block creatures with flying.)",
       "power": {
         "type": "Literal",
         "value": 3

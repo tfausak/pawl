@@ -8,6 +8,7 @@
         }
       ],
       "name": "Painter's Servant",
+      "oracleText": "As this creature enters, choose a color.\nAll cards that aren't on the battlefield, spells, and permanents are the chosen color in addition to their other colors.",
       "power": {
         "type": "Literal",
         "value": 1

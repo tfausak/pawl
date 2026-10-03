@@ -27,6 +27,7 @@
         }
       ],
       "name": "Silverbeak Griffin",
+      "oracleText": "Flying (This creature can't be blocked except by creatures with flying or reach.)",
       "power": {
         "type": "Literal",
         "value": 2

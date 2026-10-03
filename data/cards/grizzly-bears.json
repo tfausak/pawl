@@ -17,6 +17,7 @@
         }
       ],
       "name": "Grizzly Bears",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

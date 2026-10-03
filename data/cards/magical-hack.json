@@ -13,6 +13,7 @@
         }
       ],
       "name": "Magical Hack",
+      "oracleText": "Change the text of target spell or permanent by replacing all instances of one basic land type with another. (For example, you may change \"swampwalk\" to \"plainswalk.\" This effect lasts indefinitely.)",
       "spell": {
         "modes": [
           {

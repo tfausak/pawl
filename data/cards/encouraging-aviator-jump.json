@@ -22,6 +22,7 @@
         }
       ],
       "name": "Encouraging Aviator",
+      "oracleText": "Flying\nWhenever this creature attacks, it becomes prepared. (While it's prepared, you may cast a copy of its spell. Doing so unprepares it.)",
       "power": {
         "type": "Literal",
         "value": 2
@@ -90,6 +91,7 @@
         }
       ],
       "name": "Jump",
+      "oracleText": "Target creature gains flying until end of turn.",
       "spell": {
         "modes": [
           {

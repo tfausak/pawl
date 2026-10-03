@@ -66,6 +66,7 @@
         }
       ],
       "name": "Plumeveil",
+      "oracleText": "Flash\nDefender, flying",
       "power": {
         "type": "Literal",
         "value": 4

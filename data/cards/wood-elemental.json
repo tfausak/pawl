@@ -21,6 +21,7 @@
         }
       ],
       "name": "Wood Elemental",
+      "oracleText": "As this creature enters, sacrifice any number of untapped Forests.\nWood Elemental's power and toughness are each equal to the number of Forests sacrificed as it entered.",
       "power": {
         "type": "Star"
       },

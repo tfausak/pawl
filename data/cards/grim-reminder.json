@@ -89,6 +89,7 @@
         }
       ],
       "name": "Grim Reminder",
+      "oracleText": "Search your library for a nonland card and reveal it. Each opponent who cast a spell this turn with the same name as that card loses 6 life. Then shuffle.\n{B}{B}: Return this card from your graveyard to your hand. Activate only during your upkeep.",
       "spell": {
         "modes": [
           {

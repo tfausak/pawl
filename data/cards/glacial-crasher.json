@@ -81,6 +81,7 @@
         }
       ],
       "name": "Glacial Crasher",
+      "oracleText": "Trample (This creature can deal excess combat damage to the player or planeswalker it's attacking.)\nThis creature can't attack unless there is a Mountain on the battlefield.",
       "power": {
         "type": "Literal",
         "value": 5

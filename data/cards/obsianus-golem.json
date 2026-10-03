@@ -8,6 +8,7 @@
         }
       ],
       "name": "Obsianus Golem",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 4

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Feral Maaka",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

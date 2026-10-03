@@ -24,6 +24,7 @@
         }
       ],
       "name": "Thran Power Suit",
+      "oracleText": "Equipped creature gets +1/+1 for each Aura and Equipment attached to it and has ward {2}. (Whenever equipped creature becomes the target of a spell or ability an opponent controls, counter it unless that player pays {2}.)\nEquip {2} ({2}: Attach to target creature you control. Equip only as a sorcery.)",
       "staticAbilities": [
         {
           "affected": {

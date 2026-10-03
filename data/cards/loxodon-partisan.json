@@ -22,6 +22,7 @@
         }
       ],
       "name": "Loxodon Partisan",
+      "oracleText": "Battle cry (Whenever this creature attacks, each other attacking creature gets +1/+0 until end of turn.)",
       "power": {
         "type": "Literal",
         "value": 3

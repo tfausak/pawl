@@ -75,6 +75,7 @@
         }
       ],
       "name": "Bloodbraid Challenger",
+      "oracleText": "Cascade\nHaste\nEscape—{3}{R}{G}, Exile three other cards from your graveyard. (You may cast this card from your graveyard for its escape cost.)",
       "power": {
         "type": "Literal",
         "value": 4

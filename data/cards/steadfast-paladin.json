@@ -22,6 +22,7 @@
         }
       ],
       "name": "Steadfast Paladin",
+      "oracleText": "Lifelink",
       "power": {
         "type": "Literal",
         "value": 2

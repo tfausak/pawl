@@ -17,6 +17,7 @@
         }
       ],
       "name": "Life and Limb",
+      "oracleText": "All Forests and all Saprolings are 1/1 green Saproling creatures and Forest lands in addition to their other types. (They're affected by summoning sickness.)",
       "staticAbilities": [
         {
           "affected": {

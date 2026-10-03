@@ -25,6 +25,7 @@
         }
       ],
       "name": "Elementalist Adept",
+      "oracleText": "Flash (You may cast this spell any time you could cast an instant.)\nProwess (Whenever you cast a noncreature spell, this creature gets +1/+1 until end of turn.)",
       "power": {
         "type": "Literal",
         "value": 2

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Great Hart",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

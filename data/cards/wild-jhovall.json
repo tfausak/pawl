@@ -17,6 +17,7 @@
         }
       ],
       "name": "Wild Jhovall",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

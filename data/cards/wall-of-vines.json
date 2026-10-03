@@ -21,6 +21,7 @@
         }
       ],
       "name": "Wall of Vines",
+      "oracleText": "Defender (This creature can't attack.)\nReach (This creature can block creatures with flying.)",
       "power": {
         "type": "Literal",
         "value": 0

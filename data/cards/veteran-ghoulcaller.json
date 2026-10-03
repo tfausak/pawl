@@ -22,6 +22,7 @@
         }
       ],
       "name": "Veteran Ghoulcaller",
+      "oracleText": "Menace\nWhenever a card in your graveyard is put into your hand, conjure a duplicate of that card into your hand.",
       "power": {
         "type": "Literal",
         "value": 2

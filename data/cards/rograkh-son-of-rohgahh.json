@@ -22,6 +22,7 @@
       ],
       "manaCost": [],
       "name": "Rograkh, Son of Rohgahh",
+      "oracleText": "First strike, menace, trample\nPartner (You can have two commanders if both have partner.)",
       "power": {
         "type": "Literal",
         "value": 0

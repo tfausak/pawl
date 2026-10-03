@@ -26,6 +26,7 @@
         }
       ],
       "name": "Shatterskull Giant",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 4

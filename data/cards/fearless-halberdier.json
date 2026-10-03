@@ -17,6 +17,7 @@
         }
       ],
       "name": "Fearless Halberdier",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

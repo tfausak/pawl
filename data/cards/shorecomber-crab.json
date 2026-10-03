@@ -13,6 +13,7 @@
         }
       ],
       "name": "Shorecomber Crab",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 0

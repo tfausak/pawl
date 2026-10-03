@@ -17,6 +17,7 @@
         }
       ],
       "name": "Lizard Warrior",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 4

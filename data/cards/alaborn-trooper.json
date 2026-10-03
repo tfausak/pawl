@@ -17,6 +17,7 @@
         }
       ],
       "name": "Alaborn Trooper",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

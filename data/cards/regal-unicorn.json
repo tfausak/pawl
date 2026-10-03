@@ -17,6 +17,7 @@
         }
       ],
       "name": "Regal Unicorn",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

@@ -129,6 +129,7 @@
         }
       ],
       "name": "Sun Warriors",
+      "oracleText": "Firebending X, where X is the number of creatures you control. (Whenever this creature attacks, add X {R}. This mana lasts until end of combat.)\n{5}: Create a 1/1 white Ally creature token.",
       "power": {
         "type": "Literal",
         "value": 3

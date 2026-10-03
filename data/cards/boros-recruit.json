@@ -26,6 +26,7 @@
         }
       ],
       "name": "Boros Recruit",
+      "oracleText": "({R/W} can be paid with either {R} or {W}.)\nFirst strike",
       "power": {
         "type": "Literal",
         "value": 1

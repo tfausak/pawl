@@ -17,6 +17,7 @@
         }
       ],
       "name": "Young Pyromancer",
+      "oracleText": "Whenever you cast an instant or sorcery spell, create a 1/1 red Elemental creature token.",
       "power": {
         "type": "Literal",
         "value": 2

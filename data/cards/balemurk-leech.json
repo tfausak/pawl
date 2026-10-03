@@ -17,6 +17,7 @@
         }
       ],
       "name": "Balemurk Leech",
+      "oracleText": "Eerie — Whenever an enchantment you control enters and whenever you fully unlock a Room, each opponent loses 1 life.",
       "power": {
         "type": "Literal",
         "value": 2

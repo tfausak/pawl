@@ -13,6 +13,7 @@
         }
       ],
       "name": "Universal Automaton",
+      "oracleText": "Changeling (This card is every creature type.)",
       "power": {
         "type": "Literal",
         "value": 1

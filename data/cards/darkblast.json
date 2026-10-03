@@ -19,6 +19,7 @@
         }
       ],
       "name": "Darkblast",
+      "oracleText": "Target creature gets -1/-1 until end of turn.\nDredge 3 (If you would draw a card, you may mill three cards instead. If you do, return this card from your graveyard to your hand.)",
       "spell": {
         "modes": [
           {

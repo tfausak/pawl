@@ -22,6 +22,7 @@
         }
       ],
       "name": "Bladetusk Boar",
+      "oracleText": "Intimidate (This creature can't be blocked except by artifact creatures and/or creatures that share a color with it.)",
       "power": {
         "type": "Literal",
         "value": 3

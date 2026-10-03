@@ -21,6 +21,7 @@
         }
       ],
       "name": "Dream Salvage",
+      "oracleText": "Draw cards equal to the number of cards target opponent discarded this turn.",
       "spell": {
         "modes": [
           {

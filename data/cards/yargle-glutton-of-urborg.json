@@ -17,6 +17,7 @@
         }
       ],
       "name": "Yargle, Glutton of Urborg",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 9

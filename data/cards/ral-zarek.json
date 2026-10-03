@@ -187,6 +187,7 @@
         }
       ],
       "name": "Ral Zarek",
+      "oracleText": "[+1]: Tap target permanent, then untap another target permanent.\n[−2]: Ral Zarek deals 3 damage to any target.\n[−7]: Flip five coins. Take an extra turn after this one for each coin that comes up heads.",
       "typeLine": {
         "subtypes": [
           {

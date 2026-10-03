@@ -103,6 +103,7 @@
         }
       ],
       "name": "Chatterfang, Squirrel General",
+      "oracleText": "Forestwalk (This creature can't be blocked as long as defending player controls a Forest.)\nIf one or more tokens would be created under your control, those tokens plus that many 1/1 green Squirrel creature tokens are created instead.\n{B}, Sacrifice X Squirrels: Target creature gets +X/-X until end of turn.",
       "power": {
         "type": "Literal",
         "value": 3

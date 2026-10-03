@@ -18,6 +18,7 @@
         }
       ],
       "name": "Zephyr Gull",
+      "oracleText": "Flying",
       "power": {
         "type": "Literal",
         "value": 1

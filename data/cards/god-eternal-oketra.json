@@ -31,6 +31,7 @@
         }
       ],
       "name": "God-Eternal Oketra",
+      "oracleText": "Double strike\nWhenever you cast a creature spell, create a 4/4 black Zombie Warrior creature token with vigilance.\nWhen God-Eternal Oketra dies or is put into exile from the battlefield, you may put it into its owner's library third from the top.",
       "power": {
         "type": "Literal",
         "value": 3

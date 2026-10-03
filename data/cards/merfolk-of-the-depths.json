@@ -47,6 +47,7 @@
         }
       ],
       "name": "Merfolk of the Depths",
+      "oracleText": "Flash (You may cast this spell any time you could cast an instant.)",
       "power": {
         "type": "Literal",
         "value": 4

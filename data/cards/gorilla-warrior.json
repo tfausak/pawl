@@ -17,6 +17,7 @@
         }
       ],
       "name": "Gorilla Warrior",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

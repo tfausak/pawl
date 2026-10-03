@@ -18,6 +18,7 @@
         }
       ],
       "name": "Tree Monkey",
+      "oracleText": "Reach (This creature can block creatures with flying.)",
       "power": {
         "type": "Literal",
         "value": 1

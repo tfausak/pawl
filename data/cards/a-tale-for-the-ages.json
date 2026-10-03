@@ -17,6 +17,7 @@
         }
       ],
       "name": "A Tale for the Ages",
+      "oracleText": "Enchanted creatures you control get +2/+2.",
       "staticAbilities": [
         {
           "affected": {

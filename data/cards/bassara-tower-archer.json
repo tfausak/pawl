@@ -30,6 +30,7 @@
         }
       ],
       "name": "Bassara Tower Archer",
+      "oracleText": "Reach, hexproof",
       "power": {
         "type": "Literal",
         "value": 2

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Devilthorn Fox",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

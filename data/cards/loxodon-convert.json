@@ -17,6 +17,7 @@
         }
       ],
       "name": "Loxodon Convert",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 4

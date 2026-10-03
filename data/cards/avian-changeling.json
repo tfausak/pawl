@@ -25,6 +25,7 @@
         }
       ],
       "name": "Avian Changeling",
+      "oracleText": "Changeling (This card is every creature type.)\nFlying",
       "power": {
         "type": "Literal",
         "value": 2

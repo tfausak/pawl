@@ -47,6 +47,7 @@
         }
       ],
       "name": "Fireblast",
+      "oracleText": "You may sacrifice two Mountains rather than pay this spell's mana cost.\nFireblast deals 4 damage to any target.",
       "spell": {
         "modes": [
           {

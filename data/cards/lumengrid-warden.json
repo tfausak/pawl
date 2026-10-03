@@ -17,6 +17,7 @@
         }
       ],
       "name": "Lumengrid Warden",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 1

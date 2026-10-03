@@ -28,6 +28,7 @@
         }
       ],
       "name": "Mist Intruder",
+      "oracleText": "Devoid (This card has no color.)\nFlying\nIngest (Whenever this creature deals combat damage to a player, that player exiles the top card of their library.)",
       "power": {
         "type": "Literal",
         "value": 1

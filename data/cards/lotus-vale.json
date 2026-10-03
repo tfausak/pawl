@@ -38,6 +38,7 @@
         }
       ],
       "name": "Lotus Vale",
+      "oracleText": "If this land would enter, sacrifice two untapped lands instead. If you do, put this land onto the battlefield. If you don't, put it into its owner's graveyard.\n{T}: Add three mana of any one color.",
       "replacementEffects": [
         {
           "effect": {

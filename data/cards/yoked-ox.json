@@ -13,6 +13,7 @@
         }
       ],
       "name": "Yoked Ox",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 0

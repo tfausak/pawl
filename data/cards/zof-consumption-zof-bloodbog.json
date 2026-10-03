@@ -26,6 +26,7 @@
         }
       ],
       "name": "Zof Consumption",
+      "oracleText": "Each opponent loses 4 life and you gain 4 life.",
       "spell": {
         "modes": [
           {
@@ -116,6 +117,7 @@
         }
       ],
       "name": "Zof Bloodbog",
+      "oracleText": "This land enters tapped.\n{T}: Add {B}.",
       "replacementEffects": [
         {
           "effect": {

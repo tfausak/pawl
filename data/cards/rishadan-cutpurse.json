@@ -17,6 +17,7 @@
         }
       ],
       "name": "Rishadan Cutpurse",
+      "oracleText": "When this creature enters, each opponent sacrifices a permanent of their choice unless they pay {1}.",
       "power": {
         "type": "Literal",
         "value": 1

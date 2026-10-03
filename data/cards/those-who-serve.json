@@ -17,6 +17,7 @@
         }
       ],
       "name": "Those Who Serve",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

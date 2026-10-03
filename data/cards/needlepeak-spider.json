@@ -22,6 +22,7 @@
         }
       ],
       "name": "Needlepeak Spider",
+      "oracleText": "Reach",
       "power": {
         "type": "Literal",
         "value": 4

@@ -22,6 +22,7 @@
         }
       ],
       "name": "Talas Air Ship",
+      "oracleText": "Flying",
       "power": {
         "type": "Literal",
         "value": 3

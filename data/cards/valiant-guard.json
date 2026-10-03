@@ -13,6 +13,7 @@
         }
       ],
       "name": "Valiant Guard",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 0

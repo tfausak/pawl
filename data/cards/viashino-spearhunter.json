@@ -22,6 +22,7 @@
         }
       ],
       "name": "Viashino Spearhunter",
+      "oracleText": "First strike (This creature deals combat damage before creatures without first strike.)",
       "power": {
         "type": "Literal",
         "value": 2

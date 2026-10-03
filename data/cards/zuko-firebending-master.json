@@ -39,6 +39,7 @@
         }
       ],
       "name": "Zuko, Firebending Master",
+      "oracleText": "First strike\nFirebending X, where X is the number of experience counters you have. (Whenever this creature attacks, add X {R}. This mana lasts until end of combat.)\nWhenever you cast a spell during combat, you get an experience counter.",
       "power": {
         "type": "Literal",
         "value": 2

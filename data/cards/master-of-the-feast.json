@@ -31,6 +31,7 @@
         }
       ],
       "name": "Master of the Feast",
+      "oracleText": "Flying\nAt the beginning of your upkeep, each opponent draws a card.",
       "power": {
         "type": "Literal",
         "value": 5

@@ -36,6 +36,7 @@
         }
       ],
       "name": "Rhox War Monk",
+      "oracleText": "Lifelink",
       "power": {
         "type": "Literal",
         "value": 3

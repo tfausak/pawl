@@ -86,6 +86,7 @@
         }
       ],
       "name": "Hickory Woodlot",
+      "oracleText": "This land enters tapped with two depletion counters on it.\n{T}, Remove a depletion counter from this land: Add {G}{G}. If there are no depletion counters on this land, sacrifice it.",
       "replacementEffects": [
         {
           "effect": {

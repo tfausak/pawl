@@ -16,6 +16,7 @@
         }
       ],
       "name": "Wall of Spears",
+      "oracleText": "Defender (This creature can't attack.)\nFirst strike",
       "power": {
         "type": "Literal",
         "value": 2

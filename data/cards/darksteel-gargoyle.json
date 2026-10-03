@@ -16,6 +16,7 @@
         }
       ],
       "name": "Darksteel Gargoyle",
+      "oracleText": "Flying\nIndestructible (Damage and effects that say \"destroy\" don't destroy this creature.)",
       "power": {
         "type": "Literal",
         "value": 3

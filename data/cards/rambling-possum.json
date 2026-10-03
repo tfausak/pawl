@@ -23,6 +23,7 @@
         }
       ],
       "name": "Rambling Possum",
+      "oracleText": "Whenever this creature attacks while saddled, it gets +1/+2 until end of turn. Then you may return any number of creatures that saddled it this turn to their owner's hand.\nSaddle 1 (Tap any number of other creatures you control with total power 1 or more: This Mount becomes saddled until end of turn. Saddle only as a sorcery.)",
       "power": {
         "type": "Literal",
         "value": 3

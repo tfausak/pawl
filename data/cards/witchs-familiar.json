@@ -17,6 +17,7 @@
         }
       ],
       "name": "Witch's Familiar",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

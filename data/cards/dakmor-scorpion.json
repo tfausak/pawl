@@ -17,6 +17,7 @@
         }
       ],
       "name": "Dakmor Scorpion",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

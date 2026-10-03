@@ -42,6 +42,7 @@
         }
       ],
       "name": "Corpseberry Cultivator",
+      "oracleText": "At the beginning of combat on your turn, you may forage. (Exile three cards from your graveyard or sacrifice a Food.)\nWhenever you forage, put a +1/+1 counter on this creature.",
       "power": {
         "type": "Literal",
         "value": 2

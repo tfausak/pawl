@@ -24,6 +24,7 @@
         }
       ],
       "name": "Rune of Speed",
+      "oracleText": "Enchant permanent\nWhen this Aura enters, draw a card.\nAs long as enchanted permanent is a creature, it gets +1/+0 and has haste.\nAs long as enchanted permanent is an Equipment, it has \"Equipped creature gets +1/+0 and has haste.\"",
       "staticAbilities": [
         {
           "affected": {

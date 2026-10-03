@@ -22,6 +22,7 @@
         }
       ],
       "name": "Wall of Fortune",
+      "oracleText": "Defender\nYou may tap an untapped Wall you control to have any player reroll a die that player rolled.",
       "playerAbilities": [
         {
           "effect": {

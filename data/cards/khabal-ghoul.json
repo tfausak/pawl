@@ -17,6 +17,7 @@
         }
       ],
       "name": "Khabál Ghoul",
+      "oracleText": "At the beginning of each end step, put a +1/+1 counter on this creature for each creature that died this turn.",
       "power": {
         "type": "Literal",
         "value": 1

@@ -30,6 +30,7 @@
         }
       ],
       "name": "Dwalin, Weaponmaster",
+      "oracleText": "First strike\nWhenever Dwalin enters or attacks, put a hone counter on each Equipment you control. (Each hone counter on an Equipment grants +1/+0 to equipped creature.)",
       "power": {
         "type": "Literal",
         "value": 2

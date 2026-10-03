@@ -25,6 +25,7 @@
         }
       ],
       "name": "Tajuru Pathwarden",
+      "oracleText": "Vigilance (Attacking doesn't cause this creature to tap.)\nTrample (This creature can deal excess combat damage to the player or planeswalker it's attacking.)",
       "power": {
         "type": "Literal",
         "value": 5

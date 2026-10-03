@@ -41,6 +41,7 @@
         }
       ],
       "name": "Strong, the Brutish Thespian",
+      "oracleText": "Ward {2}\nEnrage — Whenever Strong is dealt damage, you get three rad counters and put three +1/+1 counters on Strong.\nYou gain life rather than lose life from radiation.",
       "power": {
         "type": "Literal",
         "value": 7

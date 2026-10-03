@@ -22,6 +22,7 @@
         }
       ],
       "name": "Makindi Aeronaut",
+      "oracleText": "Flying",
       "power": {
         "type": "Literal",
         "value": 1

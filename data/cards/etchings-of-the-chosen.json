@@ -103,6 +103,7 @@
         }
       ],
       "name": "Etchings of the Chosen",
+      "oracleText": "As this enchantment enters, choose a creature type.\nCreatures you control of the chosen type get +1/+1.\n{1}, Sacrifice a creature of the chosen type: Target creature you control gains indestructible until end of turn. (Damage and effects that say \"destroy\" don't destroy it.)",
       "replacementEffects": [
         {
           "effect": {

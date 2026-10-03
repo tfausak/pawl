@@ -13,6 +13,7 @@
         }
       ],
       "name": "Isamaru, Hound of Konda",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

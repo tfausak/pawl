@@ -106,6 +106,7 @@
         }
       ],
       "name": "Jade Statue",
+      "oracleText": "{2}: This artifact becomes a 3/6 Golem artifact creature until end of combat. Activate only during combat.",
       "typeLine": {
         "types": [
           {

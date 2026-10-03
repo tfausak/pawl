@@ -22,6 +22,7 @@
         }
       ],
       "name": "Affa Protector",
+      "oracleText": "Vigilance",
       "power": {
         "type": "Literal",
         "value": 1

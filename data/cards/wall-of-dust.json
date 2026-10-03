@@ -22,6 +22,7 @@
         }
       ],
       "name": "Wall of Dust",
+      "oracleText": "Defender (This creature can't attack.)\nWhenever this creature blocks a creature, that creature can't attack during its controller's next turn.",
       "power": {
         "type": "Literal",
         "value": 1

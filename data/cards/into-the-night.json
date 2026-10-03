@@ -17,6 +17,7 @@
         }
       ],
       "name": "Into the Night",
+      "oracleText": "It becomes night. Discard any number of cards, then draw that many cards plus one.",
       "spell": {
         "modes": [
           {

@@ -66,6 +66,7 @@
         }
       ],
       "name": "Dutiful Knowledge Seeker",
+      "oracleText": "Whenever one or more cards are put into a library from anywhere, put a +1/+1 counter on this creature.\n{3}: Put target card from a graveyard on the bottom of its owner's library.",
       "power": {
         "type": "Literal",
         "value": 2

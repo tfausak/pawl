@@ -25,6 +25,7 @@
         }
       ],
       "name": "The Whizzer, Classic Speedster",
+      "oracleText": "First strike, haste",
       "power": {
         "type": "Literal",
         "value": 3

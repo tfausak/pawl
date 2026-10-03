@@ -25,6 +25,7 @@
         }
       ],
       "name": "Peregrine Griffin",
+      "oracleText": "Flying\nFirst strike (This creature deals combat damage before creatures without first strike.)",
       "power": {
         "type": "Literal",
         "value": 2

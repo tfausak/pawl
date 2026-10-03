@@ -34,6 +34,7 @@
         }
       ],
       "name": "Ancient Spider",
+      "oracleText": "Reach (This creature can block creatures with flying.)\nFirst strike",
       "power": {
         "type": "Literal",
         "value": 2

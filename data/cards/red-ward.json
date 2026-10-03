@@ -20,6 +20,7 @@
         }
       ],
       "name": "Red Ward",
+      "oracleText": "Enchant creature\nEnchanted creature has protection from red. This effect doesn't remove this Aura.",
       "staticAbilities": [
         {
           "affected": {

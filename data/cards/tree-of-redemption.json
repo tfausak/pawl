@@ -67,6 +67,7 @@
         }
       ],
       "name": "Tree of Redemption",
+      "oracleText": "Defender\n{T}: Exchange your life total with this creature's toughness.",
       "power": {
         "type": "Literal",
         "value": 0

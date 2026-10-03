@@ -26,6 +26,7 @@
         }
       ],
       "name": "Balduvian Barbarians",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

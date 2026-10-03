@@ -26,6 +26,7 @@
         }
       ],
       "name": "Divine Intervention",
+      "oracleText": "This enchantment enters with two intervention counters on it.\nAt the beginning of your upkeep, remove an intervention counter from this enchantment.\nWhen you remove the last intervention counter from this enchantment, the game is a draw.",
       "replacementEffects": [
         {
           "effect": {

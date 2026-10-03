@@ -17,6 +17,7 @@
         }
       ],
       "name": "Cease-Fire",
+      "oracleText": "Target player can't cast creature spells this turn.\nDraw a card.",
       "spell": {
         "modes": [
           {

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Lazotep Behemoth",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 5

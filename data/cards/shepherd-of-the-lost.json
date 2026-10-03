@@ -28,6 +28,7 @@
         }
       ],
       "name": "Shepherd of the Lost",
+      "oracleText": "Flying, first strike, vigilance",
       "power": {
         "type": "Literal",
         "value": 3

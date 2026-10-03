@@ -39,6 +39,7 @@
         }
       ],
       "name": "Kederekt Creeper",
+      "oracleText": "Menace (This creature can't be blocked except by two or more creatures.)\nDeathtouch (Any amount of damage this deals to a creature is enough to destroy it.)",
       "power": {
         "type": "Literal",
         "value": 2

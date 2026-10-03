@@ -13,6 +13,7 @@
         }
       ],
       "name": "Muck Rats",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 1

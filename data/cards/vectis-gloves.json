@@ -24,6 +24,7 @@
         }
       ],
       "name": "Vectis Gloves",
+      "oracleText": "Equipped creature gets +2/+0 and has artifact landwalk. (It can't be blocked as long as defending player controls an artifact land.)\nEquip {2}",
       "staticAbilities": [
         {
           "affected": {

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Wishcoin Crab",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

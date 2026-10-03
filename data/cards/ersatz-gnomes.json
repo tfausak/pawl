@@ -100,6 +100,7 @@
         }
       ],
       "name": "Ersatz Gnomes",
+      "oracleText": "{T}: Target spell becomes colorless.\n{T}: Target permanent becomes colorless until end of turn.",
       "power": {
         "type": "Literal",
         "value": 1

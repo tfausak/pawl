@@ -17,6 +17,7 @@
         }
       ],
       "name": "Panther Warriors",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 6

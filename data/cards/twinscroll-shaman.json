@@ -22,6 +22,7 @@
         }
       ],
       "name": "Twinscroll Shaman",
+      "oracleText": "Double strike",
       "power": {
         "type": "Literal",
         "value": 1

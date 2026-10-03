@@ -37,6 +37,7 @@
         }
       ],
       "name": "Wall of Denial",
+      "oracleText": "Defender, flying\nShroud (This creature can't be the target of spells or abilities.)",
       "power": {
         "type": "Literal",
         "value": 0

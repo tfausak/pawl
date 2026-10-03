@@ -26,6 +26,7 @@
         }
       ],
       "name": "Python",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

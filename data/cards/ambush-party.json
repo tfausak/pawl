@@ -25,6 +25,7 @@
         }
       ],
       "name": "Ambush Party",
+      "oracleText": "First strike, haste",
       "power": {
         "type": "Literal",
         "value": 3

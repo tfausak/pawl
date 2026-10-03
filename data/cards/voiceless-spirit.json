@@ -25,6 +25,7 @@
         }
       ],
       "name": "Voiceless Spirit",
+      "oracleText": "Flying, first strike",
       "power": {
         "type": "Literal",
         "value": 2

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Leonin Arbiter",
+      "oracleText": "Players can't search libraries. Any player may pay {2} for that player to ignore this effect until end of turn.",
       "playerAbilities": [
         {
           "effect": {

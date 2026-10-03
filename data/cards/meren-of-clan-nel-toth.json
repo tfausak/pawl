@@ -26,6 +26,7 @@
         }
       ],
       "name": "Meren of Clan Nel Toth",
+      "oracleText": "Whenever another creature you control dies, you get an experience counter.\nAt the beginning of your end step, choose target creature card in your graveyard. If that card's mana value is less than or equal to the number of experience counters you have, return it to the battlefield. Otherwise, put it into your hand.",
       "power": {
         "type": "Literal",
         "value": 3

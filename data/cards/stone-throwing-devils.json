@@ -18,6 +18,7 @@
         }
       ],
       "name": "Stone-Throwing Devils",
+      "oracleText": "First strike",
       "power": {
         "type": "Literal",
         "value": 1

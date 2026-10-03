@@ -26,6 +26,7 @@
         }
       ],
       "name": "Showstopping Surprise",
+      "oracleText": "Choose target creature you control. Turn it face up if it's face down. Then it deals damage equal to its power to each other creature.",
       "spell": {
         "modes": [
           {

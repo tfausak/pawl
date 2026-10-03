@@ -2,6 +2,7 @@
   "faces": [
     {
       "name": "Taiga",
+      "oracleText": "({T}: Add {R} or {G}.)",
       "typeLine": {
         "subtypes": [
           {

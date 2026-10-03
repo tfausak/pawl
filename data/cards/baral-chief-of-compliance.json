@@ -17,6 +17,7 @@
         }
       ],
       "name": "Baral, Chief of Compliance",
+      "oracleText": "Instant and sorcery spells you cast cost {1} less to cast.\nWhenever a spell or ability you control counters a spell, you may draw a card. If you do, discard a card.",
       "playerAbilities": [
         {
           "effect": {

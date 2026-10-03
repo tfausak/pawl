@@ -17,6 +17,7 @@
         }
       ],
       "name": "Excavating Anurid",
+      "oracleText": "When this creature enters, you may sacrifice a land. If you do, draw a card.\nThreshold — As long as there are seven or more cards in your graveyard, this creature gets +1/+1 and has vigilance.",
       "power": {
         "type": "Literal",
         "value": 4

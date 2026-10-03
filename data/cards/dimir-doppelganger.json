@@ -122,6 +122,7 @@
         }
       ],
       "name": "Dimir Doppelganger",
+      "oracleText": "{1}{U}{B}: Exile target creature card from a graveyard. This creature becomes a copy of that card, except it has this ability.",
       "power": {
         "type": "Literal",
         "value": 0

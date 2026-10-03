@@ -26,6 +26,7 @@
         }
       ],
       "name": "Kithkin Brinefarer",
+      "oracleText": "Whenever a Kithkin card is put into your hand from your library, conjure a duplicate of that card into your hand.\nWhenever you attack, Kithkin creature cards in your hand perpetually get +1/+1.",
       "power": {
         "type": "Literal",
         "value": 3

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Coral Eel",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

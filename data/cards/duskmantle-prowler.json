@@ -25,6 +25,7 @@
         }
       ],
       "name": "Duskmantle Prowler",
+      "oracleText": "Haste (This creature can attack and {T} as soon as it comes under your control.)\nExalted (Whenever a creature you control attacks alone, that creature gets +1/+1 until end of turn.)",
       "power": {
         "type": "Literal",
         "value": 2

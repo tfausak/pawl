@@ -22,6 +22,7 @@
         }
       ],
       "name": "Maned Serval",
+      "oracleText": "Vigilance",
       "power": {
         "type": "Literal",
         "value": 1

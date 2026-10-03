@@ -17,6 +17,7 @@
         }
       ],
       "name": "Loxodon Line Breaker",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

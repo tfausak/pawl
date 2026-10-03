@@ -109,6 +109,7 @@
         }
       ],
       "name": "Vorel of the Hull Clade",
+      "oracleText": "{G}{U}, {T}: Double the number of each kind of counter on target artifact, creature, or land.",
       "power": {
         "type": "Literal",
         "value": 1

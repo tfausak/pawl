@@ -22,6 +22,7 @@
         }
       ],
       "name": "Pixie Guide",
+      "oracleText": "Flying\nGrant an Advantage — If you would roll one or more dice, instead roll that many dice plus one and ignore the lowest roll.",
       "power": {
         "type": "Literal",
         "value": 1

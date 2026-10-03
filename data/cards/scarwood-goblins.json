@@ -22,6 +22,7 @@
         }
       ],
       "name": "Scarwood Goblins",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Runeclaw Bear",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

@@ -19,6 +19,7 @@
         }
       ],
       "name": "Simic Initiate",
+      "oracleText": "Graft 1 (This creature enters with a +1/+1 counter on it. Whenever another creature enters, you may move a +1/+1 counter from this creature onto it.)",
       "power": {
         "type": "Literal",
         "value": 0

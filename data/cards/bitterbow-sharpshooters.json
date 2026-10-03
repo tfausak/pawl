@@ -25,6 +25,7 @@
         }
       ],
       "name": "Bitterbow Sharpshooters",
+      "oracleText": "Reach, vigilance",
       "power": {
         "type": "Literal",
         "value": 4

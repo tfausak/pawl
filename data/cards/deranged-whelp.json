@@ -22,6 +22,7 @@
         }
       ],
       "name": "Deranged Whelp",
+      "oracleText": "Menace (This creature can't be blocked except by two or more creatures.)",
       "power": {
         "type": "Literal",
         "value": 2

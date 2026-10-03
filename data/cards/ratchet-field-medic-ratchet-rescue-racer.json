@@ -114,6 +114,7 @@
         }
       ],
       "name": "Ratchet, Field Medic",
+      "oracleText": "More Than Meets the Eye {1}{W} (You may cast this card converted for {1}{W}.)\nLifelink\nWhenever you gain life, you may convert Ratchet. When you do, return target artifact card with mana value less than or equal to the amount of life you gained this turn from your graveyard to the battlefield tapped.",
       "power": {
         "type": "Literal",
         "value": 2
@@ -196,6 +197,7 @@
         }
       ],
       "name": "Ratchet, Rescue Racer",
+      "oracleText": "Living metal (During your turn, this Vehicle is also a creature.)\nLifelink\nWhenever one or more nontoken artifacts you control are put into a graveyard from the battlefield, convert Ratchet. This ability triggers only once each turn.",
       "power": {
         "type": "Literal",
         "value": 1

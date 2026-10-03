@@ -26,6 +26,7 @@
         }
       ],
       "name": "Night of Souls' Betrayal",
+      "oracleText": "All creatures get -1/-1.",
       "staticAbilities": [
         {
           "affected": {

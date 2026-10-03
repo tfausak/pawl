@@ -43,6 +43,7 @@
         }
       ],
       "name": "Queen Marchesa",
+      "oracleText": "Deathtouch, haste\nWhen Queen Marchesa enters, you become the monarch.\nAt the beginning of your upkeep, if an opponent is the monarch, create a 1/1 black Assassin creature token with deathtouch and haste.",
       "power": {
         "type": "Literal",
         "value": 3

@@ -25,6 +25,7 @@
         }
       ],
       "name": "Vitalizing Cascade",
+      "oracleText": "You gain X plus 3 life.",
       "spell": {
         "modes": [
           {

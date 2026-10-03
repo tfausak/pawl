@@ -35,6 +35,7 @@
         }
       ],
       "name": "Terrian, World Tyrant",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 9

@@ -31,6 +31,7 @@
         }
       ],
       "name": "Wall of Stone",
+      "oracleText": "Defender (This creature can't attack.)",
       "power": {
         "type": "Literal",
         "value": 0

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Meng Huo's Horde",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 4

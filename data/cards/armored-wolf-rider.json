@@ -26,6 +26,7 @@
         }
       ],
       "name": "Armored Wolf-Rider",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 4

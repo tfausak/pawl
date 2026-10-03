@@ -31,6 +31,7 @@
         }
       ],
       "name": "Ethereal Valkyrie",
+      "oracleText": "Flying\nWhenever this creature enters or attacks, draw a card, then exile a card from your hand face down. It becomes foretold. Its foretell cost is its mana cost reduced by {2}. (On a later turn, you may cast it for its foretell cost, even if this creature has left the battlefield.)",
       "power": {
         "type": "Literal",
         "value": 4

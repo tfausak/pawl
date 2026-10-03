@@ -25,6 +25,7 @@
         }
       ],
       "name": "Jacked Rabbit",
+      "oracleText": "Ravenous (This creature enters with X +1/+1 counters on it. If X is 5 or more, draw a card when it enters.)\nWhenever this creature attacks, create a number of 1/1 white Rabbit creature tokens equal to this creature's power.",
       "power": {
         "type": "Literal",
         "value": 1

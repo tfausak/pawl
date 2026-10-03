@@ -17,6 +17,7 @@
         }
       ],
       "name": "Treetop Warden",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

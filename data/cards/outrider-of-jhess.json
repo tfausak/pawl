@@ -22,6 +22,7 @@
         }
       ],
       "name": "Outrider of Jhess",
+      "oracleText": "Exalted (Whenever a creature you control attacks alone, that creature gets +1/+1 until end of turn.)",
       "power": {
         "type": "Literal",
         "value": 2

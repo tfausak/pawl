@@ -31,6 +31,7 @@
         }
       ],
       "name": "Hulking Bugbear",
+      "oracleText": "Haste",
       "power": {
         "type": "Literal",
         "value": 3

@@ -24,6 +24,7 @@
         }
       ],
       "name": "Presence of Gond",
+      "oracleText": "Enchant creature\nEnchanted creature has \"{T}: Create a 1/1 green Elf Warrior creature token.\"",
       "staticAbilities": [
         {
           "affected": {

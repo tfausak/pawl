@@ -8,6 +8,7 @@
         }
       ],
       "name": "Wicker Witch",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

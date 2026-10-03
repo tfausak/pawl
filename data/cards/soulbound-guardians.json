@@ -25,6 +25,7 @@
         }
       ],
       "name": "Soulbound Guardians",
+      "oracleText": "Defender, flying",
       "power": {
         "type": "Literal",
         "value": 4

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Tweeze",
+      "oracleText": "Tweeze deals 3 damage to any target. You may discard a card. If you do, draw a card.",
       "spell": {
         "modes": [
           {

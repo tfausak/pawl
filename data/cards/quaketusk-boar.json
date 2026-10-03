@@ -37,6 +37,7 @@
         }
       ],
       "name": "Quaketusk Boar",
+      "oracleText": "Reach, trample, haste",
       "power": {
         "type": "Literal",
         "value": 5

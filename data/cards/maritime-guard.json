@@ -17,6 +17,7 @@
         }
       ],
       "name": "Maritime Guard",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 1

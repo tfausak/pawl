@@ -22,6 +22,7 @@
         }
       ],
       "name": "Oko's Accomplices",
+      "oracleText": "Flying",
       "power": {
         "type": "Literal",
         "value": 2

@@ -30,6 +30,7 @@
         }
       ],
       "name": "Vizkopa Vampire",
+      "oracleText": "Lifelink",
       "power": {
         "type": "Literal",
         "value": 3

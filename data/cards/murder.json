@@ -26,6 +26,7 @@
         }
       ],
       "name": "Murder",
+      "oracleText": "Destroy target creature.",
       "spell": {
         "modes": [
           {

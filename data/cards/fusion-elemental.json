@@ -49,6 +49,7 @@
         }
       ],
       "name": "Fusion Elemental",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 8

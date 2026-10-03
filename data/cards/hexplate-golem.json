@@ -8,6 +8,7 @@
         }
       ],
       "name": "Hexplate Golem",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 5

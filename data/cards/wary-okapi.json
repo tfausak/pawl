@@ -22,6 +22,7 @@
         }
       ],
       "name": "Wary Okapi",
+      "oracleText": "Vigilance",
       "power": {
         "type": "Literal",
         "value": 3

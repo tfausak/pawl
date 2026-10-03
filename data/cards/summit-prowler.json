@@ -26,6 +26,7 @@
         }
       ],
       "name": "Summit Prowler",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 4

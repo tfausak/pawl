@@ -31,6 +31,7 @@
         }
       ],
       "name": "Galloping Lizrog",
+      "oracleText": "Trample\nWhen this creature enters, you may remove any number of +1/+1 counters from among creatures you control. If you do, put twice that many +1/+1 counters on this creature.",
       "power": {
         "type": "Literal",
         "value": 3

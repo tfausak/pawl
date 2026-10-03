@@ -17,6 +17,7 @@
         }
       ],
       "name": "Knight of the Keep",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

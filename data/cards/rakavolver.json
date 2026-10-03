@@ -55,6 +55,7 @@
         }
       ],
       "name": "Rakavolver",
+      "oracleText": "Kicker {1}{W} and/or {U} (You may pay an additional {1}{W} and/or {U} as you cast this spell.)\nIf this creature was kicked with its {1}{W} kicker, it enters with two +1/+1 counters on it and with \"Whenever this creature deals damage, you gain that much life.\"\nIf this creature was kicked with its {U} kicker, it enters with a +1/+1 counter on it and with flying.",
       "power": {
         "type": "Literal",
         "value": 2

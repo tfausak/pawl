@@ -17,6 +17,7 @@
         }
       ],
       "name": "Trumpet Blast",
+      "oracleText": "Attacking creatures get +2/+0 until end of turn.",
       "spell": {
         "modes": [
           {

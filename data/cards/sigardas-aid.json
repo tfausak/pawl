@@ -13,6 +13,7 @@
         }
       ],
       "name": "Sigarda's Aid",
+      "oracleText": "You may cast Aura and Equipment spells as though they had flash.\nWhenever an Equipment you control enters, you may attach it to target creature you control.",
       "playerAbilities": [
         {
           "effect": {

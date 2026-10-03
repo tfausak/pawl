@@ -70,6 +70,7 @@
         }
       ],
       "name": "Reassembling Skeleton",
+      "oracleText": "{1}{B}: Return this card from your graveyard to the battlefield tapped.",
       "power": {
         "type": "Literal",
         "value": 1

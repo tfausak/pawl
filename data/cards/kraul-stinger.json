@@ -22,6 +22,7 @@
         }
       ],
       "name": "Kraul Stinger",
+      "oracleText": "Deathtouch",
       "power": {
         "type": "Literal",
         "value": 2

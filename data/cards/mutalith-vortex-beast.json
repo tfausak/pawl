@@ -31,6 +31,7 @@
         }
       ],
       "name": "Mutalith Vortex Beast",
+      "oracleText": "Trample\nWarp Vortex — When this creature enters, flip a coin for each opponent you have. For each flip you win, draw a card. For each flip you lose, this creature deals 3 damage to that player.",
       "power": {
         "type": "Literal",
         "value": 6

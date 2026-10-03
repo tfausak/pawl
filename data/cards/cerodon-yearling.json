@@ -30,6 +30,7 @@
         }
       ],
       "name": "Cerodon Yearling",
+      "oracleText": "Vigilance, haste",
       "power": {
         "type": "Literal",
         "value": 2

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Horned Turtle",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 1

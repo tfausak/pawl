@@ -17,6 +17,7 @@
         }
       ],
       "name": "Vastwood Gorger",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 5

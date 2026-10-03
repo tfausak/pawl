@@ -2,6 +2,7 @@
   "faces": [
     {
       "name": "Pick-a-Beeble",
+      "oracleText": "Visit — Roll a six-sided die. Put a number of luck counters on Pick-a-Beeble equal to the result and create a Treasure token. Then if there are six or more luck counters on Pick-a-Beeble, claim the prize!\nPrize — Create two Treasure tokens, then sacrifice Pick-a-Beeble and open an Attraction.",
       "triggeredAbilities": [
         {
           "condition": {

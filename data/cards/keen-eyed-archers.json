@@ -22,6 +22,7 @@
         }
       ],
       "name": "Keen-Eyed Archers",
+      "oracleText": "Reach (This creature can block creatures with flying.)",
       "power": {
         "type": "Literal",
         "value": 2

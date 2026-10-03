@@ -26,6 +26,7 @@
         }
       ],
       "name": "Humility",
+      "oracleText": "All creatures lose all abilities and have base power and toughness 1/1.",
       "staticAbilities": [
         {
           "affected": {

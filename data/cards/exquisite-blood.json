@@ -17,6 +17,7 @@
         }
       ],
       "name": "Exquisite Blood",
+      "oracleText": "Whenever an opponent loses life, you gain that much life.",
       "triggeredAbilities": [
         {
           "condition": {

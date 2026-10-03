@@ -64,6 +64,7 @@
         }
       ],
       "name": "Exalted Dragon",
+      "oracleText": "Flying\nThis creature can't attack unless you sacrifice a land. (This cost is paid as attackers are declared.)",
       "power": {
         "type": "Literal",
         "value": 5

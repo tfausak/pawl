@@ -36,6 +36,7 @@
         }
       ],
       "name": "Gibbering Hyenas",
+      "oracleText": "This creature can't block black creatures.",
       "power": {
         "type": "Literal",
         "value": 3

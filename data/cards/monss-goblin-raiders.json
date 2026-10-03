@@ -13,6 +13,7 @@
         }
       ],
       "name": "Mons's Goblin Raiders",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 1

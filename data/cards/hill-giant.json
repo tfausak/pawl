@@ -17,6 +17,7 @@
         }
       ],
       "name": "Hill Giant",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

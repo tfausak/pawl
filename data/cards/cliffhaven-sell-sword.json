@@ -17,6 +17,7 @@
         }
       ],
       "name": "Cliffhaven Sell-Sword",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

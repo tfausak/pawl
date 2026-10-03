@@ -63,6 +63,7 @@
         }
       ],
       "name": "Krark-Clan Ironworks",
+      "oracleText": "Sacrifice an artifact: Add {C}{C}.",
       "typeLine": {
         "types": [
           {

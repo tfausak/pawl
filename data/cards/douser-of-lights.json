@@ -17,6 +17,7 @@
         }
       ],
       "name": "Douser of Lights",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 4

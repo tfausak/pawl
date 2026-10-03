@@ -17,6 +17,7 @@
         }
       ],
       "name": "Raptor Companion",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

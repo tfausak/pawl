@@ -22,6 +22,7 @@
         }
       ],
       "name": "Prickly Marmoset",
+      "oracleText": "First strike\nWhenever you cycle a card, this creature gets +2/+0 until end of turn.",
       "power": {
         "type": "Literal",
         "value": 2

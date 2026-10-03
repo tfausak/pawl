@@ -17,6 +17,7 @@
         }
       ],
       "name": "Garruk's Gorehorn",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 7

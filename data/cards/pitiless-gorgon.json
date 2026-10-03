@@ -47,6 +47,7 @@
         }
       ],
       "name": "Pitiless Gorgon",
+      "oracleText": "Deathtouch",
       "power": {
         "type": "Literal",
         "value": 2

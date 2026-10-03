@@ -71,6 +71,7 @@
         }
       ],
       "name": "Creeping Peeper",
+      "oracleText": "{T}: Add {U}. Spend this mana only to cast an enchantment spell, unlock a door, or turn a permanent face up.",
       "power": {
         "type": "Literal",
         "value": 2

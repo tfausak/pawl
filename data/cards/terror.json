@@ -17,6 +17,7 @@
         }
       ],
       "name": "Terror",
+      "oracleText": "Destroy target nonartifact, nonblack creature. It can't be regenerated.",
       "spell": {
         "modes": [
           {

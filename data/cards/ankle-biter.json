@@ -18,6 +18,7 @@
         }
       ],
       "name": "Ankle Biter",
+      "oracleText": "Deathtouch",
       "power": {
         "type": "Literal",
         "value": 1

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Uncovered Clues",
+      "oracleText": "Look at the top four cards of your library. You may reveal up to two instant and/or sorcery cards from among them and put the revealed cards into your hand. Put the rest on the bottom of your library in any order.",
       "spell": {
         "modes": [
           {

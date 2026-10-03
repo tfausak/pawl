@@ -26,6 +26,7 @@
         }
       ],
       "name": "Nyxborn Courser",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

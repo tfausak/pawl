@@ -45,6 +45,7 @@
         }
       ],
       "name": "Phyrexian Vindicator",
+      "oracleText": "Flying\nIf damage would be dealt to this creature, prevent that damage. When damage is prevented this way, this creature deals that much damage to any other target.",
       "power": {
         "type": "Literal",
         "value": 5

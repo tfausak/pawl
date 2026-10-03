@@ -26,6 +26,7 @@
         }
       ],
       "name": "Flameborn Viron",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 6

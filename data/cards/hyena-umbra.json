@@ -25,6 +25,7 @@
         }
       ],
       "name": "Hyena Umbra",
+      "oracleText": "Enchant creature\nEnchanted creature gets +1/+1 and has first strike.\nUmbra armor (If enchanted creature would be destroyed, instead remove all damage from it and destroy this Aura.)",
       "staticAbilities": [
         {
           "affected": {

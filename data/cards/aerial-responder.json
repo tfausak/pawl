@@ -37,6 +37,7 @@
         }
       ],
       "name": "Aerial Responder",
+      "oracleText": "Flying, vigilance, lifelink",
       "power": {
         "type": "Literal",
         "value": 2

@@ -129,6 +129,7 @@
         }
       ],
       "name": "Villainous Ogre",
+      "oracleText": "This creature can't block.\nAs long as you control a Demon, this creature has \"{B}: Regenerate this creature.\"",
       "power": {
         "type": "Literal",
         "value": 3

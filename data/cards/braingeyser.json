@@ -25,6 +25,7 @@
         }
       ],
       "name": "Braingeyser",
+      "oracleText": "Target player draws X cards.",
       "spell": {
         "modes": [
           {

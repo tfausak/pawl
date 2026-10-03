@@ -27,6 +27,7 @@
         }
       ],
       "name": "Invasion of Arcavios",
+      "oracleText": "(As a Siege enters, choose an opponent to protect it. You and others can attack it. When it's defeated, exile it, then cast it transformed.)\nWhen this Siege enters, search your library, graveyard, and/or outside the game for an instant or sorcery card you own, reveal it, and put it into your hand. If you search your library this way, shuffle.",
       "triggeredAbilities": [
         {
           "condition": {
@@ -116,6 +117,7 @@
         }
       ],
       "name": "Invocation of the Founders",
+      "oracleText": "Whenever you cast an instant or sorcery spell from your hand, you may copy that spell. You may choose new targets for the copy.",
       "triggeredAbilities": [
         {
           "condition": {

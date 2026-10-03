@@ -39,6 +39,7 @@
         }
       ],
       "name": "Healer's Flock",
+      "oracleText": "Flying, lifelink",
       "power": {
         "type": "Literal",
         "value": 3

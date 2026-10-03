@@ -63,6 +63,7 @@
         }
       ],
       "name": "Volrath's Shapeshifter",
+      "oracleText": "As long as the top card of your graveyard is a creature card, this creature has the full text of that card and has the text \"{2}: Discard a card.\" (This creature has that card's name, mana cost, color, types, abilities, power, and toughness.)\n{2}: Discard a card.",
       "power": {
         "type": "Literal",
         "value": 0

@@ -25,6 +25,7 @@
         }
       ],
       "name": "Bay Falcon",
+      "oracleText": "Flying, vigilance",
       "power": {
         "type": "Literal",
         "value": 1

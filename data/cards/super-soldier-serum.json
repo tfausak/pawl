@@ -24,6 +24,7 @@
         }
       ],
       "name": "Super-Soldier Serum",
+      "oracleText": "Enchant creature\nEnchanted creature gets +2/+2, has first strike and vigilance, and is a legendary Soldier in addition to its other types.\nWhenever enchanted creature attacks or blocks, attach any number of target Equipment you control to it.",
       "staticAbilities": [
         {
           "affected": {

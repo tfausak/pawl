@@ -43,6 +43,7 @@
         }
       ],
       "name": "Rorix Bladewing",
+      "oracleText": "Flying, haste",
       "power": {
         "type": "Literal",
         "value": 6

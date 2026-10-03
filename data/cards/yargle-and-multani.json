@@ -35,6 +35,7 @@
         }
       ],
       "name": "Yargle and Multani",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 18

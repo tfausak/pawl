@@ -27,6 +27,7 @@
         }
       ],
       "name": "Boros Swiftblade",
+      "oracleText": "Double strike",
       "power": {
         "type": "Literal",
         "value": 1

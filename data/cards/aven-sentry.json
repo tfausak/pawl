@@ -22,6 +22,7 @@
         }
       ],
       "name": "Aven Sentry",
+      "oracleText": "Flying",
       "power": {
         "type": "Literal",
         "value": 3

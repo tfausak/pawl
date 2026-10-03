@@ -25,6 +25,7 @@
         }
       ],
       "name": "Griffin Sentinel",
+      "oracleText": "Flying\nVigilance (Attacking doesn't cause this creature to tap.)",
       "power": {
         "type": "Literal",
         "value": 1

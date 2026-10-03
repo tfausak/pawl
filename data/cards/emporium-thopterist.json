@@ -17,6 +17,7 @@
         }
       ],
       "name": "Emporium Thopterist",
+      "oracleText": "Thopters you control get +2/+0.\nAt the beginning of your upkeep, conjure a card named Ornithopter into your hand.",
       "power": {
         "type": "Literal",
         "value": 1

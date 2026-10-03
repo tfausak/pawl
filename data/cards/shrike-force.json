@@ -28,6 +28,7 @@
         }
       ],
       "name": "Shrike Force",
+      "oracleText": "Flying, double strike, vigilance",
       "power": {
         "type": "Literal",
         "value": 1

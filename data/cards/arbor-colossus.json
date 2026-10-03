@@ -134,6 +134,7 @@
         }
       ],
       "name": "Arbor Colossus",
+      "oracleText": "Reach\n{3}{G}{G}{G}: Monstrosity 3. (If this creature isn't monstrous, put three +1/+1 counters on it and it becomes monstrous.)\nWhen this creature becomes monstrous, destroy target creature with flying an opponent controls.",
       "power": {
         "type": "Literal",
         "value": 6

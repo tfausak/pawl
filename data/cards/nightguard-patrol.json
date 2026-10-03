@@ -25,6 +25,7 @@
         }
       ],
       "name": "Nightguard Patrol",
+      "oracleText": "First strike, vigilance",
       "power": {
         "type": "Literal",
         "value": 2

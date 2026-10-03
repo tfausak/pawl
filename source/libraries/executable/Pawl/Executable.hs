@@ -124,7 +124,7 @@ ingestOne root record = case Ingest.candidate record of
     if exists
       then do
         existing <- fmap Registry.parseCard (ByteString.readFile file)
-        Monad.unless (fmap (Ingest.stamp (texts card)) existing == Right card) $
+        Monad.unless (fmap (Ingest.stamp (Map.empty, texts card)) existing == Right card) $
           IO.hPutStrLn IO.stderr (file <> ": disagrees with MTGJSON; the pool's file is kept")
       else writeCard file card
     pure (Right (not exists))
@@ -132,7 +132,7 @@ ingestOne root record = case Ingest.candidate record of
     texts card = Map.fromList [(CardName.unwrap (Face.name face), text) | face <- NonEmpty.toList (Card.Type.faces card), Just text <- [Face.oracleText face]]
 
 -- True when the card's file changed.
-stampOne :: Map.Map Text.Text Text.Text -> (FilePath, Card.Type.Card) -> IO Bool
+stampOne :: (Map.Map (Text.Text, Text.Text) Text.Text, Map.Map Text.Text Text.Text) -> (FilePath, Card.Type.Card) -> IO Bool
 stampOne known (file, card) =
   let stamped = Ingest.stamp known card
    in if stamped == card then pure False else True <$ writeCard file stamped

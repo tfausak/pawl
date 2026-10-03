@@ -22,6 +22,7 @@
         }
       ],
       "name": "Twincast",
+      "oracleText": "Copy target instant or sorcery spell. You may choose new targets for the copy.",
       "spell": {
         "modes": [
           {

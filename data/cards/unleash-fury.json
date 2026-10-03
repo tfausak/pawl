@@ -17,6 +17,7 @@
         }
       ],
       "name": "Unleash Fury",
+      "oracleText": "Double the power of target creature until end of turn.",
       "spell": {
         "modes": [
           {

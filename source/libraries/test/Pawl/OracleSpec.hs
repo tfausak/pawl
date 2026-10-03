@@ -6,6 +6,7 @@ import qualified Control.Monad as Monad
 import qualified Data.Char as Char
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Maybe as Maybe
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Keyword as Codec.Keyword
 import qualified Pawl.Ingest as Ingest
@@ -18,8 +19,11 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.TypeLine as TypeLine
 
 spec :: (Monad n) => Spec.Spec IO n -> n ()
 spec s = Spec.describe s "Pawl.Oracle" $ do
@@ -32,6 +36,20 @@ spec s = Spec.describe s "Pawl.Oracle" $ do
       case Face.oracleText (NonEmpty.head (Card.faces card)) of
         Nothing -> Spec.assertFailure s (name <> ": no Oracle text")
         Just text -> Spec.assertEqWith s name (Oracle.normalise text) (Oracle.normalise rendered)
+
+  -- `pawl ingest` stamps the text on every card MTGJSON has; a dungeon (CR
+  -- 309) is not among them, since MTGJSON files dungeons with the tokens.
+  Spec.it s "every face of the reference carries its Oracle text" $ do
+    loaded <- Registry.defaultRoot >>= Registry.loadRoot
+    let missing =
+          [ Text.unpack (CardName.unwrap (Face.name face))
+          | entry@(_, Right card) <- loaded,
+            Maybe.isJust (Registry.referenceCard entry),
+            face <- NonEmpty.toList (Card.faces card),
+            Maybe.isNothing (Face.oracleText face),
+            CardType.Dungeon `Set.notMember` TypeLine.types (Face.typeLine face)
+          ]
+    Spec.assertEq s [] missing
 
   Spec.it s "normalise drops reminder text and splits a keyword line" $ do
     Spec.assertEq s (fmap Text.pack ["flying", "trample", "vigilance"]) (Oracle.normalise (Text.pack "Flying, vigilance\nTrample (This creature can deal excess combat damage.)"))
@@ -80,6 +98,18 @@ spec s = Spec.describe s "Pawl.Oracle" $ do
         case (Common.parse (Text.pack json), card) of
           (Right value, Just expected) -> Spec.assertEqWith s name (Right expected) (Ingest.candidate value)
           _ -> Spec.assertFailure s (name <> ": no record or no card")
+
+  -- Replenish is a card of its own and the spell face of Eiganjo Dynastorian,
+  -- with different text; the card's own entry wins.
+  Spec.it s "stamp prefers the entry naming the card itself" $ do
+    registry <- Registry.defaultRoot >>= Registry.fileRegistry
+    replenish <- Registry.named registry "Replenish"
+    let own = "Return all enchantment cards from your graveyard to the battlefield. (Auras with nothing to enchant remain in your graveyard.)"
+        json = "[{\"card\":\"Eiganjo Dynastorian // Replenish\",\"name\":\"Replenish\",\"text\":\"Return all enchantment cards from your graveyard to the battlefield.\"},{\"card\":\"Replenish\",\"name\":\"Replenish\",\"text\":\"" <> own <> "\"}]"
+        unstamped c = c {Card.faces = fmap (\f -> f {Face.oracleText = Nothing}) (Card.faces c)}
+    case (Common.parse (Text.pack json) >>= Ingest.texts, replenish) of
+      (Right known, Just card) -> Spec.assertEq s (Just (Text.pack own)) (Face.oracleText (NonEmpty.head (Card.faces (Ingest.stamp known (unstamped card)))))
+      _ -> Spec.assertFailure s "Replenish: no texts or no card"
 
   Spec.it s "candidate leaves out a card it would have to guess at" $ do
     let reason json = Common.parse (Text.pack json) >>= Monad.void . Ingest.candidate

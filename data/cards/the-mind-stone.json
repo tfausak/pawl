@@ -105,6 +105,7 @@
         }
       ],
       "name": "The Mind Stone",
+      "oracleText": "Indestructible\n{T}: Add {W}.\n{5}{W}, {T}: Harness The Mind Stone. (Once harnessed, its ∞ ability is active.)\n∞ — At the beginning of your end step, exile up to one other target nonland permanent you control, then return that card to the battlefield under its owner's control.",
       "staticAbilities": [
         {
           "affected": {

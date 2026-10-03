@@ -17,6 +17,7 @@
         }
       ],
       "name": "Barbarian Horde",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

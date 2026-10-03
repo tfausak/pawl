@@ -8,6 +8,7 @@
         }
       ],
       "name": "Gilded Sentinel",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

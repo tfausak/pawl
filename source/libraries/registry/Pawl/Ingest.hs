@@ -6,6 +6,7 @@
 -- rather than being guessed at.
 module Pawl.Ingest where
 
+import qualified Control.Applicative as Applicative
 import qualified Data.Char as Char
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -66,29 +67,33 @@ candidate value = do
       face = Oracle.bare (CardName.MkCardName name) (Just text) cost (Set.fromList indicator) typeLine power toughness (Map.fromListWith (+) (fmap (\k -> (k, 1)) keywords))
   pure Card.MkCard {Card.layout = Layout.Normal, Card.faces = face NonEmpty.:| []}
 
--- | Every face's Oracle text by face name, from the reduction's @texts@. A name
--- two faces print differently is left out rather than guessed at.
-texts :: Value.Value -> Either Text.Text (Map.Map Text.Text Text.Text)
+-- | Every face's Oracle text from the reduction's @texts@, keyed by card name
+-- (faces joined by " // ", as MTGJSON names a card) and face name; and, for a
+-- face name only one face prints, by face name alone, for a card the pool
+-- joins differently (Replenish is also a face of Eiganjo Dynastorian).
+texts :: Value.Value -> Either Text.Text (Map.Map (Text.Text, Text.Text) Text.Text, Map.Map Text.Text Text.Text)
 texts value = do
   entries <- Common.asArray value >>= traverse entry
-  let grouped = Map.fromListWith Set.union [(name, Set.singleton text) | (name, text) <- entries]
-  pure (Map.mapMaybe (\set -> case Set.toList set of [one] -> Just one; _ -> Nothing) grouped)
+  let byFace = Map.fromListWith Set.union [(name, Set.singleton text) | (_, name, text) <- entries]
+  pure
+    ( Map.fromList [((card, name), text) | (card, name, text) <- entries],
+      Map.mapMaybe (\set -> case Set.toList set of [one] -> Just one; _ -> Nothing) byFace
+    )
   where
     entry v = do
       fields <- Common.asObject v
+      card <- Common.field "card" fields >>= Common.asText
       name <- Common.field "name" fields >>= Common.asText
       text <- Common.field "text" fields >>= Common.asText
-      pure (name, text)
+      pure (card, name, text)
 
--- | The card with each face's Oracle text set from the map, where it has one.
-stamp :: Map.Map Text.Text Text.Text -> Card.Card -> Card.Card
-stamp known card =
-  card
-    { Card.faces =
-        fmap
-          (\face -> maybe face (\text -> face {Face.oracleText = Just text}) (Map.lookup (CardName.unwrap (Face.name face)) known))
-          (Card.faces card)
-    }
+-- | The card with each face's Oracle text set from 'texts', where it has one.
+stamp :: (Map.Map (Text.Text, Text.Text) Text.Text, Map.Map Text.Text Text.Text) -> Card.Card -> Card.Card
+stamp (exact, byFace) card =
+  card {Card.faces = fmap (\face -> maybe face (\text -> face {Face.oracleText = Just text}) (lookupFace (CardName.unwrap (Face.name face)))) (Card.faces card)}
+  where
+    cardName = Text.intercalate (Text.pack " // ") (fmap (CardName.unwrap . Face.name) (NonEmpty.toList (Card.faces card)))
+    lookupFace name = Map.lookup (cardName, name) exact Applicative.<|> Map.lookup name byFace
 
 -- | A line of normalised Oracle text as the keyword it names.
 keyword :: Text.Text -> Either Text.Text Keyword.Keyword

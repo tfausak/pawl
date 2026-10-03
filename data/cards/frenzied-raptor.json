@@ -17,6 +17,7 @@
         }
       ],
       "name": "Frenzied Raptor",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 4

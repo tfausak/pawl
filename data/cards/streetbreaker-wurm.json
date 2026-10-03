@@ -26,6 +26,7 @@
         }
       ],
       "name": "Streetbreaker Wurm",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 6

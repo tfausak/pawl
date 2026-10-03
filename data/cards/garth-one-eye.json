@@ -84,6 +84,7 @@
         }
       ],
       "name": "Garth One-Eye",
+      "oracleText": "{T}: Choose a card name that hasn't been chosen from among Disenchant, Braingeyser, Terror, Shivan Dragon, Regrowth, and Black Lotus. Create a copy of the card with the chosen name. You may cast the copy. (You still pay its costs.)",
       "power": {
         "type": "Literal",
         "value": 5

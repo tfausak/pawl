@@ -71,6 +71,7 @@
         }
       ],
       "name": "Withered Wretch",
+      "oracleText": "{1}: Exile target card from a graveyard.",
       "power": {
         "type": "Literal",
         "value": 2

@@ -26,6 +26,7 @@
         }
       ],
       "name": "Rhox Brute",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 4

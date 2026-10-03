@@ -13,6 +13,7 @@
         }
       ],
       "name": "Millennial Gargoyle",
+      "oracleText": "Flying",
       "power": {
         "type": "Literal",
         "value": 2

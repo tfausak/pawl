@@ -22,6 +22,7 @@
         }
       ],
       "name": "Barkweave Crusher",
+      "oracleText": "Enlist (As this creature attacks, you may tap a nonattacking creature you control without summoning sickness. When you do, add its power to this creature's until end of turn.)",
       "power": {
         "type": "Literal",
         "value": 2

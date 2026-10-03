@@ -13,6 +13,7 @@
         }
       ],
       "name": "Scout's Warning",
+      "oracleText": "The next creature card you play this turn can be played as though it had flash.\nDraw a card.",
       "spell": {
         "modes": [
           {

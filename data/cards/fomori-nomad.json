@@ -17,6 +17,7 @@
         }
       ],
       "name": "Fomori Nomad",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 4

@@ -31,6 +31,7 @@
         }
       ],
       "name": "Knight of the Tusk",
+      "oracleText": "Vigilance (Attacking doesn't cause this creature to tap.)",
       "power": {
         "type": "Literal",
         "value": 3

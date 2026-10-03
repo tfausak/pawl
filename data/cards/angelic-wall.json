@@ -25,6 +25,7 @@
         }
       ],
       "name": "Angelic Wall",
+      "oracleText": "Defender (This creature can't attack.)\nFlying",
       "power": {
         "type": "Literal",
         "value": 0

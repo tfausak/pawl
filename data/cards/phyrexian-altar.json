@@ -49,6 +49,7 @@
         }
       ],
       "name": "Phyrexian Altar",
+      "oracleText": "Sacrifice a creature: Add one mana of any color.",
       "typeLine": {
         "types": [
           {

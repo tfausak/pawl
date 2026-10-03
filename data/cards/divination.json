@@ -17,6 +17,7 @@
         }
       ],
       "name": "Divination",
+      "oracleText": "Draw two cards.",
       "spell": {
         "modes": [
           {

@@ -40,6 +40,7 @@
         }
       ],
       "name": "Public Enemy",
+      "oracleText": "Enchant creature\nAll creatures attack enchanted creature's controller each combat if able.\nWhen enchanted creature dies, draw a card.",
       "triggeredAbilities": [
         {
           "condition": {

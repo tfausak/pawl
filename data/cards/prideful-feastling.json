@@ -33,6 +33,7 @@
         }
       ],
       "name": "Prideful Feastling",
+      "oracleText": "Changeling (This card is every creature type.)\nLifelink",
       "power": {
         "type": "Literal",
         "value": 2

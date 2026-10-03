@@ -22,6 +22,7 @@
         }
       ],
       "name": "Quicksilver, Pietro Maximoff",
+      "oracleText": "Haste (This creature can attack and {T} as soon as he comes under your control.)",
       "power": {
         "type": "Literal",
         "value": 3

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Dromoka Warrior",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

@@ -21,6 +21,7 @@
         }
       ],
       "name": "Healer's Hawk",
+      "oracleText": "Flying\nLifelink (Damage dealt by this creature also causes you to gain that much life.)",
       "power": {
         "type": "Literal",
         "value": 1

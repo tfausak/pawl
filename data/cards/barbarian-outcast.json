@@ -17,6 +17,7 @@
         }
       ],
       "name": "Barbarian Outcast",
+      "oracleText": "When you control no Swamps, sacrifice this creature.",
       "power": {
         "type": "Literal",
         "value": 2

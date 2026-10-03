@@ -17,6 +17,7 @@
         }
       ],
       "name": "Harnessed Lightning",
+      "oracleText": "Choose target creature. You get {E}{E}{E} (three energy counters), then you may pay any amount of {E}. Harnessed Lightning deals that much damage to that creature.",
       "spell": {
         "modes": [
           {

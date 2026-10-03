@@ -2,6 +2,7 @@
   "faces": [
     {
       "name": "Underground Sea",
+      "oracleText": "({T}: Add {U} or {B}.)",
       "typeLine": {
         "subtypes": [
           {

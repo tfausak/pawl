@@ -17,6 +17,7 @@
         }
       ],
       "name": "Spiked Corridor",
+      "oracleText": "When you unlock this door, create three 1/1 red Devil creature tokens with \"When this token dies, it deals 1 damage to any target.\"\n(You may cast either half. That door unlocks on the battlefield. As a sorcery, you may pay the mana cost of a locked door to unlock it.)",
       "triggeredAbilities": [
         {
           "condition": {
@@ -151,6 +152,7 @@
         }
       ],
       "name": "Torture Pit",
+      "oracleText": "If a source you control would deal noncombat damage to an opponent, it deals that much damage plus 2 instead.\n(You may cast either half. That door unlocks on the battlefield. As a sorcery, you may pay the mana cost of a locked door to unlock it.)",
       "replacementEffects": [
         {
           "effect": {

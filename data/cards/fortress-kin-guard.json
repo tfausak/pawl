@@ -17,6 +17,7 @@
         }
       ],
       "name": "Fortress Kin-Guard",
+      "oracleText": "When this creature enters, it endures 1. (Put a +1/+1 counter on it or create a 1/1 white Spirit creature token.)",
       "power": {
         "type": "Literal",
         "value": 1

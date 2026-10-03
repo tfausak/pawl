@@ -43,6 +43,7 @@
         }
       ],
       "name": "Kodama of the North Tree",
+      "oracleText": "Trample\nShroud (This creature can't be the target of spells or abilities.)",
       "power": {
         "type": "Literal",
         "value": 6

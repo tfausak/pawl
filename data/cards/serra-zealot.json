@@ -18,6 +18,7 @@
         }
       ],
       "name": "Serra Zealot",
+      "oracleText": "First strike",
       "power": {
         "type": "Literal",
         "value": 1

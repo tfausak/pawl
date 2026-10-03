@@ -40,6 +40,7 @@
         }
       ],
       "name": "Water Whip",
+      "oracleText": "As an additional cost to cast this spell, waterbend {5}. (While paying a waterbend cost, you can tap your artifacts and creatures to help. Each one pays for {1}.)\nReturn up to two target creatures to their owners' hands. Draw two cards.",
       "spell": {
         "modes": [
           {

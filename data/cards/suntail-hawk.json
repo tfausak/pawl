@@ -18,6 +18,7 @@
         }
       ],
       "name": "Suntail Hawk",
+      "oracleText": "Flying",
       "power": {
         "type": "Literal",
         "value": 1

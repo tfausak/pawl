@@ -34,6 +34,7 @@
         }
       ],
       "name": "Wrecking Beast",
+      "oracleText": "Riot (This creature enters with your choice of a +1/+1 counter or haste.)\nTrample",
       "power": {
         "type": "Literal",
         "value": 6

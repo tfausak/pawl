@@ -21,6 +21,7 @@
         }
       ],
       "name": "Dragon's Eye Sentry",
+      "oracleText": "Defender, first strike",
       "power": {
         "type": "Literal",
         "value": 1

@@ -71,6 +71,7 @@
         }
       ],
       "name": "Aether Hub",
+      "oracleText": "When this land enters, you get {E} (an energy counter).\n{T}: Add {C}.\n{T}, Pay {E}: Add one mana of any color.",
       "triggeredAbilities": [
         {
           "condition": {

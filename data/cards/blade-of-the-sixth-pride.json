@@ -17,6 +17,7 @@
         }
       ],
       "name": "Blade of the Sixth Pride",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

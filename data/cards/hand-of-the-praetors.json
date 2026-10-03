@@ -22,6 +22,7 @@
         }
       ],
       "name": "Hand of the Praetors",
+      "oracleText": "Infect (This creature deals damage to creatures in the form of -1/-1 counters and to players in the form of poison counters.)\nOther creatures you control with infect get +1/+1.\nWhenever you cast a creature spell with infect, target player gets a poison counter.",
       "power": {
         "type": "Literal",
         "value": 3

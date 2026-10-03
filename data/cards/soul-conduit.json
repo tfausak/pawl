@@ -58,6 +58,7 @@
         }
       ],
       "name": "Soul Conduit",
+      "oracleText": "{6}, {T}: Two target players exchange life totals.",
       "typeLine": {
         "types": [
           {

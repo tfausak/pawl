@@ -17,6 +17,7 @@
         }
       ],
       "name": "Diabolic Edict",
+      "oracleText": "Target player sacrifices a creature of their choice.",
       "spell": {
         "modes": [
           {

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Siege Mastodon",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

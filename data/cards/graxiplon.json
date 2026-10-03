@@ -79,6 +79,7 @@
         }
       ],
       "name": "Graxiplon",
+      "oracleText": "This creature can't be blocked unless defending player controls three or more creatures that share a creature type.",
       "power": {
         "type": "Literal",
         "value": 3

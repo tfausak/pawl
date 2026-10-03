@@ -126,6 +126,7 @@
         }
       ],
       "name": "Greenbelt Guardian",
+      "oracleText": "{G}: Target creature gains trample until end of turn.\nExhaust — {3}{G}: Put three +1/+1 counters on this creature. (Activate each exhaust ability only once.)",
       "power": {
         "type": "Literal",
         "value": 2

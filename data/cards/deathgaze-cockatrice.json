@@ -34,6 +34,7 @@
         }
       ],
       "name": "Deathgaze Cockatrice",
+      "oracleText": "Flying\nDeathtouch (Any amount of damage this deals to a creature is enough to destroy it.)",
       "power": {
         "type": "Literal",
         "value": 2

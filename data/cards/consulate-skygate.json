@@ -16,6 +16,7 @@
         }
       ],
       "name": "Consulate Skygate",
+      "oracleText": "Defender\nReach (This creature can block creatures with flying.)",
       "power": {
         "type": "Literal",
         "value": 0

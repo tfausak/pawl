@@ -26,6 +26,7 @@
         }
       ],
       "name": "Evacuation",
+      "oracleText": "Return all creatures to their owners' hands.",
       "spell": {
         "modes": [
           {

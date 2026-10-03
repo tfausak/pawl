@@ -17,6 +17,7 @@
         }
       ],
       "name": "Rotted Hulk",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

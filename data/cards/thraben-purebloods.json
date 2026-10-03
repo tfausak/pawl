@@ -17,6 +17,7 @@
         }
       ],
       "name": "Thraben Purebloods",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

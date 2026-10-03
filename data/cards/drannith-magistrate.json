@@ -17,6 +17,7 @@
         }
       ],
       "name": "Drannith Magistrate",
+      "oracleText": "Your opponents can't cast spells from anywhere other than their hands.",
       "playerAbilities": [
         {
           "effect": {

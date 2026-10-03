@@ -26,6 +26,7 @@
         }
       ],
       "name": "Quarry Colossus",
+      "oracleText": "When this creature enters, put target creature into its owner's library just beneath the top X cards of that library, where X is the number of Plains you control.",
       "power": {
         "type": "Literal",
         "value": 5

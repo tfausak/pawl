@@ -13,6 +13,7 @@
         }
       ],
       "name": "Trained Jackal",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 1

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Browbeat",
+      "oracleText": "Any player may have Browbeat deal 5 damage to them. If no one does, target player draws three cards.",
       "spell": {
         "modes": [
           {

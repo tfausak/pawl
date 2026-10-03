@@ -25,6 +25,7 @@
         }
       ],
       "name": "Brightblade Stoat",
+      "oracleText": "First strike, lifelink",
       "power": {
         "type": "Literal",
         "value": 2

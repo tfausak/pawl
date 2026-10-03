@@ -34,6 +34,7 @@
         }
       ],
       "name": "Bull Cerodon",
+      "oracleText": "Vigilance, haste",
       "power": {
         "type": "Literal",
         "value": 5

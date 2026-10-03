@@ -22,6 +22,7 @@
         }
       ],
       "name": "Willow Faerie",
+      "oracleText": "Flying",
       "power": {
         "type": "Literal",
         "value": 1

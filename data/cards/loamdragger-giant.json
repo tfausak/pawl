@@ -59,6 +59,7 @@
         }
       ],
       "name": "Loamdragger Giant",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 7

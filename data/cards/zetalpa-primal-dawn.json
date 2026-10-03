@@ -43,6 +43,7 @@
         }
       ],
       "name": "Zetalpa, Primal Dawn",
+      "oracleText": "Flying, double strike, vigilance, trample, indestructible",
       "power": {
         "type": "Literal",
         "value": 4

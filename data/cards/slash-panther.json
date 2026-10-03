@@ -19,6 +19,7 @@
         }
       ],
       "name": "Slash Panther",
+      "oracleText": "({R/P} can be paid with either {R} or 2 life.)\nHaste",
       "power": {
         "type": "Literal",
         "value": 4

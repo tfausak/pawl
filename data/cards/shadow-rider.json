@@ -31,6 +31,7 @@
         }
       ],
       "name": "Shadow Rider",
+      "oracleText": "Flanking (Whenever a creature without flanking blocks this creature, the blocking creature gets -1/-1 until end of turn.)",
       "power": {
         "type": "Literal",
         "value": 3

@@ -43,6 +43,7 @@
         }
       ],
       "name": "Rakdos Shred-Freak",
+      "oracleText": "Haste",
       "power": {
         "type": "Literal",
         "value": 2

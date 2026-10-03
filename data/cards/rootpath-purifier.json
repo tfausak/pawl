@@ -17,6 +17,7 @@
         }
       ],
       "name": "Rootpath Purifier",
+      "oracleText": "Lands you control and land cards in your library are basic.",
       "power": {
         "type": "Literal",
         "value": 3

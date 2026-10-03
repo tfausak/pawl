@@ -35,6 +35,7 @@
         }
       ],
       "name": "Cryptic Command",
+      "oracleText": "Choose two —\n• Counter target spell.\n• Return target permanent to its owner's hand.\n• Tap all creatures your opponents control.\n• Draw a card.",
       "spell": {
         "modes": [
           {

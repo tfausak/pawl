@@ -44,6 +44,7 @@
         }
       ],
       "name": "Thraben Gargoyle",
+      "oracleText": "Defender\n{6}: Transform this creature.",
       "power": {
         "type": "Literal",
         "value": 2
@@ -75,6 +76,7 @@
         }
       ],
       "name": "Stonewing Antagonizer",
+      "oracleText": "Flying",
       "power": {
         "type": "Literal",
         "value": 4

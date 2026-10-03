@@ -29,6 +29,7 @@
         }
       ],
       "name": "Glen Elendra's Answer",
+      "oracleText": "This spell can't be countered.\nCounter all spells your opponents control and all abilities your opponents control. Create a 1/1 blue and black Faerie creature token with flying for each spell and ability countered this way.",
       "spell": {
         "modes": [
           {

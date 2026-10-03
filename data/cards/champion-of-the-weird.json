@@ -88,6 +88,7 @@
         }
       ],
       "name": "Champion of the Weird",
+      "oracleText": "As an additional cost to cast this spell, behold a Goblin and exile it. (Exile a Goblin you control or a Goblin card from your hand.)\nPay 1 life, Blight 2: Target opponent blights 2. Activate only as a sorcery.\nWhen this creature leaves the battlefield, return the exiled card to its owner's hand.",
       "power": {
         "type": "Literal",
         "value": 5

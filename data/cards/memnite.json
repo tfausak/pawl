@@ -3,6 +3,7 @@
     {
       "manaCost": [],
       "name": "Memnite",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 1

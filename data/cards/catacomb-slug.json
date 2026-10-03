@@ -17,6 +17,7 @@
         }
       ],
       "name": "Catacomb Slug",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

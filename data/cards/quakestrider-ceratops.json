@@ -35,6 +35,7 @@
         }
       ],
       "name": "Quakestrider Ceratops",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 12

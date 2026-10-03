@@ -26,6 +26,7 @@
         }
       ],
       "name": "Ojutai's Command",
+      "oracleText": "Choose two —\n• Return target creature card with mana value 2 or less from your graveyard to the battlefield.\n• You gain 4 life.\n• Counter target creature spell.\n• Draw a card.",
       "spell": {
         "modes": [
           {

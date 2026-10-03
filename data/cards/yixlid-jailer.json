@@ -17,6 +17,7 @@
         }
       ],
       "name": "Yixlid Jailer",
+      "oracleText": "Cards in graveyards lose all abilities.",
       "power": {
         "type": "Literal",
         "value": 2

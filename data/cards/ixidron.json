@@ -59,6 +59,7 @@
         }
       ],
       "name": "Ixidron",
+      "oracleText": "As this creature enters, turn all other nontoken creatures face down. (They're 2/2 creatures.)\nIxidron's power and toughness are each equal to the number of face-down creatures on the battlefield.",
       "power": {
         "type": "Star"
       },

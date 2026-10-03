@@ -17,6 +17,7 @@
         }
       ],
       "name": "Onakke Ogre",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 4

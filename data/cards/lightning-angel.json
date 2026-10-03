@@ -46,6 +46,7 @@
         }
       ],
       "name": "Lightning Angel",
+      "oracleText": "Flying, vigilance, haste",
       "power": {
         "type": "Literal",
         "value": 3

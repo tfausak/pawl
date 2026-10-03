@@ -17,6 +17,7 @@
         }
       ],
       "name": "Zombie Goliath",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 4

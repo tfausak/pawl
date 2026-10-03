@@ -17,6 +17,7 @@
         }
       ],
       "name": "Prowling Geistcatcher",
+      "oracleText": "Whenever you sacrifice another creature, exile it. If that creature was a token, put a +1/+1 counter on this creature.\nWhen this creature leaves the battlefield, return each card exiled with it to the battlefield under your control.",
       "power": {
         "type": "Literal",
         "value": 2

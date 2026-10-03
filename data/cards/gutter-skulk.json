@@ -17,6 +17,7 @@
         }
       ],
       "name": "Gutter Skulk",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

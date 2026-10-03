@@ -17,6 +17,7 @@
         }
       ],
       "name": "Border Guard",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 1

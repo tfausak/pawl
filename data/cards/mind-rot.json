@@ -17,6 +17,7 @@
         }
       ],
       "name": "Mind Rot",
+      "oracleText": "Target player discards two cards.",
       "spell": {
         "modes": [
           {

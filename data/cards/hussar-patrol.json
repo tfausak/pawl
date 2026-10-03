@@ -34,6 +34,7 @@
         }
       ],
       "name": "Hussar Patrol",
+      "oracleText": "Flash (You may cast this spell any time you could cast an instant.)\nVigilance",
       "power": {
         "type": "Literal",
         "value": 2

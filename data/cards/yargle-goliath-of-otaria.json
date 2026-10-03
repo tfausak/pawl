@@ -17,6 +17,7 @@
         }
       ],
       "name": "Yargle, Goliath of Otaria",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

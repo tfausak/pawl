@@ -13,6 +13,7 @@
         }
       ],
       "name": "Twiddle",
+      "oracleText": "You may tap or untap target artifact, creature, or land.",
       "spell": {
         "modes": [
           {

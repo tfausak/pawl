@@ -8,6 +8,7 @@
         }
       ],
       "name": "Razorfield Thresher",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 6

@@ -13,6 +13,7 @@
         }
       ],
       "name": "Chardalyn Dragon",
+      "oracleText": "Flying",
       "power": {
         "type": "Literal",
         "value": 4

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Armored Cancrix",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

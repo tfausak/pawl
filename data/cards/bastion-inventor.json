@@ -25,6 +25,7 @@
         }
       ],
       "name": "Bastion Inventor",
+      "oracleText": "Improvise (Your artifacts can help cast this spell. Each artifact you tap after you're done activating mana abilities pays for {1}.)\nHexproof (This creature can't be the target of spells or abilities your opponents control.)",
       "power": {
         "type": "Literal",
         "value": 4

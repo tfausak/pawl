@@ -31,6 +31,7 @@
         }
       ],
       "name": "Foggy Swamp Spirit Keeper",
+      "oracleText": "Lifelink\nWhenever you draw your second card each turn, create a 1/1 colorless Spirit creature token with \"This token can't block or be blocked by non-Spirit creatures.\"",
       "power": {
         "type": "Literal",
         "value": 2

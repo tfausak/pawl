@@ -16,6 +16,7 @@
         }
       ],
       "name": "Haunted Guardian",
+      "oracleText": "Defender, first strike",
       "power": {
         "type": "Literal",
         "value": 2

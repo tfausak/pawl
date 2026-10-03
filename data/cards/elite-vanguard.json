@@ -13,6 +13,7 @@
         }
       ],
       "name": "Elite Vanguard",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

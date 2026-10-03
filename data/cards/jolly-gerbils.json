@@ -17,6 +17,7 @@
         }
       ],
       "name": "Jolly Gerbils",
+      "oracleText": "Whenever you give a gift, draw a card.",
       "power": {
         "type": "Literal",
         "value": 2

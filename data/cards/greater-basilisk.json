@@ -31,6 +31,7 @@
         }
       ],
       "name": "Greater Basilisk",
+      "oracleText": "Deathtouch (Any amount of damage this deals to a creature is enough to destroy it.)",
       "power": {
         "type": "Literal",
         "value": 3

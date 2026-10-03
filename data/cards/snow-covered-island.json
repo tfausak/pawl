@@ -2,6 +2,7 @@
   "faces": [
     {
       "name": "Snow-Covered Island",
+      "oracleText": "({T}: Add {U}.)",
       "typeLine": {
         "subtypes": [
           {

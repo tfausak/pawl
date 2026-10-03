@@ -17,6 +17,7 @@
         }
       ],
       "name": "Ironclad Krovod",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

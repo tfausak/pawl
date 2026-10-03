@@ -31,6 +31,7 @@
         }
       ],
       "name": "Count on Luck",
+      "oracleText": "At the beginning of your upkeep, exile the top card of your library. You may play that card this turn.",
       "triggeredAbilities": [
         {
           "condition": {

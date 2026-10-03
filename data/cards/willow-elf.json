@@ -13,6 +13,7 @@
         }
       ],
       "name": "Willow Elf",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 1

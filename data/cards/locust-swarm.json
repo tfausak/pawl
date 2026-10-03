@@ -112,6 +112,7 @@
         }
       ],
       "name": "Locust Swarm",
+      "oracleText": "Flying\n{G}: Regenerate this creature.\n{G}: Untap this creature. Activate only once each turn.",
       "power": {
         "type": "Literal",
         "value": 1

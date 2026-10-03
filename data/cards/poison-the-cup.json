@@ -51,6 +51,7 @@
         }
       ],
       "name": "Poison the Cup",
+      "oracleText": "Destroy target creature. If this spell was foretold, scry 2.\nForetell {1}{B} (During your turn, you may pay {2} and exile this card from your hand face down. Cast it on a later turn for its foretell cost.)",
       "spell": {
         "modes": [
           {

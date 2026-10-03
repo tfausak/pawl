@@ -17,6 +17,7 @@
         }
       ],
       "name": "Mana Severance",
+      "oracleText": "Search your library for any number of land cards, exile them, then shuffle.",
       "spell": {
         "modes": [
           {

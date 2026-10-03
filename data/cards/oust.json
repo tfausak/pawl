@@ -13,6 +13,7 @@
         }
       ],
       "name": "Oust",
+      "oracleText": "Put target creature into its owner's library second from the top. Its controller gains 3 life.",
       "spell": {
         "modes": [
           {

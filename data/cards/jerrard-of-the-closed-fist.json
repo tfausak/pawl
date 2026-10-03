@@ -35,6 +35,7 @@
         }
       ],
       "name": "Jerrard of the Closed Fist",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 6

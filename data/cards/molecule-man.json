@@ -8,6 +8,7 @@
         }
       ],
       "name": "Molecule Man",
+      "oracleText": "Nonland cards in your hand have miracle {0}. (You may cast a card for its miracle cost when you draw it if it's the first card you drew this turn.)",
       "power": {
         "type": "Literal",
         "value": 5

@@ -31,6 +31,7 @@
         }
       ],
       "name": "Enlisted Wurm",
+      "oracleText": "Cascade (When you cast this spell, exile cards from the top of your library until you exile a nonland card that costs less. You may cast it without paying its mana cost. Put the exiled cards on the bottom in a random order.)",
       "power": {
         "type": "Literal",
         "value": 5

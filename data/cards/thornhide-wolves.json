@@ -17,6 +17,7 @@
         }
       ],
       "name": "Thornhide Wolves",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 4

@@ -13,6 +13,7 @@
         }
       ],
       "name": "Scion of Ugin",
+      "oracleText": "Flying",
       "power": {
         "type": "Literal",
         "value": 4

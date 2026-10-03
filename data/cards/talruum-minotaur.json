@@ -31,6 +31,7 @@
         }
       ],
       "name": "Talruum Minotaur",
+      "oracleText": "Haste",
       "power": {
         "type": "Literal",
         "value": 3

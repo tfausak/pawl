@@ -34,6 +34,7 @@
         }
       ],
       "name": "Volcanic Dragon",
+      "oracleText": "Flying, haste",
       "power": {
         "type": "Literal",
         "value": 4

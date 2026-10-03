@@ -22,6 +22,7 @@
         }
       ],
       "name": "Yotian Medic",
+      "oracleText": "Lifelink",
       "power": {
         "type": "Literal",
         "value": 1

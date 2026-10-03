@@ -17,6 +17,7 @@
         }
       ],
       "name": "Krovikan Scoundrel",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

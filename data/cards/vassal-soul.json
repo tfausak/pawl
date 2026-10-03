@@ -47,6 +47,7 @@
         }
       ],
       "name": "Vassal Soul",
+      "oracleText": "Flying",
       "power": {
         "type": "Literal",
         "value": 2

@@ -26,6 +26,7 @@
         }
       ],
       "name": "Queen's Bay Paladin",
+      "oracleText": "Whenever this creature enters or attacks, return up to one target Vampire card from your graveyard to the battlefield with a finality counter on it. You lose life equal to its mana value. (If a creature with a finality counter on it would die, exile it instead.)",
       "power": {
         "type": "Literal",
         "value": 5

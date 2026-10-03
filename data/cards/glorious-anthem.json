@@ -26,6 +26,7 @@
         }
       ],
       "name": "Glorious Anthem",
+      "oracleText": "Creatures you control get +1/+1.",
       "staticAbilities": [
         {
           "affected": {

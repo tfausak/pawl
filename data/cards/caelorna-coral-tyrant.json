@@ -17,6 +17,7 @@
         }
       ],
       "name": "Caelorna, Coral Tyrant",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 0

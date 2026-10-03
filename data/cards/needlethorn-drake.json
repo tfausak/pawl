@@ -30,6 +30,7 @@
         }
       ],
       "name": "Needlethorn Drake",
+      "oracleText": "Flying, deathtouch",
       "power": {
         "type": "Literal",
         "value": 1

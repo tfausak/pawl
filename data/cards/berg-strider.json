@@ -17,6 +17,7 @@
         }
       ],
       "name": "Berg Strider",
+      "oracleText": "When this creature enters, tap target artifact or creature an opponent controls. If {S} was spent to cast this spell, that permanent doesn't untap during its controller's next untap step. ({S} is mana from a snow source.)",
       "power": {
         "type": "Literal",
         "value": 4

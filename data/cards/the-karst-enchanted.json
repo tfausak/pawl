@@ -190,6 +190,7 @@
         }
       ],
       "name": "The Karst, Enchanted",
+      "oracleText": "{3}{U}, {T}, Sacrifice another creature: Search your library for up to four cards that don't share a mana value, power, toughness, or card type with each other. Target opponent chooses two of those cards. Put the chosen cards into your graveyard and the rest into your hand. Then shuffle.",
       "power": {
         "type": "Literal",
         "value": 4

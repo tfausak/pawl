@@ -922,6 +922,7 @@
         }
       ],
       "name": "Tome of the Infinite",
+      "oracleText": "{U}, {T}: Conjure a random card from Tome of the Infinite's spellbook into your hand. It perpetually gains \"You may spend mana as though it were mana of any color to cast this spell.\"",
       "typeLine": {
         "subtypes": [
           {

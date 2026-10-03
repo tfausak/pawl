@@ -17,6 +17,7 @@
         }
       ],
       "name": "Lathnu Sailback",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 5

@@ -26,6 +26,7 @@
         }
       ],
       "name": "Giant Beaver",
+      "oracleText": "Vigilance\nWhenever this creature attacks while saddled, put a +1/+1 counter on target creature that saddled it this turn.\nSaddle 3 (Tap any number of other creatures you control with total power 3 or more: This Mount becomes saddled until end of turn. Saddle only as a sorcery.)",
       "power": {
         "type": "Literal",
         "value": 4

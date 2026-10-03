@@ -13,6 +13,7 @@
         }
       ],
       "name": "Sacred Prey",
+      "oracleText": "Whenever this creature becomes blocked, you gain 1 life.",
       "power": {
         "type": "Literal",
         "value": 1

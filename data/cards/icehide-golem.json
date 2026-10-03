@@ -7,6 +7,7 @@
         }
       ],
       "name": "Icehide Golem",
+      "oracleText": "({S} can be paid with one mana from a snow source.)",
       "power": {
         "type": "Literal",
         "value": 2

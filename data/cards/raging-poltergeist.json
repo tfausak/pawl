@@ -17,6 +17,7 @@
         }
       ],
       "name": "Raging Poltergeist",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 6

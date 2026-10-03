@@ -49,6 +49,7 @@
         }
       ],
       "name": "Sneaky Homunculus",
+      "oracleText": "This creature can't block or be blocked by creatures with power 2 or greater.",
       "power": {
         "type": "Literal",
         "value": 1

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Aether Channeler",
+      "oracleText": "When this creature enters, choose one —\n• Create a 1/1 white Bird creature token with flying.\n• Return another target nonland permanent to its owner's hand.\n• Draw a card.",
       "power": {
         "type": "Literal",
         "value": 3

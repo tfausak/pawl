@@ -13,6 +13,7 @@
         }
       ],
       "name": "Needle Drop",
+      "oracleText": "Needle Drop deals 1 damage to any target that was dealt damage this turn.\nDraw a card.",
       "spell": {
         "modes": [
           {

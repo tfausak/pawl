@@ -31,6 +31,7 @@
         }
       ],
       "name": "Windseeker Centaur",
+      "oracleText": "Vigilance",
       "power": {
         "type": "Literal",
         "value": 2

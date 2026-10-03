@@ -8,6 +8,7 @@
         }
       ],
       "name": "Gauntlet of Power",
+      "oracleText": "As this artifact enters, choose a color.\nCreatures of the chosen color get +1/+1.\nWhenever a basic land is tapped for mana of the chosen color, its controller adds an additional one mana of that color.",
       "replacementEffects": [
         {
           "effect": {

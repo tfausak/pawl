@@ -17,6 +17,7 @@
         }
       ],
       "name": "Warpath Ghoul",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

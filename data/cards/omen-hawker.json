@@ -74,6 +74,7 @@
         }
       ],
       "name": "Omen Hawker",
+      "oracleText": "{T}: Add {C}{U}. Spend this mana only to activate abilities.",
       "power": {
         "type": "Literal",
         "value": 1

@@ -26,6 +26,7 @@
         }
       ],
       "name": "Zealous Guardian",
+      "oracleText": "Flash",
       "power": {
         "type": "Literal",
         "value": 1

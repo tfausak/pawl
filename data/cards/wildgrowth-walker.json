@@ -17,6 +17,7 @@
         }
       ],
       "name": "Wildgrowth Walker",
+      "oracleText": "Whenever a creature you control explores, put a +1/+1 counter on this creature and you gain 3 life.",
       "power": {
         "type": "Literal",
         "value": 1

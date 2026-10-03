@@ -8,6 +8,7 @@
         }
       ],
       "name": "Phyrexian Hulk",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 5

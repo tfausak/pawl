@@ -22,6 +22,7 @@
         }
       ],
       "name": "Sporecap Spider",
+      "oracleText": "Reach",
       "power": {
         "type": "Literal",
         "value": 1

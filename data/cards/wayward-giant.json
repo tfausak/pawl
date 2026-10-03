@@ -22,6 +22,7 @@
         }
       ],
       "name": "Wayward Giant",
+      "oracleText": "Menace",
       "power": {
         "type": "Literal",
         "value": 4

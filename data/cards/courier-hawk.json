@@ -25,6 +25,7 @@
         }
       ],
       "name": "Courier Hawk",
+      "oracleText": "Flying, vigilance",
       "power": {
         "type": "Literal",
         "value": 1

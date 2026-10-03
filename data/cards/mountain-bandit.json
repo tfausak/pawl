@@ -18,6 +18,7 @@
         }
       ],
       "name": "Mountain Bandit",
+      "oracleText": "Haste",
       "power": {
         "type": "Literal",
         "value": 1

@@ -26,6 +26,7 @@
         }
       ],
       "name": "Tusked Colossodon",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 6

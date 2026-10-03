@@ -16,6 +16,7 @@
         }
       ],
       "name": "Snare Thopter",
+      "oracleText": "Flying, haste",
       "power": {
         "type": "Literal",
         "value": 3

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Night Shift of the Living Dead",
+      "oracleText": "After you roll a die, you may pay 1 life. If you do, increase or decrease the result by 1. Do this only once each turn.\nWhenever you roll a 6, create a 2/2 black Zombie Employee creature token.",
       "playerAbilities": [
         {
           "effect": {

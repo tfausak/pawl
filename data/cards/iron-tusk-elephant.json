@@ -22,6 +22,7 @@
         }
       ],
       "name": "Iron Tusk Elephant",
+      "oracleText": "Trample",
       "power": {
         "type": "Literal",
         "value": 3

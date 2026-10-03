@@ -273,6 +273,7 @@
         }
       ],
       "name": "Freyalise, Llanowar's Fury",
+      "oracleText": "[+2]: Create a 1/1 green Elf Druid creature token with \"{T}: Add {G}.\"\n[−2]: Destroy target artifact or enchantment.\n[−6]: Draw a card for each green creature you control.\nFreyalise, Llanowar's Fury can be your commander.",
       "typeLine": {
         "subtypes": [
           {

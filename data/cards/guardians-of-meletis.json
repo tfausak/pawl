@@ -13,6 +13,7 @@
         }
       ],
       "name": "Guardians of Meletis",
+      "oracleText": "Defender (This creature can't attack.)",
       "power": {
         "type": "Literal",
         "value": 0

@@ -19,6 +19,7 @@
         }
       ],
       "name": "Pest Infestation",
+      "oracleText": "Destroy up to X target artifacts and/or enchantments. Create twice X 1/1 black and green Pest creature tokens with \"When this token dies, you gain 1 life.\"",
       "spell": {
         "modes": [
           {

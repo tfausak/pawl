@@ -17,6 +17,7 @@
         }
       ],
       "name": "Matoya, Archon Elder",
+      "oracleText": "Whenever you scry or surveil, draw a card. (Draw after you scry or surveil.)",
       "power": {
         "type": "Literal",
         "value": 1

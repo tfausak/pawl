@@ -59,6 +59,7 @@
         }
       ],
       "name": "Brittle Effigy",
+      "oracleText": "{4}, {T}, Exile this artifact: Exile target creature.",
       "typeLine": {
         "types": [
           {

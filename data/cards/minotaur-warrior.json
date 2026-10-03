@@ -17,6 +17,7 @@
         }
       ],
       "name": "Minotaur Warrior",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

@@ -25,6 +25,7 @@
         }
       ],
       "name": "Ghostly Sentinel",
+      "oracleText": "Flying, vigilance",
       "power": {
         "type": "Literal",
         "value": 3

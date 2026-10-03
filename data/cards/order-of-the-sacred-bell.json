@@ -17,6 +17,7 @@
         }
       ],
       "name": "Order of the Sacred Bell",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 4

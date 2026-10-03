@@ -17,6 +17,7 @@
         }
       ],
       "name": "Prowling Caracal",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

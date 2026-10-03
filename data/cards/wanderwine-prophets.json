@@ -37,6 +37,7 @@
         }
       ],
       "name": "Wanderwine Prophets",
+      "oracleText": "Champion a Merfolk (When this enters, sacrifice it unless you exile another Merfolk you control. When this leaves the battlefield, that card returns to the battlefield.)\nWhenever this creature deals combat damage to a player, you may sacrifice a Merfolk. If you do, take an extra turn after this one.",
       "power": {
         "type": "Literal",
         "value": 4

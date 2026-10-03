@@ -83,6 +83,7 @@
         }
       ],
       "name": "Gristle Glutton",
+      "oracleText": "{T}, Blight 1: Discard a card. If you do, draw a card. (To blight 1, put a -1/-1 counter on a creature you control.)",
       "power": {
         "type": "Literal",
         "value": 1

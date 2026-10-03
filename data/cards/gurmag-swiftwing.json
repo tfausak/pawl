@@ -28,6 +28,7 @@
         }
       ],
       "name": "Gurmag Swiftwing",
+      "oracleText": "Flying, first strike, haste",
       "power": {
         "type": "Literal",
         "value": 1

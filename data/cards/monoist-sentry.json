@@ -18,6 +18,7 @@
         }
       ],
       "name": "Monoist Sentry",
+      "oracleText": "Defender",
       "power": {
         "type": "Literal",
         "value": 4

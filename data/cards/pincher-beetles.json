@@ -22,6 +22,7 @@
         }
       ],
       "name": "Pincher Beetles",
+      "oracleText": "Shroud (This creature can't be the target of spells or abilities.)",
       "power": {
         "type": "Literal",
         "value": 3

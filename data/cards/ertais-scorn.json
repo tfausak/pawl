@@ -84,6 +84,7 @@
         }
       ],
       "name": "Ertai's Scorn",
+      "oracleText": "This spell costs {U} less to cast if an opponent cast two or more spells this turn.\nCounter target spell.",
       "spell": {
         "modes": [
           {

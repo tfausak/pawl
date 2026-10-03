@@ -71,6 +71,7 @@
         }
       ],
       "name": "Worms of the Earth",
+      "oracleText": "Players can't play lands.\nLands can't enter the battlefield.\nAt the beginning of each upkeep, any player may sacrifice two lands of their choice or have this enchantment deal 5 damage to that player. If a player does either, destroy this enchantment.",
       "playerAbilities": [
         {
           "effect": {

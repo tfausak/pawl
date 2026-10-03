@@ -26,6 +26,7 @@
         }
       ],
       "name": "Mass of Ghouls",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 5

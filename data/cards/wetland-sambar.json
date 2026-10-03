@@ -17,6 +17,7 @@
         }
       ],
       "name": "Wetland Sambar",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

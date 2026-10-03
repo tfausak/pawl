@@ -26,6 +26,7 @@
         }
       ],
       "name": "Silent Artisan",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

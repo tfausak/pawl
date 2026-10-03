@@ -17,6 +17,7 @@
         }
       ],
       "name": "Viashino Warrior",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 4

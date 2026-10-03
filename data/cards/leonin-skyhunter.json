@@ -27,6 +27,7 @@
         }
       ],
       "name": "Leonin Skyhunter",
+      "oracleText": "Flying",
       "power": {
         "type": "Literal",
         "value": 2

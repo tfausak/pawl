@@ -33,6 +33,7 @@
         }
       ],
       "name": "Chitinous Graspling",
+      "oracleText": "Changeling (This card is every creature type.)\nReach",
       "power": {
         "type": "Literal",
         "value": 3

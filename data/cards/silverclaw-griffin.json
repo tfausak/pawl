@@ -34,6 +34,7 @@
         }
       ],
       "name": "Silverclaw Griffin",
+      "oracleText": "Flying, first strike",
       "power": {
         "type": "Literal",
         "value": 3

@@ -13,6 +13,7 @@
         }
       ],
       "name": "Galvanic Blast",
+      "oracleText": "Galvanic Blast deals 2 damage to any target.\nMetalcraft — Galvanic Blast deals 4 damage instead if you control three or more artifacts.",
       "spell": {
         "modes": [
           {

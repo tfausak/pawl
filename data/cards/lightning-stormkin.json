@@ -30,6 +30,7 @@
         }
       ],
       "name": "Lightning Stormkin",
+      "oracleText": "Flying\nHaste (This creature can attack and {T} as soon as it comes under your control.)",
       "power": {
         "type": "Literal",
         "value": 2

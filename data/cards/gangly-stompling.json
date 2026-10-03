@@ -33,6 +33,7 @@
         }
       ],
       "name": "Gangly Stompling",
+      "oracleText": "Changeling (This card is every creature type.)\nTrample",
       "power": {
         "type": "Literal",
         "value": 4

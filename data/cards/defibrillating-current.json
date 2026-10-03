@@ -31,6 +31,7 @@
         }
       ],
       "name": "Defibrillating Current",
+      "oracleText": "Defibrillating Current deals 4 damage to target creature or planeswalker and you gain 2 life.",
       "spell": {
         "modes": [
           {

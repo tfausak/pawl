@@ -31,6 +31,7 @@
         }
       ],
       "name": "Thunderous Debut",
+      "oracleText": "Bargain (You may sacrifice an artifact, enchantment, or token as you cast this spell.)\nLook at the top twenty cards of your library. You may reveal up to two creature cards from among them. If this spell was bargained, put the revealed cards onto the battlefield. Otherwise, put the revealed cards into your hand. Then shuffle.",
       "spell": {
         "modes": [
           {

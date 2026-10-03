@@ -17,6 +17,7 @@
         }
       ],
       "name": "Omnath, Locus of Mana",
+      "oracleText": "You don't lose unspent green mana as steps and phases end.\nOmnath gets +1/+1 for each unspent green mana you have.",
       "playerAbilities": [
         {
           "effect": {

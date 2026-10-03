@@ -26,6 +26,7 @@
         }
       ],
       "name": "Hostage Taker",
+      "oracleText": "When this creature enters, exile another target creature or artifact until this creature leaves the battlefield. You may cast that card for as long as it remains exiled, and mana of any type can be spent to cast that spell.",
       "power": {
         "type": "Literal",
         "value": 2

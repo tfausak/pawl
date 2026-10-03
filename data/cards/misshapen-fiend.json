@@ -22,6 +22,7 @@
         }
       ],
       "name": "Misshapen Fiend",
+      "oracleText": "Flying",
       "power": {
         "type": "Literal",
         "value": 1

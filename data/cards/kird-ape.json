@@ -13,6 +13,7 @@
         }
       ],
       "name": "Kird Ape",
+      "oracleText": "This creature gets +1/+2 as long as you control a Forest.",
       "power": {
         "type": "Literal",
         "value": 1

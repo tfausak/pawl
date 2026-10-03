@@ -30,6 +30,7 @@
         }
       ],
       "name": "Knight of Meadowgrain",
+      "oracleText": "First strike\nLifelink (Damage dealt by this creature also causes you to gain that much life.)",
       "power": {
         "type": "Literal",
         "value": 2

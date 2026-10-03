@@ -17,6 +17,7 @@
         }
       ],
       "name": "River Kaijin",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 1

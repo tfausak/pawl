@@ -16,6 +16,7 @@
         }
       ],
       "name": "Killing Wave",
+      "oracleText": "For each creature, its controller sacrifices it unless they pay X life.",
       "spell": {
         "modes": [
           {

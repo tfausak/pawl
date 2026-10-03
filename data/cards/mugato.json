@@ -37,6 +37,7 @@
         }
       ],
       "name": "Mugato",
+      "oracleText": "Reach, vigilance, deathtouch",
       "power": {
         "type": "Literal",
         "value": 6

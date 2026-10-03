@@ -26,6 +26,7 @@
         }
       ],
       "name": "Hollowhenge Beast",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 5

@@ -51,6 +51,7 @@
         }
       ],
       "name": "Llanowar Elves",
+      "oracleText": "{T}: Add {G}.",
       "power": {
         "type": "Literal",
         "value": 1

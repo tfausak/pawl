@@ -13,6 +13,7 @@
         }
       ],
       "name": "Norwood Ranger",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 1

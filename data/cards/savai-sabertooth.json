@@ -17,6 +17,7 @@
         }
       ],
       "name": "Savai Sabertooth",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

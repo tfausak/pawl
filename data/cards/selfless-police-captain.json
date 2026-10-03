@@ -17,6 +17,7 @@
         }
       ],
       "name": "Selfless Police Captain",
+      "oracleText": "This creature enters with a +1/+1 counter on it.\nWhen this creature leaves the battlefield, put its +1/+1 counters on target creature you control.",
       "power": {
         "type": "Literal",
         "value": 1

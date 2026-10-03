@@ -87,6 +87,7 @@
         }
       ],
       "name": "Miracle Worker",
+      "oracleText": "{T}: Destroy target Aura attached to a creature you control.",
       "power": {
         "type": "Literal",
         "value": 1

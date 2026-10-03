@@ -34,6 +34,7 @@
         }
       ],
       "name": "Seraph of the Suns",
+      "oracleText": "Flying\nIndestructible (Damage and effects that say \"destroy\" don't destroy this creature. If its toughness is 0 or less, it still dies.)",
       "power": {
         "type": "Literal",
         "value": 4

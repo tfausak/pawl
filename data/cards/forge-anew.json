@@ -17,6 +17,7 @@
         }
       ],
       "name": "Forge Anew",
+      "oracleText": "When this enchantment enters, return target Equipment card from your graveyard to the battlefield.\nDuring your turn, you may activate equip abilities any time you could cast an instant.\nYou may pay {0} rather than pay the equip cost of the first equip ability you activate during each of your turns.",
       "playerAbilities": [
         {
           "condition": {

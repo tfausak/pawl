@@ -13,6 +13,7 @@
         }
       ],
       "name": "Coiled Tinviper",
+      "oracleText": "First strike",
       "power": {
         "type": "Literal",
         "value": 2

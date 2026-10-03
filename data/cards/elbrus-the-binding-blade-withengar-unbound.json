@@ -24,6 +24,7 @@
         }
       ],
       "name": "Elbrus, the Binding Blade",
+      "oracleText": "Equipped creature gets +1/+0.\nWhen equipped creature deals combat damage to a player, unattach Elbrus, then transform it.\nEquip {1}",
       "staticAbilities": [
         {
           "affected": {
@@ -143,6 +144,7 @@
         }
       ],
       "name": "Withengar Unbound",
+      "oracleText": "Flying, intimidate, trample (A creature with intimidate can't be blocked except by artifact creatures and/or creatures that share a color with it.)\nWhenever a player loses the game, put thirteen +1/+1 counters on Withengar Unbound.",
       "power": {
         "type": "Literal",
         "value": 13

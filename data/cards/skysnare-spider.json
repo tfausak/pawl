@@ -34,6 +34,7 @@
         }
       ],
       "name": "Skysnare Spider",
+      "oracleText": "Vigilance (Attacking doesn't cause this creature to tap.)\nReach (This creature can block creatures with flying.)",
       "power": {
         "type": "Literal",
         "value": 6

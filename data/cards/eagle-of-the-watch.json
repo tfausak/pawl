@@ -25,6 +25,7 @@
         }
       ],
       "name": "Eagle of the Watch",
+      "oracleText": "Flying, vigilance",
       "power": {
         "type": "Literal",
         "value": 2

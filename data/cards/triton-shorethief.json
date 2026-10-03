@@ -13,6 +13,7 @@
         }
       ],
       "name": "Triton Shorethief",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 1

@@ -34,6 +34,7 @@
         }
       ],
       "name": "Jolrael's Centaur",
+      "oracleText": "Shroud (This creature can't be the target of spells or abilities.)\nFlanking (Whenever a creature without flanking blocks this creature, the blocking creature gets -1/-1 until end of turn.)",
       "power": {
         "type": "Literal",
         "value": 2

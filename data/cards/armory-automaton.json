@@ -8,6 +8,7 @@
         }
       ],
       "name": "Armory Automaton",
+      "oracleText": "Whenever this creature enters or attacks, you may attach any number of target Equipment to it. (Control of the Equipment doesn't change.)",
       "power": {
         "type": "Literal",
         "value": 2

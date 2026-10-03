@@ -13,6 +13,7 @@
         }
       ],
       "name": "Volunteer Militia",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 1

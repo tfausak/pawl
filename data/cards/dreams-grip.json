@@ -26,6 +26,7 @@
         }
       ],
       "name": "Dream's Grip",
+      "oracleText": "Choose one —\n• Tap target permanent.\n• Untap target permanent.\nEntwine {1} (Choose both if you pay the entwine cost.)",
       "spell": {
         "modes": [
           {

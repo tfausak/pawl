@@ -16,6 +16,7 @@
         }
       ],
       "name": "Blaze",
+      "oracleText": "Blaze deals X damage to any target.",
       "spell": {
         "modes": [
           {

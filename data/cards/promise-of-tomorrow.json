@@ -17,6 +17,7 @@
         }
       ],
       "name": "Promise of Tomorrow",
+      "oracleText": "Whenever a creature you control dies, exile it.\nAt the beginning of each end step, if you control no creatures, sacrifice this enchantment and return all cards exiled with it to the battlefield under your control.",
       "triggeredAbilities": [
         {
           "condition": {

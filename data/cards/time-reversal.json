@@ -26,6 +26,7 @@
         }
       ],
       "name": "Time Reversal",
+      "oracleText": "Each player shuffles their hand and graveyard into their library, then draws seven cards. Exile Time Reversal.",
       "spell": {
         "modes": [
           {

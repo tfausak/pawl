@@ -22,6 +22,7 @@
         }
       ],
       "name": "Alley Strangler",
+      "oracleText": "Menace",
       "power": {
         "type": "Literal",
         "value": 2

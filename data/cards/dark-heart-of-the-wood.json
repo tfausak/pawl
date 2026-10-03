@@ -70,6 +70,7 @@
         }
       ],
       "name": "Dark Heart of the Wood",
+      "oracleText": "Sacrifice a Forest: You gain 3 life.",
       "typeLine": {
         "types": [
           {

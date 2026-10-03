@@ -22,6 +22,7 @@
         }
       ],
       "name": "Insatiable Skittermaw",
+      "oracleText": "Menace (This creature can't be blocked except by two or more creatures.)\nVoid — At the beginning of your end step, if a nonland permanent left the battlefield this turn or a spell was warped this turn, put a +1/+1 counter on this creature.",
       "power": {
         "type": "Literal",
         "value": 2

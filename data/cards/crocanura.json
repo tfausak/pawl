@@ -25,6 +25,7 @@
         }
       ],
       "name": "Crocanura",
+      "oracleText": "Reach (This creature can block creatures with flying.)\nEvolve (Whenever a creature you control enters, if that creature has greater power or toughness than this creature, put a +1/+1 counter on this creature.)",
       "power": {
         "type": "Literal",
         "value": 1

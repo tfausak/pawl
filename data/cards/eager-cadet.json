@@ -13,6 +13,7 @@
         }
       ],
       "name": "Eager Cadet",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 1

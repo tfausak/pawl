@@ -68,6 +68,7 @@
         }
       ],
       "name": "Selhoff Entomber",
+      "oracleText": "{T}, Discard a creature card: Draw a card.",
       "power": {
         "type": "Literal",
         "value": 1

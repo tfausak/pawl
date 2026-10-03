@@ -24,6 +24,7 @@
         }
       ],
       "name": "Merfolk Spy",
+      "oracleText": "Islandwalk (This creature can't be blocked as long as defending player controls an Island.)\nWhenever this creature deals combat damage to a player, that player reveals a card at random from their hand.",
       "power": {
         "type": "Literal",
         "value": 1

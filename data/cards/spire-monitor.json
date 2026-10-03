@@ -25,6 +25,7 @@
         }
       ],
       "name": "Spire Monitor",
+      "oracleText": "Flash (You may cast this spell any time you could cast an instant.)\nFlying",
       "power": {
         "type": "Literal",
         "value": 3

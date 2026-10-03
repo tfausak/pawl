@@ -69,6 +69,7 @@
         }
       ],
       "name": "Ash Barrens",
+      "oracleText": "{T}: Add {C}.\nBasic landcycling {1} ({1}, Discard this card: Search your library for a basic land card, reveal it, put it into your hand, then shuffle.)",
       "typeLine": {
         "types": [
           {

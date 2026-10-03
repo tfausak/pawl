@@ -17,6 +17,7 @@
         }
       ],
       "name": "Plated Wurm",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 4

@@ -22,6 +22,7 @@
         }
       ],
       "name": "Galvanic Relay",
+      "oracleText": "Exile the top card of your library. During your next turn, you may play that card.\nStorm (When you cast this spell, copy it for each spell cast before it this turn.)",
       "spell": {
         "modes": [
           {

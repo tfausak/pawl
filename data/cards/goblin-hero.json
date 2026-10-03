@@ -17,6 +17,7 @@
         }
       ],
       "name": "Goblin Hero",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

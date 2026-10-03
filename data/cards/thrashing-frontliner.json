@@ -22,6 +22,7 @@
         }
       ],
       "name": "Thrashing Frontliner",
+      "oracleText": "Trample\nWhenever this creature attacks a battle, it gets +1/+1 until end of turn.",
       "power": {
         "type": "Literal",
         "value": 2

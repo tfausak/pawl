@@ -18,6 +18,7 @@
         }
       ],
       "name": "Lantern Kami",
+      "oracleText": "Flying",
       "power": {
         "type": "Literal",
         "value": 1

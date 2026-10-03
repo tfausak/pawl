@@ -35,6 +35,7 @@
         }
       ],
       "name": "Torsten Von Ursus",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 5

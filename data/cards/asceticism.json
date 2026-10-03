@@ -92,6 +92,7 @@
         }
       ],
       "name": "Asceticism",
+      "oracleText": "Creatures you control have hexproof.\n{1}{G}: Regenerate target creature. (The next time it would be destroyed this turn, instead tap it, remove it from combat, and heal all damage on it.)",
       "staticAbilities": [
         {
           "affected": {

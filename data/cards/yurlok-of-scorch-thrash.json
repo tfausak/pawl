@@ -120,6 +120,7 @@
         }
       ],
       "name": "Yurlok of Scorch Thrash",
+      "oracleText": "Vigilance\nA player losing unspent mana causes that player to lose that much life.\n{1}, {T}: Each player adds {B}{R}{G}.",
       "playerAbilities": [
         {
           "effect": {

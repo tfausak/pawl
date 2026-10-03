@@ -13,6 +13,7 @@
         }
       ],
       "name": "Chaos Charm",
+      "oracleText": "Choose one —\n• Destroy target Wall.\n• Chaos Charm deals 1 damage to target creature.\n• Target creature gains haste until end of turn.",
       "spell": {
         "modes": [
           {

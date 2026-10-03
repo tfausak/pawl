@@ -2,6 +2,7 @@
   "faces": [
     {
       "name": "Scrubland",
+      "oracleText": "({T}: Add {W} or {B}.)",
       "typeLine": {
         "subtypes": [
           {

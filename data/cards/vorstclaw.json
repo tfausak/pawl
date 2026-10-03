@@ -26,6 +26,7 @@
         }
       ],
       "name": "Vorstclaw",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 7

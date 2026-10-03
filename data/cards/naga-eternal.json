@@ -17,6 +17,7 @@
         }
       ],
       "name": "Naga Eternal",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

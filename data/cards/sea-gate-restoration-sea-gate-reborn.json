@@ -35,6 +35,7 @@
         }
       ],
       "name": "Sea Gate Restoration",
+      "oracleText": "Draw cards equal to the number of cards in your hand plus one. You have no maximum hand size for the rest of the game.",
       "spell": {
         "modes": [
           {
@@ -158,6 +159,7 @@
         }
       ],
       "name": "Sea Gate, Reborn",
+      "oracleText": "As this land enters, you may pay 3 life. If you don't, it enters tapped.\n{T}: Add {U}.",
       "replacementEffects": [
         {
           "effect": {

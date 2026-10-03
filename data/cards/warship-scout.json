@@ -13,6 +13,7 @@
         }
       ],
       "name": "Warship Scout",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

@@ -35,6 +35,7 @@
         }
       ],
       "name": "Future Sight",
+      "oracleText": "Play with the top card of your library revealed.\nYou may play lands and cast spells from the top of your library.",
       "playerAbilities": [
         {
           "effect": {

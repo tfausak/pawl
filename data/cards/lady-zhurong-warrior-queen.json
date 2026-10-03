@@ -22,6 +22,7 @@
         }
       ],
       "name": "Lady Zhurong, Warrior Queen",
+      "oracleText": "Horsemanship (This creature can't be blocked except by creatures with horsemanship.)",
       "power": {
         "type": "Literal",
         "value": 4

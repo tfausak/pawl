@@ -26,6 +26,7 @@
         }
       ],
       "name": "Reverse the Sands",
+      "oracleText": "Redistribute any number of players' life totals. (Each of those players gets one life total back.)",
       "spell": {
         "modes": [
           {

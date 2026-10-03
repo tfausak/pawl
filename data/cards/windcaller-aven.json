@@ -50,6 +50,7 @@
         }
       ],
       "name": "Windcaller Aven",
+      "oracleText": "Flying\nCycling {U} ({U}, Discard this card: Draw a card.)\nWhen you cycle this card, target creature gains flying until end of turn.",
       "power": {
         "type": "Literal",
         "value": 4

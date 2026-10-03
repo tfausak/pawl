@@ -40,6 +40,7 @@
         }
       ],
       "name": "Tower Gargoyle",
+      "oracleText": "Flying",
       "power": {
         "type": "Literal",
         "value": 4

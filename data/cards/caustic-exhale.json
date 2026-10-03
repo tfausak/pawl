@@ -42,6 +42,7 @@
         }
       ],
       "name": "Caustic Exhale",
+      "oracleText": "As an additional cost to cast this spell, behold a Dragon or pay {1}. (To behold a Dragon, choose a Dragon you control or reveal a Dragon card from your hand.)\nTarget creature gets -3/-3 until end of turn.",
       "spell": {
         "modes": [
           {

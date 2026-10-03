@@ -31,6 +31,7 @@
         }
       ],
       "name": "Hulk, Bruce Banner",
+      "oracleText": "Trample (This creature can deal excess combat damage to the player he's attacking.)",
       "power": {
         "type": "Literal",
         "value": 7

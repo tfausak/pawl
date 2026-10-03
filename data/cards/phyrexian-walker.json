@@ -3,6 +3,7 @@
     {
       "manaCost": [],
       "name": "Phyrexian Walker",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 0

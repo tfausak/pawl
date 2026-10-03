@@ -62,6 +62,7 @@
         }
       ],
       "name": "Gift of Doom",
+      "oracleText": "Enchant creature\nEnchanted creature has deathtouch and indestructible.\nMorph—Sacrifice another creature. (You may cast this card face down as a 2/2 creature for {3}. Turn it face up any time for its morph cost.)\nAs this Aura is turned face up, you may attach it to a creature.",
       "replacementEffects": [
         {
           "effect": {

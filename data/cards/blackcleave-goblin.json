@@ -25,6 +25,7 @@
         }
       ],
       "name": "Blackcleave Goblin",
+      "oracleText": "Haste\nInfect (This creature deals damage to creatures in the form of -1/-1 counters and to players in the form of poison counters.)",
       "power": {
         "type": "Literal",
         "value": 2

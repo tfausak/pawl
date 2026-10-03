@@ -25,6 +25,7 @@
         }
       ],
       "name": "Thundering Tanadon",
+      "oracleText": "({G/P} can be paid with either {G} or 2 life.)\nTrample",
       "power": {
         "type": "Literal",
         "value": 5

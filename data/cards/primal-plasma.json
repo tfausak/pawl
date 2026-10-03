@@ -17,6 +17,7 @@
         }
       ],
       "name": "Primal Plasma",
+      "oracleText": "As this creature enters, it becomes your choice of a 3/3 creature, a 2/2 creature with flying, or a 1/6 creature with defender.",
       "power": {
         "type": "Star"
       },

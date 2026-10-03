@@ -26,6 +26,7 @@
         }
       ],
       "name": "Kindred Discovery",
+      "oracleText": "As this enchantment enters, choose a creature type.\nWhenever a creature you control of the chosen type enters or attacks, draw a card.",
       "replacementEffects": [
         {
           "effect": {

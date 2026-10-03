@@ -22,6 +22,7 @@
         }
       ],
       "name": "Gandalf, White Rider",
+      "oracleText": "Vigilance\nWhenever you cast a spell, creatures you control get +1/+0 until end of turn. Scry 1.\nWhen Gandalf dies, you may put it into its owner's library fifth from the top.",
       "power": {
         "type": "Literal",
         "value": 3

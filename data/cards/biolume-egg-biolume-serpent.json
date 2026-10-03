@@ -71,6 +71,7 @@
         }
       ],
       "name": "Biolume Egg",
+      "oracleText": "Defender\nWhen this creature enters, scry 2.\nWhen you sacrifice this creature, return it to the battlefield transformed under its owner's control at the beginning of the next end step.",
       "power": {
         "type": "Literal",
         "value": 0
@@ -237,6 +238,7 @@
         }
       ],
       "name": "Biolume Serpent",
+      "oracleText": "Sacrifice two Islands: This creature can't be blocked this turn.",
       "power": {
         "type": "Literal",
         "value": 4

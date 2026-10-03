@@ -35,6 +35,7 @@
         }
       ],
       "name": "Nyxborn Colossus",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 6

@@ -22,6 +22,7 @@
         }
       ],
       "name": "Mineshaft Spider",
+      "oracleText": "Reach\nWhen this creature enters, you may mill two cards. (You may put the top two cards of your library into your graveyard.)",
       "power": {
         "type": "Literal",
         "value": 3

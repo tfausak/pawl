@@ -27,6 +27,7 @@
         }
       ],
       "name": "Goblin Deathraiders",
+      "oracleText": "Trample",
       "power": {
         "type": "Literal",
         "value": 3

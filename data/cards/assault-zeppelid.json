@@ -34,6 +34,7 @@
         }
       ],
       "name": "Assault Zeppelid",
+      "oracleText": "Flying, trample",
       "power": {
         "type": "Literal",
         "value": 3

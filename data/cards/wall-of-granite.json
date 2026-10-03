@@ -22,6 +22,7 @@
         }
       ],
       "name": "Wall of Granite",
+      "oracleText": "Defender (This creature can't attack.)",
       "power": {
         "type": "Literal",
         "value": 0

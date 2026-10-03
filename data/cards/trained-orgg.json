@@ -17,6 +17,7 @@
         }
       ],
       "name": "Trained Orgg",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 6

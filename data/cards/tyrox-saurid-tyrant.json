@@ -17,6 +17,7 @@
         }
       ],
       "name": "Tyrox, Saurid Tyrant",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 4

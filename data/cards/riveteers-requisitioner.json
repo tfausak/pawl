@@ -39,6 +39,7 @@
         }
       ],
       "name": "Riveteers Requisitioner",
+      "oracleText": "When this creature dies, create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")\nBlitz {2}{R} (If you cast this spell for its blitz cost, it gains haste and \"When this creature dies, draw a card.\" Sacrifice it at the beginning of the next end step.)",
       "power": {
         "type": "Literal",
         "value": 3

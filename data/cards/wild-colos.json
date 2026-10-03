@@ -22,6 +22,7 @@
         }
       ],
       "name": "Wild Colos",
+      "oracleText": "Haste",
       "power": {
         "type": "Literal",
         "value": 2

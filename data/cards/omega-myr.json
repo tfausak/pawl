@@ -8,6 +8,7 @@
         }
       ],
       "name": "Omega Myr",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 1

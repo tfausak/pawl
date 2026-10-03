@@ -150,6 +150,7 @@
         }
       ],
       "name": "Chandra, Fire Artisan",
+      "oracleText": "Whenever one or more loyalty counters are removed from Chandra, she deals that much damage to target opponent or planeswalker.\n[+1]: Exile the top card of your library. You may play it this turn.\n[−7]: Exile the top seven cards of your library. You may play them this turn.",
       "triggeredAbilities": [
         {
           "condition": {

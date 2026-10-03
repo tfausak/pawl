@@ -34,6 +34,7 @@
         }
       ],
       "name": "Tempest Drake",
+      "oracleText": "Flying, vigilance",
       "power": {
         "type": "Literal",
         "value": 2

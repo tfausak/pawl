@@ -30,6 +30,7 @@
         }
       ],
       "name": "Vernadi Shieldmate",
+      "oracleText": "Vigilance",
       "power": {
         "type": "Literal",
         "value": 2

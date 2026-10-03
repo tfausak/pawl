@@ -22,6 +22,7 @@
         }
       ],
       "name": "Grub, Storied Matriarch",
+      "oracleText": "Menace\nWhenever this creature enters or transforms into Grub, Storied Matriarch, return up to one target Goblin card from your graveyard to your hand.\nAt the beginning of your first main phase, you may pay {R}. If you do, transform Grub.",
       "power": {
         "type": "Literal",
         "value": 2
@@ -186,6 +187,7 @@
         }
       ],
       "name": "Grub, Notorious Auntie",
+      "oracleText": "Menace\nWhenever Grub attacks, you may blight 1. If you do, create a tapped and attacking token that's a copy of the blighted creature, except it has \"At the beginning of the end step, sacrifice this token.\"\nAt the beginning of your first main phase, you may pay {B}. If you do, transform Grub.",
       "power": {
         "type": "Literal",
         "value": 2

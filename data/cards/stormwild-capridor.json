@@ -22,6 +22,7 @@
         }
       ],
       "name": "Stormwild Capridor",
+      "oracleText": "Flying\nIf noncombat damage would be dealt to this creature, prevent that damage. Put a +1/+1 counter on this creature for each 1 damage prevented this way.",
       "power": {
         "type": "Literal",
         "value": 1

@@ -26,6 +26,7 @@
         }
       ],
       "name": "Minotaur Abomination",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 4

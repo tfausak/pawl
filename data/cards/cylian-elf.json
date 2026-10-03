@@ -17,6 +17,7 @@
         }
       ],
       "name": "Cylian Elf",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

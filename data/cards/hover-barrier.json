@@ -25,6 +25,7 @@
         }
       ],
       "name": "Hover Barrier",
+      "oracleText": "Defender, flying",
       "power": {
         "type": "Literal",
         "value": 0

@@ -45,6 +45,7 @@
         }
       ],
       "name": "Wheel of Sun and Moon",
+      "oracleText": "Enchant player\nIf a card would be put into enchanted player's graveyard from anywhere, instead that card is revealed and put on the bottom of that player's library.",
       "replacementEffects": [
         {
           "effect": {

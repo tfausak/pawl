@@ -37,6 +37,7 @@
         }
       ],
       "name": "Patron of the Akki",
+      "oracleText": "Goblin offering (You may cast this spell any time you could cast an instant by sacrificing a Goblin and paying the difference in mana costs between this and the sacrificed Goblin. Mana cost includes color.)\nWhenever Patron of the Akki attacks, creatures you control get +2/+0 until end of turn.",
       "power": {
         "type": "Literal",
         "value": 5

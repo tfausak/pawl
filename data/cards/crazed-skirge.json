@@ -25,6 +25,7 @@
         }
       ],
       "name": "Crazed Skirge",
+      "oracleText": "Flying, haste",
       "power": {
         "type": "Literal",
         "value": 2

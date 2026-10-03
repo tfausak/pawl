@@ -18,6 +18,7 @@
         }
       ],
       "name": "Hullcarver",
+      "oracleText": "Deathtouch",
       "power": {
         "type": "Literal",
         "value": 1

@@ -18,6 +18,7 @@
         }
       ],
       "name": "Flying Men",
+      "oracleText": "Flying",
       "power": {
         "type": "Literal",
         "value": 1

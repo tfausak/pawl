@@ -17,6 +17,7 @@
         }
       ],
       "name": "Oreskos Explorer",
+      "oracleText": "When this creature enters, search your library for up to X Plains cards, where X is the number of players who control more lands than you. Reveal those cards, put them into your hand, then shuffle.",
       "power": {
         "type": "Literal",
         "value": 2

@@ -42,6 +42,7 @@
         }
       ],
       "name": "Old Ghastbark",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

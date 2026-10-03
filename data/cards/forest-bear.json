@@ -17,6 +17,7 @@
         }
       ],
       "name": "Forest Bear",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

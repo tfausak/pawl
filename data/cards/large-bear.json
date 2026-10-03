@@ -53,6 +53,7 @@
         }
       ],
       "name": "Large Bear",
+      "oracleText": "Reach, trample, haste",
       "power": {
         "type": "Literal",
         "value": 5

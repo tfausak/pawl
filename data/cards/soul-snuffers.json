@@ -26,6 +26,7 @@
         }
       ],
       "name": "Soul Snuffers",
+      "oracleText": "When this creature enters, put a -1/-1 counter on each creature.",
       "power": {
         "type": "Literal",
         "value": 3

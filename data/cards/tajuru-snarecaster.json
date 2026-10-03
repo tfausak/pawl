@@ -22,6 +22,7 @@
         }
       ],
       "name": "Tajuru Snarecaster",
+      "oracleText": "Reach",
       "power": {
         "type": "Literal",
         "value": 1

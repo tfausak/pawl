@@ -17,6 +17,7 @@
         }
       ],
       "name": "Rotted Hystrix",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

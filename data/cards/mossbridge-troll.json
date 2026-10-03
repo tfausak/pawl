@@ -107,6 +107,7 @@
         }
       ],
       "name": "Mossbridge Troll",
+      "oracleText": "If this creature would be destroyed, regenerate it.\nTap any number of untapped creatures you control other than this creature with total power 10 or greater: This creature gets +20/+20 until end of turn.",
       "power": {
         "type": "Literal",
         "value": 5

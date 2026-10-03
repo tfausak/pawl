@@ -35,6 +35,7 @@
         }
       ],
       "name": "The Valeyard",
+      "oracleText": "If an opponent would face a villainous choice, they face that choice an additional time. (They can make the same or different choices.)\nWhile voting, you may vote an additional time.",
       "power": {
         "type": "Literal",
         "value": 4

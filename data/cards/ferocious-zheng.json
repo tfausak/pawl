@@ -26,6 +26,7 @@
         }
       ],
       "name": "Ferocious Zheng",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 4

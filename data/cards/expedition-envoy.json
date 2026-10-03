@@ -13,6 +13,7 @@
         }
       ],
       "name": "Expedition Envoy",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

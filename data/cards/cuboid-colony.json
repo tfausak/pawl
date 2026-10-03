@@ -36,6 +36,7 @@
         }
       ],
       "name": "Cuboid Colony",
+      "oracleText": "Flash\nFlying, trample\nIncrement (Whenever you cast a spell, if the amount of mana you spent is greater than this creature's power or toughness, put a +1/+1 counter on this creature.)",
       "power": {
         "type": "Literal",
         "value": 1

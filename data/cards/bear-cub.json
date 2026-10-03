@@ -17,6 +17,7 @@
         }
       ],
       "name": "Bear Cub",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

@@ -53,6 +53,7 @@
         }
       ],
       "name": "Kindle the Inner Flame",
+      "oracleText": "Create a token that's a copy of target creature you control, except it has haste and \"At the beginning of the end step, sacrifice this token.\"\nFlashback—{1}{R}, Behold three Elementals. (You may cast this card from your graveyard for its flashback cost. Then exile it. To behold an Elemental, choose an Elemental you control or reveal an Elemental card from your hand.)",
       "spell": {
         "modes": [
           {

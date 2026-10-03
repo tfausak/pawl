@@ -33,6 +33,7 @@
         }
       ],
       "name": "Auramancer's Guise",
+      "oracleText": "Enchant creature\nEnchanted creature gets +2/+2 for each Aura attached to it and has vigilance.",
       "staticAbilities": [
         {
           "affected": {

@@ -13,6 +13,7 @@
         }
       ],
       "name": "Pay No Heed",
+      "oracleText": "Prevent all damage a source of your choice would deal this turn.",
       "spell": {
         "modes": [
           {

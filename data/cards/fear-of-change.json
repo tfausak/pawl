@@ -22,6 +22,7 @@
         }
       ],
       "name": "Fear of Change",
+      "oracleText": "When this creature enters or dies, exile another creature you control. If you do, conjure a duplicate of a random creature card with mana value X onto the battlefield, where X is 2 plus the exiled creature's mana value.",
       "power": {
         "type": "Literal",
         "value": 2

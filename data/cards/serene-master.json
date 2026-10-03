@@ -17,6 +17,7 @@
         }
       ],
       "name": "Serene Master",
+      "oracleText": "Whenever this creature blocks, exchange its power and the power of target creature it's blocking until end of combat.",
       "power": {
         "type": "Literal",
         "value": 0

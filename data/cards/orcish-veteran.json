@@ -92,6 +92,7 @@
         }
       ],
       "name": "Orcish Veteran",
+      "oracleText": "This creature can't block white creatures with power 2 or greater.\n{R}: This creature gains first strike until end of turn.",
       "power": {
         "type": "Literal",
         "value": 2

@@ -26,6 +26,7 @@
         }
       ],
       "name": "Primordial Wurm",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 7

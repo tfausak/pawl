@@ -17,6 +17,7 @@
         }
       ],
       "name": "Viral Spawning",
+      "oracleText": "Create a 3/3 green Phyrexian Beast creature token with toxic 1. (Players dealt combat damage by it also get a poison counter.)\nCorrupted — As long as an opponent has three or more poison counters and this card is in your graveyard, it has flashback {2}{G}. (You may cast this card from your graveyard for its flashback cost. Then exile it.)",
       "spell": {
         "modes": [
           {

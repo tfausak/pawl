@@ -26,6 +26,7 @@
         }
       ],
       "name": "Master Thief",
+      "oracleText": "When this creature enters, gain control of target artifact for as long as you control this creature.",
       "power": {
         "type": "Literal",
         "value": 2

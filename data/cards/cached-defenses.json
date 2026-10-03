@@ -17,6 +17,7 @@
         }
       ],
       "name": "Cached Defenses",
+      "oracleText": "Bolster 3. (Choose a creature with the least toughness among creatures you control and put three +1/+1 counters on it.)",
       "spell": {
         "modes": [
           {

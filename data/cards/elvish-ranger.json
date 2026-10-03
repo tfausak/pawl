@@ -17,6 +17,7 @@
         }
       ],
       "name": "Elvish Ranger",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 4

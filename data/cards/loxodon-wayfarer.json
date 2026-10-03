@@ -17,6 +17,7 @@
         }
       ],
       "name": "Loxodon Wayfarer",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 1

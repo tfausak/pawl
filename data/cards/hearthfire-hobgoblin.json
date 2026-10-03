@@ -60,6 +60,7 @@
         }
       ],
       "name": "Hearthfire Hobgoblin",
+      "oracleText": "Double strike",
       "power": {
         "type": "Literal",
         "value": 2

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Sphinx's Decree",
+      "oracleText": "Each opponent can't cast instant or sorcery spells during that player's next turn.",
       "spell": {
         "modes": [
           {

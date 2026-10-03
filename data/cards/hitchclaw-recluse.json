@@ -22,6 +22,7 @@
         }
       ],
       "name": "Hitchclaw Recluse",
+      "oracleText": "Reach",
       "power": {
         "type": "Literal",
         "value": 1

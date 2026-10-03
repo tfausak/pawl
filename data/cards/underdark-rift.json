@@ -128,6 +128,7 @@
         }
       ],
       "name": "Underdark Rift",
+      "oracleText": "{T}: Add {C}.\n{5}, {T}, Exile this land: Roll a d10. Put target artifact, creature, or planeswalker into its owner's library just beneath the top X cards of that library, where X is the result. Activate only as a sorcery.",
       "typeLine": {
         "types": [
           {

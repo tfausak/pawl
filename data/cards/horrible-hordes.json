@@ -14,6 +14,7 @@
         }
       ],
       "name": "Horrible Hordes",
+      "oracleText": "Rampage 1 (Whenever this creature becomes blocked, it gets +1/+1 until end of turn for each creature blocking it beyond the first.)",
       "power": {
         "type": "Literal",
         "value": 2

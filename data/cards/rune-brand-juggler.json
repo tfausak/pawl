@@ -121,6 +121,7 @@
         }
       ],
       "name": "Rune-Brand Juggler",
+      "oracleText": "When this creature enters, suspect up to one target creature you control. (A suspected creature has menace and can't block.)\n{3}{B}{R}, Sacrifice a suspected creature: Target creature gets -5/-5 until end of turn.",
       "power": {
         "type": "Literal",
         "value": 2

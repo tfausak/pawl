@@ -25,6 +25,7 @@
         }
       ],
       "name": "Venomous Changeling",
+      "oracleText": "Changeling (This card is every creature type.)\nDeathtouch",
       "power": {
         "type": "Literal",
         "value": 1

@@ -68,6 +68,7 @@
         }
       ],
       "name": "Uthden Troll",
+      "oracleText": "{R}: Regenerate this creature.",
       "power": {
         "type": "Literal",
         "value": 2

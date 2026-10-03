@@ -35,6 +35,7 @@
         }
       ],
       "name": "Spider-Man, Web-Slinger",
+      "oracleText": "Web-slinging {W} (You may cast this spell for {W} if you also return a tapped creature you control to its owner's hand.)",
       "power": {
         "type": "Literal",
         "value": 3

@@ -123,6 +123,7 @@
         }
       ],
       "name": "Caldera Breaker",
+      "oracleText": "Trample\nWhen Caldera Breaker enters, exile all Mountain cards from your library. When you do, Caldera Breaker deals that much damage to target creature or planeswalker an opponent controls.\nWhen Caldera Breaker dies, put all cards exiled with it onto the battlefield under their owner's control. Conjure four cards named Volcanic Geyser into your library, then shuffle.",
       "power": {
         "type": "Literal",
         "value": 6

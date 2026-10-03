@@ -26,6 +26,7 @@
         }
       ],
       "name": "Bruenor Battlehammer",
+      "oracleText": "Each creature you control gets +2/+0 for each Equipment attached to it.\nYou may pay {0} rather than pay the equip cost of the first equip ability you activate each turn.",
       "playerAbilities": [
         {
           "effect": {

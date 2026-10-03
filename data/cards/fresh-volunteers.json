@@ -17,6 +17,7 @@
         }
       ],
       "name": "Fresh Volunteers",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

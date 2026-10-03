@@ -22,6 +22,7 @@
         }
       ],
       "name": "Fortified Rampart",
+      "oracleText": "Defender",
       "power": {
         "type": "Literal",
         "value": 0

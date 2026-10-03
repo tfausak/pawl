@@ -18,6 +18,7 @@
         }
       ],
       "name": "Fang of Shigeki",
+      "oracleText": "Deathtouch",
       "power": {
         "type": "Literal",
         "value": 1

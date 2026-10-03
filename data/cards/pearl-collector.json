@@ -89,6 +89,7 @@
         }
       ],
       "name": "Pearl Collector",
+      "oracleText": "Deathtouch, Lifelink\nAt the beginning of your second main phase, if you gained 4 or more life this turn, conjure a card named Mox Pearl into your hand. This ability triggers only once.\n{2}{W}: Another target creature perpetually gains lifelink.",
       "power": {
         "type": "Literal",
         "value": 3

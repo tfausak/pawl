@@ -25,6 +25,7 @@
         }
       ],
       "name": "Changeling Sentinel",
+      "oracleText": "Changeling (This card is every creature type.)\nVigilance",
       "power": {
         "type": "Literal",
         "value": 3

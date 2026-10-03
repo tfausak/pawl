@@ -31,6 +31,7 @@
         }
       ],
       "name": "Crash of Rhinos",
+      "oracleText": "Trample",
       "power": {
         "type": "Literal",
         "value": 8

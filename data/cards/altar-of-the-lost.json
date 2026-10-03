@@ -86,6 +86,7 @@
         }
       ],
       "name": "Altar of the Lost",
+      "oracleText": "This artifact enters tapped.\n{T}: Add two mana in any combination of colors. Spend this mana only to cast spells with flashback from a graveyard.",
       "replacementEffects": [
         {
           "effect": {

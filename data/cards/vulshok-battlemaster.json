@@ -22,6 +22,7 @@
         }
       ],
       "name": "Vulshok Battlemaster",
+      "oracleText": "Haste\nWhen this creature enters, attach all Equipment on the battlefield to it. (Control of the Equipment doesn't change.)",
       "power": {
         "type": "Literal",
         "value": 2

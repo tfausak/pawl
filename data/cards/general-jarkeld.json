@@ -89,6 +89,7 @@
         }
       ],
       "name": "General Jarkeld",
+      "oracleText": "{T}: Choose two target blocked attacking creatures. If each of those creatures could be blocked by all creatures that the other is blocked by, each creature that's blocking exactly one of those attacking creatures stops blocking it and is blocking the other attacking creature. Activate only during the declare blockers step.",
       "power": {
         "type": "Literal",
         "value": 1

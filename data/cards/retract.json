@@ -13,6 +13,7 @@
         }
       ],
       "name": "Retract",
+      "oracleText": "Return all artifacts you control to their owner's hand.",
       "spell": {
         "modes": [
           {

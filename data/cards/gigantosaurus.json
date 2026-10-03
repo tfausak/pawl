@@ -49,13 +49,14 @@
         }
       ],
       "name": "Gigantosaurus",
+      "oracleText": "",
       "power": {
         "type": "Literal",
-        "value": 1E+1
+        "value": 10
       },
       "toughness": {
         "type": "Literal",
-        "value": 1E+1
+        "value": 10
       },
       "typeLine": {
         "subtypes": [

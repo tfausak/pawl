@@ -26,6 +26,7 @@
         }
       ],
       "name": "Borrowed Malevolence",
+      "oracleText": "Escalate {2} (Pay this cost for each mode chosen beyond the first.)\nChoose one or both —\n• Target creature gets +1/+1 until end of turn.\n• Target creature gets -1/-1 until end of turn.",
       "spell": {
         "modes": [
           {

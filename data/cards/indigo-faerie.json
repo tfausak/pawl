@@ -78,6 +78,7 @@
         }
       ],
       "name": "Indigo Faerie",
+      "oracleText": "Flying\n{U}: Target permanent becomes blue in addition to its other colors until end of turn.",
       "power": {
         "type": "Literal",
         "value": 1

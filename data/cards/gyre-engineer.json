@@ -78,6 +78,7 @@
         }
       ],
       "name": "Gyre Engineer",
+      "oracleText": "{T}: Add {G}{U}.",
       "power": {
         "type": "Literal",
         "value": 1

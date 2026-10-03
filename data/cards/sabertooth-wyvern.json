@@ -25,6 +25,7 @@
         }
       ],
       "name": "Sabertooth Wyvern",
+      "oracleText": "Flying, first strike",
       "power": {
         "type": "Literal",
         "value": 3

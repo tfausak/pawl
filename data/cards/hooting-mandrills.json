@@ -25,6 +25,7 @@
         }
       ],
       "name": "Hooting Mandrills",
+      "oracleText": "Delve (Each card you exile from your graveyard while casting this spell pays for {1}.)\nTrample",
       "power": {
         "type": "Literal",
         "value": 4

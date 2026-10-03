@@ -25,6 +25,7 @@
         }
       ],
       "name": "Dawn's Light Archer",
+      "oracleText": "Flash\nReach",
       "power": {
         "type": "Literal",
         "value": 4

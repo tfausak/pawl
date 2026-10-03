@@ -27,6 +27,7 @@
         }
       ],
       "name": "Entangling Vines",
+      "oracleText": "Enchant tapped creature\nEnchanted creature doesn't untap during its controller's untap step.",
       "typeLine": {
         "subtypes": [
           {

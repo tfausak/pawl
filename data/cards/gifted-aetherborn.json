@@ -30,6 +30,7 @@
         }
       ],
       "name": "Gifted Aetherborn",
+      "oracleText": "Deathtouch, lifelink",
       "power": {
         "type": "Literal",
         "value": 2

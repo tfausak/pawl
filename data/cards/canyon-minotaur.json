@@ -17,6 +17,7 @@
         }
       ],
       "name": "Canyon Minotaur",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

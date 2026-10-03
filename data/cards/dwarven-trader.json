@@ -13,6 +13,7 @@
         }
       ],
       "name": "Dwarven Trader",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 1

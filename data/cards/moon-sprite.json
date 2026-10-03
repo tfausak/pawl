@@ -22,6 +22,7 @@
         }
       ],
       "name": "Moon Sprite",
+      "oracleText": "Flying",
       "power": {
         "type": "Literal",
         "value": 1

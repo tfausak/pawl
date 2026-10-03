@@ -31,6 +31,7 @@
         }
       ],
       "name": "Henry Wu, InGen Geneticist",
+      "oracleText": "Henry Wu and other Human creatures you control have exploit. (When a creature with exploit enters, you may sacrifice a creature.)\nWhenever a creature you control exploits a non-Human creature, draw a card. If the exploited creature had power 3 or greater, create a Treasure token.",
       "power": {
         "type": "Literal",
         "value": 1

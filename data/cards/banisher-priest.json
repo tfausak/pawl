@@ -26,6 +26,7 @@
         }
       ],
       "name": "Banisher Priest",
+      "oracleText": "When this creature enters, exile target creature an opponent controls until this creature leaves the battlefield.",
       "power": {
         "type": "Literal",
         "value": 2

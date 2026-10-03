@@ -22,6 +22,7 @@
         }
       ],
       "name": "Kithkin Billyrider",
+      "oracleText": "Double strike",
       "power": {
         "type": "Literal",
         "value": 1

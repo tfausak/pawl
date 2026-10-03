@@ -18,6 +18,7 @@
         }
       ],
       "name": "Moss Viper",
+      "oracleText": "Deathtouch",
       "power": {
         "type": "Literal",
         "value": 1

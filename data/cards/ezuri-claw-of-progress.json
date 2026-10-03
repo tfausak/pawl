@@ -26,6 +26,7 @@
         }
       ],
       "name": "Ezuri, Claw of Progress",
+      "oracleText": "Whenever a creature you control with power 2 or less enters, you get an experience counter.\nAt the beginning of combat on your turn, put X +1/+1 counters on another target creature you control, where X is the number of experience counters you have.",
       "power": {
         "type": "Literal",
         "value": 3

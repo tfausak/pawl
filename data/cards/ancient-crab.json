@@ -26,6 +26,7 @@
         }
       ],
       "name": "Ancient Crab",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 1

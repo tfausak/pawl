@@ -13,6 +13,7 @@
         }
       ],
       "name": "Devoted Hero",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 1

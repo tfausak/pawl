@@ -22,6 +22,7 @@
         }
       ],
       "name": "Ogre Berserker",
+      "oracleText": "Haste",
       "power": {
         "type": "Literal",
         "value": 4

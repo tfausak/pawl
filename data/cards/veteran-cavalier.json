@@ -27,6 +27,7 @@
         }
       ],
       "name": "Veteran Cavalier",
+      "oracleText": "Vigilance (Attacking doesn't cause this creature to tap.)",
       "power": {
         "type": "Literal",
         "value": 2

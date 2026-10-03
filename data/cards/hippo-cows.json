@@ -22,6 +22,7 @@
         }
       ],
       "name": "Hippo-Cows",
+      "oracleText": "Trample (This creature can deal excess combat damage to the player it's attacking.)",
       "power": {
         "type": "Literal",
         "value": 5

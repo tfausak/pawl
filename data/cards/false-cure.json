@@ -66,6 +66,7 @@
         }
       ],
       "name": "False Cure",
+      "oracleText": "Until end of turn, whenever a player gains life, that player loses 2 life for each 1 life they gained.",
       "spell": {
         "modes": [
           {

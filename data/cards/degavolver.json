@@ -55,6 +55,7 @@
         }
       ],
       "name": "Degavolver",
+      "oracleText": "Kicker {1}{B} and/or {R} (You may pay an additional {1}{B} and/or {R} as you cast this spell.)\nIf this creature was kicked with its {1}{B} kicker, it enters with two +1/+1 counters on it and with \"Pay 3 life: Regenerate this creature.\"\nIf this creature was kicked with its {R} kicker, it enters with a +1/+1 counter on it and with first strike.",
       "power": {
         "type": "Literal",
         "value": 1

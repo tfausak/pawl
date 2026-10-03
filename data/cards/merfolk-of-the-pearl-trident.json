@@ -13,6 +13,7 @@
         }
       ],
       "name": "Merfolk of the Pearl Trident",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 1

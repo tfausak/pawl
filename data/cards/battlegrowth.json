@@ -13,6 +13,7 @@
         }
       ],
       "name": "Battlegrowth",
+      "oracleText": "Put a +1/+1 counter on target creature.",
       "spell": {
         "modes": [
           {

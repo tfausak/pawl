@@ -13,6 +13,7 @@
         }
       ],
       "name": "Duress",
+      "oracleText": "Target opponent reveals their hand. You choose a noncreature, nonland card from it. That player discards that card.",
       "spell": {
         "modes": [
           {

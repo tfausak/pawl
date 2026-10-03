@@ -22,6 +22,7 @@
         }
       ],
       "name": "Conjurer's Ban",
+      "oracleText": "Choose a card name. Until your next turn, spells with the chosen name can't be cast and lands with the chosen name can't be played.\nDraw a card.",
       "spell": {
         "modes": [
           {

@@ -31,6 +31,7 @@
         }
       ],
       "name": "Flame Javelin",
+      "oracleText": "({2/R} can be paid with any two mana or with {R}. This card's mana value is 6.)\nFlame Javelin deals 4 damage to any target.",
       "spell": {
         "modes": [
           {

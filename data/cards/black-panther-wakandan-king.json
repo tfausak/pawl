@@ -164,6 +164,7 @@
         }
       ],
       "name": "Black Panther, Wakandan King",
+      "oracleText": "First strike\nSurvey the Realm — Whenever Black Panther or another creature you control enters, put a +1/+1 counter on target land you control.\nMine Vibranium — {3}: Move all +1/+1 counters from target land you control onto target creature. If one or more +1/+1 counters are moved this way, you gain that much life and draw a card.",
       "power": {
         "type": "Literal",
         "value": 2

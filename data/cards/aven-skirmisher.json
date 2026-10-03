@@ -18,6 +18,7 @@
         }
       ],
       "name": "Aven Skirmisher",
+      "oracleText": "Flying",
       "power": {
         "type": "Literal",
         "value": 1

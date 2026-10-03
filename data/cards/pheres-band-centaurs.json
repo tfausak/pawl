@@ -17,6 +17,7 @@
         }
       ],
       "name": "Pheres-Band Centaurs",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

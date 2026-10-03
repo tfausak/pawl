@@ -17,6 +17,7 @@
         }
       ],
       "name": "Beacon of Immortality",
+      "oracleText": "Double target player's life total. Shuffle Beacon of Immortality into its owner's library.",
       "spell": {
         "modes": [
           {

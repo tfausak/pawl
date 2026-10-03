@@ -18,6 +18,7 @@
         }
       ],
       "name": "Squirrelanoids",
+      "oracleText": "Deathtouch",
       "power": {
         "type": "Literal",
         "value": 1

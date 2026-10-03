@@ -17,6 +17,7 @@
         }
       ],
       "name": "Zimone's Experiment",
+      "oracleText": "Look at the top five cards of your library. You may reveal up to two creature and/or land cards from among them, then put the rest on the bottom of your library in a random order. Put all land cards revealed this way onto the battlefield tapped and put all creature cards revealed this way into your hand.",
       "spell": {
         "modes": [
           {

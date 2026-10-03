@@ -34,6 +34,7 @@
         }
       ],
       "name": "Sentinel Spider",
+      "oracleText": "Reach, vigilance",
       "power": {
         "type": "Literal",
         "value": 4

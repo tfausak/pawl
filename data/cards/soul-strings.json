@@ -16,6 +16,7 @@
         }
       ],
       "name": "Soul Strings",
+      "oracleText": "Return two target creature cards from your graveyard to your hand unless any player pays {X}.",
       "spell": {
         "modes": [
           {

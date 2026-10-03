@@ -17,6 +17,7 @@
         }
       ],
       "name": "Reprieve",
+      "oracleText": "Return target spell to its owner's hand.\nDraw a card.",
       "spell": {
         "modes": [
           {

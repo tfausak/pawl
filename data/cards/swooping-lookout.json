@@ -21,6 +21,7 @@
         }
       ],
       "name": "Swooping Lookout",
+      "oracleText": "Flying, vigilance",
       "power": {
         "type": "Literal",
         "value": 1

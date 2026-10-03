@@ -17,6 +17,7 @@
         }
       ],
       "name": "Zulaport Cutthroat",
+      "oracleText": "Whenever this creature or another creature you control dies, each opponent loses 1 life and you gain 1 life.",
       "power": {
         "type": "Literal",
         "value": 1

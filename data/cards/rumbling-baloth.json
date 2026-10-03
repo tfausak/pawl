@@ -26,6 +26,7 @@
         }
       ],
       "name": "Rumbling Baloth",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 4

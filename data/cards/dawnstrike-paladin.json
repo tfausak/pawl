@@ -34,6 +34,7 @@
         }
       ],
       "name": "Dawnstrike Paladin",
+      "oracleText": "Vigilance (Attacking doesn't cause this creature to tap.)\nLifelink (Damage dealt by this creature also causes you to gain that much life.)",
       "power": {
         "type": "Literal",
         "value": 2

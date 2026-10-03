@@ -26,6 +26,7 @@
         }
       ],
       "name": "Ancient Brontodon",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 9

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Thragtusk",
+      "oracleText": "When this creature enters, you gain 5 life.\nWhen this creature leaves the battlefield, create a 3/3 green Beast creature token.",
       "power": {
         "type": "Literal",
         "value": 5

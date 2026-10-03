@@ -60,6 +60,7 @@
         }
       ],
       "name": "Wilt-Leaf Cavaliers",
+      "oracleText": "Vigilance",
       "power": {
         "type": "Literal",
         "value": 3

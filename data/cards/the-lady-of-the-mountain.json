@@ -26,6 +26,7 @@
         }
       ],
       "name": "The Lady of the Mountain",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 5

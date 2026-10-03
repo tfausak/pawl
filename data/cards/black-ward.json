@@ -20,6 +20,7 @@
         }
       ],
       "name": "Black Ward",
+      "oracleText": "Enchant creature\nEnchanted creature has protection from black. This effect doesn't remove this Aura.",
       "staticAbilities": [
         {
           "affected": {

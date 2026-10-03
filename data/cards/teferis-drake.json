@@ -25,6 +25,7 @@
         }
       ],
       "name": "Teferi's Drake",
+      "oracleText": "Flying\nPhasing (This phases in or out before you untap during each of your untap steps. While it's phased out, it's treated as though it doesn't exist.)",
       "power": {
         "type": "Literal",
         "value": 3

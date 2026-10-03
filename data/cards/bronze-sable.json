@@ -8,6 +8,7 @@
         }
       ],
       "name": "Bronze Sable",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

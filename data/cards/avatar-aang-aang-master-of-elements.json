@@ -52,6 +52,7 @@
         }
       ],
       "name": "Avatar Aang",
+      "oracleText": "Flying, firebending 2\nWhenever you waterbend, earthbend, firebend, or airbend, draw a card. Then if you've done all four this turn, transform Avatar Aang.",
       "power": {
         "type": "Literal",
         "value": 4
@@ -183,6 +184,7 @@
         }
       ],
       "name": "Aang, Master of Elements",
+      "oracleText": "Flying\nSpells you cast cost {W}{U}{B}{R}{G} less to cast. (This can reduce generic costs.)\nAt the beginning of each upkeep, you may transform Aang, Master of Elements. If you do, you gain 4 life, draw four cards, put four +1/+1 counters on him, and he deals 4 damage to each opponent.",
       "playerAbilities": [
         {
           "effect": {

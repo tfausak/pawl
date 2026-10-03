@@ -34,6 +34,7 @@
         }
       ],
       "name": "Sky Spirit",
+      "oracleText": "Flying, first strike",
       "power": {
         "type": "Literal",
         "value": 2

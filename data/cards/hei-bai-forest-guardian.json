@@ -203,6 +203,7 @@
         }
       ],
       "name": "Hei Bai, Forest Guardian",
+      "oracleText": "When Hei Bai enters, reveal cards from the top of your library until you reveal a Shrine card. You may put that card onto the battlefield. Then shuffle.\n{W}{U}{B}{R}{G}, {T}: For each legendary enchantment you control, create a 1/1 colorless Spirit creature token with \"This token can't block or be blocked by non-Spirit creatures.\"",
       "power": {
         "type": "Literal",
         "value": 4

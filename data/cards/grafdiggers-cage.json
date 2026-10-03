@@ -29,6 +29,7 @@
         }
       ],
       "name": "Grafdigger's Cage",
+      "oracleText": "Creature cards in graveyards and libraries can't enter the battlefield.\nPlayers can't cast spells from graveyards or libraries.",
       "playerAbilities": [
         {
           "effect": {

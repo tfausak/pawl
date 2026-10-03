@@ -17,6 +17,7 @@
         }
       ],
       "name": "Essence Scatter",
+      "oracleText": "Counter target creature spell.",
       "spell": {
         "modes": [
           {

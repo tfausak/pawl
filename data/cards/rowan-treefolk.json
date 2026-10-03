@@ -17,6 +17,7 @@
         }
       ],
       "name": "Rowan Treefolk",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

@@ -22,6 +22,7 @@
         }
       ],
       "name": "Roc Hunter",
+      "oracleText": "Reach",
       "power": {
         "type": "Literal",
         "value": 3

@@ -26,6 +26,7 @@
         }
       ],
       "name": "Renegade Demon",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 5

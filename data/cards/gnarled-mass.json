@@ -26,6 +26,7 @@
         }
       ],
       "name": "Gnarled Mass",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

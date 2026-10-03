@@ -17,6 +17,7 @@
         }
       ],
       "name": "Follow the Tracks",
+      "oracleText": "Conjure a card of your choice from Follow the Tracks's spellbook onto the battlefield.",
       "spell": {
         "modes": [
           {

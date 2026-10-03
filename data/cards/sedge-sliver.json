@@ -17,6 +17,7 @@
         }
       ],
       "name": "Sedge Sliver",
+      "oracleText": "All Sliver creatures have \"This creature gets +1/+1 as long as you control a Swamp.\"\nAll Slivers have \"{B}: Regenerate this permanent.\" (The next time it would be destroyed this turn, instead tap it, remove it from combat, and heal all damage on it.)",
       "power": {
         "type": "Literal",
         "value": 2

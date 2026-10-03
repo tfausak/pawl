@@ -40,6 +40,7 @@
         }
       ],
       "name": "Galewind Moose",
+      "oracleText": "Flash\nReach, vigilance, trample",
       "power": {
         "type": "Literal",
         "value": 6

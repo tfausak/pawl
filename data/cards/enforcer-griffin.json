@@ -22,6 +22,7 @@
         }
       ],
       "name": "Enforcer Griffin",
+      "oracleText": "Flying",
       "power": {
         "type": "Literal",
         "value": 3

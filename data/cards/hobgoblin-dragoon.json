@@ -33,6 +33,7 @@
         }
       ],
       "name": "Hobgoblin Dragoon",
+      "oracleText": "Flying, first strike",
       "power": {
         "type": "Literal",
         "value": 1

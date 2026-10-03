@@ -22,6 +22,7 @@
         }
       ],
       "name": "Renegade Troops",
+      "oracleText": "Haste",
       "power": {
         "type": "Literal",
         "value": 4

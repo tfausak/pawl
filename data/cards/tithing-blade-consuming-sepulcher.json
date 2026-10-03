@@ -50,6 +50,7 @@
         }
       ],
       "name": "Tithing Blade",
+      "oracleText": "When this artifact enters, each opponent sacrifices a creature of their choice.\nCraft with creature {4}{B} ({4}{B}, Exile this artifact, Exile a creature you control or a creature card from your graveyard: Return this card transformed under its owner's control. Craft only as a sorcery.)",
       "triggeredAbilities": [
         {
           "condition": {
@@ -105,6 +106,7 @@
         }
       ],
       "name": "Consuming Sepulcher",
+      "oracleText": "At the beginning of your upkeep, each opponent loses 1 life and you gain 1 life.",
       "triggeredAbilities": [
         {
           "condition": {

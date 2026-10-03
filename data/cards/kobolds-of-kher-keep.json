@@ -8,6 +8,7 @@
       ],
       "manaCost": [],
       "name": "Kobolds of Kher Keep",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 0

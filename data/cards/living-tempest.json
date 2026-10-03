@@ -25,6 +25,7 @@
         }
       ],
       "name": "Living Tempest",
+      "oracleText": "Flash\nFlying",
       "power": {
         "type": "Literal",
         "value": 3

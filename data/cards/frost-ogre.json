@@ -26,6 +26,7 @@
         }
       ],
       "name": "Frost Ogre",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 5

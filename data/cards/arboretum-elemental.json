@@ -34,6 +34,7 @@
         }
       ],
       "name": "Arboretum Elemental",
+      "oracleText": "Convoke (Your creatures can help cast this spell. Each creature you tap while casting this spell pays for {1} or one mana of that creature's color.)\nHexproof (This creature can't be the target of spells or abilities your opponents control.)",
       "power": {
         "type": "Literal",
         "value": 7

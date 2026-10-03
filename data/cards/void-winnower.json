@@ -38,6 +38,7 @@
         }
       ],
       "name": "Void Winnower",
+      "oracleText": "Your opponents can't cast spells with even mana values. (Zero is even.)\nYour opponents can't block with creatures with even mana values.",
       "playerAbilities": [
         {
           "effect": {

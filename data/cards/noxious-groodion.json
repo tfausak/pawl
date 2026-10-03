@@ -22,6 +22,7 @@
         }
       ],
       "name": "Noxious Groodion",
+      "oracleText": "Deathtouch",
       "power": {
         "type": "Literal",
         "value": 2

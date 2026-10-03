@@ -22,6 +22,7 @@
         }
       ],
       "name": "Talas Scout",
+      "oracleText": "Flying",
       "power": {
         "type": "Literal",
         "value": 1

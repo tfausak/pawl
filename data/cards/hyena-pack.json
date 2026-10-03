@@ -26,6 +26,7 @@
         }
       ],
       "name": "Hyena Pack",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

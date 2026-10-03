@@ -131,6 +131,7 @@
         }
       ],
       "name": "Flowering Lumberknot",
+      "oracleText": "This creature can't attack or block unless it's paired with a creature with soulbond.",
       "power": {
         "type": "Literal",
         "value": 5

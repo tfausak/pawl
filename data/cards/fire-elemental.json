@@ -26,6 +26,7 @@
         }
       ],
       "name": "Fire Elemental",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 5

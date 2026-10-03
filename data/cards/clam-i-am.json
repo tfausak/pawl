@@ -17,6 +17,7 @@
         }
       ],
       "name": "Clam-I-Am",
+      "oracleText": "If you roll a 3 on a six-sided die, you may reroll that die.",
       "playerAbilities": [
         {
           "effect": {

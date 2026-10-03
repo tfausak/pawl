@@ -22,6 +22,7 @@
         }
       ],
       "name": "Magnigoth Sentry",
+      "oracleText": "Reach (This creature can block creatures with flying.)",
       "power": {
         "type": "Literal",
         "value": 4

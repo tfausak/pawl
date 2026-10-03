@@ -17,6 +17,7 @@
         }
       ],
       "name": "Kyoshi Warrior Guard",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2

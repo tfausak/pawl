@@ -37,6 +37,7 @@
         }
       ],
       "name": "Simic Sky Swallower",
+      "oracleText": "Flying, trample\nShroud (This creature can't be the target of spells or abilities.)",
       "power": {
         "type": "Literal",
         "value": 6

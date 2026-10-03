@@ -17,6 +17,7 @@
         }
       ],
       "name": "Frantic Search",
+      "oracleText": "Draw two cards, then discard two cards. Untap up to three lands.",
       "spell": {
         "modes": [
           {

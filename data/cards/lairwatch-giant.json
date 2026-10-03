@@ -31,6 +31,7 @@
         }
       ],
       "name": "Lairwatch Giant",
+      "oracleText": "This creature can block an additional creature each combat.\nWhenever this creature blocks two or more creatures, it gains first strike until end of turn.",
       "power": {
         "type": "Literal",
         "value": 5

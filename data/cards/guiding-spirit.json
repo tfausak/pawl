@@ -116,6 +116,7 @@
         }
       ],
       "name": "Guiding Spirit",
+      "oracleText": "Flying\n{T}: If the top card of target player's graveyard is a creature card, put that card on top of that player's library.",
       "power": {
         "type": "Literal",
         "value": 1

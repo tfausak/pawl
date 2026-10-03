@@ -46,6 +46,7 @@
         }
       ],
       "name": "Llanowar Reborn",
+      "oracleText": "This land enters tapped.\n{T}: Add {G}.\nGraft 1 (This land enters with a +1/+1 counter on it. Whenever a creature enters, you may move a +1/+1 counter from this land onto it.)",
       "replacementEffects": [
         {
           "effect": {

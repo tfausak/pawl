@@ -37,6 +37,7 @@
         }
       ],
       "name": "Blor the Impervious",
+      "oracleText": "Trample, hexproof, indestructible",
       "power": {
         "type": "Literal",
         "value": 3

@@ -25,6 +25,7 @@
         }
       ],
       "name": "Sultai Scavenger",
+      "oracleText": "Delve (Each card you exile from your graveyard while casting this spell pays for {1}.)\nFlying",
       "power": {
         "type": "Literal",
         "value": 3

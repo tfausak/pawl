@@ -22,6 +22,7 @@
         }
       ],
       "name": "Icy Prison",
+      "oracleText": "When this enchantment enters, exile target creature.\nAt the beginning of your upkeep, sacrifice this enchantment unless any player pays {3}.\nWhen this enchantment leaves the battlefield, return the exiled card to the battlefield under its owner's control.",
       "triggeredAbilities": [
         {
           "condition": {

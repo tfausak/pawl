@@ -40,6 +40,7 @@
         }
       ],
       "name": "Caprichrome",
+      "oracleText": "Flash\nVigilance\nDevour artifact 1 (As this creature enters, you may sacrifice any number of artifacts. It enters with that many +1/+1 counters on it.)",
       "power": {
         "type": "Literal",
         "value": 2

@@ -137,6 +137,7 @@
         }
       ],
       "name": "Cryptex",
+      "oracleText": "{T}, Collect evidence 3: Add one mana of any color. Put an unlock counter on this artifact. (To collect evidence 3, exile cards with total mana value 3 or greater from your graveyard.)\nSacrifice this artifact: Surveil 3, then draw three cards. Activate only if this artifact has five or more unlock counters on it.",
       "typeLine": {
         "types": [
           {

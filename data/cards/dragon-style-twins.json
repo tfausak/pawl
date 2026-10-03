@@ -34,6 +34,7 @@
         }
       ],
       "name": "Dragon-Style Twins",
+      "oracleText": "Double strike\nProwess (Whenever you cast a noncreature spell, this creature gets +1/+1 until end of turn.)",
       "power": {
         "type": "Literal",
         "value": 3

@@ -55,6 +55,7 @@
         }
       ],
       "name": "Anavolver",
+      "oracleText": "Kicker {1}{U} and/or {B} (You may pay an additional {1}{U} and/or {B} as you cast this spell.)\nIf this creature was kicked with its {1}{U} kicker, it enters with two +1/+1 counters on it and with flying.\nIf this creature was kicked with its {B} kicker, it enters with a +1/+1 counter on it and with \"Pay 3 life: Regenerate this creature.\"",
       "power": {
         "type": "Literal",
         "value": 3

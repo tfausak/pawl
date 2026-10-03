@@ -79,6 +79,7 @@
         }
       ],
       "name": "Coal Golem",
+      "oracleText": "{3}, Sacrifice this creature: Add {R}{R}{R}.",
       "power": {
         "type": "Literal",
         "value": 3

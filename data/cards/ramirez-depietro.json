@@ -40,6 +40,7 @@
         }
       ],
       "name": "Ramirez DePietro",
+      "oracleText": "First strike",
       "power": {
         "type": "Literal",
         "value": 4

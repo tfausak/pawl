@@ -26,6 +26,7 @@
         }
       ],
       "name": "Mirkwood Trapper",
+      "oracleText": "Whenever a player attacks you, target attacking creature gets -2/-0 until end of turn.\nWhenever a player attacks, if they aren't attacking you, that player chooses an attacking creature. It gets +2/+0 until end of turn.",
       "power": {
         "type": "Literal",
         "value": 1

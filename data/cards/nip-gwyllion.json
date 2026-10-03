@@ -26,6 +26,7 @@
         }
       ],
       "name": "Nip Gwyllion",
+      "oracleText": "Lifelink (Damage dealt by this creature also causes you to gain that much life.)",
       "power": {
         "type": "Literal",
         "value": 1

@@ -26,6 +26,7 @@
         }
       ],
       "name": "Craw Wurm",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 6

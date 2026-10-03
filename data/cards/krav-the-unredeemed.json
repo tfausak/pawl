@@ -112,6 +112,7 @@
         }
       ],
       "name": "Krav, the Unredeemed",
+      "oracleText": "Partner with Regna, the Redeemer (When this creature enters, target player may put Regna into their hand from their library, then shuffle.)\n{B}, Sacrifice X creatures: Target player draws X cards and gains X life. Put X +1/+1 counters on Krav.",
       "power": {
         "type": "Literal",
         "value": 3

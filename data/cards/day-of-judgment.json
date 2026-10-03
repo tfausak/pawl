@@ -26,6 +26,7 @@
         }
       ],
       "name": "Day of Judgment",
+      "oracleText": "Destroy all creatures.",
       "spell": {
         "modes": [
           {

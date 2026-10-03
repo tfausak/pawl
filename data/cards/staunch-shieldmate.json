@@ -13,6 +13,7 @@
         }
       ],
       "name": "Staunch Shieldmate",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 1

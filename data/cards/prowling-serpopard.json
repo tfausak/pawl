@@ -29,6 +29,7 @@
         }
       ],
       "name": "Prowling Serpopard",
+      "oracleText": "This spell can't be countered.\nCreature spells you control can't be countered.",
       "playerAbilities": [
         {
           "effect": {

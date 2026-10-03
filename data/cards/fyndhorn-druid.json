@@ -17,6 +17,7 @@
         }
       ],
       "name": "Fyndhorn Druid",
+      "oracleText": "When this creature dies, if it was blocked this turn, you gain 4 life.",
       "power": {
         "type": "Literal",
         "value": 2

@@ -25,6 +25,7 @@
         }
       ],
       "name": "Goblin Striker",
+      "oracleText": "First strike, haste",
       "power": {
         "type": "Literal",
         "value": 1

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Feywild Trickster",
+      "oracleText": "Whenever you roll one or more dice, create a 1/1 blue Faerie Dragon creature token with flying.",
       "power": {
         "type": "Literal",
         "value": 2

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Wandering Tombshell",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 1

@@ -60,6 +60,7 @@
         }
       ],
       "name": "Wasp Lancer",
+      "oracleText": "Flying",
       "power": {
         "type": "Literal",
         "value": 3

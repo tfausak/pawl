@@ -26,6 +26,7 @@
         }
       ],
       "name": "Edgar, King of Figaro",
+      "oracleText": "When Edgar enters, draw a card for each artifact you control.\nTwo-Headed Coin — The first time you flip one or more coins each turn, those coins come up heads and you win those flips.",
       "playerAbilities": [
         {
           "effect": {

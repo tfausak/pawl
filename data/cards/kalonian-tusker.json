@@ -22,6 +22,7 @@
         }
       ],
       "name": "Kalonian Tusker",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

@@ -13,6 +13,7 @@
         }
       ],
       "name": "Wandering Ones",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 1

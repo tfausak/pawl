@@ -69,6 +69,7 @@
         }
       ],
       "name": "Springleaf Drum",
+      "oracleText": "{T}, Tap an untapped creature you control: Add one mana of any color.",
       "typeLine": {
         "types": [
           {

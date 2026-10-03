@@ -81,6 +81,7 @@
         }
       ],
       "name": "Doom Cannon",
+      "oracleText": "As this artifact enters, choose a creature type.\n{3}, {T}, Sacrifice a creature of the chosen type: This artifact deals 3 damage to any target.",
       "replacementEffects": [
         {
           "effect": {

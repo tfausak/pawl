@@ -26,6 +26,7 @@
         }
       ],
       "name": "Flensing Raptor",
+      "oracleText": "Flying\nToxic 1 (Players dealt combat damage by this creature also get a poison counter.)\nWhen this creature enters, another target creature you control with toxic gets +1/+1 and gains flying until end of turn.",
       "power": {
         "type": "Literal",
         "value": 2

@@ -13,6 +13,7 @@
         }
       ],
       "name": "Eldrazi Devastator",
+      "oracleText": "Trample",
       "power": {
         "type": "Literal",
         "value": 8

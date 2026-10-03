@@ -13,6 +13,7 @@
         }
       ],
       "name": "Savannah Lions",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2
