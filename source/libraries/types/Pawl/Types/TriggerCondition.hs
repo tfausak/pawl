@@ -84,6 +84,9 @@ data TriggerCondition
     -- recipient no further than "a creature", and a Filter would owe CR 608.2h
     -- last known information for a recipient the damage has already killed.
     SelfDealsDamageToCreature
+  | -- | CR 603.2 / 120.1: the bearer dealt damage of any kind to any recipient,
+    -- once per damage event (Horned Cheetah). Self-scoped.
+    SelfDealsDamage
   | -- | CR 120.3: the bearer was dealt damage -- the enrage trigger's event
     -- (Ripjaw Raptor).
     SelfIsDealtDamage
