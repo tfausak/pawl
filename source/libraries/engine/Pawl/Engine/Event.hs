@@ -4118,6 +4118,15 @@ apply batch candidate event =
             Monad.unless (null milled) (State.modify' (recordEvent (GameEvent.Milled (Milled.MkMilled pid (Seq.fromList milled)))))
             Monad.void (changeZoneReturning (ReplacementCandidate.source candidate) Zone.Hand)
             pure Nothing
+      -- CR 614.10 / 614.6: Plagiarize's "that player skips that draw and you
+      -- draw a card". The event is left STANDING with the row's controller as
+      -- the drawer, so CR 616.2's next iteration re-collects against it and CR
+      -- 614.5 keeps THIS row off it -- which is the card's own ruling that
+      -- targeting yourself does nothing and loops nowhere. A row with no
+      -- controller leaves the draw skipped, CR 614.6's impossible instruction.
+      DrawRewrite.YouDraw -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        pure (ProposedEvent.WouldDraw <$> ReplacementCandidate.controller candidate)
     -- Unreachable: `applies` admits DrawR only against WouldDraw.
     (ReplacementEffect.DrawR {}, _) -> pure (Just event)
     -- CR 121.2a with CR 614.6: Alms Collector's "if an opponent would draw two or
@@ -8594,6 +8603,11 @@ drawCard pid = Monad.void (drawCardReturning pid)
 -- empty library (CR 104.3c is then the whole of what happened), or a move a
 -- replacement effect cancelled -- so a caller binding the answer binds nothing
 -- rather than binding a card that is not there.
+--
+-- Nothing too for a draw a replacement handed to another player (CR 121.6c):
+-- the card is drawn, but as a result of the replacement, so the instruction's
+-- "reveal it" does not reach it. A rewrite keeping the drawer is Plagiarize
+-- aimed at its own controller, which its ruling calls no useful effect.
 drawCardReturning :: PlayerId -> Game (Maybe ObjectId)
 drawCardReturning pid = do
   outcome <- applyReplacements (ProposedEvent.WouldDraw pid)
@@ -8602,7 +8616,9 @@ drawCardReturning pid = do
     -- already done its own work; nothing is left to do here and nothing is
     -- recorded.
     Nothing -> pure Nothing
-    Just drawer -> performDraw drawer
+    Just drawer -> do
+      drawn <- performDraw drawer
+      pure (if drawer == pid then drawn else Nothing)
 
 -- The draw itself, once CR 616.1's loop has left it standing. Split out so that
 -- rule 614.11's ordering is visible: the proposal above runs BEFORE the library

@@ -5193,6 +5193,7 @@ replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.FromOutsideTheGame payload)) -> outsideTheGameFramed [FromOutsideTheGame.filter payload]
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.GainLife _)) -> []
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.Dredge _)) -> []
+  ReplacementEffect.DrawR (DrawR.MkDrawR _ DrawRewrite.YouDraw) -> []
   ReplacementEffect.DrawCountR {} -> []
   ReplacementEffect.MillCountR {} -> []
   ReplacementEffect.CoinFlipR {} -> []
@@ -6205,6 +6206,7 @@ ruleAbilitiesFilters rules =
         <> concatMap (perCreatureFilters . AttackCost.perAttacker) (RuleAbilities.attackCosts rules)
         <> concatMap (unframed . affectedFilters . BlockCost.subject) (RuleAbilities.blockCosts rules)
         <> concatMap (perCreatureFilters . BlockCost.perBlocker) (RuleAbilities.blockCosts rules)
+        <> concatMap (unframed . Maybe.maybeToList . BlockCost.attackers) (RuleAbilities.blockCosts rules)
         <> concatMap (frame Unframed . combatRestrictionFilters) (RuleAbilities.combatRestrictions rules)
         <> concatMap (unframed . affectedFilters . SacrificeRestriction.affected) (RuleAbilities.sacrificeRestrictions rules)
         <> concatMap (unframed . affectedFilters . UntapRestriction.affected) (RuleAbilities.untapRestrictions rules)

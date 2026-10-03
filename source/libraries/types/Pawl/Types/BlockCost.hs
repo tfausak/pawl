@@ -1,6 +1,8 @@
 module Pawl.Types.BlockCost where
 
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PerCreature as PerCreature
 
 -- | CR 509.1b / CR 509.1d: one printed COST TO BLOCK (Oppressive Rays). CR 509.1b
@@ -23,11 +25,10 @@ import qualified Pawl.Types.PerCreature as PerCreature
 -- controller pays", and CR 509.1a makes every chosen creature one the defending
 -- player controls, so the payer is that player under any phrasing.
 --
--- No `scope` field either, for the same reason stated as a rule: CR 508.1b makes
--- an attack an announcement ABOUT something, which is what Ghostly Prison's "you"
--- narrows, while CR 509.1d totals over the CHOSEN CREATURES and nothing in CR 509
--- gives the cost a second object to be judged against. A printing that taxed only
--- blocks of a particular attacker would add a field here.
+-- No `scope` field either: CR 508.1b makes an attack an announcement ABOUT
+-- something, which is what Ghostly Prison's "you" narrows, while CR 509.1d totals
+-- over the CHOSEN CREATURES. What a blocker is assigned to block can still decide
+-- whether its cost is owed at all (Hipparion), which is `attackers` below.
 --
 -- Gathered LIVE from the battlefield on every read and never captured, the posture
 -- every carrier on this axis takes -- so an Oppressive Rays leaving the
@@ -51,6 +52,11 @@ data BlockCost = MkBlockCost
     -- 509.1e's window plus CR 509.1f's payment are together
     -- Pawl.Engine.Cost.payToll -- Pawl.Types.AttackCost's field for both, its
     -- reasons unchanged.
-    perBlocker :: PerCreature.PerCreature
+    perBlocker :: PerCreature.PerCreature,
+    -- | Which attackers blocking costs this -- Hipparion's "creatures with power
+    -- 3 or greater" (CR 509.1b); Nothing taxes every block. Owed once, by
+    -- `perBlocker`'s unit, when any attacker the creature is chosen to block
+    -- matches.
+    attackers :: Maybe (Filter.Filter Keyword.Keyword)
   }
   deriving (Eq, Ord, Show)
