@@ -1756,7 +1756,8 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "control belongs on a static ability, never in a stored effect" (fmap (S.nameOf . Printing.card) offenders) []
   -- CR 106.6 restricts how mana "can be spent"; it never forbids spending it
   -- outright. A Pawl.Types.ManaRestriction with no half set is mana no payment
-  -- may ever use, which is mana the card might as well not have added -- so it
+  -- may ever use (or, under prohibits, mana restricted in nothing), which is
+  -- mana the card might as well not have added (or not restricted) -- so it
   -- is card data that means nothing rather than a rule pawl implements. Nothing
   -- in the codec can refuse it: every field defaults to Nothing, which is what
   -- lets Mishra's Workshop write one key, Omen Hawker another and Overgrown

@@ -20,19 +20,26 @@ import qualified Pawl.Types.KeywordDesignator as KeywordDesignator
 -- predicate could carry: the payments are about different objects, a spell being
 -- cast, an ability's source, and the permanent a special action is taken on.
 --
--- FIVE fields and not one per payment the engine can make: CR 116.2 alone lists
--- eleven special actions, and what earns a field is a PRINTED rider naming that
--- payment. Foretelling (CR 116.2h), plotting (CR 116.2k), CR 508.1j \/ 509.1f's
+-- FIVE payment fields and not one per payment the engine can make: CR 116.2
+-- alone lists eleven special actions, and what earns a field is a PRINTED rider
+-- naming that payment. Foretelling (CR 116.2h), plotting (CR 116.2k), CR 508.1j \/ 509.1f's
 -- combat toll and CR 118.12's resolution-time payment share
 -- Pawl.Types.PaymentSubject's ForNeither arm with nothing here, none of them
 -- being named on a card.
 --
--- Nothing on a field REFUSES that kind of payment outright; @Just f@ permits it
--- when the object being paid for matches @f@. @Just (Filter.And [])@ is the
+-- Unless prohibits is set (below), Nothing on a field REFUSES that kind of
+-- payment outright; @Just f@ permits it when the object being paid for matches
+-- @f@. @Just (Filter.And [])@ is the
 -- unconditional permission -- Omen Hawker says nothing about WHICH abilities --
 -- and Pawl.Types.Filter's own haddock names that spelling as the trivial
 -- predicate. Every field Nothing would be mana no payment may spend, which no
 -- printing means; Pawl.CardSpec lints it out of the pool.
+--
+-- Read as above, the fields name the ONLY payments the mana may pay for. With
+-- prohibits set they name the payments it may NOT pay for and leave every other
+-- payment open, Pawl.Types.PaymentSubject's ForNeither arm included: Hydraulic
+-- Helper's "can't be spent to cast a nonartifact spell" still pays for an
+-- artifact spell, an activation and CR 118.12's resolution-time payment.
 --
 -- The whole record sits under a Maybe on both carriers
 -- (Pawl.Types.ManaAddition, Pawl.Types.ManaUnit), where Nothing is "no CR 106.6
@@ -60,7 +67,10 @@ data ManaRestriction = MkManaRestriction
     -- action. The filter is evaluated against the PERMANENT being turned face
     -- up, which is the object Tin Street Gossip's "turn creatures face up" is
     -- about.
-    turnsFaceUp :: Maybe (Filter.Filter Keyword.Keyword)
+    turnsFaceUp :: Maybe (Filter.Filter Keyword.Keyword),
+    -- | CR 106.6: the fields name the payments this mana can't be spent on,
+    -- rather than the only ones it can (Hydraulic Helper).
+    prohibits :: Bool
   }
   deriving (Eq, Ord, Show)
 
@@ -74,7 +84,8 @@ none =
       activations = Nothing,
       keywordActivations = Nothing,
       unlocks = Nothing,
-      turnsFaceUp = Nothing
+      turnsFaceUp = Nothing,
+      prohibits = False
     }
 
 -- | The CR 106.6 clause permitting only casts that match this filter, which is
