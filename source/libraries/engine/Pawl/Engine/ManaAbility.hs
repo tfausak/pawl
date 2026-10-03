@@ -394,6 +394,7 @@ manaProduced effect = case effect of
   Effect.RedirectDamage {} -> Nothing
   Effect.Counter {} -> Nothing
   Effect.PutCounters {} -> Nothing
+  Effect.DistributeCounters {} -> Nothing
   Effect.PutCountersFrom {} -> Nothing
   Effect.RemoveCounters {} -> Nothing
   Effect.RemoveCountersAmong {} -> Nothing
@@ -581,6 +582,7 @@ playerChoice effect = case effect of
   Effect.RedirectDamage {} -> Nothing
   Effect.Counter {} -> Nothing
   Effect.PutCounters {} -> Nothing
+  Effect.DistributeCounters {} -> Nothing
   Effect.PutCountersFrom {} -> Nothing
   Effect.RemoveCounters {} -> Nothing
   Effect.RemoveCountersAmong {} -> Nothing
@@ -842,6 +844,7 @@ movesLibraryCard effect = case effect of
   -- CR 701.6: a countered spell goes to its owner's GRAVEYARD.
   Effect.Counter {} -> False
   Effect.PutCounters {} -> False
+  Effect.DistributeCounters {} -> False
   Effect.PutCountersFrom {} -> False
   Effect.RemoveCounters {} -> False
   Effect.RemoveCountersAmong {} -> False
