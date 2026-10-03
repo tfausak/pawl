@@ -1415,6 +1415,14 @@ zoneScopeSlot scope = case scope of
 -- which is what keeps this non-circular -- a count and a bound are two numbers on
 -- one slot, and neither reads the other.
 --
+-- `seed` is the announcement's own bindings, so a count can read what the
+-- object already carries before any target is chosen: Miasma Demon's reflexive
+-- "up to that many target creatures" (CR 603.12) counts the cards its arming
+-- resolution discarded. Its GROUP bindings join the target half here, since a
+-- slot an effect filled ("the cards discarded this way") is no target and
+-- slotContext's slotObjects holds targets alone. Proved by Miasma Demon's
+-- scenario, "CR 603.12 whole card".
+--
 -- A number the board cannot supply reads zero, SlotCount.at's posture: an "up to"
 -- count of zero is a slot answered with no targets, which is what CR 601.2c gives
 -- a count nobody can name.
@@ -1426,11 +1434,13 @@ zoneScopeSlot scope = case scope of
 -- selectionLegal runs at CR 601.2e on the board the offer was built from, and the
 -- CR 707.10c / 115.7d re-target counts the recipients the object already has
 -- (Resolve.Effect.chooseNewTargetsFor) rather than asking a count again.
-countingByGiven :: Map ObjectId PC.ProjectedCharacteristics -> Maybe PlayerId -> ObjectId -> GameState -> Quantity -> Natural
-countingByGiven pcs perspective source gs =
-  Integer.toNaturalSaturating
-    . Maybe.fromMaybe 0
-    . Quantity.evaluate (Projection.fullView gs) (slotContext pcs perspective False Map.empty source Nothing gs) gs source
+countingByGiven :: Map ObjectId PC.ProjectedCharacteristics -> Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> GameState -> Quantity -> Natural
+countingByGiven pcs perspective seed source gs =
+  let context = slotContext pcs perspective False seed source Nothing gs
+      withGroups = context {Filter.slotObjects = Map.unionWith Set.union (Filter.slotObjects context) (Binding.slotObjects seed)}
+   in Integer.toNaturalSaturating
+        . Maybe.fromMaybe 0
+        . Quantity.evaluate (Projection.fullView gs) withGroups gs source
 
 -- CR 601.2c: the number of targets a slot's own text fixes ("in some cases, the
 -- number of targets will be defined by the spell's text"), for a slot that
@@ -1548,8 +1558,12 @@ slotCapacities counting x slots sets gs =
 -- number -- Pawl.TargetSpec's "CR 113.7 an activated ability's computed count
 -- reads the source's counters, not the ability's" is the proof. For a SPELL the
 -- two are one object (CR 113.7's first sentence).
-chooseTargets :: PlayerId -> ObjectId -> ObjectId -> Natural -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> Game (Map SlotName (Set Recipient))
-chooseTargets pid oid source x slots sets = do
+--
+-- `seed` is the announcement's own bindings, the map the caller's legalSets and
+-- selectionLegal are handed, so a computed count reads the same environment at
+-- the offer and at the check -- see countingByGiven.
+chooseTargets :: PlayerId -> ObjectId -> ObjectId -> Map SlotName Binding.Type.Binding -> Natural -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> Game (Map SlotName (Set Recipient))
+chooseTargets pid oid source seed x slots sets = do
   let groups = Map.fromListWith Set.union [(TargetSlot.chooser slot, Set.singleton name) | (name, slot) <- Map.toList slots]
   answers <-
     traverse
@@ -1561,7 +1575,7 @@ chooseTargets pid oid source x slots sets = do
             -- which the callers' own gate then refuses (CR 601.2e, CR 602.2, CR
             -- 603.3d's removal).
             Nothing -> pure Map.empty
-            Just chooser -> askChooser pid chooser oid source x slots sets mine
+            Just chooser -> askChooser pid chooser oid source seed x slots sets mine
       )
       (Map.toAscList groups)
   pure (Map.unions answers)
@@ -1623,12 +1637,12 @@ chooserOf controller oid relation = case relation of
 --
 -- The answer is NOT validated here -- `selectionLegal` below is that, asked by
 -- the callers that reverse an announcement (CR 601.2e, CR 602.2).
-askChooser :: PlayerId -> PlayerId -> ObjectId -> ObjectId -> Natural -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> Set SlotName -> Game (Map SlotName (Set Recipient))
-askChooser controller chooser oid source x slots sets mine = do
+askChooser :: PlayerId -> PlayerId -> ObjectId -> ObjectId -> Map SlotName Binding.Type.Binding -> Natural -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> Set SlotName -> Game (Map SlotName (Set Recipient))
+askChooser controller chooser oid source seed x slots sets mine = do
   gs <- State.get
   let decider = Decide.deciderFor chooser gs
       offered = fmap (piledOffer (Just chooser) gs) sets
-      counting = countingByGiven (Projection.projectAll gs) (Just controller) source gs
+      counting = countingByGiven (Projection.projectAll gs) (Just controller) seed source gs
       ranges = Map.restrictKeys (Map.intersectionWith (announcedRange counting x) slots (slotCapacities counting x slots offered gs)) mine
       variable = Map.keysSet (Map.filter (uncurry (/=)) ranges)
       offers = Map.restrictKeys (Map.intersectionWith (\targetSlot legal -> (SlotCount.at counting x (TargetSlot.count targetSlot), legal)) slots offered) variable
@@ -1816,7 +1830,7 @@ pileMembers perspective pile gs =
 selectionLegal :: Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Natural -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> Map SlotName (Set Recipient) -> GameState -> Bool
 selectionLegal perspective seed source x slots sets chosen gs =
   let pcs = Projection.projectAll gs
-      counting = countingByGiven pcs perspective source gs
+      counting = countingByGiven pcs perspective seed source gs
       caps = slotCapacities counting x slots sets gs
       slotLegal slot targetSlot =
         let legal = Map.findWithDefault Set.empty slot sets
@@ -1929,7 +1943,7 @@ jointlyFillableGiven pcs grants pools perspective seed source slots sets gs =
       -- The slots being ENUMERATED: the ones a reader names, a reader that is
       -- itself named included.
       named = Map.restrictKeys slots (foldMap reads_ readers)
-      counting = countingByGiven pcs perspective source gs
+      counting = countingByGiven pcs perspective seed source gs
       demanded slot = TargetCount.least (SlotCount.at counting 0 (TargetSlot.count slot))
       legalOf name = Map.findWithDefault Set.empty name sets
       -- The sizes ONE announcement could name this slot at, measured against
@@ -1995,7 +2009,7 @@ fillableModes perspective seed source extra modal gs =
 -- apiece to answer it (#716).
 fillableModesGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> Modal.Modal Card (GrantedAbility.GrantedAbility Card) -> GameState -> Set ModeIndex
 fillableModesGiven pcs grants pools perspective seed source extra modal gs =
-  let counting = countingByGiven pcs perspective source gs
+  let counting = countingByGiven pcs perspective seed source gs
       ms = Foldable.toList (Modal.modes modal)
       fillable i m =
         let slots = maybe id (\p -> announcedSlots p source gs) perspective (Map.union extra (Mode.targetSlots m))

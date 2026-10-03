@@ -808,6 +808,7 @@ damageOf event = case event of
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Milled {} -> Nothing
   GameEvent.Scried _ -> Nothing
+  GameEvent.LostTheGame _ -> Nothing
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.Proliferated _ -> Nothing
@@ -895,6 +896,7 @@ revealOf event = case event of
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Milled {} -> Nothing
   GameEvent.Scried _ -> Nothing
+  GameEvent.LostTheGame _ -> Nothing
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.Proliferated _ -> Nothing
@@ -8886,6 +8888,8 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.RoomEntered _ -> False
   -- CR 309.7 names no turn either.
   TriggerCondition.PlayerCompletesDungeon _ -> False
+  -- CR 104.3 names no turn either.
+  TriggerCondition.PlayerLosesGame _ -> False
   -- None of the four keyword-action conditions names a turn: CR 701.22,
   -- CR 701.25, CR 702.170 and CR 701.44 each state when their event happens
   -- and say nothing about whose turn it is.
@@ -9484,6 +9488,7 @@ abilityTriggeredOf event = case event of
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Milled {} -> Nothing
   GameEvent.Scried _ -> Nothing
+  GameEvent.LostTheGame _ -> Nothing
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.Proliferated _ -> Nothing

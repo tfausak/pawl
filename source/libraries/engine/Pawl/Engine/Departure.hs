@@ -32,6 +32,7 @@ import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.Decider as Decider
 import Pawl.Types.Departure (Departure)
+import qualified Pawl.Types.Departure as Departure
 import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -115,6 +116,11 @@ leaveTogether reason named = do
   -- concession board proves it.
   Event.simultaneously $ do
     Monad.forM_ departing (\(why, pid) -> State.modify' (leave why pid . clauses pid))
+    -- CR 603.9: a player who leaves loses, whatever the reason, unless the game
+    -- was a draw for them. Inside the bracket, so CR 603.10f's look-back finds
+    -- the permanents the first clause just took with them.
+    Monad.forM_ departing $ \(why, pid) ->
+      Monad.unless (why == Departure.Drew) (State.modify' (Event.recordEvent (GameEvent.LostTheGame pid)))
     Monad.forM_ pids $ \pid -> do
       Monarch.reassignOnDeparture pid
       -- CR 726.4, the same clause one rule over and for the same reason: the

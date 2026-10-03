@@ -560,6 +560,9 @@ data TriggerCondition
   | -- | CR 309.7: "whenever you complete a dungeon" (Dungeon Crawler), against
     -- GameEvent.DungeonCompleted.
     PlayerCompletesDungeon PlayerRelation.PlayerRelation
+  | -- | CR 603.9: "whenever a player loses the game" (Withengar Unbound),
+    -- against GameEvent.LostTheGame.
+    PlayerLosesGame PlayerRelation.PlayerRelation
   | -- | CR 701.22d: "whenever you scry" (Matoya, Archon Elder). Counts scries
     -- rather than cards; CR 701.22b's scry 0 records no event.
     PlayerScries PlayerRelation.PlayerRelation

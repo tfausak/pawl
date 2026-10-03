@@ -987,6 +987,34 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     Spec.assertEqWith s "bob, in alice's range as the turn began, diverts the Island to carol's graveyard" (landing S.bob) (Just Zone.Graveyard)
     Spec.assertEqWith s "carol, two seats from alice, does not reach it, so it is exiled" (landing S.carol) (Just Zone.Exile)
 
+  -- CR 603.9 on Elbrus, the Binding Blade's back face, written onto Object.face
+  -- directly (Pawl.TransformSpec's racerBoard) so the case is about the trigger
+  -- alone. Three seats, so bob leaving does not end the game; the pair differs
+  -- only in why he leaves.
+  Spec.it s "CR 603.9 Withengar Unbound grows when a player concedes, and not when the game is a draw for them" $ do
+    elbrus <- S.printingOf s registry "Elbrus, the Binding Blade"
+    let (withengarId, placed) = S.addPermanent elbrus S.alice S.threePlayerGame
+        board = placed {GameState.objects = Map.adjust (\o -> o {Object.face = Just withengar}) withengarId (GameState.objects placed)}
+        countersAfter reason = S.counterOf CounterKind.PlusOnePlusOne withengarId (resolveTriggers (S.runPure S.identityAnswer board (Departure.leaveGame reason S.bob)))
+    Spec.assertEqWith s "CR 104.3a / 603.9 bob conceding puts thirteen counters on alice's Withengar" (countersAfter Departure.Type.Conceded) 13
+    Spec.assertEqWith s "CR 603.9 a draw is not a loss, so none" (countersAfter Departure.Type.Drew) 0
+
+  -- The front face, played out: the equipped Piker connects, so Elbrus
+  -- unattaches and transforms.
+  Spec.it s "CR 701.3d / 701.27a Elbrus unattaches and transforms when the equipped creature deals combat damage to a player" $ do
+    elbrus <- S.printingOf s registry "Elbrus, the Binding Blade"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (board, attackers, _) = S.combatBoardOf [piker] []
+        (elbrusId, withElbrus) = S.addPermanent elbrus S.alice board
+        equipped = List.foldl' (flip (S.attach elbrusId)) withElbrus attackers
+        after = S.runCombat (S.attackTo S.bob) equipped
+    Spec.assertEqWith s "Elbrus is unattached and Withengar Unbound is face up" (fmap (\o -> (Object.attachedTo o, Object.face o)) (Game.lookupObject elbrusId after)) (Just (Nothing, Just withengar))
+    Spec.assertEqWith s "the Piker hit bob for 2 + 1" (fmap Player.life (Map.lookup S.bob (GameState.players after))) (Just 17)
+
+-- Elbrus, the Binding Blade's back face.
+withengar :: CardName.CardName
+withengar = CardName.MkCardName (Text.pack "Withengar Unbound")
+
 -- bob at 1 life, active, with a Bitterblossom of his own and carol's Soul Warden
 -- either lent to him or not. Returns the Warden's id and the board with bob's
 -- upkeep already stamped into the log, ready for Engine.settleForPriority to
