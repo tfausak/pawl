@@ -3488,6 +3488,73 @@ ivoryGargoyleSpec s registry =
           Spec.assertEqWith s "the same one entry was armed on this board too" (Seq.length (GameState.delayedTriggers armed)) 1
           Spec.assertEqWith s "and it still fired and was spent at the end step" (Seq.length (GameState.delayedTriggers after)) 0
 
+-- CR 603.10a's sacrifice family read off the bearer: Biolume Egg's "when you
+-- sacrifice this creature, return it to the battlefield transformed under its
+-- owner's control at the beginning of the next end step"
+-- (data/cards/biolume-egg-biolume-serpent.json, checked against Scryfall),
+-- written as PermanentSacrificed narrowed by Filter.IsSource. Its delayed
+-- payload names the graveyard it moves `became` out of, Ivory Gargoyle's shape.
+-- `Event.conditionPutsSelfInto` answers False for the bystander constructor, so
+-- `selfNamingSlots` leaves `became` out and nothing pins the ability to the
+-- graveyard; a mutation adding `became` to that set without the exemption
+-- reddens the first case here.
+--
+-- The controls differ from the positive in one thing each: the Egg DESTROYED
+-- rather than sacrificed (a death, CR 700.4, but no sacrifice), and a different
+-- permanent of alice's sacrificed while the Egg stays.
+biolumeEggSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+biolumeEggSpec s registry =
+  let settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
+      resolveTop gs = S.runPure S.identityAnswer gs Stack.resolveTop
+      endStep = Phase.Ending EndingStep.EndStep
+      beginEndStep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep})
+      throughEndStep gs = S.runPure S.identityAnswer (settle (beginEndStep gs)) Engine.priorityLoop
+      eggName = CardName.MkCardName (Text.pack "Biolume Egg")
+      serpentName = CardName.MkCardName (Text.pack "Biolume Serpent")
+      -- By NAME, since CR 400.7 mints a fresh id at each move: the projected
+      -- name on the battlefield, where CR 712.8e makes it the face shown, and
+      -- the card's own face elsewhere.
+      named name zone gs =
+        let nameOf oid = case zone of
+              Zone.Battlefield -> Projection.namesOf oid gs == Set.singleton name
+              _ -> fmap Face.name (Game.faceOf oid gs) == Just name
+         in filter nameOf (Game.zoneMembers zone S.alice gs)
+      board = do
+        egg <- S.printingOf s registry "Biolume Egg"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (eggId, g1) = S.addPermanent egg S.alice (Setup.emptyGame S.bothPlayers)
+            (pikerId, g2) = S.addPermanent piker S.alice g1
+        pure (eggId, pikerId, g2)
+   in Spec.describe s "BiolumeEgg" $ do
+        Spec.it s "CR 113.6m / 701.21a sacrificing the Egg returns it transformed at the next end step" $ do
+          (eggId, _, g) <- board
+          let placed = settle (S.runPure S.identityAnswer g (Event.sacrifice S.alice eggId))
+              after = throughEndStep (resolveTop placed)
+          Spec.assertEqWith s "CR 712.14a the Serpent is on the battlefield" (length (named serpentName Zone.Battlefield after)) 1
+          -- The preconditions, AFTER the assertion so none absorbs a mutation.
+          Spec.assertEqWith s "the sacrifice trigger reached the stack" (length (GameState.stack placed)) 1
+          Spec.assertEqWith s "the Egg really left first" (Game.lookupObject eggId placed) Nothing
+          Spec.assertEqWith s "and no Egg card is left in the graveyard" (length (named eggName Zone.Graveyard after)) 0
+          Spec.assertEqWith s "the delayed entry fired and was spent" (Seq.length (GameState.delayedTriggers after)) 0
+        Spec.it s "CR 700.4 the Egg dying without a sacrifice does not trigger it" $ do
+          (eggId, _, g) <- board
+          let placed = settle (S.runPure S.identityAnswer g (Event.destroy Regenerability.Regenerable [eggId]))
+          Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack placed)) 0
+          Spec.assertEqWith s "the Egg really died into the graveyard" (length (named eggName Zone.Graveyard placed)) 1
+        Spec.it s "CR 603.10a sacrificing another permanent does not trigger it" $ do
+          (eggId, pikerId, g) <- board
+          let placed = settle (S.runPure S.identityAnswer g (Event.sacrifice S.alice pikerId))
+          Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack placed)) 0
+          Spec.assertEqWith s "the Piker really was sacrificed and the Egg stayed" (Game.lookupObject pikerId placed, fmap Object.zone (Game.lookupObject eggId placed)) (Nothing, Just Zone.Battlefield)
+        Spec.it s "CR 113.6m both triggered abilities function on the battlefield" $ do
+          egg <- S.printingOf s registry "Biolume Egg"
+          let face = S.combinedFace egg
+          Spec.assertEqWith
+            s
+            "the battlefield for both triggered abilities"
+            (fmap (Event.zonesFunctionedIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face)) (Face.triggeredAbilities face))
+            [Set.singleton Zone.Battlefield, Set.singleton Zone.Battlefield]
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   permanentLeavesTheBattlefieldSpec s registry
@@ -3521,6 +3588,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   heirloomBladeSpec s registry
   prizedAmalgamSpec s registry
   ivoryGargoyleSpec s registry
+  biolumeEggSpec s registry
   banewaspAfflictionSpec s registry
   strippedTriggerSpec s registry
   bystanderSpec s registry
