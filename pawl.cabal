@@ -1394,6 +1394,7 @@ library engine
     Pawl.Engine.Filter
     Pawl.Engine.Forage
     Pawl.Engine.Foretell
+    Pawl.Engine.Fragmented
     Pawl.Engine.Game
     Pawl.Engine.Goad
     Pawl.Engine.Ignore
@@ -1813,6 +1814,7 @@ library test
     Pawl.FilterSpec
     Pawl.FlipSpec
     Pawl.ForageSpec
+    Pawl.FragmentedSpec
     Pawl.GameSpec
     Pawl.GoadSpec
     Pawl.HarnessSpec
@@ -2268,6 +2270,7 @@ library types
     Pawl.Types.LoggedEvent
     Pawl.Types.LookAt
     Pawl.Types.LoopMembers
+    Pawl.Types.LoopTrail
     Pawl.Types.Loyalty
     Pawl.Types.LoyaltyKind
     Pawl.Types.MadnessCost
@@ -2510,6 +2513,7 @@ library types
     Pawl.Types.StackObjectKind
     Pawl.Types.Staged
     Pawl.Types.StatedFlip
+    Pawl.Types.StateDigest
     Pawl.Types.StaticAbility
     Pawl.Types.Status
     Pawl.Types.StepBegan

@@ -34,6 +34,7 @@ import qualified Pawl.Engine.Exile as Exile
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Foretell as Foretell
+import qualified Pawl.Engine.Fragmented as Fragmented
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Ignore as Ignore
 import qualified Pawl.Engine.Initiative as Initiative
@@ -94,6 +95,7 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.LastKnown as LastKnown
+import qualified Pawl.Types.LoopTrail as LoopTrail
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Modal as Modal.Type
 import qualified Pawl.Types.Mode as Mode
@@ -1289,7 +1291,7 @@ priorityLoop = do
   -- and after each resolution or board-changing action -- never after a bare
   -- priority pass, which leaves the game state untouched. Observably identical to
   -- settling on every priority grant.
-  let loop = do
+  let loop trail = do
         -- CR 104.4b, checked HERE as well as at playGame's loop head: a
         -- resolution cycle repeats inside one priority round and never reaches it.
         checkMandatoryLoop
@@ -1335,7 +1337,7 @@ priorityLoop = do
                             -- CR 117.5: the departure changed the board, so the
                             -- next player's priority waits on a settle.
                             settleForPriority
-                            loop
+                            loop trail
                           Concession.Continues -> do
                             let decider = Decide.deciderFor p gs
                                 actions = Action.legalActions p gs
@@ -1349,10 +1351,20 @@ priorityLoop = do
                             let offersAChoice = case actions of
                                   _ : _ : _ -> True
                                   _ -> False
+                                -- CR 732.3: a fragmented loop narrows the named
+                                -- player's menu, asked only where the raw menu
+                                -- offered a choice, so a Pass-only grant pays
+                                -- nothing for it. Narrowed to Pass alone, the
+                                -- menu goes the way any Pass-only menu does.
+                                refused = if offersAChoice then Fragmented.forbidden gs p trail else Set.empty
+                                menu = if Set.null refused then actions else filter (`Set.notMember` refused) actions
+                                narrowedChoice = case menu of
+                                  _ : _ : _ -> True
+                                  _ -> False
                             answered <-
-                              if offersAChoice
-                                then Game.choose (Prompt.ChooseAction decider p actions)
-                                else Game.ask (Prompt.ChooseAction decider p actions)
+                              if offersAChoice && narrowedChoice
+                                then Game.choose (Prompt.ChooseAction decider p menu)
+                                else Game.ask (Prompt.ChooseAction decider p menu)
                             -- FILTERED, NOT TRUSTED: everything Action.legalActions
                             -- computed -- CR 302.6's tap-sickness gate, CR 307.5
                             -- timing, cost payability, CR 305.2's land allowance,
@@ -1360,7 +1372,8 @@ priorityLoop = do
                             -- is enforced here, acting on an unoffered answer
                             -- making all of it advisory. Rejecting to Pass keeps
                             -- the loop total and cannot wedge the game.
-                            let chosen = if List.elem answered actions then answered else Action.Type.Pass
+                            let chosen = if List.elem answered menu then answered else Action.Type.Pass
+                                trail' = if offersAChoice then Fragmented.record gs p chosen trail else trail
                             case chosen of
                               -- CR 117.4 / 805.5b: every team has passed in
                               -- succession once every still-playing player has,
@@ -1397,17 +1410,17 @@ priorityLoop = do
                                         EndTurnSignal.Running -> do
                                           settleForPriority
                                           State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just (priorityHolder g)})
-                                          loop
+                                          loop trail'
                                   else do
                                     State.modify' (\g -> g {GameState.passed = passed, GameState.priority = Just (passPriorityFrom gs {GameState.passed = passed} p)})
-                                    loop
+                                    loop trail'
                               Action.Type.Play oid mName -> do
                                 -- CR 116.2a: the special action, made under a
                                 -- CR 601.3 permission (Cast.playLand).
                                 Cast.playLand False p oid mName
                                 State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
-                                loop
+                                loop trail'
                               Action.Type.Cast oid name facing -> do
                                 -- CR 611.2a's spend is Cast.castSpellWith's own,
                                 -- so the two other doors into a cast -- a search's
@@ -1416,7 +1429,7 @@ priorityLoop = do
                                 Cast.castSpell Resolve.performManaAbility p oid name facing
                                 State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
-                                loop
+                                loop trail'
                               -- CR 116.2b / 702.37e / 701.40b: a special action, so
                               -- nothing goes on the stack and no player gets a
                               -- window to respond. Priority is retained and the
@@ -1426,7 +1439,7 @@ priorityLoop = do
                                 FaceDown.turnFaceUp Resolve.performManaAbility p procedure oid
                                 State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
-                                loop
+                                loop trail'
                               -- CR 116.2m / 709.5e: a special action too, the
                               -- TurnFaceUp arm's shape. What CR 709.5h's trigger
                               -- sees is the DESIGNATION, which settleForPriority
@@ -1435,7 +1448,7 @@ priorityLoop = do
                                 Room.unlock Resolve.performManaAbility p oid half
                                 State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
-                                loop
+                                loop trail'
                               -- CR 116.2e: a special action too, the TurnFaceUp
                               -- arm's shape. The discard goes through the CR
                               -- 701.9a funnel rather than a zone move, so an
@@ -1446,20 +1459,20 @@ priorityLoop = do
                                 Event.discard DiscardCause.Ordinary p oid
                                 State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
-                                loop
+                                loop trail'
                               -- CR 116.2k / 702.170b: a special action too, the
                               -- TurnFaceUp arm's shape.
                               Action.Type.Plot oid cost -> do
                                 Plot.plot Resolve.performManaAbility p oid cost
                                 State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
-                                loop
+                                loop trail'
                               -- CR 116.2h / 702.143b: a special action too.
                               Action.Type.Foretell oid -> do
                                 Foretell.foretell Resolve.performManaAbility p oid
                                 State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
-                                loop
+                                loop trail'
                               -- CR 116.2f / 702.62a: a special action too, and
                               -- the one whose window is the card's own
                               -- castability rather than a phase.
@@ -1467,7 +1480,7 @@ priorityLoop = do
                                 Suspend.suspend Resolve.performManaAbility p oid
                                 State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
-                                loop
+                                loop trail'
                               -- CR 116.2g / 702.139a: a special action too, and
                               -- the one that takes no object -- Player.companion
                               -- names the card, outside the game having no
@@ -1476,7 +1489,7 @@ priorityLoop = do
                                 Companion.take Resolve.performManaAbility p
                                 State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
-                                loop
+                                loop trail'
                               -- CR 116.2i / 901.9: a special action too, and one
                               -- that takes no object; CR 901.9a-c give the roller
                               -- priority afterwards whatever the die shows.
@@ -1484,7 +1497,7 @@ priorityLoop = do
                                 Planechase.roll Resolve.performManaAbility p
                                 State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
-                                loop
+                                loop trail'
                               -- CR 116.2c: a special action too, and the one whose
                               -- permission came from a resolution rather than
                               -- from printed text. CR 613.1's next projection is
@@ -1493,13 +1506,13 @@ priorityLoop = do
                                 EndEffect.endEffect p oid
                                 State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
-                                loop
+                                loop trail'
                               -- CR 116.2d: a special action too.
                               Action.Type.Ignore oid name -> do
                                 Ignore.ignore p oid name
                                 State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
-                                loop
+                                loop trail'
                               -- CR 605.3a's first window, and CR 605.3b's
                               -- immediacy: the ability does not go on the stack,
                               -- so activating it is over by the time this returns.
@@ -1512,12 +1525,12 @@ priorityLoop = do
                                 Monad.void (Cost.tapForMana Resolve.performManaAbility p oid)
                                 State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
-                                loop
+                                loop trail'
                               Action.Type.Activate oid ability -> do
                                 Activate.activateAbility p oid ability
                                 State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
-                                loop
+                                loop trail'
                       else do
                         -- CR 800.4a (last sentence): `p` was written as the holder
                         -- and then departed -- e.g. paying a life cost inside
@@ -1526,9 +1539,9 @@ priorityLoop = do
                         -- GameState.priority, so the stale `Just p` would
                         -- otherwise survive to the Concede prompt.
                         State.modify' (\g -> g {GameState.priority = Just (passPriorityFrom g p)})
-                        loop
+                        loop trail
   settleForPriority
-  loop
+  loop LoopTrail.empty
 
 -- CR 500.7 / 800.4k / 800.4m: this turn is over, so begin the next one -- a
 -- pending EXTRA turn if there is one, and otherwise the turn of the next SEAT in
