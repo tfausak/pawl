@@ -172,7 +172,7 @@ import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 
 asZoneChange :: ProposedEvent -> Maybe ZoneChange
 asZoneChange event = case event of
-  ProposedEvent.WouldChangeZone zc _ _ -> Just zc
+  ProposedEvent.WouldChangeZone zc _ _ _ -> Just zc
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing
   ProposedEvent.WouldBeDestroyed {} -> Nothing
@@ -699,7 +699,7 @@ reaches grants gs event candidate = case (ReplacementCandidate.controller candid
 -- class must be read against the rule rather than silently counted in range.
 affected :: ProposedEvent -> ([ObjectId], [PlayerId])
 affected event = case event of
-  ProposedEvent.WouldChangeZone zc _ _ -> ([ZoneChange.object zc], [])
+  ProposedEvent.WouldChangeZone zc _ _ _ -> ([ZoneChange.object zc], [])
   ProposedEvent.WouldEnter oid -> ([oid], [])
   ProposedEvent.WouldDealDamage de -> (Maybe.maybeToList (Recipient.objectOf (DamageEvent.target de)), Maybe.maybeToList (Recipient.playerOf (DamageEvent.target de)))
   ProposedEvent.WouldBeDestroyed oid _ _ -> ([oid], [])
@@ -734,9 +734,10 @@ matchesPrinted viewOf gs event candidate =
         -- enumerated, so this is a Maybe rather than a set of zones. A pattern
         -- naming a DISCARD cause admits only a CR 701.9a discard of that cause
         -- (Library of Leng's "if an effect causes you to discard").
-        (ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR pat _ _ _ _ _), ProposedEvent.WouldChangeZone zc discarded _) ->
+        (ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR pat _ _ _ _ _), ProposedEvent.WouldChangeZone zc discarded _ resolving) ->
           maybe True (== ZoneChange.to zc) (ZoneChangePattern.whenDestination pat)
             && maybe True ((== discarded) . Just) (ZoneChangePattern.whenDiscarded pat)
+            && (resolving || not (ZoneChangePattern.duringResolution pat))
             && matchesZoneOwner gs src (ReplacementCandidate.controller candidate) (ZoneChangePattern.whoseObject pat) (ZoneChange.object zc)
             && matchesFiltered viewOf gs candidate (ZoneChangePattern.whatObject pat) (ZoneChange.object zc)
         -- CR 615.1: which events the pattern admits (see matchesDamagePattern),
@@ -2431,7 +2432,7 @@ chooserOf gs event = affectedChooserOf gs event >>= Game.ruleChooser gs
 -- CR 616.1's own question, before rule 800.4h is applied to the answer.
 affectedChooserOf :: GameState -> ProposedEvent -> Maybe PlayerId
 affectedChooserOf gs event = case event of
-  ProposedEvent.WouldChangeZone zc _ _ -> Projection.controllerOf (ZoneChange.object zc) gs
+  ProposedEvent.WouldChangeZone zc _ _ _ -> Projection.controllerOf (ZoneChange.object zc) gs
   -- CR 616.1's affected object's controller, read LIVE off the materialized
   -- permanent -- which for an entry is the player it WOULD enter under, and
   -- which a CR 616.1b rewrite may already have changed on an earlier iteration.
@@ -4257,7 +4258,8 @@ installSpellMoveRow destination shuffling spellId caster gs =
                         -- object it was minted for -- castFromGraveyardExile's
                         -- Filter.IsSource, and for its reason.
                         ZoneChangePattern.whatObject = Filter.Type.IsSource,
-                        ZoneChangePattern.whenDiscarded = Nothing
+                        ZoneChangePattern.whenDiscarded = Nothing,
+                        ZoneChangePattern.duringResolution = False
                       }
                     destination
                     False

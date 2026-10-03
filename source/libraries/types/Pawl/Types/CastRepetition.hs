@@ -1,5 +1,7 @@
 module Pawl.Types.CastRepetition where
 
+import qualified Pawl.Types.Quantity as Quantity
+
 -- | How many of the cards a CR 608.2g offer names may be cast under it: the one
 -- Shell of the Last Kappa's "cast a spell from among cards exiled with Shell of
 -- the Last Kappa" allows, or the "any number" Fevered Suspicion's "you may cast
@@ -19,4 +21,8 @@ module Pawl.Types.CastRepetition where
 data CastRepetition
   = Once
   | AnyNumber
-  deriving (Bounded, Enum, Eq, Ord, Show)
+  | -- | Rod of Absorption's "cast any number of spells ... with total mana value
+    -- X or less": @AnyNumber@ while the spells cast so far leave room for the
+    -- next one's mana value (CR 202.3).
+    WithinTotalManaValue Quantity.Quantity
+  deriving (Eq, Ord, Show)

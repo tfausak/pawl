@@ -129,6 +129,7 @@ codec = Fields.object $ do
   mutating <- Fields.defaulted "mutating" False Common.boolean Object.mutating
   prototyped <- Fields.defaulted "prototyped" False Common.boolean Object.prototyped
   boughtBack <- Fields.defaulted "boughtBack" False Common.boolean Object.boughtBack
+  unannounced <- Fields.defaulted "unannounced" False Common.boolean Object.unannounced
   spliced <- Fields.defaulted "spliced" Seq.empty (Common.seq PrintingId.codec) Object.spliced
   phyrexianLifePaid <- Fields.defaulted "phyrexianLifePaid" 0 Common.natural Object.phyrexianLifePaid
   manaSpent <- Fields.defaulted "manaSpent" (Mana.Type.MkMana []) Mana.codec Object.manaSpent
@@ -190,6 +191,7 @@ codec = Fields.object $ do
         Object.mutating = mutating,
         Object.prototyped = prototyped,
         Object.boughtBack = boughtBack,
+        Object.unannounced = unannounced,
         Object.spliced = spliced,
         Object.phyrexianLifePaid = phyrexianLifePaid,
         Object.manaSpent = manaSpent,

@@ -24,7 +24,8 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChangeR" $ do
                 { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
                   ZoneChangePattern.whatObject = Filter.And [],
                   ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
-                  ZoneChangePattern.whenDiscarded = Nothing
+                  ZoneChangePattern.whenDiscarded = Nothing,
+                  ZoneChangePattern.duringResolution = False
                 },
             ZoneChangeR.destination = Zone.Exile,
             ZoneChangeR.revealing = False,
@@ -46,7 +47,8 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChangeR" $ do
                 { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
                   ZoneChangePattern.whatObject = Filter.IsSource,
                   ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
-                  ZoneChangePattern.whenDiscarded = Nothing
+                  ZoneChangePattern.whenDiscarded = Nothing,
+                  ZoneChangePattern.duringResolution = False
                 },
             ZoneChangeR.destination = Zone.Library,
             ZoneChangeR.revealing = True,
@@ -68,7 +70,8 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChangeR" $ do
                 { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
                   ZoneChangePattern.whatObject = Filter.And [],
                   ZoneChangePattern.whoseObject = ControllerRelation.Yours,
-                  ZoneChangePattern.whenDiscarded = Just DiscardCause.ByEffect
+                  ZoneChangePattern.whenDiscarded = Just DiscardCause.ByEffect,
+                  ZoneChangePattern.duringResolution = False
                 },
             ZoneChangeR.destination = Zone.Library,
             ZoneChangeR.revealing = False,

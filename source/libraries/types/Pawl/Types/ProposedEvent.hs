@@ -69,8 +69,10 @@ data ProposedEvent
   = -- | CR 400.7. The DiscardCause is CR 701.9a's, Nothing for a move that is
     -- not a discard; it gates which redirects are offered, DestructionCause's
     -- posture below. The LibraryPosition is CR 401.2's end, which a redirect
-    -- into a library may restate (Library of Leng's "on top").
-    WouldChangeZone ZoneChange.ZoneChange (Maybe DiscardCause.DiscardCause) LibraryPosition.LibraryPosition
+    -- into a library may restate (Library of Leng's "on top"). The Bool is CR
+    -- 608.2n's: True only for a spell's move as the last step of its own
+    -- resolution (Moved.duringResolution's door).
+    WouldChangeZone ZoneChange.ZoneChange (Maybe DiscardCause.DiscardCause) LibraryPosition.LibraryPosition Bool
   | WouldEnter ObjectId.ObjectId
   | WouldDealDamage DamageEvent.DamageEvent
   | -- | CR 701.8 / 701.19c: a permanent would be destroyed. The Regenerability is

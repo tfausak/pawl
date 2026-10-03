@@ -1097,6 +1097,7 @@ cardObject pid under printingId dest tapped ts =
       Object.mutating = False,
       Object.prototyped = False,
       Object.boughtBack = False,
+      Object.unannounced = False,
       Object.spliced = Seq.empty,
       Object.phyrexianLifePaid = 0,
       Object.manaSpent = Mana.MkMana [],
@@ -1327,6 +1328,7 @@ createEmblem pid card = do
                 Object.mutating = False,
                 Object.prototyped = False,
                 Object.boughtBack = False,
+                Object.unannounced = False,
                 Object.spliced = Seq.empty,
                 Object.phyrexianLifePaid = 0,
                 Object.manaSpent = Mana.MkMana [],
@@ -1635,12 +1637,12 @@ bringInFrom destination pid outerId gs = case Map.lookup outerId (GameState.outs
 -- alongside it because it acts on the card in the zone it is leaving, and
 -- `apply` already holds that id -- see the arm there for why that is a
 -- convenience rather than a constraint.
-resolveZoneChange :: Maybe GameState -> Maybe DiscardCause.DiscardCause -> LibraryPosition.LibraryPosition -> ZoneChange -> Game (Maybe ZoneChange, Maybe ObjectId, Bool, Maybe PrintingId.PrintingId, LibraryPosition.LibraryPosition)
-resolveZoneChange asOf discarded requestedPosition zc = do
-  (outcome, _, _, exiledBy, shuffling, splitEarly) <- applyReplacementsFully asOf Set.empty Map.empty (ProposedEvent.WouldChangeZone zc discarded requestedPosition)
+resolveZoneChange :: Maybe GameState -> Maybe DiscardCause.DiscardCause -> LibraryPosition.LibraryPosition -> Bool -> ZoneChange -> Game (Maybe ZoneChange, Maybe ObjectId, Bool, Maybe PrintingId.PrintingId, LibraryPosition.LibraryPosition)
+resolveZoneChange asOf discarded requestedPosition resolving zc = do
+  (outcome, _, _, exiledBy, shuffling, splitEarly) <- applyReplacementsFully asOf Set.empty Map.empty (ProposedEvent.WouldChangeZone zc discarded requestedPosition resolving)
   -- CR 401.2's end as the loop left it: a redirect into a library may state one.
   let position = case outcome of
-        Just (ProposedEvent.WouldChangeZone _ _ settledPosition) -> settledPosition
+        Just (ProposedEvent.WouldChangeZone _ _ settledPosition _) -> settledPosition
         _ -> requestedPosition
   case outcome >>= Replacement.asZoneChange of
     Nothing -> pure (Nothing, exiledBy, shuffling, Nothing, position)
@@ -1746,7 +1748,7 @@ offerCommandZone zc = do
 -- ZONE and whether its subject is a commander, as `offerCommandZone`'s.
 offerCommandZoneFirst :: GameState -> ProposedEvent -> [ReplacementCandidate] -> Maybe PrintingId.PrintingId -> Game (Maybe (ProposedEvent, Maybe PrintingId.PrintingId))
 offerCommandZoneFirst gs event bucket split = case (event, split, fmap Replacement.bucketOf (Maybe.listToMaybe bucket)) of
-  (ProposedEvent.WouldChangeZone zc discarded position, Nothing, Just ReplacementBucket.Other)
+  (ProposedEvent.WouldChangeZone zc discarded position resolving, Nothing, Just ReplacementBucket.Other)
     | Just owner <- Commander.commandZoneOffer zc gs -> do
         picked <- case Replacement.chooserOf gs event of
           Just chooser | chooser /= owner -> do
@@ -1760,7 +1762,7 @@ offerCommandZoneFirst gs event bucket split = case (event, split, fmap Replaceme
             pure $ case component of
               Just _ -> Just (event, component)
               Nothing
-                | ZoneChange.to redirected /= ZoneChange.to zc -> Just (ProposedEvent.WouldChangeZone redirected discarded position, Nothing)
+                | ZoneChange.to redirected /= ZoneChange.to zc -> Just (ProposedEvent.WouldChangeZone redirected discarded position resolving, Nothing)
                 | otherwise -> Nothing
   _ -> pure Nothing
 
@@ -2213,7 +2215,7 @@ applyInertly candidate rewrite event = do
 apply :: Set ObjectId -> ReplacementCandidate -> ProposedEvent -> Game (Maybe ProposedEvent)
 apply batch candidate event =
   case (ReplacementCandidate.effect candidate, event) of
-    (ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR _ toDest revealing _ toPosition optional), ProposedEvent.WouldChangeZone zc discarded position) -> do
+    (ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR _ toDest revealing _ toPosition optional), ProposedEvent.WouldChangeZone zc discarded position resolving) -> do
       -- CR 614.1a's "you may ... instead" (Library of Leng): the row's
       -- controller is asked as it applies, DrawRewrite.Dredge's posture below.
       -- Declining leaves the event standing, and `applyChosen` still records the
@@ -2259,7 +2261,7 @@ apply batch candidate event =
             gs <- State.get
             Monad.forM_ (Game.lookupObject (ZoneChange.departed zc) gs) $ \obj ->
               reveal RevealCause.Ordinary (Object.owner obj) (ZoneChange.departed zc)
-          pure (Just (ProposedEvent.WouldChangeZone zc {ZoneChange.to = toDest} discarded settledPosition))
+          pure (Just (ProposedEvent.WouldChangeZone zc {ZoneChange.to = toDest} discarded settledPosition resolving))
     -- Unreachable: `applies` admits ZoneChangeR only against WouldChangeZone.
     (ReplacementEffect.ZoneChangeR {}, _) -> pure (Just event)
     -- CR 707.5 / 614.1c / 614.12a: the entering object's controller chooses a
@@ -5679,7 +5681,7 @@ castFromOutside caster oid requestedDest shown facing = do
   case Game.lookupObject oid gs of
     Nothing -> pure Seq.empty
     Just obj -> do
-      (resolved, _, _, _, _) <- resolveZoneChange Nothing Nothing LibraryPosition.defaultValue (ZoneChange.MkZoneChange oid oid (Object.zone obj) requestedDest)
+      (resolved, _, _, _, _) <- resolveZoneChange Nothing Nothing LibraryPosition.defaultValue False (ZoneChange.MkZoneChange oid oid (Object.zone obj) requestedDest)
       case resolved of
         Nothing -> pure Seq.empty
         Just settled -> do
@@ -5851,8 +5853,9 @@ changeZoneResolvingReturning oid requestedDest = changeZoneAttaching Nothing Set
 -- Battlefield` gate rather than a `dest == requestedDest` one: the rule is about
 -- the permanent the spell becomes, and only a battlefield destination makes one.
 -- `resolving` is CR 608.2n's own move, True for changeZoneResolvingReturning
--- alone and stamped straight onto the Moved event; it is NOT gated on the
--- destination, a CR 616.1 redirect away from the graveyard leaving the condition
+-- alone, rides the proposed event so a redirect watching "as it resolves"
+-- (ZoneChangePattern.duringResolution) sees it, and is stamped straight onto
+-- the Moved event; it is NOT gated on the destination, a CR 616.1 redirect away from the graveyard leaving the condition
 -- that reads it unmatched on its own `to` test.
 --
 -- `position` needs no `dest == requestedDest` gate, unlike `face` and `facing`
@@ -5954,7 +5957,7 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
       -- loop.
       --
       -- Both ids are `oid` in the PROPOSED event: nothing has moved yet.
-      (resolved, exiledBy, shuffling, splitOff, position) <- resolveZoneChange asOf discarded requestedPosition (ZoneChange.MkZoneChange oid oid fromZone requestedDest)
+      (resolved, exiledBy, shuffling, splitOff, position) <- resolveZoneChange asOf discarded requestedPosition resolving (ZoneChange.MkZoneChange oid oid fromZone requestedDest)
       case resolved of
         -- CR 614.6: nothing survived the loop, so no zone change happens. No
         -- producer today -- no ReplacementEffect in data/cards cancels a zone
@@ -6303,6 +6306,7 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                     -- on the one destination it replaces, and only an instant or a
                     -- sorcery can carry buyback, so no permanent can reference it.
                     Object.boughtBack = False,
+                    Object.unannounced = False,
                     Object.spliced = Seq.empty,
                     -- CR 400.7d a third time, and rule 702.150a is the ability
                     -- that references it: how many of the spell's Phyrexian mana
@@ -7937,6 +7941,7 @@ createTokens controller card copy n tapped entering attached = do
                       Object.mutating = False,
                       Object.prototyped = False,
                       Object.boughtBack = False,
+                      Object.unannounced = False,
                       Object.spliced = Seq.empty,
                       Object.phyrexianLifePaid = 0,
                       Object.manaSpent = Mana.MkMana [],
@@ -8200,6 +8205,7 @@ meld controller victims resultCard = do
                 Object.mutating = False,
                 Object.prototyped = False,
                 Object.boughtBack = False,
+                Object.unannounced = False,
                 Object.spliced = Seq.empty,
                 Object.phyrexianLifePaid = 0,
                 Object.manaSpent = Mana.MkMana [],
