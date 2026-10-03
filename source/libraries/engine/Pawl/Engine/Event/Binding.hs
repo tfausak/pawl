@@ -170,6 +170,10 @@ eventBindingsOver board gs bearerBecame becameInGraveyard bearer you cond event 
   -- match.
   (TriggerCondition.SelfDealsDamageToCreature, GameEvent.DamageDealt ev) ->
     Binding.setEventAmount (DamageEvent.amount ev) Map.empty
+  -- Horned Cheetah's "that much" for the any-recipient arm, which batchBindings
+  -- sums across one damage event. Unconditional given a match.
+  (TriggerCondition.SelfDealsDamage, GameEvent.DamageDealt ev) ->
+    Binding.setEventAmount (DamageEvent.amount ev) Map.empty
   -- Doomskar Warrior's "that many" for the player-or-battle arm, and Aisha of
   -- Sparks and Smoke's "that damage" for the any-recipient one, whose batch
   -- batchBindings sums across the CR 510.2 step. Unconditional given a match.
@@ -1319,6 +1323,7 @@ eventBindingSlots cond = case cond of
   -- Just the amount for the arm one recipient over, and equally guaranteed -- see
   -- the eventBindings arm above for why the recipient gets no slot.
   TriggerCondition.SelfDealsDamageToCreature -> Set.singleton Binding.eventAmount
+  TriggerCondition.SelfDealsDamage -> Set.singleton Binding.eventAmount
   -- CR 120.3's amount for enrage, which Coalhauler Swine's "it deals that much
   -- damage to each player" reads: the same slot CR 615.13's prevention and CR
   -- 119.9's life gain stamp, and guaranteed given a match -- every DamageDealt

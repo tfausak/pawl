@@ -654,6 +654,7 @@ looksBack condition = case condition of
   TriggerCondition.SelfDealsCombatDamage -> False
   TriggerCondition.SelfDealsDamageToPlayer _ -> False
   TriggerCondition.SelfDealsDamageToCreature -> False
+  TriggerCondition.SelfDealsDamage -> False
   TriggerCondition.SelfIsDealtDamage -> False
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
   TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> False
@@ -909,6 +910,10 @@ batchScoped condition = case condition of
   TriggerCondition.SelfDealsCombatDamage -> True
   TriggerCondition.SelfDealsDamageToPlayer _ -> False
   TriggerCondition.SelfDealsDamageToCreature -> False
+  -- SelfDealsCombatDamage's True without the combat narrowing: one damage
+  -- event to several recipients -- a CR 510.2 step, or one CR 608.2f
+  -- instruction -- is one trigger event, its amount summed by batchBindings.
+  TriggerCondition.SelfDealsDamage -> True
   TriggerCondition.SelfIsDealtDamage -> False
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
   -- A True beside PermanentsDie: CR 510.2 deals every combat damage of a step
@@ -2786,6 +2791,8 @@ zonesTriggeredFrom cond =
         -- reason: the bearer is the damage's SOURCE, and a source anywhere but the
         -- battlefield is a different object from this permanent.
         TriggerCondition.SelfDealsDamageToCreature -> battlefield
+        -- CR 113.6's default again, for the SelfDealsDamageToPlayer arm's reason.
+        TriggerCondition.SelfDealsDamage -> battlefield
         -- CR 113.6's default again, and the match's own shape on top of it: this arm
         -- compares the bearer against the event's RECIPIENT, and CR 120.3's recipient is
         -- a player or a permanent -- so a bearer anywhere but the battlefield can never
@@ -3152,6 +3159,7 @@ stateTriggers gs
             TriggerCondition.SelfDealsCombatDamage -> False
             TriggerCondition.SelfDealsDamageToPlayer _ -> False
             TriggerCondition.SelfDealsDamageToCreature -> False
+            TriggerCondition.SelfDealsDamage -> False
             TriggerCondition.SelfIsDealtDamage -> False
             TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
             TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> False
