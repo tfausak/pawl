@@ -2243,6 +2243,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- And CR 115.7d, a spell that is already on the stack given new targets.
   -- And its joint half, over a spell whose second slot reads its first.
   redirectBioshiftSpec s registry
+  -- And CR 115.7a's stricter "change the target", over Deflection.
+  deflectionSpec s registry
 
 razorfinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 razorfinSpec s registry = Spec.describe s "HasCountersOfAnyKind (CR 122.1)" $ do
@@ -2897,6 +2899,103 @@ redirectBioshiftSpec s registry =
           (aimed, targets, depth) <- run False
           Spec.assertEqWith s "no ward trigger: the re-target was refused" depth 1
           Spec.assertEqWith s "and Bioshift keeps both its targets" targets (fmap Set.singleton aimed)
+
+-- CR 115.7a over Giant Growth: alice aims it at her Goblin Piker (2/1), and
+-- bob's Deflection changes its target. `others` are the other creatures on the
+-- board, each controlled by the seat it names. bob's answerer asks for the Piker
+-- back whenever it is offered and for carol's Llanowar Elves otherwise, so a
+-- re-aim that offered the current target ("another legal target") would leave
+-- Giant Growth where it was.
+deflectionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+deflectionSpec s registry =
+  let run others = do
+        forest <- S.printingOf s registry "Forest"
+        island <- S.printingOf s registry "Island"
+        piker <- S.printingOf s registry "Goblin Piker"
+        growth <- S.printingOf s registry "Giant Growth"
+        deflection <- S.printingOf s registry "Deflection"
+        printings <- traverse (\(who, name) -> fmap ((,) who) (S.printingOf s registry name)) others
+        let lands = S.landsFor island S.bob 4 (S.landsFor forest S.alice 1 S.threePlayerGame)
+            (withGrowth, growthId) = S.handOne growth lands
+            (deflectionId, g1) = S.addHandCard deflection S.bob withGrowth
+            (pikerId, g2) = S.addPermanent piker S.alice g1
+            place (ids, g) (who, printing) = let (oid, g') = S.addPermanent printing who g in (ids <> [oid], g')
+            (otherIds, board) = List.foldl' place ([], g2) printings
+            cast = S.runPure (aimingAs S.alice (Recipient.ToCreature pikerId)) board (S.cast S.alice growthId)
+        case topOfStack cast of
+          Nothing -> Spec.assertFailure s "Giant Growth never reached the stack" >> pure (pikerId, otherIds, cast)
+          Just spell -> do
+            let bobCast = S.runPure (aimingAs S.bob (Recipient.ToObject spell)) cast (S.cast S.bob deflectionId)
+                deflected = S.runPure (wantingBack pikerId otherIds) bobCast Stack.resolveTop
+            pure (pikerId, otherIds, S.runPure S.identityAnswer deflected Stack.resolveTop)
+   in Spec.describe s "Deflection (CR 115.7a)" $ do
+        Spec.it s "CR 115.7a the target changes only to ANOTHER legal target, the controller's choice" $ do
+          (pikerId, otherIds, after) <- run [(S.bob, "Hill Giant"), (S.carol, "Llanowar Elves")]
+          case otherIds of
+            [giantId, elvesId] -> do
+              -- THE GAMEPLAY ASSERTION.
+              Spec.assertEqWith s "CR 115.7a Giant Growth pumped the Elves bob chose" (S.powerToughnessOf elvesId after) (Just (4, 4))
+              Spec.assertEqWith s "and not the Piker it was cast at" (S.powerToughnessOf pikerId after) (Just (2, 1))
+              Spec.assertEqWith s "nor the Giant bob did not choose" (S.powerToughnessOf giantId after) (Just (3, 3))
+            _ -> Spec.assertFailure s "the board should hold two other creatures"
+        -- bob's answerer names neither the Piker nor the Elves here, so a prompt
+        -- would be answered with nothing and rejected: the Giant can be reached
+        -- only by the change being made without asking.
+        Spec.it s "CR 115.7a with one other legal target the change is made, unasked" $ do
+          (pikerId, otherIds, after) <- run [(S.bob, "Hill Giant")]
+          Spec.assertEqWith s "CR 115.7a Giant Growth pumped the Giant" (traverse (`S.powerToughnessOf` after) otherIds) (Just [(6, 6)])
+          Spec.assertEqWith s "and not the Piker" (S.powerToughnessOf pikerId after) (Just (2, 1))
+        -- A REGRESSION FENCE rather than a proven line: no mutation of
+        -- changeTargetsFor reaches this board, since with nothing offered every
+        -- answer is rejected anyway.
+        Spec.it s "CR 115.7a with no other legal target the original target is unchanged" $ do
+          (pikerId, _, after) <- run []
+          Spec.assertEqWith s "CR 115.7a Giant Growth still pumped the Piker" (S.powerToughnessOf pikerId after) (Just (5, 4))
+        -- Two boards differing in one thing: whether Twisted Fealty's second
+        -- "target" names the same Hill Giant its first does. Deflection's ruling:
+        -- "If a spell targets the same player or object multiple times, you can't
+        -- target it with Deflection."
+        Spec.it s "CR 601.2c a spell targeting one object through two instances of target does not have a single target" $ do
+          fealtyCast <- traverse (deflectFealty s registry) [False, True]
+          Spec.assertEqWith s "CR 601.2c Deflection reaches the stack over the single-target Fealty only" fealtyCast [2, 1]
+
+-- bob's answer to Deflection's re-aim: the Piker back whenever it is offered,
+-- otherwise the SECOND other creature (carol's Elves), filtered out of the offer.
+wantingBack :: ObjectId.ObjectId -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+wantingBack piker otherIds p = case p of
+  Prompt.ChooseTargets _ player _ asked
+    | player == S.bob ->
+        let back = Set.filter (== Recipient.ToCreature piker) . snd
+            elves = Set.filter (\r -> any (\oid -> Recipient.objectOf r == Just oid) (take 1 (drop 1 otherIds))) . snd
+         in fmap (\offer -> if Set.null (back offer) then elves offer else back offer) asked
+  _ -> S.identityAnswer p
+
+-- alice's announcement of Twisted Fealty at `giantId`: one target in the Role
+-- slot as well when `twice`, none otherwise.
+aimFealty :: Bool -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimFealty twice giantId p = case p of
+  Prompt.AnnounceTargets _ _ _ offers -> Map.mapWithKey (\slot _ -> if twice || slot == SlotName.MkSlotName (Text.pack "target") then 1 else 0) offers
+  Prompt.ChooseTargets _ _ _ asked -> fmap (Set.filter (== Recipient.ToCreature giantId) . snd) asked
+  _ -> S.identityAnswer p
+
+-- Twisted Fealty cast by alice at bob's Hill Giant, its up-to-one Role slot left
+-- empty or aimed at the same Giant, then bob's Deflection cast at it with the
+-- same four Islands either way. Answers the stack depth afterwards.
+deflectFealty :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m Int
+deflectFealty s registry twice = do
+  mountain <- S.printingOf s registry "Mountain"
+  island <- S.printingOf s registry "Island"
+  giant <- S.printingOf s registry "Hill Giant"
+  fealty <- S.printingOf s registry "Twisted Fealty"
+  deflection <- S.printingOf s registry "Deflection"
+  let lands = S.landsFor island S.bob 4 (S.landsFor mountain S.alice 3 S.threePlayerGame)
+      (withFealty, fealtyId) = S.handOne fealty lands
+      (deflectionId, g1) = S.addHandCard deflection S.bob withFealty
+      (giantId, board) = S.addPermanent giant S.bob g1
+      cast = S.runPure (aimFealty twice giantId) board (S.cast S.alice fealtyId)
+  case topOfStack cast of
+    Nothing -> Spec.assertFailure s "Twisted Fealty never reached the stack" >> pure 0
+    Just spell -> pure (length (GameState.stack (S.runPure (aimingAs S.bob (Recipient.ToObject spell)) cast (S.cast S.bob deflectionId))))
 
 -- Answer every target prompt put to `who` by FILTERING each slot's offered set
 -- down to the one recipient `aimed` names for it.

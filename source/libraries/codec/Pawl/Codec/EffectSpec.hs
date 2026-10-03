@@ -2412,6 +2412,14 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.ChooseNewTargets (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))))
       " {\"type\":\"ChooseNewTargets\",\"value\":{\"type\":\"InSlot\",\"value\":\"spell\"}} "
+  -- CR 115.7a: Deflection's "change the target of target spell".
+  Spec.it s "ChangeTargets" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.ChangeTargets (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))))
+      " {\"type\":\"ChangeTargets\",\"value\":{\"type\":\"InSlot\",\"value\":\"spell\"}} "
   -- CR 701.36a: nullary, rule 701.36a fixing the quality, the count and the
   -- chooser, leaving an author nothing to write.
   Spec.it s "Populate" $

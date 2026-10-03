@@ -82,6 +82,7 @@ import qualified Pawl.Types.RuleAbilities as RuleAbilities
 import qualified Pawl.Types.Saddling as Saddling
 import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
 import qualified Pawl.Types.Sickness as Sickness
+import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
@@ -168,6 +169,7 @@ viewOfCard face =
           -- CR 115.1: a printed face is on no stack and targets nothing.
           Filter.targets = Set.empty,
           Filter.targetViews = Map.empty,
+          Filter.targetCount = 0,
           -- Not an object, so no identity for IsSource to compare.
           Filter.identity = Nothing,
           Filter.playerIdentity = Nothing,
@@ -515,6 +517,7 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- nothing forces this map but Filter.TargetsOnlyOne's and TargetsMatching's
       -- nests.
       Filter.targetViews = targetViewsOfStackObject peers gs oid,
+      Filter.targetCount = targetCountOfStackObject gs oid,
       Filter.identity = Just oid,
       Filter.playerIdentity = Nothing,
       -- CR 508.1k: a combat status, not a characteristic (CR 109.3). CR 506.4 takes
@@ -2178,10 +2181,20 @@ abilitiesFromCharacteristics peers pc oid gs =
 -- stack object and then asks a target atom of it, nor asks one of a permanent
 -- carrying bindings, so dropping either leaves the suite green.
 targetsOfStackObject :: GameState -> ObjectId -> Set Recipient.Recipient
-targetsOfStackObject gs oid = maybe Set.empty targetsOf (Game.lookupObject oid gs)
+targetsOfStackObject gs oid = Set.unions (Map.elems (targetSlotsOfStackObject gs oid))
+
+-- CR 601.2c: how many targets the stack object above has, per slot rather than
+-- unioned, so an object chosen by two instances of "target" counts twice. What
+-- Pawl.Engine.Filter.View's `targetCount` is filled from.
+targetCountOfStackObject :: GameState -> ObjectId -> Natural
+targetCountOfStackObject gs oid = sum (fmap Natural.length (Map.elems (targetSlotsOfStackObject gs oid)))
+
+-- The two above's shared read: the declared target slots' recipients, by slot.
+targetSlotsOfStackObject :: GameState -> ObjectId -> Map SlotName (Set Recipient.Recipient)
+targetSlotsOfStackObject gs oid = maybe Map.empty targetsOf (Game.lookupObject oid gs)
   where
     targetsOf obj
-      | Object.zone obj /= Zone.Stack = Set.empty
+      | Object.zone obj /= Zone.Stack = Map.empty
       | otherwise =
           let bindings = Object.bindings obj
               chosen = Binding.modesOf bindings
@@ -2210,7 +2223,7 @@ targetsOfStackObject gs oid = maybe Set.empty targetsOf (Game.lookupObject oid g
               -- (Modal.perPlayerSlot), each a target of its printed slot. A
               -- REGRESSION FENCE: no test asks a target atom of such an object.
               isDeclared slot _ = Set.member (maybe slot fst (Modal.perPlayerOf slot)) declared
-           in Set.unions (Map.elems (Map.filterWithKey isDeclared (Binding.targetsOf bindings)))
+           in Map.filterWithKey isDeclared (Binding.targetsOf bindings)
 
 -- CR 115.1 one indirection along: a VIEW of each thing the stack object above
 -- targets, which is what Filter.TargetsOnlyOne's and TargetsMatching's nests
