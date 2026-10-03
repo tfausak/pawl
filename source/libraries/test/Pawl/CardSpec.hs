@@ -622,7 +622,7 @@ objectRefPositions =
   let plainRiders = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = Nothing, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.attachedTo = Nothing, EntryRiders.faceDown = Nothing, EntryRiders.noted = False}
       handChoice = ChosenCardInHand.MkChosenCardInHand (plantedPlayer "xh") (Filter.Type.And [])
    in [ ("deal-damage", Effect.DealDamage (DealDamage.MkDealDamage (Seq.fromList [DamagePart.MkDamagePart (plantedRef "dd1") (Quantity.Type.Literal 1), DamagePart.MkDamagePart (plantedRef "dd2") (Quantity.Type.Literal 1)]) Nothing Nothing), [plantedRef "dd1", plantedRef "dd2"]),
-        ("modify-target", Effect.ModifyTarget (ModifyTarget.MkModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Flying) (plantedRef "mt")), [plantedRef "mt"]),
+        ("modify-target", Effect.ModifyTarget (ModifyTarget.MkModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Flying) (plantedRef "mt") Nothing), [plantedRef "mt"]),
         ("restart-game", Effect.RestartGame (Just (plantedRef "rg")), [plantedRef "rg"]),
         ("destroy", Effect.Destroy (Destroy.MkDestroy (plantedRef "de") Regenerability.Regenerable Nothing Nothing Nothing), [plantedRef "de"]),
         ("attach-all", Effect.AttachAll (AttachAll.MkAttachAll (plantedRef "aa") Filter.Type.IsSource), [plantedRef "aa"]),
@@ -1126,6 +1126,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.RoomEntered _ -> []
   -- CR 309.7's condition carries a PlayerRelation, which is no Count.
   TriggerCondition.PlayerCompletesDungeon _ -> []
+  -- CR 603.9's too.
+  TriggerCondition.PlayerLosesGame _ -> []
   -- CR 701.22d and CR 701.25d carry a PlayerRelation and CR 702.170a nothing
   -- at all, so none of the three holds a Count. CR 701.44b holds a Filter, and
   -- a Filter holds no Count for PermanentEnters' reason above.
@@ -1229,7 +1231,7 @@ effectCounts effect = concatMap refCounts (Resolve.effectObjectRefs effect) <> o
 ownCounts :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [Count.Type.Count Quantity.Type.Quantity]
 ownCounts effect = case effect of
   Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> concatMap (quantityCounts . DamagePart.quantity) parts
-  Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) -> durationCounts duration <> modificationCounts modification
+  Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _ _) -> durationCounts duration <> modificationCounts modification
   Effect.ChangeText {} -> []
   Effect.AddMana _ -> []
   Effect.Firebend _ -> []
@@ -4385,6 +4387,8 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.RoomEntered _ -> []
   -- CR 309.7's condition carries a PlayerRelation, which is no Filter.
   TriggerCondition.PlayerCompletesDungeon _ -> []
+  -- CR 603.9's too.
+  TriggerCondition.PlayerLosesGame _ -> []
   -- CR 701.22d and CR 701.25d carry a PlayerRelation and CR 702.170a nothing,
   -- so none of them holds a Filter.
   TriggerCondition.PlayerScries _ -> []
@@ -4632,6 +4636,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.BoundDies slot -> [slot]
   TriggerCondition.RoomEntered _ -> []
   TriggerCondition.PlayerScries _ -> []
+  TriggerCondition.PlayerLosesGame _ -> []
   TriggerCondition.RingTemptsPlayer _ -> []
   TriggerCondition.PlayerBlights _ -> []
   TriggerCondition.PlayerForages _ -> []
@@ -5780,7 +5785,7 @@ effectFilters effect = case effect of
   Effect.AttachTargetToEach (AttachTarget.MkAttachTarget _ f) -> [(AttachDestination, f)]
   -- The dealer is a SlotName and carries no Filter.
   Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> foldMap (\part -> frame SourceHostFramed (objectRefFilters (DamagePart.ref part)) <> frame Unframed (quantityFilters (DamagePart.quantity part))) parts
-  Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
+  Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref _) ->
     frame Unframed (durationFilters duration) <> frame Unframed (modificationFilters modification) <> frame SourceHostFramed (objectRefFilters ref)
   Effect.ChangeText {} -> []
   -- CR 106.6's two clauses, and every predicate in them: the restriction's half
