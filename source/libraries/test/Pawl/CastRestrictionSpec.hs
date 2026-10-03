@@ -13,6 +13,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
@@ -56,6 +57,7 @@ import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -2471,6 +2473,32 @@ hinataSpec s registry = Spec.describe s "Hinata, Dawn-Crowned" $ do
     Spec.assertEqWith s "CR 601.2f bob's Bolt at alice cost {1}{R}" (S.tappedCount S.bob atAlice) 2
     Spec.assertEqWith s "CR 109.5 with Hinata his own, the same Bolt cost {R}" (S.tappedCount S.bob ownAtAlice) 1
     Spec.assertEqWith s "and both are on the stack" (length (GameState.stack atAlice), length (GameState.stack ownAtAlice)) (1, 1)
+  -- CR 700.2: a "choose two" aims across both chosen modes. Ojutai's Command
+  -- ({2}{W}{U}) with modes 0 and 2 targets a creature card in alice's graveyard
+  -- and bob's creature spell -- two targets, so {W}{U}, which her Island and
+  -- Plains pay. No single mode brings two targets, so a gate pricing one mode at
+  -- a time measures {1}{W}{U} and refuses the cast.
+  Spec.it s "CR 700.2 / 601.2f the gate counts the targets of every mode a choose-two announces" $ do
+    island <- S.printingOf s registry "Island"
+    plains <- S.printingOf s registry "Plains"
+    hinata <- S.printingOf s registry "Hinata, Dawn-Crowned"
+    piker <- S.printingOf s registry "Goblin Piker"
+    command <- S.printingOf s registry "Ojutai's Command"
+    let (_, g1) = S.addPermanent hinata S.alice (S.landsFor plains S.alice 1 (S.landsInPlay island 1))
+        (deadPiker, g2) = S.addGraveyardCard piker S.alice g1
+        (castPiker, g3) = S.spellOnStack piker S.bob g2
+        (commandId, g4) = S.addHandCard command S.alice g3
+        board = aliceOnTurn g4
+        answer :: Prompt.Prompt r -> r
+        answer prompt = case prompt of
+          Prompt.ChooseModes {} -> Seq.fromList (fmap ModeIndex.MkModeIndex [0, 2])
+          Prompt.ChooseTargets _ _ _ sets ->
+            fmap (\(_, legal) -> Set.filter (\r -> Recipient.objectOf r `elem` [Just deadPiker, Just castPiker]) legal) sets
+          _ -> S.identityAnswer prompt
+        after = S.runPure answer board (S.cast S.alice commandId)
+    Spec.assertBool s (S.castable S.alice commandId board) "CR 601.2 the cast is offered on an Island and a Plains"
+    Spec.assertEqWith s "CR 601.2f two targets took {2} off: both lands paid {W}{U}" (S.tappedCount S.alice after) 2
+    Spec.assertEqWith s "and the Command is on the stack above bob's Piker" (length (GameState.stack after)) 2
 
 -- Shell of the Last Kappa (CHK 269) {3} Legendary Artifact, Oracle text checked
 -- against Scryfall: "{3}, {T}: Exile target instant or sorcery spell that

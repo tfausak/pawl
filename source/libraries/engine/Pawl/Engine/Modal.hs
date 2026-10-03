@@ -458,6 +458,20 @@ selectionSatisfiedBy legal selection chosen =
         && Set.isSubsetOf distinct legal
         && (allowsRepeatsIn selection || Set.size distinct == Seq.length chosen)
 
+-- CR 700.2: every answer selectionSatisfiedBy accepts over `legal`, each in
+-- printed order -- the announcements a gate standing before CR 601.2b has to
+-- consider when a cost reads the targets they bring (Pawl.Engine.Cast.castAimable).
+-- Exponential in the mode count, which no printing takes past five.
+selections :: Set ModeIndex.ModeIndex -> ModeSelection.ModeSelection -> [Seq.Seq ModeIndex.ModeIndex]
+selections legal selection =
+  let choose :: Natural -> [ModeIndex.ModeIndex] -> [[ModeIndex.ModeIndex]]
+      choose n pool
+        | n == 0 = [[]]
+        | otherwise = case pool of
+            [] -> []
+            m : rest -> fmap (m :) (choose (n - 1) (if allowsRepeatsIn selection then pool else rest)) <> choose n rest
+   in [Seq.fromList picked | n <- selectionSizes selection, picked <- choose n (Set.toAscList legal)]
+
 -- How many modes are PRINTED, which is not the same question as how many the
 -- selection demands. CR 702.42a's entwine is what asks it: this is the count
 -- Pawl.Engine.Cast substitutes for selectionCount when the entwine cost is
