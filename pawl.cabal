@@ -14,7 +14,6 @@ license-file: LICENSE.txt
 data-dir: data
 data-files:
   cards/*.json
-  oracle/*.txt
   scenarios/**/*.json
 
 extra-doc-files:
@@ -1497,6 +1496,7 @@ library executable
     pawl:registry,
     pawl:scenario,
     pawl:test,
+    pawl:types,
     text ^>=2.1.3,
 
   hs-source-dirs: source/libraries/executable

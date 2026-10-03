@@ -1,2 +1,0 @@
-First strike (This creature deals combat damage before creatures without first strike.)
-Mentor (Whenever this creature attacks, put a +1/+1 counter on target attacking creature with lesser power.)

@@ -14,6 +14,7 @@ module Pawl.Types.Face where
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
@@ -69,6 +70,9 @@ import qualified Pawl.Types.Vanguard as Vanguard
 
 data Face card = MkFace
   { name :: CardName.CardName,
+    -- | The face's Oracle text as MTGJSON gives it, for reference; nothing in
+    -- the engine reads it.
+    oracleText :: Maybe Text.Text,
     -- | Nothing, not a zero cost: CR 202.1, a land has no mana cost at all.
     manaCost :: Maybe ManaCost.ManaCost,
     typeLine :: TypeLine.TypeLine,

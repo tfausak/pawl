@@ -4,6 +4,7 @@ module Pawl.Json.Number where
 
 import qualified Data.ByteString.Builder as Builder
 import qualified Pawl.Decimal as Decimal
+import qualified Pawl.Extra.Integer as Integer
 import qualified Text.Parsec as Parsec
 
 newtype Number = MkNumber
@@ -69,10 +70,17 @@ digits =
 fromDigits :: [Integer] -> Integer
 fromDigits = foldl' (\n -> ((10 * n) +)) 0
 
+-- | An integer is written out in full, as a person writes one (50, not 5e1),
+-- up to fifteen trailing zeros; past that, and for a fraction, the exponent is
+-- written instead, so a decoded @1e1000000@ cannot re-encode as a megabyte.
 encode :: Number -> Builder.Builder
 encode n =
   let d = unwrap n
+      e = Decimal.exponent d
    in Builder.integerDec (Decimal.mantissa d)
-        <> if Decimal.exponent d == 0
+        <> if e == 0
           then mempty
-          else Builder.charUtf8 'e' <> Builder.integerDec (Decimal.exponent d)
+          else
+            if e > 0 && e <= 15
+              then Builder.string7 (replicate (Integer.toIntSaturating e) '0')
+              else Builder.charUtf8 'e' <> Builder.integerDec e

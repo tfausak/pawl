@@ -19,6 +19,7 @@ import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Layout as Layout
@@ -33,9 +34,9 @@ import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Text.Read as Read
 
--- | The card a candidate record means, with its Oracle text verbatim (empty
--- where MTGJSON has none), or why it is not one this builds.
-candidate :: Value.Value -> Either Text.Text (Card.Card, Text.Text)
+-- | The card a candidate record means, its Oracle text verbatim (empty where
+-- MTGJSON has none), or why it is not one this builds.
+candidate :: Value.Value -> Either Text.Text Card.Card
 candidate value = do
   fields <- Common.asObject value
   let nullable key = case Common.optionalField key fields of
@@ -62,8 +63,32 @@ candidate value = do
             TypeLine.types = Set.fromList (types :: [CardType.CardType]),
             TypeLine.subtypes = Set.fromList (subtypes :: [Subtype.Subtype])
           }
-      face = Oracle.bare (CardName.MkCardName name) cost (Set.fromList indicator) typeLine power toughness (Map.fromListWith (+) (fmap (\k -> (k, 1)) keywords))
-  pure (Card.MkCard {Card.layout = Layout.Normal, Card.faces = face NonEmpty.:| []}, text)
+      face = Oracle.bare (CardName.MkCardName name) (Just text) cost (Set.fromList indicator) typeLine power toughness (Map.fromListWith (+) (fmap (\k -> (k, 1)) keywords))
+  pure Card.MkCard {Card.layout = Layout.Normal, Card.faces = face NonEmpty.:| []}
+
+-- | Every face's Oracle text by face name, from the reduction's @texts@. A name
+-- two faces print differently is left out rather than guessed at.
+texts :: Value.Value -> Either Text.Text (Map.Map Text.Text Text.Text)
+texts value = do
+  entries <- Common.asArray value >>= traverse entry
+  let grouped = Map.fromListWith Set.union [(name, Set.singleton text) | (name, text) <- entries]
+  pure (Map.mapMaybe (\set -> case Set.toList set of [one] -> Just one; _ -> Nothing) grouped)
+  where
+    entry v = do
+      fields <- Common.asObject v
+      name <- Common.field "name" fields >>= Common.asText
+      text <- Common.field "text" fields >>= Common.asText
+      pure (name, text)
+
+-- | The card with each face's Oracle text set from the map, where it has one.
+stamp :: Map.Map Text.Text Text.Text -> Card.Card -> Card.Card
+stamp known card =
+  card
+    { Card.faces =
+        fmap
+          (\face -> maybe face (\text -> face {Face.oracleText = Just text}) (Map.lookup (CardName.unwrap (Face.name face)) known))
+          (Card.faces card)
+    }
 
 -- | A line of normalised Oracle text as the keyword it names.
 keyword :: Text.Text -> Either Text.Text Keyword.Keyword

@@ -1,2 +1,0 @@
-Flying
-Indestructible (Damage and effects that say "destroy" don't destroy this creature. If its toughness is 0 or less, it still dies.)

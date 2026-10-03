@@ -1,14 +1,12 @@
--- Covers Pawl.Oracle and Pawl.Ingest, and data/oracle/*.txt against the card
--- files they sit beside (#9).
+-- Covers Pawl.Oracle and Pawl.Ingest, and every keyword-only card file against
+-- its Oracle text (#9).
 module Pawl.OracleSpec where
 
 import qualified Control.Monad as Monad
-import qualified Data.ByteString as ByteString
 import qualified Data.Char as Char
-import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Maybe as Maybe
 import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Encoding
 import qualified Pawl.Codec.Keyword as Codec.Keyword
 import qualified Pawl.Ingest as Ingest
 import qualified Pawl.Json.Value as Value
@@ -19,37 +17,21 @@ import qualified Pawl.Oracle as Oracle
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Keyword as Keyword
-import qualified System.Directory as Directory
 
 spec :: (Monad n) => Spec.Spec IO n -> n ()
 spec s = Spec.describe s "Pawl.Oracle" $ do
-  Spec.it s "each sidecar says what its card file renders" $ do
-    cards <- Registry.defaultRoot
-    oracle <- Registry.oracleRoot
-    entries <- fmap (List.sort . filter (List.isSuffixOf ".txt")) (Directory.listDirectory oracle)
-    Spec.assertBool s (not (null entries)) (oracle <> ": no sidecars")
-    Monad.forM_ entries $ \entry -> do
-      let slug = Slug.fromText (Text.pack (take (length entry - length ".txt") entry))
-          path = Registry.cardPath cards slug
-      exists <- Directory.doesFileExist path
-      Spec.assertBool s exists (entry <> ": no card file " <> path)
-      card <- fmap Registry.parseCard (ByteString.readFile path)
-      sidecar <- fmap Encoding.decodeUtf8' (ByteString.readFile (Registry.oraclePath oracle slug))
-      case (card, sidecar) of
-        (_, Left err) -> Spec.assertFailure s (entry <> ": not valid UTF-8: " <> show err)
-        (Left reason, _) -> Spec.assertFailure s (path <> ": " <> Text.unpack reason)
-        (Right parsed, Right text) -> case Oracle.render parsed of
-          Nothing -> Spec.assertFailure s (path <> ": carries more than keywords, so its sidecar cannot be checked")
-          Just rendered -> Spec.assertEqWith s path (Oracle.normalise text) (Oracle.normalise rendered)
-
-  Spec.it s "every keyword-only card of the reference has a sidecar" $ do
-    cards <- Registry.defaultRoot
-    oracle <- Registry.oracleRoot
-    loaded <- Registry.loadRoot cards
-    let keywordOnly = [card | entry@(_, Right card) <- loaded, Maybe.isJust (Registry.referenceCard entry), Maybe.isJust (Oracle.render card)]
-    missing <- Monad.filterM (fmap not . Directory.doesFileExist . Registry.oraclePath oracle . Registry.filedAs) keywordOnly
-    Spec.assertEq s [] (fmap Registry.filedAs missing)
+  Spec.it s "each keyword-only card says what its Oracle text says" $ do
+    loaded <- Registry.defaultRoot >>= Registry.loadRoot
+    let keywordOnly = [(card, rendered) | entry@(_, Right card) <- loaded, Maybe.isJust (Registry.referenceCard entry), Just rendered <- [Oracle.render card]]
+    Spec.assertBool s (not (null keywordOnly)) "no keyword-only cards"
+    Monad.forM_ keywordOnly $ \(card, rendered) -> do
+      let name = Text.unpack (Slug.unwrap (Registry.filedAs card))
+      case Face.oracleText (NonEmpty.head (Card.faces card)) of
+        Nothing -> Spec.assertFailure s (name <> ": no Oracle text")
+        Just text -> Spec.assertEqWith s name (Oracle.normalise text) (Oracle.normalise rendered)
 
   Spec.it s "normalise drops reminder text and splits a keyword line" $ do
     Spec.assertEq s (fmap Text.pack ["flying", "trample", "vigilance"]) (Oracle.normalise (Text.pack "Flying, vigilance\nTrample (This creature can deal excess combat damage.)"))
@@ -96,7 +78,7 @@ spec s = Spec.describe s "Pawl.Oracle" $ do
       $ \(name, json) -> do
         card <- Registry.named registry name
         case (Common.parse (Text.pack json), card) of
-          (Right value, Just expected) -> Spec.assertEqWith s name (Right expected) (fmap fst (Ingest.candidate value))
+          (Right value, Just expected) -> Spec.assertEqWith s name (Right expected) (Ingest.candidate value)
           _ -> Spec.assertFailure s (name <> ": no record or no card")
 
   Spec.it s "candidate leaves out a card it would have to guess at" $ do

@@ -1,1 +1,0 @@
-Indestructible (Effects that say "destroy" don't destroy this artifact.)

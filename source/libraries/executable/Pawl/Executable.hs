@@ -3,7 +3,9 @@ module Pawl.Executable where
 import qualified Control.Monad as Monad
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Builder as Builder
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
 import qualified Data.Text.IO as TextIO
@@ -20,6 +22,9 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Scenario.Load as Load
 import qualified Pawl.Test
+import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Face as Face
 import qualified System.Directory as Directory
 import qualified System.Environment as Environment
 import qualified System.Exit as Exit
@@ -74,54 +79,66 @@ deck path = do
           Exit.exitFailure
         Right parsed -> TextIO.putStr (DeckList.render parsed)
 
--- | Writes a card file for every keyword-only card in a candidates file
--- (script/ingest/candidates.jq's reduction of MTGJSON), each with its Oracle
--- text as a sidecar that Pawl.OracleSpec checks the card against (#9). A card
--- already in the pool is never overwritten -- the hand-written file wins -- but
--- gains the sidecar, which puts it under the same check, and is named on
--- stderr if it says something other than MTGJSON does. Card files are written
--- compact; `script/format-json.sh fix` puts them in canonical form.
+-- | Reads script/ingest/candidates.jq's reduction of MTGJSON's AtomicCards and
+-- writes a card file for every keyword-only card it holds, Oracle text included
+-- (#9). A card already in the pool is never overwritten -- the hand-written
+-- file wins -- and is named on stderr if it says something other than MTGJSON
+-- does. Then every pool card gains its faces' Oracle text, the one field this
+-- writes into a hand-written file. Files are written compact;
+-- `script/format-json.sh fix` puts them in canonical form.
 --
--- Prints how many it wrote, skipped and left out, and why the rest were left
--- out, by the kind of word that disqualified them.
+-- Prints what it did, and why the cards it did not write were left out, by the
+-- kind of word that disqualified them.
 ingest :: FilePath -> IO ()
 ingest path = do
   bytes <- ByteString.readFile path
   let parsed = do
         contents <- either (\err -> Left (Text.pack ("not valid UTF-8: " <> show err))) Right (Encoding.decodeUtf8' bytes)
-        Common.parse contents >>= Common.asObject >>= Common.field "cards" >>= Common.asArray
+        fields <- Common.parse contents >>= Common.asObject
+        records <- Common.field "cards" fields >>= Common.asArray
+        known <- Common.field "texts" fields >>= Ingest.texts
+        pure (records, known)
   case parsed of
     Left problem -> do
       TextIO.hPutStrLn IO.stderr (Text.pack (path <> ": ") <> problem)
       Exit.exitFailure
-    Right records -> do
-      cards <- Registry.defaultRoot
-      oracle <- Registry.oracleRoot
-      Directory.createDirectoryIfMissing True oracle
-      outcomes <- mapM (ingestOne cards oracle) records
-      let count p = length (filter p outcomes)
-          reasons = Map.fromListWith (+) [(Text.takeWhile (/= ':') reason, 1 :: Int) | Left reason <- outcomes]
-      putStrLn $ "written: " <> show (count (== Right True))
-      putStrLn $ "skipped, already in the pool: " <> show (count (== Right False))
+    Right (records, known) -> do
+      root <- Registry.defaultRoot
+      outcomes <- mapM (ingestOne root) records
+      loaded <- Registry.loadRoot root
+      stamped <- fmap length . Monad.filterM (stampOne known) $ Maybe.mapMaybe (\entry@(file, _) -> fmap ((,) file) (Registry.referenceCard entry)) loaded
+      let reasons = Map.fromListWith (+) [(Text.takeWhile (/= ':') reason, 1 :: Int) | Left reason <- outcomes]
+      putStrLn $ "written: " <> show (length (filter (== Right True) outcomes))
+      putStrLn $ "already in the pool: " <> show (length (filter (== Right False) outcomes))
+      putStrLn $ "pool files given Oracle text: " <> show stamped
       putStrLn $ "left out: " <> show (sum reasons)
       mapM_ (\(kind, n) -> TextIO.putStrLn (Text.pack "  " <> kind <> Text.pack (": " <> show n))) (Map.toDescList reasons)
 
 -- Right True for a card written, Right False for one the pool already holds.
-ingestOne :: FilePath -> FilePath -> Value.Value -> IO (Either Text.Text Bool)
-ingestOne cards oracle record = case Ingest.candidate record of
+ingestOne :: FilePath -> Value.Value -> IO (Either Text.Text Bool)
+ingestOne root record = case Ingest.candidate record of
   Left reason -> pure (Left reason)
-  Right (card, text) -> do
-    let slug = Registry.filedAs card
-        file = Registry.cardPath cards slug
+  Right card -> do
+    let file = Registry.cardPath root (Registry.filedAs card)
     exists <- Directory.doesFileExist file
     if exists
       then do
         existing <- fmap Registry.parseCard (ByteString.readFile file)
-        Monad.unless (existing == Right card) $
+        Monad.unless (fmap (Ingest.stamp (texts card)) existing == Right card) $
           IO.hPutStrLn IO.stderr (file <> ": disagrees with MTGJSON; the pool's file is kept")
-      else ByteString.writeFile file (Encoding.encodeUtf8 (Common.render (Codec.encode Card.codec card)))
-    ByteString.writeFile (Registry.oraclePath oracle slug) (Encoding.encodeUtf8 (if Text.null text then text else text <> Text.pack "\n"))
+      else writeCard file card
     pure (Right (not exists))
+  where
+    texts card = Map.fromList [(CardName.unwrap (Face.name face), text) | face <- NonEmpty.toList (Card.Type.faces card), Just text <- [Face.oracleText face]]
+
+-- True when the card's file changed.
+stampOne :: Map.Map Text.Text Text.Text -> (FilePath, Card.Type.Card) -> IO Bool
+stampOne known (file, card) =
+  let stamped = Ingest.stamp known card
+   in if stamped == card then pure False else True <$ writeCard file stamped
+
+writeCard :: FilePath -> Card.Type.Card -> IO ()
+writeCard file = ByteString.writeFile file . Encoding.encodeUtf8 . Common.render . Codec.encode Card.codec
 
 -- | Emits the card format's JSON Schema, which is otherwise reachable only
 -- from a REPL. Card rather than Printing because Pawl.Registry.parseCard is what reads

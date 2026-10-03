@@ -1,7 +1,6 @@
 -- Oracle text a card file can be checked against, for the cards whose whole
--- text is keywords (#9). A card ingested from MTGJSON keeps its Oracle text in
--- a sidecar under data/oracle/, and Pawl.OracleSpec asserts that 'render' of
--- the card file says what the sidecar says, modulo 'normalise'.
+-- text is keywords (#9). Pawl.OracleSpec asserts that 'render' of such a card
+-- says what its faces' Face.oracleText says, modulo 'normalise'.
 --
 -- That check sees what a card SAYS, never what it DOES: an ingested flier is
 -- right only because Pawl.Engine.Keyword's flying is (docs/design.md section 4).
@@ -35,15 +34,17 @@ render :: Card.Card -> Maybe Text.Text
 render card = case Card.faces card of
   face NonEmpty.:| []
     | Card.layout card == Layout.Normal,
-      face == bare (Face.name face) (Face.manaCost face) (Face.colorIndicator face) (Face.typeLine face) (Face.power face) (Face.toughness face) (Face.keywords face) ->
+      face == bare (Face.name face) (Face.oracleText face) (Face.manaCost face) (Face.colorIndicator face) (Face.typeLine face) (Face.power face) (Face.toughness face) (Face.keywords face) ->
         fmap (Text.intercalate (Text.pack "\n") . concat) . traverse (\(k, n) -> fmap (List.genericReplicate n) (printed k)) $ Map.toAscList (Face.keywords face)
   _ -> Nothing
 
--- | A face with the given characteristics and keywords and nothing else. Every
+-- | A face with the given Oracle text, characteristics and keywords and nothing
+-- else. Every
 -- field is spelled out, so a field added to 'Face.Face' fails to compile here
 -- rather than being silently ignored by 'render'.
 bare ::
   CardName.CardName ->
+  Maybe Text.Text ->
   Maybe ManaCost.ManaCost ->
   Set.Set Color.Color ->
   TypeLine.TypeLine ->
@@ -51,11 +52,12 @@ bare ::
   Maybe Toughness.Toughness ->
   Map.Map Keyword.Keyword Natural.Natural ->
   Face.Face Card.Card
-bare n c i t p x k =
+bare n t c i l p x k =
   Face.MkFace
     { Face.name = n,
+      Face.oracleText = t,
       Face.manaCost = c,
-      Face.typeLine = t,
+      Face.typeLine = l,
       Face.power = p,
       Face.toughness = x,
       Face.loyalty = Nothing,

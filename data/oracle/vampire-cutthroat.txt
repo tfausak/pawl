@@ -1,2 +1,0 @@
-Skulk (This creature can't be blocked by creatures with greater power.)
-Lifelink (Damage dealt by this creature also causes you to gain that much life.)

@@ -32,6 +32,7 @@ bareFace :: CardName.CardName -> Face.Face Card.Card
 bareFace n =
   Face.MkFace
     { Face.name = n,
+      Face.oracleText = Nothing,
       Face.manaCost = Nothing,
       Face.typeLine = TypeLine.MkTypeLine Set.empty Set.empty Set.empty,
       Face.power = Nothing,

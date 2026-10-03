@@ -1,16 +1,15 @@
-# Reduces MTGJSON's AllPrintings.json to one record per single-faced card name,
-# the input `pawl ingest` reads (#9). Run as
-#   jq -f script/ingest/candidates.jq _scratch/AllPrintings.json > _scratch/candidates.json
+# Reduces MTGJSON's AtomicCards.json to what `pawl ingest` reads (#9): every
+# single-faced card as a record it may build, and every face's Oracle text by
+# face name, which it stamps on the pool's cards. Run as
+#   jq -f script/ingest/candidates.jq _scratch/AtomicCards.json > _scratch/candidates.json
 {
   version: .meta.version,
   cards: [
     .data[]
-    | select(.type != "token" and .type != "memorabilia")
-    | .cards[]
-    | select(.language == "English" and .layout == "normal" and .side == null)
-    | select((.isFunny // false) == false and (.isRebalanced // false) == false)
+    | select(length == 1)
+    | .[0]
+    | select(.layout == "normal" and (.isFunny // false) == false)
     | {name, manaCost, colorIndicator, supertypes, types, subtypes, power, toughness, text}
-  ]
-  | group_by(.name)
-  | map(.[0])
+  ],
+  texts: [.data[][] | {name: (.faceName // .name), text: (.text // "")}] | unique
 }

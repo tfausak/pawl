@@ -1,2 +1,0 @@
-Reach (This creature can block creatures with flying.)
-Trample (This creature can deal excess combat damage to the player or planeswalker it's attacking.)

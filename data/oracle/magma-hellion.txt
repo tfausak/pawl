@@ -1,2 +1,0 @@
-Assist (Another player can pay up to {6} of this spell's cost.)
-Trample, haste

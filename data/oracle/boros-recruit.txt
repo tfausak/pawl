@@ -1,2 +1,0 @@
-({R/W} can be paid with either {R} or {W}.)
-First strike
