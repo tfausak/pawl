@@ -1104,8 +1104,8 @@ viewWithLastKnown src gs oid =
 -- CR 608.2h for EVERY id the reader is aimed at rather than for one named object:
 -- what an intervening "if" wants, since CR 603.4's clause may be about the object
 -- the EVENT named. Rule 702.100a's evolve is the case. viewWithLastKnown above is
--- this scoped to one id and delegates here, since its callers hold a resolving
--- source, whose other object is a TARGET -- and CR 608.2b wants a blank answer.
+-- this scoped to one id and delegates here; Pawl.Engine.Resolve.Slots.effectViewOf
+-- widens it again to every object a resolution's slots name.
 --
 -- Nothing when the object is gone and nothing was filed, which lands on the no-op
 -- every caller gives an unevaluable quantity. The controller and the COUNTERS come

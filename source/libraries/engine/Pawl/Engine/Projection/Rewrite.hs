@@ -1820,6 +1820,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfDealsCombatDamage -> condition
   TriggerCondition.SelfDealsDamageToPlayer _ -> condition
   TriggerCondition.SelfDealsDamageToCreature -> condition
+  TriggerCondition.SelfDealsDamage -> condition
   TriggerCondition.SelfIsDealtDamage -> condition
   TriggerCondition.PermanentDealsCombatDamageToPlayer p -> TriggerCondition.PermanentDealsCombatDamageToPlayer p {PermanentDealsCombatDamageToPlayer.filter = Filter.rewrite pairs (PermanentDealsCombatDamageToPlayer.filter p)}
   TriggerCondition.PermanentsDealCombatDamageToPlayer p -> TriggerCondition.PermanentsDealCombatDamageToPlayer p {PermanentsDealCombatDamageToPlayer.filter = Filter.rewrite pairs (PermanentsDealCombatDamageToPlayer.filter p)}
