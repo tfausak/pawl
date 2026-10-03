@@ -423,13 +423,13 @@ combatReplaySpec s =
         -- and white is exactly what defaultAnswer falls back to, so an
         -- undistinguished White would hide the bug.
         Spec.it s "ChooseColor records and replays a Color" $ do
-          let p = Prompt.ChooseColor decider S.alice oid
+          let p = Prompt.ChooseColor decider S.alice oid (Color.White NonEmpty.:| [Color.Blue, Color.Black, Color.Red, Color.Green])
           Monad.forM_ [Color.White, Color.Blue, Color.Black, Color.Red, Color.Green] $ \color ->
             Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p color)) (Just color)
-        -- CR 105.1: a transcript that runs short still answers with one of the
-        -- five, and it is the one every decider in the suite agrees on.
+        -- CR 105.1: a transcript that runs short still answers with the first
+        -- colour offered, white when all five are.
         Spec.it s "defaultAnswer chooses white" $
-          Spec.assertEqWith s "white" (Replay.defaultAnswer (Prompt.ChooseColor decider S.alice oid)) Color.White
+          Spec.assertEqWith s "white" (Replay.defaultAnswer (Prompt.ChooseColor decider S.alice oid (Color.White NonEmpty.:| [Color.Blue, Color.Black, Color.Red, Color.Green]))) Color.White
         -- CR 614.1c / 305.6: a basic land type chosen as a permanent enters. All
         -- five are round-tripped for the ChooseColor test's reason -- a codec
         -- that collapsed two would replay a Convincing Mirage naming Island as

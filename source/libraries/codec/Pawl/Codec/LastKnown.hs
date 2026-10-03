@@ -3,6 +3,7 @@
 module Pawl.Codec.LastKnown where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Pawl.Codec.AttackTarget as AttackTarget
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.Color as Color
@@ -33,7 +34,7 @@ codec = Fields.object $ do
   attached <- Fields.required "attached" (Common.set ObjectId.codec) LastKnown.attached
   chosenNames <- Fields.required "chosenNames" (Common.set CardName.codec) LastKnown.chosenNames
   chosenPlayer <- Fields.defaulted "chosenPlayer" Nothing (Common.maybe PlayerId.codec) LastKnown.chosenPlayer
-  chosenColor <- Fields.defaulted "chosenColor" Nothing (Common.maybe Color.codec) LastKnown.chosenColor
+  chosenColors <- Fields.defaulted "chosenColors" Set.empty (Common.set Color.codec) LastKnown.chosenColors
   chosenSubtype <- Fields.defaulted "chosenSubtype" Nothing (Common.maybe Subtype.codec) LastKnown.chosenSubtype
   attacking <- Fields.required "attacking" Common.boolean LastKnown.attacking
   attackTarget <- Fields.required "attackTarget" (Common.maybe AttackTarget.codec) LastKnown.attackTarget
@@ -53,7 +54,7 @@ codec = Fields.object $ do
         LastKnown.attached = attached,
         LastKnown.chosenNames = chosenNames,
         LastKnown.chosenPlayer = chosenPlayer,
-        LastKnown.chosenColor = chosenColor,
+        LastKnown.chosenColors = chosenColors,
         LastKnown.chosenSubtype = chosenSubtype,
         LastKnown.attacking = attacking,
         LastKnown.attackTarget = attackTarget,

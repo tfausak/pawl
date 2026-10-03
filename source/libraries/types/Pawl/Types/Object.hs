@@ -198,8 +198,8 @@ data Object = MkObject
     -- me" is derived by scanning the battlefield (Pawl.Engine.Filter.View's
     -- `attachedViews`), so there is no reverse index to keep consistent.
     attachedTo :: Maybe Recipient.Recipient,
-    -- | CR 614.1c: a colour this object's controller chose as it entered
-    -- (Painter's Servant). Read by Modification.AddChosenColor and by
+    -- | CR 614.1c: the colours this object's controller chose as it entered --
+    -- one (Painter's Servant) or two (Tablet of the Guilds). Read by Modification.AddChosenColor and by
     -- Filter.HasChosenColor (Gauntlet of Power) off the effect's SOURCE, never off
     -- the affected object. NOT a copiable value, so a copy runs the copied ability
     -- and makes its own new choice (CR 707.5, CR 707.6).
@@ -209,26 +209,26 @@ data Object = MkObject
     -- below are the others -- whose shared property is that each is read back OFF
     -- THE EFFECT'S SOURCE. `protector` below is chosen as the object enters too
     -- and is not one of them, being a designation rule 310 reads directly.
-    chosenColor :: Maybe Color.Color,
+    chosenColors :: Set.Set Color.Color,
     -- | CR 614.1c: a subtype this object's controller chose as it entered -- a
     -- basic land type (Convincing Mirage) or a creature type (Pillar of Origins),
     -- ONE field because no printing makes both choices. Read by
     -- Modification.SetLandSubtypeToChosen and by Filter.HasChosenSubtype off the
     -- effect's SOURCE -- in a CR 106.6 restriction through the value
     -- Pawl.Engine.Mana.sourceChosenSubtypeOf bakes onto a mana unit at production.
-    -- A sibling of chosenColor rather than one generalized
+    -- A sibling of chosenColors rather than one generalized
     -- choice map, whose sum-typed value every reader would have to re-narrow. Not
     -- a copiable value and per-incarnation, for that field's reasons.
     chosenSubtype :: Maybe Subtype.Subtype,
     -- | CR 201.4: the card names this object's controller has chosen. TWO moments
     -- write it -- CR 614.1c's as-enters choice (Null Chamber) and CR 608.2c's
     -- on-resolution one (Ancient Vendetta) -- and both readers ask the effect's
-    -- SOURCE, chosenColor's direction.
+    -- SOURCE, chosenColors's direction.
     --
     -- A SET rather than one name or a name per chooser: Null Chamber has two
     -- players each name a card and its prohibition asks only whether a name is
     -- among them. Empty for everything that never chose, which matches no card at
-    -- all (CR 201.2a). Not a copiable value and per-incarnation, for chosenColor's
+    -- all (CR 201.2a). Not a copiable value and per-incarnation, for chosenColors's
     -- reasons.
     --
     -- ASSIGNED by both writers and never added to, so CR 608.2c's scope holds for
@@ -243,7 +243,7 @@ data Object = MkObject
     -- the effect's source" rather than "read by a Modification".
     --
     -- Not a copiable value (CR 707.2's copiable values are characteristics, and a
-    -- player is not one; CR 707.6), and per-incarnation, for chosenColor's
+    -- player is not one; CR 707.6), and per-incarnation, for chosenColors's
     -- reasons.
     chosenPlayer :: Maybe PlayerId.PlayerId,
     -- | CR 613.7d: when this object entered its current zone. A static ability's
@@ -892,7 +892,7 @@ newIncarnation object =
       counterTimestamps = Map.empty,
       attachedTo = Nothing,
       enteredUnder = Nothing,
-      chosenColor = Nothing,
+      chosenColors = Set.empty,
       chosenSubtype = Nothing,
       chosenNames = Set.empty,
       chosenPlayer = Nothing,

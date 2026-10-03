@@ -355,7 +355,7 @@ pentarchPaladinSpec s registry = Spec.describe s "Pentarch Paladin" $ do
             (pikerId, g1) = S.addPermanent piker S.bob g0
             (elvesId, g2) = S.addPermanent elves S.bob g1
             (murderId, g3) = S.addHandCard murder S.bob g2
-            chose = g3 {GameState.objects = Map.adjust (\o -> o {Object.chosenColor = Just chosen}) paladinId (GameState.objects g3)}
+            chose = g3 {GameState.objects = Map.adjust (\o -> o {Object.chosenColors = Set.singleton chosen}) paladinId (GameState.objects g3)}
         case soleActivatedAbility paladin of
           Nothing -> Spec.assertFailure s "Pentarch Paladin should declare one activated ability" >> pure Nothing
           Just ability -> pure (Just (paladinId, pikerId, elvesId, murderId, S.runPure (aimAtCreature pikerId) chose (Activate.activateAbility S.alice paladinId ability)))

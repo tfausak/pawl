@@ -34,7 +34,7 @@ codec abilityCodec effectCodec =
       Arm.payload "ChoiceOf" (Common.list EntryOption.codec) EntryRewrite.ChoiceOf (\x -> case x of EntryRewrite.ChoiceOf y -> Just y; _ -> Nothing),
       Arm.payload "ChoiceByCoinFlip" EntryFlip.codec EntryRewrite.ChoiceByCoinFlip (\x -> case x of EntryRewrite.ChoiceByCoinFlip y -> Just y; _ -> Nothing),
       Arm.payload "WithCounters" WithCounters.codec EntryRewrite.WithCounters (\x -> case x of EntryRewrite.WithCounters y -> Just y; _ -> Nothing),
-      Arm.nullary "ChooseColor" EntryRewrite.ChooseColor,
+      Arm.payload "ChooseColors" Common.natural EntryRewrite.ChooseColors (\x -> case x of EntryRewrite.ChooseColors y -> Just y; _ -> Nothing),
       Arm.nullary "ChooseBasicLandType" EntryRewrite.ChooseBasicLandType,
       Arm.nullary "ChooseCreatureType" EntryRewrite.ChooseCreatureType,
       Arm.nullary "ChoosePlayer" EntryRewrite.ChoosePlayer,
@@ -70,7 +70,7 @@ tagOf x = case x of
   EntryRewrite.ChoiceOf {} -> "ChoiceOf"
   EntryRewrite.ChoiceByCoinFlip {} -> "ChoiceByCoinFlip"
   EntryRewrite.WithCounters {} -> "WithCounters"
-  EntryRewrite.ChooseColor {} -> "ChooseColor"
+  EntryRewrite.ChooseColors {} -> "ChooseColors"
   EntryRewrite.ChooseBasicLandType {} -> "ChooseBasicLandType"
   EntryRewrite.ChooseCreatureType {} -> "ChooseCreatureType"
   EntryRewrite.ChoosePlayer {} -> "ChoosePlayer"

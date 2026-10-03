@@ -562,21 +562,21 @@ chosenPlayerWithLastKnown oid gs = case lookupObject oid gs of
   Just obj -> Object.chosenPlayer obj
   Nothing -> LastKnown.chosenPlayer =<< Map.lookup oid (GameState.lastKnown gs)
 
--- CR 614.1c / 607.2d's chosen colour, through CR 608.2h: the live object's
--- Object.chosenColor, else the one it carried as it left
--- (Pawl.Types.LastKnown.chosenColor).
-chosenColorWithLastKnown :: ObjectId -> GameState -> Maybe Color.Color
-chosenColorWithLastKnown oid gs = case lookupObject oid gs of
-  Just obj -> Object.chosenColor obj
-  Nothing -> LastKnown.chosenColor =<< Map.lookup oid (GameState.lastKnown gs)
+-- CR 614.1c / 607.2d's chosen colours, through CR 608.2h: the live object's
+-- Object.chosenColors, else the ones it carried as it left
+-- (Pawl.Types.LastKnown.chosenColors).
+chosenColorsWithLastKnown :: ObjectId -> GameState -> Set.Set Color.Color
+chosenColorsWithLastKnown oid gs = case lookupObject oid gs of
+  Just obj -> Object.chosenColors obj
+  Nothing -> maybe Set.empty LastKnown.chosenColors (Map.lookup oid (GameState.lastKnown gs))
 
--- chosenColorWithLastKnown one choice over, for Object.chosenSubtype.
+-- chosenColorsWithLastKnown one choice over, for Object.chosenSubtype.
 chosenSubtypeWithLastKnown :: ObjectId -> GameState -> Maybe Subtype.Subtype
 chosenSubtypeWithLastKnown oid gs = case lookupObject oid gs of
   Just obj -> Object.chosenSubtype obj
   Nothing -> LastKnown.chosenSubtype =<< Map.lookup oid (GameState.lastKnown gs)
 
--- chosenColorWithLastKnown for CR 201.4's chosen names (Object.chosenNames). The
+-- chosenColorsWithLastKnown for CR 201.4's chosen names (Object.chosenNames). The
 -- empty set where neither the object nor its last known information exists.
 chosenNamesWithLastKnown :: ObjectId -> GameState -> Set.Set CardName.CardName
 chosenNamesWithLastKnown oid gs = case lookupObject oid gs of

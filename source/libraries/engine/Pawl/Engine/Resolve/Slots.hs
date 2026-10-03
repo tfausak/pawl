@@ -1657,7 +1657,7 @@ entryRewriteReads rewrite = case rewrite of
   EntryRewrite.AsCopy asCopy -> ([AsCopy.eligible asCopy], foldMap (Map.elems . WithCounters.counters) (AsCopy.counters asCopy))
   EntryRewrite.ChoiceOf _ -> ([], [])
   EntryRewrite.ChoiceByCoinFlip _ -> ([], [])
-  EntryRewrite.ChooseColor -> ([], [])
+  EntryRewrite.ChooseColors {} -> ([], [])
   EntryRewrite.ChooseBasicLandType -> ([], [])
   EntryRewrite.ChooseCreatureType -> ([], [])
   EntryRewrite.ChoosePlayer -> ([], [])
@@ -1793,7 +1793,7 @@ entryRewriteEffects rewrite = case rewrite of
   EntryRewrite.AsCopy _ -> []
   EntryRewrite.ChoiceOf _ -> []
   EntryRewrite.ChoiceByCoinFlip _ -> []
-  EntryRewrite.ChooseColor -> []
+  EntryRewrite.ChooseColors {} -> []
   EntryRewrite.ChooseBasicLandType -> []
   EntryRewrite.ChooseCreatureType -> []
   EntryRewrite.ChoosePlayer -> []

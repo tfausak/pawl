@@ -1421,7 +1421,7 @@ data Context = MkContext
     -- candidate's against them (HasChosenName, Ancient Vendetta). Supplied by the
     -- caller for slotNames' reason -- this module holds no game state and cannot
     -- read an object's chosen names -- by Pawl.Engine.SourceContext wherever it
-    -- fills sourceChosenColor below, which includes
+    -- fills sourceChosenColors below, which includes
     -- Pawl.Engine.Resolve.Slots.effectContext, the context every position of a
     -- resolution goes through (CR 608.2c's choice during a resolution -- Ancient
     -- Vendetta's search, Predict's tally, Petra Sphinx's revealed card), and by
@@ -1506,15 +1506,18 @@ data Context = MkContext
     -- Pawl.TargetSpec's "CR 702.16k a Saltfield Recluse stolen in response still
     -- weakens the Nemesis that chose the thief".
     aimingController :: Maybe (Maybe PlayerId.PlayerId),
-    -- CR 105.2: the colour the SOURCE chose as it entered (CR 614.1c), for the one
-    -- atom that asks whether a candidate wears it (HasChosenColor, Gauntlet of
-    -- Power). CR 607.2d links the choosing ability to every ability printed
+    -- CR 105.2: the colours the SOURCE chose as it entered (CR 614.1c), for the
+    -- atom that asks whether a candidate wears one (HasChosenColor, Gauntlet of
+    -- Power) and the quantity that counts them (Quantity.ChosenColorsItIs). CR 607.2d links the choosing ability to every ability printed
     -- beside it that names "the chosen color", so the positions that fill it are
     -- the ones such an ability's filter is matched in. All but one go through
     -- Pawl.Engine.SourceContext, which fills every choice at once: the affected
     -- set (Pawl.Engine.Projection.affectedContext, a combat restriction's too:
     -- Teferi's Moat), a trigger condition
-    -- (Pawl.Engine.Event.Match, Kindred Discovery), a resolution's own filters
+    -- (Pawl.Engine.Event.Match, Kindred Discovery), CR 603.4's intervening "if"
+    -- and its re-check (Pawl.Engine.Event.Trigger.interveningHolds,
+    -- Pawl.Engine.Stack.interveningStillHolds, Tablet of the Guilds), a
+    -- resolution's own filters
     -- (Pawl.Engine.Resolve.Slots.effectContext, Brass Herald) and the cost pools
     -- of Pawl.Engine.Cost and Pawl.Engine.Replacement.matchesPermanent. The other
     -- is Pawl.Engine.Target.slotContext's target slot (Pentarch Paladin), which
@@ -1524,19 +1527,19 @@ data Context = MkContext
     --
     -- The SOURCE's, sourceChosenNames' direction rather than carrierChosenPlayer's:
     -- the permanent whose ability asks is the permanent that made the choice, and
-    -- the candidate is what the filter is matched against. Object.chosenColor is
+    -- the candidate is what the filter is matched against. Object.chosenColors is
     -- per-incarnation (CR 707.6 does not copy it), so two Gauntlets naming two
     -- colours answer differently on the one board.
     --
-    -- Nothing in contextFor below and so in contextWithSlots and
+    -- Empty in contextFor below and so in contextWithSlots and
     -- contextComparingPower too, so the atom is vacuously False in every other
     -- position. What keeps a card out of those is Pawl.FilterPositionLintSpec's
     -- "CR 607.2d no card asks HasChosenColor or HasChosenSubtype outside an
     -- admitted position".
-    sourceChosenColor :: Maybe Color.Color,
+    sourceChosenColors :: Set.Set Color.Color,
     -- CR 205.3: the subtype the SOURCE chose as it entered (CR 614.1c), for the
     -- one atom that asks whether a candidate wears it (HasChosenSubtype). Filled
-    -- where sourceChosenColor above is, and read the same way (Obelisk of Urd,
+    -- where sourceChosenColors above is, and read the same way (Obelisk of Urd,
     -- From the Rubble, Doom Cannon).
     --
     -- One more caller, which reads it from elsewhere: Pawl.Engine.Mana.admitsUnder
@@ -1546,7 +1549,7 @@ data Context = MkContext
     -- (Pawl.Types.ManaUnit.sourceChosenSubtype, Pillar of Origins). That caller
     -- overrides whatever this field holds.
     --
-    -- Vacuously False everywhere else, sourceChosenColor's posture, and fenced by
+    -- Vacuously False everywhere else, sourceChosenColors's posture, and fenced by
     -- the same lint's subtype twin.
     sourceChosenSubtype :: Maybe Subtype.Subtype
   }
@@ -1586,7 +1589,7 @@ data Context = MkContext
 -- CR 105.2's chosen-colour atom (Gauntlet of Power) and CR 205.3's chosen-subtype
 -- atom (Obelisk of Urd) are two more a CARD may write, and they read the Nothing
 -- here in every position but the ones CR 607.2d links the choice to -- see
--- sourceChosenColor above for the list and for the lint that keeps a card to them.
+-- sourceChosenColors above for the list and for the lint that keeps a card to them.
 --
 -- CR 110.2's same-controller atom (Bioshift) is the one whose unfilled read does
 -- NOT match nothing, so the paragraphs above are a finding per atom rather than
@@ -1600,7 +1603,7 @@ data Context = MkContext
 -- here owes both halves of the same pair: which way its unfilled read answers,
 -- and what holds a card to the positions that fill it.
 contextFor :: Teams.Teams -> Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceToughness = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, evaluated = Nothing, sourceEntrants = Set.empty, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
+contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceToughness = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, evaluated = Nothing, sourceEntrants = Set.empty, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColors = Set.empty, sourceChosenSubtype = Nothing}
 
 -- contextFor with a resolution's -- or a trigger's -- slot objects supplied; see
 -- slotObjects above for who supplies them.
@@ -1638,7 +1641,7 @@ slotOneObject slot context = case Set.toList (Map.findWithDefault Set.empty slot
 -- position is one CR 303.4b's atom may be written into, which is what
 -- Pawl.CardSpec's position lint enforces.
 contextComparingPower :: Teams.Teams -> Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Maybe Integer -> Context
-contextComparingPower t p s n o = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, sourceToughness = o, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, evaluated = Nothing, sourceEntrants = Set.empty, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
+contextComparingPower t p s n o = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, sourceToughness = o, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, evaluated = Nothing, sourceEntrants = Set.empty, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColors = Set.empty, sourceChosenSubtype = Nothing}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -1969,7 +1972,7 @@ matches context view predicate = case predicate of
   -- CR 607.2d's link is compared against, so Painter's Servant's blue reaches this
   -- as readily as a printed cost does. A source that has chosen none matches
   -- nothing.
-  Filter.HasChosenColor -> maybe False (`Set.member` colors view) (sourceChosenColor context)
+  Filter.HasChosenColor -> not (Set.disjoint (sourceChosenColors context) (colors view))
   -- CR 205.3 read off the PROJECTION, the HasSubtype arm above with the subtype
   -- arriving on the Context: whatever CR 613.1d's layer left the candidate
   -- wearing is what CR 607.2d's link is compared against. A source that has
