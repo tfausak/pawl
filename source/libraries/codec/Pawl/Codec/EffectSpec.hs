@@ -334,7 +334,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
               Search.destination = SearchDestination.BattlefieldTapped,
               Search.subject = Nothing,
               Search.slot = Nothing,
-              Search.differentIn = Set.empty
+              Search.differentIn = Set.empty,
+              Search.exactly = False
             }
       )
       " {\"type\":\"Search\",\"value\":{\"searcher\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"owner\":{\"type\":\"InSlot\",\"value\":\"target\"},\"quantity\":{\"type\":\"Literal\",\"value\":2},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}},\"destination\":{\"type\":\"BattlefieldTapped\"}}} "

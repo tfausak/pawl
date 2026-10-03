@@ -50,6 +50,9 @@ codec = Fields.object $ do
   -- Defaulted: an absent key is a search that prints no "with different ...",
   -- which is most card files.
   differentIn <- Fields.defaulted "differentIn" Set.empty (Common.set DifferentIn.codec) Search.differentIn
+  -- Defaulted: an absent key is a search that does not print "exactly",
+  -- which is nearly every card file.
+  exactly <- Fields.defaulted "exactly" False Common.boolean Search.exactly
   pure
     Search.MkSearch
       { Search.searcher = searcher,
@@ -62,5 +65,6 @@ codec = Fields.object $ do
         Search.destination = destination,
         Search.subject = subject,
         Search.slot = slot,
-        Search.differentIn = differentIn
+        Search.differentIn = differentIn,
+        Search.exactly = exactly
       }

@@ -3977,7 +3977,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.MoveMana (MoveMana.MkMoveMana fromRef toRef) -> do
     gs <- State.get
     Mana.moveMana (apnapPlayersOf fromRef legal controller gs) (apnapPlayersOf toRef legal controller gs)
-  Effect.Search (Search.MkSearch searcherRef ownerRef zones outside quantity filter_ upTo destination subject foundSlot differentIn) ->
+  Effect.Search (Search.MkSearch searcherRef ownerRef zones outside quantity filter_ upTo destination subject foundSlot differentIn exactly) ->
     -- CR 701.23a: match each candidate through its own CR 613 projection --
     -- rule 613.1 names no zone, so a card in any of the searched zones is folded
     -- exactly as a permanent is, and CR 208.2a's characteristic-defining power
@@ -4176,10 +4176,28 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       -- card the filter admits is findable, and no more.
                       capHere = Maybe.fromMaybe (List.genericLength matches + outsideCopies) cap
                       decider = Decide.deciderFor searcher gs
+                      -- Search.exactly: the answer must be a group of as many
+                      -- cards as the zones can give, up to the count (CR 101.1,
+                      -- 609.3). Validated, not filled: which cards make up the
+                      -- group is the searcher's choice.
+                      required = mostDiffering differentIn gs capHere matches
+                      fills given = differing differentIn gs given == given && List.genericLength given == required
+                      -- RE-ASKED when short, Pawl.Engine.Engine's CR 603.3d
+                      -- shape: a repeat of an answer already refused is taken
+                      -- as it stands, since a pure decider repeats itself and
+                      -- answering on its behalf is the one thing this may not
+                      -- do. Keyed on the answer narrowed to the offer, so the
+                      -- recursion terminates.
+                      askExactly rejected = do
+                        given <- ListUtils.nubOrd . filter (`List.elem` matches) <$> Game.choose (Prompt.Search decider searcher matches capHere)
+                        if fills given || Set.member given rejected then pure given else askExactly (Set.insert given rejected)
                   answer <-
                     if Set.null searchedZones
                       then pure []
-                      else Game.choose (Prompt.Search decider searcher matches capHere)
+                      else
+                        if exactly
+                          then askExactly Set.empty
+                          else Game.choose (Prompt.Search decider searcher matches capHere)
                   -- CR 701.23a: every card found is one the filter admits.
                   -- Filtered, not trusted, deduplicated, and truncated to the cap.
                   -- What a SHORT answer leaves is the difference between CR
@@ -4213,13 +4231,17 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   -- name", "that have mana value 9"). A card that said "search
                   -- your library and graveyard for any number of cards" would
                   -- refute both.
-                  let mayDecline zone = upTo || Maybe.isNothing cap || (isHidden zone && Filter.statesAQuality filter_)
+                  --
+                  -- Search.exactly validated its answer above, which is then the
+                  -- whole find: nothing completes it.
+                  let mayDecline zone = exactly || upTo || Maybe.isNothing cap || (isHidden zone && Filter.statesAQuality filter_)
                       -- Search.differentIn: "with different names" (CR
                       -- 201.2b), "with different powers", "don't share a mana
                       -- value". Filtered, not trusted: a card sharing a value
                       -- with one kept ahead of it is dropped. The completion
                       -- below is not held to it, which no card reaches: every
-                      -- card in data/cards/ printing one says "up to".
+                      -- card in data/cards/ printing one says "up to" or
+                      -- "exactly".
                       picked = List.genericTake capHere . differing differentIn gs . ListUtils.nubOrd $ filter (\oid -> List.elem oid matches) answer
                       forced = concatMap snd (filter (not . mayDecline . fst) byZone)
                       filler = filter (\oid -> List.notElem oid picked) forced
@@ -11072,31 +11094,56 @@ outsideArrival destination = case destination of
   SearchDestination.Reveal -> Nothing
 
 -- Search.differentIn: the cards, in order, that keep the group apart -- each
--- shares no value on any named axis with a card kept ahead of it. Read off the
--- CR 613 projection, so a split card's two names count (CR 201.2a) and a star's
--- power is its characteristic-defining ability's number (CR 208.2a, 604.3). CR
--- 201.2b also demands each card HAVE a name; a card with no power or toughness
--- shares none. Values are keyed by their axis, so a power never meets a
--- toughness.
+-- shares no value on any named axis with a card kept ahead of it.
 differing :: Set.Set DifferentIn.DifferentIn -> GameState -> [ObjectId] -> [ObjectId]
 differing axes gs = go Set.empty
   where
+    go _ [] = []
+    go seen (oid : rest) = case differingValues axes gs oid of
+      Just values | Set.disjoint values seen -> oid : go (values <> seen) rest
+      _ -> go seen rest
+
+-- CR 609.3 for Search.exactly: the most cards, up to `cap`, that `differing`
+-- could keep together from `candidates` -- searched exhaustively rather than
+-- greedily, since a split card's two names (CR 201.2a) can block two cards a
+-- greedy pass would have kept apart. Cards with the same values are one
+-- candidate, which keeps the search to the distinct ones. Exhaustive rather
+-- than greedy is a REGRESSION FENCE: no board pairs a split card with a card
+-- sharing one of its names, so a greedy count reddens nothing.
+mostDiffering :: Set.Set DifferentIn.DifferentIn -> GameState -> Natural -> [ObjectId] -> Natural
+mostDiffering axes gs cap candidates = go Set.empty 0 0 distinct
+  where
+    found = Maybe.mapMaybe (differingValues axes gs) candidates
+    -- A card with no value at all shares none, so only the others collapse.
+    distinct = ListUtils.nubOrd (filter (not . Set.null) found) <> filter Set.null found
+    go seen n best rest
+      | n >= cap = cap
+      | n + List.genericLength rest <= best = best
+      | otherwise = case rest of
+          [] -> max n best
+          values : more ->
+            let taken = if Set.disjoint values seen then go (values <> seen) (n + 1) best more else best
+             in if taken >= cap then cap else go seen n (max best taken) more
+
+-- One card's values on Search.differentIn's axes, keyed by axis so a power never
+-- meets a toughness, or Nothing for a card no group admits. Read off the CR 613
+-- projection, so a split card's two names count (CR 201.2a) and a star's power
+-- is its characteristic-defining ability's number (CR 208.2a, 604.3). CR 201.2b
+-- demands each card HAVE a name; a card with no power or toughness shares none.
+differingValues :: Set.Set DifferentIn.DifferentIn -> GameState -> ObjectId -> Maybe (Set.Set (DifferentIn.DifferentIn, Either CardName.CardName (Either Integer CardType.CardType)))
+differingValues axes gs oid =
+  if Set.member DifferentIn.Names axes && Set.null (Filter.names view)
+    then Nothing
+    else Just (foldMap valuesOf axes)
+  where
+    view = Projection.viewOfObject oid gs
     number axis = foldMap (Set.singleton . (,) axis . Right . Left)
-    valuesOf view axis = case axis of
+    valuesOf axis = case axis of
       DifferentIn.Names -> Set.map ((,) axis . Left) (Filter.names view)
       DifferentIn.Powers -> number axis (Filter.power view)
       DifferentIn.ManaValues -> number axis (Filter.manaValue view)
       DifferentIn.Toughnesses -> number axis (Filter.toughness view)
       DifferentIn.CardTypes -> Set.map ((,) axis . Right . Right) (Filter.cardTypes view)
-    admits view seen axis =
-      let values = valuesOf view axis
-       in (axis /= DifferentIn.Names || not (Set.null values)) && Set.disjoint values seen
-    go _ [] = []
-    go seen (oid : rest) =
-      let view = Projection.viewOfObject oid gs
-       in if all (admits view seen) axes
-            then oid : go (foldMap (valuesOf view) axes <> seen) rest
-            else go seen rest
 
 -- One found card's move, a member of the search's batch whose board is `asOf`
 -- (Event.changeZoneInBatch).
