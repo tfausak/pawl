@@ -1802,6 +1802,11 @@ representativeEvents cond =
         TriggerCondition.SelfDealsDamageToCreature ->
           noTable (GameEvent.DamageDealt (DamageEvent.MkDamageEvent departed (Recipient.ToCreature arrived) 4 False False False 0 Nothing Nothing mempty False DamageKind.Noncombat))
             NonEmpty.:| [noTable (GameEvent.DamageDealt (DamageEvent.MkDamageEvent departed (Recipient.ToCreature arrived) 5 False False False 0 Nothing Nothing mempty False DamageKind.Combat))]
+        -- TWO again, a creature and a player, one of each kind: this arm admits
+        -- any recipient and either kind.
+        TriggerCondition.SelfDealsDamage ->
+          noTable (GameEvent.DamageDealt (DamageEvent.MkDamageEvent departed (Recipient.ToCreature arrived) 4 False False False 0 Nothing Nothing mempty False DamageKind.Noncombat))
+            NonEmpty.:| [noTable (GameEvent.DamageDealt (DamageEvent.MkDamageEvent departed (Recipient.ToPlayer S.bob) 5 False False False 0 Nothing Nothing mempty False DamageKind.Combat))]
         -- CR 120.3's event pointed the other way, at the BEARER -- so the pair
         -- really matches. TWO of them, combat and noncombat, because this
         -- condition admits both, as the arm above does: a floor claimed for one
@@ -2391,6 +2396,7 @@ everyTriggerCondition =
     TriggerCondition.SelfDealsDamageToPlayer PlayerRelation.AnyPlayer,
     TriggerCondition.SelfDealsDamageToPlayer PlayerRelation.Opponent,
     TriggerCondition.SelfDealsDamageToCreature,
+    TriggerCondition.SelfDealsDamage,
     TriggerCondition.SelfIsDealtDamage,
     TriggerCondition.PermanentDealsCombatDamageToPlayer (PermanentDealsCombatDamageToPlayer.MkPermanentDealsCombatDamageToPlayer (Filter.Type.And []) PlayerRelation.AnyPlayer),
     TriggerCondition.PermanentsDealCombatDamageToPlayer (PermanentsDealCombatDamageToPlayer.MkPermanentsDealCombatDamageToPlayer (Filter.Type.And []) PlayerRelation.AnyPlayer False),

@@ -1,0 +1,31 @@
+{
+  "description": "CR 603.2c / 510.2 Horned Cheetah trampling over a blocker triggers once for the total",
+  "note": "Rune of Might makes Horned Cheetah a 3/3 trampler; it holds 1 back for bob's Goblin Piker and spills 2 onto bob. CR 510.2 deals both at once, so the trigger fires once and gains 3: Ajani's Pridemate's one counter is one life gain event, where a trigger per recipient would give it two, and 23 life is the sum rather than either share.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Horned Cheetah", "label": "cheetah", "ready": true },
+          { "card": "Rune of Might", "label": "rune", "attached": "cheetah" },
+          { "card": "Ajani's Pridemate", "label": "pridemate" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "piker", "ready": true }]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$cheetah"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "PowerToughness": { "object": "$cheetah", "power": 3, "toughness": 3 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$piker": ["$cheetah"] } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "source": "$cheetah", "do": { "AssignDamage": { "$piker": 1, "$bob": 2 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Counters": { "object": "$pridemate", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "alice", "life": 23 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 18 } } }
+  ]
+}

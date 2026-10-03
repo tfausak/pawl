@@ -904,9 +904,15 @@ splitExcess gs event =
 -- Two halves, so a caller that brackets the batch as one event can keep CR
 -- 702.15e's separate life gain events OUT of the bracket: `processDamage` is the
 -- batch, and `recordLifelinkGains` lands its gains after it. This is the
--- unbracketed composition, and the shape every caller but dealWave wants.
+-- composition every noncombat caller wants: CR 608.2f processes one
+-- instruction's damage simultaneously, so the batch is one Pawl.Types.EventGroup,
+-- dealWave's bracket for a CR 510.2 step. Horned Cheetah's "whenever this
+-- creature deals damage" then fires once for Showstopping Surprise's damage to
+-- each other creature, which
+-- data/scenarios/card-trigger/cr-608-2f-horned-cheetah-dealing-damage-to-each-other-creature-triggers-once.json
+-- proves.
 applyDamage :: [DamageEvent.DamageEvent] -> Game ()
-applyDamage events = processDamage events >>= recordLifelinkGains
+applyDamage events = Event.simultaneously (processDamage events) >>= recordLifelinkGains
 
 -- applyDamage minus lifelink's gain RECORDS, returning the SETTLED gains so the
 -- caller can record those where its own bracket does not reach. The gain itself

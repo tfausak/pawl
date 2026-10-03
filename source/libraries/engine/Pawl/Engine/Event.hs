@@ -364,7 +364,8 @@ combatDamagerAgainst victim gs logged = case LoggedEvent.event logged of
 -- witnessing the batch's earlier events. CR 510.2's combat damage IS: Pawl.Engine.Damage.dealWave
 -- brackets each combat damage step -- the damage and its CR 120.3 results, with
 -- lifelink's gains recorded after the bracket closes, since CR 702.15e makes
--- each source's gain an event of its own.
+-- each source's gain an event of its own. So is CR 608.2f's one damage
+-- instruction, through Pawl.Engine.Damage.applyDamage.
 --
 -- The body is also one arrivingTogether scope, so CR 401.4 and CR 404.3 are
 -- settled before the group closes.
@@ -9029,6 +9030,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.SelfDealsCombatDamage -> False
   TriggerCondition.SelfDealsDamageToPlayer _ -> False
   TriggerCondition.SelfDealsDamageToCreature -> False
+  TriggerCondition.SelfDealsDamage -> False
   TriggerCondition.SelfIsDealtDamage -> False
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
   TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> False

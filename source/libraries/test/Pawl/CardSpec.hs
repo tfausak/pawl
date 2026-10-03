@@ -1045,6 +1045,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfDealsCombatDamage -> []
   TriggerCondition.SelfDealsDamageToPlayer _ -> []
   TriggerCondition.SelfDealsDamageToCreature -> []
+  TriggerCondition.SelfDealsDamage -> []
   TriggerCondition.SelfIsDealtDamage -> []
   -- Its watcher-scoped sibling carries a Filter, and a Filter holds no Count.
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> []
@@ -4279,6 +4280,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- Nullary as well: the printed form qualifies the damaged creature in no way,
   -- so a text change has nothing here to rewrite.
   TriggerCondition.SelfDealsDamageToCreature -> []
+  TriggerCondition.SelfDealsDamage -> []
   -- Enrage's condition is nullary: rule 120.3 qualifies the damage in no way, so
   -- there is nothing for a text change to rewrite.
   TriggerCondition.SelfIsDealtDamage -> []
@@ -4494,6 +4496,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.SelfDealsCombatDamage -> []
   TriggerCondition.SelfDealsDamageToPlayer _ -> []
   TriggerCondition.SelfDealsDamageToCreature -> []
+  TriggerCondition.SelfDealsDamage -> []
   TriggerCondition.SelfIsDealtDamage -> []
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> []
   TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> []
