@@ -4,9 +4,11 @@
 -- CR 732.3's fragmented loop, out of two synthetic printings -- Synthetic Self
 -- Tapper ("{0}: Tap this creature") under alice and Synthetic Rouser ("{0}:
 -- Untap target creature") under bob. No printing reaches the rule: Scryfall
--- `o:"{0}: untap"` and `o:"{0}: tap"`, 2026-10-03, answer only abilities
--- limited to once each turn. CR 732.3's own example undoes a continuous
--- effect, which `Fragmented.digest` does not see recur.
+-- `o:"{0}: untap"` and `o:"{0}: tap"`, 2026-10-03, answer only untaps limited
+-- to one activation a turn or a game (Instill Energy, Nature's Chosen, Touch
+-- of Vitae) and Chimeric Idol, which taps lands. CR 732.3's own example
+-- undoes a continuous effect, which `Fragmented.digest` does not see recur
+-- (gap #4650).
 --
 -- Two seats, so alice -- active, and involved -- is the named player by
 -- construction. The answerer is test-local: it sequences two players through
