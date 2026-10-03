@@ -293,6 +293,20 @@ setupSpec s registry = Spec.describe s "Setup" $ do
     Spec.assertEqWith s "CR 903.12f survives into the subgame" (S.lifeOf S.alice (subgame True)) (Just 25)
     Spec.assertEqWith s "and the subgame of an ordinary Commander game still gives forty" (S.lifeOf S.alice (subgame False)) (Just 40)
 
+  -- CR 103.4 / 119.1: setup records the starting life total per player, and CR
+  -- 727.1's restart and CR 729.2's subgame record it afresh. The rebuilds start
+  -- from a board whose record was knocked to 99, so each write is load-bearing.
+  Spec.it s "CR 103.4 the starting life total is recorded by setup, a restart and a subgame" $ do
+    shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
+    mountain <- S.printingOf s registry "Mountain"
+    let deck = Deck.MkDeck {Deck.cards = Map.singleton mountain 10, Deck.commander = Set.singleton shimatsu, Deck.vanguard = Nothing, Deck.dungeons = Set.empty, Deck.sideboard = Map.empty, Deck.conspiracies = Map.empty, Deck.attractions = Map.empty, Deck.planes = Set.empty, Deck.schemes = Map.empty}
+        built = S.runPure S.identityAnswer (settingsOf True (Setup.emptyGame S.bothPlayers)) (Setup.createDeck S.alice deck)
+        knocked = built {GameState.players = Map.adjust (\p -> p {Player.life = 7, Player.startingLife = 99}) S.alice (GameState.players built)}
+        restarted = S.runPure S.identityAnswer knocked (Setup.restartGame S.performer Set.empty S.alice)
+        subgame = S.runPure S.identityAnswer (Setup.subgameStateFrom S.alice knocked) (Setup.startGameFromCards S.performer Set.empty)
+        startingOf gs = fmap Player.startingLife (Map.lookup S.alice (GameState.players gs))
+    Spec.assertEqWith s "CR 103.4d two-player Brawl's 25, each time" (startingOf built, startingOf restarted, startingOf subgame) (Just 25, Just 25, Just 25)
+
 -- CR 800.2: put this game's options where the test wants them. The seat count
 -- is untouched, so the Brawl legs above differ from their controls in exactly
 -- one thing.

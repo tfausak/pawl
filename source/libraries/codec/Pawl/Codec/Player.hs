@@ -35,6 +35,7 @@ import qualified Pawl.Types.Status as Status.Type
 codec :: Codec.Codec Player.Player
 codec = Fields.object $ do
   life <- Fields.required "life" Common.integer Player.life
+  startingLife <- Fields.required "startingLife" Common.integer Player.startingLife
   status <- Fields.defaulted "status" Status.Type.Playing Status.codec Player.status
   counters <- Fields.defaulted "counters" Map.empty (Common.multiset PlayerCounterKind.codec) Player.counters
   ringTemptations <- Fields.defaulted "ringTemptations" 0 Common.natural Player.ringTemptations
@@ -54,6 +55,7 @@ codec = Fields.object $ do
   pure
     Player.MkPlayer
       { Player.life = life,
+        Player.startingLife = startingLife,
         Player.status = status,
         Player.counters = counters,
         Player.ringTemptations = ringTemptations,

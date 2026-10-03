@@ -64,6 +64,7 @@ codec =
       Arm.payload "Count" (Count.codec codec) Quantity.Count (\x -> case x of Quantity.Count y -> Just y; _ -> Nothing),
       Arm.payload "ManaCount" ManaCount.codec Quantity.ManaCount (\x -> case x of Quantity.ManaCount y -> Just y; _ -> Nothing),
       Arm.payload "LifeTotal" PlayerRef.codec Quantity.LifeTotal (\x -> case x of Quantity.LifeTotal y -> Just y; _ -> Nothing),
+      Arm.payload "StartingLifeTotal" PlayerRef.codec Quantity.StartingLifeTotal (\x -> case x of Quantity.StartingLifeTotal y -> Just y; _ -> Nothing),
       Arm.payload "Speed" PlayerRef.codec Quantity.Speed (\x -> case x of Quantity.Speed y -> Just y; _ -> Nothing),
       -- CR 725.1's designation, with only a PlayerRef on the wire: the answer is
       -- a 0/1 rather than a stored number, so there is nothing beside the
@@ -235,6 +236,7 @@ tagOf x = case x of
   Quantity.Count {} -> "Count"
   Quantity.ManaCount {} -> "ManaCount"
   Quantity.LifeTotal {} -> "LifeTotal"
+  Quantity.StartingLifeTotal {} -> "StartingLifeTotal"
   Quantity.Speed {} -> "Speed"
   Quantity.IsMonarch {} -> "IsMonarch"
   Quantity.HasPlayerDesignation {} -> "HasPlayerDesignation"
