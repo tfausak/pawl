@@ -526,7 +526,9 @@ candidateCostsGiven permitted pid name oid gs =
               -- `withAdditional` for flashback's, and tagged with the keyword
               -- itself. Evoke is read off `keywords`, bestow's read; the rest
               -- off `onStack`, each of their rules saying it functions while
-              -- the spell is on the stack.
+              -- the spell is on the stack. The scenario
+              -- cr-702-74a-an-evoke-aquatic-subtlety-perpetually-grants-in-a-hand-is-offered
+              -- proves evoke GRANTED to a card in a hand is offered.
               isEvoke keyword = case keyword of
                 Keyword.Type.Evoke _ -> True
                 _ -> False
