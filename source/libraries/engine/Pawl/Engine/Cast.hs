@@ -3245,7 +3245,7 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                   -- against the announced X" is what proves the two agree.
                   let seed = Binding.fromChoices Map.empty mAmount Seq.empty
                       sets = Target.legalSets (Just pid) False seed sid slots bestowedGs
-                  chosen <- Target.chooseTargets pid sid sid (Maybe.fromMaybe 0 mAmount) slots sets
+                  chosen <- Target.chooseTargets pid sid sid seed (Maybe.fromMaybe 0 mAmount) slots sets
                   if not (Target.selectionLegal (Just pid) seed sid (Maybe.fromMaybe 0 mAmount) slots sets chosen bestowedGs)
                     then reject
                     else do

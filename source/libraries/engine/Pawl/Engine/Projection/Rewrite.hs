@@ -793,6 +793,8 @@ rewriteEffect pairs effect = case effect of
   -- Warding Sigil proves it.
   Effect.PutCounters (PutCounters.MkPutCounters kind quantity ref) ->
     Effect.PutCounters (PutCounters.MkPutCounters (Filter.rewriteCounterKind pairs kind) (rewriteQuantity pairs quantity) (rewriteObjectRef pairs ref))
+  Effect.DistributeCounters (PutCounters.MkPutCounters kind quantity ref) ->
+    Effect.DistributeCounters (PutCounters.MkPutCounters (Filter.rewriteCounterKind pairs kind) (rewriteQuantity pairs quantity) (rewriteObjectRef pairs ref))
   -- The count and the kind both take the descent PutCounters' case above makes.
   -- Pawl.CounterspellSpec's Synthetic Erode the Warding proves the kind's.
   Effect.RemoveCounters x ->
@@ -1940,6 +1942,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.BoundDies _ -> condition
   TriggerCondition.RoomEntered _ -> condition
   TriggerCondition.PlayerScries _ -> condition
+  TriggerCondition.PlayerLosesGame _ -> condition
   TriggerCondition.RingTemptsPlayer _ -> condition
   TriggerCondition.PlayerBlights _ -> condition
   TriggerCondition.PlayerForages _ -> condition

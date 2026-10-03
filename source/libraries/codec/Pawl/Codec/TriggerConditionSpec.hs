@@ -1201,6 +1201,19 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PlayerCompletesDungeon PlayerRelation.Opponent)
       " {\"type\":\"PlayerCompletesDungeon\",\"value\":{\"type\":\"Opponent\"}} "
+  -- CR 603.9. Withengar Unbound's "a player" and Share the Spoils' "an
+  -- opponent".
+  Spec.it s "PlayerLosesGame round-trips both relations" $ do
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerLosesGame PlayerRelation.AnyPlayer)
+      " {\"type\":\"PlayerLosesGame\",\"value\":{\"type\":\"AnyPlayer\"}} "
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerLosesGame PlayerRelation.Opponent)
+      " {\"type\":\"PlayerLosesGame\",\"value\":{\"type\":\"Opponent\"}} "
   Spec.it s "PlayerSurveils round-trips both relations" $ do
     Common.assertCodec
       s

@@ -1291,6 +1291,14 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.EachMatching (Filter.HasDesignation Designation.Renowned))))
       " {\"type\":\"PutCounters\",\"value\":{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"quantity\":{\"type\":\"Literal\",\"value\":1},\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasDesignation\",\"value\":{\"type\":\"Renowned\"}}}}} "
+  -- CR 608.2d: PutCounters' payload under its own tag, the total divided.
+  Spec.it s "DistributeCounters" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.DistributeCounters (PutCounters.MkPutCounters CounterKind.Stun (Quantity.Literal 3) (ObjectRef.EachMatching Filter.IsTapped)))
+      " {\"type\":\"DistributeCounters\",\"value\":{\"kind\":{\"type\":\"Stun\"},\"quantity\":{\"type\":\"Literal\",\"value\":3},\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsTapped\"}}}} "
   -- CR 122.5: a third tag, not the other two in sequence -- the move is atomic
   -- where the pair is not, so a card file must be able to say which it printed.
   Spec.it s "MoveCounters" $
