@@ -378,7 +378,7 @@ data Response
     -- 103.2b admits a card with a companion ability whose condition the starting
     -- deck fulfills and rule 309.2a a dungeon card, and a transcript of one must
     -- not satisfy the other.
-    ChoseCompanion (Maybe PrintingId.PrintingId)
+    ChoseCompanion (Maybe OutsideCard.OutsideCard)
   | -- | CR 400.11c \/ 729.4: the cards a player chose to bring in from outside the
     -- game -- either CR 103.2a's sideboard pool or, from inside a subgame, CR
     -- 729.4's main game. Pawl.Types.OutsideCard's header comment gives the full
