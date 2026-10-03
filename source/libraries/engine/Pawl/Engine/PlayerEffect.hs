@@ -3922,14 +3922,14 @@ rollModifiers pid gs =
         PlayerEffect.CantGetCounters _ -> Nothing
    in Maybe.mapMaybe (\(source, effect) -> fmap ((,) source) (modifies effect)) (applying pid gs)
 
--- CR 611.2a / Quicken: the one-shot (Expiry.WhenUsed) stored grants `pid`
--- would SPEND by casting `oid` -- every row on this axis that applies to them
+-- CR 611.2a / Quicken: the one-shot (Expiry.WhenUsed) stored rows `pid` would
+-- SPEND by casting `oid` -- every row on castUse's axes that applies to them
 -- (`applies`, the readers' own gate, so a row scoped to another seat is neither
 -- widened for one player and spent by another) whose criterion matches. WotC's
--- ruling for both producers ends the effect "even if you cast it at a time you
--- normally could", so the timing loophole need not have been exercised; and
--- ALL matching rows go together, since two Quickens "will all apply to the very
--- next ... spell you cast".
+-- ruling for both flash producers ends the effect "even if you cast it at a
+-- time you normally could", so the timing loophole need not have been
+-- exercised; and ALL matching rows go together, since two Quickens "will all
+-- apply to the very next ... spell you cast".
 --
 -- Asked, not applied: Pawl.Engine.Cast.castSpellWith asks this of the
 -- asProposed-stamped PRE-MOVE state -- so the criterion sees the chosen half and
@@ -3939,7 +3939,21 @@ rollModifiers pid gs =
 -- Pawl.PlayerEffectSpec's "a rejected cast leaves the grant standing" and "a
 -- face-down cast spends the grant off the face the gate read" are the proofs.
 spentByCast :: PlayerId -> ObjectId -> GameState -> [ActivePlayerEffect.ActivePlayerEffect]
-spentByCast = spentGrants castFlashGrant
+spentByCast = spentGrants castUse
+
+-- CR 611.2a: the criterion naming the spells whose CAST uses up a one-shot row
+-- on this effect's axis, or Nothing where no cast does: castFlashGrant's axis,
+-- and CR 601.2f's spell-cost reduction (Hardened Berserker's "the next spell you
+-- cast this turn costs {1} less"), spent by the next spell its own Filter names
+-- whatever that spell's cost leaves it to take off. The fallthrough is to
+-- castFlashGrant, whose own is exhaustive. Pawl.EffectLintSpec reads it too: a
+-- card may write Duration.UntilUsed only on an axis this answers for.
+-- data/scenarios/expiry's "the Berserker's {1} off is used up by the first
+-- spell" is the proof.
+castUse :: PlayerEffect -> Maybe (Filter Keyword)
+castUse effect = case effect of
+  PlayerEffect.ReduceSpellCost reduction -> Just (ReduceSpellCost.whichSpells reduction)
+  _ -> castFlashGrant effect
 
 -- CR 611.2a / 601.1a's other half: the rows `pid` would spend by playing `oid`
 -- as a land. Asked of the pre-move state by Pawl.Engine.Engine's Play arm for
@@ -3948,11 +3962,11 @@ spentByLandPlay :: PlayerId -> ObjectId -> GameState -> [ActivePlayerEffect.Acti
 spentByLandPlay = spentGrants landPlayFlashGrant
 
 spentGrants :: (PlayerEffect -> Maybe (Filter Keyword)) -> PlayerId -> ObjectId -> GameState -> [ActivePlayerEffect.ActivePlayerEffect]
-spentGrants grantOf pid oid gs =
+spentGrants useOf pid oid gs =
   let spent active =
         applies pid (ActivePlayerEffect.controller active) gs (ActivePlayerEffect.scope active)
           && Expiry.expiresWhenUsed (ActivePlayerEffect.expiry active)
-          && maybe False (\criterion -> matchesObjectFrom (Just (ActivePlayerEffect.source active)) criterion oid gs) (grantOf (ActivePlayerEffect.effect active))
+          && maybe False (\criterion -> matchesObjectFrom (Just (ActivePlayerEffect.source active)) criterion oid gs) (useOf (ActivePlayerEffect.effect active))
    in filter spent (GameState.playerEffects gs)
 
 -- Drop the rows spentByCast / spentByLandPlay named, once the play they were

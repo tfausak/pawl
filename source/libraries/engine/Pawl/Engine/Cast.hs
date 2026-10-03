@@ -2353,7 +2353,7 @@ castSpellWith perform timed offered applied widened pid oid name facing = do
           -- none -- so every payability question below, which asks about `sid`,
           -- has to be handed the answer rather than look it up.
           spending = spendingWith widened pid oid before
-          -- CR 611.2a: the one-shot flash grants this cast would spend, asked of
+          -- CR 611.2a: the one-shot rows this cast would spend, asked of
           -- the PROPOSED state -- the view the gate read, one step ahead of the
           -- move that forgets the card -- and consumed by castProposed only once
           -- the announcement has succeeded, so a rejection spends nothing.
@@ -3546,7 +3546,7 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                           -- already off in the stack by now, which is why the id
                           -- comes from `preparedFor` above rather than from `sid`.
                           Monad.mapM_ Prepare.unprepare preparedFor
-                          -- CR 611.2a: the grants this cast spends, for the
+                          -- CR 611.2a: the rows this cast spends, for the
                           -- event's own reason -- nothing past this line rejects.
                           State.modify' (PlayerEffect.consume spent)
                           -- CR 601.3: the once-each-turn permission this cast
