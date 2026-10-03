@@ -1654,8 +1654,8 @@ turnedUpTriggers = filter ((== TriggerCondition.SelfTurnedFaceUp) . TriggeredAbi
 -- substitutes in.
 payGateCostsOf :: Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [Cost.Type.Cost Keyword.Keyword]
 payGateCostsOf modal =
-  fmap
-    PayGate.cost
+  concatMap
+    (NonEmpty.toList . CostChoice.unwrap . PayGate.cost)
     ( concatMap (Maybe.mapMaybe Clause.payGate . Foldable.toList . Mode.clauses) (Modal.modes modal)
         <> concatMap loopGates (Modal.allEffects modal)
     )
@@ -2492,7 +2492,7 @@ modeBranchesOffend mode =
 -- mana cost (Pawl.Types.CostBasis) and a mana part of its own beside it?
 --
 -- The two are one field's worth of answer at the payment
--- (Pawl.Engine.Resolve.Effect.describedCost overwrites Cost.mana with the derived
+-- (Pawl.Engine.Resolve.Effect.describedCosts overwrites Cost.mana with the derived
 -- amount), so a card writing both states mana nothing pays -- silently, which is
 -- why this is a lint. A card whose cost really is described states
 -- `mana: null`, which is the unpayable cost CR 118.6's first sentence describes
@@ -2504,7 +2504,7 @@ cardCostBasisStatesMana = any (any modeGateStatesMana . Modal.modes) . faceModal
 -- One mode's half of that lint.
 modeGateStatesMana :: Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 modeGateStatesMana mode =
-  let offends gate = Maybe.isJust (PayGate.basis gate) && Maybe.isJust (Cost.Type.mana (PayGate.cost gate))
+  let offends gate = Maybe.isJust (PayGate.basis gate) && any (Maybe.isJust . Cost.Type.mana) (CostChoice.unwrap (PayGate.cost gate))
    in any (maybe False offends . Clause.payGate) (Mode.clauses mode)
 
 -- Do these slot-name sets overlap? True when any name appears in more than one
@@ -3141,7 +3141,7 @@ withCountersFilters w =
 -- resolution's slots.
 payGateFilters :: PayGate.PayGate -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 payGateFilters gate =
-  fmap ((,) Unframed) (costFilters (PayGate.cost gate))
+  fmap ((,) Unframed) (concatMap costFilters (CostChoice.unwrap (PayGate.cost gate)))
     <> concatMap quantityFilters (Maybe.maybeToList (PayGate.perEach gate))
 
 -- CR 122.1b: the one counter kind with a Filter under it, since it carries a
@@ -6981,7 +6981,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     flash <- S.printingOf s registry "Flash"
     let face = S.combinedFace flash
         overGate f = face {Face.spell = (Face.spell face) {Modal.modes = fmap (\mode -> mode {Mode.clauses = fmap (\clause -> clause {Clause.payGate = fmap f (Clause.payGate clause)}) (Mode.clauses mode)}) (Modal.modes (Face.spell face))}}
-        stated gate = gate {PayGate.cost = (PayGate.cost gate) {Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])}}
+        stated gate = gate {PayGate.cost = CostChoice.MkCostChoice (fmap (\option -> option {Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])}) (CostChoice.unwrap (PayGate.cost gate)))}
         undescribed gate = gate {PayGate.basis = Nothing}
     Spec.assertBool s (not (cardCostBasisStatesMana face)) "Flash, whose gate states no mana of its own, is accepted"
     Spec.assertBool s (cardCostBasisStatesMana (overGate stated)) "a described cost stating a mana part of its own is rejected"

@@ -1,6 +1,7 @@
 module Pawl.Codec.PayGateSpec where
 
 import qualified Data.Either as Either
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Text as Text
 import qualified Pawl.Codec.PayGate as PayGate
 import qualified Pawl.Json.Value as Value
@@ -10,6 +11,8 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostBasis as CostBasis
+import qualified Pawl.Types.CostChoice as CostChoice
+import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.PayBranch as PayBranch
@@ -24,7 +27,7 @@ manaLeak :: PayGate.PayGate
 manaLeak =
   PayGate.MkPayGate
     { PayGate.payer = PlayerRef.ControllerOfBound (SlotName.MkSlotName (Text.pack "spell")),
-      PayGate.cost = Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 3]), Cost.components = []},
+      PayGate.cost = CostChoice.MkCostChoice (Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 3]), Cost.components = []} NonEmpty.:| []),
       PayGate.basis = Nothing,
       PayGate.branch = PayBranch.IfNotPaid,
       PayGate.obligation = PayObligation.Optional,
@@ -76,7 +79,7 @@ spec s = Spec.describe s "Pawl.Codec.PayGate" $ do
       PayGate.codec
       manaLeak
         { PayGate.payer = PlayerRef.Relative PlayerRelation.You,
-          PayGate.cost = Cost.MkCost {Cost.mana = Nothing, Cost.components = []},
+          PayGate.cost = CostChoice.MkCostChoice (Cost.MkCost {Cost.mana = Nothing, Cost.components = []} NonEmpty.:| []),
           PayGate.basis =
             Just
               CostBasis.MkCostBasis
@@ -85,6 +88,14 @@ spec s = Spec.describe s "Pawl.Codec.PayGate" $ do
                 }
         }
       " {\"payer\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"cost\":{\"mana\":null},\"basis\":{\"slot\":\"put\",\"reducedBy\":[{\"type\":\"Generic\",\"value\":2}]},\"branch\":{\"type\":\"IfNotPaid\"}} "
+  -- CR 118.12's "something else" as a disjunction, Torment of Venom's: the
+  -- first option under `cost`, the rest under `orCosts`, in printed order.
+  Spec.it s "MkPayGate, a choice of two costs" $
+    Common.assertCodec
+      s
+      PayGate.codec
+      manaLeak {PayGate.cost = CostChoice.MkCostChoice (Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 3]), Cost.components = []} NonEmpty.:| [Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost []), Cost.components = [CostComponent.PayLife 3]}])}
+      " {\"payer\":{\"type\":\"ControllerOfBound\",\"value\":\"spell\"},\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]},\"orCosts\":[{\"mana\":[],\"components\":[{\"type\":\"PayLife\",\"value\":3}]}],\"branch\":{\"type\":\"IfNotPaid\"}} "
   Spec.it s "MkPayGate, a clause hanging off an earlier clause's offer" $
     Common.assertCodec
       s

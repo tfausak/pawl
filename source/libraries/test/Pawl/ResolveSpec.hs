@@ -2963,6 +2963,71 @@ rhysticSpec s registry =
           Spec.assertEqWith s "CR 101.4b told bob paid, carol paid too" (fmap (`S.lifeOf` paid) [S.alice, S.bob, S.carol]) [Just 20, Just 15, Just 15]
           Spec.assertEqWith s "CR 101.4b told bob declined, carol declined" (fmap (`S.lifeOf` declined) [S.alice, S.bob, S.carol]) (replicate 3 (Just 20))
 
+-- CR 118.12 / 118.12a over a cost printed as a CHOICE: Torment of Venom's
+-- "Its controller loses 3 life unless they sacrifice another nonland permanent
+-- of their choice or discard a card." bob controls the target and is the payer.
+--
+-- The answerer is a State log of every ChooseCost (how many options it offered)
+-- and ChooseToPay (the cost it offered), answering ChooseCost by INDEX so a
+-- mutation cannot be repaired by a search for the "right" option. Test-local
+-- because the scenario harness matches a ChooseCost answer by its mana part
+-- alone, and neither option here has one.
+tormentSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+tormentSpec s registry =
+  let -- alice: four Swamps and Torment of Venom, cast at bob's Hill Giant. bob:
+      -- a Swamp in hand and, when `withOther`, an Ornithopter -- the one other
+      -- nonland permanent he could sacrifice.
+      board withOther = do
+        swamp <- S.printingOf s registry "Swamp"
+        giant <- S.printingOf s registry "Hill Giant"
+        thopter <- S.printingOf s registry "Ornithopter"
+        torment <- S.printingOf s registry "Torment of Venom"
+        let (target, g1) = S.addPermanent giant S.bob (S.landsFor swamp S.alice 4 S.threePlayerGame)
+            (other, g2) = if withOther then S.addPermanent thopter S.bob g1 else (target, g1)
+            (_, g3) = S.addHandCard swamp S.bob g2
+            (gs, tormentId) = S.handOne torment g3
+            aim :: Prompt.Prompt r -> r
+            aim p = case p of
+              Prompt.ChooseTargets _ _ _ sets -> S.preferring ((== Just target) . Recipient.objectOf) sets
+              _ -> S.identityAnswer p
+        pure (other, S.runPure aim gs (S.cast S.alice tormentId))
+      logging :: Int -> PaymentDecision.PaymentDecision -> Prompt.Prompt r -> State.State [Either Int (Cost.Type.Cost Keyword.Keyword)] r
+      logging pick decision p = case p of
+        Prompt.ChooseCost (Decider.MkDecider d) player _ candidates | d == player && player == S.bob -> do
+          State.modify' (<> [Left (length candidates)])
+          pure
+            ( case drop pick candidates of
+                chosen : _ -> chosen
+                [] -> S.identityAnswer p
+            )
+        Prompt.ChooseToPay (Decider.MkDecider d) player _ _ cost _ | d == player && player == S.bob -> do
+          State.modify' (<> [Right cost])
+          pure decision
+        _ -> pure (S.identityAnswer p)
+      resolveWith pick decision onStack = State.runState (Engine.runGame (logging pick decision) onStack Stack.resolveTop) []
+      discards cost = any (\c -> case c of CostComponent.DiscardCards {} -> True; _ -> False) (Cost.Type.components cost)
+      outcome other gs = (S.onBattlefield other gs, S.handSize S.bob gs, S.lifeOf S.bob gs)
+   in Spec.describe s "CR 118.12 a choice of costs" $ do
+        -- A pair differing only in bob's ChooseCost answer.
+        Spec.it s "CR 118.12a the payer picks which option to pay" $ do
+          (thopter, onStack) <- board True
+          let ((_, sacrificed), asked) = resolveWith 0 PaymentDecision.Pays onStack
+              ((_, discarded), _) = resolveWith 1 PaymentDecision.Pays onStack
+          Spec.assertEqWith s "picking the sacrifice: the Ornithopter is gone, the Swamp kept, no life lost" (outcome thopter sacrificed) (False, 1, Just 20)
+          Spec.assertEqWith s "picking the discard: the Ornithopter stays, the Swamp is gone, no life lost" (outcome thopter discarded) (True, 0, Just 20)
+          Spec.assertEqWith s "asked which of two options, then whether to pay" (fmap (either Just (const Nothing)) asked) [Just 2, Nothing]
+        Spec.it s "CR 118.12a declining both options loses the life" $ do
+          (thopter, onStack) <- board True
+          let ((_, declined), _) = resolveWith 1 PaymentDecision.Declines onStack
+          Spec.assertEqWith s "bob went 20 -> 17 and kept both" (outcome thopter declined) (True, 1, Just 17)
+        -- The board above less the Ornithopter: the target is not "another"
+        -- permanent, so only the discard is payable.
+        Spec.it s "CR 118.3 an option the payer cannot pay is not offered" $ do
+          (_, onStack) <- board False
+          let ((_, after), asked) = resolveWith 0 PaymentDecision.Pays onStack
+          Spec.assertEqWith s "CR 118.3 no ChooseCost, and the one offer is the discard" (fmap (either (const Nothing) (Just . discards)) asked) [Just True]
+          Spec.assertEqWith s "bob discarded the Swamp and lost no life" (S.handSize S.bob after, S.lifeOf S.bob after) (0, Just 20)
+
 -- CR 118.12a inside CR 608.2f's loop: Cleansing's "for each land, destroy that
 -- land unless any player pays 1 life" is one offer PER LAND, each land's
 -- destruction bought off by any one payment for THAT land. THREE SEATS and two
@@ -3105,6 +3170,7 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   brassHeraldSpec s registry
   cleansingSpec s registry
+  tormentSpec s registry
   targetSpec s registry
   resolveSpec s registry
   wormsSpec s registry
