@@ -84,6 +84,7 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectSnapshot as ObjectSnapshot
 import qualified Pawl.Types.PastActivation as PastActivation
+import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.PermissionLimit as PermissionLimit
 import qualified Pawl.Types.PermissionPool as PermissionPool
 import qualified Pawl.Types.PermissionVerb as PermissionVerb
@@ -3474,6 +3475,23 @@ spendManaAsThough pid gs =
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
    in Maybe.mapMaybe (spends . snd) (applying pid gs)
+
+-- CR 609.4b / 113.6d: spendManaAsThough plus, for a payment casting a spell,
+-- the clauses that spell's own abilities state about the mana spent to cast it
+-- (Tome of the Infinite's perpetual grant), read off its live projection. CR
+-- 601.2a has the spell on the stack under `pid` by the time it is paid for, and
+-- a perpetual grant reaches it in the hand too, which is where the castability
+-- gate asks. The scenario
+-- a-printed-spellbook-is-offered-whole-and-the-card-randomness-named-is-the-one
+-- proves it.
+spendManaAsThoughFor :: PlayerId -> PaymentSubject.PaymentSubject -> GameState -> [SpendManaAsThough.SpendManaAsThough]
+spendManaAsThoughFor pid subject gs =
+  spendManaAsThough pid gs <> case subject of
+    PaymentSubject.Casting oid -> PC.grantedSpendManaAsThough (Projection.project oid gs)
+    PaymentSubject.Activating {} -> []
+    PaymentSubject.Unlocking {} -> []
+    PaymentSubject.TurningFaceUp {} -> []
+    PaymentSubject.ForNeither -> []
 
 -- CR 701.6a / 613.11: can this spell or ability on the stack be countered
 -- (Spider-Punk, Prowling Serpopard)? The typed question

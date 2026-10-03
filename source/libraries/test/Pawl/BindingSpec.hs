@@ -60,6 +60,7 @@ sampleSnapshot =
       PC.costReductions = [],
       PC.grantedCostReductions = [],
       PC.grantedAlternativeCosts = [],
+      PC.grantedSpendManaAsThough = [],
       PC.halves = Nothing,
       PC.exceptions = [],
       PC.mergedDonors = [],
