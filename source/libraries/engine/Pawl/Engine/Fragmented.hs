@@ -23,13 +23,20 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Planechase as Planechase
 import Pawl.Types.Action (Action)
 import qualified Pawl.Types.Action as Action
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.EventGroup as EventGroup
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.LoopTrail (LoopTrail)
 import qualified Pawl.Types.LoopTrail as LoopTrail
 import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.Modal as Modal
+import qualified Pawl.Types.Mode as Mode
+import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.PrintingId as PrintingId
@@ -110,8 +117,12 @@ readsHistory gs =
               [first, second] -> Set.member (first, second) pairs
               _ -> False
          in any matches historyReaders
-   in -- Pawl.Engine.Planechase.rollCost (CR 901.9) is the rules' own reader.
-      Planechase.isPlanechase gs || any readsLog (Map.elems (GameState.printings gs))
+   in -- The rules' own readers: Pawl.Engine.Planechase.rollCost (CR 901.9),
+      -- and Pawl.Engine.Speed.increaseAbility's once-each-turn limit (CR
+      -- 702.179d), minted for any player with a speed.
+      Planechase.isPlanechase gs
+        || any (Maybe.isJust . Player.speed) (GameState.players gs)
+        || any readsLog (Map.elems (GameState.printings gs))
 
 -- The identifiers in a derived Show, in order.
 identifiers :: String -> [String]
@@ -125,7 +136,10 @@ identifiers text = case dropWhile (not . isIdentifier) text of
 
 -- | Every construct whose engine read site consults GameState.events or
 -- GameState.activationsThisTurn as history, named as Show spells it. A new
--- reader of either field owes an entry here.
+-- reader of either field owes an entry here -- and so does a construct the
+-- engine EXPANDS into one (a keyword's minted ability or rider, as
+-- Pawl.Engine.Keyword builds them), since the card's Show then spells only
+-- the keyword.
 --
 -- Read sites needing none: the readers of the CURRENT action's own events
 -- (Pawl.Engine.Resolve.Effect, Pawl.Engine.Cost's reversal and mana
@@ -183,7 +197,15 @@ historyReaders =
     -- Pawl.Engine.Coin.statedFor's flipsThisTurn.
     ["firstEachTurn", "True"],
     -- Pawl.Engine.PlayerEffect.firstActivation, over activationsThisTurn.
-    ["onlyFirst", "Just"]
+    ["onlyFirst", "Just"],
+    -- Keyword expansions, whose readers the printed keyword does not spell:
+    -- Pawl.Engine.Keyword.storm's Quantity.SpellsCastBefore (CR 702.40a),
+    -- Keyword.gravestorm's Quantity.PermanentsDiedThisTurn (CR 702.69a), and
+    -- Keyword.printedRiders' Boast arm, a Count over Filter.AttackedThisTurn
+    -- (CR 702.142a). Separate entries, the walk being case-sensitive.
+    ["Storm"],
+    ["Gravestorm"],
+    ["Boast"]
   ]
 
 -- | CR 732.3: the actions `pid`, asked at `gs` (digested as `here`), may not
@@ -193,7 +215,7 @@ historyReaders =
 -- "Involved in the loop" is the players who took a non-Pass action since the
 -- state FIRST occurred: a shorter loop nested inside a longer one through the
 -- same state (a no-op lap by one player) must not hide the longer one's
--- players. Forbidden is every non-Pass action `pid` took at ANY prior
+-- players. Forbidden is every `choiceless` action `pid` took at ANY prior
 -- occurrence, not only the last, so A, B, A, B through one state is refused
 -- too. Pass never is (CR 732.5). Pawl.FragmentedSpec's control case is the
 -- board where the nesting happens.
@@ -206,8 +228,29 @@ forbidden here gs pid loopTrail =
           acted (_, action) = action /= Action.Pass
           involved = Set.fromList (fmap fst (filter acted (Foldable.toList (Seq.drop (minimum occurrences) choices))))
           named = List.find (`Set.member` involved) (Game.turnOrderFrom (GameState.activePlayer gs) gs)
-          taken = Set.fromList [action | (who, action) <- Maybe.mapMaybe (`Seq.lookup` choices) occurrences, who == pid, action /= Action.Pass]
+          taken = Set.fromList [action | (who, action) <- Maybe.mapMaybe (`Seq.lookup` choices) occurrences, who == pid, choiceless action]
        in if named == Just pid && not (Set.null taken) && not (readsHistory gs) then taken else Set.empty
+
+-- | Is `action` the whole of the game choice (CR 732.1), so refusing it
+-- refuses only the choice that continued the loop? An activation with no
+-- target, a single mode, no X and no cost but nothing to pay; never Pass (CR
+-- 732.5).
+--
+-- Not implemented: refusing an activation by the choices it was made with --
+-- its targets (CR 601.2c), modes, X or payment -- so one that leaves any of
+-- them open is never refused, and a loop through it is not broken (#4663).
+choiceless :: Action -> Bool
+choiceless action = case action of
+  Action.Activate _ ability ->
+    let modal = ActivatedAbility.modal ability
+        cost = ActivatedAbility.cost ability
+     in all (Map.null . Mode.targetSlots) (Modal.modes modal)
+          && Seq.length (Modal.modes modal) == 1
+          && Modal.selection modal == ModeSelection.ChooseExactly 1
+          && null (ActivatedAbility.maximumX ability)
+          && maybe True (null . ManaCost.unwrap) (Cost.mana cost)
+          && null (Cost.components cost)
+  _ -> False
 
 -- | Note that `pid`, asked at `here`, chose `action`. Held as pending until
 -- the next prompt, since an action CR 733.1 reversed leaves the game in the
