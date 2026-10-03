@@ -46,10 +46,12 @@ codec = Fields.object $ do
   whoseObject <- Fields.defaulted "whoseObject" defaultWhoseObject ControllerRelation.codec ZoneChangePattern.whoseObject
   whatObject <- Fields.defaulted "whatObject" defaultWhatObject (Filter.codec Keyword.codec) ZoneChangePattern.whatObject
   whenDiscarded <- Fields.defaulted "whenDiscarded" defaultWhenDiscarded (Common.maybe DiscardCause.codec) ZoneChangePattern.whenDiscarded
+  duringResolution <- Fields.defaulted "duringResolution" False Common.boolean ZoneChangePattern.duringResolution
   pure
     ZoneChangePattern.MkZoneChangePattern
       { ZoneChangePattern.whenDestination = whenDestination,
         ZoneChangePattern.whoseObject = whoseObject,
         ZoneChangePattern.whatObject = whatObject,
-        ZoneChangePattern.whenDiscarded = whenDiscarded
+        ZoneChangePattern.whenDiscarded = whenDiscarded,
+        ZoneChangePattern.duringResolution = duringResolution
       }

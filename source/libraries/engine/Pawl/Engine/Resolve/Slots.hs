@@ -48,6 +48,7 @@ import qualified Pawl.Types.Binding as Binding.Type
 import qualified Pawl.Types.Blight as Blight.Type
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CastRepetition as CastRepetition
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.ChooseCardName as ChooseCardName
 import qualified Pawl.Types.ChooseNumber as ChooseNumber
@@ -296,6 +297,17 @@ quantitySlots quantity =
         : fmap (Map.fromSet (const SlotArity.Many) . Filter.boundSlots . Count.Type.filter) (QuantitySlot.nestedCounts quantity)
           <> fmap (either playerRefSlots (`Map.singleton` SlotArity.Many)) (Set.toList (QuantitySlot.nestedRefs quantity))
     )
+
+-- The slots a CR 608.2g repetition's budget reads, Rod of Absorption's X.
+repetitionSlots :: CastRepetition.CastRepetition -> Map.Map SlotName SlotArity
+repetitionSlots = joinSlots . fmap quantitySlots . repetitionQuantities
+
+-- The Quantity a CR 608.2g repetition carries: Rod of Absorption's budget.
+repetitionQuantities :: CastRepetition.CastRepetition -> [Quantity.Type.Quantity]
+repetitionQuantities repetition = case repetition of
+  CastRepetition.Once -> []
+  CastRepetition.AnyNumber -> []
+  CastRepetition.WithinTotalManaValue quantity -> [quantity]
 
 -- The Quantities an entry rider carries: CR 122.6's count per counter kind, which
 -- a card may write as anything a Quantity spells. A position the three walkers
@@ -1488,7 +1500,8 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- The REFERENCE alone: the caster is a PlayerRef and is reported at the head.
   -- This one is a read, bound by an earlier effect of the list (CR 400.7) where
   -- it names a slot at all.
-  Effect.OfferCast (OfferCast.MkOfferCast ref _ _ _ _ _ _ _ _) -> objectRefSlots ref
+  -- And the slots Rod of Absorption's total reads (its X).
+  Effect.OfferCast (OfferCast.MkOfferCast ref _ _ _ _ repetition _ _ _) -> joinTwo (objectRefSlots ref) (repetitionSlots repetition)
   Effect.OfferNamedCopy {} -> Map.empty
   Effect.OfferNotedCopy {} -> Map.empty
   Effect.GrantPlayFromExile grant -> joinTwo (durationSlots (GrantPlayFromExile.duration grant)) (maybe Map.empty conditionSlots (GrantPlayFromExile.condition grant))
@@ -2434,7 +2447,7 @@ readsX =
         Effect.TakeExtraTurn takeExtraTurn -> Quantity.readsX (TakeExtraTurn.count takeExtraTurn)
         Effect.ShuffleIntoLibrary {} -> False
         Effect.Shuffle {} -> False
-        Effect.OfferCast {} -> False
+        Effect.OfferCast offer -> any Quantity.readsX (repetitionQuantities (OfferCast.repetition offer))
         Effect.OfferNamedCopy {} -> False
         Effect.OfferNotedCopy {} -> False
         Effect.GrantPlayFromExile {} -> False

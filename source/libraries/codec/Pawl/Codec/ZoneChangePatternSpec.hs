@@ -22,7 +22,8 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChangePattern" $ do
         { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
           ZoneChangePattern.whatObject = Filter.And [],
           ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
-          ZoneChangePattern.whenDiscarded = Nothing
+          ZoneChangePattern.whenDiscarded = Nothing,
+          ZoneChangePattern.duringResolution = False
         }
       " {\"whenDestination\":{\"type\":\"Graveyard\"}} "
   -- CR 614.1a: Anafenza, the Foremost's "a nontoken creature an opponent owns
@@ -36,7 +37,8 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChangePattern" $ do
         { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
           ZoneChangePattern.whatObject = Filter.And [Filter.HasCardType CardType.Creature, Filter.Not Filter.IsToken],
           ZoneChangePattern.whoseObject = ControllerRelation.Opponents,
-          ZoneChangePattern.whenDiscarded = Nothing
+          ZoneChangePattern.whenDiscarded = Nothing,
+          ZoneChangePattern.duringResolution = False
         }
       " {\"whatObject\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"Not\",\"value\":{\"type\":\"IsToken\"}}]},\"whenDestination\":{\"type\":\"Graveyard\"},\"whoseObject\":{\"type\":\"Opponents\"}} "
   -- CR 702.34a's "instead of putting it anywhere else": no destination named,
@@ -49,7 +51,21 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChangePattern" $ do
         { ZoneChangePattern.whenDestination = Nothing,
           ZoneChangePattern.whatObject = Filter.IsSource,
           ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
-          ZoneChangePattern.whenDiscarded = Nothing
+          ZoneChangePattern.whenDiscarded = Nothing,
+          ZoneChangePattern.duringResolution = False
         }
       " {\"whatObject\":{\"type\":\"IsSource\"}} "
+  -- CR 608.2n: Rod of Absorption's "as it resolves".
+  Spec.it s "MkZoneChangePattern (Rod of Absorption, during resolution)" $
+    Common.assertCodec
+      s
+      ZoneChangePattern.codec
+      ZoneChangePattern.MkZoneChangePattern
+        { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
+          ZoneChangePattern.whatObject = Filter.IsSource,
+          ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
+          ZoneChangePattern.whenDiscarded = Nothing,
+          ZoneChangePattern.duringResolution = True
+        }
+      " {\"duringResolution\":true,\"whatObject\":{\"type\":\"IsSource\"},\"whenDestination\":{\"type\":\"Graveyard\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ZoneChangePattern.codec
