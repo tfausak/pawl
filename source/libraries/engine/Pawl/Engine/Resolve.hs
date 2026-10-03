@@ -28,7 +28,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Replacement as Replacement
-import Pawl.Engine.Resolve.Effect (announcedOnly, apnapPlayersOf, applyClauseEffects, applyEffectWith, branchSelects, clauseIsImpossible, gateAffordable, noSubgame, payGatePaid, targetSlotsOf)
+import Pawl.Engine.Resolve.Effect (announcedOnly, apnapPlayersOf, applyClauseEffects, applyEffectWith, branchSelects, clauseIsImpossible, gateAffordable, happenedBetween, noSubgame, payGatePaid, targetSlotsOf)
 import Pawl.Engine.Resolve.Slots (boundSlots, effectContext, slotsAreExhaustive, slotsOf)
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Natural as Natural
@@ -331,12 +331,14 @@ resolveSpellWith runSubgame oid = do
                               boundHere = Map.keysSet (instanceView (Set.empty <$ gateBindings))
                           gated <- gateHolds effectController oid (instanceView (Binding.targetsOf gateBindings)) gateBindings limb
                           taken <- if gated then exercises oid oid effectController idx limbIdx boundHere legalHere (Just facing) Set.empty limb else pure False
+                          before <- State.get
                           (admitted, answers2) <-
                             if taken
                               then payGateAdmits oid oid effectController idx limbIdx (instanceView (Map.mapWithKey legalSlot (Binding.targetsOf (Object.bindings obj)))) (Just facing) Set.empty answers limb
                               else pure (False, answers)
                           Monad.when admitted (asCostWhenNamed indexedClauses limbIdx (applyClauseEffects oid applyOne (Foldable.toList (Clause.effects limb))))
-                          pure (answers2, recordTaken admitted limbIdx ran)
+                          after <- State.get
+                          pure (answers2, recordTaken limb admitted before after limbIdx ran)
                   -- CR 608.2e's clause is the unit all four gates cover, so each
                   -- is asked once per clause. The fold carries this mode
                   -- INSTANCE's CR 118.12 answers and the clauses whose
@@ -392,6 +394,7 @@ resolveSpellWith runSubgame oid = do
                             -- re-validation. Both maps are projected into THIS
                             -- instance's view (CR 700.2d) after legality is decided,
                             -- since deciding it after the rename would miss in `slots`.
+                            before <- State.get
                             (admitted, answers2) <-
                               if taken
                                 then
@@ -409,7 +412,8 @@ resolveSpellWith runSubgame oid = do
                                         clause
                                 else pure (False, answers)
                             Monad.when admitted (asCostWhenNamed indexedClauses cIdx (applyClauseEffects oid applyOne (Foldable.toList (Clause.effects clause))))
-                            pure (answers2, picked2, recordTaken admitted cIdx ran)
+                            after <- State.get
+                            pure (answers2, picked2, recordTaken clause admitted before after cIdx ran)
                     )
                     (Map.empty, Map.empty, Set.empty)
                     indexedClauses
@@ -810,9 +814,11 @@ resolveModesWith runSubgame stackId srcId modes = do
                           boundHere = Map.keysSet (instanceView (Set.empty <$ gateBindings))
                       gated <- gateHolds effectController srcId (instanceView (Binding.targetsOf gateBindings)) gateBindings limb
                       taken <- if gated then exercises stackId srcId effectController idx limbIdx boundHere legalHere (Just facing) Set.empty limb else pure False
+                      before <- State.get
                       (admitted, answers2) <- if taken then payGateAdmits stackId srcId effectController idx limbIdx (instanceView legal) (Just facing) Set.empty answers limb else pure (False, answers)
                       Monad.when admitted (asCostWhenNamed indexedClauses limbIdx (applyClauseEffects srcId applyOne (Foldable.toList (Clause.effects limb))))
-                      pure (answers2, recordTaken admitted limbIdx ran)
+                      after <- State.get
+                      pure (answers2, recordTaken limb admitted before after limbIdx ran)
                in -- CR 608.2e's clause is what each gate covers. Run only when
                   -- `fizzles` is False.
                   Monad.foldM_
@@ -870,9 +876,11 @@ resolveModesWith runSubgame stackId srcId modes = do
                             taken <- if branch then exercises stackId srcId effectController idx cIdx boundNowForMay legalNowForMay announced committed clause else pure False
                             -- CR 118.12: then the cost paid on resolution, against the
                             -- START-of-resolution slots.
+                            before <- State.get
                             (admitted, answers2) <- if taken then payGateAdmits stackId srcId effectController idx cIdx (instanceView legal) announced committed answers clause else pure (False, answers)
                             Monad.when admitted (asCostWhenNamed indexedClauses cIdx (applyClauseEffects srcId applyOne (Foldable.toList (Clause.effects clause))))
-                            pure (answers2, picked2, recordTaken admitted cIdx ran)
+                            after <- State.get
+                            pure (answers2, picked2, recordTaken clause admitted before after cIdx ran)
                     )
                     (Map.empty, Map.empty, Set.empty)
                     indexedClauses
@@ -941,8 +949,24 @@ asCostWhenNamed indexed cIdx body =
 -- its instructions ran, which is what CR 608.2c's "If you do" asks about. One
 -- writer for both resolution paths, so the spell loop and the ability loop
 -- cannot disagree about what "you did" means.
-recordTaken :: Bool -> ClauseIndex -> Set ClauseIndex -> Set ClauseIndex
-recordTaken admitted cIdx ran = if admitted then Set.insert cIdx ran else ran
+--
+-- A MANDATORY clause is admitted whether or not it can be carried out, and CR
+-- 118.12's "If you do" asks whether the player "started to pay a mandatory
+-- cost": Standstill's sacrifice of a Standstill already gone is no payment. So
+-- it is recorded only when the board shows the payment, between `before` (ahead
+-- of its CR 118.12 gate) and `after` -- CR 603.12's own test,
+-- `happenedBetween`. An optional one needs no such test: CR 608.2d already
+-- declines it where it is impossible (`exercises`). Pawl.ResolveSpec's "CR
+-- 118.12 Victimize with no creature to sacrifice returns nothing" proves it on
+-- the spell loop, and "CR 118.12 Gristle Glutton with an empty hand draws
+-- nothing" on the ability loop. The two CR 701.55d limb sites are a REGRESSION
+-- FENCE: no "If you do" in data/cards/ hangs off a villainous limb.
+recordTaken :: Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool -> GameState -> GameState -> ClauseIndex -> Set ClauseIndex -> Set ClauseIndex
+recordTaken clause admitted before after cIdx ran =
+  let happened = case Clause.optionality clause of
+        Optionality.Mandatory -> happenedBetween before after
+        Optionality.Optional _ -> True
+   in if admitted && happened then Set.insert cIdx ran else ran
 
 -- CR 701.46a: does this clause's printed "if" hold? CR 701.37a prints the same
 -- gate on a proper prefix of a longer ability, which is why the rider is on CR
