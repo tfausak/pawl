@@ -12,8 +12,8 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- compile: `dice` is what Pawl.Types.Prompt's RollDie is asked for, and `ignored`
 -- is what CR 706.6 discards afterward.
 --
--- `roller` is CR 109.5's "you" on the resolving object -- rule 706.1's
--- instruction is aimed at a player and Pawl.Types.RollDie names none of its own.
+-- `roller` is the player rule 706.1's instruction is aimed at -- one of
+-- Pawl.Types.RollDie's rollers, each of whose rolls is its own event.
 --
 -- `dice` is the number the INSTRUCTION names (CR 706.1), never the number it ends
 -- up reading: a row that adds a die leaves CR 616.2's next iteration a

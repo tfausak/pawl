@@ -6,6 +6,7 @@ import qualified Pawl.Codec.ForbidAttack as ForbidAttack
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AimedAt as AimedAt
+import qualified Pawl.Types.AimedPlayers as AimedPlayers
 import qualified Pawl.Types.AttackTargetKind as AttackTargetKind
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Duration as Duration
@@ -38,8 +39,8 @@ spec s = Spec.describe s "Pawl.Codec.ForbidAttack" $ do
       ( ForbidAttack.MkForbidAttack
           { ForbidAttack.duration = Duration.UntilYourNextTurn,
             ForbidAttack.affected = RestrictedCreatures.Matching (Filter.HasCardType CardType.Creature),
-            ForbidAttack.aimedAt = Just (AimedAt.MkAimedAt PlayerScope.You (Set.singleton AttackTargetKind.OfPlayer))
+            ForbidAttack.aimedAt = Just (AimedAt.MkAimedAt (AimedPlayers.Scoped PlayerScope.You) (Set.singleton AttackTargetKind.OfPlayer))
           }
       )
-      " {\"duration\":{\"type\":\"UntilYourNextTurn\"},\"affected\":{\"type\":\"Matching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"aimedAt\":{\"defenders\":{\"type\":\"You\"},\"kinds\":[{\"type\":\"OfPlayer\"}]}} "
+      " {\"duration\":{\"type\":\"UntilYourNextTurn\"},\"affected\":{\"type\":\"Matching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"aimedAt\":{\"defenders\":{\"type\":\"Scoped\",\"value\":{\"type\":\"You\"}},\"kinds\":[{\"type\":\"OfPlayer\"}]}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ForbidAttack.codec

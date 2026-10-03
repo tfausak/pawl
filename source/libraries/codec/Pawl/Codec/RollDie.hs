@@ -3,6 +3,7 @@
 module Pawl.Codec.RollDie where
 
 import qualified Pawl.Codec.DiceReading as DiceReading
+import qualified Pawl.Codec.PlayerScope as PlayerScope
 import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -20,7 +21,8 @@ import qualified Pawl.Types.RollDie as RollDie
 -- Quantity the instruction adds. CR 706.1's `count` elides to one and `other`
 -- to nothing, and `reading` to the choice, for the same reason: every roll but
 -- the Endeavor cycle's and Neverwinter Hydra's throws one die and reads one
--- result.
+-- result. CR 706.1's `roller` elides to the controller and `highest` to
+-- nothing: only Chaos Dragon has every player roll.
 codec :: Codec.Codec RollDie.RollDie
 codec = Fields.object $ do
   sides <- Fields.required "sides" Common.natural RollDie.sides
@@ -29,4 +31,6 @@ codec = Fields.object $ do
   reading <- Fields.defaulted "reading" RollDie.defaultReading DiceReading.codec RollDie.reading
   slot <- Fields.required "slot" SlotName.codec RollDie.slot
   other <- Fields.defaulted "other" Nothing (Common.maybe SlotName.codec) RollDie.other
-  pure RollDie.MkRollDie {RollDie.sides = sides, RollDie.count = count, RollDie.modifier = modifier, RollDie.reading = reading, RollDie.slot = slot, RollDie.other = other}
+  roller <- Fields.defaulted "roller" RollDie.defaultRoller PlayerScope.codec RollDie.roller
+  highest <- Fields.defaulted "highest" Nothing (Common.maybe SlotName.codec) RollDie.highest
+  pure RollDie.MkRollDie {RollDie.sides = sides, RollDie.count = count, RollDie.modifier = modifier, RollDie.reading = reading, RollDie.slot = slot, RollDie.other = other, RollDie.roller = roller, RollDie.highest = highest}
