@@ -7192,6 +7192,11 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             || modalReadsAnnouncedX (Face.spell c)
             || entersTriggerReadsX c
             || turnedUpReadsX c
+            || selfReductionReadsX c
+        -- CR 601.2f's reader: the spell's own reduction counting the X its
+        -- additional cost announced (Torgaar, Famine Incarnate's "for each
+        -- creature sacrificed this way").
+        selfReductionReadsX c = any (Quantity.readsX . CostReduction.perEach) (Face.costReductions c)
         -- CR 702.37f / 702.168e's reader: a turned-face-up ability reading the X
         -- chosen for the morph or disguise cost, through its effects (Warbreak
         -- Trumpeter's X Goblins) or its target count (Aurelia's Vindicator). Its
