@@ -589,6 +589,8 @@ newGame perform matchup = do
     Planechase.shufflePlanarDeck pid
     -- CR 904.3 / 103.3a.
     Archenemy.shuffleSchemeDeck pid
+  -- CR 809.4, ahead of CR 103.1c's claim.
+  randomEmperorFirst
   -- CR 103.1c, once every conspiracy is in its command zone (CR 315.2).
   claimStartingPlayer
   seated <- State.gets GameState.turnOrder
@@ -833,6 +835,23 @@ claimStartingPlayer = do
       pure (Just (if List.elem answer claimants then answer else first))
   Monad.forM_ starter $ \pid ->
     State.modify' (\g -> g {GameState.turnOrder = rotateTo pid (GameState.turnOrder g), GameState.activePlayer = pid})
+
+-- CR 809.4: in an Emperor game a randomly determined emperor goes first, turn
+-- order to the left. Randomness and not a choice, so Prompt.RandomFirstPlayer,
+-- drawn from the emperors in turn order and filtered rather than trusted. A
+-- rotation, claimStartingPlayer's, which still supersedes it (CR 103.1c).
+-- Pawl.EmperorSpec's "CR 809.4" case proves it.
+randomEmperorFirst :: Game ()
+randomEmperorFirst = do
+  gs <- State.get
+  let emperors = GameSettings.emperors (GameState.settings gs)
+  case filter (Emperors.isEmperor emperors) (GameState.turnOrder gs) of
+    [] -> pure ()
+    first : rest -> do
+      let candidates = first NonEmpty.:| rest
+      answer <- if null rest then pure first else Game.ask (Prompt.RandomFirstPlayer candidates)
+      let starter = if List.elem answer candidates then answer else first
+      State.modify' (\g -> g {GameState.turnOrder = rotateTo starter (GameState.turnOrder g), GameState.activePlayer = starter})
 
 -- CR 103 / 727.1a: put `starter` at the head of the turn order, preserving the
 -- cyclic order. Total: a `starter` not in the order leaves it as-is.

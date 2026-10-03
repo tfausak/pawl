@@ -25,8 +25,9 @@ import qualified Pawl.Types.Teams as Teams
 -- The ranges are CR 809.6a's minima, which at three players a team are CR
 -- 809.3a's 1 for a general and 2 for an emperor.
 --
--- Not implemented: CR 809.2's and CR 809.6a's seating, and CR 809.4's random
--- starting emperor -- the seating and the first seat are the caller's (#2847).
+-- Not implemented: CR 809.2's and CR 809.6a's seating, which is the caller's
+-- and unchecked (#4497). CR 809.4's starting emperor is
+-- Pawl.Engine.Setup.randomEmperorFirst.
 setUp :: Teams.Teams -> Emperors.Emperors -> GameState -> GameState
 setUp teams emperors gs =
   gs
