@@ -206,6 +206,7 @@ import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.SlotPerPlayer as SlotPerPlayer
 import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
+import qualified Pawl.Types.TargetChooser as TargetChooser
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TheseDiscard as TheseDiscard
 import qualified Pawl.Types.TokenPattern as TokenPattern
@@ -3437,7 +3438,13 @@ targetSlotSlots slot =
         -- CR 601.2c's computed COUNT is a Quantity too, and names slots the same
         -- way its bound does, so it is reported beside it or a slot named only
         -- there would dangle.
-        maybe Map.empty quantitySlots (SlotCount.quantity (TargetSlot.count slot))
+        maybe Map.empty quantitySlots (SlotCount.quantity (TargetSlot.count slot)),
+        -- And the seat a CR 115.1 chooser names through a binding -- Curse of
+        -- Inertia's "that attacking player", which its condition must supply.
+        case TargetSlot.chooser slot of
+          Just (TargetChooser.InSlot named) -> oneSlot named
+          Just (TargetChooser.Relative _) -> Map.empty
+          Nothing -> Map.empty
       ]
 
 -- Every slot a whole MODE reads: its effects', every payer CR 118.12a's "unless

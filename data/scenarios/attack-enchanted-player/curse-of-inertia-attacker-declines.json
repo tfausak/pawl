@@ -1,0 +1,32 @@
+{
+  "description": "CR 603.5 Curse of Inertia: the attacking player declines the may and nothing is tapped",
+  "note": "The tap scenario with carol's answer to the may changed to Declines: alice's Island stays untapped. Pairs with that scenario so its tap cannot pass because the clause ran unconditionally.",
+  "board": {
+    "active": "carol",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Curse of Inertia", "label": "curse", "attached": "bob" },
+          { "card": "Island", "label": "island" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Forest", "label": "forest" }]
+      },
+      {
+        "name": "carol",
+        "battlefield": [{ "card": "Goblin Piker", "label": "attacker", "ready": true }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "carol", "do": { "Attack": ["$attacker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "carol", "source": "$attacker", "do": { "ChooseAttackTarget": "$bob" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "carol", "source": "$curse", "do": { "ChooseTargets": { "target": ["$island"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "carol", "source": "$curse", "do": { "ChooseOptional": { "type": "Declines" } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "carol", "check": { "Tapped": { "object": "$island", "tapped": false } } }
+  ]
+}

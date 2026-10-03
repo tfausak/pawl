@@ -1,0 +1,33 @@
+{
+  "description": "CR 603.3d / 601.2c / 115.1 Curse of Inertia: the attacking player chooses the target and taps it",
+  "note": "Alice's Curse enchants bob and carol attacks him. Carol, the attacking player, announces the target as the trigger goes on the stack -- alice's Island -- and takes the may, tapping it. Alice controls the trigger and bob is her other opponent: an engine asking alice, or letting her pick which opponent chooses (CR 801.5a), raises an unscheduled prompt and fails here.",
+  "board": {
+    "active": "carol",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Curse of Inertia", "label": "curse", "attached": "bob" },
+          { "card": "Island", "label": "island" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Forest", "label": "forest" }]
+      },
+      {
+        "name": "carol",
+        "battlefield": [{ "card": "Goblin Piker", "label": "attacker", "ready": true }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "carol", "do": { "Attack": ["$attacker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "carol", "source": "$attacker", "do": { "ChooseAttackTarget": "$bob" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "carol", "source": "$curse", "do": { "ChooseTargets": { "target": ["$island"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "carol", "source": "$curse", "do": { "ChooseOptional": { "type": "Exercises" } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "carol", "check": { "Tapped": { "object": "$island", "tapped": true } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "carol", "check": { "Tapped": { "object": "$forest", "tapped": false } } }
+  ]
+}
