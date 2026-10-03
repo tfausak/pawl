@@ -29,6 +29,7 @@ import qualified Pawl.Codec.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Codec.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Codec.RuleAbilities as RuleAbilities
 import qualified Pawl.Codec.SpecialAction as SpecialAction
+import qualified Pawl.Codec.SpendManaAsThough as SpendManaAsThough
 import qualified Pawl.Codec.StaticAbility as StaticAbility
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.Supertype as Supertype
@@ -85,6 +86,7 @@ codec = Fields.object $ do
   costReductions <- Fields.defaulted "costReductions" [] (Common.list CostReduction.codec) PC.costReductions
   grantedCostReductions <- Fields.defaulted "grantedCostReductions" [] (Common.list CostReduction.codec) PC.grantedCostReductions
   grantedAlternativeCosts <- Fields.defaulted "grantedAlternativeCosts" [] (Common.list AlternativeCost.codec) PC.grantedAlternativeCosts
+  grantedSpendManaAsThough <- Fields.defaulted "grantedSpendManaAsThough" [] (Common.list SpendManaAsThough.codec) PC.grantedSpendManaAsThough
   halves <- Fields.defaulted "halves" Nothing (Common.maybe Card.codec) PC.halves
   exceptions <- Fields.defaulted "exceptions" [] (Common.list (CopyException.codec (GrantedAbility.codec Card.codec))) PC.exceptions
   mergedDonors <- Fields.defaulted "mergedDonors" [] (Common.list codec) PC.mergedDonors
@@ -132,6 +134,7 @@ codec = Fields.object $ do
         PC.costReductions = costReductions,
         PC.grantedCostReductions = grantedCostReductions,
         PC.grantedAlternativeCosts = grantedAlternativeCosts,
+        PC.grantedSpendManaAsThough = grantedSpendManaAsThough,
         PC.halves = halves,
         PC.exceptions = exceptions,
         PC.mergedDonors = mergedDonors,

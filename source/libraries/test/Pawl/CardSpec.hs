@@ -912,6 +912,8 @@ modificationCounts modification = case modification of
       quantityCounts (CostReduction.perEach reduction)
         <> concatMap conditionCounts (Maybe.maybeToList (CostReduction.condition reduction))
     GrantedAbility.SelfAlternativeCost alternative -> concatMap conditionCounts (Maybe.maybeToList (AlternativeCost.condition alternative))
+    -- Carries neither a Count nor a Filter.
+    GrantedAbility.SelfSpendManaAsThough _ -> []
   -- Rule 702.165a's grant names the source, and the keywords it carries are
   -- minted from the card's Backup keyword, swept there.
   Modification.GainAbilitiesOfSource _ -> []
