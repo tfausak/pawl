@@ -1308,20 +1308,32 @@ entryAttack legal resolving entry gs = case EntryRiders.attacking entry of
 -- offer asks about the same copies over again. A copy nobody casts is left where
 -- it was made, for CR 704.5e to sweep at the next check (Pawl.Engine.Sba).
 --
+-- Rod of Absorption's total is the repeat with a budget: each round offers
+-- only a half whose mana value fits what is left (CR 202.3, through
+-- CastOffer.restriction's per-face match, so a split card's half is measured
+-- as the spell it becomes), and the cast spell's mana value is spent from it.
+-- `evaluate` reads the budget's Quantity once, before the first round (CR
+-- 608.2h).
+--
 -- Answers the spells the offer's casts put on the stack, for CR 400.7h's
 -- OfferCast.slot.
-offerCast :: Filter.Context -> [ObjectId] -> PlayerId -> CastObligation.CastObligation -> PermissionVerb.PermissionVerb -> Maybe PlayerId -> CastRepetition.CastRepetition -> Bool -> CastOffer.CastOffer -> Game [ObjectId]
-offerCast context named caster optionality verb retake repetition copied offer = do
+offerCast :: Filter.Context -> (Quantity.Type.Quantity -> Maybe Integer) -> [ObjectId] -> PlayerId -> CastObligation.CastObligation -> PermissionVerb.PermissionVerb -> Maybe PlayerId -> CastRepetition.CastRepetition -> Bool -> CastOffer.CastOffer -> Game [ObjectId]
+offerCast context evaluate named caster optionality verb retake repetition copied offer = do
   subjects <- if copied then Maybe.catMaybes <$> traverse (castableCopy caster) named else pure named
   case repetition of
     CastRepetition.Once -> foldMap (Maybe.maybeToList . snd) <$> offerCastOnce context subjects caster optionality verb retake offer
-    CastRepetition.AnyNumber -> again subjects
+    CastRepetition.AnyNumber -> again Nothing subjects
+    CastRepetition.WithinTotalManaValue quantity -> again (Just (Maybe.fromMaybe 0 (evaluate quantity))) subjects
   where
-    again remaining = do
-      taken <- offerCastOnce context remaining caster optionality verb retake offer
+    again budget remaining = do
+      let capped total = offer {CastOffer.restriction = Just (maybe (Filter.Type.ManaValueAtMost total) (\r -> Filter.Type.And [r, Filter.Type.ManaValueAtMost total]) (CastOffer.restriction offer))}
+      taken <- offerCastOnce context remaining caster optionality verb retake (maybe offer capped budget)
       case taken of
         Nothing -> pure []
-        Just (oid, spell) -> (Maybe.maybeToList spell <>) <$> again (filter (/= oid) remaining)
+        Just (oid, spell) -> do
+          gs <- State.get
+          let spent = Maybe.fromMaybe 0 (spell >>= Projection.fullView gs >>= Filter.manaValue)
+          (Maybe.maybeToList spell <>) <$> again (fmap (subtract spent) budget) (filter (/= oid) remaining)
 
 -- CR 707.12: "the copy is created in the same zone the object is in and then
 -- cast". The copy this mints is what `offerCast` above offers in the original's
@@ -1401,7 +1413,7 @@ castableCopy caster original = do
 offerOutsideCopy :: Filter.Context -> PlayerId -> PrintingId.PrintingId -> CastOffer.CastOffer -> Game ()
 offerOutsideCopy context caster printingId offer = do
   copyId <- State.state (Event.mintOutside caster printingId)
-  Monad.void (offerCast context [copyId] caster CastObligation.Optional PermissionVerb.Cast Nothing CastRepetition.Once False offer)
+  Monad.void (offerCast context (const Nothing) [copyId] caster CastObligation.Optional PermissionVerb.Cast Nothing CastRepetition.Once False offer)
   State.modify' $ \g ->
     if Set.member copyId (GameState.outsideCopies g)
       then g {GameState.objects = Map.delete copyId (GameState.objects g), GameState.outsideCopies = Set.delete copyId (GameState.outsideCopies g)}
@@ -3113,6 +3125,8 @@ changeTargetsFor chooser controller oid = do
 -- whole object (CR 707.10); here the object stays, so the decisions are named:
 -- every binding but the reserved ones that are the subject's own (its
 -- controller, itself, its copy stamp), and the cast records rule 707.2 lists.
+-- With no original on the stack it is Object.unannounced, which CR 608.2b's
+-- Resolve.targetsAllIllegal reads.
 -- Pawl.CopySpec's "CR 707.2 a spell that becomes a copy of a Bolt" proves it.
 acquireChoices :: Modal.Type.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Maybe Object.Object -> Object.Object -> Object.Object
 acquireChoices copiedSpell mOriginal subject =
@@ -3127,6 +3141,7 @@ acquireChoices copiedSpell mOriginal subject =
           Object.announcedX = mOriginal >>= Object.announcedX,
           Object.paidCosts = maybe Map.empty Object.paidCosts mOriginal,
           Object.boughtBack = any Object.boughtBack mOriginal,
+          Object.unannounced = Maybe.isNothing mOriginal,
           Object.castUsing = mOriginal >>= Object.castUsing
         }
 
@@ -5599,6 +5614,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- whose restriction reads the source (CR 702.85a) answers what the walk
         -- that named these cards answered.
         context = effectContext gs controller source legal (slotBindings resolving gs)
+        evaluate = Quantity.evaluateFor (effectViewOf source legal gs) context gs resolving source
     -- CR 608.2g names "a player", and a reference resolving to nobody offers the
     -- cast to nobody.
     spells <-
@@ -5606,7 +5622,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         <$> Monad.forM
           (playerRefPlayers legal controller gs caster)
           ( \pid ->
-              offerCast context named pid optionality verb (if controlWhileResolving then Just controller else Nothing) repetition copied offer
+              offerCast context evaluate named pid optionality verb (if controlWhileResolving then Just controller else Nothing) repetition copied offer
           )
     -- CR 400.7h: the rest of the effect names the spells, bindMinted's shape.
     bindMinted resolving slot spells
@@ -7283,11 +7299,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- CR 707.10c's "its controller may choose new targets for it": each subject
     -- on the stack, asked of that spell's controller (CR 405.4), once it is the
     -- copy. Transcantation's ruling makes the prompt the spell's only road back
-    -- to a target.
-    --
-    -- Not implemented: the ruling's "the spell won't resolve" when none is
-    -- chosen (CR 608.2b). The spell resolves and its targeted text does
-    -- nothing (#4235).
+    -- to a target; one left without any doesn't resolve (CR 608.2b,
+    -- Resolve.targetsAllIllegal).
     Monad.forM_ (if newTargets then fmap snd (copiedOriginal before) else Nothing) $ \mOriginalOf ->
       Monad.forM_ (filter (Maybe.isJust . onStackIn before) (objectRefObjects legal resolving controller source before subjectRef)) $ \spell -> do
         g <- State.get

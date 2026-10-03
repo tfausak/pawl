@@ -26,7 +26,8 @@ effect =
           { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
             ZoneChangePattern.whatObject = Filter.And [],
             ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
-            ZoneChangePattern.whenDiscarded = Nothing
+            ZoneChangePattern.whenDiscarded = Nothing,
+            ZoneChangePattern.duringResolution = False
           }
         Zone.Exile
         False

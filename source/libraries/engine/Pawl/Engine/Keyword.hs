@@ -1503,7 +1503,8 @@ unearth cost =
                         { ZoneChangePattern.whenDestination = Nothing,
                           ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
                           ZoneChangePattern.whatObject = Filter.IsBound unearthSlot,
-                          ZoneChangePattern.whenDiscarded = Nothing
+                          ZoneChangePattern.whenDiscarded = Nothing,
+                          ZoneChangePattern.duringResolution = False
                         }
                       Zone.Exile
                       False
@@ -4057,7 +4058,8 @@ castFromGraveyardExile =
           { ZoneChangePattern.whenDestination = Nothing,
             ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
             ZoneChangePattern.whatObject = Filter.IsSource,
-            ZoneChangePattern.whenDiscarded = Nothing
+            ZoneChangePattern.whenDiscarded = Nothing,
+            ZoneChangePattern.duringResolution = False
           }
         Zone.Exile
         False
@@ -4150,7 +4152,8 @@ madnessDiscardExile =
           { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
             ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
             ZoneChangePattern.whatObject = Filter.IsSource,
-            ZoneChangePattern.whenDiscarded = Nothing
+            ZoneChangePattern.whenDiscarded = Nothing,
+            ZoneChangePattern.duringResolution = False
           }
         Zone.Exile
         False

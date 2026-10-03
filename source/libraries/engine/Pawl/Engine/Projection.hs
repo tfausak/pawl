@@ -5054,7 +5054,8 @@ finalityOf oid gs =
                   -- makes it the owner's whoever controlled the permanent.
                   ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
                   ZoneChangePattern.whatObject = Filter.Type.IsSource,
-                  ZoneChangePattern.whenDiscarded = Nothing
+                  ZoneChangePattern.whenDiscarded = Nothing,
+                  ZoneChangePattern.duringResolution = False
                 }
               Zone.Exile
               False
