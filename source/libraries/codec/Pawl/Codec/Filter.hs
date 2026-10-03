@@ -168,7 +168,7 @@ codec keywordCodec =
       Arm.payload "Not" (codec keywordCodec) Filter.Not (\x -> case x of Filter.Not y -> Just y; _ -> Nothing)
     ]
 
--- | CR 110.2's comparison keyed by name (#1464): the margin, and the filter
+-- | CR 110.2's comparison keyed by name: the margin, and the filter
 -- describing the permanents being counted -- recursive like Not, and for the
 -- atom's own reason rather than the combinator's.
 controlsMoreThanYou :: (Typeable.Typeable keyword, Eq keyword) => Codec.Codec keyword -> Codec.Codec (Natural.Natural, Filter.Filter keyword)
