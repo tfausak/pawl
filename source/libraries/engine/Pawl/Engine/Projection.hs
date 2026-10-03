@@ -304,6 +304,10 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
           -- off the projection of the card being cast.
           GrantedAbility.SelfAlternativeCost a ->
             pc {PC.grantedAlternativeCosts = PC.grantedAlternativeCosts pc <> [a]}
+          -- CR 609.4b: recorded for Pawl.Engine.PlayerEffect.spendManaAsThoughFor,
+          -- which reads it off the projection of the card being cast.
+          GrantedAbility.SelfSpendManaAsThough clause ->
+            pc {PC.grantedSpendManaAsThough = PC.grantedSpendManaAsThough pc <> [clause]}
         -- CR 702.165a's grant never reaches a STORED effect: Resolve.Effect's
         -- expandGrant turns it into the ordinary GainKeyword and GainAbility arms
         -- above as the ability resolves, so nothing with this modification is ever
@@ -350,6 +354,9 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
               -- The same for a granted alternative cost. Unproven: no test
               -- wipes a card carrying a granted one.
               PC.grantedAlternativeCosts = [],
+              -- The same for a granted mana-spending permission. Unproven: no
+              -- test wipes a card carrying a granted one.
+              PC.grantedSpendManaAsThough = [],
               -- The same for a granted static ability: only an EARLIER grant is
               -- gone. Unproven: no card in data/cards/ grants a static ability
               -- to a permanent an ability wipe reaches.
@@ -5553,6 +5560,8 @@ grantedStaticWrites p g = case g of
   GrantedAbility.SelfCostReduction _ -> False
   -- CR 118.9: nor does an alternative cost.
   GrantedAbility.SelfAlternativeCost _ -> False
+  -- CR 609.4b: nor does a permission about the mana spent to cast it.
+  GrantedAbility.SelfSpendManaAsThough _ -> False
 
 -- Does this modification hand its affected objects a keyword satisfying `p`?
 -- Exhaustive rather than a catch-all: a modification added later that also hands
