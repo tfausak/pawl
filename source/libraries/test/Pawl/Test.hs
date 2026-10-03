@@ -682,6 +682,7 @@ import qualified Pawl.FilterPositionLintSpec
 import qualified Pawl.FilterSpec
 import qualified Pawl.FlipSpec
 import qualified Pawl.ForageSpec
+import qualified Pawl.FragmentedSpec
 import qualified Pawl.GameSpec
 import qualified Pawl.GoadSpec
 import qualified Pawl.HarnessSpec
@@ -1508,6 +1509,7 @@ spec s registry = do
   Pawl.FilterSpec.spec s
   Pawl.FlipSpec.spec s registry
   Pawl.ForageSpec.spec s registry
+  Pawl.FragmentedSpec.spec s registry
   Pawl.LearnSpec.spec s registry
   Pawl.GameSpec.spec s registry
   Pawl.GoadSpec.spec s registry
