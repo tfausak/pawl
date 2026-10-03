@@ -522,8 +522,8 @@ rewriteEffect pairs effect = case effect of
   -- text change reaching a quoted ability a RESOLUTION granted -- is proved by
   -- Pawl.CounterspellSpec's evolved Clavileño, whose granted dies trigger mints a
   -- Vampire Elf Token where the printed word says Demon.
-  Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
-    Effect.ModifyTarget (ModifyTarget.MkModifyTarget (rewriteDuration pairs duration) (rewriteModification pairs modification) (rewriteObjectRef pairs ref))
+  Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref each) ->
+    Effect.ModifyTarget (ModifyTarget.MkModifyTarget (rewriteDuration pairs duration) (rewriteModification pairs modification) (rewriteObjectRef pairs ref) each)
   -- CR 612.1 through BOTH halves of every clause: the recipient's ref, and the
   -- clause's own amount, whose Count may name a creature type -- Goblin War
   -- Strike's "damage equal to the number of Goblins you control". CR 120.2b's

@@ -1355,7 +1355,9 @@ baseView gs oid =
 --
 -- TWO objects, neither of them the affected one. `source` is CR 113.7a's source;
 -- `announcedOn` is the object CR 601.2b stamped the chosen X on -- for an
--- ACTIVATED ability the ability object, not the permanent.
+-- ACTIVATED ability the ability object, not the permanent. An affected object is
+-- reached only through a slot the context binds (Pawl.Types.ModifyTarget's
+-- `each`).
 --
 -- Not applied to a static ability's effect (CR 611.2 scopes 611.2a-d to a
 -- resolution, and CR 604.2's effect is regenerated per projection), nor to what

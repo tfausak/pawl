@@ -14,15 +14,30 @@ import qualified Pawl.Types.SlotName as SlotName
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.ModifyTarget" $ do
   -- CR 611: a modification over the objects the ref names, for a duration.
-  Spec.it s "MkModifyTarget, all three keys" $
+  Spec.it s "MkModifyTarget, without each" $
     Common.assertCodec
       s
       (ModifyTarget.codec Common.text)
       ( ModifyTarget.MkModifyTarget
           { ModifyTarget.duration = Duration.UntilEndOfTurn,
             ModifyTarget.modification = Modification.GainKeyword Keyword.Flying,
-            ModifyTarget.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))
+            ModifyTarget.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")),
+            ModifyTarget.each = Nothing
           }
       )
       " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"modification\":{\"type\":\"GainKeyword\",\"value\":{\"type\":\"Flying\"}},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
+  -- CR 701.10b: each affected object bound under its own name while the
+  -- quantities freeze.
+  Spec.it s "MkModifyTarget, with each" $
+    Common.assertCodec
+      s
+      (ModifyTarget.codec Common.text)
+      ( ModifyTarget.MkModifyTarget
+          { ModifyTarget.duration = Duration.UntilEndOfTurn,
+            ModifyTarget.modification = Modification.GainKeyword Keyword.Flying,
+            ModifyTarget.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")),
+            ModifyTarget.each = Just (SlotName.MkSlotName (Text.pack "creature"))
+          }
+      )
+      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"each\":\"creature\",\"modification\":{\"type\":\"GainKeyword\",\"value\":{\"type\":\"Flying\"}},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s (ModifyTarget.codec Common.text)

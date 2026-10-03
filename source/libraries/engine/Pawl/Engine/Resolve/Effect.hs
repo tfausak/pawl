@@ -3700,7 +3700,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           runDamageRewriteEffects
           runPreventionRiders
       _ -> pure ()
-  Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) -> do
+  Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref each) -> do
     -- The affected objects are enumerated once, by the same sweep every
     -- ObjectRef-taking opcode uses. Nothing to affect (an illegal slot per CR
     -- 608.2b, a set that matched nothing) arrives as the empty list.
@@ -3724,7 +3724,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- is one timestamp for CR 613.7 to order.
             --
             -- CR 608.2h / 611.2d: the VALUE is locked here too, against the
-            -- SOURCE (CR 113.7a) and its controller, never an affected object.
+            -- SOURCE (CR 113.7a) and its controller, not an affected object.
             -- CR 601.2b's announced X is read off `resolving` instead, since
             -- only the ability object holds it. A quantity that cannot be
             -- evaluated now is undetermined for good, so nothing is stored.
@@ -3733,21 +3733,30 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- own slot bindings ride along: Rush of Blood's X is the power of the
             -- creature in its own target slot, and a slotless context answers
             -- Nothing and stores nothing at all.
-            case Projection.freezeQuantities gs resolving source (effectContext gs controller source legal (slotBindings resolving gs)) modification of
-              Nothing -> gs
-              Just frozen ->
-                let store g m =
-                      let (ts, g1) = Game.freshTimestamp g
-                          eff =
-                            ContinuousEffect.MkContinuousEffect
-                              { ContinuousEffect.source = source,
-                                ContinuousEffect.timestamp = ts,
-                                ContinuousEffect.expiry = expiry,
-                                ContinuousEffect.modification = m,
-                                ContinuousEffect.affected = Affected.TheseObjects (Set.fromList targets)
-                              }
-                       in g1 {GameState.continuousEffects = eff : GameState.continuousEffects g1}
-                 in List.foldl' store gs (expandGrant resolving source gs frozen)
+            --
+            -- With `each` named, CR 701.10b's "that creature's power" instead: the
+            -- freeze runs once per affected object with that object bound under
+            -- the name, and each gets an effect of its own value.
+            let context = effectContext gs controller source legal (slotBindings resolving gs)
+                freezeFor objs ctx = (objs, Projection.freezeQuantities gs resolving source ctx modification)
+                frozenSets = case each of
+                  Nothing -> [freezeFor targets context]
+                  Just slot -> [freezeFor [t] context {Filter.slotObjects = Map.insert slot (Set.singleton t) (Filter.slotObjects context)} | t <- targets]
+                store objs g m =
+                  let (ts, g1) = Game.freshTimestamp g
+                      eff =
+                        ContinuousEffect.MkContinuousEffect
+                          { ContinuousEffect.source = source,
+                            ContinuousEffect.timestamp = ts,
+                            ContinuousEffect.expiry = expiry,
+                            ContinuousEffect.modification = m,
+                            ContinuousEffect.affected = Affected.TheseObjects (Set.fromList objs)
+                          }
+                   in g1 {GameState.continuousEffects = eff : GameState.continuousEffects g1}
+                storeSet g (objs, frozen) = case frozen of
+                  Nothing -> g
+                  Just m -> List.foldl' (store objs) g (expandGrant resolving source gs m)
+             in List.foldl' storeSet gs frozenSets
   -- CR 608.2d: a subtype word swap is not among CR 601.2b-d's announcements, so
   -- the choice is made here, as the effect applies. Observable: a countered
   -- Magical Hack is never asked.

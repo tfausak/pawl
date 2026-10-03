@@ -1814,7 +1814,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               S.alice
               (Map.singleton slot (Set.singleton (Recipient.ToCreature pikerId)))
               (Map.singleton slot (Set.singleton (Recipient.ToCreature pikerId)))
-              (Effect.ModifyTarget (ModifyTarget.MkModifyTarget Duration.UntilEndOfTurn m (ObjectRef.InSlot slot)))
+              (Effect.ModifyTarget (ModifyTarget.MkModifyTarget Duration.UntilEndOfTurn m (ObjectRef.InSlot slot) Nothing))
         refused = store (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 3) Quantity.Star))
         stored = store (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3)))
     Spec.assertEqWith s "no effect is stored for an unevaluable quantity" (GameState.continuousEffects refused) []
