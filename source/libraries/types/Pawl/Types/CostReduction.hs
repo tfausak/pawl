@@ -26,7 +26,8 @@ import qualified Pawl.Types.Quantity as Quantity
 -- (Pawl.Engine.PlayerEffect.printedRows walks it), and a spell reducing its own
 -- cost is not on the battlefield when the reduction applies; this one names no
 -- spells to match against, because the only spell it reduces is the one it is
--- printed on, and it carries a Quantity where that one carries a literal amount.
+-- printed on, and it carries a Quantity where that one carries a literal amount
+-- (scaled, at most, by the spell's targets).
 --
 -- A printed one is read straight off the card, or its copy stamp
 -- (Pawl.Engine.Game.castingFaceOf), by Pawl.Engine.Cost.selfReductions, which

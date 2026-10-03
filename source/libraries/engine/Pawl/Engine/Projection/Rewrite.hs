@@ -424,9 +424,9 @@ rewritePlayerEffect pairs effect = case effect of
   -- Omniscience's "spells" name none today; Edgewalker's "Cleric spells" does on
   -- the printed road, and Liliana, Untouched by Death's "Zombie spells" does on
   -- the stored one.
-  PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost f n) -> PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost (Filter.rewrite pairs f) n)
+  PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost f n targets) -> PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost (Filter.rewrite pairs f) n (fmap (Filter.rewrite pairs) targets))
   PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost f kind n) -> PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost (Filter.rewrite pairs f) kind n)
-  PlayerEffect.ReduceSpellCost x -> PlayerEffect.ReduceSpellCost x {ReduceSpellCost.whichSpells = Filter.rewrite pairs (ReduceSpellCost.whichSpells x)}
+  PlayerEffect.ReduceSpellCost x -> PlayerEffect.ReduceSpellCost x {ReduceSpellCost.whichSpells = Filter.rewrite pairs (ReduceSpellCost.whichSpells x), ReduceSpellCost.perTarget = fmap (Filter.rewrite pairs) (ReduceSpellCost.perTarget x)}
   -- TWO Filters of its own, and both descend. The second names
   -- what the ability targets (Dwarven Mauler's "that target this creature",
   -- spelled Filter.IsSource), so no card in `data/cards/` puts a subtype word
