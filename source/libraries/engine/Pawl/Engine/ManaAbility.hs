@@ -431,6 +431,7 @@ manaProduced effect = case effect of
   Effect.CantBeRegenerated {} -> Nothing
   Effect.ForbidBlock {} -> Nothing
   Effect.ForbidAttack {} -> Nothing
+  Effect.ForbidBeingBlocked {} -> Nothing
   Effect.ForbidActivation {} -> Nothing
   Effect.ForbidUntap {} -> Nothing
   Effect.RequireAttack {} -> Nothing
@@ -615,6 +616,7 @@ playerChoice effect = case effect of
   Effect.CantBeRegenerated {} -> Nothing
   Effect.ForbidBlock {} -> Nothing
   Effect.ForbidAttack {} -> Nothing
+  Effect.ForbidBeingBlocked {} -> Nothing
   Effect.ForbidActivation {} -> Nothing
   Effect.ForbidUntap {} -> Nothing
   Effect.RequireAttack {} -> Nothing
@@ -884,6 +886,7 @@ movesLibraryCard effect = case effect of
   Effect.CantBeRegenerated {} -> False
   Effect.ForbidBlock {} -> False
   Effect.ForbidAttack {} -> False
+  Effect.ForbidBeingBlocked {} -> False
   Effect.ForbidActivation {} -> False
   Effect.ForbidUntap {} -> False
   Effect.RequireAttack {} -> False

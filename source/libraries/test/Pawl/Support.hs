@@ -2135,6 +2135,7 @@ oneMountainState mountain ph =
           GameState.attackProhibitions = [],
           GameState.activationProhibitions = [],
           GameState.untapProhibitions = [],
+          GameState.evasions = [],
           GameState.attackRequirements = [],
           GameState.ignoredAbilities = [],
           GameState.turnOrder = [alice],

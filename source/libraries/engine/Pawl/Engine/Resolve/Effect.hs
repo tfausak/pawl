@@ -98,6 +98,7 @@ import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
 import qualified Pawl.Types.ActiveCopy as ActiveCopy
+import qualified Pawl.Types.ActiveEvasion as ActiveEvasion
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
@@ -221,6 +222,7 @@ import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ForEachNumber as ForEachNumber
 import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
+import qualified Pawl.Types.ForbidBeingBlocked as ForbidBeingBlocked
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.ForbidUntap as ForbidUntap
 import qualified Pawl.Types.FromReference as FromReference
@@ -3303,6 +3305,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.RequireAttack {} -> False
   Effect.ForbidBlock {} -> False
   Effect.ForbidAttack {} -> False
+  Effect.ForbidBeingBlocked {} -> False
   Effect.ForbidActivation {} -> False
   Effect.ForbidUntap {} -> False
   Effect.CreateEmblem {} -> False
@@ -7984,6 +7987,26 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 )
                 subjects
          in gs1 {GameState.attackProhibitions = stored <> GameState.attackProhibitions gs1}
+  Effect.ForbidBeingBlocked (ForbidBeingBlocked.MkForbidBeingBlocked duration f) ->
+    -- CR 509.1b / 611.2c: store ONE row for the class, ForbidAttack's Matching
+    -- arm and for its reasons -- not enumerated, so a creature that enters after
+    -- this resolution is inside it; bound players baked now; CR 109.5's
+    -- controller stored. Read at
+    -- Pawl.Engine.CombatRestriction.storedEvasions, never by a projection.
+    State.modify' $ \gs -> case Expiry.arm legal controller source duration gs of
+      -- CR 611.2b: the duration never started, so nothing is stored.
+      Nothing -> gs
+      Just expiry ->
+        let (ts, gs1) = Game.freshTimestamp gs
+            stored =
+              ActiveEvasion.MkActiveEvasion
+                { ActiveEvasion.source = source,
+                  ActiveEvasion.controller = controller,
+                  ActiveEvasion.timestamp = ts,
+                  ActiveEvasion.expiry = expiry,
+                  ActiveEvasion.affected = Filter.bakeBound (Binding.playersIn legal) f
+                }
+         in gs1 {GameState.evasions = stored : GameState.evasions gs1}
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration attackerRef defenderRef) ->
     -- CR 508.1d / 613.11: store one requirement per (attacker, defender) pair,
     -- rule 508.1d counting requirements PER CREATURE. A Named ref is RequireBlock's

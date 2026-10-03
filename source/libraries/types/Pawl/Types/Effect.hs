@@ -49,6 +49,7 @@ import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ForEachNumber as ForEachNumber
 import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
+import qualified Pawl.Types.ForbidBeingBlocked as ForbidBeingBlocked
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.ForbidUntap as ForbidUntap
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
@@ -557,6 +558,9 @@ data Effect card ability
   | -- | CR 508.1c / 613.11: install a stored attacking restriction for a
     -- duration (Netter en-Dal), ForbidBlock's twin one rule over.
     ForbidAttack ForbidAttack.ForbidAttack
+  | -- | CR 509.1b / 611.2c: install a stored restriction that a class of
+    -- attackers can't be blocked, for a duration (Veiling Oddity).
+    ForbidBeingBlocked ForbidBeingBlocked.ForbidBeingBlocked
   | -- | CR 602.2 / 613.11: install a stored activation prohibition over the
     -- permanents the ref names, for a duration (Deadlock Trap). The printed form
     -- gathered live off a source is Pawl.Types.ActivationProhibition instead.
