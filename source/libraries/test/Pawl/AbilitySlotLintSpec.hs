@@ -23,6 +23,7 @@ module Pawl.AbilitySlotLintSpec where
 -- triggered ability's effects (Card.allEffects only reaches the spell).
 -- whole card written by somebody else and so an independent witness to the
 import qualified Data.Foldable as Foldable
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -58,6 +59,7 @@ import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CostChoice as CostChoice
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
@@ -964,7 +966,7 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
                     ( Just
                         PayGate.MkPayGate
                           { PayGate.payer = PlayerRef.Relative PlayerRelation.You,
-                            PayGate.cost = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) [],
+                            PayGate.cost = CostChoice.MkCostChoice (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) [] NonEmpty.:| []),
                             PayGate.basis = Nothing,
                             PayGate.branch = PayBranch.IfNotPaid,
                             PayGate.obligation = PayObligation.Optional,

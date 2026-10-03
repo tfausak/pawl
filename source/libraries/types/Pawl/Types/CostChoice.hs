@@ -5,7 +5,9 @@ import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Keyword as Keyword
 
 -- | CR 118.8 / 601.2b: one printed additional cost whose payment offers the
--- payer a CHOICE -- Caustic Exhale's "behold a Dragon or pay {1}".
+-- payer a CHOICE -- Caustic Exhale's "behold a Dragon or pay {1}". Also CR
+-- 118.12's resolution-time cost (Pawl.Types.PayGate.cost), where the choice is
+-- made as the cost is offered rather than at CR 601.2b.
 --
 -- A list of whole Costs and not of Pawl.Types.CostComponents, because a branch
 -- can be MANA: CR 601.2f splits a cost into a mana part and the non-mana
@@ -21,10 +23,11 @@ import qualified Pawl.Types.Keyword as Keyword
 --
 -- NONEMPTY because a choice with no options would be a cost with no way to pay
 -- it, which is CR 118.6's unpayable cost written by accident rather than by a
--- card. Two or more is what makes it a choice at all. One option is a mandatory
--- additional cost, which belongs here only when it pays MANA that
--- Face.additionalCosts has no part for -- Water Whip's waterbend {5} -- and
--- Pawl.CardSpec is what holds a card to that.
+-- card. Two or more is what makes it a choice at all. As an additional cost,
+-- one option is a mandatory additional cost, which belongs here only when it
+-- pays MANA that Face.additionalCosts has no part for -- Water Whip's waterbend
+-- {5} -- and Pawl.CardSpec is what holds a card to that. A gate's one option is
+-- its whole cost.
 --
 -- The options are in PRINTED order, which is the order Prompt.ChooseCost offers
 -- them in.

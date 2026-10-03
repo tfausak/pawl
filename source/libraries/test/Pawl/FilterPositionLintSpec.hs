@@ -59,6 +59,7 @@ import qualified Pawl.Types.ConjureDestination as ConjureDestination
 import qualified Pawl.Types.ConjureEntry as ConjureEntry
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CostChoice as CostChoice
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -2011,7 +2012,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                                   ( Just
                                       PayGate.MkPayGate
                                         { PayGate.payer = PlayerRef.Relative PlayerRelation.You,
-                                          PayGate.cost = Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 buried)],
+                                          PayGate.cost = CostChoice.MkCostChoice (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 buried)] NonEmpty.:| []),
                                           PayGate.basis = Nothing,
                                           PayGate.branch = PayBranch.IfNotPaid,
                                           PayGate.obligation = PayObligation.Optional,
@@ -2210,7 +2211,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         gate =
           PayGate.MkPayGate
             { PayGate.payer = PlayerRef.Relative PlayerRelation.You,
-              PayGate.cost = Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [],
+              PayGate.cost = CostChoice.MkCostChoice (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [] NonEmpty.:| []),
               PayGate.basis = Nothing,
               PayGate.branch = PayBranch.IfNotPaid,
               PayGate.obligation = PayObligation.Optional,

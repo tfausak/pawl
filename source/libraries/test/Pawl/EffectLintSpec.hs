@@ -71,6 +71,7 @@ import qualified Pawl.Types.ControlSides as ControlSides
 import qualified Pawl.Types.CopyOriginal as CopyOriginal
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CostChoice as CostChoice
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -2272,7 +2273,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
                   )
                   (ModeSelection.ChooseExactly 1)
             }
-        payerFace ref = clauseFace (Just (PayGate.MkPayGate ref (Cost.Type.MkCost Nothing []) Nothing PayBranch.IfNotPaid PayObligation.Optional Nothing Nothing)) Optionality.Mandatory
+        payerFace ref = clauseFace (Just (PayGate.MkPayGate ref (CostChoice.MkCostChoice (Cost.Type.MkCost Nothing [] NonEmpty.:| [])) Nothing PayBranch.IfNotPaid PayObligation.Optional Nothing Nothing)) Optionality.Mandatory
         askerFace ref = clauseFace Nothing (Optionality.Optional ref)
         -- CR 111.1's token, whose OWN printed text carries that same predicate:
         -- Face.enchant is a Filter position cardFilters walks, so effectFilters
