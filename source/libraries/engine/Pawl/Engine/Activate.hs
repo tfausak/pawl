@@ -376,7 +376,7 @@ activateAbility pid srcId ability = do
           -- CR 601.2b leaves to the payer rather than to the fallback.
           let totalledCost = Cost.plusComponents gathered announcedAtX
           (announcedCost, _) <- Cost.announce (PaymentSubject.Activating srcId stamp) ManaSpending.AsProduced pid srcId (Cost.substitutedManas (Cost.waterbendSubstitutions (Cost.Type.components totalledCost) Map.empty pid srcId gs) (Cost.totalManas gathered)) totalledCost
-          chosen <- Target.chooseTargets pid abilId srcId (Maybe.fromMaybe 0 mAmount) slots sets
+          chosen <- Target.chooseTargets pid abilId srcId seed (Maybe.fromMaybe 0 mAmount) slots sets
           if not (Target.selectionLegal (Just pid) seed srcId (Maybe.fromMaybe 0 mAmount) slots sets chosen gs)
             then State.put before -- reject: the whole activation is a no-op
             else do
