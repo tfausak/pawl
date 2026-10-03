@@ -1,0 +1,2 @@
+Flying
+First strike (This creature deals combat damage before creatures without first strike.)

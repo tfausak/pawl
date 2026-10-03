@@ -1,0 +1,27 @@
+{
+  "faces": [
+    {
+      "name": "Snow-Covered Island",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Island"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Basic"
+          },
+          {
+            "type": "Snow"
+          }
+        ],
+        "types": [
+          {
+            "type": "Land"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "faces": [
+    {
+      "name": "Badlands",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Mountain"
+          },
+          {
+            "type": "Swamp"
+          }
+        ],
+        "types": [
+          {
+            "type": "Land"
+          }
+        ]
+      }
+    }
+  ]
+}

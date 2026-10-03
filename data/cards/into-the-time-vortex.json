@@ -1,0 +1,37 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Cascade"
+        },
+        {
+          "type": "Rebound"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Into the Time Vortex",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}

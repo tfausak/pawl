@@ -1,0 +1,2 @@
+Haste
+Wither (This deals damage to creatures in the form of -1/-1 counters.)

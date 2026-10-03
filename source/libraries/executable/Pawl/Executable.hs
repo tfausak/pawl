@@ -3,6 +3,7 @@ module Pawl.Executable where
 import qualified Control.Monad as Monad
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Builder as Builder
+import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
 import qualified Data.Text.IO as TextIO
@@ -10,13 +11,16 @@ import qualified Pawl.Benchmark
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.Scenario as Codec.Scenario
 import qualified Pawl.DeckList as DeckList
+import qualified Pawl.Ingest as Ingest
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonSchema.Define as Define
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Scenario.Load as Load
 import qualified Pawl.Test
+import qualified System.Directory as Directory
 import qualified System.Environment as Environment
 import qualified System.Exit as Exit
 import qualified System.IO as IO
@@ -36,12 +40,13 @@ main = do
     ["schema"] -> schema
     ["schema", "scenario"] -> scenarioSchema
     ["deck", path] -> deck path
+    ["ingest", path] -> ingest path
     "scenario" : paths@(_ : _) -> scenario paths
     "bench" : rest -> Environment.withArgs rest Pawl.Benchmark.main
     "test" : rest -> Environment.withArgs rest Pawl.Test.main
     _ -> do
       name <- Environment.getProgName
-      IO.hPutStrLn IO.stderr $ "usage: " <> name <> " (schema [scenario] | deck FILE | scenario FILE... | bench | test)"
+      IO.hPutStrLn IO.stderr $ "usage: " <> name <> " (schema [scenario] | deck FILE | ingest FILE | scenario FILE... | bench | test)"
       Exit.exitFailure
 
 -- | Reads a deck list and writes back the deck it means, which is what makes a
@@ -68,6 +73,55 @@ deck path = do
           mapM_ (TextIO.hPutStrLn IO.stderr . (\p -> Text.pack (path <> ": ") <> DeckList.explain p)) problems
           Exit.exitFailure
         Right parsed -> TextIO.putStr (DeckList.render parsed)
+
+-- | Writes a card file for every keyword-only card in a candidates file
+-- (script/ingest/candidates.jq's reduction of MTGJSON), each with its Oracle
+-- text as a sidecar that Pawl.OracleSpec checks the card against (#9). A card
+-- already in the pool is never overwritten -- the hand-written file wins -- but
+-- gains the sidecar, which puts it under the same check, and is named on
+-- stderr if it says something other than MTGJSON does. Card files are written
+-- compact; `script/format-json.sh fix` puts them in canonical form.
+--
+-- Prints how many it wrote, skipped and left out, and why the rest were left
+-- out, by the kind of word that disqualified them.
+ingest :: FilePath -> IO ()
+ingest path = do
+  bytes <- ByteString.readFile path
+  let parsed = do
+        contents <- either (\err -> Left (Text.pack ("not valid UTF-8: " <> show err))) Right (Encoding.decodeUtf8' bytes)
+        Common.parse contents >>= Common.asObject >>= Common.field "cards" >>= Common.asArray
+  case parsed of
+    Left problem -> do
+      TextIO.hPutStrLn IO.stderr (Text.pack (path <> ": ") <> problem)
+      Exit.exitFailure
+    Right records -> do
+      cards <- Registry.defaultRoot
+      oracle <- Registry.oracleRoot
+      Directory.createDirectoryIfMissing True oracle
+      outcomes <- mapM (ingestOne cards oracle) records
+      let count p = length (filter p outcomes)
+          reasons = Map.fromListWith (+) [(Text.takeWhile (/= ':') reason, 1 :: Int) | Left reason <- outcomes]
+      putStrLn $ "written: " <> show (count (== Right True))
+      putStrLn $ "skipped, already in the pool: " <> show (count (== Right False))
+      putStrLn $ "left out: " <> show (sum reasons)
+      mapM_ (\(kind, n) -> TextIO.putStrLn (Text.pack "  " <> kind <> Text.pack (": " <> show n))) (Map.toDescList reasons)
+
+-- Right True for a card written, Right False for one the pool already holds.
+ingestOne :: FilePath -> FilePath -> Value.Value -> IO (Either Text.Text Bool)
+ingestOne cards oracle record = case Ingest.candidate record of
+  Left reason -> pure (Left reason)
+  Right (card, text) -> do
+    let slug = Registry.filedAs card
+        file = Registry.cardPath cards slug
+    exists <- Directory.doesFileExist file
+    if exists
+      then do
+        existing <- fmap Registry.parseCard (ByteString.readFile file)
+        Monad.unless (existing == Right card) $
+          IO.hPutStrLn IO.stderr (file <> ": disagrees with MTGJSON; the pool's file is kept")
+      else ByteString.writeFile file (Encoding.encodeUtf8 (Common.render (Codec.encode Card.codec card)))
+    ByteString.writeFile (Registry.oraclePath oracle slug) (Encoding.encodeUtf8 (if Text.null text then text else text <> Text.pack "\n"))
+    pure (Right (not exists))
 
 -- | Emits the card format's JSON Schema, which is otherwise reachable only
 -- from a REPL. Card rather than Printing because Pawl.Registry.parseCard is what reads

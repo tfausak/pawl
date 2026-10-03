@@ -1,0 +1,3 @@
+Devoid (This card has no color.)
+Flying
+Ingest (Whenever this creature deals combat damage to a player, that player exiles the top card of their library.)

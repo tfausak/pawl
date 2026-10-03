@@ -1,6 +1,11 @@
 {
   "faces": [
     {
+      "colorIndicator": [
+        {
+          "type": "Red"
+        }
+      ],
       "keywords": [
         {
           "type": "FirstStrike"

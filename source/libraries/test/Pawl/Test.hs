@@ -727,6 +727,7 @@ import qualified Pawl.MoveCounterSpec
 import qualified Pawl.MulliganSpec
 import qualified Pawl.MutateSpec
 import qualified Pawl.OmenSpec
+import qualified Pawl.OracleSpec
 import qualified Pawl.OutsideTheGameSpec
 import qualified Pawl.PhasingSpec
 import qualified Pawl.PlanechaseSpec
@@ -841,6 +842,7 @@ spec s registry = do
   Pawl.EmperorSpec.spec s registry
   Pawl.FilterPositionLintSpec.spec s registry
   Pawl.CardsSpec.spec s
+  Pawl.OracleSpec.spec s
   Pawl.CaseSpec.spec s registry
   Pawl.ClashSpec.spec s registry
   Pawl.ClassSpec.spec s registry

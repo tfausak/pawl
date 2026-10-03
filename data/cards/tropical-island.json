@@ -1,0 +1,22 @@
+{
+  "faces": [
+    {
+      "name": "Tropical Island",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Forest"
+          },
+          {
+            "type": "Island"
+          }
+        ],
+        "types": [
+          {
+            "type": "Land"
+          }
+        ]
+      }
+    }
+  ]
+}

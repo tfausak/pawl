@@ -1,0 +1,22 @@
+{
+  "faces": [
+    {
+      "name": "Underground Sea",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Island"
+          },
+          {
+            "type": "Swamp"
+          }
+        ],
+        "types": [
+          {
+            "type": "Land"
+          }
+        ]
+      }
+    }
+  ]
+}

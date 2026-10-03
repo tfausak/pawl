@@ -179,6 +179,11 @@ to agents as written. What it doesn't say:
   disagreement. Everything under `_scratch/` is gitignored and may be absent
   --- a skipped step, not a blocked one.
 
+- A card whose whole text is keywords is ingested, never hand-written: `jq -f
+  script/ingest/candidates.jq` over the dump, then `pawl ingest` on the result.
+  Its `data/oracle/` sidecar is what `Pawl.OracleSpec` checks the card against,
+  and the ingest names on stderr every pool card that disagrees with MTGJSON.
+
 - When no printing can reach the rule, write `data/cards/synthetic-*.json`.
   Search first: a real card wins whenever one exists, in the order regular >
   Arena > playtest > un-set > synthetic (`docs/design.md` section 6), and a

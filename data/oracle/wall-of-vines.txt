@@ -1,0 +1,2 @@
+Defender (This creature can't attack.)
+Reach (This creature can block creatures with flying.)

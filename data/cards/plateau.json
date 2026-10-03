@@ -1,0 +1,22 @@
+{
+  "faces": [
+    {
+      "name": "Plateau",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Mountain"
+          },
+          {
+            "type": "Plains"
+          }
+        ],
+        "types": [
+          {
+            "type": "Land"
+          }
+        ]
+      }
+    }
+  ]
+}

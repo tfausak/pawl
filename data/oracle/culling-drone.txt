@@ -1,0 +1,2 @@
+Devoid (This card has no color.)
+Ingest (Whenever this creature deals combat damage to a player, that player exiles the top card of their library.)

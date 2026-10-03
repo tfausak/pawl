@@ -163,6 +163,16 @@ index loaded =
 cardPath :: FilePath -> Slug.Slug -> FilePath
 cardPath root slug = root <> "/" <> Text.unpack (Slug.unwrap slug) <> ".json"
 
+-- The default root of the Oracle-text sidecars, data/oracle beside the cards:
+-- one text file per card ingested from MTGJSON, which Pawl.OracleSpec checks
+-- the card file against (#9).
+oracleRoot :: IO FilePath
+oracleRoot = Paths.getDataFileName "oracle"
+
+-- Where the sidecar of the card filed under a given slug lives.
+oraclePath :: FilePath -> Slug.Slug -> FilePath
+oraclePath root slug = root <> "/" <> Text.unpack (Slug.unwrap slug) <> ".txt"
+
 -- What a card file's bytes mean. Pure, and separate from reading them, because
 -- that is exactly what a lookup and the corpus-wide lints agree about; they
 -- disagree about how to obtain the bytes and about what a failure to obtain

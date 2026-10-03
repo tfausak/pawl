@@ -1,0 +1,2 @@
+Haste (This creature can attack and {T} as soon as it comes under your control.)
+Exalted (Whenever a creature you control attacks alone, that creature gets +1/+1 until end of turn.)

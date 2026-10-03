@@ -1,0 +1,2 @@
+Flying
+Double strike (This creature deals both first-strike and regular combat damage.)

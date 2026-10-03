@@ -1,0 +1,3 @@
+Double strike (This creature deals both first-strike and regular combat damage.)
+Vigilance (Attacking doesn't cause this creature to tap.)
+Trample (This creature can deal excess combat damage to the player or planeswalker it's attacking.)

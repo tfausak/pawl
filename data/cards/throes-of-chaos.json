@@ -1,0 +1,37 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Cascade"
+        },
+        {
+          "type": "Retrace"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Throes of Chaos",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}
