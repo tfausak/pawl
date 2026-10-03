@@ -1227,7 +1227,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
           ability : _ -> concatMap (Maybe.mapMaybe landTypeSet . Foldable.toList . Mode.allEffects) (Modal.modes (ActivatedAbility.modal ability))
           [] -> []
         landTypeSet effect = case effect of
-          Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ (Modification.SetLandSubtype st) _) -> Just st
+          Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ (Modification.SetLandSubtype st) _ _) -> Just st
           _ -> Nothing
     -- The control: unhacked, the printed word stands.
     Spec.assertEqWith s "unhacked, the ability sets Island" (setsTo plain) [Subtype.Type.Island]
