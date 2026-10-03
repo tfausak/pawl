@@ -201,6 +201,12 @@ data View = MkView
     -- A key of `targets` missing here is a target whose object is gone (CR
     -- 608.2b), and the atom answers False for it rather than guessing.
     targetViews :: Map.Map Recipient.Recipient View,
+    -- CR 601.2c: how many targets the candidate has, an object counted once per
+    -- instance of the word "target" that chose it -- the ARITY `targets` above
+    -- forgets by taking the union. Filled beside it by
+    -- Pawl.Engine.Projection.View.targetCountOfStackObject; zero wherever
+    -- `targets` is empty.
+    targetCount :: Natural.Natural,
     -- Which object this view is OF. Nothing for a printed card off the
     -- battlefield, which is not an object -- so IsSource is vacuously False
     -- there, the same posture power and controller already take.
@@ -810,6 +816,7 @@ playerView pid =
       -- CR 115.1: a player is never on the stack, so targets nothing.
       targets = Set.empty,
       targetViews = Map.empty,
+      targetCount = 0,
       identity = Nothing,
       playerIdentity = Just pid,
       -- CR 506.3: only a creature can attack, and a player is not one.
@@ -1857,6 +1864,12 @@ matches context view predicate = case predicate of
   Filter.TargetsOnlyOne f -> case Set.toList (targets view) of
     [r] -> maybe False (\target -> matches context target f) (Map.lookup r (targetViews view))
     _ -> False
+  -- Arity alone, and counted per instance rather than per recipient: a spell
+  -- aimed at one creature through two "target" words has two targets, which
+  -- Deflection's ruling refuses ("targets the same player or object multiple
+  -- times") and TargetsOnlyOne above admits. Pawl.TargetSpec's Deflection group
+  -- proves it.
+  Filter.HasSingleTarget -> targetCount view == 1
   -- The atom above without "only": ANY target's view the nest matches, in the
   -- same context, so "a permanent YOU control" (Rebuff the Wicked) reads the
   -- evaluating source's controller and never the candidate's. CR 115.9b ignores
@@ -2359,6 +2372,7 @@ rewrite pairs predicate = case predicate of
   -- swaps.
   Filter.TargetsSource -> predicate
   Filter.TargetsOnlySource -> predicate
+  Filter.HasSingleTarget -> predicate
   -- DESCENDED into, unlike the two atoms above: the nest describes an OBJECT and
   -- so may name a subtype -- Precursor Golem's "targets only a single Golem" is
   -- the shape a CR 612.1 swap would find there.
@@ -3112,6 +3126,7 @@ bakeBound players predicate = case predicate of
   -- slot.
   Filter.TargetsSource -> predicate
   Filter.TargetsOnlySource -> predicate
+  Filter.HasSingleTarget -> predicate
   -- DESCENDED into for the reason AttachedTo below is: the nest is a description
   -- of another object and may name a bound slot, which this function's pairing
   -- with overBoundSlots requires be baked here and reported there.
@@ -3293,6 +3308,7 @@ manaValueThresholds predicate = case predicate of
   Filter.IsObject _ -> []
   Filter.TargetsSource -> []
   Filter.TargetsOnlySource -> []
+  Filter.HasSingleTarget -> []
   -- Descended into for AttachedTo's reason: the nest is a description of another
   -- object and may carry a mana-value bound of its own.
   Filter.TargetsOnlyOne f -> manaValueThresholds f
@@ -3463,6 +3479,7 @@ statesAQuality predicate = case predicate of
   -- card in a library targets nothing.
   Filter.TargetsSource -> True
   Filter.TargetsOnlySource -> True
+  Filter.HasSingleTarget -> True
   Filter.TargetsOnlyOne _ -> True
   Filter.TargetsMatching _ -> True
   Filter.TargetsPlayer _ -> True

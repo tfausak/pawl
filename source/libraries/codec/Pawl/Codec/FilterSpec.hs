@@ -270,6 +270,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.TargetsOnlySource
       " {\"type\":\"TargetsOnlySource\"} "
+  Spec.it s "HasSingleTarget" $
+    Common.assertCodec
+      s
+      codec
+      Filter.HasSingleTarget
+      " {\"type\":\"HasSingleTarget\"} "
   Spec.it s "TargetsOnlyOne" $
     Common.assertCodec
       s

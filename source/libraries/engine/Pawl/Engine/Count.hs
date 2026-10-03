@@ -354,6 +354,7 @@ bakePerspective viewOf context gs candidate predicate =
         Filter.Type.IsObject _ -> predicate
         Filter.Type.TargetsSource -> predicate
         Filter.Type.TargetsOnlySource -> predicate
+        Filter.Type.HasSingleTarget -> predicate
         -- NOT descended into, for the reason AttachedTo below is not: `candidate` here
         -- is a PLAYER, and CR 115.1 puts no player on the stack, so
         -- Pawl.Engine.Filter answers this atom False for a player candidate whatever
@@ -1151,6 +1152,7 @@ viewOfSnapshot deploy mController mOwner isToken counters snapshot =
       -- was on it, and records no announcement -- `zone` above's reason.
       Filter.targets = Set.empty,
       Filter.targetViews = Map.empty,
+      Filter.targetCount = 0,
       Filter.identity = Nothing,
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,
