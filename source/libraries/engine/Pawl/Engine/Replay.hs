@@ -92,6 +92,7 @@ encode p answer = case p of
   Prompt.ChooseCounterRemovalAmong {} -> Response.ChoseCounterRemovalAmong answer
   Prompt.ChooseCounterRemovalAtLeast {} -> Response.ChoseCounterRemovalAtLeast answer
   Prompt.ChooseCounterRemovalUpTo {} -> Response.ChoseCounterRemovalUpTo answer
+  Prompt.ChooseCounterDistribution {} -> Response.ChoseCounterDistribution answer
   Prompt.ChooseMixedCounterRemoval {} -> Response.ChoseMixedCounterRemoval answer
   Prompt.ChooseVote {} -> Response.ChoseVote answer
   Prompt.ChooseVoteWord {} -> Response.ChoseVoteWord answer
@@ -345,6 +346,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseCounterRemovalUpTo {} -> case response of
     Response.ChoseCounterRemovalUpTo division -> Just division
+    _ -> Nothing
+  Prompt.ChooseCounterDistribution {} -> case response of
+    Response.ChoseCounterDistribution division -> Just division
     _ -> Nothing
   Prompt.ChooseMixedCounterRemoval {} -> case response of
     Response.ChoseMixedCounterRemoval division -> Just division
@@ -854,6 +858,8 @@ defaultAnswer p = case p of
   Prompt.ChooseCounterRemovalAtLeast _ _ _ least offered -> Cost.fillInOrder least offered
   -- Under a cap, removing nothing is an answer.
   Prompt.ChooseCounterRemovalUpTo {} -> Map.empty
+  -- CR 608.2d: the whole total on the first candidate, a legal division.
+  Prompt.ChooseCounterDistribution _ _ _ total candidates -> Map.singleton (NonEmpty.head candidates) total
   -- The same by permanent and kind, off the first permanent alone under a
   -- spread FromOne, whose offer holds only permanents carrying the count.
   Prompt.ChooseMixedCounterRemoval _ _ _ spread owed offered -> Cost.fillMixedInOrder spread owed offered

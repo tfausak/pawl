@@ -3311,6 +3311,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.RedirectDamage {} -> False
   Effect.Counter {} -> False
   Effect.PutCounters {} -> False
+  Effect.DistributeCounters {} -> False
   -- CR 122.1 / 608.2d: a permanent bearing none of the kind has none of
   -- them to lose.
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind quantity slot _) -> case legalOne slot legal >>= Recipient.objectOf of
@@ -8668,6 +8669,34 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       Just n ->
         Monad.when (n > 0) . Event.simultaneously . Monad.forM_ targets $ \target ->
           Event.putCounters (CounterCause.ByEffect controller) target kind (Integer.toNaturalSaturating n)
+  Effect.DistributeCounters (PutCounters.MkPutCounters kind quantity ref) -> do
+    -- CR 608.2d: the resolving controller chooses which of the permanents the
+    -- ref names get counters and how many, each chosen one at least one, the
+    -- whole total placed. Untargeted, so the set is swept as this instruction is
+    -- reached (CR 608.2c) and a permanent an earlier instruction tapped is in it
+    -- (Crashing Wave). One candidate leaves one division, and is not asked.
+    gs <- State.get
+    let viewOf = effectViewOf source legal gs
+        context = effectContext gs controller source legal (slotBindings resolving gs)
+        candidates = ListUtils.nubOrd (objectRefObjects legal resolving controller source gs ref)
+    case (Quantity.evaluateFor viewOf context gs resolving source quantity, NonEmpty.nonEmpty candidates) of
+      (Just n, Just offered) | n > 0 -> do
+        let total = Integer.toNaturalSaturating n
+            fallback = Map.singleton (NonEmpty.head offered) total
+        division <- case offered of
+          _ NonEmpty.:| [] -> pure fallback
+          _ -> do
+            answer <- Game.choose (Prompt.ChooseCounterDistribution (Decide.deciderFor controller gs) controller source total offered)
+            -- An answer that does not divide the total among offered
+            -- permanents takes the replay default rather than a repair. A
+            -- regression fence, not a proved behaviour: the scenario runner
+            -- refuses an unoffered answer before it reaches here.
+            pure (if distributes total offered answer then answer else fallback)
+        -- One action on several objects, so one placement event (CR 608.2f):
+        -- Effect.PutCounters' bracket.
+        Event.simultaneously . Monad.forM_ (Map.toList division) $ \(target, count) ->
+          Event.putCounters (CounterCause.ByEffect controller) target kind count
+      _ -> pure ()
   Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom fromSlot kind ref) -> do
     gs <- State.get
     -- CR 122.8: put the counters the `from` object HAD onto every permanent the
@@ -10930,6 +10959,14 @@ bindPlayerSlot holder slot players gs =
 -- kind, the ones carrying none dropped.
 removableAmong :: GameState -> WhichCounters.WhichCounters Keyword.Type.Keyword -> [ObjectId] -> Map.Map ObjectId (Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural)
 removableAmong gs which candidates = Map.filter (not . Map.null) (Map.fromList [(candidate, Cost.removableCounters which candidate gs) | candidate <- candidates])
+
+-- CR 608.2d: does this answer divide the total among offered permanents, each
+-- one it names getting at least one?
+distributes :: Natural -> NonEmpty.NonEmpty ObjectId -> Map.Map ObjectId Natural -> Bool
+distributes total offered answer =
+  sum answer == total
+    && all (> 0) answer
+    && all (`elem` offered) (Map.keys answer)
 
 -- The objects a RemoveCountersAmong names that carry the kind, with how many
 -- each carries: Pawl.Engine.Cost.spreadRemovalCandidates' shape.

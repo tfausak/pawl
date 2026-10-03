@@ -1,0 +1,200 @@
+{
+  "description": "CR 608.2d Crashing Wave divides three stun counters among tapped creatures an opponent controls, as alice chooses",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island"
+          },
+          {
+            "card": "Island",
+            "label": "island-2"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "alice-piker",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Crashing Wave",
+            "label": "crashing-wave"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Hill Giant",
+            "label": "hill-giant"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "bob-piker",
+            "tapped": true
+          },
+          {
+            "card": "Ogre Sentry",
+            "label": "ogre-sentry"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$crashing-wave",
+          "targets": [
+            "$hill-giant"
+          ],
+          "x": 1,
+          "cost": [
+            {
+              "type": "OfType",
+              "value": {
+                "type": "Colored",
+                "value": {
+                  "type": "Blue"
+                }
+              }
+            },
+            {
+              "type": "OfType",
+              "value": {
+                "type": "Colored",
+                "value": {
+                  "type": "Blue"
+                }
+              }
+            }
+          ],
+          "mana": [
+            "$island",
+            "$island-2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Answer": {
+          "prompt": "ChooseCounterDistribution",
+          "with": [
+            [
+              "$hill-giant",
+              2
+            ],
+            [
+              "$alice-piker",
+              1
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Answer": {
+          "prompt": "ChooseCounterDistribution",
+          "with": [
+            [
+              "$hill-giant",
+              2
+            ],
+            [
+              "$ogre-sentry",
+              1
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseCounterDistribution",
+          "with": [
+            [
+              "$hill-giant",
+              2
+            ],
+            [
+              "$bob-piker",
+              1
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "$hill-giant",
+          "kind": {
+            "type": "Stun"
+          },
+          "count": 2
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "$bob-piker",
+          "kind": {
+            "type": "Stun"
+          },
+          "count": 1
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Tapped": {
+        "object": "$alice-piker",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$ogre-sentry",
+        "tapped": false
+      }
+    }
+  ],
+  "note": "Waterbend {X} at 1 taps alice's Piker, the only permanent it can tap and so unprompted, and the spell taps its target, the Hill Giant, before the division: the Giant is offered because the sweep is read after the tap (CR 608.2c). Alice's tapped Piker is not an opponent's and the Ogre Sentry is untapped, so an answer naming either is refused as unoffered; the answer splitting two onto the Giant and one onto bob's tapped Piker lands as chosen."
+}
