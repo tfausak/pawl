@@ -225,7 +225,7 @@ data Modification ability
     --
     -- Payload-free because the subtype is DERIVED at projection time from the
     -- source rather than baked into card data, the posture AddChosenColor takes
-    -- toward Object.chosenColor: a static ability's modification is card data
+    -- toward Object.chosenColors: a static ability's modification is card data
     -- and cannot name a type a player will choose, which is why this is a second
     -- constructor rather than a field on SetLandSubtype above.
     --
@@ -413,7 +413,7 @@ data Modification ability
     AddColor (Set.Set Color.Color)
   | -- | layer 5, CR 613.1e / 105.3: this object gains, IN ADDITION to its other
     -- colours, the colour chosen for THIS effect's SOURCE as that source entered
-    -- (Object.chosenColor). Painter's Servant's "the chosen color".
+    -- (Object.chosenColors). Painter's Servant's "the chosen color".
     --
     -- Payload-free because the colour is DERIVED at projection time from the
     -- source rather than baked into card data: a static ability's modification

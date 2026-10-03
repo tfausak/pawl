@@ -1818,7 +1818,7 @@ aimedAttackRestrictionSpec s registry = Spec.describe s "AimedAttackRestriction"
     let (gs, mine, theirs) = S.combatBoardOf [piker, maiden] [moat]
     case (mine, theirs) of
       ([pikerId, maidenId], [moatId]) -> do
-        let choosing color = gs {GameState.objects = Map.adjust (\o -> o {Object.chosenColor = Just color}) moatId (GameState.objects gs)}
+        let choosing color = gs {GameState.objects = Map.adjust (\o -> o {Object.chosenColors = Set.singleton color}) moatId (GameState.objects gs)}
         Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [pikerId] (choosing Color.Red))) "red chosen: the red Piker may not attack bob"
         Spec.assertBool s (Combat.legalAttackDeclaration S.alice [pikerId] (choosing Color.Green)) "green chosen: the red Piker may"
         Spec.assertBool s (Combat.legalAttackDeclaration S.alice [maidenId] (choosing Color.Red)) "red chosen: the red Bird Maiden flies, so it may"

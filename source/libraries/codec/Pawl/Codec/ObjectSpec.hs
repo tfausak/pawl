@@ -78,7 +78,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.counters = Map.empty,
           Object.counterTimestamps = Map.empty,
           Object.attachedTo = Nothing,
-          Object.chosenColor = Nothing,
+          Object.chosenColors = Set.empty,
           Object.chosenSubtype = Nothing,
           Object.chosenNames = Set.empty,
           Object.chosenPlayer = Nothing,
@@ -173,7 +173,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
               ],
           Object.counterTimestamps = Map.singleton CounterKind.PlusOnePlusOne (Timestamp.MkTimestamp 7),
           Object.attachedTo = Just (Recipient.ToCreature (ObjectId.MkObjectId 8)),
-          Object.chosenColor = Just Color.Red,
+          Object.chosenColors = Set.singleton Color.Red,
           Object.chosenSubtype = Just Subtype.Goblin,
           Object.chosenNames = Set.singleton (CardName.MkCardName (Text.pack "Mountain")),
           Object.chosenPlayer = Just (PlayerId.MkPlayerId 9),
@@ -251,7 +251,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",{\"key\":{\"type\":\"Loyalty\"},\"value\":0}]"
           <> ",\"counterTimestamps\":[{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"timestamp\":7}]"
           <> ",\"attachedTo\":{\"type\":\"ToCreature\",\"value\":8}"
-          <> ",\"chosenColor\":{\"type\":\"Red\"},\"chosenSubtype\":{\"type\":\"Goblin\"}"
+          <> ",\"chosenColors\":[{\"type\":\"Red\"}],\"chosenSubtype\":{\"type\":\"Goblin\"}"
           <> ",\"chosenNames\":[\"Mountain\"],\"chosenPlayer\":9"
           <> ",\"timestamp\":10,\"face\":\"Delver of Secrets\",\"turnedOverAt\":11"
           <> ",\"worldSince\":12"

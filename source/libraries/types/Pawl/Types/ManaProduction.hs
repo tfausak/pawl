@@ -21,7 +21,7 @@ data ManaProduction
     -- Heart's "{T}: Add one mana of the chosen color", linked to its "As this
     -- artifact enters, choose a color".
     --
-    -- Read off Object.chosenColor, which is where CR 614.1c's entry rewrite
+    -- Read off Object.chosenColors, which is where CR 614.1c's entry rewrite
     -- writes -- the same field Modification.AddChosenColor reads for Painter's
     -- Servant, and the same link CR 607.2d describes. NOT A CHOICE: the colour is
     -- already settled, so producedTypes offers one option and nothing prompts,

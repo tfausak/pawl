@@ -46,9 +46,9 @@ data EntryRewrite ability effect
   | -- | CR 614.1c decided by CR 705.2's winnerless flip / Molten Sentry: the arm
     -- above's options, picked by a coin rather than by the controller.
     ChoiceByCoinFlip EntryFlip.EntryFlip
-  | -- | CR 614.1c / Painter's Servant: choose a colour as this enters, written to
-    -- Object.chosenColor. Nullary -- CR 105.1's five colours are the offer.
-    ChooseColor
+  | -- | CR 614.1c / Painter's Servant, Tablet of the Guilds: choose that many
+    -- different colours as this enters, written to Object.chosenColors.
+    ChooseColors Natural.Natural
   | -- | CR 614.1c / Convincing Mirage: choose a basic land type as this enters,
     -- written to Object.chosenSubtype. Nullary -- CR 305.6's five types are the
     -- offer.

@@ -761,7 +761,7 @@ lastKnownRiderSpec s registry =
                     -- CR 614.1c: nothing here chose a player.
                     LastKnown.chosenPlayer = Nothing,
                     -- CR 614.1c: nor a colour or a subtype.
-                    LastKnown.chosenColor = Nothing,
+                    LastKnown.chosenColors = Set.empty,
                     LastKnown.chosenSubtype = Nothing,
                     -- CR 508.1k / 509.1g: this board declares no combat at all.
                     LastKnown.attacking = False,

@@ -1068,7 +1068,7 @@ cardObject pid under printingId dest tapped ts =
       Object.counters = Map.empty,
       Object.counterTimestamps = Map.empty,
       Object.attachedTo = Nothing,
-      Object.chosenColor = Nothing,
+      Object.chosenColors = Set.empty,
       Object.chosenSubtype = Nothing,
       Object.chosenNames = Set.empty,
       Object.chosenPlayer = Nothing,
@@ -1298,7 +1298,7 @@ createEmblem pid card = do
                 Object.counters = Map.empty,
                 Object.counterTimestamps = Map.empty,
                 Object.attachedTo = Nothing,
-                Object.chosenColor = Nothing,
+                Object.chosenColors = Set.empty,
                 Object.chosenSubtype = Nothing,
                 Object.chosenNames = Set.empty,
                 Object.chosenPlayer = Nothing,
@@ -2469,34 +2469,42 @@ apply batch candidate event =
                 )
             )
         pure (Just event)
-      -- CR 614.1c: Painter's Servant's as-enters colour choice. Unlike ChoiceOf
-      -- above, this is asked every time the entering object has a controller to
-      -- ask: CR 105.1's five colours are always all legal and always
-      -- distinguishable, so there is no one-option case to elide.
+      -- CR 614.1c: Painter's Servant's and Tablet of the Guilds' as-enters
+      -- colour choices, one prompt per colour, each offering the CR 105.1
+      -- colours not yet chosen ("two colors" are two different ones). Unlike
+      -- ChoiceOf above, a prompt is raised whenever two or more remain; only a
+      -- fifth colour would be forced.
       --
-      -- Written to Object.chosenColor, NOT to the copiable snapshot -- see
-      -- EntryRewrite.ChooseColor.
-      EntryRewrite.ChooseColor -> do
-        gs <- State.get
-        picked <- case Projection.controllerOf oid gs of
-          -- Unreachable, and defensive for ChoiceOf's reason: the object is
-          -- materialized on the battlefield before this loop runs, so
-          -- controllerOf falls back to its owner. A WEAKER fallback than
-          -- ChoiceOf's, and the one place on this path the engine would decide
-          -- something: there is no colour the card named to default to, so white
-          -- is conjured. It stands only because the branch cannot be reached.
-          Nothing -> pure Color.White
-          Just controller -> do
-            let decider = Decide.deciderFor controller gs
-            Game.choose (Prompt.ChooseColor decider controller oid)
+      -- Written to Object.chosenColors, NOT to the copiable snapshot -- see
+      -- EntryRewrite.ChooseColors.
+      EntryRewrite.ChooseColors count -> do
+        let pick chosen _ = do
+              gs <- State.get
+              case (Projection.controllerOf oid gs, filter (`Set.notMember` chosen) [minBound .. maxBound :: Color.Color]) of
+                (_, []) -> pure chosen
+                (_, [only]) -> pure (Set.insert only chosen)
+                -- Unreachable, and defensive for ChoiceOf's reason: the object is
+                -- materialized on the battlefield before this loop runs, so
+                -- controllerOf falls back to its owner. A WEAKER fallback than
+                -- ChoiceOf's, and the one place on this path the engine would
+                -- decide something: there is no colour the card named to default
+                -- to, so the first offered is conjured. It stands only because the
+                -- branch cannot be reached.
+                (Nothing, first : _) -> pure (Set.insert first chosen)
+                (Just controller, first : second : more) -> do
+                  answer <- Game.choose (Prompt.ChooseColor (Decide.deciderFor controller gs) controller oid (first NonEmpty.:| (second : more)))
+                  -- Filtered, not trusted: an answer outside the offer falls
+                  -- back to its first colour, since the choice is mandatory.
+                  pure (Set.insert (if List.elem answer (first : second : more) then answer else first) chosen)
+        picked <- Monad.foldM pick Set.empty [1 .. count]
         Replacement.consume (ReplacementCandidate.identity candidate)
         State.modify' $ \g ->
-          let stamp o = o {Object.chosenColor = Just picked}
+          let stamp o = o {Object.chosenColors = picked}
            in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
         pure (Just event)
       -- CR 614.1c: Convincing Mirage's as-enters basic land type choice. Asked
       -- every time the entering object has a controller to ask, for
-      -- ChooseColor's reason just above: CR 305.6's five basic land types are
+      -- ChooseColors' reason just above: CR 305.6's five basic land types are
       -- always all legal and always distinguishable, so there is no one-option
       -- case to elide.
       --
@@ -2508,7 +2516,7 @@ apply batch candidate event =
           -- Unreachable, and defensive for ChoiceOf's reason: the object is
           -- materialized on the battlefield before this loop runs, so
           -- controllerOf falls back to its owner. The same WEAKER fallback
-          -- ChooseColor's arm carries, and for the same reason: no type the card
+          -- ChooseColors' arm carries, and for the same reason: no type the card
           -- named to default to, so Mountain is conjured.
           Nothing -> pure Subtype.Mountain
           Just controller -> do
@@ -2560,7 +2568,7 @@ apply batch candidate event =
           -- Unreachable, and defensive for ChoiceOf's reason: the object is
           -- materialized on the battlefield before this loop runs, so
           -- controllerOf falls back to its owner. Chooses NOBODY rather than
-          -- conjuring a seat the way ChooseColor's arm conjures white, because a
+          -- conjuring a seat the way ChooseColors' arm conjures a colour, because a
           -- player is a real board object where a colour is not -- and CR 101.3
           -- already ignores the share of a later instruction that names nobody.
           (Nothing, _) -> pure Nothing
@@ -3203,7 +3211,7 @@ apply batch candidate event =
       -- NEVER ELIDED. A +1/+1 counter and haste are two outcomes a player can
       -- tell apart on any board -- the whole reason the keyword exists -- so this
       -- prompt is raised every time the entering object has a controller to ask,
-      -- the posture ChooseColor's arm takes and not ChoiceOf's one-option
+      -- the posture ChooseColors' arm takes and not ChoiceOf's one-option
       -- elision.
       --
       -- The counter goes into the pending map, exactly as the WithCounters arm
@@ -6483,7 +6491,7 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                         -- id moves before its host, and the live board has already
                         -- forgotten it. Pawl.ZoneTriggerSpec's "the Equipment dying
                         -- in the same batch, ahead of its host" is the proof.
-                        GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Game.attachments oid lki) (Object.chosenNames obj) (Object.chosenPlayer obj) (Object.chosenColor obj) (Object.chosenSubtype obj) (Game.isAttacking oid gs) (Game.attackTargetOf oid gs) (Game.isBlocking oid gs) (Object.protector obj) (Object.paidCosts obj) (Object.controlClock obj) (Object.zone obj)) (GameState.lastKnown g1),
+                        GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Game.attachments oid lki) (Object.chosenNames obj) (Object.chosenPlayer obj) (Object.chosenColors obj) (Object.chosenSubtype obj) (Game.isAttacking oid gs) (Game.attackTargetOf oid gs) (Game.isBlocking oid gs) (Object.protector obj) (Object.paidCosts obj) (Object.controlClock obj) (Object.zone obj)) (GameState.lastKnown g1),
                         -- CR 608.2h's record for a STACK object, filed in the same
                         -- write and from the same board as `lastKnown` above, which
                         -- cannot keep it: rule 707.10 copies the DECISIONS, and CR
@@ -7891,7 +7899,7 @@ createTokens controller card copy n tapped entering attached = do
                       Object.counters = Map.empty,
                       Object.counterTimestamps = Map.empty,
                       Object.attachedTo = Nothing,
-                      Object.chosenColor = Nothing,
+                      Object.chosenColors = Set.empty,
                       Object.chosenSubtype = Nothing,
                       Object.chosenNames = Set.empty,
                       Object.chosenPlayer = Nothing,
@@ -8154,7 +8162,7 @@ meld controller victims resultCard = do
                 Object.counters = Map.empty,
                 Object.counterTimestamps = Map.empty,
                 Object.attachedTo = Nothing,
-                Object.chosenColor = Nothing,
+                Object.chosenColors = Set.empty,
                 Object.chosenSubtype = Nothing,
                 Object.chosenNames = Set.empty,
                 Object.chosenPlayer = Nothing,
@@ -8536,7 +8544,7 @@ forgetObject gs oid = case Game.lookupObject oid gs of
         cleared = Game.removeFromZones (Object.owner obj) oid gs
      in cleared
           { GameState.objects = Map.delete oid (GameState.objects cleared),
-            GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Game.attachments oid gs) (Object.chosenNames obj) (Object.chosenPlayer obj) (Object.chosenColor obj) (Object.chosenSubtype obj) (Game.isAttacking oid gs) (Game.attackTargetOf oid gs) (Game.isBlocking oid gs) (Object.protector obj) (Object.paidCosts obj) (Object.controlClock obj) (Object.zone obj)) (GameState.lastKnown cleared)
+            GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Game.attachments oid gs) (Object.chosenNames obj) (Object.chosenPlayer obj) (Object.chosenColors obj) (Object.chosenSubtype obj) (Game.isAttacking oid gs) (Game.attackTargetOf oid gs) (Game.isBlocking oid gs) (Object.protector obj) (Object.paidCosts obj) (Object.controlClock obj) (Object.zone obj)) (GameState.lastKnown cleared)
           }
 
 -- CR 119.3: move one player's life total by this much, and record the CR 608.2i

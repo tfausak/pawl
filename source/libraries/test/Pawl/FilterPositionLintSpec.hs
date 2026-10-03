@@ -632,9 +632,10 @@ hasChosenNameTag = Text.pack "HasChosenName"
 -- SourceHostFramed and not `hostFramed`: since #3320 that tag means an effect's
 -- ObjectRef and nothing else, which is what makes it admissible here. The
 -- positions it used to share the tag with carry StandingHostFramed and are
--- REJECTED -- CR 604.2's clause and CR 603.4's intervening "if" are each read
--- outside a resolution, through Filter.contextFor or Filter.contextWithSlots,
--- where sourceChosenNames is empty.
+-- REJECTED -- CR 604.2's clause is read outside a resolution, through
+-- Filter.contextFor, where sourceChosenNames is empty. CR 603.4's intervening
+-- "if" shares that tag although Pawl.Engine.SourceContext fills its context, so
+-- it is rejected too.
 -- The self-test below plants the atom in a static condition and expects the
 -- offence.
 --
@@ -658,10 +659,12 @@ hasChosenNameCounts card =
 -- (Pawl.Engine.PlayerEffect.contextFor). Filter.contextFor, Filter.contextWithSlots,
 -- Filter.contextComparingPower and
 -- Pawl.Engine.Target.admittedGiven all leave it empty, so Filter.HasChosenName in
--- a target slot, a static ability's CR 604.2 condition or a triggered ability's
--- CR 603.4 intervening "if" is a silent False rather than a rejected card. This is where that is made loud -- the three condition
+-- a target slot or a static ability's CR 604.2 condition is a silent False
+-- rather than a rejected card. This is where that is made loud -- the three condition
 -- positions through StandingHostFramed, which #3320 split off SourceHostFramed
--- precisely so this allowlist could refuse them.
+-- precisely so this allowlist could refuse them. A triggered ability's CR 603.4
+-- intervening "if" shares that tag, and is refused with them although its
+-- context is filled (Pawl.Engine.Event.Trigger.interveningHolds).
 --
 -- The positions hasChosenNameCounts admits are narrower than that, on
 -- purpose: see its own note. So a card rejected here is not necessarily one the
@@ -706,7 +709,7 @@ chosenValueCounts admitted tag card =
       inSpell = total (`elem` admitted) (modalFilters (Face.spell card))
    in (total (`elem` admitted) (cardFilters card) - inSpell, total (`notElem` admitted) (cardFilters card) + inSpell)
 
--- CR 105.2's chosen colour is answerable only where Filter.Context.sourceChosenColor
+-- CR 105.2's chosen colour is answerable only where Filter.Context.sourceChosenColors
 -- is filled: a static ability's or a combat restriction's affected set
 -- (Pawl.Engine.Projection.affectsWith),
 -- an ability's target slot (Pawl.Engine.Target.slotContext), an activated
@@ -714,8 +717,11 @@ chosenValueCounts admitted tag card =
 -- Pawl.Engine.Replacement.matchesPermanent), a trigger condition
 -- (Pawl.Engine.Event.Match) and every position of a resolution
 -- (Pawl.Engine.Resolve.Slots.effectContext) -- plus a static grant's bare
--- protection quality (grantedChosenColors). Everywhere else -- a CR 604.2 or
--- CR 603.4 clause, an attach destination -- it is a silent False.
+-- protection quality (grantedChosenColors). Everywhere else -- a CR 604.2
+-- clause, an attach destination -- it is a silent False. A CR 603.4 clause is
+-- filled (Tablet of the Guilds reads its colours there through
+-- Quantity.ChosenColorsItIs) but shares StandingHostFramed with CR 604.2's, so
+-- the atom is refused there too.
 hasChosenColorCounts :: Face.Face Card.Type.Card -> (Int, Int)
 hasChosenColorCounts card =
   let (framed, elsewhere) = chosenValueCounts chosenValuePositions hasChosenColorTag card

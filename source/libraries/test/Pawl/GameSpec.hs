@@ -192,7 +192,7 @@ gameSpec s registry = Spec.describe s "Game" $ do
               Object.counters = Map.empty,
               Object.counterTimestamps = Map.empty,
               Object.attachedTo = Nothing,
-              Object.chosenColor = Nothing,
+              Object.chosenColors = Set.empty,
               Object.chosenSubtype = Nothing,
               Object.chosenNames = Set.empty,
               Object.chosenPlayer = Nothing,
@@ -680,7 +680,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     -- The card-driven proof for Setup.startGameFromCards' hand-written zone
     -- move. Painter's Servant is CAST rather than placed, because CR 614.1c's
     -- colour choice happens only on the entry path (Event.runEntry) -- a
-    -- Servant put straight onto the battlefield has chosenColor = Nothing and
+    -- Servant put straight onto the battlefield has chosenColors = Set.empty and
     -- this test would assert nothing. S.identityAnswer answers ChooseColor with
     -- white, which is all this needs: WHICH colour it chose does not matter,
     -- only that it chose one.
@@ -727,9 +727,9 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
         -- going in, and the object that carried it is still the same object,
         -- sitting in a library, coming out.
         (Just before, Just rebuilt) -> do
-          Spec.assertBool s (Maybe.isJust (Object.chosenColor before)) "CR 614.1c: the cast Servant chose a colour as it entered"
+          Spec.assertBool s (not (Set.null (Object.chosenColors before))) "CR 614.1c: the cast Servant chose a colour as it entered"
           Spec.assertEqWith s "CR 727.2: the rebuilt Servant is the same object, in a library" (Object.zone rebuilt) Zone.Library
-          Spec.assertEqWith s "CR 400.7: the Servant in the library forgot the colour it chose" (Object.chosenColor rebuilt) Nothing
+          Spec.assertEqWith s "CR 400.7: the Servant in the library forgot the colour it chose" (Object.chosenColors rebuilt) Set.empty
         (_, Nothing) -> Spec.assertFailure s "the opening draw took the Servant out of the library; raise alice's pool"
         _ -> Spec.assertFailure s "the fixture lost the Servant before the restart"
       _ -> Spec.assertFailure s "Painter's Servant did not reach the battlefield"
@@ -2059,7 +2059,7 @@ handBobBolt lightningBolt gs =
             Object.counters = Map.empty,
             Object.counterTimestamps = Map.empty,
             Object.attachedTo = Nothing,
-            Object.chosenColor = Nothing,
+            Object.chosenColors = Set.empty,
             Object.chosenSubtype = Nothing,
             Object.chosenNames = Set.empty,
             Object.chosenPlayer = Nothing,
@@ -2532,7 +2532,7 @@ restartOnStack mountain =
             Object.counters = Map.empty,
             Object.counterTimestamps = Map.empty,
             Object.attachedTo = Nothing,
-            Object.chosenColor = Nothing,
+            Object.chosenColors = Set.empty,
             Object.chosenSubtype = Nothing,
             Object.chosenNames = Set.empty,
             Object.chosenPlayer = Nothing,

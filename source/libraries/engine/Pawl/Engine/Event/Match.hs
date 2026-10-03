@@ -13884,7 +13884,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
 -- PermanentTappedForMana arm above, where PlayerRelation.holds and
 -- Filter.matches are the other two.
 --
--- CR 607.2d's link is resolved by reading Object.chosenColor off the BEARER,
+-- CR 607.2d's link is resolved by reading Object.chosenColors off the BEARER,
 -- which is the object the triggered ability is on: Gauntlet of Power's "of the
 -- chosen color" means the colour its own "As this artifact enters, choose a
 -- color" settled. Pawl.Engine.Mana.producedTypes resolves ManaProduction.Chosen
@@ -13901,6 +13901,4 @@ producedSpecified gs bearer specified produced = case specified of
   -- nothing left to ask.
   ManaSpecification.AnyMana -> True
   ManaSpecification.ChosenColor ->
-    case Game.lookupObject bearer gs >>= Object.chosenColor of
-      Nothing -> False
-      Just color -> Set.member (ManaType.Colored color) produced
+    any (\color -> Set.member (ManaType.Colored color) produced) (foldMap Object.chosenColors (Game.lookupObject bearer gs))

@@ -488,7 +488,7 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- known information, since CR 608.2b re-asks the slot after the
             -- source may have left (Pawl.TargetSpec's Pentarch Paladin group).
             -- A THUNK, like its siblings.
-            Filter.sourceChosenColor = Game.chosenColorWithLastKnown source gs,
+            Filter.sourceChosenColors = Game.chosenColorsWithLastKnown source gs,
             -- The field above's sibling for "the chosen type" (From the Rubble).
             Filter.sourceChosenSubtype = Game.chosenSubtypeWithLastKnown source gs
           }

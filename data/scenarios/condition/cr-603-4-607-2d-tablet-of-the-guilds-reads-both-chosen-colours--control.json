@@ -1,0 +1,144 @@
+{
+  "description": "CR 603.4 / 607.2d Tablet of the Guilds reads both chosen colours (control: red and green, so the intervening if is false)",
+  "note": "Alice names white then blue for the Tablet, then casts the white-blue Guiding Spirit: the intervening if holds when the trigger is put on the stack and again as it resolves, and she gains 1 life for each of the two chosen colours the spell is. The control names red and green and gains nothing.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "m1",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "m2",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "m3",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "p",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "i",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Tablet of the Guilds",
+            "label": "tablet"
+          },
+          {
+            "card": "Guiding Spirit",
+            "label": "spirit"
+          }
+        ],
+        "library": [
+          {
+            "card": "Swamp"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          {
+            "card": "Island"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$tablet",
+          "mana": [
+            "$m1",
+            "$m2",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseColor",
+          "with": {
+            "type": "Red"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseColor",
+          "with": {
+            "type": "Green"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$spirit",
+          "mana": [
+            "$m3",
+            "$p",
+            "$i"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "alice",
+          "life": 20
+        }
+      }
+    }
+  ]
+}

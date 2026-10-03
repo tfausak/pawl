@@ -118,7 +118,8 @@
                 "type": "IsSource"
               },
               "rewrite": {
-                "type": "ChooseColor"
+                "type": "ChooseColors",
+                "value": 1
               }
             }
           }
