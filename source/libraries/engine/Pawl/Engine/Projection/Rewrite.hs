@@ -72,6 +72,7 @@ import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.CopyOriginal as CopyOriginal
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
+import qualified Pawl.Types.CostChoice as CostChoice
 import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
@@ -551,7 +552,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Firebend addition -> Effect.Firebend (rewriteManaAddition pairs addition)
   Effect.ActivateManaAbilities (ActivateManaAbilities.MkActivateManaAbilities ref filter_) -> Effect.ActivateManaAbilities (ActivateManaAbilities.MkActivateManaAbilities ref (Filter.rewrite pairs filter_))
   Effect.MoveMana _ -> effect
-  Effect.Search (Search.MkSearch searcher owner zones outside quantity filter_ upTo destination subject slot differentIn) -> Effect.Search (Search.MkSearch searcher owner zones outside (fmap (rewriteQuantity pairs) quantity) (Filter.rewrite pairs filter_) upTo destination subject slot differentIn)
+  Effect.Search (Search.MkSearch searcher owner zones outside quantity filter_ upTo destination subject slot differentIn exactly) -> Effect.Search (Search.MkSearch searcher owner zones outside (fmap (rewriteQuantity pairs) quantity) (Filter.rewrite pairs filter_) upTo destination subject slot differentIn exactly)
   Effect.ExileAllGraveyards -> effect
   Effect.Proliferate -> effect
   Effect.Reroll -> effect
@@ -1764,7 +1765,7 @@ rewritePayGate :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> PayGate.PayG
 rewritePayGate pairs gate =
   PayGate.MkPayGate
     { PayGate.payer = PayGate.payer gate,
-      PayGate.cost = Filter.rewriteCost pairs (PayGate.cost gate),
+      PayGate.cost = CostChoice.MkCostChoice (fmap (Filter.rewriteCost pairs) (CostChoice.unwrap (PayGate.cost gate))),
       PayGate.basis = PayGate.basis gate,
       PayGate.branch = PayGate.branch gate,
       PayGate.obligation = PayGate.obligation gate,

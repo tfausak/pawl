@@ -735,8 +735,11 @@ answerGeneric gs key kind index timed prompt = case Timed.entry timed of
     popAt key index
     chosen <- decodeAnswer verb answer
     allowed <- legalAnswer gs prompt chosen
+    -- One the runner cannot judge goes to the engine, which must ask the same
+    -- prompt again (CR 733.1), as a refused action must: answerPrompt checks
+    -- the next prompt, and settle the end of the run.
     if allowed && withinOffer prompt chosen
-      then failWith (Failure.MkUnrefusedMove key verb (Just kind))
+      then chosen <$ State.modify' (\rehearsal -> rehearsal {refusing = Just (key, verb, kind)})
       else do
         found <- takeAnswer gs (Just (When.player key)) kind
         case found of

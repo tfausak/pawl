@@ -163,6 +163,7 @@ import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostBasis as CostBasis
+import qualified Pawl.Types.CostChoice as CostChoice
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterCause as CounterCause
@@ -3976,7 +3977,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.MoveMana (MoveMana.MkMoveMana fromRef toRef) -> do
     gs <- State.get
     Mana.moveMana (apnapPlayersOf fromRef legal controller gs) (apnapPlayersOf toRef legal controller gs)
-  Effect.Search (Search.MkSearch searcherRef ownerRef zones outside quantity filter_ upTo destination subject foundSlot differentIn) ->
+  Effect.Search (Search.MkSearch searcherRef ownerRef zones outside quantity filter_ upTo destination subject foundSlot differentIn exactly) ->
     -- CR 701.23a: match each candidate through its own CR 613 projection --
     -- rule 613.1 names no zone, so a card in any of the searched zones is folded
     -- exactly as a permanent is, and CR 208.2a's characteristic-defining power
@@ -4175,10 +4176,28 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       -- card the filter admits is findable, and no more.
                       capHere = Maybe.fromMaybe (List.genericLength matches + outsideCopies) cap
                       decider = Decide.deciderFor searcher gs
+                      -- Search.exactly: the answer must be a group of as many
+                      -- cards as the zones can give, up to the count (CR 101.1,
+                      -- 609.3). Validated, not filled: which cards make up the
+                      -- group is the searcher's choice.
+                      required = mostDiffering differentIn gs capHere matches
+                      fills given = differing differentIn gs given == given && List.genericLength given == required
+                      -- RE-ASKED when short, Pawl.Engine.Engine's CR 603.3d
+                      -- shape: a repeat of an answer already refused is taken
+                      -- as it stands, since a pure decider repeats itself and
+                      -- answering on its behalf is the one thing this may not
+                      -- do. Keyed on the answer narrowed to the offer, so the
+                      -- recursion terminates.
+                      askExactly rejected = do
+                        given <- ListUtils.nubOrd . filter (`List.elem` matches) <$> Game.choose (Prompt.Search decider searcher matches capHere)
+                        if fills given || Set.member given rejected then pure given else askExactly (Set.insert given rejected)
                   answer <-
                     if Set.null searchedZones
                       then pure []
-                      else Game.choose (Prompt.Search decider searcher matches capHere)
+                      else
+                        if exactly
+                          then askExactly Set.empty
+                          else Game.choose (Prompt.Search decider searcher matches capHere)
                   -- CR 701.23a: every card found is one the filter admits.
                   -- Filtered, not trusted, deduplicated, and truncated to the cap.
                   -- What a SHORT answer leaves is the difference between CR
@@ -4212,13 +4231,17 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   -- name", "that have mana value 9"). A card that said "search
                   -- your library and graveyard for any number of cards" would
                   -- refute both.
-                  let mayDecline zone = upTo || Maybe.isNothing cap || (isHidden zone && Filter.statesAQuality filter_)
+                  --
+                  -- Search.exactly validated its answer above, which is then the
+                  -- whole find: nothing completes it.
+                  let mayDecline zone = exactly || upTo || Maybe.isNothing cap || (isHidden zone && Filter.statesAQuality filter_)
                       -- Search.differentIn: "with different names" (CR
                       -- 201.2b), "with different powers", "don't share a mana
                       -- value". Filtered, not trusted: a card sharing a value
                       -- with one kept ahead of it is dropped. The completion
                       -- below is not held to it, which no card reaches: every
-                      -- card in data/cards/ printing one says "up to".
+                      -- card in data/cards/ printing one says "up to" or
+                      -- "exactly".
                       picked = List.genericTake capHere . differing differentIn gs . ListUtils.nubOrd $ filter (\oid -> List.elem oid matches) answer
                       forced = concatMap snd (filter (not . mayDecline . fst) byZone)
                       filler = filter (\oid -> List.notElem oid picked) forced
@@ -11071,31 +11094,56 @@ outsideArrival destination = case destination of
   SearchDestination.Reveal -> Nothing
 
 -- Search.differentIn: the cards, in order, that keep the group apart -- each
--- shares no value on any named axis with a card kept ahead of it. Read off the
--- CR 613 projection, so a split card's two names count (CR 201.2a) and a star's
--- power is its characteristic-defining ability's number (CR 208.2a, 604.3). CR
--- 201.2b also demands each card HAVE a name; a card with no power or toughness
--- shares none. Values are keyed by their axis, so a power never meets a
--- toughness.
+-- shares no value on any named axis with a card kept ahead of it.
 differing :: Set.Set DifferentIn.DifferentIn -> GameState -> [ObjectId] -> [ObjectId]
 differing axes gs = go Set.empty
   where
+    go _ [] = []
+    go seen (oid : rest) = case differingValues axes gs oid of
+      Just values | Set.disjoint values seen -> oid : go (values <> seen) rest
+      _ -> go seen rest
+
+-- CR 609.3 for Search.exactly: the most cards, up to `cap`, that `differing`
+-- could keep together from `candidates` -- searched exhaustively rather than
+-- greedily, since a split card's two names (CR 201.2a) can block two cards a
+-- greedy pass would have kept apart. Cards with the same values are one
+-- candidate, which keeps the search to the distinct ones. Exhaustive rather
+-- than greedy is a REGRESSION FENCE: no board pairs a split card with a card
+-- sharing one of its names, so a greedy count reddens nothing.
+mostDiffering :: Set.Set DifferentIn.DifferentIn -> GameState -> Natural -> [ObjectId] -> Natural
+mostDiffering axes gs cap candidates = go Set.empty 0 0 distinct
+  where
+    found = Maybe.mapMaybe (differingValues axes gs) candidates
+    -- A card with no value at all shares none, so only the others collapse.
+    distinct = ListUtils.nubOrd (filter (not . Set.null) found) <> filter Set.null found
+    go seen n best rest
+      | n >= cap = cap
+      | n + List.genericLength rest <= best = best
+      | otherwise = case rest of
+          [] -> max n best
+          values : more ->
+            let taken = if Set.disjoint values seen then go (values <> seen) (n + 1) best more else best
+             in if taken >= cap then cap else go seen n (max best taken) more
+
+-- One card's values on Search.differentIn's axes, keyed by axis so a power never
+-- meets a toughness, or Nothing for a card no group admits. Read off the CR 613
+-- projection, so a split card's two names count (CR 201.2a) and a star's power
+-- is its characteristic-defining ability's number (CR 208.2a, 604.3). CR 201.2b
+-- demands each card HAVE a name; a card with no power or toughness shares none.
+differingValues :: Set.Set DifferentIn.DifferentIn -> GameState -> ObjectId -> Maybe (Set.Set (DifferentIn.DifferentIn, Either CardName.CardName (Either Integer CardType.CardType)))
+differingValues axes gs oid =
+  if Set.member DifferentIn.Names axes && Set.null (Filter.names view)
+    then Nothing
+    else Just (foldMap valuesOf axes)
+  where
+    view = Projection.viewOfObject oid gs
     number axis = foldMap (Set.singleton . (,) axis . Right . Left)
-    valuesOf view axis = case axis of
+    valuesOf axis = case axis of
       DifferentIn.Names -> Set.map ((,) axis . Left) (Filter.names view)
       DifferentIn.Powers -> number axis (Filter.power view)
       DifferentIn.ManaValues -> number axis (Filter.manaValue view)
       DifferentIn.Toughnesses -> number axis (Filter.toughness view)
       DifferentIn.CardTypes -> Set.map ((,) axis . Right . Right) (Filter.cardTypes view)
-    admits view seen axis =
-      let values = valuesOf view axis
-       in (axis /= DifferentIn.Names || not (Set.null values)) && Set.disjoint values seen
-    go _ [] = []
-    go seen (oid : rest) =
-      let view = Projection.viewOfObject oid gs
-       in if all (admits view seen) axes
-            then oid : go (foldMap (valuesOf view) axes <> seen) rest
-            else go seen rest
 
 -- One found card's move, a member of the search's batch whose board is `asOf`
 -- (Event.changeZoneInBatch).
@@ -11702,11 +11750,11 @@ loopOffers resolving source controller slot legal members gate = do
   answered <-
     Monad.foldM
       ( \acc (payer, member) -> do
-          (slots, cost) <- State.gets (gateCostOf resolving source controller (legalFor member) gate)
+          (slots, options) <- State.gets (gateCostOf resolving source controller (legalFor member) gate)
           let earlier = Seq.fromList [(p, maybe PaymentDecision.Declines (const PaymentDecision.Pays) taken) | (p, m, taken) <- Foldable.toList acc, m == member]
               owed = fmap (Cost.together . fmap snd) (NonEmpty.nonEmpty (agreedBy payer acc))
-          agreed <- payGateAgreed resolving source (PayOffer.ForMember member) earlier payer gate slots owed cost
-          pure (acc Seq.|> (payer, member, if agreed then Just (slots, cost) else Nothing))
+          agreed <- payGateAgreed resolving source (PayOffer.ForMember member) earlier payer gate slots owed options
+          pure (acc Seq.|> (payer, member, fmap ((,) slots) agreed))
       )
       Seq.empty
       offers
@@ -11768,13 +11816,14 @@ loopOffers resolving source controller slot legal members gate = do
 -- whole of what this function asks about.
 payGatePaidBy :: ObjectId -> ObjectId -> PlayerId -> PayOffer.PayOffer -> Seq.Seq (PlayerId, PaymentDecision.PaymentDecision) -> Map.Map SlotName (Set Recipient) -> PlayerId -> PayGate.PayGate -> Game Bool
 payGatePaidBy resolving source controller offer earlier legal payer gate = do
-  (slots, cost) <- State.gets (gateCostOf resolving source controller legal gate)
-  agreed <- payGateAgreed resolving source offer earlier payer gate slots Nothing cost
-  if agreed then payGateCost slots payer source cost else pure False
+  (slots, options) <- State.gets (gateCostOf resolving source controller legal gate)
+  agreed <- payGateAgreed resolving source offer earlier payer gate slots Nothing options
+  maybe (pure False) (payGateCost slots payer source) agreed
 
--- The cost one offer of this gate owes, with the slot map its components read:
--- payGatePaidBy's CR 107.3 X, CR 118.6 description and "for each" multiplier.
-gateCostOf :: ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> PayGate.PayGate -> GameState -> (Map.Map SlotName (Set ObjectId), Cost.Type.Cost Keyword.Type.Keyword)
+-- The costs one offer of this gate may be paid with, one per option in printed
+-- order (PayGate.cost), with the slot map their components read: payGatePaidBy's
+-- CR 107.3 X, CR 118.6 description and "for each" multiplier, applied to each.
+gateCostOf :: ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> PayGate.PayGate -> GameState -> (Map.Map SlotName (Set ObjectId), NonEmpty.NonEmpty (Cost.Type.Cost Keyword.Type.Keyword))
 gateCostOf resolving source controller legal gate gs =
   let multiplier = case PayGate.perEach gate of
         Nothing -> 1
@@ -11782,39 +11831,57 @@ gateCostOf resolving source controller legal gate gs =
           let viewOf = effectViewOf source legal gs
               context = effectContext gs controller source legal (slotBindings resolving gs)
            in maybe 0 Integer.toNaturalSaturating (Quantity.evaluateFor viewOf context gs resolving source quantity)
-      cost = Cost.repeated multiplier (Cost.substituteX (announcedXOn resolving gs) (describedCost resolving controller source legal gs gate))
+      costs = fmap (Cost.repeated multiplier . Cost.substituteX (announcedXOn resolving gs)) (describedCosts resolving controller source legal gs gate)
       -- effectContext's slot map, so a component's criterion reads what every
       -- other filter of this resolution reads -- CR 608.2b's legal targets, the
       -- reserved cost slots among them (Binding.discardedCard), and the groups.
       -- Pawl.ConjureSpec's Calim's Breath cases prove it.
       slots = Binding.withGroups (effectSlotObjects legal) (Binding.groupsOf (slotBindings resolving gs))
-   in (slots, cost)
+   in (slots, costs)
 
--- CR 118.3 / 800.4f for one seat, before any offer: could this payer pay this
--- gate's cost against the board as it stands? Pawl.Engine.Resolve.chosenBranch
+-- CR 118.3 / 800.4f for one seat, before any offer: could this payer pay any
+-- of this gate's options against the board as it stands? Pawl.Engine.Resolve.chosenBranch
 -- asks it per announcing seat, CR 608.2d's "can't choose an option that's ...
 -- impossible" being a question about the player choosing.
 gateAffordable :: ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> PlayerId -> PayGate.PayGate -> GameState -> Bool
 gateAffordable resolving source controller legal payer gate gs =
-  let (slots, cost) = gateCostOf resolving source controller legal gate gs
-   in elem payer (Game.stillPlaying gs) && Cost.canPayReading slots PaymentSubject.ForNeither payer source cost gs
+  let (slots, options) = gateCostOf resolving source controller legal gate gs
+   in elem payer (Game.stillPlaying gs) && any (\cost -> Cost.canPayReading slots PaymentSubject.ForNeither payer source cost gs) options
 
 -- CR 118.12a's question, before anything is paid: does this payer take the
--- offer? CR 800.4f and CR 118.3 first, as payGatePaidBy says. `owed` is what the
--- payer has already agreed to pay alongside it, so affordability is of the
--- TOTAL (CR 118.3, and Killing Wave's ruling "you can't pay more life than you
--- have") -- Nothing for a clause's single offer.
-payGateAgreed :: ObjectId -> ObjectId -> PayOffer.PayOffer -> Seq.Seq (PlayerId, PaymentDecision.PaymentDecision) -> PlayerId -> PayGate.PayGate -> Map.Map SlotName (Set ObjectId) -> Maybe (Cost.Type.Cost Keyword.Type.Keyword) -> Cost.Type.Cost Keyword.Type.Keyword -> Game Bool
-payGateAgreed resolving source offer earlier payer gate slots owed cost = do
+-- offer, and with which option? The option agreed to, Nothing for none. CR
+-- 800.4f and CR 118.3 first, as payGatePaidBy says. `owed` is what the payer has
+-- already agreed to pay alongside it, so affordability is of the TOTAL (CR
+-- 118.3, and Killing Wave's ruling "you can't pay more life than you have") --
+-- Nothing for a clause's single offer.
+--
+-- Of several options (Torment of Venom's "sacrifice ... or discard a card"),
+-- only the payable ones are offered (CR 118.3), and the payer picks among them
+-- with Prompt.ChooseCost, asked only where two or more are payable; an answer
+-- outside them pays nothing. Then Prompt.ChooseToPay over the option picked, so
+-- an optional cost can still be declined. Proved by Pawl.ResolveSpec's "CR
+-- 118.12 a choice of costs" group.
+payGateAgreed :: ObjectId -> ObjectId -> PayOffer.PayOffer -> Seq.Seq (PlayerId, PaymentDecision.PaymentDecision) -> PlayerId -> PayGate.PayGate -> Map.Map SlotName (Set ObjectId) -> Maybe (Cost.Type.Cost Keyword.Type.Keyword) -> NonEmpty.NonEmpty (Cost.Type.Cost Keyword.Type.Keyword) -> Game (Maybe (Cost.Type.Cost Keyword.Type.Keyword))
+payGateAgreed resolving source offer earlier payer gate slots owed options = do
   gs <- State.get
-  let total = maybe cost (`Cost.plus` cost) owed
-  if notElem payer (Game.stillPlaying gs) || not (Cost.canPayReading slots PaymentSubject.ForNeither payer source total gs)
-    then pure False
+  let total cost = maybe cost (`Cost.plus` cost) owed
+      payable = filter (\cost -> Cost.canPayReading slots PaymentSubject.ForNeither payer source (total cost) gs) (NonEmpty.toList options)
+  if notElem payer (Game.stillPlaying gs)
+    then pure Nothing
     else do
-      decision <- case PayGate.obligation gate of
-        PayObligation.Mandatory -> pure PaymentDecision.Pays
-        PayObligation.Optional -> Game.choose (Prompt.ChooseToPay (Decide.deciderFor payer gs) payer resolving offer cost earlier)
-      pure (decision == PaymentDecision.Pays)
+      picked <- case payable of
+        [] -> pure Nothing
+        [only] -> pure (Just only)
+        _ -> do
+          answer <- Game.choose (Prompt.ChooseCost (Decide.deciderFor payer gs) payer resolving payable)
+          pure (List.find (== answer) payable)
+      case picked of
+        Nothing -> pure Nothing
+        Just cost -> do
+          decision <- case PayGate.obligation gate of
+            PayObligation.Mandatory -> pure PaymentDecision.Pays
+            PayObligation.Optional -> Game.choose (Prompt.ChooseToPay (Decide.deciderFor payer gs) payer resolving offer cost earlier)
+          pure (if decision == PaymentDecision.Pays then Just cost else Nothing)
 
 -- The payment of a cost the payer agreed to, against `source` (CR 113.7a).
 payGateCost :: Map.Map SlotName (Set ObjectId) -> PlayerId -> ObjectId -> Cost.Type.Cost Keyword.Type.Keyword -> Game Bool
@@ -11884,9 +11951,9 @@ payGateCost slots payer source cost = do
 --
 -- The stated COMPONENTS survive: what a basis supplies is the mana part alone,
 -- and a card stating both pays both. None in the pool does.
-describedCost :: ObjectId -> PlayerId -> ObjectId -> Map.Map SlotName (Set Recipient) -> GameState -> PayGate.PayGate -> Cost.Type.Cost Keyword.Type.Keyword
-describedCost resolving controller source legal gs gate = case PayGate.basis gate of
-  Nothing -> PayGate.cost gate
+describedCosts :: ObjectId -> PlayerId -> ObjectId -> Map.Map SlotName (Set Recipient) -> GameState -> PayGate.PayGate -> NonEmpty.NonEmpty (Cost.Type.Cost Keyword.Type.Keyword)
+describedCosts resolving controller source legal gs gate = case PayGate.basis gate of
+  Nothing -> CostChoice.unwrap (PayGate.cost gate)
   Just basis ->
     let -- The gate's own `legal` is the START-of-resolution targets (CR 608.2b,
         -- payGateAdmits' caller), which is not where a slot an EARLIER CLAUSE
@@ -11897,7 +11964,7 @@ describedCost resolving controller source legal gs gate = case PayGate.basis gat
         described = case objectRefObjects bound resolving controller source gs (ObjectRef.InSlot (CostBasis.slot basis)) of
           [oid] -> Filter.manaCost =<< effectViewOf source bound gs oid
           _ -> Nothing
-     in (PayGate.cost gate) {Cost.Type.mana = fmap (Cost.reducedManaCost (CostBasis.reducedBy basis)) described}
+     in fmap (\option -> option {Cost.Type.mana = fmap (Cost.reducedManaCost (CostBasis.reducedBy basis)) described}) (CostChoice.unwrap (PayGate.cost gate))
 
 -- CR 118.4 / CR 107.3a: the value of X in a cost paid during resolution. NOT a
 -- choice the payer makes -- CR 107.3a fixes it at the value the object's own

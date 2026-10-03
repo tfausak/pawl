@@ -71,6 +71,7 @@ import qualified Pawl.Types.ControlSides as ControlSides
 import qualified Pawl.Types.CopyOriginal as CopyOriginal
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CostChoice as CostChoice
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -247,7 +248,7 @@ ownQuantities effect = case effect of
   Effect.Firebend _ -> []
   Effect.ActivateManaAbilities _ -> []
   Effect.MoveMana _ -> []
-  Effect.Search (Search.MkSearch _ _ _ _ quantity _ _ _ _ _ _) -> Maybe.maybeToList quantity
+  Effect.Search (Search.MkSearch _ _ _ _ quantity _ _ _ _ _ _ _) -> Maybe.maybeToList quantity
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.Reroll -> []
@@ -1760,7 +1761,8 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "control belongs on a static ability, never in a stored effect" (fmap (S.nameOf . Printing.card) offenders) []
   -- CR 106.6 restricts how mana "can be spent"; it never forbids spending it
   -- outright. A Pawl.Types.ManaRestriction with no half set is mana no payment
-  -- may ever use, which is mana the card might as well not have added -- so it
+  -- may ever use (or, under prohibits, mana restricted in nothing), which is
+  -- mana the card might as well not have added (or not restricted) -- so it
   -- is card data that means nothing rather than a rule pawl implements. Nothing
   -- in the codec can refuse it: every field defaults to Nothing, which is what
   -- lets Mishra's Workshop write one key, Omen Hawker another and Overgrown
@@ -2276,7 +2278,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
                   )
                   (ModeSelection.ChooseExactly 1)
             }
-        payerFace ref = clauseFace (Just (PayGate.MkPayGate ref (Cost.Type.MkCost Nothing []) Nothing PayBranch.IfNotPaid PayObligation.Optional Nothing Nothing)) Optionality.Mandatory
+        payerFace ref = clauseFace (Just (PayGate.MkPayGate ref (CostChoice.MkCostChoice (Cost.Type.MkCost Nothing [] NonEmpty.:| [])) Nothing PayBranch.IfNotPaid PayObligation.Optional Nothing Nothing)) Optionality.Mandatory
         askerFace ref = clauseFace Nothing (Optionality.Optional ref)
         -- CR 111.1's token, whose OWN printed text carries that same predicate:
         -- Face.enchant is a Filter position cardFilters walks, so effectFilters

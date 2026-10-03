@@ -1,5 +1,6 @@
 module Pawl.Codec.ForEachSpec where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import qualified Pawl.Codec.ForEach as ForEach
@@ -8,6 +9,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CostChoice as CostChoice
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ForEach as ForEach
@@ -97,7 +99,7 @@ spec s = Spec.describe s "Pawl.Codec.ForEach" $ do
               Just
                 PayGate.MkPayGate
                   { PayGate.payer = PlayerRef.EachPlayer,
-                    PayGate.cost = Cost.MkCost (Just (ManaCost.MkManaCost [])) [CostComponent.PayLife 1],
+                    PayGate.cost = CostChoice.MkCostChoice (Cost.MkCost (Just (ManaCost.MkManaCost [])) [CostComponent.PayLife 1] NonEmpty.:| []),
                     PayGate.basis = Nothing,
                     PayGate.branch = PayBranch.IfNonePaid,
                     PayGate.obligation = PayObligation.Optional,

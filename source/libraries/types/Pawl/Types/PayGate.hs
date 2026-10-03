@@ -1,9 +1,8 @@
 module Pawl.Types.PayGate where
 
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
-import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostBasis as CostBasis
-import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.CostChoice as CostChoice
 import qualified Pawl.Types.PayBranch as PayBranch
 import qualified Pawl.Types.PayObligation as PayObligation
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -62,7 +61,7 @@ data PayGate = MkPayGate
     -- Pawl.Engine.Binding.gatePlayers, so the clause's own instructions can say
     -- "they" -- see Pawl.Engine.Resolve.payGateAdmits.
     payer :: PlayerRef.PlayerRef,
-    -- | What that player is offered the chance to pay. A whole Cost and not a
+    -- | What that player is offered the chance to pay. Whole Costs and not a
     -- bare ManaCost, so Pawl.Engine.Cost.canPay and .pay are the one payment
     -- path, and so a non-mana cost of this family (CR 118.12's own "sacrifice
     -- this enchantment") needs no second field. Mana Leak's is {3}, Merfolk
@@ -76,7 +75,13 @@ data PayGate = MkPayGate
     -- CR 107.3a, whose value is the one the object's controller announced at
     -- CR 601.2b. Clash of Wills' is {X}; Pawl.Engine.Resolve.Effect.announcedXOn is
     -- where it is substituted in.
-    cost :: Cost.Cost Keyword.Keyword,
+    --
+    -- A CHOICE of whole costs, in printed order, because the "something else"
+    -- may be a disjunction: Torment of Venom's "unless they sacrifice another
+    -- nonland permanent of their choice or discard a card". The payer picks one
+    -- payable option or declines (Pawl.Engine.Resolve.Effect.payGateAgreed);
+    -- every other gate has one option.
+    cost :: CostChoice.CostChoice,
     -- | CR 118.6's other kind of cost: one the card DESCRIBES in terms of
     -- another object rather than printing -- Flash's "unless you pay its mana
     -- cost reduced by {2}". Nothing is the printed case every other gate in the
