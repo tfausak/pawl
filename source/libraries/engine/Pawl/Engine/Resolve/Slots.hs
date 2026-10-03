@@ -118,6 +118,7 @@ import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ForEachNumber as ForEachNumber
 import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
+import qualified Pawl.Types.ForbidBeingBlocked as ForbidBeingBlocked
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.ForbidUntap as ForbidUntap
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
@@ -801,6 +802,8 @@ effectObjectRefs effect = case effect of
   Effect.ForbidAttack (ForbidAttack.MkForbidAttack _ affected _) -> case affected of
     RestrictedCreatures.Named ref -> [ref]
     RestrictedCreatures.Matching _ -> []
+  -- No ref at all: the class is a Filter (CR 611.2c).
+  Effect.ForbidBeingBlocked {} -> []
   Effect.CreateEmblem {} -> []
   Effect.BecomeMonarch {} -> []
   Effect.TakeTheInitiative {} -> []
@@ -1004,6 +1007,7 @@ effectPlayerRefs effect = case effect of
     AttackTargetRef.Permanents _ -> durationPlayerRefs duration
   Effect.ForbidBlock {} -> []
   Effect.ForbidAttack {} -> []
+  Effect.ForbidBeingBlocked {} -> []
   Effect.ForbidActivation {} -> []
   Effect.ForbidUntap {} -> []
   Effect.CreateEmblem {} -> []
@@ -1386,6 +1390,8 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.CantBeRegenerated {} -> Map.empty
   Effect.ForbidBlock {} -> Map.empty
   Effect.ForbidAttack {} -> Map.empty
+  -- The class is a FILTER read, RequireAttack's Matching arm below.
+  Effect.ForbidBeingBlocked (ForbidBeingBlocked.MkForbidBeingBlocked duration f) -> joinTwo (durationSlots duration) (filterSlotsOf f)
   Effect.ForbidActivation {} -> Map.empty
   Effect.ForbidUntap {} -> Map.empty
   -- CR 508.1b's two sides are reported at the head when a ref names the
@@ -2058,6 +2064,7 @@ ownSlotsAreExhaustive effect = case effect of
   -- slotsOf reports the Duration and the class's Filter, ModifyTarget's and
   -- Search's readings.
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) -> durationSlotsAreExhaustive duration
+  Effect.ForbidBeingBlocked (ForbidBeingBlocked.MkForbidBeingBlocked duration _) -> durationSlotsAreExhaustive duration
   -- CR 114.2's emblem is minted with EMPTY bindings, so its card is literal text.
   Effect.CreateEmblem _ -> True
   Effect.BecomeMonarch MonarchTarget.TheController -> True
@@ -2299,6 +2306,7 @@ readsX =
         Effect.CantBeRegenerated {} -> False
         Effect.ForbidBlock {} -> False
         Effect.ForbidAttack {} -> False
+        Effect.ForbidBeingBlocked {} -> False
         Effect.ForbidActivation {} -> False
         Effect.ForbidUntap {} -> False
         Effect.RequireAttack {} -> False
@@ -2556,6 +2564,7 @@ boundSlots effect = case effect of
   Effect.CantBeRegenerated {} -> Set.empty
   Effect.ForbidBlock {} -> Set.empty
   Effect.ForbidAttack {} -> Set.empty
+  Effect.ForbidBeingBlocked {} -> Set.empty
   Effect.ForbidActivation {} -> Set.empty
   Effect.ForbidUntap {} -> Set.empty
   Effect.RequireAttack {} -> Set.empty
