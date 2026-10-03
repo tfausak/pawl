@@ -22,7 +22,7 @@ sourceContext gs perspective source =
 withChoicesOf :: ObjectId.ObjectId -> GameState.GameState -> Filter.Context -> Filter.Context
 withChoicesOf source gs context =
   context
-    { Filter.sourceChosenColor = Game.chosenColorWithLastKnown source gs,
+    { Filter.sourceChosenColors = Game.chosenColorsWithLastKnown source gs,
       Filter.sourceChosenSubtype = Game.chosenSubtypeWithLastKnown source gs,
       Filter.sourceChosenNames = Game.chosenNamesWithLastKnown source gs
     }

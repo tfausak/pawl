@@ -542,11 +542,13 @@ targetSlotsOf obj oid gs face =
 -- (#3166); Pawl.ResolveSpec's "CR 608.2f / 603.12 a reflexive armed inside a
 -- ForEach reads only that member's own instruction" is the case that proves it.
 --
--- Not implemented: only the instruction IMMEDIATELY before the arm is asked
--- about, not whichever earlier instruction the reflexive's own wording names
--- ("do A. do B. when you do A" would read B's outcome instead); no card in
--- `data/cards/` writes an arm that is not second in its clause or its ForEach
--- body (#3057).
+-- Only the instruction IMMEDIATELY before the arm is asked about. A reflexive
+-- naming an earlier one ("do A. do B. when you do A this way") is written as its
+-- own clause, gated on what A bound: CR 603.12 asks only whether A's event
+-- occurred, and "this way" is the objects A acted on. Fiery Encore's "discard a
+-- card, then draw a card" is the case; its scenario "CR 603.12 whole card: Fiery
+-- Encore cast from an otherwise empty hand discards nothing, still draws, and
+-- creates no reflexive" proves the draw is not what it reads.
 applyClauseEffects ::
   ObjectId ->
   (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game ()) ->
@@ -563,7 +565,8 @@ applyClauseEffects source applyOne =
    in Monad.foldM_ step Nothing
 
 -- CR 603.12: did the instruction that took the game from `before` to `after`
--- HAPPEN? Yes when it recorded a game event, or when anything but bookkeeping
+-- HAPPEN? Also CR 118.12's "started to pay a mandatory cost", for
+-- Resolve.recordTaken's "If you do". Yes when it recorded a game event, or when anything but bookkeeping
 -- changed. A field is bookkeeping, and copied across from `before` here, iff an
 -- instruction that did NOT happen can still write it: the event log and its
 -- CR 603.10 samples (read by the first disjunct, and the samples are

@@ -5140,7 +5140,8 @@ mintedRemovalRestrictionsFor keyword =
 -- CR 607.2d's "protection from the chosen color" likewise: `chosen` is the
 -- GRANTER's entry choice (Cho-Manno's Blessing), which the host's frame cannot
 -- read, so a bare Filter.HasChosenColor quality bakes it into Filter.HasColor,
--- and into the empty Or -- protection from nothing -- where none was chosen.
+-- an Or of them where several were chosen, and the empty Or -- protection from
+-- nothing -- where none was.
 -- Pawl.FilterPositionLintSpec's grantedChosenColors admits the bare atom
 -- alone, so a card burying it is rejected rather than misread.
 --
@@ -5149,13 +5150,15 @@ mintedRemovalRestrictionsFor keyword =
 -- `already`, the host's attachments stamped no later than the granter (CR
 -- 613.7e restamps each attach, so that is "already attached when the effect
 -- started to apply").
-grantedBy :: ObjectId -> Maybe Color.Color -> Maybe PlayerId -> [ObjectId] -> Keyword -> Keyword
+grantedBy :: ObjectId -> Set.Set Color.Color -> Maybe PlayerId -> [ObjectId] -> Keyword -> Keyword
 grantedBy granter chosen you already keyword = case keyword of
   Keyword.Protection protection ->
     Keyword.Protection
       protection
         { Protection.quality = case Protection.quality protection of
-            Filter.HasChosenColor -> maybe (Filter.Or []) Filter.HasColor chosen
+            Filter.HasChosenColor -> case Set.toList chosen of
+              [color] -> Filter.HasColor color
+              colors -> Filter.Or (fmap Filter.HasColor colors)
             quality -> quality,
           Protection.spares = fmap spare (Protection.spares protection)
         }

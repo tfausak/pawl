@@ -82,14 +82,13 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
             }
       )
       " {\"type\":\"ChoiceByCoinFlip\",\"value\":{\"heads\":{\"power\":5,\"toughness\":2,\"keywords\":[{\"type\":\"Haste\"}]},\"tails\":{\"power\":2,\"toughness\":5,\"keywords\":[{\"type\":\"Defender\"}]}}} "
-  -- CR 614.1c / 105.1: an as-enters colour choice, payload-free because the
-  -- five colours are always the whole offer.
-  Spec.it s "ChooseColor (Painter's Servant)" $
+  -- CR 614.1c / 105.1: an as-enters choice of that many colours.
+  Spec.it s "ChooseColors (Tablet of the Guilds)" $
     Common.assertCodec
       s
       (EntryRewrite.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
-      EntryRewrite.ChooseColor
-      " {\"type\":\"ChooseColor\"} "
+      (EntryRewrite.ChooseColors 2)
+      " {\"type\":\"ChooseColors\",\"value\":2} "
   Spec.it s "ChooseBasicLandType (Convincing Mirage)" $
     Common.assertCodec
       s

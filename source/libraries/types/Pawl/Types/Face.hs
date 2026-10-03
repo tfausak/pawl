@@ -417,7 +417,9 @@ data Face card = MkFace
     -- Printed-only, and deliberately so: an effect that APPLIES an alternative
     -- cost to a spell carries it elsewhere -- one-shot in Pawl.Types.CastOffer,
     -- standing in Pawl.Types.PlayerEffect's CastFromHandWithoutPayingManaCost --
-    -- and Pawl.Engine.Cost.candidateCostsFor offers all three side by side. CR
+    -- and one that GRANTS the card one rides the projection
+    -- (ProjectedCharacteristics.grantedAlternativeCosts, Mine Security), and
+    -- Pawl.Engine.Cost.candidateCostsFor offers them all side by side. CR
     -- 118.9 is about SPELLS, so this lives on a face and never on
     -- ActivatedAbility -- a rules fact, not an elision.
     --

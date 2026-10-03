@@ -49,17 +49,29 @@ spec s registry = Spec.describe s "a fragmented loop (CR 732.3)" $ do
     -- the lap after that one, whose untap is a no-op, recurs.
     Spec.assertEqWith s "CR 732.3 a new state is no loop" (fst (offers (loopBoard tapper rouser Nothing True))) [True, True, False]
 
-  Spec.it s "a card reading the turn's history keeps the loop's states distinct" $ do
+  Spec.it s "a card reading history the loop does not write leaves the loop detected" $ do
     tapper <- S.printingOf s registry "Synthetic Self Tapper"
     rouser <- S.printingOf s registry "Synthetic Rouser"
+    ghoul <- S.printingOf s registry "Khabál Ghoul"
     harvest <- S.printingOf s registry "Ominous Harvest"
     -- CR 732.3's example: "nothing in the game cares how many times an ability
-    -- has been activated". Ominous Harvest's gravestorm counts the turn's
-    -- deaths off the log, from alice's library, through the trigger
-    -- Pawl.Engine.Keyword mints -- the card itself spells only the keyword.
-    -- So the log the digest drops is observable and no state recurs; the
-    -- answerer's budget is what stops her.
-    Spec.assertEqWith s "CR 732.3 the gate keeps every offer" (fst (offers (loopBoard tapper rouser (Just harvest) False))) (replicate (budget + 1) True)
+    -- has been activated". Khabál Ghoul, in alice's library, counts the
+    -- turn's deaths off the log, and the lap kills nothing, so the state
+    -- still recurs. Ominous Harvest reads the same deaths through the
+    -- gravestorm trigger Pawl.Engine.Keyword mints -- the card itself spells
+    -- only the keyword.
+    Spec.assertEqWith s "CR 732.3 Khabál Ghoul leaves alice's activation withheld" (fst (offers (loopBoard tapper rouser (Just ghoul) False))) [True, False]
+    Spec.assertEqWith s "CR 732.3 Ominous Harvest leaves alice's activation withheld" (fst (offers (loopBoard tapper rouser (Just harvest) False))) [True, False]
+
+  Spec.it s "a card reading history the loop writes keeps the loop's states distinct" $ do
+    tapper <- S.printingOf s registry "Synthetic Self Tapper"
+    rouser <- S.printingOf s registry "Synthetic Rouser"
+    ashling <- S.printingOf s registry "Ashling the Pilgrim"
+    -- Ashling the Pilgrim, in alice's library, counts an ability's
+    -- resolutions this turn off the log, and every lap resolves two. So a card
+    -- can tell the recurring state from the first, and the answerer's budget
+    -- is what stops her.
+    Spec.assertEqWith s "CR 732.3 Ashling keeps every offer" (fst (offers (loopBoard tapper rouser (Just ashling) False))) (replicate (budget + 1) True)
 
   Spec.it s "an activation with a target to choose is not refused" $ do
     tapper <- S.printingOf s registry "Synthetic Self Tapper"

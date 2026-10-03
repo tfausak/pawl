@@ -57,6 +57,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.SlotCount as SlotCount
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.SlotPerPlayer as SlotPerPlayer
+import qualified Pawl.Types.TargetChooser as TargetChooser
 import qualified Pawl.Types.TargetCount as TargetCount
 import Pawl.Types.TargetSlot (TargetSlot)
 import qualified Pawl.Types.TargetSlot as TargetSlot
@@ -488,7 +489,7 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- known information, since CR 608.2b re-asks the slot after the
             -- source may have left (Pawl.TargetSpec's Pentarch Paladin group).
             -- A THUNK, like its siblings.
-            Filter.sourceChosenColor = Game.chosenColorWithLastKnown source gs,
+            Filter.sourceChosenColors = Game.chosenColorsWithLastKnown source gs,
             -- The field above's sibling for "the chosen type" (From the Rubble).
             Filter.sourceChosenSubtype = Game.chosenSubtypeWithLastKnown source gs
           }
@@ -1547,7 +1548,7 @@ slotCapacities counting x slots sets gs =
 -- still taken over the whole announcement afterwards.
 --
 -- The controller's slots go first (Ord on Maybe), and the rest follow in the
--- relation's own order. Rule 601.2c fixes no order between choosers; this one is
+-- chooser's own order. Rule 601.2c fixes no order between choosers; this one is
 -- deterministic, which a replay needs.
 --
 -- TWO object ids, and they differ on the ability roads. `oid` is the STACK
@@ -1568,8 +1569,8 @@ chooseTargets pid oid source seed x slots sets = do
   let groups = Map.fromListWith Set.union [(TargetSlot.chooser slot, Set.singleton name) | (name, slot) <- Map.toList slots]
   answers <-
     traverse
-      ( \(relation, mine) -> do
-          seat <- chooserOf pid oid relation
+      ( \(named, mine) -> do
+          seat <- chooserOf pid oid seed named
           case seat of
             -- CR 601.2c has nobody to announce with, which is CR 102.2's game of one
             -- seat under an "of an opponent's choice" slot. The slots go unanswered,
@@ -1581,13 +1582,19 @@ chooseTargets pid oid source seed x slots sets = do
       (Map.toAscList groups)
   pure (Map.unions answers)
 
--- CR 115.1 with CR 601.2c: which seat announces the slots a relation names.
+-- CR 115.1 with CR 601.2c: which seat announces the slots a chooser names.
 --
 -- Nothing on the slot is the rule's default and asks nobody -- the controller
 -- announces. A relation admitting SEVERAL seats is a choice the CONTROLLER makes,
 -- CR 801.5a's example being the rule text that says so ("choosing Rob as the
 -- opponent who picks the other target"); one seat is elided, and none leaves the
 -- slots unanswered.
+--
+-- A SLOT names its seat outright, off `seed` -- the bindings the announcement
+-- already holds, which for a triggered ability are CR 603.2's event bindings
+-- (Curse of Inertia's "that attacking player"). Nobody is asked which seat: the
+-- card has said. A slot naming no player, or a seat no longer reachable, leaves
+-- the slots unanswered as an empty relation does.
 --
 -- Which prompt is picked by whether the offer holds the controller, the posture
 -- Pawl.Engine.Resolve.Effect's CR 608.2d choice takes: Prompt.ChooseOpponent
@@ -1598,10 +1605,13 @@ chooseTargets pid oid source seed x slots sets = do
 -- Off Game.reachableBy, so a seat that has left (CR 104.3a), or sits outside the
 -- controller's range (CR 801.5a), neither chooses nor is counted towards eliding
 -- the question.
-chooserOf :: PlayerId -> ObjectId -> Maybe PlayerRelation.PlayerRelation -> Game (Maybe PlayerId)
-chooserOf controller oid relation = case relation of
+chooserOf :: PlayerId -> ObjectId -> Map SlotName Binding.Type.Binding -> Maybe TargetChooser.TargetChooser -> Game (Maybe PlayerId)
+chooserOf controller oid seed chooser = case chooser of
   Nothing -> pure (Just controller)
-  Just r -> do
+  Just (TargetChooser.InSlot slot) -> do
+    gs <- State.get
+    pure (List.find (`List.elem` Game.reachableBy controller gs) (Map.lookup slot (Binding.playerSlots seed)))
+  Just (TargetChooser.Relative r) -> do
     gs <- State.get
     case List.filter (PlayerRelation.holds (Game.teams gs) r controller) (Game.reachableBy controller gs) of
       [] -> pure Nothing

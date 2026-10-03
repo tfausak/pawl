@@ -351,7 +351,7 @@ objectWith before entry closed = do
   counters <- field Object.counters
   counterTimestamps <- field Object.counterTimestamps
   attachedTo <- field Object.attachedTo
-  chosenColor <- field Object.chosenColor
+  chosenColors <- field Object.chosenColors
   chosenSubtype <- field Object.chosenSubtype
   chosenNames <- field Object.chosenNames
   chosenPlayer <- field Object.chosenPlayer
@@ -410,7 +410,7 @@ objectWith before entry closed = do
         Object.counters = counters,
         Object.counterTimestamps = counterTimestamps,
         Object.attachedTo = attachedTo,
-        Object.chosenColor = chosenColor,
+        Object.chosenColors = chosenColors,
         Object.chosenSubtype = chosenSubtype,
         Object.chosenNames = chosenNames,
         Object.chosenPlayer = chosenPlayer,

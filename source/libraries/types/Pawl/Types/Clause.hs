@@ -60,6 +60,10 @@ data Clause card ability = MkClause
     -- optional clause because CR 121.3 makes the draw happen whenever it is
     -- chosen, so the answer and the action cannot come apart.
     --
+    -- A MANDATORY named clause has no answer to key on, so the board answers
+    -- after all: it counts only if CR 118.12's payment was started, which a
+    -- sacrifice with nothing to sacrifice is not (Pawl.Engine.Resolve.recordTaken).
+    --
     -- An option the named clause could not take at all is not offered (CR
     -- 608.2d, Pawl.Engine.Resolve.Effect.clauseIsImpossible), so "you may
     -- discard a card" on an empty hand never admits this clause -- Tweeze is

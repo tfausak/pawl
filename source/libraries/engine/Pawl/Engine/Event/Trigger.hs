@@ -2511,10 +2511,12 @@ enchantedObjectLeaves condition = case condition of
 -- each, so `functionsIn` reads the same either way. They are here so the rule is
 -- stated once, not because a test can redden them.
 --
--- Not implemented: a self condition spelled as a bystander constructor narrowed
--- by Filter.IsSource (PermanentSacrificed {You, IsSource}, Biolume Egg's shape)
--- -- the `_` answers False for it, and the ability is pinned to its own
--- graveyard (#3177).
+-- A self condition spelled as a bystander constructor narrowed by
+-- Filter.IsSource (Biolume Egg's PermanentSacrificed {You, IsSource}) answers
+-- False through the `_`, so `selfNamingSlots` leaves `became` out and the
+-- graveyard its payload names pins nothing: the battlefield default, which is
+-- CR 113.6m's answer once the exemption reads CR 701.21a's graveyard.
+-- Pawl.LeavesTriggerSpec's `biolumeEggSpec` proves the Egg returns.
 --
 -- The AnyOf arm serves `selfNamingSlots`; `zonesFunctionedIn` asks each
 -- disjunct on its own.
@@ -3760,9 +3762,11 @@ interveningHolds gs pending =
         (Projection.viewWithLastKnownAnywhere gs)
         -- CR 303.4b's host rides in beside the slots, for the reason they do:
         -- Ray of Frost's "if enchanted creature is red" is about the SOURCE's
-        -- attachment rather than about the event, and Stack's CR 608.2a re-check
-        -- supplies the same field so the two checks cannot disagree.
-        ((Filter.contextWithSlots (Game.teams gs) (Just (PendingTrigger.controller pending)) (Just oid) (Binding.slotObjects (PendingTrigger.bindings pending))) {Filter.sourceAttachedTo = Projection.hostOf oid gs, Filter.slotPlayers = Binding.slotPlayers (PendingTrigger.bindings pending), Filter.boundAmounts = Condition.inheritedX (TriggeredAbility.condition (PendingTrigger.ability pending)) oid gs})
+        -- attachment rather than about the event, and so do the source's CR
+        -- 607.2d choices (Tablet of the Guilds' "the chosen colors"). Stack's CR
+        -- 608.2a re-check supplies the same fields so the two checks cannot
+        -- disagree.
+        (SourceContext.withChoicesOf oid gs (Filter.contextWithSlots (Game.teams gs) (Just (PendingTrigger.controller pending)) (Just oid) (Binding.slotObjects (PendingTrigger.bindings pending))) {Filter.sourceAttachedTo = Projection.hostOf oid gs, Filter.slotPlayers = Binding.slotPlayers (PendingTrigger.bindings pending), Filter.boundAmounts = Condition.inheritedX (TriggeredAbility.condition (PendingTrigger.ability pending)) oid gs})
         gs
         oid
         cond

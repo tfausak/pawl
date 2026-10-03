@@ -166,6 +166,11 @@ data Quantity
     -- colorless snow mana and a green non-snow mana satisfy TagWasSpent Snow and
     -- HasColor Green between them, and this clause not at all.
     TagWasSpentOfOwnColor ProductionTag.ProductionTag
+  | -- | CR 105.2 / 607.2d: how many of the source's chosen colours the object
+    -- this quantity is evaluated against is (Tablet of the Guilds). Read off
+    -- Filter.Context.sourceChosenColors, so 0 wherever
+    -- Pawl.Engine.SourceContext did not fill it.
+    ChosenColorsItIs
   | -- | CR 202.1a \/ 702.191a: how many mana were spent to pay for the object this
     -- quantity is evaluated against -- rule 702.191a's "the amount of mana spent
     -- to cast that spell".

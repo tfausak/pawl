@@ -580,9 +580,9 @@ data Prompt r where
   -- permanent enters so it enters untapped, Nothing declining; raised at one
   -- candidate too.
   ChooseRevealOnEntry :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt (Maybe ObjectId.ObjectId)
-  -- | CR 614.1c: the colour an entering object's controller chooses; no
-  -- candidate list (CR 105.1).
-  ChooseColor :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt Color.Color
+  -- | CR 614.1c: a colour an entering object's controller chooses, from those
+  -- (CR 105.1) not already chosen for it.
+  ChooseColor :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty Color.Color -> Prompt Color.Color
   -- | CR 105.4 / 106.3: which mana a resolving object adds when the type it
   -- names is not settled, from Pawl.Engine.Mana.producedTypes.
   ChooseManaType :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ManaType.ManaType -> Prompt ManaType.ManaType

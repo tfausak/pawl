@@ -107,6 +107,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.StepBegins as StepBegins
+import qualified Pawl.Types.TargetChooser as TargetChooser
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -865,6 +866,29 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
       "a bound folding over the objects a slot names reports that slot"
       (Map.keysSet (Resolve.targetSlotSlots (TargetSlot.withAmount overBound (TargetSlot.required Pool.Permanents Nothing))))
       (Set.singleton target)
+  -- The slot's FOURTH read: a CR 115.1 chooser naming its seat through a
+  -- binding (Curse of Inertia's "that attacking player ... of their choice").
+  -- Unreported, a card could hand its announcement to a player its condition
+  -- never binds, and the trigger would be removed every time (CR 603.3d).
+  Spec.it s "the lint itself catches a target chooser naming a slot the condition never binds" $ do
+    inertia <- S.printingOf s registry "Curse of Inertia"
+    let target = SlotName.MkSlotName (Text.pack "target")
+        chosen =
+          Mode.MkMode
+            (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Tap (ObjectRef.InSlot target)))))
+            (Map.singleton target (TargetSlot.chosenBy (TargetChooser.InSlot Binding.triggerPlayer) (TargetSlot.required Pool.Permanents Nothing)))
+    Spec.assertBool
+      s
+      (triggeredAbilityOffends (modalTrigger TriggerCondition.SelfEnters [chosen]))
+      "CR 603.2 thatPlayer as a chooser under an enters trigger is rejected"
+    Spec.assertBool
+      s
+      (not (triggeredAbilityOffends (modalTrigger (TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer) [chosen])))
+      "and under a combat-damage trigger it is accepted"
+    Spec.assertBool
+      s
+      (not (any triggeredAbilityOffends (Face.triggeredAbilities (S.combinedFace inertia))))
+      "the real card's own trigger is accepted"
   -- The same equality on a read that is not an effect's operand, a target slot's
   -- pool, its filter or its bound: CR 701.46a's per-clause "if". CR 608.2c lets a
   -- later clause's gate read what an earlier one bound, so a gate is the one

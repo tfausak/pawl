@@ -1085,7 +1085,7 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
   -- candidate wears. Membership, so a multicoloured candidate matches on any one
   -- of them.
   Spec.describe s "HasChosenColor" $ do
-    let chose c = self {Filter.sourceChosenColor = Just c}
+    let chose c = self {Filter.sourceChosenColors = Set.singleton c}
         wearing cs = blackCreature {Filter.colors = Set.fromList cs}
     Spec.it s "matches a candidate wearing the chosen colour" $ do
       Spec.assertBool s (Filter.matches (chose Color.Black) blackCreature Filter.Type.HasChosenColor) "the chosen colour"

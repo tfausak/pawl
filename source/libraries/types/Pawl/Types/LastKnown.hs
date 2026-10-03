@@ -131,13 +131,13 @@ data LastKnown = MkLastKnown
     -- (Pawl.EntryReplacementSpec). Not a characteristic, for `chosenNames`'
     -- reason.
     chosenPlayer :: !(Maybe PlayerId.PlayerId),
-    -- | CR 614.1c / 607.2d: the colour chosen for it as it entered -- the same
-    -- Object.chosenColor the live object carried. What CR 608.2h answers for an
+    -- | CR 614.1c / 607.2d: the colours chosen for it as it entered -- the same
+    -- Object.chosenColors the live object carried. What CR 608.2h answers for an
     -- ability of the object asking for "the chosen color" once the object has
     -- left (Pentarch Paladin destroyed in response, Pawl.TargetSpec). Not a
     -- characteristic, for `chosenNames`' reason.
-    chosenColor :: !(Maybe Color.Color),
-    -- | The subtype chosen for it as it entered, `chosenColor`'s sibling for
+    chosenColors :: !(Set.Set Color.Color),
+    -- | The subtype chosen for it as it entered, `chosenColors`'s sibling for
     -- Object.chosenSubtype.
     chosenSubtype :: !(Maybe Subtype.Subtype),
     -- | CR 508.1k: was it attacking as it left -- the same membership

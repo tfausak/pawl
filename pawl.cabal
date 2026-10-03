@@ -1214,6 +1214,8 @@ library codec
     Pawl.Codec.TapPermanentsSpec
     Pawl.Codec.TapState
     Pawl.Codec.TapStateSpec
+    Pawl.Codec.TargetChooser
+    Pawl.Codec.TargetChooserSpec
     Pawl.Codec.TargetCount
     Pawl.Codec.TargetCountSpec
     Pawl.Codec.TargetSlot
@@ -2555,6 +2557,7 @@ library types
     Pawl.Types.TappedIs
     Pawl.Types.TapPermanents
     Pawl.Types.TapState
+    Pawl.Types.TargetChooser
     Pawl.Types.TargetCount
     Pawl.Types.TargetSlot
     Pawl.Types.TeamId
