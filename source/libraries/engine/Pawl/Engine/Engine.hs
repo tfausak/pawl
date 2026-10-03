@@ -1004,7 +1004,7 @@ placeBorne srcId pending = do
           -- The cast road (Cast.castProposed) and the activation road
           -- (Activate.activateAbility) ask the same three.
           attempt rejected = do
-            chosen <- Target.chooseTargets controller abilId srcId inheritedX slots sets
+            chosen <- Target.chooseTargets controller abilId srcId bound inheritedX slots sets
             if Target.selectionLegal (Just controller) bound srcId inheritedX slots sets chosen gs
               then pure (Just chosen)
               else
