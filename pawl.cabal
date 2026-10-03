@@ -119,6 +119,8 @@ library codec
     Pawl.Codec.ActiveBlockRequirementSpec
     Pawl.Codec.ActiveCopy
     Pawl.Codec.ActiveCopySpec
+    Pawl.Codec.ActiveEvasion
+    Pawl.Codec.ActiveEvasionSpec
     Pawl.Codec.ActivePlayerEffect
     Pawl.Codec.ActivePlayerEffectSpec
     Pawl.Codec.ActiveReplacement
@@ -636,6 +638,8 @@ library codec
     Pawl.Codec.ForbidActivationSpec
     Pawl.Codec.ForbidAttack
     Pawl.Codec.ForbidAttackSpec
+    Pawl.Codec.ForbidBeingBlocked
+    Pawl.Codec.ForbidBeingBlockedSpec
     Pawl.Codec.ForbidBlock
     Pawl.Codec.ForbidBlockSpec
     Pawl.Codec.ForbidUntap
@@ -1162,6 +1166,8 @@ library codec
     Pawl.Codec.SpellCastSpec
     Pawl.Codec.SpellWasCast
     Pawl.Codec.SpellWasCastSpec
+    Pawl.Codec.SpellWasCopied
+    Pawl.Codec.SpellWasCopiedSpec
     Pawl.Codec.SpendManaAsThough
     Pawl.Codec.SpendManaAsThoughSpec
     Pawl.Codec.Splice
@@ -1396,6 +1402,7 @@ library engine
     Pawl.Engine.Filter
     Pawl.Engine.Forage
     Pawl.Engine.Foretell
+    Pawl.Engine.Fragmented
     Pawl.Engine.Game
     Pawl.Engine.Goad
     Pawl.Engine.Ignore
@@ -1815,6 +1822,7 @@ library test
     Pawl.FilterSpec
     Pawl.FlipSpec
     Pawl.ForageSpec
+    Pawl.FragmentedSpec
     Pawl.GameSpec
     Pawl.GoadSpec
     Pawl.HarnessSpec
@@ -1920,6 +1928,7 @@ library types
     Pawl.Types.ActiveBlockProhibition
     Pawl.Types.ActiveBlockRequirement
     Pawl.Types.ActiveCopy
+    Pawl.Types.ActiveEvasion
     Pawl.Types.ActivePlayerEffect
     Pawl.Types.ActiveReplacement
     Pawl.Types.ActiveUnregeneratable
@@ -2205,6 +2214,7 @@ library types
     Pawl.Types.ForageMode
     Pawl.Types.ForbidActivation
     Pawl.Types.ForbidAttack
+    Pawl.Types.ForbidBeingBlocked
     Pawl.Types.ForbidBlock
     Pawl.Types.ForbidUntap
     Pawl.Types.ForEach
@@ -2270,6 +2280,7 @@ library types
     Pawl.Types.LoggedEvent
     Pawl.Types.LookAt
     Pawl.Types.LoopMembers
+    Pawl.Types.LoopTrail
     Pawl.Types.Loyalty
     Pawl.Types.LoyaltyKind
     Pawl.Types.MadnessCost
@@ -2507,11 +2518,13 @@ library types
     Pawl.Types.SpeedDecrease
     Pawl.Types.SpellCast
     Pawl.Types.SpellWasCast
+    Pawl.Types.SpellWasCopied
     Pawl.Types.SpendManaAsThough
     Pawl.Types.Splice
     Pawl.Types.StackObjectKind
     Pawl.Types.Staged
     Pawl.Types.StatedFlip
+    Pawl.Types.StateDigest
     Pawl.Types.StaticAbility
     Pawl.Types.Status
     Pawl.Types.StepBegan

@@ -127,6 +127,10 @@ representatives pcs gs candidates =
 -- 509.1b, CR 508.1c, CR 602.2, CR 502.3), so two creatures
 -- alike in every characteristic are told apart by which of them a row covers.
 --
+-- GameState.evasions is listed although its rows name a class rather than an
+-- object (CR 611.2c): requiring it empty is the side that cannot make a
+-- player's choice, the reason given for the entry bookkeeping below.
+--
 -- GameState.enteringCounters, GameState.copyExceptionCounters,
 -- GameState.enteringTogether, GameState.detachedBindings and
 -- GameState.broughtIn are listed below because each holds ObjectIds, and NOT
@@ -149,6 +153,7 @@ quiet gs =
     && null (GameState.attackProhibitions gs)
     && null (GameState.activationProhibitions gs)
     && null (GameState.untapProhibitions gs)
+    && null (GameState.evasions gs)
     && null (GameState.ignoredAbilities gs)
     && Seq.null (GameState.delayedTriggers gs)
     && Seq.null (GameState.pendingPreventionRiders gs)

@@ -6424,7 +6424,8 @@ prowess =
                   -- And no ordinal either: every noncreature spell cast fires it,
                   -- not one chosen occurrence of the turn.
                   SpellCast.ordinal = Nothing,
-                  SpellCast.phase = Nothing
+                  SpellCast.phase = Nothing,
+                  SpellCast.copies = False
                 },
           TriggeredAbility.modal =
             Modal.MkModal
@@ -6472,7 +6473,8 @@ extort =
                   SpellCast.scope = TurnScope.EachTurn,
                   SpellCast.zone = Nothing,
                   SpellCast.ordinal = Nothing,
-                  SpellCast.phase = Nothing
+                  SpellCast.phase = Nothing,
+                  SpellCast.copies = False
                 },
           TriggeredAbility.modal =
             Modal.MkModal
@@ -6532,7 +6534,8 @@ increment =
                   SpellCast.scope = TurnScope.EachTurn,
                   SpellCast.zone = Nothing,
                   SpellCast.ordinal = Nothing,
-                  SpellCast.phase = Nothing
+                  SpellCast.phase = Nothing,
+                  SpellCast.copies = False
                 },
           TriggeredAbility.modal =
             Modal.MkModal

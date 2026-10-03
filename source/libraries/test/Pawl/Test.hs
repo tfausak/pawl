@@ -43,6 +43,7 @@ import qualified Pawl.Codec.ActiveAttackRequirementSpec
 import qualified Pawl.Codec.ActiveBlockProhibitionSpec
 import qualified Pawl.Codec.ActiveBlockRequirementSpec
 import qualified Pawl.Codec.ActiveCopySpec
+import qualified Pawl.Codec.ActiveEvasionSpec
 import qualified Pawl.Codec.ActivePlayerEffectSpec
 import qualified Pawl.Codec.ActiveReplacementSpec
 import qualified Pawl.Codec.ActiveUnregeneratableSpec
@@ -297,6 +298,7 @@ import qualified Pawl.Codec.ForEachNumberSpec
 import qualified Pawl.Codec.ForEachSpec
 import qualified Pawl.Codec.ForbidActivationSpec
 import qualified Pawl.Codec.ForbidAttackSpec
+import qualified Pawl.Codec.ForbidBeingBlockedSpec
 import qualified Pawl.Codec.ForbidBlockSpec
 import qualified Pawl.Codec.ForbidUntapSpec
 import qualified Pawl.Codec.ForetellCostSpec
@@ -552,6 +554,7 @@ import qualified Pawl.Codec.SpecialActionSpec
 import qualified Pawl.Codec.SpeedDecreaseSpec
 import qualified Pawl.Codec.SpellCastSpec
 import qualified Pawl.Codec.SpellWasCastSpec
+import qualified Pawl.Codec.SpellWasCopiedSpec
 import qualified Pawl.Codec.SpendManaAsThoughSpec
 import qualified Pawl.Codec.SpliceSpec
 import qualified Pawl.Codec.StackObjectKindSpec
@@ -679,6 +682,7 @@ import qualified Pawl.FilterPositionLintSpec
 import qualified Pawl.FilterSpec
 import qualified Pawl.FlipSpec
 import qualified Pawl.ForageSpec
+import qualified Pawl.FragmentedSpec
 import qualified Pawl.GameSpec
 import qualified Pawl.GoadSpec
 import qualified Pawl.HarnessSpec
@@ -861,6 +865,7 @@ spec s registry = do
   Pawl.Codec.ActiveReplacementSpec.spec s
   Pawl.Codec.ActiveUnregeneratableSpec.spec s
   Pawl.Codec.ActiveUntapProhibitionSpec.spec s
+  Pawl.Codec.ActiveEvasionSpec.spec s
   Pawl.Codec.AddActivationCostSpec.spec s
   Pawl.Codec.AddSpellCostSpec.spec s
   Pawl.Codec.ActivateManaAbilitiesSpec.spec s
@@ -1116,6 +1121,7 @@ spec s registry = do
   Pawl.Codec.ForbidActivationSpec.spec s
   Pawl.Codec.ForbidBlockSpec.spec s
   Pawl.Codec.ForbidUntapSpec.spec s
+  Pawl.Codec.ForbidBeingBlockedSpec.spec s
   Pawl.Codec.FromOutsideTheGameSpec.spec s
   Pawl.Codec.FromReferenceSpec.spec s
   Pawl.Codec.GameEventSpec.spec s
@@ -1373,6 +1379,7 @@ spec s registry = do
   Pawl.Codec.SpeedDecreaseSpec.spec s
   Pawl.Codec.SpellCastSpec.spec s
   Pawl.Codec.SpellWasCastSpec.spec s
+  Pawl.Codec.SpellWasCopiedSpec.spec s
   Pawl.Codec.SpendManaAsThoughSpec.spec s
   Pawl.Codec.StackObjectKindSpec.spec s
   Pawl.Codec.StaticAbilitySpec.spec s
@@ -1502,6 +1509,7 @@ spec s registry = do
   Pawl.FilterSpec.spec s
   Pawl.FlipSpec.spec s registry
   Pawl.ForageSpec.spec s registry
+  Pawl.FragmentedSpec.spec s registry
   Pawl.LearnSpec.spec s registry
   Pawl.GameSpec.spec s registry
   Pawl.GoadSpec.spec s registry

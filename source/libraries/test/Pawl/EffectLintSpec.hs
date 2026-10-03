@@ -107,6 +107,7 @@ import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ForEachNumber as ForEachNumber
 import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
+import qualified Pawl.Types.ForbidBeingBlocked as ForbidBeingBlocked
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.ForbidUntap as ForbidUntap
 import qualified Pawl.Types.FromReference as FromReference
@@ -373,6 +374,7 @@ ownQuantities effect = case effect of
   Effect.ForbidActivation (ForbidActivation.MkForbidActivation duration _) -> durationQuantities duration
   Effect.ForbidUntap (ForbidUntap.MkForbidUntap duration _) -> durationQuantities duration
   Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration _ _) -> durationQuantities duration
+  Effect.ForbidBeingBlocked (ForbidBeingBlocked.MkForbidBeingBlocked duration _) -> durationQuantities duration
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) -> durationQuantities duration
   Effect.CreateEmblem _ -> []
   Effect.BecomeMonarch _ -> []
@@ -442,6 +444,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.Count {} -> False
   Quantity.Type.ManaCount {} -> False
   Quantity.Type.LifeTotal {} -> False
+  Quantity.Type.StartingLifeTotal {} -> False
   Quantity.Type.Speed {} -> False
   Quantity.Type.IsMonarch {} -> False
   Quantity.Type.HasPlayerDesignation {} -> False
@@ -1499,6 +1502,7 @@ effectObjectRefs effect =
         Effect.ForbidAttack (ForbidAttack.MkForbidAttack _ affected _) -> case affected of
           RestrictedCreatures.Named ref -> read_ [ref]
           RestrictedCreatures.Matching _ -> []
+        Effect.ForbidBeingBlocked {} -> []
         Effect.RequireAttack (RequireAttack.MkRequireAttack _ attacker defender) ->
           ( case attacker of
               RestrictedCreatures.Named ref -> read_ [ref]

@@ -102,6 +102,7 @@ import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ForEachNumber as ForEachNumber
 import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
+import qualified Pawl.Types.ForbidBeingBlocked as ForbidBeingBlocked
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.ForbidUntap as ForbidUntap
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
@@ -2023,6 +2024,12 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       codec
       (Effect.ForbidAttack (ForbidAttack.MkForbidAttack Duration.UntilEndOfTurn (RestrictedCreatures.Named (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))) Nothing))
       " {\"type\":\"ForbidAttack\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"affected\":{\"type\":\"Named\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}}}} "
+  Spec.it s "ForbidBeingBlocked" $
+    Common.assertCodec
+      s
+      codec
+      (Effect.ForbidBeingBlocked (ForbidBeingBlocked.MkForbidBeingBlocked Duration.UntilEndOfTurn (Filter.HasCardType CardType.Creature)))
+      " {\"type\":\"ForbidBeingBlocked\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"affected\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
   Spec.it s "CreateEmblem" $
     Common.assertJsonCodec
       s

@@ -181,6 +181,13 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.LifeTotal (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       " {\"type\":\"LifeTotal\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
+  -- CR 103.4, LifeTotal's wire shape: Resolute Archangel's "your".
+  Spec.it s "StartingLifeTotal" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.StartingLifeTotal (PlayerRef.Relative PlayerRelation.You))
+      " {\"type\":\"StartingLifeTotal\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}} "
   -- CR 725.1, with a PlayerRef and nothing else on the wire: the arm answers a
   -- 0/1 rather than carrying a number. Dawnglade Regent's "you're the monarch"
   -- is the Relative arm; the InSlot arm beside it is the one a recursive decoder

@@ -13,6 +13,11 @@ import qualified Pawl.Types.Status as Status
 
 data Player = MkPlayer
   { life :: Integer,
+    -- | CR 103.4 / 119.1: the life total this player began the game with, fixed
+    -- at setup. A shared team total's member holds the team's (CR 119.1a, 810.4,
+    -- CR 810.9a's reading of an individual's total); a restart (CR 727.1) and a
+    -- subgame (CR 729.2) set it afresh under rule 103.
+    startingLife :: Integer,
     status :: Status.Status,
     -- | CR 122.1: player counters, counted per kind. Unlike object counters (CR
     -- 122.2, which cease to exist on a zone change), these persist for the whole
