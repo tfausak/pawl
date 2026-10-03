@@ -1,0 +1,137 @@
+{
+  "description": "CR 706.1 each player rolls, and the opponent with the highest result can't be attacked by the Dragon",
+  "note": "Chaos Dragon's trigger has each player roll a d20 in APNAP order: alice, then bob, then carol, every die answered from alice's seat. Bob's 16 is his own Night Shift of the Living Dead's to raise (CR 706.2a, 706.2b), so the offer goes to bob, who pays 1 life for 17. Three seats, so barring bob leaves carol: the Dragon must attack (CR 508.1d) and, with one opponent left, is announced at carol unasked. The card omits 'if one or more opponents': a restriction aimed at its own controller bars nothing, since only opponents defend (CR 506.2, 802.2). Legs: bob highest (here), alice and bob tied for highest (--tie), alice highest (--control), which leaves both opponents attackable.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Chaos Dragon",
+            "label": "dragon"
+          }
+        ],
+        "library": [
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Night Shift of the Living Dead",
+            "label": "shift"
+          }
+        ],
+        "library": [
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "library": [
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "RollDie",
+          "with": 5
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "RollDie",
+          "with": 16
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "bob",
+      "do": {
+        "Answer": {
+          "prompt": "AdjustDieRoll",
+          "with": [
+            0,
+            "Increase"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "RollDie",
+          "with": 9
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$dragon"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Attackers": {
+          "attackers": {
+            "$dragon": "$carol"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "bob",
+          "life": 19
+        }
+      }
+    }
+  ]
+}

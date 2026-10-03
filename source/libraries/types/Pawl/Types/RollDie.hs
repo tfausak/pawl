@@ -2,6 +2,7 @@ module Pawl.Types.RollDie where
 
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.DiceReading as DiceReading
+import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
 
@@ -64,6 +65,17 @@ import qualified Pawl.Types.SlotName as SlotName
 -- against the striation's range, which is what CR 706.3b's "all part of one
 -- ability" already says (Djinni Windseer, Pawl.DiceSpec).
 --
+-- `roller` is CR 706.1's player the instruction is aimed at: You for every
+-- printing but Chaos Dragon's "each player rolls a d20", which is EachPlayer.
+-- Each roller throws in APNAP order (CR 101.4) and is the player CR 706.2b's
+-- pick and CR 706.4's choice belong to. Where several roll, `slot` binds the
+-- highest result any of them used, and `other` is held by Pawl.CardSpec's lint
+-- to the one-roller instruction.
+--
+-- `highest` binds EVERY player whose used result was the highest of the
+-- instruction's rollers, ties included, as players for a later clause to name
+-- (Chaos Dragon's "those players"). Nothing where no clause reads it.
+--
 -- Construct with BRACE syntax everywhere: positional construction absorbs a new
 -- field in argument order with nothing red (#2009, #2021).
 data RollDie = MkRollDie
@@ -72,7 +84,9 @@ data RollDie = MkRollDie
     modifier :: Maybe Quantity.Quantity,
     reading :: DiceReading.DiceReading,
     slot :: SlotName.SlotName,
-    other :: Maybe SlotName.SlotName
+    other :: Maybe SlotName.SlotName,
+    roller :: PlayerScope.PlayerScope,
+    highest :: Maybe SlotName.SlotName
   }
   deriving (Eq, Ord, Show)
 
@@ -84,3 +98,8 @@ defaultCount = Quantity.Literal 1
 -- elides.
 defaultReading :: DiceReading.DiceReading
 defaultReading = DiceReading.ChooseOne
+
+-- | What an instruction rolled by its controller writes (CR 109.5), and the
+-- value the codec elides.
+defaultRoller :: PlayerScope.PlayerScope
+defaultRoller = PlayerScope.You

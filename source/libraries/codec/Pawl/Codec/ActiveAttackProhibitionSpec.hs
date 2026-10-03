@@ -6,6 +6,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Types.AimedAt as AimedAt
+import qualified Pawl.Types.AimedPlayers as AimedPlayers
 import qualified Pawl.Types.AttackTargetKind as AttackTargetKind
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Expiry as Expiry
@@ -46,8 +47,8 @@ spec s = Spec.describe s "Pawl.Codec.ActiveAttackProhibition" $ do
           ActiveAttackProhibition.timestamp = Timestamp.MkTimestamp 2,
           ActiveAttackProhibition.expiry = Expiry.AtTurnOf (PlayerId.MkPlayerId 4),
           ActiveAttackProhibition.affected = RestrictedCreatures.Matching (Filter.HasCardType CardType.Creature),
-          ActiveAttackProhibition.aimedAt = Just (AimedAt.MkAimedAt PlayerScope.You (Set.singleton AttackTargetKind.OfPlayer))
+          ActiveAttackProhibition.aimedAt = Just (AimedAt.MkAimedAt (AimedPlayers.Scoped PlayerScope.You) (Set.singleton AttackTargetKind.OfPlayer))
         }
-      " {\"source\":1,\"controller\":4,\"timestamp\":2,\"expiry\":{\"type\":\"AtTurnOf\",\"value\":4},\"affected\":{\"type\":\"Matching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"aimedAt\":{\"defenders\":{\"type\":\"You\"},\"kinds\":[{\"type\":\"OfPlayer\"}]}} "
+      " {\"source\":1,\"controller\":4,\"timestamp\":2,\"expiry\":{\"type\":\"AtTurnOf\",\"value\":4},\"affected\":{\"type\":\"Matching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"aimedAt\":{\"defenders\":{\"type\":\"Scoped\",\"value\":{\"type\":\"You\"}},\"kinds\":[{\"type\":\"OfPlayer\"}]}} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s ActiveAttackProhibition.codec
