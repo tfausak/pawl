@@ -646,6 +646,7 @@ objectRefPositions =
         ("redirect-damage", Effect.RedirectDamage (RedirectDamage.MkRedirectDamage Duration.UntilEndOfTurn Nothing Nothing (Just (plantedRef "rd-from")) Nothing Nothing (plantedRef "rd-to") Nothing), [plantedRef "rd-from", plantedRef "rd-to"]),
         ("counter", Effect.Counter (Counter.MkCounter (plantedRef "co") Nothing Nothing Nothing), [plantedRef "co"]),
         ("put-counters", Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Type.Literal 1) (plantedRef "pc")), [plantedRef "pc"]),
+        ("distribute-counters", Effect.DistributeCounters (PutCounters.MkPutCounters CounterKind.Stun (Quantity.Type.Literal 3) (plantedRef "dc")), [plantedRef "dc"]),
         ("move-counters", Effect.MoveCounters (MoveCounters.MkMoveCounters (plantedRef "mc-from") MovedKinds.Every Nothing (plantedRef "mc-to")), [plantedRef "mc-from", plantedRef "mc-to"]),
         ("put-counters-from", Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom (SlotName.MkSlotName (Text.pack "giver")) Nothing (plantedRef "pf")), [plantedRef "pf"]),
         ("tap", Effect.Tap (plantedRef "ta"), [plantedRef "ta"]),
@@ -1351,6 +1352,7 @@ ownCounts effect = case effect of
   Effect.ExchangeBlocks _ -> []
   Effect.Counter {} -> []
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> quantityCounts quantity
+  Effect.DistributeCounters (PutCounters.MkPutCounters _ quantity _) -> quantityCounts quantity
   Effect.PutCountersFrom {} -> []
   -- The count the moved kinds may write. CR 122.5's GIVER carries the other one,
   -- through the ObjectRef it became when the first side was widened to a group,
@@ -1828,6 +1830,7 @@ effectNestedEffects effect = case effect of
   Effect.ExchangeBlocks {} -> []
   Effect.Counter {} -> []
   Effect.PutCounters {} -> []
+  Effect.DistributeCounters {} -> []
   Effect.PutCountersFrom {} -> []
   Effect.MoveCounters {} -> []
   Effect.RemoveCounters {} -> []
@@ -2357,6 +2360,7 @@ effectReplacements effect = case effect of
   Effect.ExchangeBlocks _ -> []
   Effect.Counter {} -> []
   Effect.PutCounters {} -> []
+  Effect.DistributeCounters {} -> []
   Effect.PutCountersFrom {} -> []
   Effect.MoveCounters {} -> []
   Effect.RemoveCounters {} -> []
@@ -2850,6 +2854,7 @@ effectMintedFaces effect = case effect of
   Effect.ExchangeBlocks _ -> []
   Effect.Counter {} -> []
   Effect.PutCounters {} -> []
+  Effect.DistributeCounters {} -> []
   Effect.PutCountersFrom {} -> []
   Effect.MoveCounters {} -> []
   Effect.RemoveCounters {} -> []
@@ -5974,6 +5979,7 @@ effectFilters effect = case effect of
   -- otherwise escape the lint; the count is a Quantity like any other; and CR
   -- 122.1b's kind may be a whole Keyword with a Filter under it; see #2728.
   Effect.PutCounters (PutCounters.MkPutCounters kind quantity ref) -> frame Unframed (counterKindFilters kind <> quantityFilters quantity) <> frame SourceHostFramed (objectRefFilters ref)
+  Effect.DistributeCounters (PutCounters.MkPutCounters kind quantity ref) -> frame Unframed (counterKindFilters kind <> quantityFilters quantity) <> frame SourceHostFramed (objectRefFilters ref)
   -- The destination and CR 122.1b's kind, PutCounters' framing: `from` is a bare
   -- SlotName and carries no Filter, and the kind is the one rule 122.8's second
   -- sentence lets a card name, which may be a whole Keyword with a Filter under

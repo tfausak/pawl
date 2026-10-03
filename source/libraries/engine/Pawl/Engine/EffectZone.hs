@@ -223,6 +223,7 @@ zoneFunctionedFrom itself delayed effect = case effect of
   Effect.RedirectDamage {} -> Nothing
   Effect.Counter {} -> Nothing
   Effect.PutCounters {} -> Nothing
+  Effect.DistributeCounters {} -> Nothing
   Effect.PutCountersFrom {} -> Nothing
   Effect.RemoveCounters {} -> Nothing
   Effect.RemoveCountersAmong {} -> Nothing

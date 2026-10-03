@@ -1671,6 +1671,15 @@ combatReplaySpec s =
           Spec.assertEqWith s "taking none round trips" (Replay.decode p (Replay.encode p Map.empty)) (Just Map.empty)
           -- Discriminating: fails if the division prompts share a response.
           Spec.assertEqWith s "and a floored division transcript does not decode as one" (Replay.decode p (Response.ChoseCounterRemovalAtLeast most)) Nothing
+        -- CR 608.2d, dividing new counters among chosen permanents.
+        Spec.it s "ChooseCounterDistribution round-trips through the transcript" $ do
+          let a = ObjectId.MkObjectId 11
+              b = ObjectId.MkObjectId 13
+              p = Prompt.ChooseCounterDistribution decider S.alice oid 3 (a NonEmpty.:| [b])
+              split = Map.fromList [(a, 2 :: Natural.Natural), (b, 1)]
+          Spec.assertEqWith s "a split round trips" (Replay.decode p (Replay.encode p split)) (Just split)
+          -- Discriminating: fails if it shares a removal prompt's response.
+          Spec.assertEqWith s "and a removal transcript does not decode as one" (Replay.decode p (Response.ChoseCounterRemovalAmong split)) Nothing
         -- CR 122.1 / 601.2h, where the payer divides by kind as well.
         Spec.it s "ChooseMixedCounterRemoval round-trips through the transcript" $ do
           let a = ObjectId.MkObjectId 11

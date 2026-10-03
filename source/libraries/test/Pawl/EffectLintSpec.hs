@@ -336,6 +336,7 @@ ownQuantities effect = case effect of
   Effect.ExchangeBlocks _ -> []
   Effect.Counter {} -> []
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> [quantity]
+  Effect.DistributeCounters (PutCounters.MkPutCounters _ quantity _) -> [quantity]
   Effect.PutCountersFrom {} -> []
   Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> Maybe.maybeToList (MovedKinds.quantityOf kinds)
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _ _) -> [quantity]
@@ -1452,6 +1453,9 @@ effectObjectRefs effect =
         Effect.ExchangeBlocks {} -> []
         Effect.Counter (Counter.MkCounter ref _ _ _) -> read_ [ref]
         Effect.PutCounters (PutCounters.MkPutCounters _ _ ref) -> read_ [ref]
+        -- A READ: which of the swept permanents get counters is asked of the
+        -- answer (Prompt.ChooseCounterDistribution), not of the ref.
+        Effect.DistributeCounters (PutCounters.MkPutCounters _ _ ref) -> read_ [ref]
         Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom _ _ ref) -> read_ [ref]
         -- BOTH sides, each a READ -- CR 122.5 takes no choice of WHICH objects the
         -- counters leave or land on, so this arm goes through the pure objectRefObjects
