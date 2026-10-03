@@ -8686,7 +8686,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           _ -> do
             answer <- Game.choose (Prompt.ChooseCounterDistribution (Decide.deciderFor controller gs) controller source total offered)
             -- An answer that does not divide the total among offered
-            -- permanents takes the replay default rather than a repair.
+            -- permanents takes the replay default rather than a repair. A
+            -- regression fence, not a proved behaviour: the scenario runner
+            -- refuses an unoffered answer before it reaches here.
             pure (if distributes total offered answer then answer else fallback)
         -- One action on several objects, so one placement event (CR 608.2f):
         -- Effect.PutCounters' bracket.
