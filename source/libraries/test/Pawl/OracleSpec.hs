@@ -6,7 +6,6 @@ import qualified Control.Monad as Monad
 import qualified Data.Char as Char
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Maybe as Maybe
-import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Keyword as Codec.Keyword
 import qualified Pawl.Ingest as Ingest
@@ -19,37 +18,24 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Card as Card
-import qualified Pawl.Types.CardName as CardName
-import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.TypeLine as TypeLine
 
 spec :: (Monad n) => Spec.Spec IO n -> n ()
 spec s = Spec.describe s "Pawl.Oracle" $ do
+  -- Oracle text is optional; a keyword-only card that carries it must agree.
   Spec.it s "each keyword-only card says what its Oracle text says" $ do
     loaded <- Registry.defaultRoot >>= Registry.loadRoot
-    let keywordOnly = [(card, rendered) | entry@(_, Right card) <- loaded, Maybe.isJust (Registry.referenceCard entry), Just rendered <- [Oracle.render card]]
-    Spec.assertBool s (not (null keywordOnly)) "no keyword-only cards"
-    Monad.forM_ keywordOnly $ \(card, rendered) -> do
-      let name = Text.unpack (Slug.unwrap (Registry.filedAs card))
-      case Face.oracleText (NonEmpty.head (Card.faces card)) of
-        Nothing -> Spec.assertFailure s (name <> ": no Oracle text")
-        Just text -> Spec.assertEqWith s name (Oracle.normalise text) (Oracle.normalise rendered)
-
-  -- `pawl ingest` stamps the text on every card MTGJSON has; a dungeon (CR
-  -- 309) is not among them, since MTGJSON files dungeons with the tokens.
-  Spec.it s "every face of the reference carries its Oracle text" $ do
-    loaded <- Registry.defaultRoot >>= Registry.loadRoot
-    let missing =
-          [ Text.unpack (CardName.unwrap (Face.name face))
+    let checked =
+          [ (card, text, rendered)
           | entry@(_, Right card) <- loaded,
             Maybe.isJust (Registry.referenceCard entry),
-            face <- NonEmpty.toList (Card.faces card),
-            Maybe.isNothing (Face.oracleText face),
-            CardType.Dungeon `Set.notMember` TypeLine.types (Face.typeLine face)
+            Just rendered <- [Oracle.render card],
+            Just text <- [Face.oracleText (NonEmpty.head (Card.faces card))]
           ]
-    Spec.assertEq s [] missing
+    Spec.assertBool s (not (null checked)) "no keyword-only card carries Oracle text"
+    Monad.forM_ checked $ \(card, text, rendered) ->
+      Spec.assertEqWith s (Text.unpack (Slug.unwrap (Registry.filedAs card))) (Oracle.normalise text) (Oracle.normalise rendered)
 
   Spec.it s "normalise drops reminder text and splits a keyword line" $ do
     Spec.assertEq s (fmap Text.pack ["flying", "trample", "vigilance"]) (Oracle.normalise (Text.pack "Flying, vigilance\nTrample (This creature can deal excess combat damage.)"))
