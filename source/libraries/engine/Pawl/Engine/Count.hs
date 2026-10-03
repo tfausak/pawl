@@ -921,6 +921,7 @@ snapshotView viewOf gs shape event = case event of
           (LastKnown.counters lastKnown)
           (LastKnown.characteristics lastKnown)
   GameEvent.Scried _ -> Nothing
+  GameEvent.LostTheGame _ -> Nothing
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.Proliferated _ -> Nothing
