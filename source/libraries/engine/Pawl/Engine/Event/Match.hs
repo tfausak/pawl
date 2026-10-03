@@ -2457,7 +2457,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _ _ _)
       | oid == bearer ->
           let viewOf = Projection.viewWithLastKnown bearer gs
-              context = SourceContext.withChoicesOf bearer gs (Filter.contextComparingPower (Game.teams gs) (Just you) bearer (Filter.power =<< viewOf bearer))
+              context = SourceContext.withChoicesOf bearer gs (Filter.contextComparingPower (Game.teams gs) (Just you) bearer (Filter.power =<< viewOf bearer) (Filter.toughness =<< viewOf bearer))
               -- Rule 702.149a's "OTHER". Not independently observable while the
               -- Filter's comparison is strict -- nothing has power greater than
               -- its own -- so dropping it leaves the suite green; it is here

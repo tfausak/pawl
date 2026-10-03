@@ -931,13 +931,13 @@ cantBeBlockedBy defending blockers attackers gs =
         Just (affected, criterion) ->
           let subject = if null changes then affected else Projection.rewriteAffected changes affected
               wanted = if null changes then criterion else Filter.rewrite changes criterion
-              -- Lazy in the power, which a filter naming no source-power atom
-              -- never forces.
+              -- Lazy in the power and toughness, which a filter naming no
+              -- source-power or source-toughness atom never forces.
               -- CR 702.16k: the carrier of rule 702.16f's minted row IS the
               -- attacker (Affected.Matching Filter.IsSource), so the chosen
               -- player comes off the same object the power does.
               context attacker =
-                (Filter.contextComparingPower (Game.teams gs) (Projection.controllerOf attacker gs) attacker (Projection.powerOf attacker gs))
+                (Filter.contextComparingPower (Game.teams gs) (Projection.controllerOf attacker gs) attacker (Projection.powerOf attacker gs) (Projection.toughnessOf attacker gs))
                   { Filter.carrierChosenPlayer = Game.lookupObject attacker gs >>= Object.chosenPlayer
                   }
               matched attacker blocker = Filter.matches (context attacker) (Projection.viewOfObject blocker gs) wanted
@@ -990,8 +990,9 @@ storedEvasions blockers attackers gs =
 -- or greater", the Spirit token's "can't block ... non-Spirit creatures".
 -- `cantBeBlockedBy`'s walk with the sides swapped: the affected set names
 -- BLOCKERS, and the Filter is matched against each attacker in the blocker's
--- context, so Spitfire Handler's "greater than this creature's power" compares
--- against the blocker. Both read off the projection (CR 613), at the moment the
+-- context, so Spitfire Handler's "greater than this creature's power" and
+-- Ironclaw Curse's "the enchanted creature's toughness" compare against the
+-- blocker. Both read off the projection (CR 613), at the moment the
 -- declaration is checked.
 cantBlockCreatures :: Maybe PlayerId -> [ObjectId] -> [ObjectId] -> GameState -> Set (ObjectId, ObjectId)
 cantBlockCreatures defending blockers attackers gs =
@@ -1003,7 +1004,7 @@ cantBlockCreatures defending blockers attackers gs =
         Just (affected, criterion) ->
           let subject = if null changes then affected else Projection.rewriteAffected changes affected
               wanted = if null changes then criterion else Filter.rewrite changes criterion
-              context blocker = Filter.contextComparingPower (Game.teams gs) (Projection.controllerOf blocker gs) blocker (Projection.powerOf blocker gs)
+              context blocker = Filter.contextComparingPower (Game.teams gs) (Projection.controllerOf blocker gs) blocker (Projection.powerOf blocker gs) (Projection.toughnessOf blocker gs)
               matched blocker attacker = Filter.matches (context blocker) (Projection.viewOfObject attacker gs) wanted
               barred blocker = fmap (\attacker -> (blocker, attacker)) (filter (matched blocker) attackers)
               -- CR 116.2d, `cantBeBlockedBy`'s filter with the BLOCKERS as the

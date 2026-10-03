@@ -85,6 +85,11 @@ data Filter keyword
     -- strictly greater than the source's (CR 702.149a's training). Not
     -- PowerLessThanSource's negation, which admits equal and absent power alike.
     PowerGreaterThanSource
+  | -- | CR 208.1 against the SOURCE's toughness: the object's power is >= the
+    -- toughness of the object the evaluation comes from (Ironclaw Curse, a CR
+    -- 509.1b pairwise restriction). Read off Pawl.Engine.Filter.Context's
+    -- sourceToughness, and vacuously False where either number is absent.
+    PowerAtLeastSourceToughness
   | -- | CR 208.1 compared against a number an earlier clause of the same
     -- resolution BOUND at this slot -- Localized Destruction's "power equal to
     -- the amount of {E} paid this way". Exact equality, and vacuously False where

@@ -4729,6 +4729,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.ToughnessGreaterThanPower -> []
   Filter.Type.PowerLessThanSource -> []
   Filter.Type.PowerGreaterThanSource -> []
+  Filter.Type.PowerAtLeastSourceToughness -> []
   -- Not one either, though it names a slot: the slot holds an AMOUNT
   -- (Pawl.Engine.Filter.Context's boundAmounts), a namespace disjoint from the
   -- object slots a binder mints, which is ControlledByBound's position above.

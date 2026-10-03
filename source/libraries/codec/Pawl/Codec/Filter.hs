@@ -53,6 +53,7 @@ codec keywordCodec =
       Arm.nullary "ToughnessGreaterThanPower" Filter.ToughnessGreaterThanPower,
       Arm.nullary "PowerLessThanSource" Filter.PowerLessThanSource,
       Arm.nullary "PowerGreaterThanSource" Filter.PowerGreaterThanSource,
+      Arm.nullary "PowerAtLeastSourceToughness" Filter.PowerAtLeastSourceToughness,
       Arm.payload "PowerIsAmountInSlot" SlotName.codec Filter.PowerIsAmountInSlot (\x -> case x of Filter.PowerIsAmountInSlot y -> Just y; _ -> Nothing),
       Arm.payload "PowerAtLeastAmountInSlot" SlotName.codec Filter.PowerAtLeastAmountInSlot (\x -> case x of Filter.PowerAtLeastAmountInSlot y -> Just y; _ -> Nothing),
       Arm.nullary "ControlledByDefendingPlayer" Filter.ControlledByDefendingPlayer,
@@ -182,6 +183,7 @@ tagOf x = case x of
   Filter.ToughnessGreaterThanPower {} -> "ToughnessGreaterThanPower"
   Filter.PowerLessThanSource {} -> "PowerLessThanSource"
   Filter.PowerGreaterThanSource {} -> "PowerGreaterThanSource"
+  Filter.PowerAtLeastSourceToughness {} -> "PowerAtLeastSourceToughness"
   Filter.PowerIsAmountInSlot {} -> "PowerIsAmountInSlot"
   Filter.PowerAtLeastAmountInSlot {} -> "PowerAtLeastAmountInSlot"
   Filter.ControlledByDefendingPlayer {} -> "ControlledByDefendingPlayer"
