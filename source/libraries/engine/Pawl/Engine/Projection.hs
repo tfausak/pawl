@@ -3959,6 +3959,7 @@ quantityReads q = case q of
   Quantity.Type.Star -> Set.empty
   Quantity.Type.ManaCount _ -> Set.empty
   Quantity.Type.LifeTotal _ -> Set.empty
+  Quantity.Type.StartingLifeTotal _ -> Set.empty
   Quantity.Type.Speed _ -> Set.empty
   Quantity.Type.IsMonarch _ -> Set.empty
   -- Reads Player.designations, which no Modification writes, so CR 613.8a's

@@ -89,6 +89,8 @@ data Quantity
     ManaCount ManaCount.ManaCount
   | -- | CR 119.1: that player's life total.
     LifeTotal PlayerRef.PlayerRef
+  | -- | CR 103.4 / 119.1: that player's starting life total.
+    StartingLifeTotal PlayerRef.PlayerRef
   | -- | CR 702.179: that player's speed; no speed reads 0 (CR 702.179f).
     Speed PlayerRef.PlayerRef
   | -- | CR 725.1: 1 if that player is the monarch, else 0; no monarch reads 0

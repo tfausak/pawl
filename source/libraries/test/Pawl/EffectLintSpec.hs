@@ -441,6 +441,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.Count {} -> False
   Quantity.Type.ManaCount {} -> False
   Quantity.Type.LifeTotal {} -> False
+  Quantity.Type.StartingLifeTotal {} -> False
   Quantity.Type.Speed {} -> False
   Quantity.Type.IsMonarch {} -> False
   Quantity.Type.HasPlayerDesignation {} -> False
