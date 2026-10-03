@@ -231,6 +231,7 @@ import qualified Pawl.Codec.DevourSpec
 import qualified Pawl.Codec.DiceReadingSpec
 import qualified Pawl.Codec.DieRollRSpec
 import qualified Pawl.Codec.DieRollRewriteSpec
+import qualified Pawl.Codec.DifferentInSpec
 import qualified Pawl.Codec.DiscardCardsSpec
 import qualified Pawl.Codec.DiscardCauseSpec
 import qualified Pawl.Codec.DiscardSpec
@@ -1352,6 +1353,7 @@ spec s registry = do
   Pawl.Codec.RoomHalfSpec.spec s
   Pawl.Codec.RoomIndexSpec.spec s
   Pawl.Codec.RoundingSpec.spec s
+  Pawl.Codec.DifferentInSpec.spec s
   Pawl.Codec.RuleAbilitiesSpec.spec s
   Pawl.Codec.SacrificeAnyNumberSpec.spec s
   Pawl.Codec.SacrificeToEnterSpec.spec s

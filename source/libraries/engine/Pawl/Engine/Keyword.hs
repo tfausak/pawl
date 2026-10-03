@@ -57,6 +57,7 @@ import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CostChoice as CostChoice
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CostDirection as CostDirection
 import qualified Pawl.Types.CostKeyword as CostKeyword
@@ -880,7 +881,7 @@ cycling cost searchFor =
                 -- CR 701.3a question, so no object is fixed for one to be about.
                 Search.subject = Nothing,
                 Search.slot = Nothing,
-                Search.differentNames = False
+                Search.differentIn = Set.empty
               }
    in ActivatedAbility.MkActivatedAbility
         { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.DiscardThis DiscardCause.ToPayCyclingCost]},
@@ -1074,7 +1075,7 @@ searchForSameManaValue cost filter_ destination =
               -- CR 701.3a question, so no object is fixed for one to be about.
               Search.subject = Nothing,
               Search.slot = Nothing,
-              Search.differentNames = False
+              Search.differentIn = Set.empty
             }
    in ActivatedAbility.MkActivatedAbility
         { ActivatedAbility.cost = cost,
@@ -6455,7 +6456,7 @@ extort =
       gate =
         PayGate.MkPayGate
           { PayGate.payer = PlayerRef.Relative PlayerRelation.You,
-            PayGate.cost = extortCost,
+            PayGate.cost = CostChoice.MkCostChoice (extortCost NonEmpty.:| []),
             PayGate.basis = Nothing,
             PayGate.branch = PayBranch.IfPaid,
             PayGate.obligation = PayObligation.Optional,
@@ -6898,7 +6899,7 @@ ward w =
       gate =
         PayGate.MkPayGate
           { PayGate.payer = PlayerRef.ControllerOfBound Binding.targetingObject,
-            PayGate.cost = Ward.cost w,
+            PayGate.cost = CostChoice.MkCostChoice (Ward.cost w NonEmpty.:| []),
             PayGate.basis = Nothing,
             PayGate.branch = PayBranch.IfNotPaid,
             PayGate.obligation = PayObligation.Optional,
@@ -7609,12 +7610,15 @@ fabricate n =
         PayGate.MkPayGate
           { PayGate.payer = PlayerRef.InSlot Binding.you,
             PayGate.cost =
-              Cost.MkCost
-                { -- CR 118.5, crew's note above: no mana part is `Just` an empty
-                  -- one, never the Nothing that means unpayable.
-                  Cost.mana = Just (ManaCost.MkManaCost []),
-                  Cost.components = [CostComponent.PutPlusOneCountersOnThis n]
-                },
+              CostChoice.MkCostChoice
+                ( Cost.MkCost
+                    { -- CR 118.5, crew's note above: no mana part is `Just` an empty
+                      -- one, never the Nothing that means unpayable.
+                      Cost.mana = Just (ManaCost.MkManaCost []),
+                      Cost.components = [CostComponent.PutPlusOneCountersOnThis n]
+                    }
+                    NonEmpty.:| []
+                ),
             PayGate.basis = Nothing,
             PayGate.branch = PayBranch.IfNotPaid,
             -- Optional because rule 702.123a prints the "may" itself; no offeredAt,
@@ -8217,7 +8221,7 @@ partnerWith name =
               -- Nothing attaches and the filter asks no CR 701.3a question.
               Search.subject = Nothing,
               Search.slot = Nothing,
-              Search.differentNames = False
+              Search.differentIn = Set.empty
             }
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfEnters,
@@ -8457,7 +8461,7 @@ recover cost =
   let gate branch offeredAt =
         PayGate.MkPayGate
           { PayGate.payer = PlayerRef.Relative PlayerRelation.You,
-            PayGate.cost = cost,
+            PayGate.cost = CostChoice.MkCostChoice (cost NonEmpty.:| []),
             PayGate.basis = Nothing,
             PayGate.branch = branch,
             PayGate.obligation = PayObligation.Optional,
@@ -9661,7 +9665,7 @@ cumulativeUpkeep cost =
       gate =
         PayGate.MkPayGate
           { PayGate.payer = PlayerRef.Relative PlayerRelation.You,
-            PayGate.cost = cost,
+            PayGate.cost = CostChoice.MkCostChoice (cost NonEmpty.:| []),
             PayGate.basis = Nothing,
             PayGate.branch = PayBranch.IfNotPaid,
             PayGate.obligation = PayObligation.Optional,
@@ -9715,7 +9719,7 @@ echo cost =
       gate =
         PayGate.MkPayGate
           { PayGate.payer = PlayerRef.Relative PlayerRelation.You,
-            PayGate.cost = cost,
+            PayGate.cost = CostChoice.MkCostChoice (cost NonEmpty.:| []),
             PayGate.basis = Nothing,
             PayGate.branch = PayBranch.IfNotPaid,
             PayGate.obligation = PayObligation.Optional,

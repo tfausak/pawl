@@ -507,6 +507,8 @@ library codec
     Pawl.Codec.DieRollRewrite
     Pawl.Codec.DieRollRewriteSpec
     Pawl.Codec.DieRollRSpec
+    Pawl.Codec.DifferentIn
+    Pawl.Codec.DifferentInSpec
     Pawl.Codec.Discard
     Pawl.Codec.DiscardCards
     Pawl.Codec.DiscardCardsSpec
@@ -2147,6 +2149,7 @@ library types
     Pawl.Types.DieResult
     Pawl.Types.DieRollR
     Pawl.Types.DieRollRewrite
+    Pawl.Types.DifferentIn
     Pawl.Types.Discard
     Pawl.Types.DiscardCards
     Pawl.Types.DiscardCause

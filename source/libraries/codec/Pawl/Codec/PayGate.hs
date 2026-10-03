@@ -2,6 +2,7 @@
 
 module Pawl.Codec.PayGate where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Pawl.Codec.ClauseIndex as ClauseIndex
 import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.CostBasis as CostBasis
@@ -13,6 +14,7 @@ import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
+import qualified Pawl.Types.CostChoice as CostChoice
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PayObligation as PayObligation
 
@@ -22,7 +24,7 @@ import qualified Pawl.Types.PayObligation as PayObligation
 -- the branch, where a default would let a card written a word short play as the
 -- opposite card.
 --
--- The other four are elided when unmarked, which is what every card but
+-- The other five are elided when unmarked, which is what every card but
 -- Standstill and Don't Make a Sound writes: CR 118.12a's rewriting makes an
 -- "unless" cost optional, a clause that names no other clause makes its own
 -- offer, and a cost is offered once rather than once per counted thing.
@@ -31,10 +33,14 @@ import qualified Pawl.Types.PayObligation as PayObligation
 -- `basis` is Flash's alone: CR 118.6 lets a cost be described in terms of
 -- another object's mana cost rather than printed, and every other gate prints
 -- one.
+--
+-- `cost` is the gate's first option and `orCosts` the rest, in printed order
+-- (Pawl.Types.PayGate.cost), so a one-option gate writes no list.
 codec :: Codec.Codec PayGate.PayGate
 codec = Fields.object $ do
   payer <- Fields.required "payer" PlayerRef.codec PayGate.payer
-  cost <- Fields.required "cost" (Cost.codec Keyword.codec) PayGate.cost
+  cost <- Fields.required "cost" (Cost.codec Keyword.codec) (NonEmpty.head . CostChoice.unwrap . PayGate.cost)
+  orCosts <- Fields.defaulted "orCosts" [] (Common.list (Cost.codec Keyword.codec)) (NonEmpty.tail . CostChoice.unwrap . PayGate.cost)
   basis <- Fields.defaulted "basis" Nothing (Common.maybe CostBasis.codec) PayGate.basis
   branch <- Fields.required "branch" PayBranch.codec PayGate.branch
   obligation <- Fields.defaulted "obligation" PayObligation.Optional PayObligation.codec PayGate.obligation
@@ -43,7 +49,7 @@ codec = Fields.object $ do
   pure
     PayGate.MkPayGate
       { PayGate.payer = payer,
-        PayGate.cost = cost,
+        PayGate.cost = CostChoice.MkCostChoice (cost NonEmpty.:| orCosts),
         PayGate.basis = basis,
         PayGate.branch = branch,
         PayGate.obligation = obligation,

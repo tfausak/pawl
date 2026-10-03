@@ -4,7 +4,7 @@
       "manaCost": [
         {
           "type": "Generic",
-          "value": 4
+          "value": 2
         },
         {
           "type": "OfType",
@@ -16,7 +16,7 @@
           }
         }
       ],
-      "name": "Elemental Teachings",
+      "name": "Threats Undetected",
       "spell": {
         "modes": [
           {
@@ -31,13 +31,13 @@
                       },
                       "differentIn": [
                         {
-                          "type": "Names"
+                          "type": "Powers"
                         }
                       ],
                       "filter": {
                         "type": "HasCardType",
                         "value": {
-                          "type": "Land"
+                          "type": "Creature"
                         }
                       },
                       "owner": {
@@ -76,6 +76,12 @@
                   {
                     "type": "MoveToZone",
                     "value": {
+                      "placement": {
+                        "type": "RandomOrder",
+                        "value": {
+                          "type": "Top"
+                        }
+                      },
                       "ref": {
                         "type": "ChosenCardFromAmong",
                         "value": {
@@ -94,8 +100,18 @@
                           "slot": "found"
                         }
                       },
+                      "slot": "chosen",
                       "zone": {
-                        "type": "Graveyard"
+                        "type": "Library"
+                      }
+                    }
+                  },
+                  {
+                    "type": "Shuffle",
+                    "value": {
+                      "type": "Relative",
+                      "value": {
+                        "type": "You"
                       }
                     }
                   }
@@ -107,16 +123,20 @@
                     "type": "MoveToZone",
                     "value": {
                       "ref": {
-                        "type": "InSlot",
-                        "value": "found"
-                      },
-                      "riders": {
-                        "tapped": {
-                          "type": "Tapped"
+                        "type": "EachCardFromAmong",
+                        "value": {
+                          "filter": {
+                            "type": "Not",
+                            "value": {
+                              "type": "IsBound",
+                              "value": "chosen"
+                            }
+                          },
+                          "slot": "found"
                         }
                       },
                       "zone": {
-                        "type": "Battlefield"
+                        "type": "Hand"
                       }
                     }
                   }
@@ -127,14 +147,9 @@
         ]
       },
       "typeLine": {
-        "subtypes": [
-          {
-            "type": "Lesson"
-          }
-        ],
         "types": [
           {
-            "type": "Instant"
+            "type": "Sorcery"
           }
         ]
       }

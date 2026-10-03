@@ -1,0 +1,30 @@
+{
+  "description": "CR 106.6 Hydraulic Helper's mana pays an activation and not a nonartifact spell",
+  "note": "The Island makes Ponder castable, so the refusal paying it from Hydraulic Helper is the prohibition; Words of Worship's {1} is an activation of a nonartifact, which the prohibition leaves open.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Hydraulic Helper", "label": "helper", "ready": true },
+          { "card": "Island", "label": "island", "ready": true },
+          { "card": "Words of Worship", "label": "words", "ready": true }
+        ],
+        "hand": [{ "card": "Ponder", "label": "ponder" }]
+      },
+      { "name": "bob" }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "refuse": { "Cast": { "object": "$ponder", "mana": ["$helper", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseOptional": { "type": "Exercises" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "$words", "ability": 0, "mana": ["$helper", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "View": { "of": "Stack", "is": ["ability of $words"] } } }
+  ],
+  "final": [
+    { "Count": { "player": "alice", "zone": "Hand", "card": "Ponder", "count": 1 } },
+    { "Tapped": { "object": "$island", "tapped": false } }
+  ]
+}

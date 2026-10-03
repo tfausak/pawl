@@ -706,7 +706,7 @@ playerRefPositions =
       affecting effect = Effect.AffectPlayers (AffectPlayers.MkAffectPlayers Duration.UntilEndOfTurn (AffectedPlayers.Scoped PlayerScope.You) effect)
    in [ ("add-mana", Effect.AddMana (ManaAddition.MkManaAddition (plantedPlayer "am") ManaProduction.AnyColor (Quantity.Type.Literal 1) ManaRetention.Ordinary Nothing Nothing), [plantedPlayer "am"]),
         ("firebend", Effect.Firebend (ManaAddition.MkManaAddition (plantedPlayer "fb") ManaProduction.AnyColor (Quantity.Type.Literal 1) ManaRetention.Ordinary Nothing Nothing), [plantedPlayer "fb"]),
-        ("search", Effect.Search (Search.MkSearch (plantedPlayer "se-searcher") (plantedPlayer "se-owner") Set.empty False Nothing (Filter.Type.And []) False SearchDestination.Battlefield Nothing Nothing False), [plantedPlayer "se-searcher", plantedPlayer "se-owner"]),
+        ("search", Effect.Search (Search.MkSearch (plantedPlayer "se-searcher") (plantedPlayer "se-owner") Set.empty False Nothing (Filter.Type.And []) False SearchDestination.Battlefield Nothing Nothing Set.empty), [plantedPlayer "se-searcher", plantedPlayer "se-owner"]),
         ("draw", Effect.Draw (Draw.MkDraw (plantedPlayer "dr") one Nothing), [plantedPlayer "dr"]),
         ("mill", Effect.Mill (Mill.MkMill (plantedPlayer "mi") one Nothing Nothing), [plantedPlayer "mi"]),
         ("scry", Effect.Scry (playerQuantity "sc"), [plantedPlayer "sc"]),
@@ -1654,8 +1654,8 @@ turnedUpTriggers = filter ((== TriggerCondition.SelfTurnedFaceUp) . TriggeredAbi
 -- substitutes in.
 payGateCostsOf :: Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [Cost.Type.Cost Keyword.Keyword]
 payGateCostsOf modal =
-  fmap
-    PayGate.cost
+  concatMap
+    (NonEmpty.toList . CostChoice.unwrap . PayGate.cost)
     ( concatMap (Maybe.mapMaybe Clause.payGate . Foldable.toList . Mode.clauses) (Modal.modes modal)
         <> concatMap loopGates (Modal.allEffects modal)
     )
@@ -2492,7 +2492,7 @@ modeBranchesOffend mode =
 -- mana cost (Pawl.Types.CostBasis) and a mana part of its own beside it?
 --
 -- The two are one field's worth of answer at the payment
--- (Pawl.Engine.Resolve.Effect.describedCost overwrites Cost.mana with the derived
+-- (Pawl.Engine.Resolve.Effect.describedCosts overwrites Cost.mana with the derived
 -- amount), so a card writing both states mana nothing pays -- silently, which is
 -- why this is a lint. A card whose cost really is described states
 -- `mana: null`, which is the unpayable cost CR 118.6's first sentence describes
@@ -2504,7 +2504,7 @@ cardCostBasisStatesMana = any (any modeGateStatesMana . Modal.modes) . faceModal
 -- One mode's half of that lint.
 modeGateStatesMana :: Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 modeGateStatesMana mode =
-  let offends gate = Maybe.isJust (PayGate.basis gate) && Maybe.isJust (Cost.Type.mana (PayGate.cost gate))
+  let offends gate = Maybe.isJust (PayGate.basis gate) && any (Maybe.isJust . Cost.Type.mana) (CostChoice.unwrap (PayGate.cost gate))
    in any (maybe False offends . Clause.payGate) (Mode.clauses mode)
 
 -- Do these slot-name sets overlap? True when any name appears in more than one
@@ -3141,7 +3141,7 @@ withCountersFilters w =
 -- resolution's slots.
 payGateFilters :: PayGate.PayGate -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 payGateFilters gate =
-  fmap ((,) Unframed) (costFilters (PayGate.cost gate))
+  fmap ((,) Unframed) (concatMap costFilters (CostChoice.unwrap (PayGate.cost gate)))
     <> concatMap quantityFilters (Maybe.maybeToList (PayGate.perEach gate))
 
 -- CR 122.1b: the one counter kind with a Filter under it, since it carries a
@@ -4864,14 +4864,16 @@ damagePatternFilters pattern_ = DamagePattern.whatSource pattern_ : Maybe.maybeT
 -- 701.6a).
 playerEffectFilters :: PlayerEffect.PlayerEffect -> [Filter.Type.Filter Keyword.Keyword]
 playerEffectFilters playerEffect = case playerEffect of
-  PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost f _) -> [f]
+  -- BOTH Filters, ReduceActivationCost's reason below: `perTarget` asks about
+  -- the spell's targets through the same context.
+  PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost f _ targets) -> f : Maybe.maybeToList targets
   -- CR 601.2f at the ACTIVATION moment, Oppressive Rays' third line. Its Filter
   -- names the ability's SOURCE PERMANENT, exactly as ReduceActivationCost's
   -- below does. The whichKind beside it is not returned, for the reason that
   -- arm's grantedBy is not: CR 605.1a's classification is no more a Filter than
   -- a rule-702 family is.
   PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost f _ _) -> [f]
-  PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost f _ _) -> [f]
+  PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost f _ _ targets) -> f : Maybe.maybeToList targets
   -- CR 601.2f's other moment: Heartstone's Filter narrows the ability's SOURCE
   -- PERMANENT rather than a spell, and is authored the same way. The grantedBy
   -- and whichKind beside it are not returned: neither a KeywordFamily nor CR
@@ -6980,7 +6982,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     flash <- S.printingOf s registry "Flash"
     let face = S.combinedFace flash
         overGate f = face {Face.spell = (Face.spell face) {Modal.modes = fmap (\mode -> mode {Mode.clauses = fmap (\clause -> clause {Clause.payGate = fmap f (Clause.payGate clause)}) (Mode.clauses mode)}) (Modal.modes (Face.spell face))}}
-        stated gate = gate {PayGate.cost = (PayGate.cost gate) {Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])}}
+        stated gate = gate {PayGate.cost = CostChoice.MkCostChoice (fmap (\option -> option {Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])}) (CostChoice.unwrap (PayGate.cost gate)))}
         undescribed gate = gate {PayGate.basis = Nothing}
     Spec.assertBool s (not (cardCostBasisStatesMana face)) "Flash, whose gate states no mana of its own, is accepted"
     Spec.assertBool s (cardCostBasisStatesMana (overGate stated)) "a described cost stating a mana part of its own is rejected"
@@ -7191,6 +7193,11 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             || modalReadsAnnouncedX (Face.spell c)
             || entersTriggerReadsX c
             || turnedUpReadsX c
+            || selfReductionReadsX c
+        -- CR 601.2f's reader: the spell's own reduction counting the X its
+        -- additional cost announced (Torgaar, Famine Incarnate's "for each
+        -- creature sacrificed this way").
+        selfReductionReadsX c = any (Quantity.readsX . CostReduction.perEach) (Face.costReductions c)
         -- CR 702.37f / 702.168e's reader: a turned-face-up ability reading the X
         -- chosen for the morph or disguise cost, through its effects (Warbreak
         -- Trumpeter's X Goblins) or its target count (Aurelia's Vindicator). Its

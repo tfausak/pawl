@@ -1,6 +1,7 @@
 module Pawl.Types.Search where
 
 import qualified Data.Set as Set
+import qualified Pawl.Types.DifferentIn as DifferentIn
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -119,12 +120,12 @@ data Search = MkSearch
     -- the destination minted (CR 400.7), so a later clause or a delayed ability
     -- can say "that card" -- Grinning Totem's "you may play that card".
     slot :: Maybe SlotName.SlotName,
-    -- | Whether the found cards must have different names (CR 201.2b) --
-    -- Gifts Ungiven's "up to four cards with different names". A constraint on
-    -- the found SET, which no per-card filter can state.
+    -- | What no two found cards may share -- Gifts Ungiven's "with different
+    -- names" (CR 201.2b), Threats Undetected's "with different powers". A
+    -- constraint on the found SET, which no per-card filter can state.
     --
     -- Not implemented: a find outside the game (CR 701.23j) is not held to it
     -- (#4295).
-    differentNames :: Bool
+    differentIn :: Set.Set DifferentIn.DifferentIn
   }
   deriving (Eq, Ord, Show)
