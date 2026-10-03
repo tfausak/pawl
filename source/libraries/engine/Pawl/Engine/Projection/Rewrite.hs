@@ -1018,6 +1018,7 @@ rewriteEffect pairs effect = case effect of
     Effect.RepeatIf (RepeatIf.MkRepeatIf (fmap (rewriteEffect pairs) process) (rewriteCondition pairs condition) (fmap (rewriteEffect pairs) ifHolds))
   Effect.Heal ref -> Effect.Heal (rewriteObjectRef pairs ref)
   Effect.ChooseNewTargets ref -> Effect.ChooseNewTargets (rewriteObjectRef pairs ref)
+  Effect.ChangeTargets ref -> Effect.ChangeTargets (rewriteObjectRef pairs ref)
 
 -- CR 612.2 over one word whose family a card's text names rather than a
 -- constructor -- a ChangeText's forbidden-word set.

@@ -298,7 +298,8 @@ codec cardCodec abilityCodec =
           Arm.payload "Repeat" repeatCodec Effect.Repeat (\x -> case x of Effect.Repeat y -> Just y; _ -> Nothing),
           Arm.payload "RepeatIf" repeatIfCodec Effect.RepeatIf (\x -> case x of Effect.RepeatIf y -> Just y; _ -> Nothing),
           Arm.payload "Heal" ObjectRef.codec Effect.Heal (\x -> case x of Effect.Heal y -> Just y; _ -> Nothing),
-          Arm.payload "ChooseNewTargets" ObjectRef.codec Effect.ChooseNewTargets (\x -> case x of Effect.ChooseNewTargets y -> Just y; _ -> Nothing)
+          Arm.payload "ChooseNewTargets" ObjectRef.codec Effect.ChooseNewTargets (\x -> case x of Effect.ChooseNewTargets y -> Just y; _ -> Nothing),
+          Arm.payload "ChangeTargets" ObjectRef.codec Effect.ChangeTargets (\x -> case x of Effect.ChangeTargets y -> Just y; _ -> Nothing)
         ]
 
 tagOf :: Effect.Effect card ability -> String
@@ -468,3 +469,4 @@ tagOf x = case x of
   Effect.RepeatIf {} -> "RepeatIf"
   Effect.Heal {} -> "Heal"
   Effect.ChooseNewTargets {} -> "ChooseNewTargets"
+  Effect.ChangeTargets {} -> "ChangeTargets"

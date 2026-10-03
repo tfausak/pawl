@@ -3005,6 +3005,83 @@ chooseNewTargetsFor unannounced chooser controller copyId = do
           let write o = o {Object.bindings = Map.union (fmap Binding.toRecipients (Map.filter (not . Set.null) drawn)) (Object.bindings o)}
           State.modify' (\g -> g {GameState.objects = Map.adjust write copyId (GameState.objects g)})
 
+-- Effect.ChooseNewTargets' and Effect.ChangeTargets' shared walk: over each
+-- named spell or ability still on the stack, the re-aim is asked of the
+-- resolving controller (Redirect's and Deflection's "you") and judged from the
+-- object's own controller, which is the re-aim's second argument.
+retargetEach :: (PlayerId -> ObjectId -> Game ()) -> Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId -> ObjectId -> ObjectRef -> Game ()
+retargetEach reaim legal resolving controller source ref = do
+  gs <- State.get
+  Monad.forM_ (objectRefObjects legal resolving controller source gs ref) $ \oid -> do
+    g <- State.get
+    Monad.forM_ (List.find ((== Zone.Stack) . Object.zone) (Game.lookupObject oid g)) $ \obj ->
+      Monad.forM_ (copyOnStackOf (Object.source obj)) $ \(_, kind) -> do
+        let aimer = Maybe.fromMaybe (Projection.defaultControllerOf obj) (Projection.controllerOf oid g)
+            before = targetsOnStack oid g
+        reaim aimer oid
+        -- A recipient CR 115.7 newly chose becomes a target of the object (CR
+        -- 601.2c's event), so CR 702.21a's ward fires on it. Only what CHANGED,
+        -- per slot: unlike the copy arm, the object already held the targets it
+        -- kept. Pawl.TargetSpec's Redirect group proves it.
+        after <- State.get
+        let changed = Map.differenceWith (\new old -> let fresh = Set.difference new old in if Set.null fresh then Nothing else Just fresh) (targetsOnStack oid after) before
+        Monad.unless (Map.null changed) (Event.becameTarget after oid kind aimer changed)
+
+-- CR 115.7a: "each target can be changed only to another legal target", a
+-- target that can't be "is unchanged, even if the original target is itself
+-- illegal by then", and "if all the targets aren't changed to other legal
+-- targets, none of them are changed". Effect.ChangeTargets' re-aim, with
+-- chooseNewTargetsFor's two seats: `chooser` is asked, `controller` -- the
+-- object's own -- is who legality is judged from.
+--
+-- Per slot, the OFFER is the recipients legal now less what that slot already
+-- targets ("another"), and the count is what the slot holds. A slot offering
+-- fewer leaves every target unchanged, unasked -- a REGRESSION FENCE, since the
+-- rejection below would refuse every answer anyway. No "may": unlike CR 115.7d
+-- the current targets are not offered, so leaving them is no answer. Not raised
+-- when every slot's offer is exactly its count, the options being
+-- indistinguishable.
+--
+-- Not implemented: a multi-target slot reusing one of its own current targets
+-- for another of them, which CR 115.7e allows (#4659).
+--
+-- Reject-not-repair, chooseNewTargetsFor's posture and for its reason: an
+-- answer outside the offer, a CR 406.4 draw landing on a refused or current
+-- target, or a final set CR 601.2c's joint check refuses (CR 115.7e judges only
+-- the final set) leaves every target unchanged.
+changeTargetsFor :: PlayerId -> PlayerId -> ObjectId -> Game ()
+changeTargetsFor chooser controller oid = do
+  gs <- State.get
+  Monad.forM_ (Game.lookupObject oid gs) $ \obj -> do
+    let slots = stackTargetSlots obj oid gs
+        current = Map.filter (not . Set.null) (targetsOnStack oid gs)
+        seed = Map.withoutKeys (Object.bindings obj) (Map.keysSet slots)
+        aimer = Maybe.fromMaybe oid (Game.abilitySourceOf oid gs)
+        fresh = Target.legalSets (Just controller) False seed aimer slots gs
+        another old = Set.filter (\r -> not (any (Recipient.sameReferent r) old))
+        offer slot old = (Natural.length old, Target.piledOffer (Just chooser) gs (another old (Map.findWithDefault Set.empty slot fresh)))
+        asked = Map.mapWithKey offer current
+        enough (n, offered) = Natural.length offered >= n
+        settled (n, offered) = Natural.length offered == n
+    Monad.when (not (Map.null asked) && all enough asked) $ do
+      answer <-
+        if all settled asked
+          then pure (fmap snd asked)
+          else Game.choose (Prompt.ChooseTargets (Decide.deciderFor chooser gs) chooser oid asked)
+      let admits (n, offered) picked = Natural.length picked == n && Set.isSubsetOf picked offered
+          wellFormed =
+            Map.keysSet answer == Map.keysSet asked
+              && and (Map.elems (Map.intersectionWith admits asked answer))
+      Monad.when wellFormed $ do
+        drawn <- traverse (Target.drawFromPiles (Just chooser)) answer
+        let stands slot picked =
+              Set.isSubsetOf picked (Map.findWithDefault Set.empty slot fresh)
+                && another (Map.findWithDefault Set.empty slot current) picked == picked
+            coherent = all Set.null (Target.jointlyIllegal (Just controller) seed aimer slots drawn gs)
+        Monad.when (and (Map.elems (Map.mapWithKey stands drawn)) && coherent) $ do
+          let write o = o {Object.bindings = Map.union (fmap Binding.toRecipients drawn) (Object.bindings o)}
+          State.modify' (\g -> g {GameState.objects = Map.adjust write oid (GameState.objects g)})
+
 -- CR 707.2: a spell on the stack that becomes a copy acquires the original's
 -- "choices made when casting or activating it (mode, targets, the value of X,
 -- whether it was kicked ...)", replacing its own -- and has none when the
@@ -3223,6 +3300,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.BecomeCopy {} -> False
   Effect.CopyStackObject {} -> False
   Effect.ChooseNewTargets {} -> False
+  Effect.ChangeTargets {} -> False
   Effect.Replace {} -> False
   Effect.SkipNextPhase {} -> False
   Effect.PreventNextDamage {} -> False
@@ -7369,25 +7447,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- ability is itself an ability".
             gsCopied <- State.get
             Event.becameTarget gsCopied copyId kind copier (targetsOnStack copyId gsCopied)
-  Effect.ChooseNewTargets ref -> do
-    gs <- State.get
-    -- CR 115.7d over each named spell or ability still on the stack, asked of
-    -- the resolving controller (Redirect's "you") and judged from the object's
-    -- own controller.
-    Monad.forM_ (objectRefObjects legal resolving controller source gs ref) $ \oid -> do
-      g <- State.get
-      Monad.forM_ (List.find ((== Zone.Stack) . Object.zone) (Game.lookupObject oid g)) $ \obj ->
-        Monad.forM_ (copyOnStackOf (Object.source obj)) $ \(_, kind) -> do
-          let aimer = Maybe.fromMaybe (Projection.defaultControllerOf obj) (Projection.controllerOf oid g)
-              before = targetsOnStack oid g
-          chooseNewTargetsFor False controller aimer oid
-          -- A recipient CR 115.7d newly chose becomes a target of the object
-          -- (CR 601.2c's event), so CR 702.21a's ward fires on it. Only what
-          -- CHANGED, per slot: unlike the copy arm above, the object already
-          -- held the targets it kept. Pawl.TargetSpec's Redirect group proves it.
-          after <- State.get
-          let changed = Map.differenceWith (\new old -> let fresh = Set.difference new old in if Set.null fresh then Nothing else Just fresh) (targetsOnStack oid after) before
-          Monad.unless (Map.null changed) (Event.becameTarget after oid kind aimer changed)
+  -- CR 115.7d over each named spell or ability still on the stack.
+  Effect.ChooseNewTargets ref -> retargetEach (chooseNewTargetsFor False controller) legal resolving controller source ref
+  -- CR 115.7a, the same walk with the stricter re-aim.
+  Effect.ChangeTargets ref -> retargetEach (changeTargetsFor controller) legal resolving controller source ref
   Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger name onset duration) -> do
     gs <- State.get
     -- CR 608.2h's last-known fallback, and not belt and braces: the source can

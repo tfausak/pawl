@@ -482,6 +482,7 @@ manaProduced effect = case effect of
   Effect.RepeatIf (RepeatIf.MkRepeatIf process _ ifHolds) -> Maybe.listToMaybe (Maybe.mapMaybe manaProduced (Foldable.toList (process <> ifHolds)))
   Effect.Heal _ -> Nothing
   Effect.ChooseNewTargets _ -> Nothing
+  Effect.ChangeTargets _ -> Nothing
 
 -- CR 608.2d: does this effect have its controller choose a player and bind the
 -- answer to a slot, and from which players? Read by Mana.manaSuppliesGiven,
@@ -660,6 +661,7 @@ playerChoice effect = case effect of
   Effect.RepeatIf {} -> Nothing
   Effect.Heal _ -> Nothing
   Effect.ChooseNewTargets _ -> Nothing
+  Effect.ChangeTargets _ -> Nothing
 
 -- CR 605.1a's fourth clause, asked of one effect: does it move a card to or from
 -- a library? The 2026-08-07 update added the clause, and `isManaAbility` folds
@@ -933,6 +935,7 @@ movesLibraryCard effect = case effect of
   Effect.RepeatIf (RepeatIf.MkRepeatIf process _ ifHolds) -> any movesLibraryCard (process <> ifHolds)
   Effect.Heal _ -> False
   Effect.ChooseNewTargets _ -> False
+  Effect.ChangeTargets _ -> False
 
 -- Which zone an ObjectRef reaches, asked of libraries alone: does the ref name
 -- cards that may be IN one? movesLibraryCard's shared half, since CR 605.1a's

@@ -1,0 +1,67 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Shunt",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "ChangeTargets",
+                    "value": {
+                      "type": "InSlot",
+                      "value": "spell"
+                    }
+                  }
+                ]
+              }
+            ],
+            "targetSlots": {
+              "spell": {
+                "filter": {
+                  "type": "HasSingleTarget"
+                },
+                "pool": {
+                  "type": "Spells"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}

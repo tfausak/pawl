@@ -683,6 +683,7 @@ objectRefPositions =
         ("for-each", Effect.ForEach (ForEach.MkForEach (plantedRef "fe") LoopMembers.Every (SlotName.MkSlotName (Text.pack "each")) Seq.empty False Nothing), [plantedRef "fe"]),
         ("heal", Effect.Heal (plantedRef "he"), [plantedRef "he"]),
         ("choose-new-targets", Effect.ChooseNewTargets (plantedRef "cnt"), [plantedRef "cnt"]),
+        ("change-targets", Effect.ChangeTargets (plantedRef "ct"), [plantedRef "ct"]),
         ("exchange-values", Effect.ExchangeValues (ExchangeValues.MkExchangeValues (ExchangedValue.Power (plantedRef "xv-power")) (ExchangedValue.Toughness (plantedRef "xv-toughness")) Duration.Indefinite), [plantedRef "xv-power", plantedRef "xv-toughness"])
       ]
 
@@ -1447,6 +1448,7 @@ ownCounts effect = case effect of
   Effect.RepeatIf (RepeatIf.MkRepeatIf process condition ifHolds) -> conditionCounts condition <> concatMap effectCounts (process <> ifHolds)
   Effect.Heal _ -> []
   Effect.ChooseNewTargets _ -> []
+  Effect.ChangeTargets _ -> []
 
 -- Every Count reachable from one triggered ability (a card's own, or a
 -- delayed one -- both TriggeredAbility Card): its TriggerCondition, its
@@ -1740,6 +1742,7 @@ effectNestedEffects effect = case effect of
   Effect.RepeatIf (RepeatIf.MkRepeatIf process _ ifHolds) -> Foldable.toList (process <> ifHolds)
   Effect.Heal _ -> []
   Effect.ChooseNewTargets _ -> []
+  Effect.ChangeTargets _ -> []
   Effect.Create {} -> []
   Effect.Conjure {} -> []
   Effect.CreateCopy {} -> []
@@ -2342,6 +2345,7 @@ effectReplacements effect = case effect of
   Effect.RepeatIf (RepeatIf.MkRepeatIf process _ ifHolds) -> concatMap effectReplacements (process <> ifHolds)
   Effect.Heal _ -> []
   Effect.ChooseNewTargets _ -> []
+  Effect.ChangeTargets _ -> []
   Effect.RedirectDamage {} -> []
   -- CR 708.2's listed replacement abilities.
   Effect.TurnFaceDown turn -> listedReplacements (TurnFaceDown.characteristics turn)
@@ -2832,6 +2836,7 @@ effectMintedFaces effect = case effect of
   Effect.RepeatIf (RepeatIf.MkRepeatIf process _ ifHolds) -> concatMap effectMintedFaces (process <> ifHolds)
   Effect.Heal _ -> []
   Effect.ChooseNewTargets _ -> []
+  Effect.ChangeTargets _ -> []
   Effect.RedirectDamage {} -> []
   -- CR 708.2's listed characteristics are not a minted FACE: they replace an
   -- existing object's, and Pawl.Engine.Card.faceDownFace supplies every field
@@ -4736,6 +4741,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.IsObject _ -> []
   Filter.Type.TargetsSource -> []
   Filter.Type.TargetsOnlySource -> []
+  Filter.Type.HasSingleTarget -> []
   -- DESCENT, for AttachedTo's reason below: CR 115.1's atom carries the one
   -- target's description, which a card author writes like any other filter.
   Filter.Type.TargetsOnlyOne f -> filterSlotsReadSingly f
@@ -6123,6 +6129,7 @@ effectFilters effect = case effect of
   Effect.RepeatIf (RepeatIf.MkRepeatIf process condition ifHolds) -> frame Unframed (conditionFilters condition) <> concatMap effectFilters (process <> ifHolds)
   Effect.Heal ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.ChooseNewTargets ref -> frame SourceHostFramed (objectRefFilters ref)
+  Effect.ChangeTargets ref -> frame SourceHostFramed (objectRefFilters ref)
 
 -- Per MODE rather than through Modal.allTargetSlots, which is a Map.unions and so
 -- collapses two modes declaring the same slot name (#475) -- the cross-check
