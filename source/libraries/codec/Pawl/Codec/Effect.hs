@@ -216,6 +216,7 @@ codec cardCodec abilityCodec =
           Arm.payload "PreventNextDamageInstance" preventInstanceCodec Effect.PreventNextDamageInstance (\x -> case x of Effect.PreventNextDamageInstance y -> Just y; _ -> Nothing),
           Arm.payload "RedirectDamage" RedirectDamage.codec Effect.RedirectDamage (\x -> case x of Effect.RedirectDamage y -> Just y; _ -> Nothing),
           Arm.payload "PutCounters" PutCounters.codec Effect.PutCounters (\x -> case x of Effect.PutCounters y -> Just y; _ -> Nothing),
+          Arm.payload "DistributeCounters" PutCounters.codec Effect.DistributeCounters (\x -> case x of Effect.DistributeCounters y -> Just y; _ -> Nothing),
           Arm.payload "MoveCounters" MoveCounters.codec Effect.MoveCounters (\x -> case x of Effect.MoveCounters y -> Just y; _ -> Nothing),
           Arm.payload "PutCountersFrom" PutCountersFrom.codec Effect.PutCountersFrom (\x -> case x of Effect.PutCountersFrom y -> Just y; _ -> Nothing),
           Arm.payload "RemoveCounters" RemoveCounters.codec Effect.RemoveCounters (\x -> case x of Effect.RemoveCounters y -> Just y; _ -> Nothing),
@@ -386,6 +387,7 @@ tagOf x = case x of
   Effect.PreventNextDamageInstance {} -> "PreventNextDamageInstance"
   Effect.RedirectDamage {} -> "RedirectDamage"
   Effect.PutCounters {} -> "PutCounters"
+  Effect.DistributeCounters {} -> "DistributeCounters"
   Effect.MoveCounters {} -> "MoveCounters"
   Effect.PutCountersFrom {} -> "PutCountersFrom"
   Effect.RemoveCounters {} -> "RemoveCounters"

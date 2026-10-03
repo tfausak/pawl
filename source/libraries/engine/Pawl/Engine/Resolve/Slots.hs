@@ -742,6 +742,7 @@ effectObjectRefs effect = case effect of
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage _ _ _ from _ _ to _) -> Maybe.maybeToList from <> [to]
   Effect.Counter (Counter.MkCounter ref _ _ _) -> [ref]
   Effect.PutCounters (PutCounters.MkPutCounters _ _ ref) -> [ref]
+  Effect.DistributeCounters (PutCounters.MkPutCounters _ _ ref) -> [ref]
   Effect.RemoveCounters {} -> []
   Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong _ from _ _) -> [from]
   -- CR 122.5's two sides, either of which may name a group.
@@ -962,6 +963,7 @@ effectPlayerRefs effect = case effect of
   Effect.RedirectDamage x -> durationPlayerRefs (RedirectDamage.duration x)
   Effect.Counter {} -> []
   Effect.PutCounters {} -> []
+  Effect.DistributeCounters {} -> []
   Effect.RemoveCounters {} -> []
   Effect.RemoveCountersAmong {} -> []
   Effect.MoveCounters {} -> []
@@ -1327,6 +1329,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- The bound slot is a DEFINITION, not a read: see boundSlots below.
   Effect.Counter {} -> Map.empty
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> quantitySlots quantity
+  Effect.DistributeCounters (PutCounters.MkPutCounters _ quantity _) -> quantitySlots quantity
   -- CR 122.8 reads its tally off ONE object, so `from` is read singly, where the
   -- destination is an ObjectRef and may sweep.
   Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom from _ _) -> oneSlot from
@@ -2003,6 +2006,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ amount _ _ _ _ _) -> durationSlotsAreExhaustive duration && all Quantity.slotsAreExhaustive amount
   Effect.Counter {} -> True
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.slotsAreExhaustive quantity
+  Effect.DistributeCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.slotsAreExhaustive quantity
   -- No Quantity at all: CR 122.8 names neither a kind nor a count.
   Effect.PutCountersFrom {} -> True
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _ _) -> Quantity.slotsAreExhaustive quantity
@@ -2269,6 +2273,7 @@ readsX =
         Effect.RedirectDamage (RedirectDamage.MkRedirectDamage _ _ amount _ _ _ _ _) -> any Quantity.readsX amount
         Effect.Counter {} -> False
         Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.readsX quantity
+        Effect.DistributeCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.readsX quantity
         Effect.PutCountersFrom {} -> False
         Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _ _) -> Quantity.readsX quantity
         Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count _ _ _) -> any Quantity.readsX (RemovalCount.quantityOf count)
@@ -2522,6 +2527,7 @@ boundSlots effect = case effect of
   -- countered this way", and the permanents whose abilities were (CR 113.7).
   Effect.Counter (Counter.MkCounter _ mSlot mSources mExiled) -> foldMap Set.singleton mSlot <> foldMap Set.singleton mSources <> foldMap Set.singleton mExiled
   Effect.PutCounters {} -> Set.empty
+  Effect.DistributeCounters {} -> Set.empty
   Effect.PutCountersFrom {} -> Set.empty
   -- CR 122.1: how many counters the removal actually took off, where the card
   -- reads it back -- Destroy's count slot one opcode over.

@@ -1206,8 +1206,7 @@ stillAdmitted pcs grants pools perspective source recipient slot gs =
 
 -- CR 601.2c's announcements a payability gate still has to consider, as the slot
 -- maps each would bind: every way of filling every slot of the map handed in,
--- which holds one slot's WHOLE legal object set per slot (legalSets, read
--- through Recipient.objectOf). A gate asked before the announcement exists is an
+-- which holds one slot's WHOLE legal set per slot (legalSets). A gate asked before the announcement exists is an
 -- EXISTENCE question over these -- CR 601.2 makes a casting legal when the
 -- player can comply with every step, not when they can comply blind.
 --
@@ -1216,12 +1215,17 @@ stillAdmitted pcs grants pools perspective source recipient slot gs =
 -- sits beside in `data/cards/`. Not implemented: a slot of a higher count, whose
 -- announcement binds more than these maps do -- a criterion reading the slot
 -- positively then finds fewer objects than the payment will, and one reading it
--- negatively excludes fewer (#2959).
+-- negatively excludes fewer, and a per-target cost change (Hinata, Dawn-Crowned)
+-- counts fewer targets; nor binds none to an "up to" slot (#2959).
 --
--- A slot that binds no OBJECT is dropped rather than assigned the empty set: CR
--- 601.2c lets a target be a player, and a product that treated such a slot as
--- having no choices would collapse to no announcement at all.
-aimings :: Map SlotName (Set ObjectId) -> [Map SlotName (Set ObjectId)]
+-- A slot with nothing to bind is dropped rather than assigned the empty set: a
+-- product that treated such a slot as having no choices would collapse to no
+-- announcement at all.
+--
+-- Over whatever a slot binds: Activatable's maps hold objects, and
+-- Pawl.Engine.Cast.castAimable's whole recipients, so a player target counts
+-- for a per-target cost change.
+aimings :: Map SlotName (Set a) -> [Map SlotName (Set a)]
 aimings slots =
   foldr
     ( \(name, objects) rest -> do

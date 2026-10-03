@@ -5,7 +5,9 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Quantity as Quantity
 
--- | The payload of Pawl.Types.Effect's PutCounters arm (#1305).
+-- | The payload of Pawl.Types.Effect's PutCounters arm (#1305), and of its
+-- DistributeCounters arm, where `quantity` is the total divided among the
+-- permanents `ref` names rather than the count each one gets (CR 608.2d).
 --
 -- An ObjectRef rather than a bare slot, so that Renegade Krasis' "each other
 -- creature you control with a +1/+1 counter on it" can be written: CR 115.10a

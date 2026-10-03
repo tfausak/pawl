@@ -580,9 +580,11 @@ recipientObjects = Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList
 -- before it asks: one slot map per fillable mode, each slot holding every object
 -- that mode could name for it. One mode at a time and kept apart, rather than
 -- Modal.modesTargetSlots over the whole fillable set at once: two modes may
--- print the same slot name, and a union of the SLOT MAPS would drop one of them
--- -- and an announcement chooses one mode, so an aiming drawn across two is not
--- one a player could make.
+-- print the same slot name, and a union of the SLOT MAPS would drop one of them.
+--
+-- Not implemented: a selection of two or more modes (CR 700.2, Synthetic
+-- Prismatic Wellspring's "choose two"), whose announcement may aim across them;
+-- Pawl.Engine.Cast.castAimable enumerates selections and this does not (#2959).
 --
 -- Only the FILLABLE modes (CR 700.2a), which is the set activatableGiven's mode
 -- conjunct measures: a slot belonging to a mode this board cannot choose is not

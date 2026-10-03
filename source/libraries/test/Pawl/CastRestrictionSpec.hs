@@ -13,6 +13,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
@@ -56,6 +57,7 @@ import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -66,6 +68,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Response as Response
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
@@ -2397,6 +2400,106 @@ terrorOfThePeaksSpec s registry = Spec.describe s "Terror of the Peaks" $ do
     Spec.assertEqWith s "the Dragon entering beside a Piker already out dealt nothing" (S.lifeOf S.bob itself) (Just 20)
     Spec.assertEqWith s "though it did enter" (S.countOnBattlefieldByName (S.printingName terror) S.alice itself) 1
 
+-- Hinata, Dawn-Crowned (NEO 218) {1}{U}{R}{W} Legendary Creature -- Kirin Spirit
+-- 4/4, Oracle text checked against Scryfall: "Flying, trample / Spells you cast
+-- cost {1} less to cast for each target. / Spells your opponents cast cost {1}
+-- more to cast for each target."
+--
+-- CR 601.2c fixes the targets before CR 601.2f totals the cost, and the count is
+-- of distinct objects and players, not instances of the word (CR 601.2c's "the
+-- chosen objects and/or players each become a target"; Hinata's ruling). alice
+-- controls Hinata; bob controls two Goblin Pikers. Twisted Fealty ({2}{R}, "Gain
+-- control of target creature ... Create a Young Hero Role token attached to up
+-- to one target creature") has two target words that may name one creature.
+hinataBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Int ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+hinataBoard mountain hinata piker fealty mountains =
+  let (_, g1) = S.addPermanent hinata S.alice (S.landsFor mountain S.alice mountains (Setup.emptyGame S.bothPlayers))
+      (first, g2) = S.addPermanent piker S.bob g1
+      (second, g3) = S.addPermanent piker S.bob g2
+      (fealtyId, g4) = S.addHandCard fealty S.alice g3
+   in (first, second, fealtyId, aliceOnTurn g4)
+
+-- Twisted Fealty's "target" slot at `stolen` and its "creature" slot at `roled`,
+-- each filtered from the offered set rather than built, and the "up to one"
+-- slot announced as taking one.
+fealtyAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+fealtyAnswer stolen roled prompt = case prompt of
+  Prompt.AnnounceTargets _ _ _ slots -> fmap (const 1) slots
+  Prompt.ChooseTargets _ _ _ sets ->
+    let wanted slot = if slot == SlotName.MkSlotName (Text.pack "creature") then roled else stolen
+     in Map.mapWithKey (\slot (_, legal) -> Set.filter ((== Just (wanted slot)) . Recipient.objectOf) legal) sets
+  _ -> S.identityAnswer prompt
+
+hinataSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+hinataSpec s registry = Spec.describe s "Hinata, Dawn-Crowned" $ do
+  -- The reduction, as a pair differing in the aim alone: both words at one
+  -- Piker is one target, so {1} comes off; one Piker each is two, so {2} does.
+  -- Counting instances (Filter.View's targetCount) would answer two both times.
+  -- The one-Mountain board is the castability gate's: only an aiming at both
+  -- Pikers makes Twisted Fealty payable there, so the gate has to search them.
+  Spec.it s "CR 601.2c / 601.2f alice's spell costs {1} less per distinct target, and the gate finds the aiming that pays" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    hinata <- S.printingOf s registry "Hinata, Dawn-Crowned"
+    piker <- S.printingOf s registry "Goblin Piker"
+    fealty <- S.printingOf s registry "Twisted Fealty"
+    let (first, second, fealtyId, board) = hinataBoard mountain hinata piker fealty 2
+        once = S.runPure (fealtyAnswer first first) board (S.cast S.alice fealtyId)
+        twice = S.runPure (fealtyAnswer first second) board (S.cast S.alice fealtyId)
+        (_, _, shortId, short) = hinataBoard mountain hinata piker fealty 1
+    Spec.assertEqWith s "CR 601.2c one Piker named by both words is one target: {1}{R}, two Mountains" (S.tappedCount S.alice once) 2
+    Spec.assertEqWith s "two Pikers are two targets: {R}, one Mountain" (S.tappedCount S.alice twice) 1
+    Spec.assertBool s (S.castable S.alice shortId short) "CR 601.2 on one Mountain the cast is offered, since aiming at both Pikers pays it"
+    Spec.assertEqWith s "and both casts were made" (length (GameState.stack once), length (GameState.stack twice)) (1, 1)
+  -- The increase, and a PLAYER target counts: bob's Lightning Bolt at alice
+  -- costs {1}{R}. The same Bolt with Hinata under bob costs his own {R}, which
+  -- is "your opponents" (CR 109.5).
+  Spec.it s "CR 601.2f an opponent's spell costs {1} more for its target, a player among them" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    hinata <- S.printingOf s registry "Hinata, Dawn-Crowned"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let boardWith owner =
+          let (_, g1) = S.addPermanent hinata owner (S.landsFor mountain S.bob 3 (Setup.emptyGame S.bothPlayers))
+           in S.addHandCard bolt S.bob g1
+        (boltId, taxed) = boardWith S.alice
+        (ownId, own) = boardWith S.bob
+        atAlice = S.runPure (aimAtPlayer S.alice) taxed (S.cast S.bob boltId)
+        ownAtAlice = S.runPure (aimAtPlayer S.alice) own (S.cast S.bob ownId)
+    Spec.assertEqWith s "CR 601.2f bob's Bolt at alice cost {1}{R}" (S.tappedCount S.bob atAlice) 2
+    Spec.assertEqWith s "CR 109.5 with Hinata his own, the same Bolt cost {R}" (S.tappedCount S.bob ownAtAlice) 1
+    Spec.assertEqWith s "and both are on the stack" (length (GameState.stack atAlice), length (GameState.stack ownAtAlice)) (1, 1)
+  -- CR 700.2: a "choose two" aims across both chosen modes. Ojutai's Command
+  -- ({2}{W}{U}) with modes 0 and 2 targets a creature card in alice's graveyard
+  -- and bob's creature spell -- two targets, so {W}{U}, which her Island and
+  -- Plains pay. No single mode brings two targets, so a gate pricing one mode at
+  -- a time measures {1}{W}{U} and refuses the cast.
+  Spec.it s "CR 700.2 / 601.2f the gate counts the targets of every mode a choose-two announces" $ do
+    island <- S.printingOf s registry "Island"
+    plains <- S.printingOf s registry "Plains"
+    hinata <- S.printingOf s registry "Hinata, Dawn-Crowned"
+    piker <- S.printingOf s registry "Goblin Piker"
+    command <- S.printingOf s registry "Ojutai's Command"
+    let (_, g1) = S.addPermanent hinata S.alice (S.landsFor plains S.alice 1 (S.landsInPlay island 1))
+        (deadPiker, g2) = S.addGraveyardCard piker S.alice g1
+        (castPiker, g3) = S.spellOnStack piker S.bob g2
+        (commandId, g4) = S.addHandCard command S.alice g3
+        board = aliceOnTurn g4
+        answer :: Prompt.Prompt r -> r
+        answer prompt = case prompt of
+          Prompt.ChooseModes {} -> Seq.fromList (fmap ModeIndex.MkModeIndex [0, 2])
+          Prompt.ChooseTargets _ _ _ sets ->
+            fmap (\(_, legal) -> Set.filter (\r -> Recipient.objectOf r `elem` [Just deadPiker, Just castPiker]) legal) sets
+          _ -> S.identityAnswer prompt
+        after = S.runPure answer board (S.cast S.alice commandId)
+    Spec.assertBool s (S.castable S.alice commandId board) "CR 601.2 the cast is offered on an Island and a Plains"
+    Spec.assertEqWith s "CR 601.2f two targets took {2} off: both lands paid {W}{U}" (S.tappedCount S.alice after) 2
+    Spec.assertEqWith s "and the Command is on the stack above bob's Piker" (length (GameState.stack after)) 2
+
 -- Shell of the Last Kappa (CHK 269) {3} Legendary Artifact, Oracle text checked
 -- against Scryfall: "{3}, {T}: Exile target instant or sorcery spell that
 -- targets you. (The spell has no effect.) / {3}, {T}, Sacrifice Shell of the
@@ -2590,6 +2693,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   grafdiggersCageCastSpec s registry
   avenInterrupterSpec s registry
   terrorOfThePeaksSpec s registry
+  hinataSpec s registry
   shellOfTheLastKappaSpec s registry
   shellSecondAbilitySpec s registry
   senTripletsSpec s registry

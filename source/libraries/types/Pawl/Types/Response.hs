@@ -237,6 +237,8 @@ data Response
     -- cap. Its own constructor: an answer below the count is legal here and not
     -- to ChooseCounterRemovalAmong.
     ChoseCounterRemovalUpTo (Map.Map ObjectId.ObjectId Natural.Natural)
+  | -- | CR 608.2d: the division of new counters a resolving player chose.
+    ChoseCounterDistribution (Map.Map ObjectId.ObjectId Natural.Natural)
   | -- | CR 122.1: the division by permanent AND kind a paying or resolving
     -- player chose where the removal names no kind.
     ChoseMixedCounterRemoval (Map.Map ObjectId.ObjectId (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural))

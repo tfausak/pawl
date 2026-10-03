@@ -425,9 +425,9 @@ rewritePlayerEffect pairs effect = case effect of
   -- Omniscience's "spells" name none today; Edgewalker's "Cleric spells" does on
   -- the printed road, and Liliana, Untouched by Death's "Zombie spells" does on
   -- the stored one.
-  PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost f n) -> PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost (Filter.rewrite pairs f) n)
+  PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost f n targets) -> PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost (Filter.rewrite pairs f) n (fmap (Filter.rewrite pairs) targets))
   PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost f kind n) -> PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost (Filter.rewrite pairs f) kind n)
-  PlayerEffect.ReduceSpellCost x -> PlayerEffect.ReduceSpellCost x {ReduceSpellCost.whichSpells = Filter.rewrite pairs (ReduceSpellCost.whichSpells x)}
+  PlayerEffect.ReduceSpellCost x -> PlayerEffect.ReduceSpellCost x {ReduceSpellCost.whichSpells = Filter.rewrite pairs (ReduceSpellCost.whichSpells x), ReduceSpellCost.perTarget = fmap (Filter.rewrite pairs) (ReduceSpellCost.perTarget x)}
   -- TWO Filters of its own, and both descend. The second names
   -- what the ability targets (Dwarven Mauler's "that target this creature",
   -- spelled Filter.IsSource), so no card in `data/cards/` puts a subtype word
@@ -552,7 +552,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Firebend addition -> Effect.Firebend (rewriteManaAddition pairs addition)
   Effect.ActivateManaAbilities (ActivateManaAbilities.MkActivateManaAbilities ref filter_) -> Effect.ActivateManaAbilities (ActivateManaAbilities.MkActivateManaAbilities ref (Filter.rewrite pairs filter_))
   Effect.MoveMana _ -> effect
-  Effect.Search (Search.MkSearch searcher owner zones outside quantity filter_ upTo destination subject slot differentNames) -> Effect.Search (Search.MkSearch searcher owner zones outside (fmap (rewriteQuantity pairs) quantity) (Filter.rewrite pairs filter_) upTo destination subject slot differentNames)
+  Effect.Search (Search.MkSearch searcher owner zones outside quantity filter_ upTo destination subject slot differentIn) -> Effect.Search (Search.MkSearch searcher owner zones outside (fmap (rewriteQuantity pairs) quantity) (Filter.rewrite pairs filter_) upTo destination subject slot differentIn)
   Effect.ExileAllGraveyards -> effect
   Effect.Proliferate -> effect
   Effect.Reroll -> effect
@@ -794,6 +794,8 @@ rewriteEffect pairs effect = case effect of
   -- Warding Sigil proves it.
   Effect.PutCounters (PutCounters.MkPutCounters kind quantity ref) ->
     Effect.PutCounters (PutCounters.MkPutCounters (Filter.rewriteCounterKind pairs kind) (rewriteQuantity pairs quantity) (rewriteObjectRef pairs ref))
+  Effect.DistributeCounters (PutCounters.MkPutCounters kind quantity ref) ->
+    Effect.DistributeCounters (PutCounters.MkPutCounters (Filter.rewriteCounterKind pairs kind) (rewriteQuantity pairs quantity) (rewriteObjectRef pairs ref))
   -- The count and the kind both take the descent PutCounters' case above makes.
   -- Pawl.CounterspellSpec's Synthetic Erode the Warding proves the kind's.
   Effect.RemoveCounters x ->
