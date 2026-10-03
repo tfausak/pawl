@@ -6,6 +6,8 @@ import qualified Pawl.Types.ManaType as ManaType
 
 -- | The payload of Pawl.Types.PlayerEffect's SpendManaAsThough arm: one clause
 -- of CR 609.4b, "spend [this] mana as though it were mana of [these types]".
+-- Pawl.Types.GrantedAbility's SelfSpendManaAsThough carries one scoped to
+-- casting its own object (Tome of the Infinite).
 --
 -- CR 609.4b's own limit is what this type is shaped by -- "this affects only how
 -- the player may pay a cost. It doesn't change that cost, and it doesn't change
