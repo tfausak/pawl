@@ -880,7 +880,7 @@ cycling cost searchFor =
                 -- CR 701.3a question, so no object is fixed for one to be about.
                 Search.subject = Nothing,
                 Search.slot = Nothing,
-                Search.differentNames = False
+                Search.differentIn = Set.empty
               }
    in ActivatedAbility.MkActivatedAbility
         { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.DiscardThis DiscardCause.ToPayCyclingCost]},
@@ -1074,7 +1074,7 @@ searchForSameManaValue cost filter_ destination =
               -- CR 701.3a question, so no object is fixed for one to be about.
               Search.subject = Nothing,
               Search.slot = Nothing,
-              Search.differentNames = False
+              Search.differentIn = Set.empty
             }
    in ActivatedAbility.MkActivatedAbility
         { ActivatedAbility.cost = cost,
@@ -8217,7 +8217,7 @@ partnerWith name =
               -- Nothing attaches and the filter asks no CR 701.3a question.
               Search.subject = Nothing,
               Search.slot = Nothing,
-              Search.differentNames = False
+              Search.differentIn = Set.empty
             }
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfEnters,
