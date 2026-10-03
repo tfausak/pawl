@@ -3,6 +3,7 @@ module Pawl.Types.ModifyTarget where
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.SlotName as SlotName
 
 -- | The payload of Pawl.Types.Effect's ModifyTarget arm (#1305): apply this
 -- modification to the objects the ObjectRef names, for this duration.
@@ -18,6 +19,12 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 data ModifyTarget ability = MkModifyTarget
   { duration :: Duration.Duration,
     modification :: Modification.Modification ability,
-    ref :: ObjectRef.ObjectRef
+    ref :: ObjectRef.ObjectRef,
+    -- | The name each affected object is bound under while the modification's
+    -- quantities are frozen, so each gets its own value (CR 701.10b's "that
+    -- creature's power"): one stored effect per object. Nothing freezes once,
+    -- against the source. Proved by data/scenarios/power-toughness/'s
+    -- cr-701-10b-611-2c God-Eternal Rhonas scenario.
+    each :: Maybe SlotName.SlotName
   }
   deriving (Eq, Ord, Show)
