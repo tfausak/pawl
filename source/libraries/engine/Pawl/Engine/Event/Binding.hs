@@ -831,8 +831,8 @@ eventBindingsOver board gs bearerBecame becameInGraveyard bearer you cond event 
   -- Banewasp Affliction's "that creature's controller loses life equal to ITS
   -- toughness" names the host rather than the Aura, and both halves of that
   -- sentence are CR 608.2h reads of a permanent CR 400.7 has already replaced.
-  -- Pawl.Engine.Resolve.Slots.effectViewOf is what answers the toughness, and it looks
-  -- back for exactly this slot and Binding.sacrificedPermanent;
+  -- Pawl.Engine.Resolve.Slots.effectViewOf is what answers the toughness, looking
+  -- back for this slot's object as for every slot's;
   -- Pawl.Engine.Projection.controllerWithLastKnown answers the controller for any
   -- slot PlayerRef.ControllerOfBound names.
   --
