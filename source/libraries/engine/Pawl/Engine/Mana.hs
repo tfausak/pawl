@@ -1849,8 +1849,8 @@ hybridHalves a b = if a == b then [a] else [a, b]
 -- cost takes when no effect has spoken about it.
 --
 -- NO SUBJECT either (ForNeither), so mana a CR 106.6 permission restricts is no
--- supply for it (spendableFor). Every caller is a spec asking about a bare mana cost, and a
--- caller with a subject wants canPayCommitting below, which is what
+-- supply for it (spendableFor). Every caller is a spec asking about a bare mana
+-- cost, and a caller with a subject wants canPayCommitting below, which is what
 -- Pawl.Engine.Cost.canPay takes.
 canPay :: Capacity -> PlayerId -> ManaCost -> GameState -> Bool
 canPay capacity pid = canPayCommitting PaymentSubject.ForNeither capacity ManaSpending.AsProduced pid 0 0 []

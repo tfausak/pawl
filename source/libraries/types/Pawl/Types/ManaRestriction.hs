@@ -22,17 +22,16 @@ import qualified Pawl.Types.KeywordDesignator as KeywordDesignator
 --
 -- FIVE payment fields and not one per payment the engine can make: CR 116.2
 -- alone lists eleven special actions, and what earns a field is a PRINTED rider
--- naming that payment. Foretelling (CR 116.2h), plotting (CR 116.2k), CR 508.1j \/ 509.1f's
--- combat toll and CR 118.12's resolution-time payment share
+-- naming that payment. Foretelling (CR 116.2h), plotting (CR 116.2k), CR
+-- 508.1j \/ 509.1f's combat toll and CR 118.12's resolution-time payment share
 -- Pawl.Types.PaymentSubject's ForNeither arm with nothing here, none of them
 -- being named on a card.
 --
 -- Unless prohibits is set (below), Nothing on a field REFUSES that kind of
 -- payment outright; @Just f@ permits it when the object being paid for matches
--- @f@. @Just (Filter.And [])@ is the
--- unconditional permission -- Omen Hawker says nothing about WHICH abilities --
--- and Pawl.Types.Filter's own haddock names that spelling as the trivial
--- predicate. Every field Nothing would be mana no payment may spend, which no
+-- @f@. @Just (Filter.And [])@ is the unconditional permission -- Omen Hawker
+-- says nothing about WHICH abilities -- and Pawl.Types.Filter's own haddock
+-- names that spelling as the trivial predicate. Every field Nothing would be mana no payment may spend, which no
 -- printing means; Pawl.CardSpec lints it out of the pool.
 --
 -- Read as above, the fields name the ONLY payments the mana may pay for. With
