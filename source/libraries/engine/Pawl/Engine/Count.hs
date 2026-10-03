@@ -952,6 +952,7 @@ snapshotView viewOf gs shape event = case event of
   GameEvent.Earthbent _ -> Nothing
   GameEvent.Waterbent _ -> Nothing
   GameEvent.Airbent _ -> Nothing
+  GameEvent.SpellCopied _ -> Nothing
   GameEvent.Firebent _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.TriggeredAbilityResolved _ -> Nothing

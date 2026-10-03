@@ -1162,6 +1162,8 @@ library codec
     Pawl.Codec.SpellCastSpec
     Pawl.Codec.SpellWasCast
     Pawl.Codec.SpellWasCastSpec
+    Pawl.Codec.SpellWasCopied
+    Pawl.Codec.SpellWasCopiedSpec
     Pawl.Codec.SpendManaAsThough
     Pawl.Codec.SpendManaAsThoughSpec
     Pawl.Codec.Splice
@@ -2507,6 +2509,7 @@ library types
     Pawl.Types.SpeedDecrease
     Pawl.Types.SpellCast
     Pawl.Types.SpellWasCast
+    Pawl.Types.SpellWasCopied
     Pawl.Types.SpendManaAsThough
     Pawl.Types.Splice
     Pawl.Types.StackObjectKind

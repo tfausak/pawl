@@ -2421,6 +2421,8 @@ honourShuffle offered answer =
 castOf :: GameEvent -> Maybe SpellWasCast.SpellWasCast
 castOf event = case event of
   GameEvent.SpellCast cast -> Just cast
+  -- CR 707.10: a copy is not cast.
+  GameEvent.SpellCopied _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
   GameEvent.TurnedFaceDown _ -> Nothing
@@ -2530,6 +2532,7 @@ castsInLog gs = Seq.fromList (Maybe.mapMaybe (castOf . LoggedEvent.event) (Folda
 abilityResolved :: GameEvent -> Maybe Source.Source
 abilityResolved event = case event of
   GameEvent.SpellCast {} -> Nothing
+  GameEvent.SpellCopied _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
   GameEvent.TurnedFaceDown _ -> Nothing
@@ -2632,6 +2635,7 @@ discardOf event = case event of
   -- in. Opposite directions, and neither event stands in for the other.
   GameEvent.Drew {} -> Nothing
   GameEvent.SpellCast {} -> Nothing
+  GameEvent.SpellCopied _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
   GameEvent.TurnedFaceDown _ -> Nothing
@@ -2762,6 +2766,7 @@ movedChange event = case event of
   GameEvent.Discarded {} -> Nothing
   GameEvent.Drew {} -> Nothing
   GameEvent.SpellCast {} -> Nothing
+  GameEvent.SpellCopied _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
   GameEvent.TurnedFaceDown _ -> Nothing
@@ -2884,6 +2889,7 @@ damageDealt event = case event of
   GameEvent.Discarded {} -> Nothing
   GameEvent.Drew {} -> Nothing
   GameEvent.SpellCast {} -> Nothing
+  GameEvent.SpellCopied _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
   GameEvent.TurnedFaceDown _ -> Nothing
@@ -3167,6 +3173,7 @@ lifeGainOf event = case event of
   GameEvent.Discarded {} -> Nothing
   GameEvent.Drew {} -> Nothing
   GameEvent.SpellCast {} -> Nothing
+  GameEvent.SpellCopied _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
   GameEvent.TurnedFaceDown _ -> Nothing

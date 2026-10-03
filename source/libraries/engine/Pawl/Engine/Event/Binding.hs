@@ -59,6 +59,7 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
+import qualified Pawl.Types.SpellWasCopied as SpellWasCopied
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TappedForMana as TappedForMana
 import Pawl.Types.TriggerCondition (TriggerCondition)
@@ -695,6 +696,10 @@ eventBindingsOver board gs bearerBecame becameInGraveyard bearer you cond event 
   -- unconditionally, so no shape of the event withholds either.
   (TriggerCondition.SpellCast {}, GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _ _ _)) ->
     Binding.setTriggerPlayer caster (Binding.setCastSpell spell Map.empty)
+  -- Magecraft's "or copy" binds the same pair off its own event (CR 707.10):
+  -- the copy, and the player who copied it.
+  (TriggerCondition.SpellCast {}, GameEvent.SpellCopied (SpellWasCopied.MkSpellWasCopied copier copy)) ->
+    Binding.setTriggerPlayer copier (Binding.setCastSpell copy Map.empty)
   -- CR 702.21a's "that spell or ability": the object whose announcement fired
   -- this, which ward counters and whose controller ward offers the cost to.
   -- Unconditional given a match, which is what eventBindingSlots' per-condition

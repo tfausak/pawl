@@ -113,6 +113,7 @@ import qualified Pawl.Types.SelfCountersRemoved as SelfCountersRemoved
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
+import qualified Pawl.Types.SpellWasCopied as SpellWasCopied
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
@@ -312,6 +313,7 @@ countersRemovedFrom bearer wanted event = case event of
   GameEvent.DamagePrevented {} -> Nothing
   GameEvent.StepBegan {} -> Nothing
   GameEvent.SpellCast {} -> Nothing
+  GameEvent.SpellCopied _ -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
   GameEvent.TookInitiative _ -> Nothing
   GameEvent.Discarded {} -> Nothing
@@ -367,6 +369,7 @@ boundDeparts bindings destinations slot event = case event of
   GameEvent.DamageDealt _ -> False
   GameEvent.StepBegan {} -> False
   GameEvent.SpellCast {} -> False
+  GameEvent.SpellCopied _ -> False
   GameEvent.DamagePrevented {} -> False
   GameEvent.BecameMonarch _ -> False
   GameEvent.TookInitiative _ -> False
@@ -465,6 +468,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -570,6 +574,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -658,6 +663,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -758,6 +764,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Moved {} -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -848,6 +855,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Moved {} -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -936,6 +944,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Moved {} -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -1032,6 +1041,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Moved {} -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -1129,6 +1139,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Moved {} -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -1224,6 +1235,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Moved {} -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -1329,6 +1341,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Moved {} -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -1441,6 +1454,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -1549,6 +1563,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -1641,6 +1656,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -1733,6 +1749,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -1834,6 +1851,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -1936,6 +1954,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -2034,6 +2053,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -2131,6 +2151,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew {} -> False
@@ -2232,6 +2253,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -2342,6 +2364,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -2450,6 +2473,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -2550,6 +2574,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -2648,6 +2673,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -2742,6 +2768,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -2878,6 +2905,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -2997,6 +3025,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -3077,6 +3106,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -3176,6 +3206,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -3300,6 +3331,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -3403,6 +3435,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -3518,6 +3551,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -3603,6 +3637,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -3692,6 +3727,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -3805,6 +3841,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -3896,6 +3933,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -4004,6 +4042,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -4099,6 +4138,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -4205,6 +4245,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -4306,6 +4347,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -4468,6 +4510,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.DamageDealt _ -> False
           GameEvent.StepBegan {} -> False
           GameEvent.SpellCast {} -> False
+          GameEvent.SpellCopied _ -> False
           GameEvent.DamagePrevented {} -> False
           GameEvent.BecameMonarch _ -> False
           GameEvent.TookInitiative _ -> False
@@ -4633,6 +4676,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.DamageDealt _ -> False
           GameEvent.StepBegan {} -> False
           GameEvent.SpellCast {} -> False
+          GameEvent.SpellCopied _ -> False
           GameEvent.DamagePrevented {} -> False
           GameEvent.BecameMonarch _ -> False
           GameEvent.TookInitiative _ -> False
@@ -4726,6 +4770,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -4812,6 +4857,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -4906,6 +4952,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -5005,6 +5052,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -5112,6 +5160,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -5247,6 +5296,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.DamageDealt _ -> False
           GameEvent.StepBegan {} -> False
           GameEvent.SpellCast {} -> False
+          GameEvent.SpellCopied _ -> False
           GameEvent.DamagePrevented {} -> False
           GameEvent.BecameMonarch _ -> False
           GameEvent.TookInitiative _ -> False
@@ -5342,6 +5392,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -5451,6 +5502,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -5611,6 +5663,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -5725,6 +5778,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -5813,6 +5867,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -5918,6 +5973,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityTriggered {} -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
@@ -6000,6 +6056,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -6113,6 +6170,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -6205,6 +6263,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -6300,6 +6359,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -6440,6 +6500,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -6534,6 +6595,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -6634,6 +6696,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.DamageDealt _ -> False
           GameEvent.StepBegan {} -> False
           GameEvent.SpellCast {} -> False
+          GameEvent.SpellCopied _ -> False
           GameEvent.DamagePrevented {} -> False
           GameEvent.BecameMonarch _ -> False
           GameEvent.TookInitiative _ -> False
@@ -6744,6 +6807,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.DamageDealt _ -> False
           GameEvent.StepBegan {} -> False
           GameEvent.SpellCast {} -> False
+          GameEvent.SpellCopied _ -> False
           GameEvent.DamagePrevented {} -> False
           GameEvent.BecameMonarch _ -> False
           GameEvent.TookInitiative _ -> False
@@ -6804,6 +6868,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -6955,6 +7020,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.DamageDealt _ -> False
           GameEvent.StepBegan {} -> False
           GameEvent.SpellCast {} -> False
+          GameEvent.SpellCopied _ -> False
           GameEvent.DamagePrevented {} -> False
           GameEvent.BecameMonarch _ -> False
           GameEvent.TookInitiative _ -> False
@@ -7035,6 +7101,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.DamageDealt _ -> False
           GameEvent.StepBegan {} -> False
           GameEvent.SpellCast {} -> False
+          GameEvent.SpellCopied _ -> False
           GameEvent.DamagePrevented {} -> False
           GameEvent.BecameMonarch _ -> False
           GameEvent.TookInitiative _ -> False
@@ -7134,6 +7201,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -7230,6 +7298,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -7347,6 +7416,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
     GameEvent.Discarded {} -> False
@@ -7459,6 +7529,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
     GameEvent.Discarded {} -> False
@@ -7566,6 +7637,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamagePrevented {} -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
     GameEvent.Discarded {} -> False
@@ -7672,6 +7744,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamagePrevented {} -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
     GameEvent.Discarded {} -> False
@@ -7827,6 +7900,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamagePrevented {} -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
     GameEvent.Discarded {} -> False
@@ -7930,6 +8004,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamagePrevented {} -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
     GameEvent.Discarded {} -> False
@@ -8067,6 +8142,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamagePrevented {} -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
     GameEvent.Discarded {} -> False
@@ -8128,105 +8204,122 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- cast happened in -- so the active player standing now is the one the cast
   -- happened under. Read against `you`, CR 109.5's controller of the ability (CR
   -- 603.3a), exactly as the StepBegins arm above reads its own.
-  TriggerCondition.SpellCast (SpellCast.MkSpellCast f scope fromZone ordinal window) -> case event of
-    GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _ castFrom _) -> case Game.lookupObject spell gs of
-      Nothing -> False
-      Just _ ->
-        Turn.turnScopeAdmits gs scope (GameState.activePlayer gs) you
-          -- "During combat" off the GAME STATE, the TurnScope's reason: the cast
-          -- happened in this same settle, so the phase standing now is its phase.
-          && maybe True (`Turn.inWindow` GameState.phase gs) window
-          -- CR 601.2a's zone, read off the EVENT and not off the spell: rule
-          -- 400.7 left the stack incarnation with no memory of it. A condition
-          -- that names no zone admits every cast, which is what almost every
-          -- printing writes.
-          && maybe True (\z -> castFrom == Just z) fromZone
-          && Filter.matches (SourceContext.sourceContext gs (Just you) bearer) (Projection.viewOfSpell caster spell gs) f
-          -- Clarion Spirit's "your SECOND spell each turn", asked LAST so the
-          -- log walk happens only for a cast the rest of the condition already
-          -- admits.
-          && maybe True (castOrdinal (SourceContext.sourceContext gs (Just you) bearer) f fromZone spell gs ==) ordinal
-    GameEvent.HalfUnlocked {} -> False
-    GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
-    GameEvent.Transformed {} -> False
-    GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
-    GameEvent.Mentored {} -> False
-    GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
-    GameEvent.BecameCrewed _ -> False
-    GameEvent.Convoked _ -> False
-    GameEvent.Saddled _ -> False
-    GameEvent.Crewed _ -> False
-    GameEvent.PermanentSacrificed {} -> False
-    GameEvent.AbilityTriggered {} -> False
-    GameEvent.CountersRemoved {} -> False
-    GameEvent.ControlChanged {} -> False
-    GameEvent.VentureMarkerEntered {} -> False
-    GameEvent.BecameTarget {} -> False
-    GameEvent.BecameAttached {} -> False
-    GameEvent.BecameUnattached {} -> False
-    GameEvent.LeftTheGame _ -> False
-    GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
-    GameEvent.DiceRolled _ -> False
-    GameEvent.DieResultSettled _ -> False
-    GameEvent.RolledToVisit _ -> False
-    GameEvent.PlanarDieRolled _ -> False
-    GameEvent.SchemeSetInMotion _ -> False
-    GameEvent.ClassLevelSet _ -> False
-    GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
-    GameEvent.BecameAttacked _ -> False
-    GameEvent.AttackersDeclared _ -> False
-    GameEvent.BecameTapped _ -> False
-    GameEvent.BecameUntapped _ -> False
-    GameEvent.TappedForMana _ -> False
-    GameEvent.ManaAdded _ -> False
-    GameEvent.ManaAbilityResolved _ -> False
-    GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
-    GameEvent.ActivatedAbilityResolved _ -> False
-    GameEvent.TriggeredAbilityResolved _ -> False
-    GameEvent.CardArrived _ -> False
-    GameEvent.CountersPut {} -> False
-    GameEvent.Moved {} -> False
-    GameEvent.DamageDealt _ -> False
-    GameEvent.DamagePrevented {} -> False
-    GameEvent.StepBegan {} -> False
-    GameEvent.BecameMonarch _ -> False
-    GameEvent.TookInitiative _ -> False
-    GameEvent.Discarded {} -> False
-    GameEvent.Drew {} -> False
-    GameEvent.Revealed {} -> False
-    GameEvent.AttackerDeclared {} -> False
-    GameEvent.BecameBlocking {} -> False
-    GameEvent.BlocksDeclared {} -> False
-    GameEvent.AttackerBlocked {} -> False
-    GameEvent.AttackerUnblocked _ -> False
-    GameEvent.SpellCountered _ -> False
-    GameEvent.AbilityCountered _ -> False
-    GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost {} -> False
-    GameEvent.LifeGained {} -> False
+  TriggerCondition.SpellCast (SpellCast.MkSpellCast f scope fromZone ordinal window copies) ->
+    let -- What a cast and a copy are both asked: whose turn, which phase, and
+        -- the Filter over the spell as its controller sees it.
+        admits controller spell =
+          Turn.turnScopeAdmits gs scope (GameState.activePlayer gs) you
+            -- "During combat" off the GAME STATE, the TurnScope's reason: the
+            -- event happened in this same settle, so the phase standing now is
+            -- its phase.
+            && maybe True (`Turn.inWindow` GameState.phase gs) window
+            && Filter.matches (SourceContext.sourceContext gs (Just you) bearer) (Projection.viewOfSpell controller spell gs) f
+     in case event of
+          GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _ castFrom _) -> case Game.lookupObject spell gs of
+            Nothing -> False
+            Just _ ->
+              admits caster spell
+                -- CR 601.2a's zone, read off the EVENT and not off the spell: rule
+                -- 400.7 left the stack incarnation with no memory of it. A
+                -- condition that names no zone admits every cast, which is what
+                -- almost every printing writes.
+                && maybe True (\z -> castFrom == Just z) fromZone
+                -- Clarion Spirit's "your SECOND spell each turn", asked LAST so the
+                -- log walk happens only for a cast the rest of the condition
+                -- already admits.
+                && maybe True (castOrdinal (SourceContext.sourceContext gs (Just you) bearer) f fromZone spell gs ==) ordinal
+          -- Magecraft's "or copy" (CR 707.10): the player who copied the spell,
+          -- the copy's controller, is the one whose "you copy" this is -- not
+          -- the copied spell's. data/scenarios/copy's
+          -- Twincast-and-magecraft case proves it. A copy left no zone and is
+          -- no cast of the turn, so a zone or an ordinal never admits it.
+          GameEvent.SpellCopied (SpellWasCopied.MkSpellWasCopied copier copy) ->
+            copies
+              && Maybe.isNothing fromZone
+              && Maybe.isNothing ordinal
+              && Maybe.isJust (Game.lookupObject copy gs)
+              && admits copier copy
+          GameEvent.HalfUnlocked {} -> False
+          GameEvent.TurnedFaceUp _ -> False
+          GameEvent.TurnedFaceDown _ -> False
+          GameEvent.Transformed {} -> False
+          GameEvent.BecameDesignated {} -> False
+          GameEvent.Evolved _ -> False
+          GameEvent.Mutated _ -> False
+          GameEvent.Mentored {} -> False
+          GameEvent.Exploited {} -> False
+          GameEvent.Trained _ -> False
+          GameEvent.BecameCrewed _ -> False
+          GameEvent.Convoked _ -> False
+          GameEvent.Saddled _ -> False
+          GameEvent.Crewed _ -> False
+          GameEvent.PermanentSacrificed {} -> False
+          GameEvent.AbilityTriggered {} -> False
+          GameEvent.CountersRemoved {} -> False
+          GameEvent.ControlChanged {} -> False
+          GameEvent.VentureMarkerEntered {} -> False
+          GameEvent.BecameTarget {} -> False
+          GameEvent.BecameAttached {} -> False
+          GameEvent.BecameUnattached {} -> False
+          GameEvent.LeftTheGame _ -> False
+          GameEvent.Milled {} -> False
+          GameEvent.Scried _ -> False
+          GameEvent.DungeonCompleted _ -> False
+          GameEvent.Surveiled _ -> False
+          GameEvent.Proliferated _ -> False
+          GameEvent.DiceRolled _ -> False
+          GameEvent.DieResultSettled _ -> False
+          GameEvent.RolledToVisit _ -> False
+          GameEvent.PlanarDieRolled _ -> False
+          GameEvent.SchemeSetInMotion _ -> False
+          GameEvent.ClassLevelSet _ -> False
+          GameEvent.Plotted _ -> False
+          GameEvent.Explored _ -> False
+          GameEvent.Connived _ -> False
+          GameEvent.Exerted _ -> False
+          GameEvent.BecameAttacked _ -> False
+          GameEvent.AttackersDeclared _ -> False
+          GameEvent.BecameTapped _ -> False
+          GameEvent.BecameUntapped _ -> False
+          GameEvent.TappedForMana _ -> False
+          GameEvent.ManaAdded _ -> False
+          GameEvent.ManaAbilityResolved _ -> False
+          GameEvent.CoinFlipped {} -> False
+          GameEvent.RingTempted _ -> False
+          GameEvent.Blighted _ -> False
+          GameEvent.Foraged _ -> False
+          GameEvent.Foretold _ -> False
+          GameEvent.CollectedEvidence _ -> False
+          GameEvent.GaveGift _ -> False
+          GameEvent.AttractionOpened _ -> False
+          GameEvent.PrizeClaimed _ -> False
+          GameEvent.Earthbent _ -> False
+          GameEvent.Waterbent _ -> False
+          GameEvent.Airbent _ -> False
+          GameEvent.Firebent _ -> False
+          GameEvent.ActivatedAbilityResolved _ -> False
+          GameEvent.TriggeredAbilityResolved _ -> False
+          GameEvent.CardArrived _ -> False
+          GameEvent.CountersPut {} -> False
+          GameEvent.Moved {} -> False
+          GameEvent.DamageDealt _ -> False
+          GameEvent.DamagePrevented {} -> False
+          GameEvent.StepBegan {} -> False
+          GameEvent.BecameMonarch _ -> False
+          GameEvent.TookInitiative _ -> False
+          GameEvent.Discarded {} -> False
+          GameEvent.Drew {} -> False
+          GameEvent.Revealed {} -> False
+          GameEvent.AttackerDeclared {} -> False
+          GameEvent.BecameBlocking {} -> False
+          GameEvent.BlocksDeclared {} -> False
+          GameEvent.AttackerBlocked {} -> False
+          GameEvent.AttackerUnblocked _ -> False
+          GameEvent.SpellCountered _ -> False
+          GameEvent.AbilityCountered _ -> False
+          GameEvent.LoyaltyAbilityActivated _ -> False
+          GameEvent.LifeLost {} -> False
+          GameEvent.LifeGained {} -> False
   -- CR 601.2i, self-scoped: the spell that became cast IS the bearer. A bare
   -- comparison of ids and no Filter at all, which is what separates this arm
   -- from SpellCast's above -- nothing about the spell is read, so no projection
@@ -8240,6 +8333,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- there, so eventTriggers' `spellCast` source offers exactly that incarnation.
   TriggerCondition.SelfCast -> case event of
     GameEvent.SpellCast (SpellWasCast.MkSpellWasCast _ spell _ _ _) -> spell == bearer
+    -- CR 707.10: a copy is not cast.
+    GameEvent.SpellCopied _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew {} -> False
     GameEvent.Moved {} -> False
@@ -8379,6 +8474,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.TriggeredAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew {} -> False
     GameEvent.Moved {} -> False
@@ -8482,6 +8578,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.TriggeredAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew {} -> False
     GameEvent.Moved {} -> False
@@ -8595,6 +8692,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.TriggeredAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew {} -> False
     GameEvent.Moved {} -> False
@@ -8663,6 +8761,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
@@ -8759,6 +8858,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityTriggered {} -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
@@ -8857,6 +8957,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityTriggered {} -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
@@ -8989,6 +9090,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityTriggered {} -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
@@ -9103,6 +9205,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityTriggered {} -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
@@ -9191,6 +9294,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityTriggered {} -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
@@ -9276,6 +9380,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityTriggered {} -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
@@ -9368,6 +9473,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityTriggered {} -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
@@ -9455,6 +9561,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityTriggered {} -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
@@ -9553,6 +9660,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityTriggered {} -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
@@ -9639,6 +9747,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityTriggered {} -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
@@ -9731,6 +9840,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityTriggered {} -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
@@ -9831,6 +9941,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityTriggered {} -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
@@ -9926,6 +10037,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityTriggered {} -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
@@ -10017,6 +10129,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityTriggered {} -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
@@ -10106,6 +10219,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityTriggered {} -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
@@ -10209,6 +10323,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
@@ -10319,6 +10434,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Crewed _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
@@ -10454,6 +10570,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Crewed _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
@@ -10603,6 +10720,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Crewed _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.Moved {} -> False
@@ -10695,6 +10813,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Crewed _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.Moved {} -> False
@@ -10729,6 +10848,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -10820,6 +10940,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -10910,6 +11031,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -10996,6 +11118,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -11081,6 +11204,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -11179,6 +11303,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -11265,6 +11390,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -11354,6 +11480,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -11442,6 +11569,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -11527,6 +11655,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -11618,6 +11747,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -11709,6 +11839,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -11800,6 +11931,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -11895,6 +12027,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -11988,6 +12121,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -12078,6 +12212,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -12177,6 +12312,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -12278,6 +12414,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -12376,6 +12513,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -12475,6 +12613,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -12566,6 +12705,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -12652,6 +12792,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -12737,6 +12878,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -12822,6 +12964,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -12907,6 +13050,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -12992,6 +13136,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -13084,6 +13229,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -13174,6 +13320,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -13258,6 +13405,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
@@ -13343,6 +13491,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
