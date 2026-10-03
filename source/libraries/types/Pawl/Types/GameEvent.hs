@@ -39,6 +39,7 @@ import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Saddling as Saddling
 import qualified Pawl.Types.SchemeSetInMotion as SchemeSetInMotion
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
+import qualified Pawl.Types.SpellWasCopied as SpellWasCopied
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TappedForMana as TappedForMana
 import qualified Pawl.Types.Transformed as Transformed
@@ -90,6 +91,9 @@ data GameEvent
     -- the Moved event the same cast records: CR 707.10's copy reaches the stack
     -- without being cast.
     SpellCast SpellWasCast.SpellWasCast
+  | -- | CR 707.10: a copy of a spell was put onto the stack. Not a cast, so no
+    -- reader of SpellCast above sees it.
+    SpellCopied SpellWasCopied.SpellWasCopied
   | -- | CR 725.1: a player became the monarch. What Palace Jailer's exile duration
     -- keys off, and the substrate for any future "whenever a player becomes the
     -- monarch" trigger.

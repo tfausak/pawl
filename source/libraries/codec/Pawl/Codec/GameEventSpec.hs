@@ -72,6 +72,7 @@ import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.Saddling as Saddling
 import qualified Pawl.Types.SchemeSetInMotion as SchemeSetInMotion
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
+import qualified Pawl.Types.SpellWasCopied as SpellWasCopied
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TappedForMana as TappedForMana
@@ -145,6 +146,12 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
           <> ProjectedCharacteristicsSpec.testCharacteristicsJson
           <> ",\"zone\":{\"type\":\"Hand\"}}}"
       )
+  Spec.it s "SpellCopied" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.SpellCopied (SpellWasCopied.MkSpellWasCopied (PlayerId.MkPlayerId 1) (ObjectId.MkObjectId 7)))
+      " {\"type\":\"SpellCopied\",\"value\":{\"player\":1,\"copy\":7}} "
   Spec.it s "BecameMonarch" $
     Common.assertCodec
       s

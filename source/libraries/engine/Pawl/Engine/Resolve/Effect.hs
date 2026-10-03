@@ -354,6 +354,7 @@ import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
+import qualified Pawl.Types.SpellWasCopied as SpellWasCopied
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
@@ -7444,6 +7445,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- ability is itself an ability".
             gsCopied <- State.get
             Event.becameTarget gsCopied copyId kind copier (targetsOnStack copyId gsCopied)
+            -- CR 707.10: a copy of a SPELL put onto the stack, which is not a
+            -- cast, is the event magecraft's "or copy" watches (SpellCast.copies).
+            Monad.when (kind == StackObjectKind.Spell) (State.modify' (Event.recordEvent (GameEvent.SpellCopied (SpellWasCopied.MkSpellWasCopied copier copyId))))
   -- CR 115.7d over each named spell or ability still on the stack.
   Effect.ChooseNewTargets ref -> retargetEach (chooseNewTargetsFor False controller) legal resolving controller source ref
   -- CR 115.7a, the same walk with the stricter re-aim.

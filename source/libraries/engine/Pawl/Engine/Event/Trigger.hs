@@ -106,6 +106,7 @@ import qualified Pawl.Types.SelfCountersRemoved as SelfCountersRemoved
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
+import qualified Pawl.Types.SpellWasCopied as SpellWasCopied
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
@@ -198,6 +199,7 @@ movedOf event = case event of
   GameEvent.DamagePrevented {} -> Nothing
   GameEvent.StepBegan {} -> Nothing
   GameEvent.SpellCast {} -> Nothing
+  GameEvent.SpellCopied _ -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
   GameEvent.TookInitiative _ -> Nothing
   -- The Moved event emitted by the same discard is the zone change; this one
@@ -341,6 +343,7 @@ participants event =
         GameEvent.DamagePrevented p -> ([DamagePrevented.source p], []) <> foldMap recipient (Map.keys (DamagePrevented.amounts p))
         GameEvent.StepBegan b -> player (StepBegan.player b)
         GameEvent.SpellCast c -> ([SpellWasCast.spell c], [SpellWasCast.player c])
+        GameEvent.SpellCopied c -> ([SpellWasCopied.copy c], [SpellWasCopied.player c])
         GameEvent.BecameMonarch pid -> player pid
         GameEvent.TookInitiative pid -> player pid
         GameEvent.Discarded d -> ([Discarded.card d], [Discarded.player d])
@@ -510,7 +513,9 @@ looksBack condition = case condition of
   -- bearer is routinely gone by the CR 117.5 boundary.
   TriggerCondition.SelfBecomesUnattachedFrom _ -> True
   -- CR 603.10f names this one too, and CR 800.4a is why: the loser's
-  -- permanents leave the game in the departure's own event group.
+  -- permanents leave the game in the departure's own event group. Kept because
+  -- the rule states it; nothing in data/cards/ observes it, Withengar Unbound's
+  -- payload naming only itself, which has left with its owner.
   TriggerCondition.PlayerLosesGame _ -> True
   -- CR 603.6c's two written forms, which CR 603.10a names first:
   -- leaves-the-battlefield abilities. CR 700.4 narrows the second to a
@@ -1366,6 +1371,7 @@ eventTriggers events gs =
         GameEvent.DamagePrevented {} -> Map.empty
         GameEvent.StepBegan {} -> Map.empty
         GameEvent.SpellCast {} -> Map.empty
+        GameEvent.SpellCopied _ -> Map.empty
         GameEvent.BecameMonarch _ -> Map.empty
         GameEvent.TookInitiative _ -> Map.empty
         GameEvent.Discarded {} -> Map.empty
@@ -1653,6 +1659,7 @@ eventTriggers events gs =
         GameEvent.DamagePrevented {} -> Map.empty
         GameEvent.StepBegan {} -> Map.empty
         GameEvent.SpellCast {} -> Map.empty
+        GameEvent.SpellCopied _ -> Map.empty
         GameEvent.BecameMonarch _ -> Map.empty
         GameEvent.TookInitiative _ -> Map.empty
         -- A reveal is not a cycling, whatever it showed. `revealedInHand` below is
@@ -1975,6 +1982,8 @@ eventTriggers events gs =
              in case Maybe.mapMaybe (functionsIn (PC.subtypes pc) (Face.delayedAbilities face) Zone.Stack) (PC.triggeredAbilities pc) <> fmap whole (Keyword.stackTriggeredAbilitiesOf (PC.keywords pc)) of
                   [] -> Map.empty
                   abilities -> Map.singleton spell (caster, abilities)
+        -- CR 707.10: a copy is not cast, so no "when you cast this spell" fires.
+        GameEvent.SpellCopied _ -> Map.empty
         GameEvent.Discarded {} -> Map.empty
         GameEvent.Drew {} -> Map.empty
         GameEvent.Moved {} -> Map.empty
@@ -2155,6 +2164,7 @@ eventTriggers events gs =
         GameEvent.DamagePrevented {} -> Map.empty
         GameEvent.StepBegan {} -> Map.empty
         GameEvent.SpellCast {} -> Map.empty
+        GameEvent.SpellCopied _ -> Map.empty
         GameEvent.BecameMonarch _ -> Map.empty
         GameEvent.TookInitiative _ -> Map.empty
         GameEvent.AttackerDeclared {} -> Map.empty
@@ -3889,6 +3899,7 @@ resnapshot gs without event =
         GameEvent.Revealed r -> fmap (\pc -> GameEvent.Revealed r {Revealed.characteristics = pc}) (reread (Revealed.card r) (Revealed.characteristics r))
         GameEvent.Transformed t -> fmap (\pc -> GameEvent.Transformed t {Transformed.characteristics = pc}) (reread (Transformed.object t) (Transformed.characteristics t))
         GameEvent.CardArrived {} -> Just event
+        GameEvent.SpellCopied {} -> Just event
         GameEvent.DamageDealt {} -> Just event
         GameEvent.DamagePrevented {} -> Just event
         GameEvent.StepBegan {} -> Just event
