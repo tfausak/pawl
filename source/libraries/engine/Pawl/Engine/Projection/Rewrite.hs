@@ -551,7 +551,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Firebend addition -> Effect.Firebend (rewriteManaAddition pairs addition)
   Effect.ActivateManaAbilities (ActivateManaAbilities.MkActivateManaAbilities ref filter_) -> Effect.ActivateManaAbilities (ActivateManaAbilities.MkActivateManaAbilities ref (Filter.rewrite pairs filter_))
   Effect.MoveMana _ -> effect
-  Effect.Search (Search.MkSearch searcher owner zones outside quantity filter_ upTo destination subject slot differentNames) -> Effect.Search (Search.MkSearch searcher owner zones outside (fmap (rewriteQuantity pairs) quantity) (Filter.rewrite pairs filter_) upTo destination subject slot differentNames)
+  Effect.Search (Search.MkSearch searcher owner zones outside quantity filter_ upTo destination subject slot differentIn) -> Effect.Search (Search.MkSearch searcher owner zones outside (fmap (rewriteQuantity pairs) quantity) (Filter.rewrite pairs filter_) upTo destination subject slot differentIn)
   Effect.ExileAllGraveyards -> effect
   Effect.Proliferate -> effect
   Effect.Reroll -> effect
