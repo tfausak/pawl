@@ -1,0 +1,148 @@
+{
+  "description": "CR 702.74a with no Aquatic Subtlety resolved, the Sandbar Crocodile has no evoke to be cast for",
+  "note": "The control: the same board with Aquatic Subtlety never cast. The Sandbar Crocodile has no evoke, so the cast exiling Ponder is not offered.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-2",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-3",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Aquatic Subtlety",
+            "label": "subtlety"
+          },
+          {
+            "card": "Sandbar Crocodile",
+            "label": "crocodile"
+          },
+          {
+            "card": "Ponder",
+            "label": "ponder"
+          },
+          {
+            "card": "Diviner's Portent",
+            "label": "portent"
+          }
+        ],
+        "library": [
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Forest"
+          },
+          {
+            "card": "Swamp"
+          },
+          {
+            "card": "Swamp"
+          },
+          {
+            "card": "Swamp"
+          },
+          {
+            "card": "Swamp"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Keywords": {
+          "object": "$crocodile",
+          "keyword": {
+            "type": "Evoke",
+            "value": {
+              "components": [
+                {
+                  "type": "ExileCardFromHand",
+                  "value": {
+                    "type": "HasColor",
+                    "value": {
+                      "type": "Blue"
+                    }
+                  }
+                }
+              ],
+              "mana": []
+            }
+          },
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Cast": {
+          "object": "$crocodile"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Hand",
+          "card": "Sandbar Crocodile",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Hand",
+          "card": "Ponder",
+          "count": 1
+        }
+      }
+    }
+  ]
+}
