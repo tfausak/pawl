@@ -4002,6 +4002,8 @@ quantityKindFilters quantity = case quantity of
   -- CR 700.5's payload is a PlayerRef and a set of colours: no CounterKind, so
   -- no Keyword and so no Filter.
   Quantity.Type.Devotion {} -> []
+  -- CR 700.8's payload is a PlayerRef: no CounterKind.
+  Quantity.Type.PartySize _ -> []
   -- The position this whole function exists for: CR 122.1's per-OBJECT tally
   -- names the kind on the card, and "the number of hexproof-from-Goblins
   -- counters" would carry a Filter under it.

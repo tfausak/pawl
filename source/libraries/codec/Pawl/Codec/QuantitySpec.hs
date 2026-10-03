@@ -426,6 +426,17 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.Devotion (Devotion.MkDevotion (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Set.fromList [Color.Black, Color.Green])))
       " {\"type\":\"Devotion\",\"value\":{\"player\":{\"type\":\"InSlot\",\"value\":\"target\"},\"colors\":[{\"type\":\"Black\"},{\"type\":\"Green\"}]}} "
+  Spec.it s "PartySize, relative and from a slot" $ do
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.PartySize (PlayerRef.Relative PlayerRelation.You))
+      " {\"type\":\"PartySize\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}} "
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.PartySize (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      " {\"type\":\"PartySize\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
   -- CR 122.1's OBJECT reading, with only a CounterKind on the wire: the object
   -- is whichever one the quantity is evaluated against, so there is no reference
   -- beside the kind. The payload-bearing CounterKind arm (CR 122.1b's keyword

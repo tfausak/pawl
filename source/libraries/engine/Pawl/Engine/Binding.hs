@@ -388,12 +388,10 @@ eventAmount = SlotName.MkSlotName (Text.pack "thatMuch")
 -- through last known information, ControllerOfBound's own
 -- Projection.controllerWithLastKnown among them.
 --
--- NOT named by Pawl.Engine.Resolve.Slots.effectViewOf, `unattachedHost`'s
--- posture: no card in data/cards/ reads a CHARACTERISTIC off the source whose
--- damage was stopped. A trigger's condition asking one is matched through
--- Projection.viewWithLastKnown already; a rider or payload asking one --
--- Honorable Passage's "if damage from a red source is prevented this way" --
--- would want the arm.
+-- A CHARACTERISTIC of it reads its last known information through
+-- Pawl.Engine.Resolve.Slots.effectViewOf, like any slot's object. No card in
+-- data/cards/ asks for one; Honorable Passage's "if damage from a red source is
+-- prevented this way" would.
 --
 -- Not a target (CR 115.10a; nothing was chosen), so the same CR 608.2b posture
 -- and the same "no card's targetSlots may name it" sweep as `became`, and the
@@ -1133,14 +1131,12 @@ attachedHost = SlotName.MkSlotName (Text.pack "thatHost")
 -- zone as becoming unattached -- which is what CR 603.10c's look-back is for, and
 -- is the payload's problem exactly as it is for `blockingCreature`.
 --
--- NOT named by Pawl.Engine.Resolve.Slots.effectViewOf, unlike
--- `sacrificedPermanent` and `departedPermanent` there, so a CHARACTERISTIC of a
--- dead former host reads blank. Nothing in print asks for one: Scryfall
--- o:"becomes unattached", 2026-09-05, returns Captain's Hook, Grafted
--- Exoskeleton, Grafted Wargear, Killer Cosplay and Stitcher's Graft, and every
--- one of them names the ex-host as a whole object rather than reading anything
--- off it. A printing that read "equal to that permanent's power" would want the
--- arm.
+-- A CHARACTERISTIC of a dead former host reads its last known information
+-- through Pawl.Engine.Resolve.Slots.effectViewOf, like any slot's object.
+-- Nothing in print asks for one: Scryfall o:"becomes unattached", 2026-09-05,
+-- returns Captain's Hook, Grafted Exoskeleton, Grafted Wargear, Killer Cosplay
+-- and Stitcher's Graft, and every one of them names the ex-host as a whole
+-- object rather than reading anything off it.
 unattachedHost :: SlotName
 unattachedHost = SlotName.MkSlotName (Text.pack "thatFormerHost")
 
