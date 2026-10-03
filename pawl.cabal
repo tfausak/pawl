@@ -119,6 +119,8 @@ library codec
     Pawl.Codec.ActiveBlockRequirementSpec
     Pawl.Codec.ActiveCopy
     Pawl.Codec.ActiveCopySpec
+    Pawl.Codec.ActiveEvasion
+    Pawl.Codec.ActiveEvasionSpec
     Pawl.Codec.ActivePlayerEffect
     Pawl.Codec.ActivePlayerEffectSpec
     Pawl.Codec.ActiveReplacement
@@ -636,6 +638,8 @@ library codec
     Pawl.Codec.ForbidActivationSpec
     Pawl.Codec.ForbidAttack
     Pawl.Codec.ForbidAttackSpec
+    Pawl.Codec.ForbidBeingBlocked
+    Pawl.Codec.ForbidBeingBlockedSpec
     Pawl.Codec.ForbidBlock
     Pawl.Codec.ForbidBlockSpec
     Pawl.Codec.ForbidUntap
@@ -1922,6 +1926,7 @@ library types
     Pawl.Types.ActiveBlockProhibition
     Pawl.Types.ActiveBlockRequirement
     Pawl.Types.ActiveCopy
+    Pawl.Types.ActiveEvasion
     Pawl.Types.ActivePlayerEffect
     Pawl.Types.ActiveReplacement
     Pawl.Types.ActiveUnregeneratable
@@ -2207,6 +2212,7 @@ library types
     Pawl.Types.ForageMode
     Pawl.Types.ForbidActivation
     Pawl.Types.ForbidAttack
+    Pawl.Types.ForbidBeingBlocked
     Pawl.Types.ForbidBlock
     Pawl.Types.ForbidUntap
     Pawl.Types.ForEach
