@@ -1476,7 +1476,8 @@ unearth cost =
           ModifyTarget.MkModifyTarget
             { ModifyTarget.duration = Duration.Indefinite,
               ModifyTarget.modification = Modification.GainKeyword Keyword.Haste,
-              ModifyTarget.ref = ObjectRef.InSlot unearthSlot
+              ModifyTarget.ref = ObjectRef.InSlot unearthSlot,
+              ModifyTarget.each = Nothing
             }
       armed =
         Effect.ArmDelayedTrigger
@@ -1793,7 +1794,8 @@ encore cost =
           ModifyTarget.MkModifyTarget
             { ModifyTarget.duration = Duration.Indefinite,
               ModifyTarget.modification = Modification.GainKeyword Keyword.Haste,
-              ModifyTarget.ref = ObjectRef.InSlot encoreTokenSlot
+              ModifyTarget.ref = ObjectRef.InSlot encoreTokenSlot,
+              ModifyTarget.each = Nothing
             }
       armed =
         Effect.ArmDelayedTrigger
@@ -2130,6 +2132,7 @@ crew n =
               Duration.UntilEndOfTurn
               (Modification.AddCardType cardType)
               (ObjectRef.InSlot Binding.triggerSource)
+              Nothing
           )
    in ActivatedAbility.MkActivatedAbility
         { ActivatedAbility.cost =
@@ -6156,6 +6159,7 @@ battleCry =
               ( ObjectRef.EachMatching
                   (Filter.And [Filter.HasCardType CardType.Creature, Filter.IsAttacking, Filter.Not Filter.IsSource])
               )
+              Nothing
           )
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
@@ -6406,6 +6410,7 @@ prowess =
               Duration.UntilEndOfTurn
               (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 1) (Quantity.Literal 1)))
               (ObjectRef.EachMatching Filter.IsSource)
+              Nothing
           )
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition =
@@ -6559,6 +6564,7 @@ melee =
               Duration.UntilEndOfTurn
               (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness bonus bonus))
               (ObjectRef.EachMatching Filter.IsSource)
+              Nothing
           )
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
@@ -6589,6 +6595,7 @@ rampage n =
               Duration.UntilEndOfTurn
               (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness bonus bonus))
               (ObjectRef.EachMatching Filter.IsSource)
+              Nothing
           )
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfBecomesBlocked,
@@ -6634,6 +6641,7 @@ flankingEffect =
         Duration.UntilEndOfTurn
         (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal (-1)) (Quantity.Literal (-1))))
         (ObjectRef.InSlot Binding.blockingCreature)
+        Nothing
     )
 
 -- CR 702.83a, the one minted ability borne by a BYSTANDER on both sides at once:
@@ -6656,6 +6664,7 @@ exalted =
               Duration.UntilEndOfTurn
               (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 1) (Quantity.Literal 1)))
               (ObjectRef.InSlot Binding.attackingCreature)
+              Nothing
           )
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition =
@@ -6700,6 +6709,7 @@ bushidoHalf condition n =
               Duration.UntilEndOfTurn
               (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal (toInteger n)) (Quantity.Literal (toInteger n))))
               (ObjectRef.EachMatching Filter.IsSource)
+              Nothing
           )
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = condition,
@@ -6733,6 +6743,7 @@ enlistReflexive =
               Duration.UntilEndOfTurn
               (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot Binding.tappedPermanent Quantity.Power)) (Quantity.Literal 0)))
               (ObjectRef.EachMatching Filter.IsSource)
+              Nothing
           )
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.Reflexive,
@@ -6763,6 +6774,7 @@ frenzy n =
               Duration.UntilEndOfTurn
               (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal (toInteger n)) (Quantity.Literal 0)))
               (ObjectRef.EachMatching Filter.IsSource)
+              Nothing
           )
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfAttacksUnblocked,
@@ -7679,7 +7691,8 @@ backup (Backup.MkBackup n above) =
           ModifyTarget.MkModifyTarget
             { ModifyTarget.duration = Duration.UntilEndOfTurn,
               ModifyTarget.modification = Modification.GainAbilitiesOfSource above,
-              ModifyTarget.ref = ObjectRef.InSlot backupTarget
+              ModifyTarget.ref = ObjectRef.InSlot backupTarget,
+              ModifyTarget.each = Nothing
             }
       another =
         Condition.Compares
