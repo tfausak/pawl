@@ -27,6 +27,7 @@ import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Prepare as Prepare
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Resolve.Slots as Slots
 import qualified Pawl.Engine.SplitSecond as SplitSecond
 import qualified Pawl.Engine.Target as Target
@@ -51,6 +52,7 @@ import qualified Pawl.Types.Convoking as Convoking
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.DuringPhase as DuringPhase
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
@@ -419,8 +421,40 @@ targetable castFor pid oid name gs = case proposedFace oid name gs of
 -- stack incarnation that holds no permission, so a gate that read one off the
 -- board would answer this cast's question about the wrong object. `spendingWith`
 -- is what the pre-move callers derive it with.
+--
+-- A spell whose own reduction reads the X (readsAnnouncedX) is asked at every X
+-- `gateXs` names rather than the least alone: the cast is legal if SOME
+-- announcement can be complied with (CR 601.2), and that spell's least X is
+-- its dearest.
 payableCost :: Maybe (Seq.Seq ModeIndex.ModeIndex) -> [ManaCost.ManaCost] -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payableCost modes extra spending pid oid gs = payableCostAt modes (maybe 0 Face.minimumX (Game.faceOf oid gs)) extra spending pid oid gs
+payableCost modes extra spending pid oid gs cost = any (\x -> payableCostAt modes x extra spending pid oid gs cost) (gateXs pid oid gs cost)
+
+-- The values of X a gate asks a cost at. CR 601.2b's least X alone, unless the
+-- spell's own reduction reads the X (readsAnnouncedX): then payability is no longer
+-- monotone in X -- Torgaar, Famine Incarnate's "costs {2} less for each
+-- creature sacrificed this way" makes its least X its dearest -- so every X up
+-- to the first whose COMPONENTS alone cannot be paid. That climb is monotone
+-- for Cost.greatestPayableX's reason, and it stops when a component's demand
+-- grows with X (Cost.componentDemandGrowsWithX, SacrificeX's past the matching
+-- permanents) or at CR 101.1's ceiling. A cost with neither keeps the least X,
+-- the only value the climb could not overrun.
+gateXs :: PlayerId -> ObjectId -> GameState -> Cost Keyword -> [Natural]
+gateXs pid oid gs cost =
+  let least = maybe 0 Face.minimumX (Game.faceOf oid gs)
+      ceiling_ = (\face -> Cost.maximumX pid oid face gs) =<< Game.faceOf oid gs
+      componentsAt x = Cost.componentsPayable Map.empty pid oid (Cost.Type.components (Cost.substituteX x cost)) gs
+      bounded = Maybe.isJust ceiling_ || any Cost.componentDemandGrowsWithX (Cost.Type.components cost)
+   in if readsAnnouncedX pid oid cost gs && bounded
+        then least : takeWhile (\x -> all (x <=) ceiling_ && componentsAt x) [least + 1 ..]
+        else [least]
+
+-- Whether this cost still carries an X that the spell's own CR 601.2f
+-- reduction reads (Cost.selfSentences, a perEach naming Binding.variableX).
+-- False once the X is substituted, so a measure of the announced cost reads
+-- the announced binding rather than one of its own.
+readsAnnouncedX :: PlayerId -> ObjectId -> Cost Keyword -> GameState -> Bool
+readsAnnouncedX pid oid cost gs =
+  Cost.hasVariable cost && any (Quantity.readsX . CostReduction.perEach) (Cost.selfSentences pid oid gs)
 
 -- The same question asked at some OTHER value of X. `payableCost` is this at CR
 -- 601.2b's floor, and `affordableX` is this climbed; one predicate, so what the
@@ -497,15 +531,21 @@ payableCostAt modes x extra spending pid oid gs =
 -- `payableCost` with the board's projection and CR 601.2g supply sweep handed
 -- in, so an enumeration over a hand builds the projection once (#435).
 payableCostGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> [ObjectId] -> [ManaCost.ManaCost] -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payableCostGiven pcs sources extra spending pid oid gs = payableCostAtGiven Nothing pcs sources (maybe 0 Face.minimumX (Game.faceOf oid gs)) extra spending pid oid gs
+payableCostGiven pcs sources extra spending pid oid gs cost = any (\x -> payableCostAtGiven Nothing pcs sources x extra spending pid oid gs cost) (gateXs pid oid gs cost)
 
 -- `payableCostAt` with the projection and sweep handed in.
+--
+-- A spell whose own reduction reads the X (readsAnnouncedX) is totalled with
+-- `x` bound on it under Binding.variableX, castProposed's own seed, so CR
+-- 601.2f's reduction counts the X being asked about rather than none.
 payableCostAtGiven :: Maybe (Seq.Seq ModeIndex.ModeIndex) -> Map.Map ObjectId PC.ProjectedCharacteristics -> [ObjectId] -> Natural -> [ManaCost.ManaCost] -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAtGiven modes pcs sources x extra spending pid oid gs cost =
   let substituted = Cost.substituteX x cost
       assisted = Cost.assistable (PaymentSubject.Casting oid) pid oid gs
+      withX o = o {Object.bindings = Map.union (Binding.fromChoices Map.empty (Just x) Seq.empty) (Object.bindings o)}
+      priced = if readsAnnouncedX pid oid cost gs then gs {GameState.objects = Map.adjust withX oid (GameState.objects gs)} else gs
       ask aiming =
-        let adjustments = Cost.plusReductions extra (Cost.spellAdjustments (Set.unions (Map.elems aiming)) pid oid gs)
+        let adjustments = Cost.plusReductions extra (Cost.spellAdjustments (Set.unions (Map.elems aiming)) pid oid priced)
             totalled = Cost.plusComponents adjustments substituted
             slots = fmap (Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList) aiming
          in Cost.canPaySomeCompletionGiven slots (PaymentSubject.Casting oid) spending sources pcs pid oid (fmap assisted . Cost.totalManas adjustments) (Cost.manaSubstitutions (Cost.Type.components totalled) slots pid oid gs) totalled gs
@@ -616,8 +656,16 @@ castAimable announced pid oid gs = case Game.faceOf oid gs of
 -- and one unpayable even at X=0 -- both answer 0, and Cost.greatestPayableX says
 -- why. Neither is reachable from castSpell, which asks only about a candidate
 -- that already passed payableCost and only when Cost.hasVariable holds.
+--
+-- The one predicate that is NOT monotone is a spell whose own reduction reads
+-- the X (readsAnnouncedX): Torgaar's least X is its dearest. That one is the
+-- greatest payable X among `gateXs`, whose climb is over the components alone.
 affordableX :: Seq.Seq ModeIndex.ModeIndex -> Maybe Natural -> [ManaCost.ManaCost] -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Natural
-affordableX modes mCeiling extra spending pid oid gs cost = Cost.greatestPayableX mCeiling (\x -> payableCostAt (Just modes) x extra spending pid oid gs cost) cost
+affordableX modes mCeiling extra spending pid oid gs cost
+  | readsAnnouncedX pid oid cost gs = Maybe.fromMaybe 0 (Maybe.listToMaybe (reverse (filter payableAt (gateXs pid oid gs cost))))
+  | otherwise = Cost.greatestPayableX mCeiling payableAt cost
+  where
+    payableAt x = payableCostAt (Just modes) x extra spending pid oid gs cost
 
 -- CR 118.8a: "Any number of additional costs may be applied to a spell as it's
 -- being cast", summed into the total by CR 601.2f. So a card printing two entwine
@@ -692,7 +740,7 @@ modeCostTotal costs chosen =
 --      cast would announce fewer modes than CR 702.42a says it chose, and
 --      castSpell's own size check would turn the whole cast into a silent no-op.
 --   3. Some candidate cost plus this one is payable -- CR 601.2f's "plus all
---      additional costs", at CR 601.2b's least X and with the same payableCost
+--      additional costs", at the X values gateXs names and with the same payableCost
 --      predicate castability was gated on. An option the player cannot take is
 --      not offered.
 --
@@ -740,7 +788,7 @@ withOptionalPayments paid candidate =
 --      Each rule's first ability is a static ability of the spell itself (CR
 --      702.33a, CR 702.157a).
 --   2. Some candidate cost plus this one is payable -- CR 601.2f's "plus all
---      additional costs", at CR 601.2b's least X and with the same payableCost
+--      additional costs", at the X values gateXs names and with the same payableCost
 --      predicate castability was gated on. An option the player cannot take is not
 --      offered.
 --
@@ -3144,8 +3192,9 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
               -- CR 601.2: a step the player cannot comply with makes the casting
               -- illegal and returns the game to before it was proposed. The X just
               -- named is where that can first become true, since every candidate
-              -- offered above passed payableCost at CR 601.2b's LEAST X -- the
-              -- only value castability can measure before the announcement exists.
+              -- offered above passed payableCost at SOME X (gateXs) -- usually
+              -- CR 601.2b's least, the only value castability can measure before
+              -- the announcement exists without searching.
               --
               -- Asked with the same predicate the floor was asked with, so a gate
               -- and an announcement cannot disagree about what a cost is. That

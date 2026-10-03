@@ -1484,6 +1484,16 @@ hatredSpec s registry =
              in State.execState (Engine.runGame answerHatredAtBound gs (S.cast S.alice hatredId)) []
       Spec.assertEqWith s "at 20 life the bound is 20" (boundsAt 20) [20]
       Spec.assertEqWith s "at 4 life the bound is 4" (boundsAt 4) [4]
+    -- A bound found past a value that cannot be paid: on four Swamps and three
+    -- Pikers, Torgaar, Famine Incarnate's X = 1 leaves {4}{B}{B}, but X = 3
+    -- leaves {B}{B}. An ascending climb stops at 0.
+    Spec.it s "CR 601.2b Torgaar is asked for X, bounded past the dearer values its own reduction skips" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      piker <- S.printingOf s registry "Goblin Piker"
+      torgaar <- S.printingOf s registry "Torgaar, Famine Incarnate"
+      let addPiker = snd . S.addPermanent piker S.alice
+          (gs, torgaarId) = S.handOne torgaar (addPiker (addPiker (addPiker (S.landsInPlay swamp 4))))
+      Spec.assertEqWith s "the bound is 3, one sacrifice per Piker" (State.execState (Engine.runGame answerHatredAtBound gs (S.cast S.alice torgaarId)) []) [3]
     -- The fence under the two functions above. CR 601.2 reverses a casting whose
     -- steps a player cannot comply with; it never picks a value on their behalf,
     -- so an unannounced X is simply unpayable. Unreachable from either cast path
