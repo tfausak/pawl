@@ -572,6 +572,12 @@ createInSchemeDeck pid printingId = do
 
 newGame :: HandActionPerformer -> NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> Game ()
 newGame perform matchup = do
+  -- CR 904.2 / 904.6 / 103.1b: an Archenemy game's teams, and the archenemy
+  -- takes the first turn -- a rotation, claimStartingPlayer's, so CR 103.1c
+  -- still supersedes it below. Ahead of createDeck, whose CR 904.13b shared
+  -- total reads the teams.
+  Monad.forM_ (Archenemy.sole (NonEmpty.toList matchup)) $ \archenemy ->
+    State.modify' (\g -> (Archenemy.setUp archenemy g) {GameState.turnOrder = rotateTo archenemy (GameState.turnOrder g), GameState.activePlayer = archenemy})
   -- CR 103.3: build and shuffle every library before any opening hand is drawn,
   -- so CR 103.5's declaration round sees settled libraries.
   Monad.forM_ (NonEmpty.toList matchup) $ \(pid, deck) -> do

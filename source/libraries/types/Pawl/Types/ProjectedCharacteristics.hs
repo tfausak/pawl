@@ -28,6 +28,7 @@ import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Types.RuleAbilities as RuleAbilities
 import qualified Pawl.Types.SpecialAction as SpecialAction
+import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -357,6 +358,15 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- cast"). Apart from costReductions for grantedPlayerAbilities' reason: that
     -- list is copiable and read off Game.castingFaceOf, and a grant is neither.
     grantedCostReductions :: [CostReduction.CostReduction],
+    -- | CR 613.1f / 118.9: the alternative costs layer 6 GRANTED the object
+    -- (Mine Security's perpetual "You may pay {0} rather than pay this spell's
+    -- mana cost"), apart from alternativeCosts for grantedCostReductions' reason.
+    grantedAlternativeCosts :: [AlternativeCost.AlternativeCost],
+    -- | CR 613.1f / 609.4b: the permissions about the mana spent to cast it that
+    -- layer 6 GRANTED the object (Tome of the Infinite's perpetual "You may
+    -- spend mana as though it were mana of any color to cast this spell"), read
+    -- by Pawl.Engine.PlayerEffect.spendManaAsThoughFor.
+    grantedSpendManaAsThough :: [SpendManaAsThough.SpendManaAsThough],
     -- | CR 709.5: the card whose HALVES this object has, and Nothing for an
     -- object with no shared type line. The one field here that is not a
     -- characteristic: rule 709.5's last sentence makes the shared type line's

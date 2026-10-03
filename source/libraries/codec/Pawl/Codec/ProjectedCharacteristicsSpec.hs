@@ -28,6 +28,7 @@ import qualified Pawl.Types.Face as Face.Type
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaFilter as ManaFilter
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Modal as Modal
@@ -39,6 +40,7 @@ import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SpecialAction as SpecialAction
+import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -106,6 +108,8 @@ testCharacteristics =
       PC.alternativeCosts = [AlternativeCost.MkAlternativeCost Nothing (Cost.MkCost (Just (ManaCost.MkManaCost [])) [])],
       PC.costReductions = [CostReduction.MkCostReduction (ManaCost.MkManaCost [ManaSymbol.Generic 3]) (Quantity.Literal 1) Nothing Nothing CostDirection.Less],
       PC.grantedCostReductions = [CostReduction.MkCostReduction (ManaCost.MkManaCost [ManaSymbol.Generic 1]) (Quantity.Literal 1) Nothing Nothing CostDirection.Less],
+      PC.grantedAlternativeCosts = [AlternativeCost.MkAlternativeCost Nothing (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [])],
+      PC.grantedSpendManaAsThough = [SpendManaAsThough.MkSpendManaAsThough ManaFilter.Any (Set.singleton ManaType.Colorless) True],
       -- Synthetic like the rest of this value: a Mountain has no halves, and
       -- what the case is about is that the field carries a whole card through
       -- the wire (CR 709.5).
@@ -160,6 +164,8 @@ testCharacteristicsJson =
     <> "\"alternativeCosts\":[{\"cost\":{\"mana\":[]}}],"
     <> "\"costReductions\":[{\"amount\":[{\"type\":\"Generic\",\"value\":3}],\"perEach\":{\"type\":\"Literal\",\"value\":1}}],"
     <> "\"grantedCostReductions\":[{\"amount\":[{\"type\":\"Generic\",\"value\":1}],\"perEach\":{\"type\":\"Literal\",\"value\":1}}],"
+    <> "\"grantedAlternativeCosts\":[{\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}}],"
+    <> "\"grantedSpendManaAsThough\":[{\"which\":{\"type\":\"Any\"},\"asThough\":[{\"type\":\"Colorless\"}],\"only\":true}],"
     <> "\"halves\":{\"faces\":[{\"name\":\"Mountain\",\"typeLine\":{\"supertypes\":[{\"type\":\"Basic\"}],\"types\":[{\"type\":\"Land\"}],\"subtypes\":[{\"type\":\"Mountain\"}]}}]},"
     <> "\"exceptions\":[{\"type\":\"NoManaCost\"}],"
     <> "\"mergedDonors\":[{\"names\":[\"Mountain\"],\"cardTypes\":[{\"type\":\"Land\"}]}],"
@@ -209,6 +215,8 @@ minimalCharacteristics =
       PC.alternativeCosts = [],
       PC.costReductions = [],
       PC.grantedCostReductions = [],
+      PC.grantedAlternativeCosts = [],
+      PC.grantedSpendManaAsThough = [],
       PC.halves = Nothing,
       PC.exceptions = [],
       PC.mergedDonors = [],

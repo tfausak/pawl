@@ -450,12 +450,21 @@ candidateCostsGiven permitted pid name oid gs =
               -- abilities has no alternative cost" and "CR 113.6d under Yixlid
               -- Jailer a Fireblast cast from the graveyard still sacrifices two
               -- Mountains" prove both.
-              alternatives = case Face.alternativeCosts face of
-                [] -> []
-                printedAlternatives ->
-                  if PC.lostAllAbilities spell
-                    then []
-                    else fmap (withAdditional . AlternativeCost.cost) (filter available printedAlternatives)
+              --
+              -- A GRANTED alternative cost (Mine Security's perpetual "You may
+              -- pay {0} rather than pay this spell's mana cost") is read off
+              -- `spell` too, CR 113.6d's standing; the projection has already
+              -- applied any wipe to it. The scenario
+              -- cr-118-9-the-kavu-mine-security-conjured-is-cast-for-0 proves it.
+              alternatives =
+                ( case Face.alternativeCosts face of
+                    [] -> []
+                    printedAlternatives ->
+                      if PC.lostAllAbilities spell
+                        then []
+                        else fmap (withAdditional . AlternativeCost.cost) (filter available printedAlternatives)
+                )
+                  <> fmap (withAdditional . AlternativeCost.cost) (filter available (PC.grantedAlternativeCosts spell))
               -- CR 702.103a: bestow, offered from EVERY zone the printed cost is
               -- -- "a static ability that functions in any zone from which you
               -- could play the card it's on" -- so it joins `ordinary` below
@@ -5151,7 +5160,7 @@ payManaWindow perform inFlight record subject spending pid substituting cost = d
       -- permission the cast carried in, so a Celestial Dawn that leaves
       -- mid-payment stops applying (CR 604.2) -- the opposite of `spending`, which
       -- rule 118.14 fixes when the cast was permitted.
-      settlement gs = Mana.spend (PlayerEffect.spendManaAsThough pid gs) spending (Maybe.fromMaybe 0 (Mana.lifeNeeded subject (midPayment (manaActivationsGiven (PlayerEffect.applying pid gs))) spending pid cost gs)) cost (Mana.Type.MkMana (fst (Mana.spendableFor subject pid gs)))
+      settlement gs = Mana.spend (PlayerEffect.spendManaAsThoughFor pid subject gs) spending (Maybe.fromMaybe 0 (Mana.lifeNeeded subject (midPayment (manaActivationsGiven (PlayerEffect.applying pid gs))) spending pid cost gs)) cost (Mana.Type.MkMana (fst (Mana.spendableFor subject pid gs)))
       -- `activated` is the sources whose mana ability this window ran, newest
       -- first -- CR 733.1's "any legal mana abilities that player activated",
       -- gathered because that rule offers them back.
@@ -5221,10 +5230,10 @@ payManaWindow perform inFlight record subject spending pid substituting cost = d
         -- unspent, it does not vanish because one cost could not use it).
         let shut = ManaWindow.MkManaWindow {ManaWindow.payer = pid, ManaWindow.activated = reverse activated, ManaWindow.opened = entry, ManaWindow.closed = closed}
             (available, withheld) = Mana.spendableFor subject pid gs
-        case Mana.plan (PlayerEffect.spendManaAsThough pid gs) spending (Maybe.fromMaybe 0 (Mana.lifeNeeded subject (midPayment (manaActivationsGiven (PlayerEffect.applying pid gs))) spending pid residual gs)) residual (Mana.Type.MkMana available) of
+        case Mana.plan (PlayerEffect.spendManaAsThoughFor pid subject gs) spending (Maybe.fromMaybe 0 (Mana.lifeNeeded subject (midPayment (manaActivationsGiven (PlayerEffect.applying pid gs))) spending pid residual gs)) residual (Mana.Type.MkMana available) of
           Nothing -> pure (False, extra, shut)
           Just (steps, life) -> do
-            (Mana.Type.MkMana left, spent) <- Mana.spendChosen pid (PlayerEffect.spendManaAsThough pid gs) steps (Mana.Type.MkMana available)
+            (Mana.Type.MkMana left, spent) <- Mana.spendChosen pid (PlayerEffect.spendManaAsThoughFor pid subject gs) steps (Mana.Type.MkMana available)
             -- Three writes in the order the one composed `State.modify'` they
             -- replace applied them in: the pool goes back, then the life is paid,
             -- then CR 400.7d's record of what was spent. Event.payLife is monadic

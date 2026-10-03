@@ -27,6 +27,7 @@ import qualified Pawl.Codec.ManaSymbol as Codec.ManaSymbol
 import qualified Pawl.Codec.ManaType as Codec.ManaType
 import qualified Pawl.Codec.ManaUnit as Codec.ManaUnit
 import qualified Pawl.Codec.OptionalDecision as Codec.OptionalDecision
+import qualified Pawl.Codec.OutsideCard as Codec.OutsideCard
 import qualified Pawl.Codec.PaymentDecision as Codec.PaymentDecision
 import qualified Pawl.Codec.PrintingId as Codec.PrintingId
 import qualified Pawl.Codec.Reference as Codec.Reference
@@ -332,7 +333,7 @@ shapeOf prompt = case prompt of
   Prompt.ChooseCardFromAmong {} -> object
   Prompt.ChooseCardsFromAmong {} -> setOf object
   Prompt.ChooseDungeon {} -> viaCodec Codec.PrintingId.codec
-  Prompt.ChooseCompanion {} -> maybeOf (viaCodec Codec.PrintingId.codec)
+  Prompt.ChooseCompanion {} -> maybeOf (viaCodec Codec.OutsideCard.codec)
   Prompt.ChooseFromOutsideTheGame {} -> unsupported (Text.pack "outside cards")
   Prompt.ChooseRoom {} -> wrapped RoomIndex.MkRoomIndex RoomIndex.unwrap
   Prompt.ChooseHalf {} -> viaCodec Codec.CardName.codec

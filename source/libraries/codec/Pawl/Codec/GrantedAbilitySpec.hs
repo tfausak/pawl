@@ -12,7 +12,9 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
@@ -21,7 +23,9 @@ import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaFilter as ManaFilter
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
@@ -32,6 +36,7 @@ import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.RuleAbilities as RuleAbilities
+import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerLimit as TriggerLimit
@@ -126,4 +131,20 @@ spec s = Spec.describe s "Pawl.Codec.GrantedAbility" $ do
       codec
       (GrantedAbility.SelfCostReduction (CostReduction.MkCostReduction (ManaCost.MkManaCost [ManaSymbol.Generic 1]) (Quantity.Literal 1) Nothing Nothing CostDirection.Less))
       " {\"type\":\"SelfCostReduction\",\"value\":{\"amount\":[{\"type\":\"Generic\",\"value\":1}],\"perEach\":{\"type\":\"Literal\",\"value\":1}}} "
+  -- CR 118.9: Mine Security's "You may pay {0} rather than pay this spell's
+  -- mana cost".
+  Spec.it s "SelfAlternativeCost" $
+    Common.assertCodec
+      s
+      codec
+      (GrantedAbility.SelfAlternativeCost (AlternativeCost.MkAlternativeCost Nothing (Cost.MkCost (Just (ManaCost.MkManaCost [])) [])))
+      " {\"type\":\"SelfAlternativeCost\",\"value\":{\"cost\":{\"mana\":[]}}} "
+  -- CR 609.4b: Tome of the Infinite's "You may spend mana as though it were mana
+  -- of any color to cast this spell", one color shown.
+  Spec.it s "SelfSpendManaAsThough" $
+    Common.assertCodec
+      s
+      codec
+      (GrantedAbility.SelfSpendManaAsThough (SpendManaAsThough.MkSpendManaAsThough ManaFilter.Any (Set.singleton (ManaType.Colored Color.Red)) False))
+      " {\"type\":\"SelfSpendManaAsThough\",\"value\":{\"which\":{\"type\":\"Any\"},\"asThough\":[{\"type\":\"Colored\",\"value\":{\"type\":\"Red\"}}],\"only\":false}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

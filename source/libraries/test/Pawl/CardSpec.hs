@@ -911,6 +911,9 @@ modificationCounts modification = case modification of
     GrantedAbility.SelfCostReduction reduction ->
       quantityCounts (CostReduction.perEach reduction)
         <> concatMap conditionCounts (Maybe.maybeToList (CostReduction.condition reduction))
+    GrantedAbility.SelfAlternativeCost alternative -> concatMap conditionCounts (Maybe.maybeToList (AlternativeCost.condition alternative))
+    -- Carries neither a Count nor a Filter.
+    GrantedAbility.SelfSpendManaAsThough _ -> []
   -- Rule 702.165a's grant names the source, and the keywords it carries are
   -- minted from the card's Backup keyword, swept there.
   Modification.GainAbilitiesOfSource _ -> []
@@ -6224,6 +6227,17 @@ grantedCostReductions card =
     )
     (grantedModifications card)
 
+-- The ALTERNATIVE-COST kind of the same grant (CR 118.9), swept for the same
+-- reason.
+grantedAlternativeCosts :: Face.Face Card.Type.Card -> [AlternativeCost.AlternativeCost]
+grantedAlternativeCosts card =
+  Maybe.mapMaybe
+    ( \modification -> case modification of
+        Modification.GainAbility (GrantedAbility.SelfAlternativeCost alternative) -> Just alternative
+        _ -> Nothing
+    )
+    (grantedModifications card)
+
 -- CR 708.2: a face-down listing's quoted abilities, as the grant they amount to.
 listedGrants :: FaceDownCharacteristics.FaceDownCharacteristics (GrantedAbility.GrantedAbility Card.Type.Card) -> [Projection.Modification]
 listedGrants = fmap Modification.GainAbility . FaceDownCharacteristics.abilities
@@ -6499,6 +6513,8 @@ cardFilters card =
     <> frame Unframed (concatMap (quantityFilters . CostReduction.perEach) (grantedCostReductions card))
     <> frame Unframed (concatMap (concatMap conditionFilters . Maybe.maybeToList . CostReduction.condition) (grantedCostReductions card))
     <> unframed (Maybe.mapMaybe CostReduction.whichTargets (grantedCostReductions card))
+    -- A granted alternative cost, Unframed for the printed one's reason.
+    <> concatMap (frame Unframed . alternativeCostFilters) (grantedAlternativeCosts card)
     <> concatMap triggeredAbilityFilters (Face.triggeredAbilities card)
     <> concatMap triggeredAbilityFilters (Map.elems (Face.delayedAbilities card))
     <> concatMap (modalFilters . DungeonRoom.ability) (Face.rooms card)

@@ -24,6 +24,7 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.AnyNumberDiscard as AnyNumberDiscard
 import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
@@ -1327,6 +1328,14 @@ rewriteGrantedAbility pairs granted = case granted of
           CostReduction.condition = fmap (rewriteCondition pairs) (CostReduction.condition r),
           CostReduction.whichTargets = fmap (Filter.rewrite pairs) (CostReduction.whichTargets r)
         }
+  GrantedAbility.SelfAlternativeCost a ->
+    GrantedAbility.SelfAlternativeCost
+      a
+        { AlternativeCost.condition = fmap (rewriteCondition pairs) (AlternativeCost.condition a),
+          AlternativeCost.cost = Filter.rewriteCost pairs (AlternativeCost.cost a)
+        }
+  -- Mana types and filters carry no land type word.
+  GrantedAbility.SelfSpendManaAsThough clause -> GrantedAbility.SelfSpendManaAsThough clause
 
 -- CR 612.1 over a TRIGGERED ability printed on a permanent. Three parts, not
 -- just the payload: the CR 603.8 condition is where the word usually is, and CR

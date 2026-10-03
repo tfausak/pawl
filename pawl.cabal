@@ -868,6 +868,8 @@ library codec
     Pawl.Codec.OptionalitySpec
     Pawl.Codec.OrElse
     Pawl.Codec.OrElseSpec
+    Pawl.Codec.OutsideCard
+    Pawl.Codec.OutsideCardSpec
     Pawl.Codec.OutsideDestination
     Pawl.Codec.OutsideDestinationSpec
     Pawl.Codec.OutsideObject
