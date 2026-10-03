@@ -660,7 +660,7 @@ effectObjectRefs :: Effect card ability -> [ObjectRef]
 effectObjectRefs effect = case effect of
   Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> Foldable.toList (fmap DamagePart.ref parts)
   Effect.Fight {} -> []
-  Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ _ ref) -> [ref]
+  Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ _ ref _) -> [ref]
   Effect.ChangeText {} -> []
   Effect.AddMana {} -> []
   Effect.Firebend {} -> []
@@ -1136,9 +1136,10 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- slot named by only one half would still look dangling.
   Effect.Fight (Fight.MkFight first second) -> joinTwo (oneSlot first) (oneSlot second)
   -- The modification's own quantities read slots too, through
-  -- Projection.quantitiesOf.
-  Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) ->
-    joinTwo (joinSlots (fmap quantitySlots (Projection.quantitiesOf modification))) (durationSlots duration)
+  -- Projection.quantitiesOf. The per-object name is subtracted: the arm itself
+  -- binds it while it freezes, and nowhere else.
+  Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _ each) ->
+    joinTwo (maybe id Map.delete each (joinSlots (fmap quantitySlots (Projection.quantitiesOf modification)))) (durationSlots duration)
   Effect.ChangeText (ChangeText.MkChangeText _ _ slot) -> oneSlot slot
   Effect.AddMana {} -> Map.empty
   Effect.Firebend {} -> Map.empty
@@ -1888,7 +1889,7 @@ ownSlotsAreExhaustive :: Effect Card.Type.Card (GrantedAbility.GrantedAbility Ca
 ownSlotsAreExhaustive effect = case effect of
   Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> all (Quantity.slotsAreExhaustive . DamagePart.quantity) parts
   Effect.Fight {} -> True
-  Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) ->
+  Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _ _) ->
     durationSlotsAreExhaustive duration
       && all Quantity.slotsAreExhaustive (Projection.quantitiesOf modification)
   Effect.ChangeText {} -> True
@@ -2178,7 +2179,7 @@ readsX =
         Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> any (Quantity.readsX . DamagePart.quantity) parts
         Effect.Fight {} -> False
         -- Untamed Might's "+X/+X" sits inside the Modification, not on the effect.
-        Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _) -> any Quantity.readsX (Projection.quantitiesOf modification)
+        Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _ _) -> any Quantity.readsX (Projection.quantitiesOf modification)
         Effect.ChangeText {} -> False
         Effect.AddMana _ -> False
         Effect.Firebend _ -> False

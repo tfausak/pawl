@@ -85,7 +85,7 @@ import qualified Pawl.Types.Zone as Zone
 instructions :: Earthbend.Earthbend -> [Effect Card (GrantedAbility.GrantedAbility Card)]
 instructions earthbend =
   let ref = Earthbend.ref earthbend
-      animate modification = Effect.ModifyTarget (ModifyTarget.MkModifyTarget Duration.Indefinite modification ref)
+      animate modification = Effect.ModifyTarget (ModifyTarget.MkModifyTarget Duration.Indefinite modification ref Nothing)
    in [ animate (Modification.AddCardType CardType.Creature),
         animate (Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness (Just (Quantity.Literal 0)) (Just (Quantity.Literal 0)))),
         animate (Modification.GainKeyword Keyword.Haste),

@@ -241,7 +241,7 @@ effectQuantities effect = concatMap Resolve.objectRefQuantities (Resolve.effectO
 ownQuantities :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [Quantity.Type.Quantity]
 ownQuantities effect = case effect of
   Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> fmap DamagePart.quantity (Foldable.toList parts)
-  Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) -> durationQuantities duration <> Projection.quantitiesOf modification
+  Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _ _) -> durationQuantities duration <> Projection.quantitiesOf modification
   Effect.ChangeText {} -> []
   Effect.AddMana _ -> []
   Effect.Firebend _ -> []
@@ -1343,7 +1343,7 @@ effectObjectRefs effect =
         -- Resolve.permanentsGathered.
         Effect.AttachAll (AttachAll.MkAttachAll ref _) -> [(AsksTransformGather, ref)]
         Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> read_ (fmap DamagePart.ref (Foldable.toList parts))
-        Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ _ ref) -> [(AsksChosenPermanent, ref)]
+        Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ _ ref _) -> [(AsksChosenPermanent, ref)]
         Effect.ChangeText {} -> []
         Effect.AddMana {} -> []
         Effect.Firebend {} -> []
@@ -1754,7 +1754,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "no card authors a control modification into a resolving effect (#199)" $ do
     ps <- S.allPrintings s
     let offends effect = case effect of
-          Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _) -> Projection.layer modification == Layer.Control
+          Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _ _) -> Projection.layer modification == Layer.Control
           _ -> False
         offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
     Spec.assertEqWith s "control belongs on a static ability, never in a stored effect" (fmap (S.nameOf . Printing.card) offenders) []
@@ -1788,7 +1788,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           Modification.AddSubtype subtype -> [subtype]
           _ -> []
         stored effect = case effect of
-          Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _) -> addedSubtypes modification
+          Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _ _) -> addedSubtypes modification
           _ -> []
         added card = concatMap addedSubtypes (grantedModifications card) <> concatMap stored (cardResolutionEffects card)
         misfiled subtype = Subtype.Engine.isLandType subtype || Subtype.Engine.isCreatureType subtype

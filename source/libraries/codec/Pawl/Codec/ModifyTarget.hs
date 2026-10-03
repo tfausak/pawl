@@ -6,7 +6,9 @@ import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.Duration as Duration
 import qualified Pawl.Codec.Modification as Modification
 import qualified Pawl.Codec.ObjectRef as ObjectRef
+import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.JsonCodec.Codec as Codec
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
 
@@ -21,9 +23,11 @@ codec abilityCodec = Fields.object $ do
   duration <- Fields.required "duration" Duration.codec ModifyTarget.duration
   modification <- Fields.required "modification" (Modification.codec abilityCodec) ModifyTarget.modification
   ref <- Fields.required "ref" ObjectRef.codec ModifyTarget.ref
+  each <- Fields.defaulted "each" Nothing (Common.maybe SlotName.codec) ModifyTarget.each
   pure
     ModifyTarget.MkModifyTarget
       { ModifyTarget.duration = duration,
         ModifyTarget.modification = modification,
-        ModifyTarget.ref = ref
+        ModifyTarget.ref = ref,
+        ModifyTarget.each = each
       }
