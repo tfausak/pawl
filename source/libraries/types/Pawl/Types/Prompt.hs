@@ -761,9 +761,10 @@ data Prompt r where
   -- printed "you may attach it"; never elided, declining leaving it to CR
   -- 704.5m.
   ChooseTurnUpAttachment :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt OptionalDecision.OptionalDecision
-  -- | Which of several costs this object\'s controller pays. Asked at four
-  -- moments, all of them "which cost", which is why one constructor serves
-  -- all: CR 601.2b\'s payable alternative and additional costs, after modes and
+  -- | Which of several costs the named player pays. Asked at five moments, all
+  -- of them "which cost", which is why one constructor serves all: CR 118.12\'s
+  -- choice among a resolution-time cost\'s options, ahead of Prompt.ChooseToPay
+  -- (Pawl.Engine.Resolve.Effect.payGateAgreed); CR 601.2b\'s payable alternative and additional costs, after modes and
   -- before X and targets (CR 118.9b makes an alternative cost optional); CR
   -- 702.51b\'s, CR 702.66b\'s, CR 702.126b\'s and CR 701.67a\'s substitutes once the
   -- total cost is locked in and CR 601.2g\'s mana window has closed
@@ -772,7 +773,7 @@ data Prompt r where
   -- 616.1\'s choice of which CR 702.35a madness ability exiled a discarded card,
   -- offered as the costs they settle to and unfiltered, since nothing is paid yet
   -- (Pawl.Engine.Event.madnessChoice). The candidates are filtered by
-  -- payability at the first three, and an answer outside them is rejected.
+  -- payability at the first four, and an answer outside them is rejected.
   ChooseCost :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [Cost.Cost Keyword.Keyword] -> Prompt (Cost.Cost Keyword.Keyword)
   -- | CR 601.3 / 305.1: which of the permissions admitting a play of the
   -- ObjectId it is made under (Nothing = none of them); asked only where two

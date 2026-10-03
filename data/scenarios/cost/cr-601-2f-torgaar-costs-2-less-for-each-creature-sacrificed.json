@@ -1,0 +1,39 @@
+{
+  "description": "CR 601.2f Torgaar, Famine Incarnate costs {2} less for each creature its additional cost sacrifices",
+  "note": "Four Swamps pay {6}{B}{B} only with two creatures sacrificed, so the cast is offered only if the gate looks past X = 0, and X = 1 is refused for the {4}{B}{B} it leaves. Three creatures make the sacrifice a real choice: the Wraith and the Giant go, the Piker stays. Bob at 7 rises to 10, half his starting 20, so the ETB sets rather than subtracts.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Swamp", "label": "s1" },
+          { "card": "Swamp", "label": "s2" },
+          { "card": "Swamp", "label": "s3" },
+          { "card": "Swamp", "label": "s4" },
+          { "card": "Bog Wraith", "label": "wraith" },
+          { "card": "Hill Giant", "label": "giant" },
+          { "card": "Goblin Piker", "label": "piker" }
+        ],
+        "hand": [{ "card": "Torgaar, Famine Incarnate", "label": "torgaar" }]
+      },
+      { "name": "bob", "life": 7 }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "refuse": { "Cast": { "object": "$torgaar", "x": 1, "mana": ["$s1", "$s2", "$s3", "$s4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Answer": { "prompt": "ChooseSacrifices", "with": ["$wraith", "$giant"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$torgaar", "x": 2, "mana": ["$s1", "$s2", "$s3", "$s4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "target": ["$bob"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 10 } } }
+  ],
+  "final": [
+    { "Count": { "player": "alice", "zone": "Battlefield", "card": "Torgaar, Famine Incarnate", "count": 1 } },
+    { "Count": { "player": "alice", "zone": "Graveyard", "card": "Bog Wraith", "count": 1 } },
+    { "Count": { "player": "alice", "zone": "Graveyard", "card": "Hill Giant", "count": 1 } },
+    { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } }
+  ]
+}
