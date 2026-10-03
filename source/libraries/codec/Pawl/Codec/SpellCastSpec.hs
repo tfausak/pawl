@@ -22,7 +22,8 @@ spec s = Spec.describe s "Pawl.Codec.SpellCast" $ do
             SpellCast.scope = TurnScope.EachTurn,
             SpellCast.zone = Nothing,
             SpellCast.ordinal = Nothing,
-            SpellCast.phase = Nothing
+            SpellCast.phase = Nothing,
+            SpellCast.copies = False
           }
       )
       " {\"filter\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}},\"scope\":{\"type\":\"EachTurn\"}} "
@@ -37,7 +38,8 @@ spec s = Spec.describe s "Pawl.Codec.SpellCast" $ do
             SpellCast.scope = TurnScope.OpponentsTurn,
             SpellCast.zone = Nothing,
             SpellCast.ordinal = Nothing,
-            SpellCast.phase = Nothing
+            SpellCast.phase = Nothing,
+            SpellCast.copies = False
           }
       )
       " {\"filter\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}},\"scope\":{\"type\":\"OpponentsTurn\"}} "
@@ -52,7 +54,8 @@ spec s = Spec.describe s "Pawl.Codec.SpellCast" $ do
             SpellCast.scope = TurnScope.EachTurn,
             SpellCast.zone = Just Zone.Hand,
             SpellCast.ordinal = Nothing,
-            SpellCast.phase = Nothing
+            SpellCast.phase = Nothing,
+            SpellCast.copies = False
           }
       )
       " {\"filter\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}},\"scope\":{\"type\":\"EachTurn\"},\"zone\":{\"type\":\"Hand\"}} "
@@ -67,7 +70,8 @@ spec s = Spec.describe s "Pawl.Codec.SpellCast" $ do
             SpellCast.scope = TurnScope.EachTurn,
             SpellCast.zone = Nothing,
             SpellCast.ordinal = Just 2,
-            SpellCast.phase = Nothing
+            SpellCast.phase = Nothing,
+            SpellCast.copies = False
           }
       )
       " {\"filter\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}},\"scope\":{\"type\":\"EachTurn\"},\"ordinal\":2} "
@@ -82,8 +86,24 @@ spec s = Spec.describe s "Pawl.Codec.SpellCast" $ do
             SpellCast.scope = TurnScope.EachTurn,
             SpellCast.zone = Nothing,
             SpellCast.ordinal = Nothing,
-            SpellCast.phase = Just PhaseSelector.CombatPhase
+            SpellCast.phase = Just PhaseSelector.CombatPhase,
+            SpellCast.copies = False
           }
       )
       " {\"filter\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}},\"scope\":{\"type\":\"EachTurn\"},\"phase\":{\"type\":\"CombatPhase\"}} "
+  -- Magecraft's "or copy", elided when absent like the phase.
+  Spec.it s "MkSpellCast, a window that copies fire too" $
+    Common.assertCodec
+      s
+      SpellCast.codec
+      ( SpellCast.MkSpellCast
+          { SpellCast.filter = Filter.ControlledBy PlayerRelation.You,
+            SpellCast.scope = TurnScope.EachTurn,
+            SpellCast.zone = Nothing,
+            SpellCast.ordinal = Nothing,
+            SpellCast.phase = Nothing,
+            SpellCast.copies = True
+          }
+      )
+      " {\"filter\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}},\"scope\":{\"type\":\"EachTurn\"},\"copies\":true} "
   Spec.it s "has a schema" $ Common.assertHasSchema s SpellCast.codec

@@ -45,6 +45,7 @@ import qualified Pawl.Codec.Revealed as Revealed
 import qualified Pawl.Codec.Saddling as Saddling
 import qualified Pawl.Codec.SchemeSetInMotion as SchemeSetInMotion
 import qualified Pawl.Codec.SpellWasCast as SpellWasCast
+import qualified Pawl.Codec.SpellWasCopied as SpellWasCopied
 import qualified Pawl.Codec.StepBegan as StepBegan
 import qualified Pawl.Codec.TappedForMana as TappedForMana
 import qualified Pawl.Codec.Transformed as Transformed
@@ -69,6 +70,7 @@ codec =
       Arm.payload "DamagePrevented" DamagePrevented.codec GameEvent.DamagePrevented (\x -> case x of GameEvent.DamagePrevented y -> Just y; _ -> Nothing),
       Arm.payload "StepBegan" StepBegan.codec GameEvent.StepBegan (\x -> case x of GameEvent.StepBegan y -> Just y; _ -> Nothing),
       Arm.payload "SpellCast" SpellWasCast.codec GameEvent.SpellCast (\x -> case x of GameEvent.SpellCast y -> Just y; _ -> Nothing),
+      Arm.payload "SpellCopied" SpellWasCopied.codec GameEvent.SpellCopied (\x -> case x of GameEvent.SpellCopied y -> Just y; _ -> Nothing),
       Arm.payload "BecameMonarch" PlayerId.codec GameEvent.BecameMonarch (\x -> case x of GameEvent.BecameMonarch y -> Just y; _ -> Nothing),
       Arm.payload "TookInitiative" PlayerId.codec GameEvent.TookInitiative (\x -> case x of GameEvent.TookInitiative y -> Just y; _ -> Nothing),
       Arm.payload "Discarded" Discarded.codec GameEvent.Discarded (\x -> case x of GameEvent.Discarded y -> Just y; _ -> Nothing),
@@ -166,6 +168,7 @@ tagOf x = case x of
   GameEvent.DamagePrevented {} -> "DamagePrevented"
   GameEvent.StepBegan {} -> "StepBegan"
   GameEvent.SpellCast {} -> "SpellCast"
+  GameEvent.SpellCopied {} -> "SpellCopied"
   GameEvent.BecameMonarch {} -> "BecameMonarch"
   GameEvent.TookInitiative {} -> "TookInitiative"
   GameEvent.Discarded {} -> "Discarded"
