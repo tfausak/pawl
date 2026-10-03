@@ -593,7 +593,7 @@ data Face card = MkFace
     -- attackCosts' twin, its own field for that field's reason with CR 509.1a's
     -- candidate list substituted for CR 508.1a's, and separate from it because one
     -- printed sentence can tax one action without the other: Ghostly Prison taxes
-    -- only attacking, and a card taxing only blocking would fill only this.
+    -- only attacking, and Hipparion, taxing only blocking, fills only this.
     -- Oppressive Rays fills both, which is what its "can't attack or block" says.
     blockCosts :: [BlockCost.BlockCost],
     -- | CR 103.5b: this face's "any time you could mulligan" actions, in printed

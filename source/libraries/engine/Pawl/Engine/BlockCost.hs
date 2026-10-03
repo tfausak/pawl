@@ -5,11 +5,10 @@
 -- Pawl.Engine.AttackCost). None is a layer, and no layer of
 -- Pawl.Engine.Projection rewrites them.
 --
--- Pawl.Engine.AttackCost's twin, NARROWER by that module's second argument: an
--- attack is announced against something (CR 508.1b) and a cost to attack may be
--- judged against it, while CR 509.1d totals a cost to block over the chosen
--- CREATURES. So this module's question is about the blocker alone, and what it
--- is blocking never reaches it.
+-- Pawl.Engine.AttackCost's twin: an attack is announced against something (CR
+-- 508.1b) and a cost to attack may be judged against it, while CR 509.1d totals a
+-- cost to block over the chosen CREATURES. What a creature blocks decides only
+-- WHETHER a cost with an attacker filter is owed (Hipparion), never how often.
 --
 -- The only reader of Pawl.Types.BlockCost. Pawl.Engine.Combat asks for COSTS and
 -- never learns which card wrote one -- each cost is tagged with the PERMANENT it
@@ -38,13 +37,15 @@ import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PerCreature as PerCreature
 import qualified Pawl.Types.RuleAbilities as RuleAbilities
 
--- CR 509.1d read for ONE creature: what must its controller pay for it to block?
--- One entry per printed cost in force, unpooled, because CR 509.1d is what totals
--- them.
+-- CR 509.1d read for ONE creature chosen to block `blocked`: what must its
+-- controller pay for it to block? One entry per printed cost in force, unpooled,
+-- because CR 509.1d is what totals them.
 --
--- No target argument, where AttackCost.costsOn takes one: see the module header.
--- A creature blocking two attackers under a Palace Guard therefore owes its share
--- ONCE, which is CR 509.1d totalling over the chosen creatures.
+-- A cost carrying an attacker filter is owed when ANY of `blocked` matches it,
+-- read in the blocker's context as CombatRestriction.cantBlockCreatures reads its
+-- own pairwise filter (CR 509.1b). A creature blocking two attackers under a
+-- Palace Guard still owes each share ONCE, which is CR 509.1d totalling over the
+-- chosen creatures.
 --
 -- Each share is TAGGED with the permanent that printed it, AttackCost.costsOn's
 -- pairing and its reason: CR 509.1d adds several printed costs into one total, so
@@ -54,8 +55,8 @@ import qualified Pawl.Types.RuleAbilities as RuleAbilities
 -- Empty for the board almost every game is played on: the battlefield walk stops
 -- at `Face.blockCosts face` for every permanent that prints none, so no projection
 -- is forced (#200).
-costsOn :: ObjectId -> GameState -> [(ObjectId, Cost.Cost Keyword.Keyword)]
-costsOn blocker gs =
+costsOn :: ObjectId -> Set.Set ObjectId -> GameState -> [(ObjectId, Cost.Cost Keyword.Keyword)]
+costsOn blocker blocked gs =
   let -- Hoisted out of the walk as AttackCost.costsOn hoists them, and both
       -- unforced until some permanent actually declares a cost.
       setEffs = Projection.setLandSubtypeEffects gs
@@ -100,8 +101,14 @@ costsOn blocker gs =
           let context = Filter.contextFor (Game.teams gs) (Projection.controllerOf source gs) (Just source)
               generic n = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic (Integer.toNaturalSaturating n)])) []
            in Maybe.maybeToList (fmap generic (Quantity.evaluate (Projection.fullView gs) context gs source quantity))
+      -- CR 509.1b: "can't block [these] creatures unless", so the cost is owed
+      -- only for a block of an attacker the filter names.
+      blockerContext = Filter.contextComparingPower (Game.teams gs) (Projection.controllerOf blocker gs) blocker (Projection.powerOf blocker gs) (Projection.toughnessOf blocker gs)
+      taxes bc = case BlockCost.attackers bc of
+        Nothing -> True
+        Just wanted -> any (\attacker -> Filter.matches blockerContext (Projection.viewOfObject attacker gs) wanted) (Set.toList blocked)
       fromCost source bc =
-        if Projection.affectsUnder grants source blocker (BlockCost.subject bc) view gs
+        if taxes bc && Projection.affectsUnder grants source blocker (BlockCost.subject bc) view gs
           then fmap ((,) source) (shareOf source bc)
           else []
    in concatMap (\source -> fromPermanent source <> fromGrant source) (Set.toList (GameState.battlefield gs))
@@ -124,13 +131,13 @@ costsOn blocker gs =
 -- Combat.declareBlockers calls it once, binds the result, and pays THAT.
 totalCost :: Map ObjectId (Set.Set ObjectId) -> GameState -> [(ObjectId, Cost.Cost Keyword.Keyword)]
 totalCost declaration gs =
-  concatMap (\blocker -> costsOn blocker gs) (Map.keys (Map.filter (not . Set.null) declaration))
+  concatMap (\(blocker, blocked) -> costsOn blocker blocked gs) (Map.toList (Map.filter (not . Set.null) declaration))
 
 -- CR 509.1c's cost clause: a player is never required to pay a cost to block.
--- True when this creature can be declared as a blocker for nothing.
+-- True when this creature can be declared blocking this attacker for nothing.
 --
--- No pair to range over, where the attacking side asks costsOn of each
--- (creature, target) announcement CR 508.1b admits: the cost this asks about is
--- not judged against what is blocked, so a blocker is free or it is not.
-blocksFreely :: ObjectId -> GameState -> Bool
-blocksFreely blocker gs = null (costsOn blocker gs)
+-- A PAIR, as the attacking side asks costsOn of each (creature, target)
+-- announcement CR 508.1b admits: a Hipparion taxed only against big attackers
+-- can still be required to block a small one.
+blocksFreely :: ObjectId -> ObjectId -> GameState -> Bool
+blocksFreely blocker attacker gs = null (costsOn blocker (Set.singleton attacker) gs)
