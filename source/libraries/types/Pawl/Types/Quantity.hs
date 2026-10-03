@@ -106,6 +106,8 @@ data Quantity
     -- mana symbols of any of them appear among the mana costs of the permanents
     -- they control.
     Devotion Devotion.Devotion
+  | -- | CR 700.8a: how many creatures are in that player's party, 0 to 4.
+    PartySize PlayerRef.PlayerRef
   | -- | CR 122.1: how many counters of that kind that player has; an absent
     -- kind reads 0.
     PlayerCounters PlayerCounterTally.PlayerCounterTally

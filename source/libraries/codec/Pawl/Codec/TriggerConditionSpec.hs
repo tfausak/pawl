@@ -138,6 +138,12 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.SelfDealsDamageToCreature
       " {\"type\":\"SelfDealsDamageToCreature\"} "
+  Spec.it s "SelfDealsDamage" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.SelfDealsDamage
+      " {\"type\":\"SelfDealsDamage\"} "
   -- CR 120.3: the same history read the other way round -- the bearer was DEALT
   -- damage. Nullary, since enrage qualifies the damage in no way.
   Spec.it s "SelfIsDealtDamage" $

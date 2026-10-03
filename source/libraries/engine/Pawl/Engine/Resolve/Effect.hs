@@ -8647,7 +8647,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- makes CR 608.2h answer it: `effectViewOf` hands the resolving SOURCE its
     -- last known information, and Iron Apprentice's "when this creature dies" is
     -- read off the source itself. A `from` slot naming a departing BYSTANDER is
-    -- Binding.departedPermanent, the other id effectViewOf looks back for --
+    -- Binding.departedPermanent, which effectViewOf looks back for too --
     -- Resourceful Defense's "whenever a permanent you control leaves the
     -- battlefield", proved in Pawl.PutCounterSpec.
     let viewOf = effectViewOf source legal gs

@@ -1,0 +1,29 @@
+{
+  "description": "CR 608.2h Swords to Plowshares gains its controller the exiled creature's power",
+  "note": "The exile happens first, so CR 400.7 has already replaced the Hill Giant when \"its power\" is read; CR 608.2h answers it off the creature's last known information. Three seats with distinct life totals keep \"its controller\" apart from the caster and the bystander: carol, whose Giant it was, goes from 17 to 20, and alice and bob stay put.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Plains", "label": "plains" }],
+        "hand": [{ "card": "Swords to Plowshares", "label": "swords" }]
+      },
+      { "name": "bob", "life": 19 },
+      {
+        "name": "carol",
+        "life": 17,
+        "battlefield": [{ "card": "Hill Giant", "label": "giant" }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$swords", "targets": ["$giant"], "mana": ["$plains"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "carol", "life": 20 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Exile", "card": "Hill Giant", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 20 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 19 } } }
+  ]
+}

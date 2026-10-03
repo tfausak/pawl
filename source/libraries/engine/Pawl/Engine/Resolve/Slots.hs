@@ -3318,32 +3318,33 @@ slotBindings :: ObjectId -> GameState -> Map.Map SlotName Binding.Type.Binding
 slotBindings = resolvingBindings
 
 -- CR 608.2h's reader for one resolution: Projection.viewWithLastKnown, which
--- answers the SOURCE off its last known information, widened to two reserved
--- slots whose object is gone by construction.
+-- answers the SOURCE off its last known information, widened to every object a
+-- slot of this resolution names.
 --
--- Binding.sacrificedPermanent is the first -- CR 601.2h paid the cost before the
+-- A TARGET is one: `legal` already omits a target CR 608.2b found illegal as
+-- resolution began, so a slot's object that is gone now was moved by an earlier
+-- instruction of this same resolution, and CR 608.2h answers it off its last
+-- known information. Swords to Plowshares' "its power" is read after its own
+-- exile; the scenario "CR 608.2h Swords to Plowshares gains its controller the
+-- exiled creature's power" in data/scenarios/resolve proves it.
+--
+-- Binding.sacrificedPermanent is another -- CR 601.2h paid the cost before the
 -- ability was on the stack at all, and CR 701.21a put the permanent in a
--- graveyard as a new object (CR 400.7) -- so viewWithLastKnown's blank answer for
--- a non-source object would leave Jarad, Golgari Lich Lord's "the sacrificed
--- creature's power" permanently unanswerable.
+-- graveyard as a new object (CR 400.7) -- which is Jarad, Golgari Lich Lord's
+-- "the sacrificed creature's power".
 --
--- Binding.departedPermanent is the second, and CR 603.10a is why: what a
+-- Binding.departedPermanent is a third, and CR 603.10a is why: what a
 -- leaves-the-battlefield trigger says "it" about is the permanent as it last
 -- existed on the battlefield, which CR 400.7 has already deleted by the time the
 -- ability resolves. Resourceful Defense's "put those counters" reads its whole CR
 -- 122.8 tally through here.
 --
--- The blank is still right for every OTHER non-source id, and that is why this
--- names two slots rather than lifting the scope: those ids are TARGETS, and CR
--- 608.2b wants a target that has left to answer with nothing. Neither slot here
--- was ever a target (CR 115.10a).
+-- Any other id keeps viewWithLastKnown's blank for a gone object.
 effectViewOf :: ObjectId -> Map.Map SlotName (Set Recipient) -> GameState -> ObjectId -> Maybe Filter.View
 effectViewOf source legal gs oid =
-  let slots = effectSlotObjects legal
-      lookBack slot = Map.lookup slot slots == Just oid
-   in if lookBack Binding.sacrificedPermanent || lookBack Binding.departedPermanent
-        then Projection.viewWithLastKnownAnywhere gs oid
-        else Projection.viewWithLastKnown source gs oid
+  if oid `elem` effectSlotObjects legal
+    then Projection.viewWithLastKnownAnywhere gs oid
+    else Projection.viewWithLastKnown source gs oid
 
 -- The members of a group that a ref's own Filter matches: the shared half of "a
 -- card from among them" and "all cards from among them", so the choice one makes

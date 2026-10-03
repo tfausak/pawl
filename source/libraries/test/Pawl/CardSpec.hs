@@ -1046,6 +1046,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfDealsCombatDamage -> []
   TriggerCondition.SelfDealsDamageToPlayer _ -> []
   TriggerCondition.SelfDealsDamageToCreature -> []
+  TriggerCondition.SelfDealsDamage -> []
   TriggerCondition.SelfIsDealtDamage -> []
   -- Its watcher-scoped sibling carries a Filter, and a Filter holds no Count.
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> []
@@ -4006,6 +4007,8 @@ quantityKindFilters quantity = case quantity of
   -- CR 700.5's payload is a PlayerRef and a set of colours: no CounterKind, so
   -- no Keyword and so no Filter.
   Quantity.Type.Devotion {} -> []
+  -- CR 700.8's payload is a PlayerRef: no CounterKind.
+  Quantity.Type.PartySize _ -> []
   -- The position this whole function exists for: CR 122.1's per-OBJECT tally
   -- names the kind on the card, and "the number of hexproof-from-Goblins
   -- counters" would carry a Filter under it.
@@ -4282,6 +4285,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- Nullary as well: the printed form qualifies the damaged creature in no way,
   -- so a text change has nothing here to rewrite.
   TriggerCondition.SelfDealsDamageToCreature -> []
+  TriggerCondition.SelfDealsDamage -> []
   -- Enrage's condition is nullary: rule 120.3 qualifies the damage in no way, so
   -- there is nothing for a text change to rewrite.
   TriggerCondition.SelfIsDealtDamage -> []
@@ -4497,6 +4501,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.SelfDealsCombatDamage -> []
   TriggerCondition.SelfDealsDamageToPlayer _ -> []
   TriggerCondition.SelfDealsDamageToCreature -> []
+  TriggerCondition.SelfDealsDamage -> []
   TriggerCondition.SelfIsDealtDamage -> []
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> []
   TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> []
