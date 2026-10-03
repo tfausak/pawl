@@ -68,6 +68,7 @@ blackCreature =
       -- stack view of their own.
       Filter.targets = Set.empty,
       Filter.targetViews = Map.empty,
+      Filter.targetCount = 0,
       Filter.identity = Just (ObjectId.MkObjectId 7),
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,
@@ -146,6 +147,7 @@ devoidBigCreature =
       Filter.castFrom = Nothing,
       Filter.targets = Set.empty,
       Filter.targetViews = Map.empty,
+      Filter.targetCount = 0,
       Filter.identity = Nothing,
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,

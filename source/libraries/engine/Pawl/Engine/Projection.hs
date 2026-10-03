@@ -3293,6 +3293,7 @@ filterReads f = case f of
   -- characteristic, so no Modification writes one.
   Filter.Type.TargetsSource -> Set.empty
   Filter.Type.TargetsOnlySource -> Set.empty
+  Filter.Type.HasSingleTarget -> Set.empty
   -- DESCENT where its siblings above read nothing: the nest is matched against
   -- the TARGET's view, so whatever aspect it asks of that object is an aspect a
   -- Modification can move.
@@ -3632,6 +3633,7 @@ filterReadsPeers f = case f of
   Filter.Type.IsObject _ -> False
   Filter.Type.TargetsSource -> False
   Filter.Type.TargetsOnlySource -> False
+  Filter.Type.HasSingleTarget -> False
   Filter.Type.TargetsPlayer _ -> False
   Filter.Type.IsBound _ -> False
   Filter.Type.SameNameAsBound _ -> False
