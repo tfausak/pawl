@@ -3475,7 +3475,7 @@ modeSlots mode =
 -- resolution's own context, reported whole for targetSlotSlots' computed
 -- bound's reason; and the slot a DESCRIBED cost reads its mana part off
 -- (Pawl.Types.CostBasis, Flash's "its mana cost reduced by {2}"), at arity ONE
--- since a slot naming several names no one mana cost and `describedCost`
+-- since a slot naming several names no one mana cost and `describedCosts`
 -- answers Nothing there rather than picking.
 payGateSlots :: PayGate.PayGate -> Map.Map SlotName SlotArity
 payGateSlots gate =

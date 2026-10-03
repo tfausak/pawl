@@ -1064,8 +1064,9 @@ serves supply demand =
 -- 601.2h's cast, Omen Hawker's admits CR 602.2b's activation and Overgrown
 -- Zealot's admits CR 116.2b's turn-face-up, each under its own predicate. A
 -- payment that is none of those -- a special action no rider names, a combat
--- toll, CR 118.12's resolution-time payment -- can spend no restricted mana at
--- all, since no clause in the vocabulary names it.
+-- toll, CR 118.12's resolution-time payment -- can spend no mana a permission
+-- restricts, since no clause in the vocabulary names it, and any mana a
+-- prohibition restricts (Pawl.Types.ManaRestriction.prohibits).
 --
 -- A SPLIT rather than a filter, because the withheld units are still in the pool
 -- (CR 106.4): Pawl.Engine.Cost.payMana puts them back beside whatever the
@@ -1123,11 +1124,15 @@ admitsUnder subject pid gs =
    in \unit -> case ManaUnit.restriction unit of
         Nothing -> True
         Just restriction ->
-          byKeyword restriction || case asked of
-            Nothing -> False
-            Just (half, context, view) -> case half restriction of
-              Nothing -> False
-              Just wanted -> Filter.matches (context {Filter.sourceChosenSubtype = ManaUnit.sourceChosenSubtype unit}) view wanted
+          let named =
+                byKeyword restriction || case asked of
+                  Nothing -> False
+                  Just (half, context, view) -> case half restriction of
+                    Nothing -> False
+                    Just wanted -> Filter.matches (context {Filter.sourceChosenSubtype = ManaUnit.sourceChosenSubtype unit}) view wanted
+           in -- A prohibition (Hydraulic Helper) admits exactly the payments a
+              -- permission would refuse, ForNeither among them.
+              if ManaRestriction.prohibits restriction then not named else named
 
 -- A pool unit as a supply. Its type is settled, so the option set is a
 -- singleton, and its tags are the ones production stamped on it
@@ -1843,9 +1848,9 @@ hybridHalves a b = if a == b then [a] else [a, b]
 -- nothing claimed and no CR 118.14 permission, which is the spending rule every
 -- cost takes when no effect has spoken about it.
 --
--- NO SUBJECT either (ForNeither), so CR 106.6-restricted mana is no supply for
--- it (spendableFor). Every caller is a spec asking about a bare mana cost, and a
--- caller with a subject wants canPayCommitting below, which is what
+-- NO SUBJECT either (ForNeither), so mana a CR 106.6 permission restricts is no
+-- supply for it (spendableFor). Every caller is a spec asking about a bare mana
+-- cost, and a caller with a subject wants canPayCommitting below, which is what
 -- Pawl.Engine.Cost.canPay takes.
 canPay :: Capacity -> PlayerId -> ManaCost -> GameState -> Bool
 canPay capacity pid = canPayCommitting PaymentSubject.ForNeither capacity ManaSpending.AsProduced pid 0 0 []

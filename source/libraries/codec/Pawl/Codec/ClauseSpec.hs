@@ -14,6 +14,7 @@ import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CostChoice as CostChoice
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Effect as Effect
@@ -120,7 +121,7 @@ spec s = Spec.describe s "Pawl.Codec.Clause" $ do
           ( Just
               PayGate.MkPayGate
                 { PayGate.payer = PlayerRef.ControllerOfBound (SlotName.MkSlotName (Text.pack "spell")),
-                  PayGate.cost = Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 3]), Cost.components = []},
+                  PayGate.cost = CostChoice.MkCostChoice (Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 3]), Cost.components = []} NonEmpty.:| []),
                   PayGate.basis = Nothing,
                   PayGate.branch = PayBranch.IfNotPaid,
                   PayGate.obligation = PayObligation.Optional,

@@ -1,0 +1,148 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Torment of Venom",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "PutCounters",
+                    "value": {
+                      "kind": {
+                        "type": "MinusOneMinusOne"
+                      },
+                      "quantity": {
+                        "type": "Literal",
+                        "value": 3
+                      },
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "effects": [
+                  {
+                    "type": "LoseLife",
+                    "value": {
+                      "player": {
+                        "type": "ControllerOfBound",
+                        "value": "target"
+                      },
+                      "quantity": {
+                        "type": "Literal",
+                        "value": 3
+                      }
+                    }
+                  }
+                ],
+                "payGate": {
+                  "branch": {
+                    "type": "IfNotPaid"
+                  },
+                  "cost": {
+                    "components": [
+                      {
+                        "type": "Sacrifice",
+                        "value": {
+                          "count": 1,
+                          "whichPermanents": {
+                            "type": "And",
+                            "value": [
+                              {
+                                "type": "Not",
+                                "value": {
+                                  "type": "HasCardType",
+                                  "value": {
+                                    "type": "Land"
+                                  }
+                                }
+                              },
+                              {
+                                "type": "Not",
+                                "value": {
+                                  "type": "IsBound",
+                                  "value": "target"
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ],
+                    "mana": []
+                  },
+                  "orCosts": [
+                    {
+                      "components": [
+                        {
+                          "type": "DiscardCards",
+                          "value": {
+                            "count": 1,
+                            "whichCards": {
+                              "type": "And",
+                              "value": []
+                            }
+                          }
+                        }
+                      ],
+                      "mana": []
+                    }
+                  ],
+                  "payer": {
+                    "type": "ControllerOfBound",
+                    "value": "target"
+                  }
+                }
+              }
+            ],
+            "targetSlots": {
+              "target": {
+                "pool": {
+                  "type": "Creatures"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}
