@@ -1,34 +1,18 @@
 {
   "faces": [
     {
-      "manaCost": [
+      "activatedAbilities": [
         {
-          "type": "Generic",
-          "value": 1
-        },
-        {
-          "type": "OfType",
-          "value": {
-            "type": "Colored",
-            "value": {
-              "type": "White"
-            }
-          }
-        }
-      ],
-      "name": "Oreskos Explorer",
-      "power": {
-        "type": "Literal",
-        "value": 2
-      },
-      "toughness": {
-        "type": "Literal",
-        "value": 2
-      },
-      "triggeredAbilities": [
-        {
-          "condition": {
-            "type": "SelfEnters"
+          "cost": {
+            "components": [
+              {
+                "type": "TapThis"
+              },
+              {
+                "type": "ExileThis"
+              }
+            ],
+            "mana": []
           },
           "modal": {
             "modes": [
@@ -40,13 +24,24 @@
                         "type": "Search",
                         "value": {
                           "destination": {
-                            "type": "RevealThenHand"
+                            "type": "Battlefield"
                           },
                           "filter": {
-                            "type": "HasSubtype",
-                            "value": {
-                              "type": "Plains"
-                            }
+                            "type": "And",
+                            "value": [
+                              {
+                                "type": "HasCardType",
+                                "value": {
+                                  "type": "Land"
+                                }
+                              },
+                              {
+                                "type": "HasSupertype",
+                                "value": {
+                                  "type": "Basic"
+                                }
+                              }
+                            ]
                           },
                           "owner": {
                             "type": "Relative",
@@ -69,7 +64,7 @@
                                       "type": "Land"
                                     }
                                   },
-                                  "margin": 1
+                                  "margin": 2
                                 }
                               },
                               "scope": {
@@ -96,18 +91,17 @@
           }
         }
       ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        }
+      ],
+      "name": "Surveyor's Scope",
       "typeLine": {
-        "subtypes": [
-          {
-            "type": "Cat"
-          },
-          {
-            "type": "Scout"
-          }
-        ],
         "types": [
           {
-            "type": "Creature"
+            "type": "Artifact"
           }
         ]
       }

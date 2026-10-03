@@ -694,7 +694,7 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
   -- here for the same reason it is pinned there -- Pawl.CountSpec's Oreskos
   -- Explorer group is what proves the BAKED answer.
   Spec.it s "ControlsMoreThanYou is False unbaked, for a player and for an object alike" $ do
-    let lands = Filter.Type.ControlsMoreThanYou (Filter.Type.HasCardType CardType.Land)
+    let lands = Filter.Type.ControlsMoreThanYou 1 (Filter.Type.HasCardType CardType.Land)
     Spec.assertBool s (not (Filter.matches self aPlayer lands)) "player"
     Spec.assertBool s (not (Filter.matches self blackCreature lands)) "object"
 
