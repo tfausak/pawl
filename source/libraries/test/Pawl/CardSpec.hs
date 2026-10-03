@@ -192,6 +192,7 @@ import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ForEachNumber as ForEachNumber
 import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
+import qualified Pawl.Types.ForbidBeingBlocked as ForbidBeingBlocked
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.ForbidUntap as ForbidUntap
 import qualified Pawl.Types.ForetellCost as ForetellCost
@@ -1394,6 +1395,7 @@ ownCounts effect = case effect of
   Effect.ForbidActivation (ForbidActivation.MkForbidActivation duration _) -> durationCounts duration
   Effect.ForbidUntap (ForbidUntap.MkForbidUntap duration _) -> durationCounts duration
   Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration _ _) -> durationCounts duration
+  Effect.ForbidBeingBlocked (ForbidBeingBlocked.MkForbidBeingBlocked duration _) -> durationCounts duration
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) -> durationCounts duration
   Effect.CreateEmblem card -> overFaces cardCounts card
   Effect.BecomeMonarch _ -> []
@@ -1886,6 +1888,7 @@ effectNestedEffects effect = case effect of
   Effect.CantBeRegenerated {} -> []
   Effect.ForbidBlock {} -> []
   Effect.ForbidAttack {} -> []
+  Effect.ForbidBeingBlocked {} -> []
   Effect.ForbidActivation {} -> []
   Effect.ForbidUntap {} -> []
   Effect.RequireAttack {} -> []
@@ -2392,6 +2395,7 @@ effectReplacements effect = case effect of
   Effect.CantBeRegenerated {} -> []
   Effect.ForbidBlock {} -> []
   Effect.ForbidAttack {} -> []
+  Effect.ForbidBeingBlocked {} -> []
   Effect.ForbidActivation {} -> []
   Effect.ForbidUntap {} -> []
   Effect.RequireAttack {} -> []
@@ -2884,6 +2888,7 @@ effectMintedFaces effect = case effect of
   Effect.CantBeRegenerated {} -> []
   Effect.ForbidBlock {} -> []
   Effect.ForbidAttack {} -> []
+  Effect.ForbidBeingBlocked {} -> []
   Effect.ForbidActivation {} -> []
   Effect.ForbidUntap {} -> []
   Effect.RequireAttack {} -> []
@@ -6032,6 +6037,9 @@ effectFilters effect = case effect of
     frame Unframed (durationFilters duration) <> case affected of
       RestrictedCreatures.Named ref -> frame SourceHostFramed (objectRefFilters ref)
       RestrictedCreatures.Matching f -> unframed [f]
+  -- ForbidAttack's Matching arm, read at
+  -- Pawl.Engine.CombatRestriction.storedEvasions.
+  Effect.ForbidBeingBlocked (ForbidBeingBlocked.MkForbidBeingBlocked duration f) -> frame Unframed (durationFilters duration) <> unframed [f]
   -- ForbidAttack's arm: the Matching class is read through a bare
   -- Filter.contextFor at Pawl.Engine.AttackRequirement. A defender naming
   -- players carries no Filter; one naming permanents is an ObjectRef like the

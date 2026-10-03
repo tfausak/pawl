@@ -121,6 +121,7 @@ import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ForEachNumber as ForEachNumber
 import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
+import qualified Pawl.Types.ForbidBeingBlocked as ForbidBeingBlocked
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.ForbidUntap as ForbidUntap
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
@@ -906,6 +907,9 @@ rewriteEffect pairs effect = case effect of
           RestrictedCreatures.Named ref -> RestrictedCreatures.Named (rewriteObjectRef pairs ref)
           RestrictedCreatures.Matching f -> RestrictedCreatures.Matching (Filter.rewrite pairs f)
      in Effect.ForbidAttack (ForbidAttack.MkForbidAttack (rewriteDuration pairs duration) rewritten aimedAt)
+  -- CR 612.1 reaches the class's words, ForbidAttack's Matching arm.
+  Effect.ForbidBeingBlocked (ForbidBeingBlocked.MkForbidBeingBlocked duration f) ->
+    Effect.ForbidBeingBlocked (ForbidBeingBlocked.MkForbidBeingBlocked (rewriteDuration pairs duration) (Filter.rewrite pairs f))
   -- CR 612.1 reaches the creatures on either arm, ForbidAttack's reading, and a
   -- defender only where it names permanents: a PlayerRef prints no word a
   -- Filter could name (Alluring Siren's "you").

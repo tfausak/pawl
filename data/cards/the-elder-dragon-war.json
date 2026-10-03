@@ -1,0 +1,232 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "ReadAhead"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "The Elder Dragon War",
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfCountersReached",
+            "value": {
+              "amount": 1,
+              "kind": {
+                "type": "Lore"
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "DealDamage",
+                        "value": {
+                          "parts": [
+                            {
+                              "quantity": {
+                                "type": "Literal",
+                                "value": 2
+                              },
+                              "ref": {
+                                "type": "EachMatching",
+                                "value": {
+                                  "type": "HasCardType",
+                                  "value": {
+                                    "type": "Creature"
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "quantity": {
+                                "type": "Literal",
+                                "value": 2
+                              },
+                              "ref": {
+                                "type": "EachOpponent"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "condition": {
+            "type": "SelfCountersReached",
+            "value": {
+              "amount": 2,
+              "kind": {
+                "type": "Lore"
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Discard",
+                        "value": {
+                          "type": "AnyNumber",
+                          "value": {
+                            "cards": {
+                              "filter": {
+                                "type": "And",
+                                "value": []
+                              }
+                            },
+                            "discarded": "discarded",
+                            "player": {
+                              "type": "Relative",
+                              "value": {
+                                "type": "You"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "Draw",
+                        "value": {
+                          "player": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          "quantity": {
+                            "type": "BoundCount",
+                            "value": "discarded"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "condition": {
+            "type": "SelfCountersReached",
+            "value": {
+              "amount": 3,
+              "kind": {
+                "type": "Lore"
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Create",
+                        "value": {
+                          "card": {
+                            "faces": [
+                              {
+                                "colorIndicator": [
+                                  {
+                                    "type": "Red"
+                                  }
+                                ],
+                                "keywords": [
+                                  {
+                                    "type": "Flying"
+                                  }
+                                ],
+                                "name": "Dragon Token",
+                                "power": {
+                                  "type": "Literal",
+                                  "value": 4
+                                },
+                                "toughness": {
+                                  "type": "Literal",
+                                  "value": 4
+                                },
+                                "typeLine": {
+                                  "subtypes": [
+                                    {
+                                      "type": "Dragon"
+                                    }
+                                  ],
+                                  "types": [
+                                    {
+                                      "type": "Creature"
+                                    }
+                                  ]
+                                }
+                              }
+                            ]
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Saga"
+          }
+        ],
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}

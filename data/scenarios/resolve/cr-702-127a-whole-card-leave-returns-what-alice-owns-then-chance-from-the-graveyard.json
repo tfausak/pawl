@@ -1,0 +1,295 @@
+{
+  "description": "CR 702.127a whole card: Leave returns the permanents alice owns, then Chance is cast from her graveyard",
+  "note": "The Piker bob controls but alice owns is a legal target and comes back to alice's hand; bob's own Piker is not. Chance then discards one and draws one, and is exiled.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-2",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-2",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-3",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-4",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "lent-piker",
+            "ready": true,
+            "controller": "bob"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Leave",
+            "label": "leave",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest"
+          }
+        ],
+        "library": [
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "bob-piker",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Cast": {
+          "object": "$leave",
+          "targets": [
+            "$bob-piker"
+          ],
+          "mana": [
+            "$plains",
+            "$plains-2",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$leave",
+          "targets": [
+            "$piker",
+            "$lent-piker"
+          ],
+          "mana": [
+            "$plains",
+            "$plains-2",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Hand",
+          "card": "Goblin Piker",
+          "count": 2
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Battlefield",
+          "card": "Goblin Piker",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Graveyard",
+          "card": "Leave",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "Leave",
+          "mana": [
+            "$mountain",
+            "$mountain-2",
+            "$mountain-3",
+            "$mountain-4"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseAnyNumberToDiscard",
+          "with": [
+            "$forest"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Hand",
+          "card": "Goblin Piker",
+          "count": 3
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Graveyard",
+          "card": "Forest",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Library",
+          "card": "Goblin Piker",
+          "count": 5
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Exile",
+          "card": "Leave",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Graveyard",
+          "card": "Leave",
+          "count": 0
+        }
+      }
+    }
+  ]
+}

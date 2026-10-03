@@ -46,6 +46,7 @@ import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
+import qualified Pawl.Types.ActiveEvasion as ActiveEvasion
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.AimedAt as AimedAt
@@ -953,11 +954,35 @@ cantBeBlockedBy defending blockers attackers gs =
    in Set.fromList (concatMap fromRestriction (inForce defending gs))
 
 -- CR 509.1b's pairwise restrictions from BOTH sides: every (blocker, attacker)
--- pair `cantBeBlockedBy` or `cantBlockCreatures` forbids. What
+-- pair `cantBeBlockedBy`, `cantBlockCreatures` or `storedEvasions` forbids. What
 -- Pawl.Engine.Combat reads.
 barredBlocks :: Maybe PlayerId -> [ObjectId] -> [ObjectId] -> GameState -> Set (ObjectId, ObjectId)
 barredBlocks defending blockers attackers gs =
-  Set.union (cantBeBlockedBy defending blockers attackers gs) (cantBlockCreatures defending blockers attackers gs)
+  Set.unions
+    [ cantBeBlockedBy defending blockers attackers gs,
+      cantBlockCreatures defending blockers attackers gs,
+      storedEvasions blockers attackers gs
+    ]
+
+-- CR 509.1b / 611.2c: every (blocker, attacker) pair a stored,
+-- resolution-generated "can't be blocked" forbids -- Veiling Oddity's
+-- "creatures can't be blocked this turn". Every blocker is barred from an
+-- attacker the row's class matches, the class re-read against the LIVE board
+-- here, so a creature that entered after the effect began is inside it:
+-- `storedSubjects`'s Matching arm and for its reasons, CR 109.5's "you" the
+-- STORED controller among them. Pawl.CombatSpec's StoredEvasion group is the
+-- proof.
+--
+-- Unioned beside the printed rows rather than gathered by `inForce`, for
+-- `blockProhibited`'s reasons: the row has outlived its source, names no
+-- Pawl.Types.Affected, and Pawl.Types.ForbidBeingBlocked states no "unless".
+storedEvasions :: [ObjectId] -> [ObjectId] -> GameState -> Set (ObjectId, ObjectId)
+storedEvasions blockers attackers gs =
+  let evading active =
+        let context = SourceContext.sourceContext gs (Just (ActiveEvasion.controller active)) (ActiveEvasion.source active)
+         in filter (\oid -> Filter.matches context (Projection.viewOfObject oid gs) (ActiveEvasion.affected active)) attackers
+      evaders = concatMap evading (GameState.evasions gs)
+   in Set.fromList [(blocker, attacker) | attacker <- evaders, blocker <- blockers]
 
 -- CR 509.1b: which (blocker, attacker) pairs a restriction written from the
 -- BLOCKER's side forbids -- Brassclaw Orcs' "can't block creatures with power 2
