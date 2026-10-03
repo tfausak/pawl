@@ -1,5 +1,7 @@
+{-# LANGUAGE GADTs #-}
+
 -- Covers: CR 809's Emperor variant -- Pawl.Engine.Emperor's setUp (CR 809.3,
--- 809.6a) and fallsWith (CR 809.5b, 809.5c, read by Pawl.Engine.Departure's
+-- 809.6a), Pawl.Engine.Setup.randomEmperorFirst (CR 809.4) and fallsWith (CR 809.5b, 809.5c, read by Pawl.Engine.Departure's
 -- departTogether), Pawl.Engine.Combat's attackableOpponents under
 -- AttackOption.Adjacent (CR 809.3c) over Pawl.Engine.Game.neighbours, and
 -- Pawl.Engine.Departure's outcomeAfterLeaving for a team (CR 104.2c).
@@ -9,6 +11,7 @@
 -- erin its emperor. Each emperor sits between two generals of their own.
 module Pawl.EmperorSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Pawl.Engine.Emperor as Emperor
@@ -20,6 +23,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Emperors as Emperors
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -29,6 +33,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Status as Status
@@ -63,6 +68,17 @@ spec s registry = Spec.describe s "Emperor" $ do
   -- CR 809.5b / 104.2c: erin, an emperor, is at 0 life. Her team loses with her
   -- and bob's team, the last one playing, wins. The paired board puts frank, a
   -- general, at 0 instead: he leaves alone and the game goes on.
+  -- CR 809.4 through the whole of Setup.newGame: the random draw is answered
+  -- with its second candidate, pinned by position, so erin goes first and turn
+  -- order runs on to her left. Recorded: the draw offered the emperors alone.
+  Spec.it s "CR 809.4 a randomly determined emperor goes first" $ do
+    forest <- S.printingOf s registry "Forest"
+    let deck = Deck.fromCards (Map.singleton forest 20)
+        matchup = fmap (\pid -> (pid, deck)) (S.alice NonEmpty.:| drop 1 seats)
+        ((_, started), drawnFrom) = State.runState (Engine.runGame secondDrawn emperorGame (Setup.newGame S.performer matchup)) []
+    Spec.assertEqWith s "CR 809.4 erin takes the first turn, turn order to her left" (GameState.activePlayer started, GameState.turnOrder started) (erin, [erin, frank, S.alice, S.bob, S.carol, S.dave])
+    Spec.assertEqWith s "the draw was among the emperors alone" drawnFrom [[S.bob, erin]]
+
   Spec.it s "CR 809.5b a team loses the game if its emperor loses" $ do
     let atZero pid = S.settleSba emperorGame {GameState.players = Map.adjust (\p -> p {Player.life = 0}) pid (GameState.players emperorGame)}
     Spec.assertEqWith s "CR 809.5b erin's generals leave with her" (Game.stillPlaying (atZero erin)) [S.alice, S.bob, S.carol]
@@ -111,3 +127,14 @@ spec s registry = Spec.describe s "Emperor" $ do
       let upkeep = Phase.Beginning BeginningStep.Upkeep
           began = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep pid)) (gs {GameState.phase = upkeep, GameState.activePlayer = pid})
        in resolveAll (S.runPure S.identityAnswer began Engine.settleForPriority)
+
+-- Answers every CR 809.4 draw with its second candidate, recording each
+-- candidate list; everything else is S.identityAnswer's.
+secondDrawn :: Prompt.Prompt r -> State.State [[PlayerId.PlayerId]] r
+secondDrawn p = case p of
+  Prompt.RandomFirstPlayer candidates -> do
+    State.modify' (<> [NonEmpty.toList candidates])
+    pure $ case candidates of
+      _ NonEmpty.:| (second : _) -> second
+      first NonEmpty.:| [] -> first
+  _ -> pure (S.identityAnswer p)
