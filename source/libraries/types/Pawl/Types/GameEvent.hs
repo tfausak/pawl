@@ -427,6 +427,9 @@ data GameEvent
     -- leaving a main-game ZONE, so a card a subgame took out of a hand,
     -- graveyard, library or exile does not enter this log (#2463).
     LeftTheGame ObjectId.ObjectId
+  | -- | CR 104.3 / 603.9: a player lost the game, or left it other than by a
+    -- draw. Recorded by Pawl.Engine.Departure.leaveTogether.
+    LostTheGame PlayerId.PlayerId
   | -- | CR 701.22d: a player completed CR 701.22a's scry. Recorded after the
     -- reorder and even where nothing could move, that rule covering the actions
     -- that were impossible; CR 701.22b's zero is no scry at all. Nothing else in

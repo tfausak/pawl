@@ -2296,6 +2296,8 @@ representativeEvents cond =
         -- player would still agree with eventBindingSlots here if the two
         -- coincided.
         TriggerCondition.PlayerScries _ -> one (GameEvent.Scried S.bob)
+        -- CR 603.9's own event, the PlayerScries arm's shape and reasoning.
+        TriggerCondition.PlayerLosesGame _ -> one (GameEvent.LostTheGame S.bob)
         -- CR 701.54d's own event, the PlayerScries arm's shape and reasoning.
         TriggerCondition.RingTemptsPlayer _ -> one (GameEvent.RingTempted S.bob)
         -- CR 701.68d's own event, the arm above's shape and reasoning. A
@@ -2584,6 +2586,10 @@ everyTriggerCondition =
     TriggerCondition.BoundDiesOrIsExiled (SlotName.MkSlotName (Text.pack "target")),
     TriggerCondition.BoundDies (SlotName.MkSlotName (Text.pack "target")),
     TriggerCondition.RoomEntered RoomIndex.topmost,
+    -- Withengar Unbound's relation and Share the Spoils', on the
+    -- PlayerBecomesMonarch pair's reasoning.
+    TriggerCondition.PlayerLosesGame PlayerRelation.AnyPlayer,
+    TriggerCondition.PlayerLosesGame PlayerRelation.Opponent,
     -- BOTH relations for each of the two, on the PlayerBecomesMonarch pair's
     -- reasoning: an eventBindings arm that had cased on the relation and stamped
     -- nothing under one of them would go unseen if only one were listed.

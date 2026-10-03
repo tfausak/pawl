@@ -506,6 +506,13 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.LeftTheGame (ObjectId.MkObjectId 7))
       " {\"type\":\"LeftTheGame\",\"value\":7} "
+  -- CR 603.9. One player id, Scried's payload: the player who lost.
+  Spec.it s "LostTheGame" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.LostTheGame (PlayerId.MkPlayerId 2))
+      " {\"type\":\"LostTheGame\",\"value\":2} "
   -- CR 701.17a. Two cards in one entry, that rule milling them at once.
   Spec.it s "Milled" $
     Common.assertCodec
