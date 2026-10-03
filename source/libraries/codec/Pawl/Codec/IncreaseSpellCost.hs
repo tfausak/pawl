@@ -15,8 +15,12 @@ codec :: Codec.Codec IncreaseSpellCost.IncreaseSpellCost
 codec = Fields.object $ do
   whichSpells <- Fields.required "whichSpells" (Filter.codec Keyword.codec) IncreaseSpellCost.whichSpells
   amount <- Fields.required "amount" Common.natural IncreaseSpellCost.amount
+  -- DEFAULTED to Nothing, a fixed amount: only a card printing "for each
+  -- target" writes the key.
+  perTarget <- Fields.defaulted "perTarget" Nothing (Common.maybe (Filter.codec Keyword.codec)) IncreaseSpellCost.perTarget
   pure
     IncreaseSpellCost.MkIncreaseSpellCost
       { IncreaseSpellCost.whichSpells = whichSpells,
-        IncreaseSpellCost.amount = amount
+        IncreaseSpellCost.amount = amount,
+        IncreaseSpellCost.perTarget = perTarget
       }

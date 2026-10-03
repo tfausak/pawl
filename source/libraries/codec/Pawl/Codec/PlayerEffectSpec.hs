@@ -69,7 +69,7 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost (Filter.Not (Filter.HasCardType CardType.Creature)) 1))
+      (PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost (Filter.Not (Filter.HasCardType CardType.Creature)) 1 Nothing))
       " {\"type\":\"IncreaseSpellCost\",\"value\":{\"whichSpells\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"amount\":1}} "
   -- CR 613.11 / 601.2f / 602.2b / Oppressive Rays, whose criterion is CR
   -- 303.4b's "enchanted" and nothing else.
@@ -84,7 +84,7 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost (Filter.HasColor Color.Blue) (ManaCost.MkManaCost [ManaSymbol.Generic 1]) False))
+      (PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost (Filter.HasColor Color.Blue) (ManaCost.MkManaCost [ManaSymbol.Generic 1]) False Nothing))
       " {\"type\":\"ReduceSpellCost\",\"value\":{\"whichSpells\":{\"type\":\"HasColor\",\"value\":{\"type\":\"Blue\"}},\"reduction\":[{\"type\":\"Generic\",\"value\":1}]}} "
   -- The reduction that names a mana type, which the generic one above would not
   -- catch a regression in -- Edgewalker's, so it also carries the one key CR
@@ -93,7 +93,7 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost (Filter.HasSubtype Subtype.Cleric) (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.White), ManaSymbol.OfType (ManaType.Colored Color.Black)]) True))
+      (PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost (Filter.HasSubtype Subtype.Cleric) (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.White), ManaSymbol.OfType (ManaType.Colored Color.Black)]) True Nothing))
       " {\"type\":\"ReduceSpellCost\",\"value\":{\"whichSpells\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Cleric\"}},\"reduction\":[{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"White\"}}},{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Black\"}}}],\"coloredOnly\":true}} "
   -- CR 613.11 / 601.2f / Heartstone, floor and all.
   Spec.it s "ReduceActivationCost" $

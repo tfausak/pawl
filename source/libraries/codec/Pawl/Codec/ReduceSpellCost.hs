@@ -19,9 +19,13 @@ codec = Fields.object $ do
   -- DEFAULTED to False, which is CR 118.7b-d's spill: only a card printing
   -- Edgewalker's restricting sentence writes the key.
   coloredOnly <- Fields.defaulted "coloredOnly" False Common.boolean ReduceSpellCost.coloredOnly
+  -- DEFAULTED to Nothing, a fixed reduction: only a card printing "for each
+  -- ... it targets" writes the key.
+  perTarget <- Fields.defaulted "perTarget" Nothing (Common.maybe (Filter.codec Keyword.codec)) ReduceSpellCost.perTarget
   pure
     ReduceSpellCost.MkReduceSpellCost
       { ReduceSpellCost.whichSpells = whichSpells,
         ReduceSpellCost.reduction = reduction,
-        ReduceSpellCost.coloredOnly = coloredOnly
+        ReduceSpellCost.coloredOnly = coloredOnly,
+        ReduceSpellCost.perTarget = perTarget
       }

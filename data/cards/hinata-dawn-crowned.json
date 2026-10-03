@@ -1,0 +1,121 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Flying"
+        },
+        {
+          "type": "Trample"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Hinata, Dawn-Crowned",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "ReduceSpellCost",
+            "value": {
+              "perTarget": {
+                "type": "And",
+                "value": []
+              },
+              "reduction": [
+                {
+                  "type": "Generic",
+                  "value": 1
+                }
+              ],
+              "whichSpells": {
+                "type": "And",
+                "value": []
+              }
+            }
+          },
+          "scope": {
+            "type": "You"
+          }
+        },
+        {
+          "effect": {
+            "type": "IncreaseSpellCost",
+            "value": {
+              "amount": 1,
+              "perTarget": {
+                "type": "And",
+                "value": []
+              },
+              "whichSpells": {
+                "type": "And",
+                "value": []
+              }
+            }
+          },
+          "scope": {
+            "type": "Opponents"
+          }
+        }
+      ],
+      "power": {
+        "type": "Literal",
+        "value": 4
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 4
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Kirin"
+          },
+          {
+            "type": "Spirit"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

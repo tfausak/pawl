@@ -16,8 +16,22 @@ spec s = Spec.describe s "Pawl.Codec.IncreaseSpellCost" $ do
       IncreaseSpellCost.codec
       ( IncreaseSpellCost.MkIncreaseSpellCost
           { IncreaseSpellCost.whichSpells = Filter.Not (Filter.HasCardType CardType.Creature),
-            IncreaseSpellCost.amount = 1
+            IncreaseSpellCost.amount = 1,
+            IncreaseSpellCost.perTarget = Nothing
           }
       )
       " {\"whichSpells\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"amount\":1} "
+  -- CR 601.2c / 601.2f, as Hinata, Dawn-Crowned taxes an opponent's spell {1}
+  -- for each target: the one shape that writes the defaulted key.
+  Spec.it s "MkIncreaseSpellCost perTarget" $
+    Common.assertCodec
+      s
+      IncreaseSpellCost.codec
+      ( IncreaseSpellCost.MkIncreaseSpellCost
+          { IncreaseSpellCost.whichSpells = Filter.And [],
+            IncreaseSpellCost.amount = 1,
+            IncreaseSpellCost.perTarget = Just (Filter.And [])
+          }
+      )
+      " {\"whichSpells\":{\"type\":\"And\",\"value\":[]},\"amount\":1,\"perTarget\":{\"type\":\"And\",\"value\":[]}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s IncreaseSpellCost.codec
