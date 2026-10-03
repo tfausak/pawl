@@ -130,6 +130,9 @@ arm targets controller source duration gs = case duration of
   -- arm that also states a BEGINNING. Sampled through seatOf for that arm's
   -- reasons, and Nothing where the reference names nobody for that arm's reason
   -- too -- a window that cannot begin stores nothing.
+  --
+  -- Not implemented: a ControllerOfBound seat following its object to a new
+  -- controller before the window opens (#4696).
   Duration.DuringNextTurnOf ref ->
     fmap
       (\pid -> Expiry.DuringTurnOf (AfterTurn.MkAfterTurn pid (GameState.turnNumber gs)))

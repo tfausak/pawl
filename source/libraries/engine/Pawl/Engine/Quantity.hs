@@ -738,6 +738,11 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         Quantity.AttackersDeclaredThisTurn ref -> case playersOf ref of
           Just [pid] -> Just (toInteger (Game.attackersDeclaredThisTurn gs pid))
           _ -> Nothing
+        -- CR 508.1a / 506.4: Combat.declaredAttackers, which keeps an attacker
+        -- that has since left the battlefield and never holds one CR 508.4 put
+        -- onto it attacking. Always a number: no object or player is read.
+        Quantity.AttackersDeclaredThisCombat ->
+          Just (toInteger (Set.size (Combat.declaredAttackers (GameState.combat gs))))
         -- CR 508.1a as a 0/1, PlayedBy's footing: an object related to a player,
         -- read off GameState.attacksInOwnLastTurn rather than the turn's log.
         Quantity.AttackedInLastTurnOf ref -> case (playersOf ref, mOid) of
@@ -1309,6 +1314,7 @@ objectSlots quantity = case quantity of
   Quantity.DamageDealtToThisTurn -> Set.empty
   Quantity.OpponentsAttacked _ -> Set.empty
   Quantity.AttackersDeclaredThisTurn _ -> Set.empty
+  Quantity.AttackersDeclaredThisCombat -> Set.empty
   Quantity.AttackedInLastTurnOf _ -> Set.empty
   Quantity.AttackersInTheirLastTurn _ -> Set.empty
   Quantity.CardsDiscardedThisTurn _ -> Set.empty
@@ -1588,6 +1594,7 @@ readsX quantity = case quantity of
   Quantity.DamageDealtToThisTurn -> False
   Quantity.OpponentsAttacked _ -> False
   Quantity.AttackersDeclaredThisTurn _ -> False
+  Quantity.AttackersDeclaredThisCombat -> False
   Quantity.AttackedInLastTurnOf _ -> False
   Quantity.AttackersInTheirLastTurn _ -> False
   Quantity.CardsDiscardedThisTurn _ -> False

@@ -1,0 +1,29 @@
+{
+  "description": "CR 508.1a / 603.4: Kytheon counts an attacker that died in combat, and returns transformed",
+  "note": "Three declared attackers, one of which bob's blocker kills before the end of combat step: two remain on the battlefield, so only the combat's declaration record reaches three.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Kytheon, Hero of Akros", "label": "kytheon", "ready": true },
+          { "card": "Hill Giant", "label": "giant", "ready": true },
+          { "card": "Goblin Piker", "label": "piker", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Hill Giant", "label": "blocker", "ready": true }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$kytheon", "$giant", "$piker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$blocker": ["$piker"] } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Gideon, Battle-Forged", "count": 1 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Counters": { "object": "Gideon, Battle-Forged", "kind": { "type": "Loyalty" }, "count": 3 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Goblin Piker", "count": 1 } } }
+  ]
+}

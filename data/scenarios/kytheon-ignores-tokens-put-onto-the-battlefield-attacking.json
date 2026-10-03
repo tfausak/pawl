@@ -1,0 +1,25 @@
+{
+  "description": "CR 508.4 / 603.4: Hanweir Garrison's tokens are attacking but never attacked, so Kytheon stays",
+  "note": "Two declared attackers and two tokens put onto the battlefield attacking: four attacking creatures at the end of combat step, two declared.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Kytheon, Hero of Akros", "label": "kytheon", "ready": true },
+          { "card": "Hanweir Garrison", "label": "garrison", "ready": true }
+        ]
+      },
+      { "name": "bob" }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$kytheon", "$garrison"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTimestamps": ["Human Token", "Human Token#2"] } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Gideon, Battle-Forged", "count": 0 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Kytheon, Hero of Akros", "count": 1 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 14 } } }
+  ]
+}

@@ -62,8 +62,8 @@ data Expiry
     -- only "has this ended" sees this row from the moment it is stored and
     -- applies it a turn early.
     --
-    -- Four carriers ask `begun`, one per producer: GameState.attackProhibitions
-    -- (Wall of Dust), GameState.attackRequirements (Taunt),
+    -- Four carriers ask `begun`: GameState.attackProhibitions (Wall of Dust),
+    -- GameState.attackRequirements (Taunt, Gideon, Battle-Forged),
     -- GameState.playerEffects (Sphinx's Decree) and Object.playableFromExile
     -- (Galvanic Relay). No printing states such a window on any other carrier
     -- (Scryfall o:"during your next turn", o:"during that player's next turn",

@@ -135,6 +135,7 @@ codec =
       -- from anything the card names, and the turn is the log's extent rather than
       -- a window a card could state. Rule 207.2c's raid is this against 1.
       Arm.payload "AttackersDeclaredThisTurn" PlayerRef.codec Quantity.AttackersDeclaredThisTurn (\x -> case x of Quantity.AttackersDeclaredThisTurn y -> Just y; _ -> Nothing),
+      Arm.nullary "AttackersDeclaredThisCombat" Quantity.AttackersDeclaredThisCombat,
       Arm.payload "AttackedInLastTurnOf" PlayerRef.codec Quantity.AttackedInLastTurnOf (\x -> case x of Quantity.AttackedInLastTurnOf y -> Just y; _ -> Nothing),
       Arm.payload "AttackersInTheirLastTurn" PlayerRef.codec Quantity.AttackersInTheirLastTurn (\x -> case x of Quantity.AttackersInTheirLastTurn y -> Just y; _ -> Nothing),
       -- CR 701.9a's tally, with only a PlayerRef on the wire for
@@ -268,6 +269,7 @@ tagOf x = case x of
   Quantity.ClassLevel {} -> "ClassLevel"
   Quantity.OpponentsAttacked {} -> "OpponentsAttacked"
   Quantity.AttackersDeclaredThisTurn {} -> "AttackersDeclaredThisTurn"
+  Quantity.AttackersDeclaredThisCombat {} -> "AttackersDeclaredThisCombat"
   Quantity.AttackedInLastTurnOf {} -> "AttackedInLastTurnOf"
   Quantity.AttackersInTheirLastTurn {} -> "AttackersInTheirLastTurn"
   Quantity.CardsDiscardedThisTurn {} -> "CardsDiscardedThisTurn"
