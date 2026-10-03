@@ -1309,9 +1309,10 @@ entryAttack legal resolving entry gs = case EntryRiders.attacking entry of
 -- it was made, for CR 704.5e to sweep at the next check (Pawl.Engine.Sba).
 --
 -- Rod of Absorption's total is the repeat with a budget: each round offers
--- only a half whose mana value fits what is left (CR 202.3, through
+-- only a half whose mana value fits what is left (CR 202.3d, through
 -- CastOffer.restriction's per-face match, so a split card's half is measured
--- as the spell it becomes), and the cast spell's mana value is spent from it.
+-- as the spell it becomes -- unobserved, no board casting a split card this
+-- way), and the cast spell's mana value is spent from it.
 -- `evaluate` reads the budget's Quantity once, before the first round (CR
 -- 608.2h).
 --
