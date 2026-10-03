@@ -3,6 +3,7 @@
 module Pawl.Codec.Search where
 
 import qualified Data.Set as Set
+import qualified Pawl.Codec.DifferentIn as DifferentIn
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.PlayerRef as PlayerRef
@@ -46,9 +47,9 @@ codec = Fields.object $ do
   subject <- Fields.defaulted "subject" Nothing (Common.maybe SlotName.codec) Search.subject
   -- Defaulted: an absent key is a search whose finds no later clause names.
   slot <- Fields.defaulted "slot" Nothing (Common.maybe SlotName.codec) Search.slot
-  -- Defaulted: an absent key is a search that does not print "with different
-  -- names", which is every card file already written.
-  differentNames <- Fields.defaulted "differentNames" False Common.boolean Search.differentNames
+  -- Defaulted: an absent key is a search that prints no "with different ...",
+  -- which is most card files.
+  differentIn <- Fields.defaulted "differentIn" Set.empty (Common.set DifferentIn.codec) Search.differentIn
   pure
     Search.MkSearch
       { Search.searcher = searcher,
@@ -61,5 +62,5 @@ codec = Fields.object $ do
         Search.destination = destination,
         Search.subject = subject,
         Search.slot = slot,
-        Search.differentNames = differentNames
+        Search.differentIn = differentIn
       }

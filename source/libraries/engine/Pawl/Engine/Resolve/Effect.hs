@@ -185,6 +185,7 @@ import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.DiceReading as DiceReading
 import qualified Pawl.Types.DieResult as DieResult
+import qualified Pawl.Types.DifferentIn as DifferentIn
 import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.DoesNotUntapNext as DoesNotUntapNext
 import qualified Pawl.Types.Draw as Draw
@@ -3965,7 +3966,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.MoveMana (MoveMana.MkMoveMana fromRef toRef) -> do
     gs <- State.get
     Mana.moveMana (apnapPlayersOf fromRef legal controller gs) (apnapPlayersOf toRef legal controller gs)
-  Effect.Search (Search.MkSearch searcherRef ownerRef zones outside quantity filter_ upTo destination subject foundSlot differentNames) ->
+  Effect.Search (Search.MkSearch searcherRef ownerRef zones outside quantity filter_ upTo destination subject foundSlot differentIn) ->
     -- CR 701.23a: match each candidate through its own CR 613 projection --
     -- rule 613.1 names no zone, so a card in any of the searched zones is folded
     -- exactly as a permanent is, and CR 208.2a's characteristic-defining power
@@ -4202,12 +4203,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   -- your library and graveyard for any number of cards" would
                   -- refute both.
                   let mayDecline zone = upTo || Maybe.isNothing cap || (isHidden zone && Filter.statesAQuality filter_)
-                      -- CR 201.2b: "with different names". Filtered, not
-                      -- trusted: a card sharing a name with one kept ahead of it
-                      -- is dropped. The completion below is not held to it,
-                      -- which no card reaches: every card in data/cards/
-                      -- printing it says "up to".
-                      picked = List.genericTake capHere . (if differentNames then differentlyNamed gs else id) . ListUtils.nubOrd $ filter (\oid -> List.elem oid matches) answer
+                      -- Search.differentIn: "with different names" (CR
+                      -- 201.2b), "with different powers", "don't share a mana
+                      -- value". Filtered, not trusted: a card sharing a value
+                      -- with one kept ahead of it is dropped. The completion
+                      -- below is not held to it, which no card reaches: every
+                      -- card in data/cards/ printing one says "up to".
+                      picked = List.genericTake capHere . differing differentIn gs . ListUtils.nubOrd $ filter (\oid -> List.elem oid matches) answer
                       forced = concatMap snd (filter (not . mayDecline . fst) byZone)
                       filler = filter (\oid -> List.notElem oid picked) forced
                       -- CR 701.23j: the searcher "MAY choose" a card out there,
@@ -11022,17 +11024,31 @@ outsideArrival destination = case destination of
   SearchDestination.BattlefieldAttached -> Nothing
   SearchDestination.Reveal -> Nothing
 
--- CR 201.2b: the cards, in order, that keep the group differently named -- each
--- has a name and shares none with a card kept ahead of it. Names are read off
--- the CR 613 projection, so a split card's two count (CR 201.2a).
-differentlyNamed :: GameState -> [ObjectId] -> [ObjectId]
-differentlyNamed gs = go Set.empty
+-- Search.differentIn: the cards, in order, that keep the group apart -- each
+-- shares no value on any named axis with a card kept ahead of it. Read off the
+-- CR 613 projection, so a split card's two names count (CR 201.2a) and a star's
+-- power is its characteristic-defining ability's number (CR 208.2a, 604.3). CR
+-- 201.2b also demands each card HAVE a name; a card with no power or toughness
+-- shares none. Values are keyed by their axis, so a power never meets a
+-- toughness.
+differing :: Set.Set DifferentIn.DifferentIn -> GameState -> [ObjectId] -> [ObjectId]
+differing axes gs = go Set.empty
   where
+    number axis = foldMap (Set.singleton . (,) axis . Right . Left)
+    valuesOf view axis = case axis of
+      DifferentIn.Names -> Set.map ((,) axis . Left) (Filter.names view)
+      DifferentIn.Powers -> number axis (Filter.power view)
+      DifferentIn.ManaValues -> number axis (Filter.manaValue view)
+      DifferentIn.Toughnesses -> number axis (Filter.toughness view)
+      DifferentIn.CardTypes -> Set.map ((,) axis . Right . Right) (Filter.cardTypes view)
+    admits view seen axis =
+      let values = valuesOf view axis
+       in (axis /= DifferentIn.Names || not (Set.null values)) && Set.disjoint values seen
     go _ [] = []
     go seen (oid : rest) =
-      let names = Filter.names (Projection.viewOfObject oid gs)
-       in if not (Set.null names) && Set.disjoint names seen
-            then oid : go (Set.union seen names) rest
+      let view = Projection.viewOfObject oid gs
+       in if all (admits view seen) axes
+            then oid : go (foldMap (valuesOf view) axes <> seen) rest
             else go seen rest
 
 -- One found card's move, a member of the search's batch whose board is `asOf`
