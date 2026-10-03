@@ -750,11 +750,11 @@ playersFor viewOf context gs ref =
 -- announcement behind it at all -- a static ability's projection -- and for a
 -- spell, whose source IS its stack object.
 --
--- Not implemented: a replacement's condition still takes the fallback, which for
--- it is #1783's failure over again. Pawl.Engine.Replacement holds only the OBJECT
--- half of the installing resolution's slots (Pawl.Types.ActiveReplacement.slots),
--- so there is no player half to pass and filling it is a field rather than a line
--- (#3212).
+-- A replacement's CONDITION still takes the fallback, which for it is #1783's
+-- failure over again: Pawl.Types.ActiveReplacement.slots holds only the OBJECT
+-- half of the installing resolution's slots. No printing asks it -- see
+-- Filter.Context.slotPlayers for the query -- since a row's "if that player"
+-- is its pattern, which ControllerRelation.InSlot bakes at install.
 slotPlayers :: Filter.Context -> GameState -> SlotName.SlotName -> Maybe [PlayerId]
 slotPlayers context gs name = case Map.lookup name (Filter.slotPlayers context) of
   Just pids -> Just (Set.toList pids)

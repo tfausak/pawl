@@ -1519,6 +1519,7 @@ rewriteDrawRewrite pairs rewrite = case rewrite of
   DrawRewrite.FromOutsideTheGame payload -> DrawRewrite.FromOutsideTheGame payload {FromOutsideTheGame.filter = Filter.rewrite pairs (FromOutsideTheGame.filter payload)}
   -- CR 702.52a's dredge carries a COUNT and nothing CR 612.1 can swap.
   DrawRewrite.Dredge _ -> rewrite
+  DrawRewrite.YouDraw -> rewrite
 
 -- CR 612.1 through CR 707.9's "except ..." clause. Exhaustive for
 -- rewriteReplacementEffect's reason.

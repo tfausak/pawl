@@ -11,6 +11,7 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Bifunctor as Bifunctor
 import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.Foldable as Foldable
+import qualified Data.Functor.Identity as Functor
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -72,7 +73,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Recruit as Recruit
 import qualified Pawl.Engine.Replacement as Replacement
-import Pawl.Engine.Resolve.Slots (battlefieldMatching, boundSlots, conditionSlots, effectContext, effectObjectRefs, effectPlayerRefs, effectSlotObjects, effectViewOf, graveyardCardsOf, handCardsOf, legalMany, legalOne, libraryCardsOf, matchingFromAmong, objectRefObjects, playerRefPlayers, replacementRowSlots, slotBindings, slotGroup, zoneScopePlayers)
+import Pawl.Engine.Resolve.Slots (battlefieldMatching, boundSlots, conditionSlots, effectContext, effectObjectRefs, effectPlayerRefs, effectSlotObjects, effectViewOf, graveyardCardsOf, handCardsOf, legalMany, legalOne, libraryCardsOf, matchingFromAmong, objectRefObjects, overRelations, playerRefPlayers, replacementRowSlots, slotBindings, slotGroup, zoneScopePlayers)
 import qualified Pawl.Engine.Restamp as Restamp
 import qualified Pawl.Engine.Ring as Ring
 import qualified Pawl.Engine.Room as Room
@@ -160,6 +161,7 @@ import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.ControlDuration as ControlDuration
 import qualified Pawl.Types.ControlPlayer as ControlPlayer
 import qualified Pawl.Types.ControlSides as ControlSides
+import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.CopyOriginal as CopyOriginal
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
@@ -1825,6 +1827,18 @@ installDamageRow targets slots controller source duration kind rewrite uses ride
         -- carriers, so it contributes no third half.
         namedSlots = Map.keysSet (replacementRowSlots re) <> foldMap (Map.keysSet . PreventionRider.targets) rider
      in g1 {GameState.replacements = active : GameState.replacements g1}
+
+-- CR 601.2c / 608.2b: an InSlot names the players this resolution's slot holds,
+-- baked into Among as the row is installed; every other relation is CR 109.5's
+-- and is read as the event happens. A slot naming nobody bakes to nobody.
+bakeRelation :: Map.Map SlotName (Set PlayerId) -> ControllerRelation.ControllerRelation -> ControllerRelation.ControllerRelation
+bakeRelation players rel = case rel of
+  ControllerRelation.InSlot slot -> ControllerRelation.Among (Map.findWithDefault Set.empty slot players)
+  ControllerRelation.Yours -> rel
+  ControllerRelation.Anyones -> rel
+  ControllerRelation.Opponents -> rel
+  ControllerRelation.EnchantedPlayers -> rel
+  ControllerRelation.Among _ -> rel
 
 -- CR 601.2c / 615.12: the same bake one carrier over. A stored CR 615.12 or CR
 -- 614.9 prohibition narrows the damage event by a DamagePattern too, and a card
@@ -7547,7 +7561,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               let (ts, gs1) = Game.freshTimestamp gs
                   active =
                     ActiveReplacement.MkActiveReplacement
-                      { ActiveReplacement.effect = re,
+                      { -- CR 601.2c / 608.2b: "target player" is the player this
+                        -- resolution's slot names now, BAKED for `controller`'s
+                        -- reason below.
+                        ActiveReplacement.effect = Functor.runIdentity (overRelations (pure . bakeRelation (Filter.slotPlayers context)) re),
                         ActiveReplacement.source = source,
                         -- CR 109.5: the resolution's controller, BAKED now --
                         -- the source is a spell CR 608.2n is about to put in a

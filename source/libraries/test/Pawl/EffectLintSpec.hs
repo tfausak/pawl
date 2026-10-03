@@ -68,6 +68,7 @@ import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.ConjureCards as ConjureCards
 import qualified Pawl.Types.Connive as Connive
 import qualified Pawl.Types.ControlSides as ControlSides
+import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.CopyOriginal as CopyOriginal
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.Cost as Cost.Type
@@ -91,6 +92,7 @@ import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.DoesNotUntapNext as DoesNotUntapNext
 import qualified Pawl.Types.Draw as Draw
+import qualified Pawl.Types.DrawR as DrawR
 import qualified Pawl.Types.DungeonRoom as DungeonRoom
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
@@ -640,9 +642,23 @@ phasePatternOffends replacement = case replacement of
 -- different reason: a RULE creates it off a permanent's counters, so a card
 -- printing either half would be claiming an ability no rule gives it.
 --
+-- ControllerRelation.Among is the same prohibition on every arm's pattern at once:
+-- the players an InSlot named, which only the Effect.Replace install bakes.
+--
 -- Exhaustive rather than a wildcard, this file's discipline for a sum.
 engineOnlyOffends :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
-engineOnlyOffends replacement = case replacement of
+engineOnlyOffends replacement = any isAmong (Resolve.relationsOf replacement) || engineOnlyArmOffends replacement
+  where
+    isAmong rel = case rel of
+      ControllerRelation.Among _ -> True
+      ControllerRelation.Yours -> False
+      ControllerRelation.Anyones -> False
+      ControllerRelation.Opponents -> False
+      ControllerRelation.EnchantedPlayers -> False
+      ControllerRelation.InSlot _ -> False
+
+engineOnlyArmOffends :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
+engineOnlyArmOffends replacement = case replacement of
   -- `whatRecipient` and `whoRecipient` beside it are the PRINTED halves and are
   -- not swept: a card may describe the recipient it shields (Stormwild Capridor)
   -- and name CR 109.5's relation to the row's controller (Divine Deflection's
@@ -2926,6 +2942,14 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     -- CR 122.1d's row, which only Projection.stunOf may mint.
     Spec.assertBool s (engineOnlyOffends (ReplacementEffect.UntapR (UntapR.MkUntapR Nothing UntapRewrite.RemoveStunCounter))) "and so is CR 122.1d's untap replacement"
     Spec.assertBool s (not (engineOnlyOffends (ReplacementEffect.UntapR (UntapR.MkUntapR Nothing (UntapRewrite.RemoveCounterToUntap CounterKind.PlusOnePlusOne))))) "while Bewitching Leechcraft's printed one is accepted"
+    -- ControllerRelation.Among, which only the Effect.Replace install bakes.
+    plagiarize <- S.printingOf s registry "Plagiarize"
+    let slotted = cardReplacementEffects (S.combinedFace plagiarize)
+        bakeAmong replacement = case replacement of
+          ReplacementEffect.DrawR r -> ReplacementEffect.DrawR r {DrawR.whose = ControllerRelation.Among (Set.singleton (PlayerId.MkPlayerId 1))}
+          other -> other
+    Spec.assertBool s (not (any engineOnlyOffends slotted)) "Plagiarize naming its player by slot is accepted"
+    Spec.assertBool s (any (engineOnlyOffends . bakeAmong) slotted) "while the same row naming a player by id is rejected"
   -- CR 615.5's rider is a PREVENTION effect's, which the type cannot say. See
   -- riderWithoutPreventionOffends.
   Spec.it s "no card hangs CR 615.5's additional effect off a rewrite that prevents nothing" $ do

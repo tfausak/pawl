@@ -1310,9 +1310,13 @@ data Context = MkContext
     -- it together for the reason they share a view: the two must not disagree about
     -- what a slot names.
     --
-    -- Not implemented: a replacement's condition still leaves it empty, because
-    -- Pawl.Types.ActiveReplacement captures only the object half of the installing
-    -- resolution's slots and there is no player half to pass (#3212).
+    -- A replacement's CONDITION leaves it empty: Pawl.Types.ActiveReplacement
+    -- captures only the object half of the installing resolution's slots. Its
+    -- PATTERN names a slot's player through ControllerRelation.InSlot instead,
+    -- baked as the row is installed. Scryfall `o:/(this turn|until end of turn),
+    -- if (target|that) (player|opponent)/`, 2026-10-03, answers Plagiarize alone,
+    -- whose "if" is its pattern; a floating row whose condition named a slot's
+    -- player would need the half.
     --
     -- NO atom in `matches` below reads it. It is a channel THROUGH this record to
     -- Pawl.Engine.Count.playersFor, which is handed CR 113.7's SOURCE and needs
