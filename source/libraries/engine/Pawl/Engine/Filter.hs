@@ -2018,7 +2018,7 @@ matches context view predicate = case predicate of
   -- is matched, because answering it means counting permanents and this module
   -- holds no game state. An atom that survives to here is one in a position
   -- nothing bakes -- any filter but a Scope.OverPlayers count's.
-  Filter.ControlsMoreThanYou _ -> False
+  Filter.ControlsMoreThanYou _ _ -> False
   -- CR 400.1's per-player graveyard, and False WHEREVER IT IS REACHED, for the
   -- two atoms above's reason plus one of its own: this module holds no game
   -- state to size a zone with, and CR 109.3 counts no zone among an OBJECT's
@@ -2346,7 +2346,7 @@ rewrite pairs predicate = case predicate of
   -- DESCENT, like And/Or/Not above: the nested filter describes the permanents
   -- being counted ("more LANDS than you"), so a word swap reaches it exactly as it
   -- reaches the same description written at the top level.
-  Filter.ControlsMoreThanYou f -> Filter.ControlsMoreThanYou (rewrite pairs f)
+  Filter.ControlsMoreThanYou n f -> Filter.ControlsMoreThanYou n (rewrite pairs f)
   -- Untouched, where the atom above is rewritten, and the contrast is CR 612's
   -- rather than an omission: rule 612.1's swap acts on a WORD in the text, and a
   -- family names no word. Magical Hack turning "Swamp" into "Island" turns a
@@ -3104,7 +3104,7 @@ bakeBound players predicate = case predicate of
   -- Descended into for the reason `rewrite` descends: the nested filter is a
   -- filter like any other, and a slot named inside it must be baked before the
   -- match or it can never be answered.
-  Filter.ControlsMoreThanYou f -> Filter.ControlsMoreThanYou (bakeBound players f)
+  Filter.ControlsMoreThanYou n f -> Filter.ControlsMoreThanYou n (bakeBound players f)
   Filter.ControlledByPlayer _ -> predicate
   -- Untouched: CR 603.2's slot is not the recipient an effect has reached, and no
   -- binding could answer this atom -- Pawl.Engine.Filter.Context carries it.
@@ -3275,7 +3275,7 @@ manaValueThresholds predicate = case predicate of
   -- only widens CR 601.3a's sample, and the alternative -- an empty list -- would
   -- have to argue that no nested atom can ever matter, which is a claim about the
   -- inner filter rather than about this atom.
-  Filter.ControlsMoreThanYou f -> manaValueThresholds f
+  Filter.ControlsMoreThanYou _ f -> manaValueThresholds f
   -- Reads the mana value and compares it against NO literal, so it bounds
   -- nothing: parity is what the sample's two-past-the-greatest tail is for.
   Filter.ManaValueIsEven -> []
@@ -3453,7 +3453,7 @@ statesAQuality predicate = case predicate of
   -- A quality like any other atom's, whatever the nested filter says: a search
   -- whose predicate is this one is looking for cards with a stated quality, so CR
   -- 701.23b applies and no descent could change that.
-  Filter.ControlsMoreThanYou _ -> True
+  Filter.ControlsMoreThanYou _ _ -> True
   Filter.ManaValueAtMost _ -> True
   -- A quality like the literal bound's, the source-power atoms' answer: "a
   -- nonland card with mana value less than this spell's" describes the card.
@@ -3674,7 +3674,7 @@ overBoundSlots f predicate = case predicate of
   -- it silently, this being the first atom to carry a Filter DIRECTLY -- a
   -- keyword's own filter (CR 702.29e) is out of both functions' reach alike, so
   -- the pairing holds there by both sides declining.
-  Filter.ControlsMoreThanYou g -> fmap Filter.ControlsMoreThanYou (overBoundSlots f g)
+  Filter.ControlsMoreThanYou n g -> fmap (Filter.ControlsMoreThanYou n) (overBoundSlots f g)
   -- Descended into for the atom above's reason and named explicitly for the same
   -- one: `bakeBound` descends into the host's description, so the catch-all below
   -- would silently bake a slot this function never reported.

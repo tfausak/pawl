@@ -4793,7 +4793,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.IsControllerOfBound slot -> [slot]
   -- DESCENT: the nest is card text like any other, and an atom written into it
   -- is read exactly as one written at the top level.
-  Filter.Type.ControlsMoreThanYou f -> filterSlotsReadSingly f
+  Filter.Type.ControlsMoreThanYou _ f -> filterSlotsReadSingly f
   Filter.Type.CardsInGraveyardAtLeast _ -> []
   Filter.Type.IsAttacking -> []
   Filter.Type.IsAttackingPlayer _ -> []

@@ -244,14 +244,14 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       (Filter.IsControllerOfBound (SlotName.MkSlotName (Text.pack "permanent")))
       " {\"type\":\"IsControllerOfBound\",\"value\":\"permanent\"} "
-  -- Nested, unlike every atom above: the payload is a whole Filter, so this pins
-  -- the recursion as well as the tag.
+  -- Nested, unlike every atom above: the payload carries a whole Filter beside
+  -- the margin, so this pins the recursion and both keys as well as the tag.
   Spec.it s "ControlsMoreThanYou" $
     Common.assertCodec
       s
       codec
-      (Filter.ControlsMoreThanYou (Filter.HasCardType CardType.Land))
-      " {\"type\":\"ControlsMoreThanYou\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}} "
+      (Filter.ControlsMoreThanYou 2 (Filter.HasCardType CardType.Land))
+      " {\"type\":\"ControlsMoreThanYou\",\"value\":{\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}},\"margin\":2}} "
   Spec.it s "CardsInGraveyardAtLeast" $
     Common.assertCodec
       s
@@ -800,7 +800,7 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
               Filter.AttachedTo (Filter.And [Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.You])
             ]
         auraGraftDestination = Filter.CanHostSubject
-        oreskosExplorer = Filter.ControlsMoreThanYou (Filter.HasCardType CardType.Land)
+        oreskosExplorer = Filter.ControlsMoreThanYou 1 (Filter.HasCardType CardType.Land)
         roundTrip f v = Spec.assertEqWith s "preserved" (Codec.decode codec (Codec.encode codec f)) (Right v)
      in mapM_
           (\f -> roundTrip f f)

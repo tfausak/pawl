@@ -3340,7 +3340,7 @@ filterReads f = case f of
   Filter.Type.IsControllerOfBound _ -> Set.empty
   -- Over-declared deliberately, as CanHostSubject is: the atom reads every
   -- permanent's controller plus whatever its nest reads of each.
-  Filter.Type.ControlsMoreThanYou g -> Set.insert Controller (filterReads g)
+  Filter.Type.ControlsMoreThanYou _ g -> Set.insert Controller (filterReads g)
   -- Reads a ZONE's size, which is no object's characteristic (CR 109.3) and no
   -- Modification writes; every zone change happens between projections.
   Filter.Type.CardsInGraveyardAtLeast _ -> Set.empty
@@ -3590,7 +3590,7 @@ filterReadsPeers f = case f of
   -- False outright, Pawl.Engine.Count.bakePerspective having settled it between
   -- projections, so the nest is not read here at all. Descending only costs the
   -- re-ask.
-  Filter.Type.ControlsMoreThanYou g -> filterReadsPeers g
+  Filter.Type.ControlsMoreThanYou _ g -> filterReadsPeers g
   -- DESCENT for the atom above's reason, and where filterReads deliberately does
   -- not descend: CR 708.12's nest is matched against viewOfCard, which takes no
   -- `peers` and no board at all.

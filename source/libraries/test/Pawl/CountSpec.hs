@@ -373,6 +373,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
   charnelTallySpec s registry
   tyranidInvasionSpec s registry
   oreskosExplorerSpec s registry
+  surveyorsScopeSpec s registry
   keeningStoneSpec s registry
   priceOfKnowledgeSpec s registry
   ebonyOwlNetsukeSpec s registry
@@ -736,6 +737,63 @@ findsWhatItCan :: Prompt.Prompt r -> r
 findsWhatItCan p = case p of
   Prompt.Search _ _ matches cap -> List.genericTake cap matches
   _ -> S.identityAnswer p
+
+-- CR 110.2 with a MARGIN: the Oreskos Explorer group's atom asked for "at least
+-- two more" rather than "more". GAMEPLAY LEVEL for that group's reason.
+--
+-- Surveyor's Scope, {2} Artifact: "{T}, Exile this artifact: Search your library
+-- for up to X basic land cards, where X is the number of players who control at
+-- least two more lands than you. Put those cards onto the battlefield, then
+-- shuffle."
+--
+-- THREE SEATS: alice 2 lands, bob 4, carol 3 or 4, the pair of boards differing
+-- in carol's fourth land alone:
+--
+--                              margin 2 (>=+2)   margin ignored (>)   nobody
+--   alice 2, bob 4, carol 3          1                  2               0
+--   alice 2, bob 4, carol 4          2                  2               0
+--
+-- Carol one ahead is the row that tells the margin from Oreskos's strict "more".
+-- X is OBSERVED as the Forests alice controls afterwards: her library holds three
+-- Forests and an Evolving Wilds, so the cap is never the library's, and the
+-- nonbasic Wilds staying behind proves the basic filter still ran.
+surveyorsScopeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+surveyorsScopeSpec s registry =
+  let forestName = CardName.MkCardName (Text.pack "Forest")
+      board carolLands = do
+        scope <- S.printingOf s registry "Surveyor's Scope"
+        plains <- S.printingOf s registry "Plains"
+        forest <- S.printingOf s registry "Forest"
+        island <- S.printingOf s registry "Island"
+        swamp <- S.printingOf s registry "Swamp"
+        wilds <- S.printingOf s registry "Evolving Wilds"
+        let withLands = S.landsFor swamp S.carol carolLands (S.landsFor island S.bob 4 (S.landsFor plains S.alice 2 S.threePlayerGame))
+            withLibrary = List.foldl' (\g p -> snd (S.addLibraryCard p S.alice g)) withLands [forest, forest, forest, wilds]
+            (scopeId, withScope) = S.addPermanent scope S.alice withLibrary
+        pure (scopeId, withScope {GameState.priority = Just S.alice}, Face.activatedAbilities (S.combinedFace scope))
+      fire scopeId ability gs = S.runPure findsWhatItCan gs (do Activate.activateAbility S.alice scopeId ability; Stack.resolveTop)
+      forests = S.countOnBattlefieldByName forestName S.alice
+      inLibrary gs = length (Game.zoneMembers Zone.Library S.alice gs)
+   in Spec.describe s "Surveyor's Scope" $ do
+        -- The discriminating case: carol is ahead by one, which Oreskos's strict
+        -- "more" would count and "at least two more" does not.
+        Spec.it s "CR 110.2 a seat ONE land ahead is not two more; the seat two ahead is" $ do
+          (scopeId, ready, abilities) <- board 3
+          case abilities of
+            [] -> Spec.assertFailure s "Surveyor's Scope should declare one activated ability"
+            ability : _ -> do
+              let after = fire scopeId ability ready
+              Spec.assertEqWith s "only bob is two ahead, so one Forest found" (forests after) 1
+              Spec.assertEqWith s "the Wilds and two Forests stayed behind" (inLibrary after) 3
+              Spec.assertEqWith s "everything resolved" (GameState.stack after) []
+        Spec.it s "CR 110.2 two seats each two lands ahead fetch two" $ do
+          (scopeId, ready, abilities) <- board 4
+          case abilities of
+            [] -> Spec.assertFailure s "Surveyor's Scope should declare one activated ability"
+            ability : _ -> do
+              let after = fire scopeId ability ready
+              Spec.assertEqWith s "bob and carol are both two ahead, so two Forests found" (forests after) 2
+              Spec.assertEqWith s "the Wilds and one Forest stayed behind" (inLibrary after) 2
 
 -- CR 113.7 / CR 608.2c: a count whose SCOPE names the player an ABILITY's slot
 -- bound. Pawl.Engine.Resolve.Slots.effectContext frames the resolution on the
