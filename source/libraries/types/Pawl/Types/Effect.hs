@@ -863,4 +863,7 @@ data Effect card ability
   | -- | CR 115.7d: the resolving controller may choose new targets for each
     -- spell or ability on the stack the ObjectRef names (Redirect).
     ChooseNewTargets ObjectRef.ObjectRef
+  | -- | CR 115.7a: the resolving controller changes the targets of each spell or
+    -- ability on the stack the ObjectRef names (Deflection).
+    ChangeTargets ObjectRef.ObjectRef
   deriving (Eq, Ord, Show)

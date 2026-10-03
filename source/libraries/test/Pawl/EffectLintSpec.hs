@@ -415,6 +415,7 @@ ownQuantities effect = case effect of
   Effect.RepeatIf loop -> conditionQuantities (RepeatIf.condition loop)
   Effect.Heal _ -> []
   Effect.ChooseNewTargets _ -> []
+  Effect.ChangeTargets _ -> []
 
 -- The shapes CR 208.1 and CR 208.2 allow in a printed power or toughness box:
 -- "two numbers separated by a slash", or a value that "includes a star (*)" --
@@ -1545,6 +1546,7 @@ effectObjectRefs effect =
         Effect.RepeatIf {} -> []
         Effect.Heal ref -> read_ [ref]
         Effect.ChooseNewTargets ref -> read_ [ref]
+        Effect.ChangeTargets ref -> read_ [ref]
 
 -- The chooser-shaped refs one effect writes where nothing can ask for them: the
 -- lint's offenders. Each is a CR 608.2d choice nobody makes, so the ref names no
