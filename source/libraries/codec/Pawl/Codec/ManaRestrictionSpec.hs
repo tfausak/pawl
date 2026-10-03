@@ -70,4 +70,15 @@ spec s = Spec.describe s "Pawl.Codec.ManaRestriction" $ do
           ManaRestriction.turnsFaceUp = Just (Filter.And [])
         }
       " {\"casts\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Enchantment\"}},\"unlocks\":{\"type\":\"And\",\"value\":[]},\"turnsFaceUp\":{\"type\":\"And\",\"value\":[]}} "
+  -- Hydraulic Helper's "can't be spent to cast a nonartifact spell": the cast
+  -- key under a prohibition, leaving every other payment open.
+  Spec.it s "a prohibition" $
+    Common.assertCodec
+      s
+      ManaRestriction.codec
+      ManaRestriction.none
+        { ManaRestriction.casts = Just (Filter.Not (Filter.HasCardType CardType.Artifact)),
+          ManaRestriction.prohibits = True
+        }
+      " {\"casts\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}}},\"prohibits\":true} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ManaRestriction.codec
