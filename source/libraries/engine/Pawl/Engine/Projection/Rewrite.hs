@@ -1608,7 +1608,7 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
   -- CR 105.1's five colours, CR 305.6's five basic land types, CR 205.3m's
   -- creature types and CR 102.1's seats are the offers themselves, so none of
   -- these four prints a word the card chose.
-  EntryRewrite.ChooseColor -> rewrite
+  EntryRewrite.ChooseColors {} -> rewrite
   EntryRewrite.ChooseBasicLandType -> rewrite
   EntryRewrite.ChooseCreatureType -> rewrite
   EntryRewrite.ChoosePlayer -> rewrite
@@ -2125,6 +2125,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.CastUsing _ -> quantity
   Quantity.Type.TagWasSpent {} -> quantity
   Quantity.Type.TagWasSpentOfOwnColor {} -> quantity
+  Quantity.Type.ChosenColorsItIs -> quantity
   Quantity.Type.ManaSpent -> quantity
   Quantity.Type.WasToken -> quantity
   Quantity.Type.WasAttacking -> quantity

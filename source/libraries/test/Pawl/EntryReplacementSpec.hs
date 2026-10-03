@@ -962,7 +962,7 @@ stuffyDollSpec s registry =
         -- record UPDATE, so omitting the field there compiles and silently carries
         -- a chosen player across a zone change; -Werror cannot name that site, and
         -- this is what stands in its place. Mirrors Pawl.GameSpec's Painter's
-        -- Servant chosenColor case.
+        -- Servant chosenColors case.
         Spec.it s "CR 400.7 a new incarnation has chosen nobody" $ do
           doll <- S.printingOf s registry "Stuffy Doll"
           mountain <- S.printingOf s registry "Mountain"

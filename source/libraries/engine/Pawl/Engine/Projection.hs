@@ -214,7 +214,7 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
         -- Blessing and Benevolent Blessing cases prove them.
         Modification.GainKeyword k ->
           let granter = Game.lookupObject src gs
-              chosen = granter >>= Object.chosenColor
+              chosen = foldMap Object.chosenColors granter
               stampedBy limit attacher = maybe False ((<= limit) . Object.timestamp) (Game.lookupObject attacher gs)
               already = foldMap (\g -> filter (stampedBy (Object.timestamp g)) (Set.toList (Game.attachments oid gs))) granter
            in pc {PC.keywords = Map.insertWith (+) (Keyword.grantedBy src chosen (controllerOf src gs) already k) 1 (PC.keywords pc)}
@@ -602,9 +602,7 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
           pc {PC.colors = Set.union cs (PC.colors pc)}
         -- CR 105.3's parenthetical, colour read off the source's entry choice.
         Modification.AddChosenColor ->
-          case Game.lookupObject src gs >>= Object.chosenColor of
-            Nothing -> pc
-            Just c -> pc {PC.colors = Set.insert c (PC.colors pc)}
+          pc {PC.colors = Set.union (foldMap Object.chosenColors (Game.lookupObject src gs)) (PC.colors pc)}
         -- CR 613.4d.
         Modification.SwitchPowerToughness ->
           pc {PC.power = PC.toughness pc, PC.toughness = PC.power pc}
@@ -1037,7 +1035,7 @@ affectsWith grants peers source oid a partial gs = case a of
 -- source's controller, and CR 607.2d's link puts the SOURCE's choices beside it
 -- (SourceContext.sourceContext), since the ability that chose and the affected
 -- clause that reads the choice are printed on the one permanent. Read off the
--- OBJECT and not its card: Object.chosenColor is per-incarnation, and CR 707.6
+-- OBJECT and not its card: Object.chosenColors is per-incarnation, and CR 707.6
 -- leaves a copy to make its own choice, so two permanents of the one printing
 -- answer differently.
 affectedContext :: ObjectId -> Maybe PlayerId.PlayerId -> GameState -> Filter.Context
@@ -3656,7 +3654,7 @@ filterReadsPeers f = case f of
   Filter.Type.SharesCreatureTypeWithBound _ -> False
   Filter.Type.ToughnessLessThanBound _ -> False
   Filter.Type.HasChosenName -> False
-  -- The source's chosen colour arrives on the Context, read off Object.chosenColor
+  -- The source's chosen colour arrives on the Context, read off Object.chosenColors
   -- rather than off a projection; the candidate's own colours come from its
   -- partial, so no PEER is projected.
   Filter.Type.HasChosenColor -> False
@@ -3993,6 +3991,7 @@ quantityReads q = case q of
   Quantity.Type.CastUsing _ -> Set.empty
   Quantity.Type.TagWasSpent {} -> Set.empty
   Quantity.Type.TagWasSpentOfOwnColor {} -> Set.empty
+  Quantity.Type.ChosenColorsItIs -> Set.empty
   Quantity.Type.ManaSpent -> Set.empty
   Quantity.Type.WasToken -> Set.empty
   Quantity.Type.WasAttacking -> Set.empty

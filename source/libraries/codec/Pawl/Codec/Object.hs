@@ -100,7 +100,7 @@ codec = Fields.object $ do
   counters <- Fields.defaulted "counters" Map.empty (Common.multiset (CounterKind.codec Keyword.codec)) Object.counters
   counterTimestamps <- Fields.defaulted "counterTimestamps" Map.empty (Common.keyedList counterTimestamp) Object.counterTimestamps
   attachedTo <- Fields.defaulted "attachedTo" Nothing (Common.maybe Recipient.codec) Object.attachedTo
-  chosenColor <- Fields.defaulted "chosenColor" Nothing (Common.maybe Color.codec) Object.chosenColor
+  chosenColors <- Fields.defaulted "chosenColors" Set.empty (Common.set Color.codec) Object.chosenColors
   chosenSubtype <- Fields.defaulted "chosenSubtype" Nothing (Common.maybe Subtype.codec) Object.chosenSubtype
   chosenNames <- Fields.defaulted "chosenNames" Set.empty (Common.set CardName.codec) Object.chosenNames
   chosenPlayer <- Fields.defaulted "chosenPlayer" Nothing (Common.maybe PlayerId.codec) Object.chosenPlayer
@@ -161,7 +161,7 @@ codec = Fields.object $ do
         Object.counters = counters,
         Object.counterTimestamps = counterTimestamps,
         Object.attachedTo = attachedTo,
-        Object.chosenColor = chosenColor,
+        Object.chosenColors = chosenColors,
         Object.chosenSubtype = chosenSubtype,
         Object.chosenNames = chosenNames,
         Object.chosenPlayer = chosenPlayer,

@@ -1614,7 +1614,7 @@ chosenColorSpec s registry = Spec.describe s "Mana of the chosen color (CR 607.2
   Spec.it s "CR 607.2d a Coldsteel Heart placed with no colour chosen produces nothing" $ do
     coldsteel <- S.printingOf s registry "Coldsteel Heart"
     let (oid, gs) = S.addPermanent coldsteel S.alice (Setup.emptyGame S.bothPlayers)
-    Spec.assertEqWith s "chosenColor is unset" (fmap Object.chosenColor (Game.lookupObject oid gs)) (Just Nothing)
+    Spec.assertEqWith s "chosenColors is unset" (fmap Object.chosenColors (Game.lookupObject oid gs)) (Just Set.empty)
     Spec.assertEqWith s "so it offers no mana" (Mana.manaTypesOf oid gs) []
     Spec.assertEqWith s "and tapping it adds none" (tappedFor S.identityAnswer oid gs) []
     Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Blue)]) gs)) "and it pays for nothing"

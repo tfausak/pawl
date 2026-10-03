@@ -4005,6 +4005,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.CastUsing {} -> []
   Quantity.Type.TagWasSpent {} -> []
   Quantity.Type.TagWasSpentOfOwnColor {} -> []
+  Quantity.Type.ChosenColorsItIs -> []
   Quantity.Type.ManaSpent -> []
   Quantity.Type.WasToken -> []
   Quantity.Type.WasAttacking -> []
@@ -5081,7 +5082,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   -- is what proves the descent.
   EntryRewrite.ChoiceOf options -> concatMap entryOptionFilters options
   EntryRewrite.ChoiceByCoinFlip f -> entryOptionFilters (EntryFlip.heads f) <> entryOptionFilters (EntryFlip.tails f)
-  EntryRewrite.ChooseColor -> []
+  EntryRewrite.ChooseColors {} -> []
   EntryRewrite.ChooseBasicLandType -> []
   EntryRewrite.ChooseCreatureType -> []
   EntryRewrite.ChoosePlayer -> []
@@ -5396,7 +5397,7 @@ blockPermissionFilters permission =
 --     overlays no Filter.Context.sourceAttachedTo.
 --   * AffectedSetFramed -- a static ability's or a combat restriction's own
 --     affected set, matched by Pawl.Engine.Projection.affectsWith through
---     affectedContext, which fills Filter.Context.sourceChosenColor and
+--     affectedContext, which fills Filter.Context.sourceChosenColors and
 --     sourceChosenSubtype (CR 607.2d, Gauntlet of Power, Obelisk of Urd,
 --     Teferi's Moat).
 --   * ActivationCostFramed -- an activated ability's own cost, whose pools in

@@ -260,7 +260,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
   -- atom apart from "any chosen colour on the battlefield": each pumps the
   -- creature of ITS colour and neither pumps the other's. Cast rather than
   -- placed, so each colour is a player's answer travelling CR 614.1c's entry
-  -- rewrite; Object.chosenColor is per-incarnation and CR 707.6 does not copy it,
+  -- rewrite; Object.chosenColors is per-incarnation and CR 707.6 does not copy it,
   -- which is what makes the two answers survive on one board.
   -- The colourless Myr is the third creature neither may reach.
   Spec.it s "CR 607.2d two Gauntlets of Power each pump the creatures of their OWN chosen colour" $ do
@@ -528,7 +528,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     --
     -- CAST rather than S.addPermanent, because the colour choice happens only on
     -- the entry path (Event.runEntry): a Servant placed straight onto the
-    -- battlefield has chosenColor = Nothing and its AddChosenColor adds nothing.
+    -- battlefield has chosenColors = Set.empty and its AddChosenColor adds nothing.
     mountain <- S.printingOf s registry "Mountain"
     paintersServant <- S.printingOf s registry "Painter's Servant"
     slaughterDrone <- S.printingOf s registry "Slaughter Drone"

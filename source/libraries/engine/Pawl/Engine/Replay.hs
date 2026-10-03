@@ -20,7 +20,6 @@ import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.BuybackDecision as BuybackDecision
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CoinFace as CoinFace
-import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.DamageEvent as DamageEvent
@@ -1051,7 +1050,7 @@ defaultAnswer p = case p of
   -- its owner's graveyard as usual (CR 608.2n).
   Prompt.ChooseEncode {} -> Nothing
   -- CR 105.1: any of the five colours is a legal answer.
-  Prompt.ChooseColor {} -> Color.White
+  Prompt.ChooseColor _ _ _ colors -> NonEmpty.head colors
   -- CR 105.4: every candidate is a type Mana.producedTypes offered, so the head
   -- is legal -- the same filter-not-trust fallback Resolve's arm applies to a
   -- wrong answer.

@@ -378,7 +378,7 @@ blankObject zone pid printingId ts =
       Object.counters = Map.empty,
       Object.counterTimestamps = Map.empty,
       Object.attachedTo = Nothing,
-      Object.chosenColor = Nothing,
+      Object.chosenColors = Set.empty,
       Object.chosenSubtype = Nothing,
       Object.chosenNames = Set.empty,
       Object.chosenPlayer = Nothing,
@@ -1463,7 +1463,7 @@ applyCrossings finalSub parent =
                 (Game.attachments oid g)
                 (Object.chosenNames obj)
                 (Object.chosenPlayer obj)
-                (Object.chosenColor obj)
+                (Object.chosenColors obj)
                 (Object.chosenSubtype obj)
                 -- CR 508.1k, the sibling read of the same record.
                 (Game.isAttacking oid g)

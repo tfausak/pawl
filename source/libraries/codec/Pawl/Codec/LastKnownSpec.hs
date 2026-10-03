@@ -49,7 +49,7 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           LastKnown.attached = Set.singleton (ObjectId.MkObjectId 9),
           LastKnown.chosenNames = Set.singleton (CardName.MkCardName (Text.pack "Goblin Piker")),
           LastKnown.chosenPlayer = Just (PlayerId.MkPlayerId 3),
-          LastKnown.chosenColor = Just Color.Green,
+          LastKnown.chosenColors = Set.singleton Color.Green,
           LastKnown.chosenSubtype = Just Subtype.Goblin,
           LastKnown.attacking = False,
           LastKnown.attackTarget = Nothing,
@@ -66,7 +66,7 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           <> ",\"copiable\":"
           <> minimalJson
           <> ",\"attached\":[9]"
-          <> ",\"chosenNames\":[\"Goblin Piker\"],\"chosenPlayer\":3,\"chosenColor\":{\"type\":\"Green\"},\"chosenSubtype\":{\"type\":\"Goblin\"},\"attacking\":false,\"attackTarget\":null,\"blocking\":true,\"protector\":7"
+          <> ",\"chosenNames\":[\"Goblin Piker\"],\"chosenPlayer\":3,\"chosenColors\":[{\"type\":\"Green\"}],\"chosenSubtype\":{\"type\":\"Goblin\"},\"attacking\":false,\"attackTarget\":null,\"blocking\":true,\"protector\":7"
           <> ",\"paidCosts\":[{\"key\":{\"type\":\"Offspring\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}},\"value\":1}]"
           <> ",\"controlClock\":[{\"player\":1,\"clock\":{\"type\":\"SinceLastUpkeep\"}}]"
           <> ",\"zone\":{\"type\":\"Battlefield\"}} "
@@ -88,7 +88,7 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           LastKnown.attached = Set.empty,
           LastKnown.chosenNames = Set.empty,
           LastKnown.chosenPlayer = Nothing,
-          LastKnown.chosenColor = Nothing,
+          LastKnown.chosenColors = Set.empty,
           LastKnown.chosenSubtype = Nothing,
           LastKnown.attacking = True,
           LastKnown.attackTarget = Just (AttackTarget.OfPlaneswalker (ObjectId.MkObjectId 8)),

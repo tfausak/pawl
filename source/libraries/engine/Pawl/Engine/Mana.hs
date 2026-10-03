@@ -221,7 +221,7 @@ noActivations = Activations.MkActivations {Activations.times = 0, Activations.cl
 -- tag, because CR 107.4h reads the SOURCE (productionTagsGiven) and never the
 -- symbol the effect was written with.
 --
--- CR 607.2d's linked pair is resolved by reading Object.chosenColor off the
+-- CR 607.2d's linked pair is resolved by reading Object.chosenColors off the
 -- SOURCE, which is why this takes one: an ability referring to "the chosen
 -- color" means the colour its own object was told to choose. One option, so it
 -- offers no choice; none at all when nothing has been chosen, which for
@@ -235,7 +235,7 @@ producedTypes oid gs production = case production of
       ManaType.Colored
       [Color.White, Color.Blue, Color.Black, Color.Red, Color.Green]
   ManaProduction.Chosen ->
-    fmap ManaType.Colored (Maybe.maybeToList (Game.lookupObject oid gs >>= Object.chosenColor))
+    fmap ManaType.Colored (Set.toList (foldMap Object.chosenColors (Game.lookupObject oid gs)))
   ManaProduction.SnowSymbol -> [ManaType.Colorless]
 
 -- Every ROUTE by which this object could be activated for mana, as the mana ONE

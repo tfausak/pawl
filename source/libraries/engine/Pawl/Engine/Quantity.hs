@@ -629,6 +629,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- A CLASSIFICATION like the arm above, one axis wider: a production tag
         -- and a colour, never an effect's identity.
         Quantity.TagWasSpentOfOwnColor tag -> fmap (\view -> if Set.disjoint (Map.findWithDefault Set.empty tag (Filter.manaSpentTagColors view)) (Filter.colors view) then 0 else 1) mView
+        Quantity.ChosenColorsItIs -> fmap (toInteger . Set.size . Set.intersection (Filter.sourceChosenColors context) . Filter.colors) mView
         -- CR 202.1a's amount, the arm above's read one field over and a COUNT
         -- rather than a 0/1: rule 702.191a's "the amount of mana spent to cast that
         -- spell". Zero for a spell cast for no mana, which is an ordinary answer.
@@ -1297,6 +1298,7 @@ objectSlots quantity = case quantity of
   Quantity.CastUsing _ -> Set.empty
   Quantity.TagWasSpent {} -> Set.empty
   Quantity.TagWasSpentOfOwnColor {} -> Set.empty
+  Quantity.ChosenColorsItIs -> Set.empty
   Quantity.ManaSpent -> Set.empty
   Quantity.WasToken -> Set.empty
   Quantity.WasAttacking -> Set.empty
@@ -1575,6 +1577,7 @@ readsX quantity = case quantity of
   Quantity.CastUsing _ -> False
   Quantity.TagWasSpent {} -> False
   Quantity.TagWasSpentOfOwnColor {} -> False
+  Quantity.ChosenColorsItIs -> False
   Quantity.ManaSpent -> False
   Quantity.WasToken -> False
   Quantity.WasAttacking -> False
