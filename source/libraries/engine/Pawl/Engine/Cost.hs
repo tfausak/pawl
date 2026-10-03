@@ -4653,10 +4653,11 @@ payToll perform began pid charges =
       (paidMana, windows) <-
         if null (ManaCost.unwrap pooled)
           then pure (True, [])
-          -- No subject (ForNeither), so CR 106.6-restricted mana cannot pay a
-          -- combat toll. Exact: every printed restriction names a cast, an
-          -- activation or a special action, and CR 508.1j's toll is none of
-          -- those.
+          -- No subject (ForNeither), so mana a CR 106.6 permission restricts
+          -- cannot pay a combat toll and mana a prohibition restricts can
+          -- (Pawl.Engine.Mana.admitsUnder). Exact: every printed restriction
+          -- names a cast, an activation or a special action, and CR 508.1j's
+          -- toll is none of those.
           else do
             (paid, _, window) <- payManaWindow perform Set.empty Nothing PaymentSubject.ForNeither ManaSpending.AsProduced pid (\mc -> pure (mc, [])) pooled
             pure (paid, [window])

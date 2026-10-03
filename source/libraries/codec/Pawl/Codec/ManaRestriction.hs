@@ -15,7 +15,9 @@ import qualified Pawl.Types.ManaRestriction as ManaRestriction
 -- says "only to turn permanents face up" writes no cast half. The default is a
 -- refusal rather than a permission, so an omitted key never widens what the
 -- printing allows -- and it is also why adding a kind leaves every card file in
--- the pool spelled as it was.
+-- the pool spelled as it was. Under "prohibits" an omitted key is a payment
+-- left open, which is what "can't be spent to cast a nonartifact spell" says
+-- of every payment it does not name.
 --
 -- An object and not a bare filter, which is what the field held before Omen
 -- Hawker: the same predicate means different things depending on which payment
@@ -27,11 +29,13 @@ codec = Fields.object $ do
   keywordActivations <- Fields.defaulted "keywordActivations" Nothing (Common.maybe KeywordDesignator.codec) ManaRestriction.keywordActivations
   unlocks <- Fields.defaulted "unlocks" Nothing (Common.maybe (Filter.codec Keyword.codec)) ManaRestriction.unlocks
   turnsFaceUp <- Fields.defaulted "turnsFaceUp" Nothing (Common.maybe (Filter.codec Keyword.codec)) ManaRestriction.turnsFaceUp
+  prohibits <- Fields.defaulted "prohibits" False Common.boolean ManaRestriction.prohibits
   pure
     ManaRestriction.MkManaRestriction
       { ManaRestriction.casts = casts,
         ManaRestriction.activations = activations,
         ManaRestriction.keywordActivations = keywordActivations,
         ManaRestriction.unlocks = unlocks,
-        ManaRestriction.turnsFaceUp = turnsFaceUp
+        ManaRestriction.turnsFaceUp = turnsFaceUp,
+        ManaRestriction.prohibits = prohibits
       }
