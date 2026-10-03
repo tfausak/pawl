@@ -19,6 +19,7 @@ import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastFrom as CastFrom
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Color as Color
@@ -54,6 +55,7 @@ import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Rounding as Rounding
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Times as Times
 import qualified Pawl.Types.Zone as Zone
@@ -533,6 +535,11 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- keeps a devotion-gated continuous effect from reading its own output.
         Quantity.Devotion (Devotion.MkDevotion ref colors) -> case playersOf ref of
           Just [pid] -> Just (devotionOf viewOf colors pid gs)
+          _ -> Nothing
+        -- CR 700.8a: the size of that player's party, Devotion's arity and
+        -- control-off-the-view for Devotion's reasons. See partySizeOf.
+        Quantity.PartySize ref -> case playersOf ref of
+          Just [pid] -> Just (partySizeOf viewOf pid gs)
           _ -> Nothing
         -- CR 122.1's OBJECT reading, through the injected view exactly as the Power
         -- arm above is -- so this arm never learns whether it is looking at a live
@@ -1268,6 +1275,7 @@ objectSlots quantity = case quantity of
   Quantity.IsActivePlayer _ -> Set.empty
   Quantity.PlayerCounters {} -> Set.empty
   Quantity.Devotion {} -> Set.empty
+  Quantity.PartySize _ -> Set.empty
   Quantity.ObjectCounters _ -> Set.empty
   Quantity.ObjectCountersOfAnyKind -> Set.empty
   Quantity.HasDesignation _ -> Set.empty
@@ -1544,6 +1552,7 @@ readsX quantity = case quantity of
   Quantity.IsActivePlayer _ -> False
   Quantity.PlayerCounters {} -> False
   Quantity.Devotion {} -> False
+  Quantity.PartySize _ -> False
   Quantity.ObjectCounters _ -> False
   Quantity.ObjectCountersOfAnyKind -> False
   Quantity.HasDesignation _ -> False
@@ -1695,6 +1704,31 @@ devotionOf viewOf colors pid gs =
             else []
       counts symbol = any (`Set.member` colors) (symbolColors symbol)
    in toInteger (length (concatMap (filter counts . symbolsOf) (Set.toList (GameState.battlefield gs))))
+
+-- CR 700.8a / 700.8b: how many creatures that player controls can fill
+-- distinct slots among CR 700.8's four creature types, each filling one slot at
+-- most. That is a maximum bipartite matching, not a per-type sum: a changeling
+-- fills one slot, not four. Hall's theorem settles it over the sixteen subsets
+-- of the types: a subset can be filled exactly when each of its own subsets has
+-- at least as many creatures with one of those types.
+--
+-- data/scenarios/cost/cr-700-8b-a-changeling-fills-one-party-slot-so-tazri-takes-3-off.json
+-- is what proves the matching.
+partySizeOf :: Count.ViewOf -> PlayerId.PlayerId -> GameState -> Integer
+partySizeOf viewOf pid gs =
+  let partyTypes = Set.fromList [Subtype.Cleric, Subtype.Rogue, Subtype.Warrior, Subtype.Wizard]
+      slotsOf oid = case viewOf oid of
+        Just view
+          | Filter.controller view == Just pid,
+            Set.member CardType.Creature (Filter.cardTypes view) ->
+              Set.intersection partyTypes (Filter.subtypes view)
+        _ -> Set.empty
+      members = filter (not . Set.null) (fmap slotsOf (Set.toList (GameState.battlefield gs)))
+      fillable types =
+        all
+          (\subset -> length (filter (not . Set.disjoint subset) members) >= Set.size subset)
+          (Set.toList (Set.powerSet types))
+   in toInteger (foldr (max . Set.size) 0 (filter fillable (Set.toList (Set.powerSet partyTypes))))
 
 -- CR 105.2c: colourless is not a colour, so a colourless hybrid half adds none.
 colorOfManaType :: ManaType.ManaType -> Maybe Color.Color

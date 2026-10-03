@@ -1,0 +1,47 @@
+{
+  "description": "CR 608.2h / 707.2 Swords to Plowshares on a Clone of Hill Giant gains the copied power",
+  "note": "The projection tripwire: the last known power is the copiable value the Clone took from bob's Hill Giant (3), not the printed Clone's 0. carol casts the Clone and it resolves; alice answers at instant speed by exiling it, and carol, its controller, goes from 17 to 20 while alice and bob stay put. Bob's Giant is untouched.",
+  "board": {
+    "active": "carol",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "carol",
+        "life": 17,
+        "battlefield": [
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true }
+        ],
+        "hand": [{ "card": "Clone", "label": "clone" }]
+      },
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Plains", "label": "plains" }],
+        "hand": [{ "card": "Swords to Plowshares", "label": "swords" }]
+      },
+      {
+        "name": "bob",
+        "life": 19,
+        "battlefield": [{ "card": "Hill Giant", "label": "giant" }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": { "Cast": { "object": "$clone", "mana": ["Island", "Island#2", "Island#3", "Island#4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": { "ChooseCopyTarget": "$giant" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "check": { "PowerToughness": { "object": "Clone", "power": 3, "toughness": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$swords", "targets": ["Clone"], "mana": ["$plains"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "check": { "Life": { "player": "carol", "life": 20 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "check": { "Count": { "player": "carol", "zone": "Exile", "card": "Clone", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "check": { "Life": { "player": "alice", "life": 20 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "check": { "Life": { "player": "bob", "life": 19 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Hill Giant", "count": 1 } } }
+  ]
+}

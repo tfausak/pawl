@@ -451,6 +451,8 @@ printedBoxQuantity quantity = case quantity of
   -- Blessed by the Sun's "toughness is equal to your devotion to white" is a
   -- characteristic-defining ABILITY (CR 604.3), not a printed box.
   Quantity.Type.Devotion {} -> False
+  -- CR 700.8 reads the board, as Devotion does.
+  Quantity.Type.PartySize {} -> False
   Quantity.Type.ObjectCounters {} -> False
   Quantity.Type.ObjectCountersOfAnyKind -> False
   Quantity.Type.HasDesignation {} -> False

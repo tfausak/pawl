@@ -1,0 +1,242 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Kicker",
+          "value": {
+            "mana": [
+              {
+                "type": "Generic",
+                "value": 1
+              },
+              {
+                "type": "OfType",
+                "value": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Green"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "Kicker",
+          "value": {
+            "mana": [
+              {
+                "type": "OfType",
+                "value": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "White"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Necravolver",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "replacementEffects": [
+        {
+          "condition": {
+            "type": "Compares",
+            "value": {
+              "comparison": {
+                "type": "AtLeast"
+              },
+              "measured": {
+                "type": "TimesPaid",
+                "value": {
+                  "type": "Kicker",
+                  "value": {
+                    "mana": [
+                      {
+                        "type": "Generic",
+                        "value": 1
+                      },
+                      {
+                        "type": "OfType",
+                        "value": {
+                          "type": "Colored",
+                          "value": {
+                            "type": "Green"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              "threshold": {
+                "type": "Literal",
+                "value": 1
+              }
+            }
+          },
+          "effect": {
+            "type": "EntryR",
+            "value": {
+              "matching": {
+                "type": "IsSource"
+              },
+              "rewrite": {
+                "type": "EntersWith",
+                "value": {
+                  "counters": [
+                    {
+                      "count": {
+                        "type": "Literal",
+                        "value": 2
+                      },
+                      "kind": {
+                        "type": "PlusOnePlusOne"
+                      }
+                    }
+                  ],
+                  "keywords": [
+                    {
+                      "type": "Trample"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "condition": {
+            "type": "Compares",
+            "value": {
+              "comparison": {
+                "type": "AtLeast"
+              },
+              "measured": {
+                "type": "TimesPaid",
+                "value": {
+                  "type": "Kicker",
+                  "value": {
+                    "mana": [
+                      {
+                        "type": "OfType",
+                        "value": {
+                          "type": "Colored",
+                          "value": {
+                            "type": "White"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              "threshold": {
+                "type": "Literal",
+                "value": 1
+              }
+            }
+          },
+          "effect": {
+            "type": "EntryR",
+            "value": {
+              "matching": {
+                "type": "IsSource"
+              },
+              "rewrite": {
+                "type": "EntersWith",
+                "value": {
+                  "abilities": [
+                    {
+                      "type": "Triggered",
+                      "value": {
+                        "condition": {
+                          "type": "SelfDealsDamage"
+                        },
+                        "modal": {
+                          "modes": [
+                            {
+                              "clauses": [
+                                {
+                                  "effects": [
+                                    {
+                                      "type": "GainLife",
+                                      "value": {
+                                        "player": {
+                                          "type": "Relative",
+                                          "value": {
+                                            "type": "You"
+                                          }
+                                        },
+                                        "quantity": {
+                                          "type": "InSlot",
+                                          "value": "thatMuch"
+                                        }
+                                      }
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "counters": [
+                    {
+                      "count": {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      "kind": {
+                        "type": "PlusOnePlusOne"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Volver"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

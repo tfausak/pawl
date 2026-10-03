@@ -56,11 +56,10 @@ data GameSettings = MkGameSettings
     -- "opponent" is exact for.
     -- Pawl.Engine.Archenemy.setUp writes CR 904.2's two teams.
     --
-    -- Not implemented: CR 808.2's seating and CR 808.4's starting player, which
-    -- are the rest of the Team vs. Team variant -- pawl's turn order is the
-    -- caller's list and no random team is chosen from it (#2847). CR 808.3a's
-    -- attack multiple players option is the field above, which is on by default,
-    -- so a game with teams gets it without asking. CR 808.5 needs nothing: no
+    -- Not implemented: CR 808.2's seating is unchecked (#4497), and CR 808.4's
+    -- starting player, no random team being chosen from the caller's list
+    -- (#2847). CR 808.3a's attack multiple players option is the field above,
+    -- which is on by default, so a game with teams gets it without asking. CR 808.5 needs nothing: no
     -- Team vs. Team resource is shared (sharedTeamLife is CR 810's and CR 904's),
     -- and one player has never been able to touch another's cards.
     teams :: Teams.Teams,
@@ -71,7 +70,7 @@ data GameSettings = MkGameSettings
     -- Pawl.Engine.Turn.sharesTurn.
     --
     -- Not implemented: CR 805.1's adjacent seating is not checked, the turn
-    -- order being the caller's list (#2847).
+    -- order being the caller's list (#4497).
     sharedTeamTurns :: Bool,
     -- | CR 810.4 / 904.13b: whether each team shares one life total. Off by
     -- default (Pawl.Engine.Setup.emptyGame); Pawl.Engine.Game.lifeSharers reads
