@@ -149,6 +149,8 @@ library codec
     Pawl.Codec.AggregationSpec
     Pawl.Codec.AimedAt
     Pawl.Codec.AimedAtSpec
+    Pawl.Codec.AimedPlayers
+    Pawl.Codec.AimedPlayersSpec
     Pawl.Codec.AlternativeActivationCost
     Pawl.Codec.AlternativeActivationCostSpec
     Pawl.Codec.AlternativeCost
@@ -1943,6 +1945,7 @@ library types
     Pawl.Types.AgainstSlot
     Pawl.Types.Aggregation
     Pawl.Types.AimedAt
+    Pawl.Types.AimedPlayers
     Pawl.Types.AlternativeActivationCost
     Pawl.Types.AlternativeCost
     Pawl.Types.Amass

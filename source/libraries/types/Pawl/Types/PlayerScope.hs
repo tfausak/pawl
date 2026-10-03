@@ -25,7 +25,7 @@ module Pawl.Types.PlayerScope where
 --   * Pawl.Types.ChoosePlayer -- which players a resolving "choose a player"
 --     offers (Stadium Vendors), against the resolving controller; the one
 --     carrier that is an offer rather than an axis of application.
---   * Pawl.Types.PlayerEffect.CantSearchLibraries, Pawl.Types.AimedAt and
+--   * Pawl.Types.PlayerEffect.CantSearchLibraries, Pawl.Types.AimedPlayers and
 --     Pawl.Types.CantAttackPlayer carry it too, each against its own perspective.
 --
 -- The scope is always resolved DYNAMICALLY on both PlayerEffect carriers. CR

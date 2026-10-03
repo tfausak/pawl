@@ -58,6 +58,7 @@ import qualified Pawl.Codec.AfterTurnSpec
 import qualified Pawl.Codec.AgainstSlotSpec
 import qualified Pawl.Codec.AggregationSpec
 import qualified Pawl.Codec.AimedAtSpec
+import qualified Pawl.Codec.AimedPlayersSpec
 import qualified Pawl.Codec.AlternativeActivationCostSpec
 import qualified Pawl.Codec.AlternativeCostSpec
 import qualified Pawl.Codec.AnswerSpec
@@ -873,6 +874,7 @@ spec s registry = do
   Pawl.Codec.AffectedPlayersSpec.spec s
   Pawl.Codec.AffectedSpec.spec s
   Pawl.Codec.AimedAtSpec.spec s
+  Pawl.Codec.AimedPlayersSpec.spec s
   Pawl.Codec.AffectedUnlessSpec.spec s
   Pawl.Codec.AfterTurnSpec.spec s
   Pawl.Codec.AgainstSlotSpec.spec s

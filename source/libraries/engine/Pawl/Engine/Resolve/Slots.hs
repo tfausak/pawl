@@ -29,6 +29,8 @@ import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Types.ActivateManaAbilities as ActivateManaAbilities
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
+import qualified Pawl.Types.AimedAt as AimedAt
+import qualified Pawl.Types.AimedPlayers as AimedPlayers
 import qualified Pawl.Types.Amass as Amass.Type
 import qualified Pawl.Types.AnyNumberDiscard as AnyNumberDiscard
 import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
@@ -799,7 +801,7 @@ effectObjectRefs effect = case effect of
   Effect.ForbidActivation (ForbidActivation.MkForbidActivation _ ref) -> [ref]
   Effect.ForbidUntap (ForbidUntap.MkForbidUntap _ ref) -> [ref]
   -- One side only, and only when a ref names it: the Matching arm is a Filter
-  -- (CR 611.2c's class), and what the attack is aimed at is a PlayerScope.
+  -- (CR 611.2c's class), and what the attack is aimed at is effectPlayerRefs'.
   Effect.ForbidAttack (ForbidAttack.MkForbidAttack _ affected _) -> case affected of
     RestrictedCreatures.Named ref -> [ref]
     RestrictedCreatures.Matching _ -> []
@@ -1008,7 +1010,11 @@ effectPlayerRefs effect = case effect of
     AttackTargetRef.Players ref -> ref : durationPlayerRefs duration
     AttackTargetRef.Permanents _ -> durationPlayerRefs duration
   Effect.ForbidBlock {} -> []
-  Effect.ForbidAttack {} -> []
+  -- The players a slot names, where the restriction is aimed at them (Chaos
+  -- Dragon's "those players").
+  Effect.ForbidAttack (ForbidAttack.MkForbidAttack _ _ aimedAt) -> case fmap AimedAt.defenders aimedAt of
+    Just (AimedPlayers.EachInSlot slot) -> [PlayerRef.EachInSlot slot]
+    _ -> []
   Effect.ForbidBeingBlocked {} -> []
   Effect.ForbidActivation {} -> []
   Effect.ForbidUntap {} -> []
@@ -2395,7 +2401,8 @@ boundSlots effect = case effect of
   -- CR 706.4: the result the roller used, and, where the card reads it, the
   -- other result of the same instruction, for a later effect of this resolution
   -- to read as Quantity.InSlot.
-  Effect.RollDie rollDie -> Set.singleton (RollDie.slot rollDie) <> foldMap Set.singleton (RollDie.other rollDie)
+  -- The players who had the highest result, where several rolled.
+  Effect.RollDie rollDie -> Set.singleton (RollDie.slot rollDie) <> foldMap Set.singleton (RollDie.other rollDie) <> foldMap Set.singleton (RollDie.highest rollDie)
   -- CR 705.2: how many of the instruction's flips the flipping player won (or
   -- how many coins came up heads), and, where the card reads it, how many they
   -- lost, for a later effect of this resolution to read as Quantity.InSlot.

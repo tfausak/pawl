@@ -50,6 +50,7 @@ import qualified Pawl.Types.ActiveEvasion as ActiveEvasion
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.AimedAt as AimedAt
+import qualified Pawl.Types.AimedPlayers as AimedPlayers
 import qualified Pawl.Types.AttackLimitUnless as AttackLimitUnless
 import qualified Pawl.Types.AttackTargetKind as AttackTargetKind
 import qualified Pawl.Types.CantAttackPlayer as CantAttackPlayer
@@ -1051,8 +1052,12 @@ cantAttackPlayer candidates players gs =
   let rows = gathered gs
       stored active = case ActiveAttackProhibition.aimedAt active of
         Nothing -> []
-        Just (AimedAt.MkAimedAt scope kinds) ->
-          let barred = filter (\pid -> PlayerEffect.inScope pid (ActiveAttackProhibition.controller active) gs scope) players
+        Just (AimedAt.MkAimedAt aimed kinds) ->
+          let barred = case aimed of
+                AimedPlayers.Scoped scope -> filter (\pid -> PlayerEffect.inScope pid (ActiveAttackProhibition.controller active) gs scope) players
+                AimedPlayers.BoundPlayer bound -> filter (== bound) players
+                -- Baked as the row is stored, so an unbaked slot names nobody.
+                AimedPlayers.EachInSlot _ -> []
            in do
                 creature <- storedSubjects candidates gs active
                 pid <- barred

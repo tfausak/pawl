@@ -12,7 +12,7 @@ import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 --
 -- Netter en-Dal's is @ForbidAttack UntilEndOfTurn (Named (InSlot target))
 -- Nothing@; Chronomantic Escape's is @ForbidAttack UntilYourNextTurn (Matching
--- creature) (Just (AimedAt You {OfPlayer}))@.
+-- creature) (Just (AimedAt (Scoped You) {OfPlayer}))@.
 --
 -- Two axes where Pawl.Types.ForbidBlock has one, and Pawl.Types.RestrictedCreatures
 -- where it has an ObjectRef: CR 611.2c makes "creatures can't attack you" a class

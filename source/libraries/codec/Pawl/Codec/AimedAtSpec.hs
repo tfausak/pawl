@@ -5,6 +5,7 @@ import qualified Pawl.Codec.AimedAt as AimedAt
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AimedAt as AimedAt
+import qualified Pawl.Types.AimedPlayers as AimedPlayers
 import qualified Pawl.Types.AttackTargetKind as AttackTargetKind
 import qualified Pawl.Types.PlayerScope as PlayerScope
 
@@ -15,9 +16,9 @@ spec s = Spec.describe s "Pawl.Codec.AimedAt" $ do
       s
       AimedAt.codec
       ( AimedAt.MkAimedAt
-          { AimedAt.defenders = PlayerScope.You,
+          { AimedAt.defenders = AimedPlayers.Scoped PlayerScope.You,
             AimedAt.kinds = Set.fromList [AttackTargetKind.OfPlayer, AttackTargetKind.OfPlaneswalker]
           }
       )
-      " {\"defenders\":{\"type\":\"You\"},\"kinds\":[{\"type\":\"OfPlayer\"},{\"type\":\"OfPlaneswalker\"}]} "
+      " {\"defenders\":{\"type\":\"Scoped\",\"value\":{\"type\":\"You\"}},\"kinds\":[{\"type\":\"OfPlayer\"},{\"type\":\"OfPlaneswalker\"}]} "
   Spec.it s "has a schema" $ Common.assertHasSchema s AimedAt.codec

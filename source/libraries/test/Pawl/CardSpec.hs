@@ -6724,14 +6724,15 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- Pawl.Engine.Resolve leaves the slot unbound rather than guessing which of
   -- them the card meant. So a card writing the slot at another count is asking
   -- for a number nothing will ever bind, which compiles and reads as zero. A
-  -- total chooses nothing, so it has no other result either.
+  -- total chooses nothing, so it has no other result either. Nor does an
+  -- instruction several players roll: each roller has their own.
   Spec.it s "a roll binds the other result only where it rolls two dice" $ do
     ps <- S.allPrintings s
     let binds effect = case effect of
           Effect.RollDie rollDie -> Maybe.isJust (RollDie.other rollDie)
           _ -> False
         offends effect = case effect of
-          Effect.RollDie rollDie -> Maybe.isJust (RollDie.other rollDie) && (RollDie.count rollDie /= Quantity.Type.Literal 2 || RollDie.reading rollDie /= DiceReading.ChooseOne)
+          Effect.RollDie rollDie -> Maybe.isJust (RollDie.other rollDie) && (RollDie.count rollDie /= Quantity.Type.Literal 2 || RollDie.reading rollDie /= DiceReading.ChooseOne || RollDie.roller rollDie /= PlayerScope.You)
           _ -> False
         offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
     -- A guard, since a pool binding no other result at all would pass saying

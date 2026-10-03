@@ -106,6 +106,8 @@ import qualified Pawl.Types.ActiveUntapProhibition as ActiveUntapProhibition
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
+import qualified Pawl.Types.AimedAt as AimedAt
+import qualified Pawl.Types.AimedPlayers as AimedPlayers
 import qualified Pawl.Types.Amass as Amass.Type
 import qualified Pawl.Types.AnyNumberDiscard as AnyNumberDiscard
 import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
@@ -4482,10 +4484,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- per die on its natural result, and then `adjusting`, once every die is up.
   --
   -- CR 706.1's roll is also the event TriggerCondition.PlayerRollsDice watches
-  -- (Feywild Trickster). Recorded under `controller`, not `source`: rule 706.1's
-  -- instruction is aimed at a PLAYER, RollDie names none of its own, and an
-  -- unnamed player on a resolving object is CR 109.5's "you" -- its controller. A
-  -- card telling ANOTHER player to roll would put the seat on Pawl.Types.RollDie.
+  -- (Feywild Trickster). Recorded under each ROLLER, not `source`: rule 706.1's
+  -- instruction is aimed at a PLAYER, RollDie's `roller`, read against CR
+  -- 109.5's "you" -- the resolving controller. Several rollers throw in APNAP
+  -- order (CR 101.4), each through throwDice as the player CR 706.2b's pick and
+  -- CR 706.2a's modifiers belong to, and each chooses their own CR 706.4 result.
   --
   -- One writer per road: Prompt.RollDie is asked from this arm and from
   -- Effect.Reroll below, and each records the roll it throws -- a reroll inside
@@ -4493,7 +4496,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   --
   -- Recorded AFTER the binding, so a trigger placed by CR 603.3 sees the same
   -- state a later effect of this resolution would. Nothing observes the order --
-  -- the trigger goes on the stack only once this resolution finishes.
+  -- the trigger goes on the stack only once this resolution finishes. Where
+  -- several roll, `slot` binds the highest result any of them used and
+  -- `highest` every player who had it, ties included (Chaos Dragon).
   --
   -- ONE ENTRY PER INSTRUCTION, however many dice CR 706.1's count named, where
   -- FlipCoin below records one per coin: the condition reading this event is
@@ -4536,38 +4541,49 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           pure $ case RollDie.modifier rollDie of
             Nothing -> 0
             Just quantity -> Maybe.fromMaybe 0 (Quantity.evaluateFor viewOf context gs resolving source quantity)
-    (results, throwers) <- throwDice controller sides named perDie
-    case RollDie.reading rollDie of
-      -- CR 706.4's total: every result read at once, so there is nothing to
-      -- choose, and the total of no dice is zero rather than unbound.
-      DiceReading.Total -> State.modify' (bindAmountSlot resolving source (RollDie.slot rollDie) (sum results))
-      DiceReading.ChooseOne -> Foldable.for_ (NonEmpty.nonEmpty results) $ \offered -> do
-        gs <- State.get
-        -- CR 706.4: WHICH result the instruction uses, where it threw more than
-        -- one ("roll two d6 and choose one result"). A choice and not a roll, so
-        -- it goes through Game.choose and CR 723.5's controller may make it.
-        -- Elided where every result is the same number: both bindings below come
-        -- out the same whichever die is named, so no board can tell the answers
-        -- apart. FILTERED, NOT TRUSTED, the ChooseBolster posture: an index past
-        -- the end takes the first die rolled.
-        index <-
-          if all (== NonEmpty.head offered) (NonEmpty.tail offered)
-            then pure 0
-            else do
-              answer <- Game.choose (Prompt.ChooseDieResult (Decide.deciderFor controller gs) controller resolving offered)
-              pure (if answer < List.genericLength results then answer else 0)
-        State.modify' (bindAmountSlot resolving source (RollDie.slot rollDie) (Replacement.at results index (NonEmpty.head offered)))
-        -- CR 706.4's "the other result", off the same throw rather than re-derived
-        -- from the count, FlipCoin's `misses` below and for its reason. Only a
-        -- two-die instruction has an "other": at any other count what is left is
-        -- not one number, and the slot stays unbound rather than guessing which of
-        -- them the card meant. Pawl.CardSpec's lint keeps data/cards/ to counts
-        -- this can answer for.
-        Foldable.for_ (RollDie.other rollDie) $ \other ->
-          case fmap snd (filter (\(i, _) -> i /= index) (zip [0 ..] results)) of
-            [rest] -> State.modify' (bindAmountSlot resolving source other rest)
-            _ -> pure ()
-    Monad.unless (null results) (recordRoll controller throwers results)
+        rollers = filter (`elem` Maybe.fromMaybe [] (PlayerEffect.playersInScope (Just controller) before (RollDie.roller rollDie))) (Game.apnapOrder before)
+    rolled <- Monad.forM rollers $ \roller -> do
+      (results, throwers) <- throwDice roller sides named perDie
+      used <- case RollDie.reading rollDie of
+        -- CR 706.4's total: every result read at once, so there is nothing to
+        -- choose, and the total of no dice is zero rather than unbound.
+        DiceReading.Total -> pure (Just (sum results))
+        DiceReading.ChooseOne -> Monad.forM (NonEmpty.nonEmpty results) $ \offered -> do
+          gs <- State.get
+          -- CR 706.4: WHICH result the instruction uses, where it threw more
+          -- than one ("roll two d6 and choose one result"). A choice and not a
+          -- roll, so it goes through Game.choose and CR 723.5's controller may
+          -- make it. Elided where every result is the same number: both
+          -- bindings below come out the same whichever die is named, so no
+          -- board can tell the answers apart. FILTERED, NOT TRUSTED, the
+          -- ChooseBolster posture: an index past the end takes the first die
+          -- rolled.
+          index <-
+            if all (== NonEmpty.head offered) (NonEmpty.tail offered)
+              then pure 0
+              else do
+                answer <- Game.choose (Prompt.ChooseDieResult (Decide.deciderFor roller gs) roller resolving offered)
+                pure (if answer < List.genericLength results then answer else 0)
+          -- CR 706.4's "the other result", off the same throw rather than
+          -- re-derived from the count, FlipCoin's `misses` below and for its
+          -- reason. Only a two-die instruction has an "other": at any other
+          -- count what is left is not one number, and the slot stays unbound
+          -- rather than guessing which of them the card meant. Pawl.CardSpec's
+          -- lint keeps data/cards/ to counts this can answer for, and to one
+          -- roller.
+          Foldable.for_ (RollDie.other rollDie) $ \other ->
+            case fmap snd (filter (\(i, _) -> i /= index) (zip [0 ..] results)) of
+              [rest] -> State.modify' (bindAmountSlot resolving source other rest)
+              _ -> pure ()
+          pure (Replacement.at results index (NonEmpty.head offered))
+      pure (roller, used, throwers, results)
+    let top = fmap maximum (NonEmpty.nonEmpty [n | (_, Just n, _, _) <- rolled])
+    Foldable.for_ top $ \n -> do
+      State.modify' (bindAmountSlot resolving source (RollDie.slot rollDie) n)
+      Foldable.for_ (RollDie.highest rollDie) $ \slot ->
+        State.modify' (bindPlayerSlot resolving slot (Set.fromList [roller | (roller, Just m, _, _) <- rolled, m == n]))
+    Foldable.for_ rolled $ \(roller, _, throwers, results) ->
+      Monad.unless (null results) (recordRoll roller throwers results)
   -- CR 706.2b's reroll, thrown by the ability Goblin Bookie activates inside
   -- throwDice's window: the same die, the new face filtered back to
   -- CR 706.1a's range, and handed back through GameState.rerolledTo. No window
@@ -4605,8 +4621,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   --
   -- CR 705.1's flip is also the event TriggerCondition's PlayerWinsCoinFlip and
   -- PlayerLosesCoinFlip watch (Tavern Scoundrel, Karplusan Minotaur), recorded
-  -- under `controller` for the reason the
-  -- roll above gives: the instruction is aimed at a player, Pawl.Types.FlipCoin
+  -- under `controller`: the instruction is aimed at a player, Pawl.Types.FlipCoin
   -- names none of its own, and CR 705.2's last sentence keeps every other seat
   -- out of it. EVERY coin is recorded, won or lost -- Pawl.Types.CoinFlipped
   -- says why the outcome is a field rather than the presence of an entry -- and
@@ -8049,20 +8064,26 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         let subjects = case affected of
               RestrictedCreatures.Named ref -> fmap RestrictedCreatures.Named (objectRefObjects legal resolving controller source gs ref)
               RestrictedCreatures.Matching f -> [RestrictedCreatures.Matching (Filter.bakeBound (Binding.playersIn legal) f)]
+            -- A slot's players baked now, one row each, for the class's reason:
+            -- the binding is gone once this resolution is over. A slot naming
+            -- nobody stores nothing (Chaos Dragon's "those players").
+            aims = case aimedAt of
+              Just (AimedAt.MkAimedAt (AimedPlayers.EachInSlot slot) kinds) ->
+                fmap (\pid -> Just (AimedAt.MkAimedAt (AimedPlayers.BoundPlayer pid) kinds)) (playerRefPlayers legal controller gs (PlayerRef.EachInSlot slot))
+              _ -> [aimedAt]
             (ts, gs1) = Game.freshTimestamp gs
-            stored =
-              fmap
-                ( \subject ->
-                    ActiveAttackProhibition.MkActiveAttackProhibition
-                      { ActiveAttackProhibition.source = source,
-                        ActiveAttackProhibition.controller = controller,
-                        ActiveAttackProhibition.timestamp = ts,
-                        ActiveAttackProhibition.expiry = expiry,
-                        ActiveAttackProhibition.affected = subject,
-                        ActiveAttackProhibition.aimedAt = aimedAt
-                      }
-                )
-                subjects
+            stored = do
+              subject <- subjects
+              aim <- aims
+              pure
+                ActiveAttackProhibition.MkActiveAttackProhibition
+                  { ActiveAttackProhibition.source = source,
+                    ActiveAttackProhibition.controller = controller,
+                    ActiveAttackProhibition.timestamp = ts,
+                    ActiveAttackProhibition.expiry = expiry,
+                    ActiveAttackProhibition.affected = subject,
+                    ActiveAttackProhibition.aimedAt = aim
+                  }
          in gs1 {GameState.attackProhibitions = stored <> GameState.attackProhibitions gs1}
   Effect.ForbidBeingBlocked (ForbidBeingBlocked.MkForbidBeingBlocked duration f) ->
     -- CR 509.1b / 611.2c: store ONE row for the class, ForbidAttack's Matching

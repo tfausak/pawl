@@ -2,8 +2,8 @@
 
 module Pawl.Codec.AimedAt where
 
+import qualified Pawl.Codec.AimedPlayers as AimedPlayers
 import qualified Pawl.Codec.AttackTargetKind as AttackTargetKind
-import qualified Pawl.Codec.PlayerScope as PlayerScope
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
@@ -14,7 +14,7 @@ import qualified Pawl.Types.AimedAt as AimedAt
 -- sentence itself.
 codec :: Codec.Codec AimedAt.AimedAt
 codec = Fields.object $ do
-  defenders <- Fields.required "defenders" PlayerScope.codec AimedAt.defenders
+  defenders <- Fields.required "defenders" AimedPlayers.codec AimedAt.defenders
   kinds <- Fields.required "kinds" (Common.set AttackTargetKind.codec) AimedAt.kinds
   pure
     AimedAt.MkAimedAt
