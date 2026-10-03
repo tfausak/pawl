@@ -54,6 +54,7 @@ data GameSettings = MkGameSettings
     -- game that is not played between teams -- every game pawl started before
     -- this field existed, and the one CR 806.1's free-for-all reading of
     -- "opponent" is exact for.
+    -- Pawl.Engine.Archenemy.setUp writes CR 904.2's two teams.
     --
     -- Not implemented: CR 808.2's seating and CR 808.4's starting player, which
     -- are the rest of the Team vs. Team variant -- pawl's turn order is the
@@ -65,7 +66,8 @@ data GameSettings = MkGameSettings
     teams :: Teams.Teams,
     -- | CR 805.1: whether each team takes its turns together, every member of
     -- the active team being an active player (CR 805.4a, 805.9). Off by
-    -- default (Pawl.Engine.Setup.emptyGame), and read through
+    -- default (Pawl.Engine.Setup.emptyGame), on in an Archenemy game
+    -- (Pawl.Engine.Archenemy.setUp, CR 904.2), and read through
     -- Pawl.Engine.Turn.sharesTurn.
     --
     -- Not implemented: CR 805.1's adjacent seating is not checked, the turn

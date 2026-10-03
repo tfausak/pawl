@@ -8,12 +8,8 @@
 -- brought a scheme deck is an archenemy (isArchenemy). CR 904.12b's Supervillain
 -- Rumble, where every player is one, is that same reading.
 --
--- WHAT IS NOT IMPLEMENTED:
---
---   * CR 904.2's team structure and CR 904.6's first turn, which are the
---     caller's settings and turn order (#4315).
---   * CR 904.13d's scheme deck construction, deck legality being unchecked
---     (#4458).
+-- Not implemented: CR 904.13d's scheme deck construction, deck legality being
+-- unchecked (#4458).
 module Pawl.Engine.Archenemy where
 
 import qualified Control.Monad as Monad
@@ -27,8 +23,11 @@ import qualified Pawl.Engine.Event.Trigger as Trigger
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Scheme as Scheme
+import qualified Pawl.Types.AttackOption as AttackOption
+import qualified Pawl.Types.Deck as Deck
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
@@ -38,6 +37,8 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.SchemeSetInMotion as SchemeSetInMotion
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.TeamId as TeamId
+import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 
@@ -49,6 +50,31 @@ deckOf pid gs = foldMap Foldable.toList (Map.lookup pid (GameState.schemeDecks g
 -- deck.
 isArchenemy :: PlayerId -> GameState -> Bool
 isArchenemy pid gs = Map.member pid (GameState.schemeDecks gs)
+
+-- | CR 904.2a: the one player of this matchup bringing a scheme deck, when
+-- exactly one does. Nothing for CR 904.12's Supervillain Rumble, whose every
+-- player is an archenemy and which keeps a random starting player (CR
+-- 904.12c), nor for a game with no archenemy.
+sole :: [(PlayerId, Deck.Deck)] -> Maybe PlayerId
+sole matchup = case [pid | (pid, deck) <- matchup, not (Map.null (Deck.schemes deck))] of
+  [pid] -> Just pid
+  _ -> Nothing
+
+-- | CR 904.2: an Archenemy game's settings -- two teams, this archenemy alone
+-- on one (CR 904.2a) and every other seat on the other (CR 904.2b), with the
+-- attack multiple players and shared team turns options (CR 805.1). No choice
+-- is made: CR 904.13's Commander option keeps the same two teams.
+setUp :: PlayerId -> GameState -> GameState
+setUp archenemy gs =
+  let teamOf pid = TeamId.MkTeamId (if pid == archenemy then 0 else 1)
+   in gs
+        { GameState.settings =
+            (GameState.settings gs)
+              { GameSettings.teams = Teams.MkTeams (Map.fromList [(pid, teamOf pid) | pid <- GameState.turnOrder gs]),
+                GameSettings.sharedTeamTurns = True,
+                GameSettings.attackOption = Just AttackOption.MultiplePlayers
+              }
+        }
 
 -- | CR 904.5: the archenemy starts at 40 life where every other player starts
 -- at 20, so 20 more.

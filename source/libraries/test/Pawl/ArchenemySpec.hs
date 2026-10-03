@@ -20,6 +20,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -52,9 +53,24 @@ spec s registry = Spec.describe s "Pawl.Engine.Archenemy" $ do
     Spec.assertEqWith s "none is face up" (Archenemy.faceUp started) []
     Spec.assertEqWith s "and none is in her library" (length (Game.zoneMembers Zone.Library S.alice started)) 13
 
+  -- CR 904.6 / 904.2 through Setup.newGame: carol, seated last, brings the only
+  -- scheme deck. The pair differs only in bob bringing one too, CR 904.12's
+  -- Supervillain Rumble: a free-for-all from the head of the order.
+  Spec.it s "CR 904.6 the archenemy takes the first turn, and CR 904.2 the rest are one team sharing turns" $ do
+    forest <- S.printingOf s registry "Forest"
+    look <- S.printingOf s registry "Look Skyward and Despair"
+    let plain = Deck.fromCards (Map.singleton forest 20)
+        schemer = plain {Deck.schemes = Map.singleton look 2}
+        started bobs = S.runPure S.identityAnswer (Setup.emptyGame S.threePlayers) (Setup.newGame Resolve.performHandAction ((S.alice, plain) NonEmpty.:| [(S.bob, bobs), (S.carol, schemer)]))
+        sides gs = (fmap (`Game.opponentsOf` gs) [S.alice, S.bob, S.carol], Turn.sharesTurn gs S.alice S.bob)
+    Spec.assertEqWith s "CR 904.6 carol takes the first turn, the cyclic order kept" (GameState.activePlayer (started plain), GameState.turnOrder (started plain)) (S.carol, [S.carol, S.alice, S.bob])
+    Spec.assertEqWith s "CR 904.2 alice and bob are teammates sharing turns, each carol's opponent" (sides (started plain)) ([[S.carol], [S.carol], [S.alice, S.bob]], True)
+    Spec.assertEqWith s "CR 904.12c with two archenemies alice starts a free-for-all" (GameState.activePlayer (started schemer), sides (started schemer)) (S.alice, ([[S.bob, S.carol], [S.alice, S.carol], [S.alice, S.bob]], False))
+
   -- CR 904.13b / 904.13c through Setup.newGame: a three-seat Commander game in
-  -- which alice brings the scheme deck and bob and carol are the opposing team.
-  -- The pair of starts differs only in GameSettings.sharedTeamLife. Bob loses
+  -- which alice brings the scheme deck and bob and carol are the opposing team,
+  -- the teams CR 904.2 derives from the scheme deck alone. The pair of starts
+  -- differs only in GameSettings.sharedTeamLife. Bob loses
   -- 7, which carol's total shows (CR 810.9a). From there, carol taking ten
   -- poison loses alone, and bob losing the other 53 takes the whole team.
   Spec.it s "CR 904.13b the opposing team shares one 60-point life total, and CR 904.13c keeps poison per player" $ do
@@ -64,7 +80,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Archenemy" $ do
     let commanderDeck = (Deck.fromCards (Map.singleton forest 20)) {Deck.commander = Set.singleton shimatsu}
         alices = commanderDeck {Deck.schemes = Map.singleton look 2}
         teamed shared =
-          let gs = S.inTeams [[S.bob, S.carol]] (Setup.emptyGame S.threePlayers)
+          let gs = Setup.emptyGame S.threePlayers
            in gs {GameState.settings = (GameState.settings gs) {GameSettings.sharedTeamLife = shared}}
         started shared = S.runPure S.identityAnswer (teamed shared) (Setup.newGame Resolve.performHandAction ((S.alice, alices) NonEmpty.:| [(S.bob, commanderDeck), (S.carol, commanderDeck)]))
         lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
