@@ -1,0 +1,125 @@
+{
+  "description": "CR 700.8b a changeling fills one party slot, so Tazri takes {3} off and leaves one of three W floating",
+  "note": "Alice's party is the Cleric, one Rogue and the changeling in a third slot: 3. A per-type sum, or a count of her party-typed creatures, says 4 and leaves two W; so does counting bob's Wizard, or her Warrior Equipment, which is no creature (CR 700.8). A changeling taking the Rogue slot greedily says 2, which does not pay. The Battle-Axe then attaches to Tazri, a Warrior entering.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "manaPool": "WWW",
+        "battlefield": [
+          {
+            "card": "Woodland Changeling",
+            "ready": true
+          },
+          {
+            "card": "Merfolk Spy",
+            "ready": true
+          },
+          {
+            "card": "Merfolk Spy",
+            "ready": true
+          },
+          {
+            "card": "Cabal Evangel",
+            "ready": true
+          },
+          {
+            "card": "Obsidian Battle-Axe",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Tazri, Beacon of Unity",
+            "label": "tazri"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Prodigal Sorcerer",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$tazri",
+          "mana": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "ManaPool",
+          "player": "alice",
+          "is": [
+            {
+              "manaType": {
+                "type": "Colored",
+                "value": {
+                  "type": "White"
+                }
+              },
+              "tags": [],
+              "retention": {
+                "type": "Ordinary"
+              },
+              "restriction": null,
+              "rider": null,
+              "sourceChosenSubtype": null
+            }
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "ChooseOptional": {
+          "type": "Exercises"
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Tazri, Beacon of Unity",
+        "count": 1
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Tazri, Beacon of Unity",
+        "power": 6,
+        "toughness": 7
+      }
+    }
+  ]
+}

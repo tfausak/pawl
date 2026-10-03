@@ -79,6 +79,7 @@ codec =
       -- Pawl.Types.Devotion holds as a SET so "to black and green" is one reading
       -- rather than two summed.
       Arm.payload "Devotion" Devotion.codec Quantity.Devotion (\x -> case x of Quantity.Devotion y -> Just y; _ -> Nothing),
+      Arm.payload "PartySize" PlayerRef.codec Quantity.PartySize (\x -> case x of Quantity.PartySize y -> Just y; _ -> Nothing),
       -- CR 122.1's OBJECT reading: only a kind on the wire, since the object is
       -- whichever one the quantity is evaluated against (Pawl.Types.Quantity).
       Arm.payload "ObjectCounters" (CounterKind.codec Keyword.codec) Quantity.ObjectCounters (\x -> case x of Quantity.ObjectCounters y -> Just y; _ -> Nothing),
@@ -241,6 +242,7 @@ tagOf x = case x of
   Quantity.IsActivePlayer {} -> "IsActivePlayer"
   Quantity.PlayerCounters {} -> "PlayerCounters"
   Quantity.Devotion {} -> "Devotion"
+  Quantity.PartySize {} -> "PartySize"
   Quantity.ObjectCounters {} -> "ObjectCounters"
   Quantity.ObjectCountersOfAnyKind {} -> "ObjectCountersOfAnyKind"
   Quantity.HasDesignation {} -> "HasDesignation"

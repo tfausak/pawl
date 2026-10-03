@@ -3964,6 +3964,9 @@ quantityReads q = case q of
   -- and its mana cost. Only the first is an Aspect: no Modification writes a
   -- mana cost, so CR 613.8a's dependency cannot turn on that half.
   Quantity.Type.Devotion {} -> Set.singleton Controller
+  -- CR 700.8 reads who controls each permanent and whether it is a creature of
+  -- one of four creature types.
+  Quantity.Type.PartySize _ -> Set.fromList [Controller, Types, Subtypes]
   Quantity.Type.ObjectCounters _ -> Set.empty
   Quantity.Type.ObjectCountersOfAnyKind -> Set.empty
   Quantity.Type.HasDesignation _ -> Set.empty
