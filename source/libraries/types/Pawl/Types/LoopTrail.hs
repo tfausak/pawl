@@ -9,8 +9,9 @@ import qualified Pawl.Types.StateDigest as StateDigest
 -- | CR 732.3: the priority choices one priority loop has seen, and where each
 -- game state recurred among them. Loop-local, so no codec.
 data LoopTrail = MkLoopTrail
-  { -- | Each choice taken at a prompt that offered one, oldest first.
-    choices :: Seq.Seq (PlayerId.PlayerId, Action.Action),
+  { -- | Each choice taken at a prompt that offered one, oldest first, with
+    -- the state it was taken in.
+    choices :: Seq.Seq (StateDigest.StateDigest, PlayerId.PlayerId, Action.Action),
     -- | Each digested state's positions in `choices`, newest first.
     seen :: Map.Map StateDigest.StateDigest [Int],
     -- | The latest choice and the state it was made in, held until the next
