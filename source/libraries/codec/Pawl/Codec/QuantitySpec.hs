@@ -635,6 +635,13 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       Quantity.PermanentsDiedThisTurn
       " {\"type\":\"PermanentsDiedThisTurn\"} "
+  -- CR 508.1a: the combat's record, naming no player.
+  Spec.it s "AttackersDeclaredThisCombat is nullary" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      Quantity.AttackersDeclaredThisCombat
+      " {\"type\":\"AttackersDeclaredThisCombat\"} "
   -- CR 702.185c: the family is the payload, as CastUsing's is.
   Spec.it s "SpellsCastUsingThisTurn" $
     Common.assertCodec

@@ -2150,6 +2150,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.ObjectCountersOfAnyKind -> quantity
   Quantity.Type.OpponentsAttacked _ -> quantity
   Quantity.Type.AttackersDeclaredThisTurn _ -> quantity
+  Quantity.Type.AttackersDeclaredThisCombat -> quantity
   Quantity.Type.AttackedInLastTurnOf _ -> quantity
   Quantity.Type.AttackersInTheirLastTurn _ -> quantity
   Quantity.Type.CardsDiscardedThisTurn _ -> quantity

@@ -177,7 +177,8 @@ data Combat = MkCombat
     declaredAttackedThisStep :: Set.Set AttackTarget.AttackTarget,
     -- | CR 508.1a: the creatures DECLARED as attackers this combat phase.
     -- Hollow Warrior's "not declared as an attacking or blocking creature this
-    -- combat" is what reads it, through Filter.DeclaredAttackerThisCombat.
+    -- combat" reads it through Filter.DeclaredAttackerThisCombat, and Kytheon,
+    -- Hero of Akros counts it through Quantity.AttackersDeclaredThisCombat.
     --
     -- SEPARATE from `attackers` and monotone within the phase, for the reason
     -- `attacked` above is separate from it: CR 508.1k keeps a creature attacking
@@ -189,7 +190,7 @@ data Combat = MkCombat
     --
     -- Written by Pawl.Engine.Combat.attemptAttackDeclaration BEFORE CR 508.1j's
     -- payment and after CR 508.1's preamble is captured, which is the ordering
-    -- the card needs and the only reason this is not a fold over
+    -- Hollow Warrior needs and the only reason this is not a fold over
     -- GameEvent.AttackerDeclared: CR 508.1k records the attack after the toll is
     -- paid, so an event-log reading is False for exactly the creatures being
     -- declared alongside the one paying. An unpayable toll rewinds the write
