@@ -70,6 +70,11 @@ data SpellCast = MkSpellCast
     -- The ordinal above counts casts without regard to it. Scryfall
     -- o:"spell during combat", 2026-09-25, found Zuko alone, which prints no
     -- ordinal.
-    phase :: Maybe PhaseSelector.PhaseSelector
+    phase :: Maybe PhaseSelector.PhaseSelector,
+    -- | Magecraft's "whenever you cast OR COPY" (CR 207.2c): also fires as a
+    -- copy of a matching spell is put onto the stack, which CR 707.10 says is
+    -- not cast (GameEvent.SpellCopied). A copy came from no zone and is no
+    -- cast of the turn, so it never satisfies `zone` or `ordinal` above.
+    copies :: Bool
   }
   deriving (Eq, Ord, Show)

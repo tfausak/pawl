@@ -3977,6 +3977,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.Count count -> concatMap quantityKindFilters (countQuantities count)
   Quantity.Type.ManaCount _ -> []
   Quantity.Type.LifeTotal _ -> []
+  Quantity.Type.StartingLifeTotal _ -> []
   Quantity.Type.Speed _ -> []
   Quantity.Type.IsMonarch _ -> []
   Quantity.Type.HasPlayerDesignation {} -> []
@@ -4459,7 +4460,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PermanentGetsCounters (CounterPlacement.MkCounterPlacement kind f) -> unframed [f] <> counterKindFilters kind
   -- CR 601.2i's "whenever you cast a [type] spell" carries one directly, over
   -- the spell rather than over a permanent.
-  TriggerCondition.SpellCast (SpellCast.MkSpellCast f _ _ _ _) -> unframed [f]
+  TriggerCondition.SpellCast (SpellCast.MkSpellCast f _ _ _ _ _) -> unframed [f]
   -- "This spell" names the bearer and needs no Filter to say so.
   TriggerCondition.SelfCast -> []
   -- Rule 702.21a names the bearer as well, and asks only a relation of the

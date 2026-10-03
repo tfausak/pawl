@@ -119,6 +119,12 @@ startingLifeOf settings seats pid commander modifier =
         Just team | GameSettings.sharedTeamLife settings -> teamStartingLife commander (length (filter (== team) (Map.elems teams)))
         _ -> startingLife settings seats commander modifier
 
+-- CR 902.4 / 904.5: what this player's vanguard and scheme deck add to
+-- startingLife's base, read off a board where CR 313.2 has kept every vanguard
+-- in the command zone.
+lifeModifierOf :: PlayerId -> GameState -> Integer
+lifeModifierOf pid gs = Vanguard.lifeModifierOf pid gs + (if Archenemy.isArchenemy pid gs then Archenemy.lifeBonus else 0)
+
 -- CR 810.4 / 810.11: a Two-Headed Giant team starts at 30, and 15 more for each
 -- member beyond the second. CR 904.13b: an Archenemy Commander team, the
 -- archenemy's included, starts at 60 whatever its size. A designated commander
@@ -162,6 +168,7 @@ emptyGame order =
       -- CR 102.4 / CR 808.1: and a game not played between teams, which every
       -- variant but CR 808's, CR 809's, CR 810's and CR 811's is.
       settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.sharedTeamLife = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False, GameSettings.emperors = Emperors.none}
+      total = startingLife settings (length order_) Nothing 0
       newPlayer pid =
         ( pid,
           Player.MkPlayer
@@ -169,7 +176,8 @@ emptyGame order =
               -- createDeck below; no deck has been read yet here.
               -- CR 902.4's modifier is zero for the same reason: no vanguard card
               -- is in a command zone this function leaves empty.
-              Player.life = startingLife settings (length order_) Nothing 0,
+              Player.life = total,
+              Player.startingLife = total,
               Player.status = Status.Playing,
               Player.counters = Map.empty,
               -- CR 701.54c: the Ring has tempted nobody in a game that has not
@@ -460,7 +468,8 @@ createDeck pid deck = do
           -- CR 400.11a: the sideboard is recorded on the player for the same
           -- reason and no object is minted for it either. CR 400.11c is what
           -- keeps anything else from reaching these until a card brings one in.
-          Map.adjust (\p -> p {Player.life = startingLifeOf (GameState.settings gs) (length (GameState.turnOrder gs)) pid (Deck.commander deck) (Vanguard.lifeModifierOf pid gs + (if Map.null (Deck.schemes deck) then 0 else Archenemy.lifeBonus)), Player.dungeons = Set.fromList dungeonIds, Player.outsideTheGame = Map.fromList sideboardIds}) pid (GameState.players gs)
+          let total = startingLifeOf (GameState.settings gs) (length (GameState.turnOrder gs)) pid (Deck.commander deck) (Vanguard.lifeModifierOf pid gs + (if Map.null (Deck.schemes deck) then 0 else Archenemy.lifeBonus))
+           in Map.adjust (\p -> p {Player.life = total, Player.startingLife = total, Player.dungeons = Set.fromList dungeonIds, Player.outsideTheGame = Map.fromList sideboardIds}) pid (GameState.players gs)
       }
   -- CR 717.2: the Attraction deck begins in the command zone, and is neither in
   -- the library nor, below, in the starting deck.
@@ -879,8 +888,8 @@ rotateTo starter order = case break (== starter) order of
 -- Takes the life modifier per player for the same reason it takes the settings:
 -- CR 902.4's number is read off a card in the command zone, and this function is
 -- handed a players map rather than the state that holds one. Both callers pass
--- Pawl.Engine.Vanguard.lifeModifierOf against the board the rebuild starts from,
--- where CR 313.2 has kept every vanguard sitting since the game began.
+-- lifeModifierOf against the board the rebuild starts from, where CR 313.2 has
+-- kept every vanguard sitting since the game began.
 resetPlayers :: GameSettings.GameSettings -> Int -> (PlayerId -> Integer) -> Map.Map PlayerId Player.Player -> Map.Map PlayerId Player.Player
 resetPlayers settings seats lifeModifier players =
   let reset pid player = case Player.status player of
@@ -896,6 +905,7 @@ resetPlayers settings seats lifeModifier players =
               -- forbids the vanguard card to leave the command zone, so the card
               -- the modifier is read off is still there to be read.
               Player.life = startingLifeOf settings seats pid (Player.commander player) (lifeModifier pid),
+              Player.startingLife = startingLifeOf settings seats pid (Player.commander player) (lifeModifier pid),
               Player.counters = Map.empty,
               -- CR 727.1 / 729.2: a NEW game, so the Ring has tempted nobody in
               -- it. The command zone this line's callers empty is where the
@@ -972,7 +982,7 @@ restartGame perform exempt starter = do
             -- CR 902.4: the modifier is read off `gs`, the board the restart
             -- starts from, where CR 313.2 has kept every vanguard card since the
             -- game began -- and startGameFromCards leaves it there.
-            GameState.players = resetPlayers (GameState.settings gs) (length order) (\pid -> Vanguard.lifeModifierOf pid gs + (if Archenemy.isArchenemy pid gs then Archenemy.lifeBonus else 0)) (GameState.players gs),
+            GameState.players = resetPlayers (GameState.settings gs) (length order) (`lifeModifierOf` gs) (GameState.players gs),
             GameState.manaPool = Map.empty,
             GameState.combat = Combat.emptyCombat,
             GameState.events = Seq.empty,
@@ -1221,7 +1231,7 @@ subgameStateFrom starter parent =
           -- holds every vanguard card at this point -- `cmdIds` below is what
           -- moves them into the subgame, and it is computed from the same board.
           -- CR 103.4e likewise: the archenemy's scheme deck is the one moving in.
-          GameState.players = resetPlayers (GameState.settings parent) (length order) (\pid -> Vanguard.lifeModifierOf pid parent + (if Archenemy.isArchenemy pid parent then Archenemy.lifeBonus else 0)) (GameState.players parent),
+          GameState.players = resetPlayers (GameState.settings parent) (length order) (`lifeModifierOf` parent) (GameState.players parent),
           GameState.outsideObjects = outside,
           -- CR 729.4a: nothing has crossed into this subgame yet.
           GameState.broughtIn = Seq.empty,
