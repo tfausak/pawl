@@ -1,0 +1,223 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "TapThis"
+              },
+              {
+                "type": "Sacrifice",
+                "value": {
+                  "count": 1,
+                  "whichPermanents": {
+                    "type": "And",
+                    "value": [
+                      {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Creature"
+                        }
+                      },
+                      {
+                        "type": "Not",
+                        "value": {
+                          "type": "IsSource"
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "mana": [
+              {
+                "type": "Generic",
+                "value": 3
+              },
+              {
+                "type": "OfType",
+                "value": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Blue"
+                  }
+                }
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Search",
+                        "value": {
+                          "destination": {
+                            "type": "Reveal"
+                          },
+                          "differentIn": [
+                            {
+                              "type": "Powers"
+                            },
+                            {
+                              "type": "ManaValues"
+                            },
+                            {
+                              "type": "Toughnesses"
+                            },
+                            {
+                              "type": "CardTypes"
+                            }
+                          ],
+                          "filter": {
+                            "type": "And",
+                            "value": []
+                          },
+                          "owner": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 4
+                          },
+                          "searcher": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          "slot": "found",
+                          "upTo": true
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "effects": [
+                      {
+                        "type": "MoveToZone",
+                        "value": {
+                          "ref": {
+                            "type": "ChosenCardFromAmong",
+                            "value": {
+                              "chooser": {
+                                "type": "InSlot",
+                                "value": "opponent"
+                              },
+                              "count": {
+                                "type": "Literal",
+                                "value": 2
+                              },
+                              "filter": {
+                                "type": "And",
+                                "value": []
+                              },
+                              "slot": "found"
+                            }
+                          },
+                          "zone": {
+                            "type": "Graveyard"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "effects": [
+                      {
+                        "type": "MoveToZone",
+                        "value": {
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "found"
+                          },
+                          "zone": {
+                            "type": "Hand"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "targetSlots": {
+                  "opponent": {
+                    "filter": {
+                      "type": "IsPlayer",
+                      "value": {
+                        "type": "Opponent"
+                      }
+                    },
+                    "pool": {
+                      "type": "Players"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "The Karst, Enchanted",
+      "power": {
+        "type": "Literal",
+        "value": 4
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 4
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Elemental"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          },
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1001,12 +1001,13 @@ plusReductions amounts adjustments =
 -- for each previous time", so a reduction still applies afterwards.
 --
 -- `targets` is CR 601.2c's announcement, which the spell's own sentence may
--- read (selfReductions); empty for a caller standing before CR 601.2c, where
--- such a sentence does not apply.
-spellAdjustments :: Set.Set ObjectId -> PlayerId -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
+-- read (selfReductions), and so may another object's per-target change
+-- (PlayerEffect.perTargetCount); empty for a caller standing before CR 601.2c,
+-- where neither applies.
+spellAdjustments :: Set.Set Recipient.Recipient -> PlayerId -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
 spellAdjustments targets pid oid gs =
-  let adjustments = PlayerEffect.spellCostAdjustments pid oid gs
-      self = selfReductions targets pid oid gs
+  let adjustments = PlayerEffect.spellCostAdjustments targets pid oid gs
+      self = selfReductions (Set.fromList (Maybe.mapMaybe Recipient.objectOf (Set.toList targets))) pid oid gs
       withSelf =
         adjustments
           { CostAdjustments.reductions =
@@ -1115,11 +1116,14 @@ asSpell pid oid gs
        in moved {GameState.objects = Map.adjust (\o -> o {Object.zone = Zone.Stack, Object.enteredUnder = Just pid}) oid (GameState.objects moved)}
   | otherwise = gs
 
--- Whether any of the spell's own cost sentences reads CR 601.2c's targets, so a
--- gate measuring the cost before them has to search the aimings
--- (Pawl.Engine.Cast.payableCostAt).
-selfReadsTargets :: PlayerId -> ObjectId -> GameState -> Bool
-selfReadsTargets pid oid gs = any (Maybe.isJust . CostReduction.whichTargets) (selfSentences pid oid gs)
+-- Whether the spell's CR 601.2f adjustments read CR 601.2c's targets -- one of
+-- its own cost sentences (Bury in Books), or another object's per-target change
+-- (PlayerEffect.spellCostReadsTargets) -- so a gate measuring the cost before
+-- them has to search the aimings (Pawl.Engine.Cast.payableCostAt).
+readsTargets :: PlayerId -> ObjectId -> GameState -> Bool
+readsTargets pid oid gs =
+  any (Maybe.isJust . CostReduction.whichTargets) (selfSentences pid oid gs)
+    || PlayerEffect.spellCostReadsTargets pid oid gs
 
 -- CR 601.2f's adjustments for an ACTIVATION cost, which CR 602.2b routes
 -- through rule 601.2b-i like a spell's. No commander tax: CR 903.8 taxes

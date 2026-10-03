@@ -706,7 +706,7 @@ playerRefPositions =
       affecting effect = Effect.AffectPlayers (AffectPlayers.MkAffectPlayers Duration.UntilEndOfTurn (AffectedPlayers.Scoped PlayerScope.You) effect)
    in [ ("add-mana", Effect.AddMana (ManaAddition.MkManaAddition (plantedPlayer "am") ManaProduction.AnyColor (Quantity.Type.Literal 1) ManaRetention.Ordinary Nothing Nothing), [plantedPlayer "am"]),
         ("firebend", Effect.Firebend (ManaAddition.MkManaAddition (plantedPlayer "fb") ManaProduction.AnyColor (Quantity.Type.Literal 1) ManaRetention.Ordinary Nothing Nothing), [plantedPlayer "fb"]),
-        ("search", Effect.Search (Search.MkSearch (plantedPlayer "se-searcher") (plantedPlayer "se-owner") Set.empty False Nothing (Filter.Type.And []) False SearchDestination.Battlefield Nothing Nothing False), [plantedPlayer "se-searcher", plantedPlayer "se-owner"]),
+        ("search", Effect.Search (Search.MkSearch (plantedPlayer "se-searcher") (plantedPlayer "se-owner") Set.empty False Nothing (Filter.Type.And []) False SearchDestination.Battlefield Nothing Nothing Set.empty), [plantedPlayer "se-searcher", plantedPlayer "se-owner"]),
         ("draw", Effect.Draw (Draw.MkDraw (plantedPlayer "dr") one Nothing), [plantedPlayer "dr"]),
         ("mill", Effect.Mill (Mill.MkMill (plantedPlayer "mi") one Nothing Nothing), [plantedPlayer "mi"]),
         ("scry", Effect.Scry (playerQuantity "sc"), [plantedPlayer "sc"]),
@@ -4864,14 +4864,16 @@ damagePatternFilters pattern_ = DamagePattern.whatSource pattern_ : Maybe.maybeT
 -- 701.6a).
 playerEffectFilters :: PlayerEffect.PlayerEffect -> [Filter.Type.Filter Keyword.Keyword]
 playerEffectFilters playerEffect = case playerEffect of
-  PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost f _) -> [f]
+  -- BOTH Filters, ReduceActivationCost's reason below: `perTarget` asks about
+  -- the spell's targets through the same context.
+  PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost f _ targets) -> f : Maybe.maybeToList targets
   -- CR 601.2f at the ACTIVATION moment, Oppressive Rays' third line. Its Filter
   -- names the ability's SOURCE PERMANENT, exactly as ReduceActivationCost's
   -- below does. The whichKind beside it is not returned, for the reason that
   -- arm's grantedBy is not: CR 605.1a's classification is no more a Filter than
   -- a rule-702 family is.
   PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost f _ _) -> [f]
-  PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost f _ _) -> [f]
+  PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost f _ _ targets) -> f : Maybe.maybeToList targets
   -- CR 601.2f's other moment: Heartstone's Filter narrows the ability's SOURCE
   -- PERMANENT rather than a spell, and is authored the same way. The grantedBy
   -- and whichKind beside it are not returned: neither a KeywordFamily nor CR

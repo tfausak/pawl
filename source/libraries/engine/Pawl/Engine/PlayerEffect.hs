@@ -50,6 +50,7 @@ import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Engine.Vanguard as Vanguard
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AbilityKind as AbilityKind
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
@@ -99,6 +100,7 @@ import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.PlotFromZone as PlotFromZone
 import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Types.SlotName as SlotName
@@ -1334,12 +1336,17 @@ admitsAtManaValue permission oid manaValue gs = case permission of
 -- matchesObjectFrom is called only from inside an arm that already matched a
 -- cost-modifying constructor, so a board with no Thalia and no Medallion runs no
 -- projections at all.
-spellCostAdjustments :: PlayerId -> ObjectId -> GameState -> CostAdjustments
-spellCostAdjustments pid oid gs =
+--
+-- `targets` is CR 601.2c's announcement, which a per-target amount counts
+-- (perTargetCount); empty for a caller standing before CR 601.2c.
+spellCostAdjustments :: Set.Set Recipient.Recipient -> PlayerId -> ObjectId -> GameState -> CostAdjustments
+spellCostAdjustments targets pid oid gs =
   let matching :: Maybe ObjectId -> Filter Keyword -> a -> Maybe a
       matching source criterion amount = if matchesObjectFrom source criterion oid gs then Just amount else Nothing
+      times source = maybe 1 (perTargetCount targets pid source gs)
       increaseOf (source, effect) = case effect of
-        PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost criterion amount) -> matching source criterion amount
+        PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost criterion amount perTarget) ->
+          matching source criterion (amount * times source perTarget)
         -- Oppressive Rays, turned away by the CONSTRUCTOR and not by its Filter
         -- -- the mirror of what keeps Thalia off an activation cost in
         -- activationCostAdjustmentsGiven below, and the same #90.
@@ -1388,8 +1395,12 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
       reductionOf (source, effect) = case effect of
-        PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost criterion amount coloredOnly) ->
-          fmap (\a -> (a, coloredOnly)) (matching source criterion amount)
+        -- A per-target reduction is REPEATED rather than multiplied, as
+        -- Pawl.Engine.Cost.selfReductions repeats Thrasta's, so a typed amount
+        -- needs no arithmetic.
+        PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost criterion amount coloredOnly perTarget) ->
+          let repeated = ManaCost.MkManaCost (concat (List.genericReplicate (times source perTarget) (ManaCost.unwrap amount)))
+           in fmap (\a -> (a, coloredOnly)) (matching source criterion repeated)
         PlayerEffect.IncreaseSpellCost {} -> Nothing
         PlayerEffect.IncreaseActivationCost {} -> Nothing
         -- The arms this whole split exists for: an ability's reduction is not a
@@ -1509,6 +1520,33 @@ spellCostAdjustments pid oid gs =
           -- spell from another effect.
           CostAdjustments.components = concat (Maybe.mapMaybe additionOf effects)
         }
+
+-- Whether a cost change applying to `pid` casting `oid` counts the spell's
+-- targets (`perTarget`), so a gate standing before CR 601.2c has to search the
+-- aimings (Pawl.Engine.Cost.readsTargets).
+spellCostReadsTargets :: PlayerId -> ObjectId -> GameState -> Bool
+spellCostReadsTargets pid oid gs =
+  let counts (source, effect) = case effect of
+        PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost criterion _ (Just _)) -> matchesObjectFrom source criterion oid gs
+        PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost criterion _ _ (Just _)) -> matchesObjectFrom source criterion oid gs
+        _ -> False
+   in any counts (applying pid gs)
+
+-- CR 601.2c / 601.2f: how many times a per-target cost change applies -- the
+-- DISTINCT objects and players among the announced `targets` that `wanted`
+-- matches, against each one's own view with the effect's source framing it and
+-- the caster as CR 109.5's "you". Distinct, not per instance of the word: CR
+-- 601.2c's "the chosen objects and/or players each become a target", and Hinata,
+-- Dawn-Crowned's ruling counts a creature chosen for two words once. So
+-- Filter.View's `targetCount`, which counts instances, is not this. Merging by
+-- referent is a fence: the announcement's union already merges a recipient named
+-- twice, and no test names one object under two of CR 115.4's tags.
+perTargetCount :: Set.Set Recipient.Recipient -> PlayerId -> Maybe ObjectId -> GameState -> Filter Keyword -> Natural
+perTargetCount targets pid source gs wanted =
+  let context = contextFor (Just pid) source gs
+      referent r = (Recipient.objectOf r, Recipient.playerOf r)
+      matched r = maybe False (\view -> Filter.matches context view wanted) (Projection.viewOfRecipient (Projection.fullView gs) gs r)
+   in Natural.length (Set.map referent (Set.filter matched targets))
 
 -- Professor Hojo's "the FIRST activated ability you activate during your turn"
 -- and Kíli the Resourceful's "the first equip ability you activate each turn":

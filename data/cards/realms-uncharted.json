@@ -29,7 +29,11 @@
                       "destination": {
                         "type": "Reveal"
                       },
-                      "differentNames": true,
+                      "differentIn": [
+                        {
+                          "type": "Names"
+                        }
+                      ],
                       "filter": {
                         "type": "HasCardType",
                         "value": {

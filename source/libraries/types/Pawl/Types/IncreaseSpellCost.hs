@@ -11,6 +11,11 @@ import qualified Pawl.Types.Keyword as Keyword
 -- coloured symbol.
 data IncreaseSpellCost = MkIncreaseSpellCost
   { whichSpells :: Filter.Filter Keyword.Keyword,
-    amount :: Natural.Natural
+    amount :: Natural.Natural,
+    -- | CR 601.2c / 601.2f: when Just, 'amount' is owed once per distinct
+    -- object or player the spell targets that this matches -- Hinata,
+    -- Dawn-Crowned's "{1} more to cast for each target". Nothing is a fixed
+    -- amount.
+    perTarget :: Maybe (Filter.Filter Keyword.Keyword)
   }
   deriving (Eq, Ord, Show)
