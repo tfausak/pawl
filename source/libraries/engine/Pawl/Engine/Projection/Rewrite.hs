@@ -2126,6 +2126,9 @@ rewriteQuantity pairs quantity = case quantity of
   -- A leaf: CR 612.2 swaps a subtype word, and CR 700.5's payload is a PlayerRef
   -- and a set of colours -- neither is one.
   Quantity.Type.Devotion {} -> quantity
+  -- A leaf: CR 700.8's four types are the rule's, not printed words for CR
+  -- 612.2 to swap.
+  Quantity.Type.PartySize _ -> quantity
   Quantity.Type.ObjectCounters _ -> quantity
   Quantity.Type.ObjectCountersOfAnyKind -> quantity
   Quantity.Type.OpponentsAttacked _ -> quantity
