@@ -85,6 +85,7 @@ codec keywordCodec =
       Arm.payload "IsObject" ObjectId.codec Filter.IsObject (\x -> case x of Filter.IsObject y -> Just y; _ -> Nothing),
       Arm.nullary "TargetsSource" Filter.TargetsSource,
       Arm.nullary "TargetsOnlySource" Filter.TargetsOnlySource,
+      Arm.nullary "HasSingleTarget" Filter.HasSingleTarget,
       -- Recursive for ControlsMoreThanYou's reason: the payload describes the one
       -- TARGET, and a card author writes it exactly as they write any other filter.
       Arm.payload "TargetsOnlyOne" (codec keywordCodec) Filter.TargetsOnlyOne (\x -> case x of Filter.TargetsOnlyOne y -> Just y; _ -> Nothing),
@@ -205,6 +206,7 @@ tagOf x = case x of
   Filter.IsObject {} -> "IsObject"
   Filter.TargetsSource {} -> "TargetsSource"
   Filter.TargetsOnlySource {} -> "TargetsOnlySource"
+  Filter.HasSingleTarget {} -> "HasSingleTarget"
   Filter.TargetsOnlyOne {} -> "TargetsOnlyOne"
   Filter.TargetsMatching {} -> "TargetsMatching"
   Filter.TargetsPlayer {} -> "TargetsPlayer"
