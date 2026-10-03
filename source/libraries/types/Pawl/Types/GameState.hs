@@ -13,6 +13,7 @@ import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
 import qualified Pawl.Types.ActiveCopy as ActiveCopy
+import qualified Pawl.Types.ActiveEvasion as ActiveEvasion
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
@@ -267,6 +268,9 @@ data GameState = MkGameState
     -- | CR 502.3 / 611.1: stored untap prohibitions from resolutions, each with
     -- an expiry; printed ones are re-derived live.
     untapProhibitions :: [ActiveUntapProhibition.ActiveUntapProhibition],
+    -- | CR 509.1b / 611.2c: stored classes of attackers that can't be
+    -- blocked, from resolutions, each with an expiry.
+    evasions :: [ActiveEvasion.ActiveEvasion],
     -- | CR 116.2d: the ignores players have paid for, each with an expiry, read
     -- by Pawl.Engine.PlayerEffect.applying.
     ignoredAbilities :: [IgnoredAbility.IgnoredAbility],

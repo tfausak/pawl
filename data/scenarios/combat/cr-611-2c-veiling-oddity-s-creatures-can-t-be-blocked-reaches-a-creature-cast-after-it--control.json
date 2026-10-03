@@ -1,0 +1,153 @@
+{
+  "description": "CR 611.2c Veiling Oddity's creatures can't be blocked reaches a creature cast after it (control)",
+  "note": "The pair of the board above, differing only in a second time counter on the Oddity: its last counter stays on, nothing triggers, and the Spider blocks the Chariot.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "m0"
+          },
+          {
+            "card": "Mountain",
+            "label": "m1"
+          },
+          {
+            "card": "Mountain",
+            "label": "m2"
+          },
+          {
+            "card": "Hill Giant",
+            "label": "early"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Goblin Chariot",
+            "label": "held"
+          }
+        ],
+        "exile": [
+          {
+            "card": "Veiling Oddity",
+            "label": "oddity",
+            "counters": [
+              {
+                "key": {
+                  "type": "Time"
+                },
+                "value": 2
+              }
+            ]
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Giant Spider",
+            "label": "blocker"
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "Untap"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "Upkeep",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$held",
+          "mana": [
+            "$m0",
+            "$m1",
+            "$m2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "Goblin Chariot",
+          "$early"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
+        "Block": {
+          "$blocker": [
+            "Goblin Chariot"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Blockers": {
+          "attacker": "Goblin Chariot",
+          "blockers": [
+            "$blocker"
+          ]
+        }
+      }
+    }
+  ]
+}
