@@ -68,9 +68,9 @@ spec s registry = Spec.describe s "a fragmented loop (CR 732.3)" $ do
     rouser <- S.printingOf s registry "Synthetic Rouser"
     ashling <- S.printingOf s registry "Ashling the Pilgrim"
     -- Ashling the Pilgrim, in alice's library, counts an ability's
-    -- resolutions this turn off the log, and every lap resolves two. So the
-    -- states the lap passes through differ in what a card can read, nothing
-    -- recurs, and the answerer's budget is what stops her.
+    -- resolutions this turn off the log, and every lap resolves two. So a card
+    -- can tell the recurring state from the first, and the answerer's budget
+    -- is what stops her.
     Spec.assertEqWith s "CR 732.3 Ashling keeps every offer" (fst (offers (loopBoard tapper rouser (Just ashling) False))) (replicate (budget + 1) True)
 
   Spec.it s "an activation with a target to choose is not refused" $ do
