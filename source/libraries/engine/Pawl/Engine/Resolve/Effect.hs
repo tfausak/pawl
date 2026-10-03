@@ -5980,10 +5980,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- CR 121.1's "and reveal IT": the cards the draw put into a hand, for a later
     -- clause of this resolution to name (#1899). The ids are the ones the CR 400.7
     -- funnel ANSWERED -- the incarnation in the hand -- so a reader finds the card
-    -- where the rule says it is; a draw a replacement diverted, or one off an
-    -- empty library, contributes nothing and binds nothing. Pawl.Types.Draw says
-    -- why CR 701.20a rather than CR 400.7j is what makes the card findable in a
-    -- hidden zone.
+    -- where the rule says it is; a draw a replacement diverted (CR 121.6c, even to
+    -- another drawer), or one off an empty library, contributes nothing and binds
+    -- nothing. Pawl.Types.Draw says why CR 701.20a rather than CR 400.7j is what
+    -- makes the card findable in a hidden zone.
     --
     -- ACROSS drawers and across CR 121.2's individual draws, the tally's posture
     -- in the Mill arm below: the slot is one name and no reader is per-player.
