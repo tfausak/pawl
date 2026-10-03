@@ -544,6 +544,40 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
       "CR 701.20a the reveal happens either way"
       (S.revealsOf after)
       [(S.alice, Set.singleton (S.printingName mountain))]
+  -- CR 121.6c: the card Plagiarize has alice draw in place of bob's draw is
+  -- drawn as a result of the replacement, so bob's "reveal it" does not reach it.
+  -- The pair differ in EXACTLY ONE THING, whether alice cast Plagiarize at bob
+  -- before he activated; bob's library tops with a Goblin Piker and alice's with
+  -- Divination, so a reveal of either is identifiable by name.
+  Spec.it s "CR 121.6c a draw Plagiarize redirects binds nothing for Shahrazad and Sindbad's reveal" $ do
+    sindbad <- S.printingOf s registry "Shahrazad and Sindbad"
+    plagiarize <- S.printingOf s registry "Plagiarize"
+    piker <- S.printingOf s registry "Goblin Piker"
+    divination <- S.printingOf s registry "Divination"
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    let (sindbadId, withSindbad) = S.addPermanent sindbad S.bob (Setup.emptyGame S.bothPlayers)
+        stocked = stockLibrary divination S.alice 2 (snd (S.addLibraryCard piker S.bob (stockLibrary plains S.bob 2 withSindbad)))
+        withMana = List.foldl' (\g _ -> snd (S.addPermanent island S.alice g)) stocked [1 .. (4 :: Int)]
+        (board, plagiarizeId) = S.handOne plagiarize withMana
+        activateForBob gs = case Activatable.abilitiesFor sindbadId gs of
+          [ability] ->
+            let activated = S.runPure S.identityAnswer gs (Activate.activateAbility S.bob sindbadId ability)
+             in S.runPure S.identityAnswer activated Stack.resolveTop
+          other -> error ("Pawl.ZoneChangeSpec: expected exactly one activated ability, got " <> show (length other))
+        plagiarized =
+          let cast = S.runPure atBobAnswer board (S.cast S.alice plagiarizeId)
+           in S.runPure S.identityAnswer cast Stack.resolveTop
+        after = activateForBob plagiarized
+        control = activateForBob board
+    Spec.assertEqWith s "nothing is revealed: alice's Divination was drawn as a result of the replacement" (S.revealsOf after) []
+    Spec.assertEqWith
+      s
+      "and on the board without Plagiarize, bob reveals the Goblin Piker he drew"
+      (S.revealsOf control)
+      [(S.bob, Set.singleton (S.printingName piker))]
+    Spec.assertEqWith s "alice drew the Divination in bob's place" (namesIn Zone.Hand S.alice after) [Just (S.printingName divination)]
+    Spec.assertEqWith s "and bob drew nothing" (namesIn Zone.Hand S.bob after) []
   -- CR 701.9a's per-turn TALLY, the same log read as a number rather than as the
   -- set one resolution moved: Dream Salvage's "draw cards equal to the number of
   -- cards target opponent discarded this turn". The declared target is read ONLY
