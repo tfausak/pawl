@@ -400,6 +400,10 @@ data Effect card ability
     -- ObjectRef names, one call to Event.putCounters apiece since CR 614.16
     -- replaces one placement at a time.
     PutCounters PutCounters.PutCounters
+  | -- | CR 608.2d: distribute this many counters of this kind among any number
+    -- of the permanents the ObjectRef names, the resolving controller choosing
+    -- them and the division, each chosen one getting at least one.
+    DistributeCounters PutCounters.PutCounters
   | -- | CR 122: remove this many counters of this kind from the slot's target
     -- permanent; asking for more than are present removes what is there.
     RemoveCounters RemoveCounters.RemoveCounters

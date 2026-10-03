@@ -6,6 +6,7 @@ import qualified Pawl.Codec.Search as Search
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.DifferentIn as DifferentIn
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -36,16 +37,16 @@ spec s = Spec.describe s "Pawl.Codec.Search" $ do
             Search.destination = SearchDestination.BattlefieldTapped,
             Search.subject = Nothing,
             Search.slot = Just (SlotName.MkSlotName (Text.pack "found")),
-            Search.differentNames = True
+            Search.differentIn = Set.fromList [DifferentIn.Names, DifferentIn.Powers]
           }
       )
-      " {\"searcher\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"owner\":{\"type\":\"InSlot\",\"value\":\"player\"},\"zones\":[{\"type\":\"Library\"},{\"type\":\"Graveyard\"}],\"outsideTheGame\":true,\"quantity\":{\"type\":\"Literal\",\"value\":1},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}},\"upTo\":true,\"destination\":{\"type\":\"BattlefieldTapped\"},\"slot\":\"found\",\"differentNames\":true} "
+      " {\"searcher\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"owner\":{\"type\":\"InSlot\",\"value\":\"player\"},\"zones\":[{\"type\":\"Library\"},{\"type\":\"Graveyard\"}],\"outsideTheGame\":true,\"quantity\":{\"type\":\"Literal\",\"value\":1},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}},\"upTo\":true,\"destination\":{\"type\":\"BattlefieldTapped\"},\"slot\":\"found\",\"differentIn\":[{\"type\":\"Names\"},{\"type\":\"Powers\"}]} "
   -- The other reading of the same count: no "upTo" key means the quantity is a
   -- quota. Paired with the case above so each key's absence is asserted, not
   -- just its presence -- a required key would have made every card file
   -- rewrite. "zones" is the same shape: absent means the library alone, which is
   -- what every card file written before Delivery Moogle says.
-  Spec.it s "an absent upTo, zones, outsideTheGame and differentNames take their defaults and are not written back" $
+  Spec.it s "an absent upTo, zones, outsideTheGame and differentIn take their defaults and are not written back" $
     Common.assertCodec
       s
       Search.codec
@@ -60,7 +61,7 @@ spec s = Spec.describe s "Pawl.Codec.Search" $ do
             Search.destination = SearchDestination.BattlefieldTapped,
             Search.subject = Nothing,
             Search.slot = Nothing,
-            Search.differentNames = False
+            Search.differentIn = Set.empty
           }
       )
       " {\"searcher\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"owner\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"quantity\":{\"type\":\"Literal\",\"value\":1},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}},\"destination\":{\"type\":\"BattlefieldTapped\"}} "
@@ -83,7 +84,7 @@ spec s = Spec.describe s "Pawl.Codec.Search" $ do
             Search.destination = SearchDestination.Exile,
             Search.subject = Nothing,
             Search.slot = Nothing,
-            Search.differentNames = False
+            Search.differentIn = Set.empty
           }
       )
       " {\"searcher\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"owner\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"quantity\":null,\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}},\"destination\":{\"type\":\"Exile\"}} "

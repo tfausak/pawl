@@ -23,6 +23,11 @@ data ReduceSpellCost = MkReduceSpellCost
     -- False is the RULE and the default on the wire: a reducer that does not
     -- print the sentence spills (CR 118.7b-d), which is what
     -- Pawl.Engine.Cost.applyAdjustments does with it.
-    coloredOnly :: Bool
+    coloredOnly :: Bool,
+    -- | CR 601.2c / 601.2f: when Just, 'reduction' comes off once per distinct
+    -- object or player the spell targets that this matches -- Battlefield
+    -- Thaumaturge's "{1} less to cast for each creature it targets". Nothing is
+    -- a fixed reduction.
+    perTarget :: Maybe (Filter.Filter Keyword.Keyword)
   }
   deriving (Eq, Ord, Show)

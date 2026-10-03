@@ -741,6 +741,10 @@ data Prompt r where
   -- | CR 608.2d: ChooseCounterRemovalAmong where the Natural is a cap, so none
   -- is an answer (Sensational Spider-Man). Never elided.
   ChooseCounterRemovalUpTo :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Map.Map ObjectId.ObjectId Natural.Natural -> Prompt (Map.Map ObjectId.ObjectId Natural.Natural)
+  -- | CR 608.2d: how many of the Natural's new counters each candidate gets,
+  -- the answer naming only candidates, each at least one, summing to it.
+  -- Elided at one candidate.
+  ChooseCounterDistribution :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt (Map.Map ObjectId.ObjectId Natural.Natural)
   -- | CR 122.1 / CR 601.2h: how many counters of EACH kind come off each
   -- permanent, where a cost names no kind (Tayam, Luminous Enigma), or an effect
   -- does not (Eventide's Shadow, CR 608.2d); the Map is what each candidate

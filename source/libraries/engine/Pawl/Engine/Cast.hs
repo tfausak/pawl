@@ -352,8 +352,9 @@ flashOn oid face gs =
 --     hand size cannot enter a cost or a filter.
 --   * a cost adjustment carries a LITERAL amount. PlayerEffect.IncreaseSpellCost
 --     and ReduceSpellCost hold a Natural or a ManaCost, never a Quantity, so no
---     adjustment can count anything -- which is the only route a zone read could
---     take into Cost.total.
+--     adjustment can count anything but the spell's own targets (`perTarget`),
+--     which the first point keeps out of hidden zones -- and a count is the only
+--     route a zone read could take into Cost.total.
 --
 -- The one object whose stack membership the move does change is the spell itself,
 -- and CR 115.5 takes that one back out of every stack pool
@@ -425,8 +426,8 @@ targetable castFor pid oid name gs = case proposedFace oid name gs of
 -- `gateXs` names rather than the least alone: the cast is legal if SOME
 -- announcement can be complied with (CR 601.2), and that spell's least X is
 -- its dearest.
-payableCost :: [ManaCost.ManaCost] -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payableCost extra spending pid oid gs cost = any (\x -> payableCostAt x extra spending pid oid gs cost) (gateXs pid oid gs cost)
+payableCost :: Maybe (Seq.Seq ModeIndex.ModeIndex) -> [ManaCost.ManaCost] -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
+payableCost modes extra spending pid oid gs cost = any (\x -> payableCostAt modes x extra spending pid oid gs cost) (gateXs pid oid gs cost)
 
 -- The values of X a gate asks a cost at. CR 601.2b's least X alone, unless the
 -- spell's own reduction reads the X (readsAnnouncedX): then payability is no longer
@@ -496,8 +497,9 @@ readsAnnouncedX pid oid cost gs =
 -- CR 601.2c's targets do not exist at any moment this gate is asked -- every
 -- caller sits at CR 601.3 or inside CR 601.2b -- and a cost whose criterion NAMES one cannot be measured without them
 -- (Cost.readsBoundSlot), nor can a spell whose own cost sentence reads them
--- (Cost.selfReadsTargets, Bury in Books' "if it targets an attacking
--- creature"). Such a cost is asked of every announcement still open
+-- (Cost.readsTargets, Bury in Books' "if it targets an attacking
+-- creature"), nor one another object's change counts them for (Hinata,
+-- Dawn-Crowned). Such a cost is asked of every announcement still open
 -- instead -- CR 601.2 makes a casting legal when the player can comply with
 -- every step, so the gate's question is whether SOME aiming complies, exactly
 -- as Activatable.aimingSomewhere asks it. Whole aimings rather than one
@@ -521,38 +523,41 @@ readsAnnouncedX pid oid cost gs =
 -- and ahead of the substitutes, which is where castProposed pays them
 -- (Cost.assistable): a caster with one Forest may propose Charging Binox beside a
 -- player holding seven Plains. Off Cost.spellKeywords, as castProposed reads it.
-payableCostAt :: Natural -> [ManaCost.ManaCost] -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payableCostAt x extra spending pid oid gs =
+payableCostAt :: Maybe (Seq.Seq ModeIndex.ModeIndex) -> Natural -> [ManaCost.ManaCost] -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
+payableCostAt modes x extra spending pid oid gs =
   let pcs = Projection.projectAll gs
-   in payableCostAtGiven pcs (Cost.supplyManaSourcesGiven (Projection.controlGrants gs) pcs pid gs) x extra spending pid oid gs
+   in payableCostAtGiven modes pcs (Cost.supplyManaSourcesGiven (Projection.controlGrants gs) pcs pid gs) x extra spending pid oid gs
 
 -- `payableCost` with the board's projection and CR 601.2g supply sweep handed
 -- in, so an enumeration over a hand builds the projection once (#435).
 payableCostGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> [ObjectId] -> [ManaCost.ManaCost] -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payableCostGiven pcs sources extra spending pid oid gs cost = any (\x -> payableCostAtGiven pcs sources x extra spending pid oid gs cost) (gateXs pid oid gs cost)
+payableCostGiven pcs sources extra spending pid oid gs cost = any (\x -> payableCostAtGiven Nothing pcs sources x extra spending pid oid gs cost) (gateXs pid oid gs cost)
 
 -- `payableCostAt` with the projection and sweep handed in.
 --
 -- A spell whose own reduction reads the X (readsAnnouncedX) is totalled with
 -- `x` bound on it under Binding.variableX, castProposed's own seed, so CR
 -- 601.2f's reduction counts the X being asked about rather than none.
-payableCostAtGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> [ObjectId] -> Natural -> [ManaCost.ManaCost] -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payableCostAtGiven pcs sources x extra spending pid oid gs cost =
+payableCostAtGiven :: Maybe (Seq.Seq ModeIndex.ModeIndex) -> Map.Map ObjectId PC.ProjectedCharacteristics -> [ObjectId] -> Natural -> [ManaCost.ManaCost] -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
+payableCostAtGiven modes pcs sources x extra spending pid oid gs cost =
   let substituted = Cost.substituteX x cost
       assisted = Cost.assistable (PaymentSubject.Casting oid) pid oid gs
       withX o = o {Object.bindings = Map.union (Binding.fromChoices Map.empty (Just x) Seq.empty) (Object.bindings o)}
       priced = if readsAnnouncedX pid oid cost gs then gs {GameState.objects = Map.adjust withX oid (GameState.objects gs)} else gs
-      ask slots =
-        let adjustments = Cost.plusReductions extra (Cost.spellAdjustments (Set.unions (Map.elems slots)) pid oid priced)
+      ask aiming =
+        let adjustments = Cost.plusReductions extra (Cost.spellAdjustments (Set.unions (Map.elems aiming)) pid oid priced)
             totalled = Cost.plusComponents adjustments substituted
+            slots = fmap (Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList) aiming
          in Cost.canPaySomeCompletionGiven slots (PaymentSubject.Casting oid) spending sources pcs pid oid (fmap assisted . Cost.totalManas adjustments) (Cost.manaSubstitutions (Cost.Type.components totalled) slots pid oid gs) totalled gs
-   in if Cost.readsBoundSlot substituted || Cost.selfReadsTargets pid oid gs
-        then any (any ask . Target.aimings) (castAimable pid oid gs)
+   in if Cost.readsBoundSlot substituted || Cost.readsTargets pid oid gs
+        then any (any ask . Target.aimings) (castAimable modes pid oid gs)
         else ask Map.empty
 
--- What CR 601.2c could still bind for this proposal, one slot map per fillable
--- mode: Activatable.candidateSlotsGiven's cast-side twin, and one mode at a time
--- for its reason. Read off the SAME board and the same slots `targetable` above
+-- What CR 601.2c could still bind for this proposal, one slot map per selection
+-- of fillable modes CR 601.2b could announce -- or for the one it did, once it
+-- has. Activatable.candidateSlotsGiven's cast-side twin, except that it does not
+-- stop at one mode: an announcement may choose several (CR 700.2), and each
+-- selection's slots are built as castProposed builds them. Read off the SAME board and the same slots `targetable` above
 -- measures, including CR 702.103b's enchant slot, so the gate that offers the
 -- cast and the gate that prices it cannot disagree about what could be aimed at.
 --
@@ -576,20 +581,25 @@ payableCostAtGiven pcs sources x extra spending pid oid gs cost =
 -- slot, neither of which takes this
 -- road. A card printing an X-bounded target slot beside a slot-reading
 -- additional cost is what would make the two values differ.
-castAimable :: PlayerId -> ObjectId -> GameState -> [Map.Map SlotName.SlotName (Set.Set ObjectId)]
-castAimable pid oid gs = case Game.faceOf oid gs of
+castAimable :: Maybe (Seq.Seq ModeIndex.ModeIndex) -> PlayerId -> ObjectId -> GameState -> [Map.Map SlotName.SlotName (Set.Set Recipient.Recipient)]
+castAimable announced pid oid gs = case Game.faceOf oid gs of
   Nothing -> []
   Just face ->
     let modal = Face.spell face
+        enchants = Projection.enchantOf oid gs
+        mutating = maybe False Object.mutating (Game.lookupObject oid gs)
         -- CR 702.140a's slot beside CR 303.4a's, `targetable` above's union: a
         -- mutating creature spell aims at the creature it will merge with.
-        enchant = Map.union (Card.enchantSlotMapGiven (Projection.enchantOf oid gs)) (Card.mutateSlotMapGiven (maybe False Object.mutating (Game.lookupObject oid gs)))
+        enchant = Map.union (Card.enchantSlotMapGiven enchants) (Card.mutateSlotMapGiven mutating)
         -- CR 601.2c's per-player copies, as castProposed offers them. A REGRESSION
         -- FENCE: no card pairs a per-player slot with a target-reading cost.
-        slotsOf mi = Target.announcedSlots pid oid gs (Map.union enchant (Modal.modesTargetSlots (Seq.singleton mi) modal))
-        objectsOf = Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList
+        slotsOf chosen = Target.announcedSlots pid oid gs (Card.modesTargetSlotsGiven enchants mutating chosen face)
         setsOf slots = Target.legalSets (Just pid) True Map.empty oid slots gs
-     in fmap (fmap objectsOf . setsOf . slotsOf) (Set.toList (Target.fillableModes (Just pid) Map.empty oid enchant modal gs))
+        -- CR 700.2: the modes CR 601.2b announced, or every selection the printed
+        -- instruction admits among the fillable modes -- a "choose two" spell
+        -- (Ojutai's Command) aims across both.
+        selected = maybe (Modal.selections (Target.fillableModes (Just pid) Map.empty oid enchant modal gs) (Modal.Type.selection modal)) pure announced
+     in fmap (setsOf . slotsOf) selected
 
 -- CR 601.2b: the greatest value of X this player could actually pay for, which is
 -- what Prompt.ChooseX carries -- measured on the cost the cast is measuring, with
@@ -650,10 +660,12 @@ castAimable pid oid gs = case Game.faceOf oid gs of
 -- The one predicate that is NOT monotone is a spell whose own reduction reads
 -- the X (readsAnnouncedX): Torgaar's least X is its dearest. That one is the
 -- greatest payable X among `gateXs`, whose climb is over the components alone.
-affordableX :: Maybe Natural -> [ManaCost.ManaCost] -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Natural
-affordableX mCeiling extra spending pid oid gs cost
-  | readsAnnouncedX pid oid cost gs = Maybe.fromMaybe 0 (Maybe.listToMaybe (reverse (filter (\x -> payableCostAt x extra spending pid oid gs cost) (gateXs pid oid gs cost))))
-  | otherwise = Cost.greatestPayableX mCeiling (\x -> payableCostAt x extra spending pid oid gs cost) cost
+affordableX :: Seq.Seq ModeIndex.ModeIndex -> Maybe Natural -> [ManaCost.ManaCost] -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Natural
+affordableX modes mCeiling extra spending pid oid gs cost
+  | readsAnnouncedX pid oid cost gs = Maybe.fromMaybe 0 (Maybe.listToMaybe (reverse (filter payableAt (gateXs pid oid gs cost))))
+  | otherwise = Cost.greatestPayableX mCeiling payableAt cost
+  where
+    payableAt x = payableCostAt (Just modes) x extra spending pid oid gs cost
 
 -- CR 118.8a: "Any number of additional costs may be applied to a spell as it's
 -- being cast", summed into the total by CR 601.2f. So a card printing two entwine
@@ -749,7 +761,7 @@ entwineOffer spending pid oid candidates gs = case Game.faceOf oid gs of
     let modal = Face.spell face
         legal = Target.fillableModes (Just pid) Map.empty oid (Card.enchantSlotMap face) modal gs
     Monad.guard (Natural.length legal == Modal.modeCount modal)
-    Monad.guard (any (\(extra, candidate) -> payableCost extra spending pid oid gs (Cost.plus candidate cost)) candidates)
+    Monad.guard (any (\(extra, candidate) -> payableCost (Just (Seq.fromList (Set.toAscList legal))) extra spending pid oid gs (Cost.plus candidate cost)) candidates)
     pure cost
 
 -- CR 601.2f: one candidate cost with every optional additional payment announced
@@ -796,11 +808,11 @@ withOptionalPayments paid candidate =
 -- together are payable. How high a multikicker count may go is not gated here at
 -- all -- the answer is honoured and then measured, which is Prompt.ChooseX's
 -- posture, and castProposed rejects a cast whose announced total nothing can pay.
-announceOptionalCosts :: ManaSpending -> PlayerId -> ObjectId -> [([ManaCost.ManaCost], Cost Keyword)] -> [Keyword] -> GameState -> Game (Map.Map Keyword Natural)
-announceOptionalCosts spending pid sid candidates offers gs =
+announceOptionalCosts :: Seq.Seq ModeIndex.ModeIndex -> ManaSpending -> PlayerId -> ObjectId -> [([ManaCost.ManaCost], Cost Keyword)] -> [Keyword] -> GameState -> Game (Map.Map Keyword Natural)
+announceOptionalCosts modes spending pid sid candidates offers gs =
   let ask paid keyword = case Keyword.optionalCost keyword of
         Just (cost, limit)
-          | any (\(extra, candidate) -> payableCost extra spending pid sid gs (Cost.plus (withOptionalPayments paid candidate) cost)) candidates -> do
+          | any (\(extra, candidate) -> payableCost (Just modes) extra spending pid sid gs (Cost.plus (withOptionalPayments paid candidate) cost)) candidates -> do
               decision <- Game.choose (Prompt.ChooseKicker (Decide.deciderFor pid gs) pid sid keyword limit)
               let times = KickerDecision.unwrap decision
               pure (if times == 0 then paid else Map.insert keyword times paid)
@@ -1732,7 +1744,7 @@ castableGiven shared pid oid name facing gs =
   let proposed = asProposed oid name facing gs
       payable extra spending board cost = case shared of
         Just (grants, pcs) -> payableCostGiven pcs (Cost.supplyManaSourcesGiven grants pcs pid board) extra spending pid oid board cost
-        Nothing -> payableCost extra spending pid oid board cost
+        Nothing -> payableCost Nothing extra spending pid oid board cost
       -- CR 601.3, CR 601.2c and CR 601.2b, asked TOGETHER and per candidate,
       -- because CR 702.103d makes them one question: a candidate is one this
       -- player may announce when the board its own choice produces neither
@@ -2128,7 +2140,7 @@ castableWhenOffered spending pid oid name candidates proposed =
       ( \candidate ->
           candidateAllowed pid oid proposed candidate
             && candidateFillable pid oid name proposed candidate
-            && payableCost (CandidateCost.reductions candidate) (spendingWith spending pid oid proposed) pid oid (proposedFor oid (CandidateCost.keyword candidate) proposed) (CandidateCost.cost candidate)
+            && payableCost Nothing (CandidateCost.reductions candidate) (spendingWith spending pid oid proposed) pid oid (proposedFor oid (CandidateCost.keyword candidate) proposed) (CandidateCost.cost candidate)
       )
       candidates
     && printedRestrictionsOk pid oid name proposed
@@ -2939,7 +2951,7 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
       --
       -- Carried as the counts per cost rather than as a flag, for entwine's
       -- reason: the candidate costs below and the CR 702.33d stamp read one value.
-      paid <- announceOptionalCosts spending pid sid announcedCandidates optionalOffers gs
+      paid <- announceOptionalCosts chosenModes spending pid sid announcedCandidates optionalOffers gs
       --
       -- CR 702.33d: "if a spell's controller declares the intention to pay any of
       -- that spell's kicker costs, that spell has been kicked" -- the DECLARATION
@@ -2965,7 +2977,7 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
       -- Carried as the additional Cost itself rather than as a flag, entwine's
       -- reason: the candidate costs below and the CR 702.27a stamp read one value.
       let buybackAffordable extra =
-            any (\(reduced, candidate) -> payableCost reduced spending pid sid gs (Cost.plus (withOptionalPayments paid candidate) extra)) announcedCandidates
+            any (\(reduced, candidate) -> payableCost (Just chosenModes) reduced spending pid sid gs (Cost.plus (withOptionalPayments paid candidate) extra)) announcedCandidates
       boughtBack <- case Keyword.buybackCost keywords of
         Nothing -> pure Nothing
         Just extra
@@ -2990,7 +3002,7 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
       -- is offered, and where one is, the player answers.
       let withBoughtBack candidate = maybe candidate (Cost.plus candidate) boughtBack
           spliceAffordable extra =
-            any (\(reduced, candidate) -> payableCost reduced spending pid sid gs (Cost.plus (withBoughtBack (withOptionalPayments paid candidate)) extra)) announcedCandidates
+            any (\(reduced, candidate) -> payableCost (Just chosenModes) reduced spending pid sid gs (Cost.plus (withBoughtBack (withOptionalPayments paid candidate)) extra)) announcedCandidates
           spliceOffers = filter (spliceAffordable . snd) (Maybe.mapMaybe (spliceOffer pid sid gs) (Game.zoneMembers Zone.Hand pid gs))
       spliced <- if null spliceOffers then pure [] else Game.choose (Prompt.ChooseSplice decider pid sid spliceOffers)
       -- CR 702.47b: "you can't splice any one card onto the same spell more than
@@ -3027,7 +3039,7 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
           -- spells cost {1} more" is what tells the two apart.
           payableCandidates =
             filter
-              (\candidate -> payableCost (CandidateCost.reductions candidate) spending pid sid (proposedFor sid (CandidateCost.keyword candidate) gs) (CandidateCost.cost candidate))
+              (\candidate -> payableCost (Just chosenModes) (CandidateCost.reductions candidate) spending pid sid (proposedFor sid (CandidateCost.keyword candidate) gs) (CandidateCost.cost candidate))
               (fmap (\candidate -> candidate {CandidateCost.cost = withSplice (withBuyback (withKicker (withModeCost (withEscalate (withEntwine (CandidateCost.cost candidate))))))}) candidateCosts)
           payable = fmap CandidateCost.cost payableCandidates
       if null payable || overKickerLimit || not spliceValid
@@ -3161,7 +3173,7 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
               -- Its least value is CR 101.1's printed floor, off the same face.
               mAmount <-
                 if Cost.hasVariable chargedCost
-                  then fmap Just (Game.choose (Prompt.ChooseX decider pid sid (Face.minimumX face) (affordableX mCeiling chosenReductions spending pid sid bestowedGs chargedCost)))
+                  then fmap Just (Game.choose (Prompt.ChooseX decider pid sid (Face.minimumX face) (affordableX chosenModes mCeiling chosenReductions spending pid sid bestowedGs chargedCost)))
                   else pure Nothing
               -- CR 101.1, and CR 101.2 for its direction: the card's sentence
               -- overrides the rule that would otherwise leave X free, and a
@@ -3215,7 +3227,7 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                   withX o = o {Object.bindings = Map.union (Binding.fromChoices Map.empty mAmount Seq.empty) (Object.bindings o)}
                   announcedBoard = bestowedGs {GameState.objects = Map.adjust withX sid (GameState.objects bestowedGs)}
                   refused = Maybe.isJust mAmount && maybe False (refusedAt castFor permissionUsed) (Filter.manaValue (Projection.viewOfObject sid announcedBoard))
-              if overCeiling || underFloor || refused || not (payableCost chosenReductions spending pid sid announcedBoard announcedAtX)
+              if overCeiling || underFloor || refused || not (payableCost (Just chosenModes) chosenReductions spending pid sid announcedBoard announcedAtX)
                 then reject
                 else do
                   -- CR 601.2b's own order puts the hybrid and Phyrexian
@@ -3244,16 +3256,25 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                   -- Phyrexian symbol (Scryfall keyword:assist, 2026-09-23), so
                   -- no announcement here has a choice it could change.
                   --
-                  -- No targets yet, so a spell's own sentence reading them
-                  -- (Cost.selfReadsTargets) is not in this total, and the routes
-                  -- are offered as if it did not apply. A fence, not a proof:
-                  -- no printing states such a sentence beside a hybrid or
-                  -- Phyrexian symbol (MTGJSON 2026-08-23, "costs .* (less|more)
-                  -- to cast if it targets").
-                  let gathered = Cost.plusReductions chosenReductions (Cost.spellAdjustments Set.empty pid sid announcedBoard)
+                  -- No targets yet, so an adjustment reading them
+                  -- (Cost.readsTargets) is totalled under every aiming CR
+                  -- 601.2c could still make, payableCostAtGiven's search, and a
+                  -- route is offered when SOME aiming pays it: measured with no
+                  -- targets, Hinata, Dawn-Crowned's reduction would hide a mana
+                  -- route the payer is entitled to. Pawl.ManaSymbolSpec's "CR
+                  -- 601.2f Dismember under Hinata offers both mana routes" proves
+                  -- it.
+                  let gatheredFor targets = Cost.plusReductions chosenReductions (Cost.spellAdjustments targets pid sid announcedBoard)
+                      gathered = gatheredFor Set.empty
+                      aimedGathers
+                        | Cost.readsTargets pid sid announcedBoard =
+                            -- Merged by value: aimings counting alike total alike.
+                            Set.toList . Set.fromList $ gathered : fmap (gatheredFor . Set.unions . Map.elems) (Target.aimings (Target.legalSets (Just pid) False (Binding.fromChoices Map.empty mAmount Seq.empty) sid slots announcedBoard))
+                        | otherwise = [gathered]
+                      routeTotals mana = concatMap (`Cost.totalManas` mana) aimedGathers
                   let totalledCost = Cost.plusComponents gathered announcedAtX
                       assistedTotal = Cost.assistable (PaymentSubject.Casting sid) pid sid announcedBoard
-                  (announcedCost, phyrexianLifePaid) <- Cost.announce (PaymentSubject.Casting sid) spending pid sid (Cost.substitutedManas (Cost.manaSubstitutions (Cost.Type.components totalledCost) Map.empty pid sid announcedBoard) (fmap assistedTotal . Cost.totalManas gathered)) totalledCost
+                  (announcedCost, phyrexianLifePaid) <- Cost.announce (PaymentSubject.Casting sid) spending pid sid (Cost.substitutedManas (Cost.manaSubstitutions (Cost.Type.components totalledCost) Map.empty pid sid announcedBoard) (fmap assistedTotal . routeTotals)) totalledCost
                   -- CR 400.7d's cost record, stamped on the SPELL and carried
                   -- onto the permanent it becomes by
                   -- Pawl.Engine.Event.changeZoneAttaching, `Object.paidCosts`'s
@@ -3381,10 +3402,9 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                       -- Reap cases are the proof (Baral pays the sacrifice, and
                       -- the Reap still costs {B}).
                       pricedGs <- State.get
-                      -- CR 601.2c's targets are fixed by now, so the spell's own
-                      -- sentence reading them (Bury in Books) is asked here.
-                      let announced = Set.fromList (Maybe.mapMaybe Recipient.objectOf (Set.toList (Set.unions (Map.elems chosen))))
-                      adjustments <- Cost.announceReductions pid sid pricedGs announcedCost (Cost.plusReductions chosenReductions (Cost.spellAdjustments announced pid sid pricedGs))
+                      -- CR 601.2c's targets are fixed by now, so an adjustment
+                      -- reading them (Bury in Books, Hinata) is asked here.
+                      adjustments <- Cost.announceReductions pid sid pricedGs announcedCost (Cost.plusReductions chosenReductions (Cost.spellAdjustments (Set.unions (Map.elems chosen)) pid sid pricedGs))
                       -- CR 601.2f's "plus all additional costs", gathered NOW
                       -- that the targets are fixed, where `gathered` at CR
                       -- 601.2b above could not see them: a component read off
