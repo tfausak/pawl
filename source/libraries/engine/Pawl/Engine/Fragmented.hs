@@ -254,7 +254,10 @@ choiceless action = case action of
 
 -- | Note that `pid`, asked at `here`, chose `action`. Held as pending until
 -- the next prompt, since an action CR 733.1 reversed leaves the game in the
--- state it was taken in and never happened.
+-- state it was taken in and never happened. A REGRESSION FENCE: only a
+-- `choiceless` activation is ever refused, and none of those can be reversed,
+-- so no test observes the hold; it keeps a reversed attempt from counting its
+-- player as involved.
 record :: StateDigest -> PlayerId -> Action -> LoopTrail -> LoopTrail
 record here pid action loopTrail = loopTrail {LoopTrail.pending = Just (here, pid, action)}
 
