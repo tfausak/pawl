@@ -1940,6 +1940,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.BoundDies _ -> condition
   TriggerCondition.RoomEntered _ -> condition
   TriggerCondition.PlayerScries _ -> condition
+  TriggerCondition.PlayerLosesGame _ -> condition
   TriggerCondition.RingTemptsPlayer _ -> condition
   TriggerCondition.PlayerBlights _ -> condition
   TriggerCondition.PlayerForages _ -> condition

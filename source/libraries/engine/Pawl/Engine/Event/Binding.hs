@@ -1228,6 +1228,8 @@ eventBindingSlots cond = case cond of
   -- Nothing either: CR 309.7 names the completing player, and Dungeon Crawler's
   -- payload points at no one -- it returns itself.
   TriggerCondition.PlayerCompletesDungeon _ -> Set.empty
+  -- Nothing: Withengar Unbound's payload points at no one -- it grows itself.
+  TriggerCondition.PlayerLosesGame _ -> Set.empty
   -- Nothing, for all four keyword actions. CR 701.22d and CR 701.25d name a
   -- player and CR 702.170a and CR 701.44b an object, but no printed payload
   -- under any of them points at one: Matoya, Archon Elder draws, Aloe

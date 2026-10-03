@@ -249,6 +249,7 @@ movedOf event = case event of
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Milled {} -> Nothing
   GameEvent.Scried _ -> Nothing
+  GameEvent.LostTheGame _ -> Nothing
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.Proliferated _ -> Nothing
@@ -395,6 +396,7 @@ participants event =
         GameEvent.BecameUnattached a -> ([BecameUnattached.attachment a], []) <> recipient (BecameUnattached.host a)
         GameEvent.LeftTheGame oid -> one oid
         GameEvent.Scried pid -> player pid
+        GameEvent.LostTheGame pid -> player pid
         GameEvent.DungeonCompleted pid -> player pid
         GameEvent.Surveiled pid -> player pid
         GameEvent.Proliferated pid -> player pid
@@ -435,8 +437,9 @@ participants event =
 -- abilities, abilities that trigger when a player sacrifices a permanent,
 -- abilities that trigger when a card leaves a graveyard, and abilities that
 -- trigger when an object that all players can see is put into a hand or library"
--- -- and CR 603.10b through CR 603.10g add six more, none of which pawl has a
--- condition for. Everything else takes CR 603.10's first sentence.
+-- -- and CR 603.10b through CR 603.10g add six more; the arms below say which
+-- of those pawl answers True for. Everything else takes CR 603.10's first
+-- sentence.
 --
 -- A TOTAL case, with no wildcard, which is the whole reason this is a function
 -- rather than a guard at the use site: a new condition must be READ against that
@@ -509,6 +512,11 @@ looksBack condition = case condition of
   -- counts the attachment leaving the battlefield as becoming unattached, so the
   -- bearer is routinely gone by the CR 117.5 boundary.
   TriggerCondition.SelfBecomesUnattachedFrom _ -> True
+  -- CR 603.10f names this one too, and CR 800.4a is why: the loser's
+  -- permanents leave the game in the departure's own event group. Kept because
+  -- the rule states it; nothing in data/cards/ observes it, Withengar Unbound's
+  -- payload naming only itself, which has left with its owner.
+  TriggerCondition.PlayerLosesGame _ -> True
   -- CR 603.6c's two written forms, which CR 603.10a names first:
   -- leaves-the-battlefield abilities. CR 700.4 narrows the second to a
   -- graveyard, and narrowing the destination does not leave the family.
@@ -784,6 +792,7 @@ batchScoped :: TriggerCondition -> Bool
 batchScoped condition = case condition of
   TriggerCondition.RoomEntered _ -> False
   TriggerCondition.PlayerScries _ -> False
+  TriggerCondition.PlayerLosesGame _ -> False
   TriggerCondition.RingTemptsPlayer _ -> False
   TriggerCondition.PlayerBlights _ -> False
   TriggerCondition.PlayerForages _ -> False
@@ -1320,6 +1329,7 @@ eventTriggers events gs =
           Just lk -> Map.singleton oid (LastKnown.controller lk, battlefieldAbilitiesOf oid (LastKnown.characteristics lk))
         GameEvent.Milled {} -> Map.empty
         GameEvent.Scried _ -> Map.empty
+        GameEvent.LostTheGame _ -> Map.empty
         GameEvent.DungeonCompleted _ -> Map.empty
         GameEvent.Surveiled _ -> Map.empty
         GameEvent.Proliferated _ -> Map.empty
@@ -1691,6 +1701,7 @@ eventTriggers events gs =
         GameEvent.LeftTheGame _ -> Map.empty
         GameEvent.Milled {} -> Map.empty
         GameEvent.Scried _ -> Map.empty
+        GameEvent.LostTheGame _ -> Map.empty
         GameEvent.DungeonCompleted _ -> Map.empty
         GameEvent.Surveiled _ -> Map.empty
         GameEvent.Proliferated _ -> Map.empty
@@ -2018,6 +2029,7 @@ eventTriggers events gs =
         GameEvent.LeftTheGame _ -> Map.empty
         GameEvent.Milled {} -> Map.empty
         GameEvent.Scried _ -> Map.empty
+        GameEvent.LostTheGame _ -> Map.empty
         GameEvent.DungeonCompleted _ -> Map.empty
         GameEvent.Surveiled _ -> Map.empty
         GameEvent.Proliferated _ -> Map.empty
@@ -2191,6 +2203,7 @@ eventTriggers events gs =
         GameEvent.LeftTheGame _ -> Map.empty
         GameEvent.Milled {} -> Map.empty
         GameEvent.Scried _ -> Map.empty
+        GameEvent.LostTheGame _ -> Map.empty
         GameEvent.DungeonCompleted _ -> Map.empty
         GameEvent.Surveiled _ -> Map.empty
         GameEvent.Proliferated _ -> Map.empty
@@ -2622,6 +2635,8 @@ zonesTriggeredFrom cond =
         TriggerCondition.RingTemptsPlayer _ -> battlefield
         TriggerCondition.PlayerSurveils _ -> battlefield
         TriggerCondition.PlayerProliferates _ -> battlefield
+        -- CR 113.6's default: Withengar Unbound is a creature.
+        TriggerCondition.PlayerLosesGame _ -> battlefield
         TriggerCondition.PermanentExplores _ -> battlefield
         TriggerCondition.PermanentConnives _ -> battlefield
         -- CR 113.6's default again: Synthetic Blight Chronicler is an ordinary
@@ -3112,6 +3127,8 @@ stateTriggers gs
             -- CR 603.2 again: CR 309.7's completion is the dungeon card's
             -- removal happening, not a state that could be true standing still.
             TriggerCondition.PlayerCompletesDungeon _ -> False
+            -- CR 104.3: losing the game happens; it is not a CR 603.8 state.
+            TriggerCondition.PlayerLosesGame _ -> False
             -- CR 603.2 event triggers, all four: a scry, a surveil, a card
             -- becoming plotted and an explore are things that HAPPEN, each with
             -- its own log entry, and none of them is a CR 603.8 state that could
@@ -3927,6 +3944,7 @@ resnapshot gs without event =
         GameEvent.BecameUnattached {} -> Just event
         GameEvent.LeftTheGame {} -> Just event
         GameEvent.Scried {} -> Just event
+        GameEvent.LostTheGame {} -> Just event
         GameEvent.DungeonCompleted {} -> Just event
         GameEvent.Surveiled {} -> Just event
         GameEvent.Proliferated {} -> Just event
