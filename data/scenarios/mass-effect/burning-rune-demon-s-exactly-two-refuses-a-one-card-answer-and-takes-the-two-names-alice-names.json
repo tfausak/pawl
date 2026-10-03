@@ -1,6 +1,6 @@
 {
-  "description": "Burning-Rune Demon's exactly two completes a one-card answer past a second card of the same name",
-  "note": "Alice names Murder alone. Exactly two takes away CR 701.23b's permission to find fewer, so the find is completed from the library in order, skipping the second Murder (different names) and taking Hill Giant; the other Burning-Rune Demon is never a candidate. Bob keeps Murder for Alice, so the graveyard tells the readings apart: a find left at one card buries nothing, and a completion not held to different names buries the second Murder.",
+  "description": "Burning-Rune Demon's exactly two refuses a one-card answer and takes the two names Alice names",
+  "note": "Alice first names Murder alone. Exactly two takes away CR 701.23b's permission to find fewer, and the library holds two different names, so the answer is refused and she is asked again; she names Murder and Forest, passing over Hill Giant, which a fill in library order would have taken. The other Burning-Rune Demon is never a candidate. Bob keeps Murder for Alice, so Forest is buried.",
   "board": {
     "seats": [
       {
@@ -92,11 +92,25 @@
       "turn": 1,
       "step": "PrecombatMain",
       "player": "alice",
-      "do": {
+      "refuse": {
         "Answer": {
           "prompt": "Search",
           "with": [
             "$murder"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "Search",
+          "with": [
+            "$murder",
+            "$forest"
           ]
         }
       }
@@ -180,7 +194,7 @@
           "player": "alice",
           "zone": "Graveyard",
           "is": [
-            "Hill Giant"
+            "Forest"
           ]
         }
       }

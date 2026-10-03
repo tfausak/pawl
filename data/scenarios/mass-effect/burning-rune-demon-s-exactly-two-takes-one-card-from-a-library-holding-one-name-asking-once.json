@@ -1,6 +1,6 @@
 {
-  "description": "Burning-Rune Demon's exactly two finds the one name a short library holds, and it goes to hand",
-  "note": "Alice searches but names nothing. The library's only candidates are two copies of Murder, so the most cards with different names it can give is one (CR 609.3), and exactly two forces that one; the opponent's choice is forced and Murder goes to hand. A search free to find fewer would leave the hand empty.",
+  "description": "Burning-Rune Demon's exactly two takes one card from a library holding one name, asking once",
+  "note": "The library's only candidates are two copies of Murder, so the most cards with different names it can give is one (CR 609.3). Alice names one Murder and the answer stands without a second ask; the opponent's choice is forced and Murder goes to hand.",
   "board": {
     "seats": [
       {
@@ -87,7 +87,9 @@
       "do": {
         "Answer": {
           "prompt": "Search",
-          "with": []
+          "with": [
+            "$murder"
+          ]
         }
       }
     },

@@ -131,6 +131,9 @@ data Search = MkSearch
     -- "exactly two cards ... that have different names" -- which takes away CR
     -- 701.23b's permission to find fewer (CR 101.1). A library short of such
     -- cards still gives as many as it can (CR 609.3). Never set beside `upTo`.
+    --
+    -- Not implemented: cards outside the game (CR 701.23j) do not count toward
+    -- how many it can give (#4295).
     exactly :: Bool
   }
   deriving (Eq, Ord, Show)
