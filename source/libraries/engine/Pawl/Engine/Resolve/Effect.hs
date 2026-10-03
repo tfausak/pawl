@@ -563,7 +563,8 @@ applyClauseEffects source applyOne =
    in Monad.foldM_ step Nothing
 
 -- CR 603.12: did the instruction that took the game from `before` to `after`
--- HAPPEN? Yes when it recorded a game event, or when anything but bookkeeping
+-- HAPPEN? Also CR 118.12's "started to pay a mandatory cost", for
+-- Resolve.recordTaken's "If you do". Yes when it recorded a game event, or when anything but bookkeeping
 -- changed. A field is bookkeeping, and copied across from `before` here, iff an
 -- instruction that did NOT happen can still write it: the event log and its
 -- CR 603.10 samples (read by the first disjunct, and the samples are

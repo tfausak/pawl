@@ -1005,6 +1005,31 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "and her library still holds all three Pikers" (length (Game.zoneMembers Zone.Library S.alice after)) 3
     Spec.assertEqWith s "CR 603.5's \"may\" was never put" (optionalsAnswered asked) []
     Spec.assertEqWith s "the control: the mandatory first clause still happened, so bob took the 3 damage" (S.lifeOf S.bob after) (Just 17)
+  -- CR 118.12: Victimize ({2}{B} Sorcery, "Choose two target creature cards in
+  -- your graveyard. Sacrifice a creature. If you do, return the chosen cards to
+  -- the battlefield tapped."; Scryfall 2026-10-03). The sacrifice is MANDATORY,
+  -- so no "may" answer stands for it: with no creature, no payment was started
+  -- and the "If you do" fails. Two boards differing only in
+  -- alice's Llanowar Elves; the graveyard is read whole, Victimize included, so
+  -- a fizzle or an uncast spell would show too.
+  Spec.it s "CR 118.12 Victimize with no creature to sacrifice returns nothing" $ do
+    after <- victimizeRun s registry False
+    Spec.assertEqWith s "CR 118.12 nothing was sacrificed, so both chosen cards stayed in alice's graveyard" (List.sort (namesIn Zone.Graveyard S.alice after)) (fmap (Just . CardName.MkCardName . Text.pack) ["Goblin Piker", "Hill Giant", "Victimize"])
+  Spec.it s "CR 118.12 Victimize with a creature to sacrifice returns both chosen cards" $ do
+    after <- victimizeRun s registry True
+    Spec.assertEqWith s "CR 118.12 the Elves were sacrificed, so the chosen cards left alice's graveyard" (List.sort (namesIn Zone.Graveyard S.alice after)) (fmap (Just . CardName.MkCardName . Text.pack) ["Llanowar Elves", "Victimize"])
+    Spec.assertEqWith s "and both entered the battlefield" (fmap (\name -> S.countOnBattlefieldByName (CardName.MkCardName (Text.pack name)) S.alice after) ["Goblin Piker", "Hill Giant"]) [1, 1]
+  -- The same on the ability loop: Gristle Glutton ({1}{R} Creature -- Goblin
+  -- Scout 1/3, "{T}, Blight 1: Discard a card. If you do, draw a card."; Scryfall
+  -- 2026-10-03). An empty hand discards nothing, so nothing is drawn; the
+  -- control differs only in the Hill Giant in hand.
+  Spec.it s "CR 118.12 Gristle Glutton with an empty hand draws nothing" $ do
+    after <- gluttonRun s registry False
+    Spec.assertEqWith s "CR 118.12 nothing was discarded, so alice's hand is still empty" (namesIn Zone.Hand S.alice after) []
+    Spec.assertEqWith s "and her library still holds all three Pikers" (length (Game.zoneMembers Zone.Library S.alice after)) 3
+  Spec.it s "CR 118.12 Gristle Glutton with a card in hand discards it and draws" $ do
+    after <- gluttonRun s registry True
+    Spec.assertEqWith s "CR 118.12 the Hill Giant was discarded and a Piker drawn" (namesIn Zone.Hand S.alice after, namesIn Zone.Graveyard S.alice after) ([Just (CardName.MkCardName (Text.pack "Goblin Piker"))], [Just (CardName.MkCardName (Text.pack "Hill Giant"))])
   -- The same negative through CR 118.12a: Development ({3}{U}{R} Instant, the
   -- right half of Research // Development: "Create a 3/1 red Elemental creature
   -- token unless any opponent has you draw a card. Repeat this process two more
@@ -2031,6 +2056,41 @@ findFirstExercising :: Prompt.Prompt r -> r
 findFirstExercising p = case p of
   Prompt.ChooseOptional {} -> OptionalDecision.Exercises
   _ -> findFirst p
+
+-- Three Swamps pay Victimize's {2}{B}; a Goblin Piker and a Hill Giant in
+-- alice's graveyard are its only two candidates, and `withFodder` adds the
+-- Llanowar Elves it can sacrifice. Every target offered is taken.
+victimizeRun :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m GameState.GameState
+victimizeRun s registry withFodder = do
+  swamp <- S.printingOf s registry "Swamp"
+  victimize <- S.printingOf s registry "Victimize"
+  piker <- S.printingOf s registry "Goblin Piker"
+  giant <- S.printingOf s registry "Hill Giant"
+  elves <- S.printingOf s registry "Llanowar Elves"
+  let lands = S.landsInPlay swamp 3
+      fodder = if withFodder then snd (S.addPermanent elves S.alice lands) else lands
+      buried = snd (S.addGraveyardCard giant S.alice (snd (S.addGraveyardCard piker S.alice fodder)))
+      (gs, spellId) = S.handOne victimize buried
+      answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> S.preferring (const True) sets
+        _ -> S.identityAnswer p
+  pure (S.runPure answer gs (S.cast S.alice spellId >> Stack.resolveTop))
+
+-- Alice's Gristle Glutton over a library of three Goblin Pikers, with a Hill
+-- Giant in hand when `holding`; its one ability activated and resolved, the
+-- blight landing on the Glutton itself.
+gluttonRun :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m GameState.GameState
+gluttonRun s registry holding = do
+  glutton <- S.printingOf s registry "Gristle Glutton"
+  piker <- S.printingOf s registry "Goblin Piker"
+  giant <- S.printingOf s registry "Hill Giant"
+  let (gluttonId, g0) = S.addPermanent glutton S.alice (Setup.emptyGame S.bothPlayers)
+      stocked = List.foldl' (\gs _ -> snd (S.addLibraryCard piker S.alice gs)) g0 [1 :: Int .. 3]
+      board = (if holding then snd (S.addHandCard giant S.alice stocked) else stocked) {GameState.priority = Just S.alice}
+  case Face.activatedAbilities (S.combinedFace glutton) of
+    [ability] -> pure (S.runPure S.identityAnswer board (Activate.activateAbility S.alice gluttonId ability >> Stack.resolveTop))
+    _ -> Spec.assertFailure s "Gristle Glutton should declare one activated ability"
 
 -- The same card with alice's hand holding nothing but the spell, so CR 608.2d's
 -- "impossible" is what the discard is: the three Mountains pay the {2}{R} and
