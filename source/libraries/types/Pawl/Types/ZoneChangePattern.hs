@@ -57,6 +57,11 @@ data ZoneChangePattern = MkZoneChangePattern
     -- | CR 701.9a: admit only a discard of this cause -- Library of Leng's "if
     -- an effect causes you to discard a card" is ByEffect, which its ruling
     -- parts from a discard paid as a cost. Nothing admits any move.
-    whenDiscarded :: Maybe DiscardCause.DiscardCause
+    whenDiscarded :: Maybe DiscardCause.DiscardCause,
+    -- | CR 608.2n: admit only a spell's move as the last step of its own
+    -- resolution -- Rod of Absorption's "instead of putting it into a graveyard
+    -- as it resolves", which a countered spell (CR 701.6a) and one that doesn't
+    -- resolve (CR 608.2b) escape. False admits any move.
+    duringResolution :: Bool
   }
   deriving (Eq, Ord, Show)

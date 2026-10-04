@@ -378,6 +378,7 @@ objectWith before entry closed = do
   mutating <- field Object.mutating
   prototyped <- field Object.prototyped
   boughtBack <- field Object.boughtBack
+  unannounced <- field Object.unannounced
   spliced <- field Object.spliced
   phyrexianLifePaid <- field Object.phyrexianLifePaid
   manaSpent <- field Object.manaSpent
@@ -437,6 +438,7 @@ objectWith before entry closed = do
         Object.mutating = mutating,
         Object.prototyped = prototyped,
         Object.boughtBack = boughtBack,
+        Object.unannounced = unannounced,
         Object.spliced = spliced,
         Object.phyrexianLifePaid = phyrexianLifePaid,
         Object.manaSpent = manaSpent,

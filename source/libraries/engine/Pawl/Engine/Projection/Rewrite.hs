@@ -53,6 +53,7 @@ import qualified Pawl.Types.CardPutIntoGraveyard as CardPutIntoGraveyard
 import qualified Pawl.Types.CardsPutIntoZone as CardsPutIntoZone
 import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.CastOffer as CastOffer
+import qualified Pawl.Types.CastRepetition as CastRepetition
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.ChooseCardName as ChooseCardName
@@ -996,6 +997,9 @@ rewriteEffect pairs effect = case effect of
     Effect.OfferCast
       oc
         { OfferCast.ref = rewriteObjectRef pairs (OfferCast.ref oc),
+          OfferCast.repetition = case OfferCast.repetition oc of
+            CastRepetition.WithinTotalManaValue quantity -> CastRepetition.WithinTotalManaValue (rewriteQuantity pairs quantity)
+            repetition -> repetition,
           OfferCast.offer =
             (OfferCast.offer oc)
               { CastOffer.payingInstead = fmap (Filter.rewriteCost pairs) (CastOffer.payingInstead (OfferCast.offer oc)),
@@ -2146,6 +2150,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.ObjectCountersOfAnyKind -> quantity
   Quantity.Type.OpponentsAttacked _ -> quantity
   Quantity.Type.AttackersDeclaredThisTurn _ -> quantity
+  Quantity.Type.AttackersDeclaredThisCombat -> quantity
   Quantity.Type.AttackedInLastTurnOf _ -> quantity
   Quantity.Type.AttackersInTheirLastTurn _ -> quantity
   Quantity.Type.CardsDiscardedThisTurn _ -> quantity

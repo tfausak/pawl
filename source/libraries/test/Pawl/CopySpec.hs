@@ -1117,6 +1117,7 @@ handAppend printing pid gs =
             Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
+            Object.unannounced = False,
             Object.spliced = Seq.empty,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.Type.MkMana [],

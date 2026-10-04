@@ -309,16 +309,14 @@ data Filter keyword
     -- Pawl.Engine.Count.bakePerspective, and vacuously False outside a
     -- Scope.OverPlayers count's filter.
     IsControllerOfBound SlotName.SlotName
-  | -- | CR 110.2: the candidate PLAYER controls strictly more permanents matching
-    -- this filter than the perspective player does (CR 109.5) -- Oreskos
-    -- Explorer's "the number of players who control more lands than you".
-    -- Answered by rewriting at Pawl.Engine.Count.bakePerspective, and vacuously
-    -- False outside a Scope.OverPlayers count's filter. Strict, which is what
-    -- lets Oreskos ask it of every player.
-    --
-    -- Not implemented: Surveyor's Scope's "at least two more lands than you",
-    -- which wants a margin beside the filter (#2353).
-    ControlsMoreThanYou (Filter keyword)
+  | -- | CR 110.2: the candidate PLAYER controls at least this many more
+    -- permanents matching the filter than the perspective player does (CR 109.5)
+    -- -- Oreskos Explorer's "more lands than you" at 1, Surveyor's Scope's "at
+    -- least two more lands than you" at 2. Answered by rewriting at
+    -- Pawl.Engine.Count.bakePerspective, and vacuously False outside a
+    -- Scope.OverPlayers count's filter. A margin of at least 1 is what lets a
+    -- card ask it of every player.
+    ControlsMoreThanYou Natural.Natural (Filter keyword)
   | -- | CR 400.1: the candidate PLAYER's own graveyard holds at least this many
     -- cards -- The Master of Lake-town's "each graveyard with seven or more cards
     -- in it". A player atom like the two above, answered by

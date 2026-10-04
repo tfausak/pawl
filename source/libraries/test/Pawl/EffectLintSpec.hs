@@ -29,7 +29,9 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Pawl.CardSpec (Framing (SourceHostFramed), MintedKind (MintedEmblem), anyFace, cardAuthoredEffects, cardFilters, cardReplacementEffects, cardResolutionEffects, conditionQuantities, copyTargetsRefs, durationConditions, effectFilters, effectMintedFaces, effectWithNested, enchantSlots, faceModals, frame, framedSlotsReadSingly, grantedActivatedAbilities, grantedModifications, grantedTriggeredAbilities, instantLine, mintedFaces, mintedFacesTagged, objectRefFilters, oneFaced, overFaces, replacementEffectRiders, restrictionFilters, spellLine, triggerConditionFilters, triggerConditionSlots, vanillaFace)
+import qualified Pawl.Codec.Card as Card.Codec
 import qualified Pawl.Codec.EntryRiders as EntryRiders
+import qualified Pawl.Codec.Face as Face.Codec
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect.Engine
 import qualified Pawl.Engine.Projection as Projection
@@ -37,6 +39,8 @@ import qualified Pawl.Engine.QuantitySlot as QuantitySlot
 import qualified Pawl.Engine.Resolve.Slots as Resolve
 import qualified Pawl.Engine.Subtype as Subtype.Engine
 import qualified Pawl.Extra.Natural as Natural
+import Pawl.FilterPositionLintSpec (jsonAtoms)
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -484,6 +488,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.DamageDealtToThisTurn -> False
   Quantity.Type.OpponentsAttacked {} -> False
   Quantity.Type.AttackersDeclaredThisTurn {} -> False
+  Quantity.Type.AttackersDeclaredThisCombat -> False
   Quantity.Type.AttackedInLastTurnOf {} -> False
   Quantity.Type.AttackersInTheirLastTurn {} -> False
   Quantity.Type.CardsDiscardedThisTurn {} -> False
@@ -3434,6 +3439,28 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     -- NOT an offence on the layouts CR 712.1 lists alongside this one: a
     -- nonmodal double-faced card prints two Magic card faces and stores both.
     Spec.assertBool s (not (meldFaceCountOffends (Printing.card ranger))) "a Transforming card may print two faces"
+  -- CR 611.2a, swept over the pool. See untilUsedOffends.
+  Spec.it s "CR 611.2a no card writes UntilUsed where nothing uses it up" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (anyFace untilUsedOffends . Printing.card) ps
+    Spec.assertBool s (any (anyFace ((/= 0) . spendableUntilUseds) . Printing.card) ps) "the pool has a card writing a spendable UntilUsed"
+    Spec.assertEqWith s "UntilUsed sits only on a player effect a cast or a land play uses up" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The REJECTING direction, against planted faces rather than card files: one
+  -- on a player-effect axis no cast uses up, one on another carrier altogether.
+  Spec.it s "the lint itself catches UntilUsed where nothing uses it up" $ do
+    berserker <- S.printingOf s registry "Hardened Berserker"
+    let planted effect =
+          (vanillaFace "Planted" instantLine)
+            { Face.spell =
+                Modal.MkModal
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+                  (ModeSelection.ChooseExactly 1)
+            }
+        prohibition = Effect.AffectPlayers (AffectPlayers.MkAffectPlayers Duration.UntilUsed (AffectedPlayers.Scoped PlayerScope.You) PlayerEffect.CantCastSpells)
+        pump = Effect.ModifyTarget (ModifyTarget.MkModifyTarget Duration.UntilUsed (Modification.GainKeyword Keyword.Flying) (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)) Nothing)
+    Spec.assertBool s (not (anyFace untilUsedOffends (Printing.card berserker))) "the real Hardened Berserker is accepted"
+    Spec.assertBool s (untilUsedOffends (planted prohibition)) "a prohibition no cast uses up is rejected"
+    Spec.assertBool s (untilUsedOffends (planted pump)) "a continuous effect on an object is rejected"
 
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Card" $ do
@@ -3442,3 +3469,21 @@ spec s registry = Spec.describe s "Pawl.Engine.Card" $ do
 -- | The discard of the cards a ref names, binding nothing.
 discardsThese :: ObjectRef.ObjectRef -> Effect.Effect card ability
 discardsThese ref = Effect.Discard (Discard.These (TheseDiscard.MkTheseDiscard ref Nothing))
+
+-- CR 611.2a: Duration.UntilUsed arms Expiry.WhenUsed, which only
+-- Pawl.Engine.PlayerEffect.spentByCast and spentByLandPlay end early, and only
+-- on a stored player effect PlayerEffect.castUse answers for. Anywhere else it
+-- would last until cleanup, so it offends. Counted against the ENCODED face for
+-- jsonAtoms' reason: a carrier cardAuthoredEffects misses is an offence rather
+-- than a blind spot.
+untilUsedOffends :: Face.Face Card.Type.Card -> Bool
+untilUsedOffends card = jsonAtoms (Text.pack "UntilUsed") (Codec.encode (Face.Codec.codec Card.Codec.codec) card) /= spendableUntilUseds card
+
+-- How many UntilUsed durations this face writes where a cast or a land play
+-- uses them up.
+spendableUntilUseds :: Face.Face Card.Type.Card -> Int
+spendableUntilUseds card =
+  let spendable effect = case effect of
+        Effect.AffectPlayers (AffectPlayers.MkAffectPlayers Duration.UntilUsed _ playerEffect) -> Maybe.isJust (PlayerEffect.Engine.castUse playerEffect)
+        _ -> False
+   in length (filter spendable (cardAuthoredEffects card))

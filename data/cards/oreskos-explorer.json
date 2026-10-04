@@ -64,10 +64,13 @@
                               "filter": {
                                 "type": "ControlsMoreThanYou",
                                 "value": {
-                                  "type": "HasCardType",
-                                  "value": {
-                                    "type": "Land"
-                                  }
+                                  "filter": {
+                                    "type": "HasCardType",
+                                    "value": {
+                                      "type": "Land"
+                                    }
+                                  },
+                                  "margin": 1
                                 }
                               },
                               "scope": {

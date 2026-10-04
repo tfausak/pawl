@@ -286,12 +286,12 @@ bakePerspective :: ViewOf -> Filter.Context -> GameState -> PlayerId -> Filter.T
 bakePerspective viewOf context gs candidate predicate =
   let recur = bakePerspective viewOf context gs candidate
    in case predicate of
-        -- STRICTLY more, and False when no perspective frames the match (CR 109.5) --
-        -- the vacuous posture every player-referencing atom takes.
-        Filter.Type.ControlsMoreThanYou inner ->
+        -- At least `margin` more, and False when no perspective frames the match
+        -- (CR 109.5) -- the vacuous posture every player-referencing atom takes.
+        Filter.Type.ControlsMoreThanYou margin inner ->
           let theirs = controlledMatching viewOf context gs inner candidate
               yours = fmap (controlledMatching viewOf context gs inner) (Filter.perspective context)
-           in truth (maybe False (theirs >) yours)
+           in truth (maybe False (\n -> theirs >= n + toInteger margin) yours)
         -- CR 108.4 / 608.2h: is this candidate the player who controls the object the
         -- slot names? Baked here for ControlsMoreThanYou's reason -- projecting a
         -- controller is a question about the board -- and off the same view the fold

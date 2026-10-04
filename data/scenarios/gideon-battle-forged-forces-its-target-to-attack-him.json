@@ -1,0 +1,33 @@
+{
+  "description": "CR 508.1d / 611.2a whole cards: Gideon, Battle-Forged's +2 makes the targeted creature, and only it, attack Gideon on its controller's next turn",
+  "note": "bob declines twice: CR 508.1d rejects the first decline and the repeat degrades to the declaration obeying the most requirements. The untargeted Goblin Piker is under no requirement, so it stays home.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Kytheon, Hero of Akros", "face": "Gideon, Battle-Forged", "label": "gideon", "counters": [{ "key": { "type": "Loyalty" }, "value": 3 }] }
+        ],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Hill Giant", "label": "giant", "ready": true },
+          { "card": "Goblin Piker", "label": "piker", "ready": true }
+        ],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "$gideon", "ability": 0, "targets": ["$giant"] } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Counters": { "object": "$gideon", "kind": { "type": "Loyalty" }, "count": 5 } } },
+    { "turn": 2, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": [] } },
+    { "turn": 2, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": [] } },
+    { "turn": 2, "step": "EndOfCombat", "player": "bob", "check": { "Attackers": { "attackers": { "$giant": "$gideon" } } } },
+    { "turn": 2, "step": "EndOfCombat", "player": "bob", "check": { "Counters": { "object": "$gideon", "kind": { "type": "Loyalty" }, "count": 2 } } }
+  ]
+}

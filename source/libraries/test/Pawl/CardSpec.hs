@@ -1440,7 +1440,7 @@ ownCounts effect = case effect of
   Effect.Shuffle {} -> []
   Effect.OfferNamedCopy {} -> []
   Effect.OfferNotedCopy {} -> []
-  Effect.OfferCast {} -> []
+  Effect.OfferCast offer -> concatMap quantityCounts (Resolve.repetitionQuantities (OfferCast.repetition offer))
   -- The Duration's Condition, exactly as GainControl's: Victor Mancha, Runaway's
   -- "for as long as you control this creature" is a Count, and dropping it here
   -- would take its Filters out of the lint with it.
@@ -4033,6 +4033,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.ObjectCountersOfAnyKind -> []
   Quantity.Type.OpponentsAttacked _ -> []
   Quantity.Type.AttackersDeclaredThisTurn _ -> []
+  Quantity.Type.AttackersDeclaredThisCombat -> []
   Quantity.Type.AttackedInLastTurnOf _ -> []
   Quantity.Type.AttackersInTheirLastTurn _ -> []
   Quantity.Type.CardsDiscardedThisTurn _ -> []
@@ -4794,7 +4795,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.IsControllerOfBound slot -> [slot]
   -- DESCENT: the nest is card text like any other, and an atom written into it
   -- is read exactly as one written at the top level.
-  Filter.Type.ControlsMoreThanYou f -> filterSlotsReadSingly f
+  Filter.Type.ControlsMoreThanYou _ f -> filterSlotsReadSingly f
   Filter.Type.CardsInGraveyardAtLeast _ -> []
   Filter.Type.IsAttacking -> []
   Filter.Type.IsAttackingPlayer _ -> []
@@ -6135,6 +6136,7 @@ effectFilters effect = case effect of
     frame SourceHostFramed (objectRefFilters (OfferCast.ref offer))
       <> slotlessCost (foldMap costFilters (CastOffer.payingInstead (OfferCast.offer offer)))
       <> outsideTheGameFramed (Maybe.maybeToList (CastOffer.restriction (OfferCast.offer offer)))
+      <> concatMap quantityFilters (Resolve.repetitionQuantities (OfferCast.repetition offer))
   -- Both, as GainControl's arm does: the Duration's Condition carries Victor
   -- Mancha, Runaway's IsSource and ControlledBy, and an empty list here would
   -- take them out of the lint without failing anything.

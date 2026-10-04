@@ -107,6 +107,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.mutating = False,
           Object.prototyped = False,
           Object.boughtBack = False,
+          Object.unannounced = False,
           Object.spliced = Seq.empty,
           Object.phyrexianLifePaid = 0,
           Object.manaSpent = Mana.MkMana [],
@@ -216,6 +217,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.mutating = True,
           Object.prototyped = True,
           Object.boughtBack = True,
+          Object.unannounced = True,
           Object.spliced = Seq.fromList [PrintingId.MkPrintingId 31, PrintingId.MkPrintingId 30],
           Object.phyrexianLifePaid = 19,
           Object.manaSpent =
@@ -272,6 +274,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"mutating\":true"
           <> ",\"prototyped\":true"
           <> ",\"boughtBack\":true"
+          <> ",\"unannounced\":true"
           <> ",\"spliced\":[31,30]"
           <> ",\"phyrexianLifePaid\":19"
           <> ",\"manaSpent\":[{\"manaType\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}"

@@ -225,6 +225,9 @@ data Quantity
     -- turns option each player on the active team is an attacking player (CR
     -- 805.10a).
     AttackersDeclaredThisTurn PlayerRef.PlayerRef
+  | -- | CR 508.1a: how many creatures, of any player, were declared as attackers
+    -- this combat, departed ones included (Kytheon, Hero of Akros).
+    AttackersDeclaredThisCombat
   | -- | CR 508.1a: 1 if the object this quantity is evaluated against was
     -- declared as an attacker during that player's own most recent turn
     -- (GameState.attacksInOwnLastTurn), else 0.

@@ -623,6 +623,13 @@ data Object = MkObject
     -- instant or a sorcery can carry buyback, so there is no permanent to
     -- reference it afterwards. Nothing carries it across a zone change.
     boughtBack :: Bool,
+    -- | CR 707.2: this SPELL became a copy of something that was not a spell on
+    -- the stack, so it announced no targets. Each slot whose text fixes a count
+    -- and that is still empty is then an instance of "target" with no legal
+    -- target (CR 608.2b), per Transcantation's ruling. Written by
+    -- Pawl.Engine.Resolve.Effect.acquireChoices; nothing carries it across a
+    -- zone change.
+    unannounced :: Bool,
     -- | CR 702.47a: the cards spliced onto this SPELL, in the order CR 702.47b
     -- has its controller choose. Stamped by Pawl.Engine.Cast at CR 601.2b and
     -- read by Pawl.Engine.Resolve.splicedModes, which gives the spell each
@@ -933,6 +940,9 @@ newIncarnation object =
       -- in the hand, so the card that arrives there is a new object that was
       -- never bought back.
       boughtBack = False,
+      -- CR 707.2's record is written back by nothing: only a spell on the stack
+      -- can become a copy that announced nothing.
+      unannounced = False,
       -- CR 702.47e: "the spell loses any splice changes once it leaves the
       -- stack for any reason", and nothing writes it back.
       spliced = Seq.empty,

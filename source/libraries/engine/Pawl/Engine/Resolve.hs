@@ -232,6 +232,14 @@ spellController obj oid gs = Maybe.fromMaybe (Projection.defaultControllerOf obj
 -- never fizzles, and one with several survives if any one is still legal.
 -- Reserved slots are not targets and are vacuously legal. Shared with the Aura
 -- path in Pawl.Engine.Stack, so the two cannot drift.
+--
+-- A spell that became a copy of a card announced nothing (CR 707.2,
+-- Object.unannounced), so each slot whose text fixes a count and that CR
+-- 707.10c's re-choice left empty is an instance of "target" with no legal
+-- target -- Transcantation's ruling, "the spell won't resolve". Only then: a
+-- slot CR 601.2c let the caster skip (awaken's, cast without awaken) is no
+-- target at all. The scenario "CR 608.2b a Transcantated spell left with no
+-- target doesn't resolve" proves it.
 targetsAllIllegal :: ObjectId -> GameState -> Bool
 targetsAllIllegal oid gs = case Game.lookupObject oid gs of
   Nothing -> False
@@ -245,7 +253,8 @@ targetsAllIllegal oid gs = case Game.lookupObject oid gs of
             -- CR 608.2b's perspective is the SPELL's controller (CR 405.4).
             Just targetSlot -> Set.filter (\recipient -> Target.stillLegal (Just (spellController obj oid gs)) (Object.bindings obj) oid recipient targetSlot gs) recipients
           legal = Map.mapWithKey legalSlot chosen
-          targeted = Map.restrictKeys legal (Map.keysSet slots)
+          unaimed = if Object.unannounced obj then Map.withoutKeys (Set.empty <$ Map.mapMaybe Target.fixedCount slots) (Map.keysSet chosen) else Map.empty
+          targeted = Map.union (Map.restrictKeys legal (Map.keysSet slots)) unaimed
        in -- Measured on the TARGETS chosen, not the slots declared: CR 115.6
           -- makes a spell that chose zero targets untargeted.
           not (Map.null targeted) && all Set.null (Map.elems targeted)

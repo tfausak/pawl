@@ -130,6 +130,9 @@ arm targets controller source duration gs = case duration of
   -- arm that also states a BEGINNING. Sampled through seatOf for that arm's
   -- reasons, and Nothing where the reference names nobody for that arm's reason
   -- too -- a window that cannot begin stores nothing.
+  --
+  -- Not implemented: a ControllerOfBound seat following its object to a new
+  -- controller before the window opens (#4696).
   Duration.DuringNextTurnOf ref ->
     fmap
       (\pid -> Expiry.DuringTurnOf (AfterTurn.MkAfterTurn pid (GameState.turnNumber gs)))
@@ -180,12 +183,9 @@ arm targets controller source duration gs = case duration of
   -- CR 611.2a: nothing about the game's clock or a payment is baked in --
   -- Pawl.Engine.PlayerEffect.spentByCast/spentByLandPlay are what end this
   -- early, matching the stored effect's own Filter against whatever was just
-  -- cast or played.
-  --
-  -- Not implemented: a consumer for any OTHER carrier this arms -- a continuous
-  -- effect, a replacement or a delayed trigger under UntilUsed stores WhenUsed
-  -- and then lasts until cleanup, and no lint refuses the duration there
-  -- (#3176).
+  -- cast or played. Those read only a player effect on PlayerEffect.castUse's
+  -- axes, so Pawl.EffectLintSpec refuses the duration on every other carrier
+  -- and axis.
   Duration.UntilUsed -> Just Expiry.WhenUsed
 
 -- The ONE seat a Duration.UntilEndOfNextTurnOf or DuringNextTurnOf reference
