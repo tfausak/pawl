@@ -138,6 +138,7 @@
         }
       ],
       "name": "Ashling the Pilgrim",
+      "oracleText": "{1}{R}: Put a +1/+1 counter on Ashling. If this is the third time this ability has resolved this turn, remove all +1/+1 counters from Ashling, and it deals that much damage to each creature and each player.",
       "power": {
         "type": "Literal",
         "value": 1

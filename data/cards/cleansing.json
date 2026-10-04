@@ -31,6 +31,7 @@
         }
       ],
       "name": "Cleansing",
+      "oracleText": "For each land, destroy that land unless any player pays 1 life.",
       "spell": {
         "modes": [
           {

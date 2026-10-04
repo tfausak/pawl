@@ -17,6 +17,7 @@
         }
       ],
       "name": "Wibbly-wobbly, Timey-wimey",
+      "oracleText": "Time travel. (For each suspended card you own and each permanent you control with a time counter on it, you may add or remove a time counter.)\nDraw a card.",
       "spell": {
         "modes": [
           {

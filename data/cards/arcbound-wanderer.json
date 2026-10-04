@@ -13,6 +13,7 @@
         }
       ],
       "name": "Arcbound Wanderer",
+      "oracleText": "Modular—Sunburst (This creature enters with a +1/+1 counter on it for each color of mana spent to cast it. When it dies, you may put its +1/+1 counters on target artifact creature.)",
       "power": {
         "type": "Literal",
         "value": 0

@@ -30,6 +30,7 @@
         }
       ],
       "name": "Gaea's Protector",
+      "oracleText": "This creature must be blocked if able.",
       "power": {
         "type": "Literal",
         "value": 4

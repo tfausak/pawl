@@ -22,6 +22,7 @@
         }
       ],
       "name": "Belltower Sphinx",
+      "oracleText": "Flying\nWhenever a source deals damage to this creature, that source's controller mills that many cards.",
       "power": {
         "type": "Literal",
         "value": 2

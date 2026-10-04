@@ -35,6 +35,7 @@
         }
       ],
       "name": "Soulfire Eruption",
+      "oracleText": "Choose any number of target creatures, planeswalkers, and/or players. For each of them, exile the top card of your library, then Soulfire Eruption deals damage equal to that card's mana value to that permanent or player. You may play the exiled cards until the end of your next turn.",
       "spell": {
         "modes": [
           {

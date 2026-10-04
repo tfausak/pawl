@@ -97,6 +97,7 @@
         }
       ],
       "name": "Shattered Ego",
+      "oracleText": "Enchant creature\nEnchanted creature gets -3/-0.\n{3}{U}{U}: Put enchanted creature into its owner's library third from the top.",
       "staticAbilities": [
         {
           "affected": {

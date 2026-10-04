@@ -65,6 +65,7 @@
         }
       ],
       "name": "Rustic Clachan",
+      "oracleText": "As this land enters, you may reveal a Kithkin card from your hand. If you don't, this land enters tapped.\n{T}: Add {W}.\nReinforce 1—{1}{W} ({1}{W}, Discard this card: Put a +1/+1 counter on target creature.)",
       "replacementEffects": [
         {
           "effect": {

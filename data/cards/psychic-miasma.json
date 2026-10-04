@@ -17,6 +17,7 @@
         }
       ],
       "name": "Psychic Miasma",
+      "oracleText": "Target player discards a card. If a land card is discarded this way, return Psychic Miasma to its owner's hand.",
       "spell": {
         "modes": [
           {

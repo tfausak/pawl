@@ -23,6 +23,7 @@
         }
       ],
       "name": "Eternal of Harsh Truths",
+      "oracleText": "Afflict 2 (Whenever this creature becomes blocked, defending player loses 2 life.)\nWhenever this creature attacks and isn't blocked, draw a card.",
       "power": {
         "type": "Literal",
         "value": 1

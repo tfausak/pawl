@@ -22,6 +22,7 @@
         }
       ],
       "name": "Takesies",
+      "oracleText": "Move up to one counter from each permanent onto target permanent.\nFuse (You may cast one or both halves of this card from your hand.)",
       "spell": {
         "modes": [
           {
@@ -90,6 +91,7 @@
         }
       ],
       "name": "Backsies",
+      "oracleText": "Until end of turn, treat all counters as -1/-1 counters.\nFuse (You may cast one or both halves of this card from your hand.)",
       "typeLine": {
         "types": [
           {

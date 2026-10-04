@@ -98,6 +98,7 @@
         }
       ],
       "name": "Hulk, Gamma Goliath",
+      "oracleText": "Reach, trample\nPower-up abilities of other creatures you control cost {3} less to activate.\nPower-up — {6}{R}{G}: Put five +1/+1 counters on Hulk. (Activate each power-up ability only once. Reduce the cost by his mana cost if he entered this turn.)",
       "playerAbilities": [
         {
           "effect": {

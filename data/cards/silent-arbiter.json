@@ -22,6 +22,7 @@
         }
       ],
       "name": "Silent Arbiter",
+      "oracleText": "No more than one creature can attack each combat.\nNo more than one creature can block each combat.",
       "power": {
         "type": "Literal",
         "value": 1

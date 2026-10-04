@@ -143,6 +143,7 @@
         }
       ],
       "name": "Shahrazad and Sindbad",
+      "oracleText": "Whenever Shahrazad and Sindbad deals combat damage to an opponent, if there haven't been any subgames this match, players play a Magic subgame using their libraries as their decks. Each player who doesn't win the subgame loses half their life, rounded up.\n{T}: Draw a card and reveal it. If it isn't a land card, discard it.",
       "power": {
         "type": "Literal",
         "value": 3

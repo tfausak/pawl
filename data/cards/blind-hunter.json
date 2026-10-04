@@ -34,6 +34,7 @@
         }
       ],
       "name": "Blind Hunter",
+      "oracleText": "Flying\nHaunt (When this creature dies, exile it haunting target creature.)\nWhen this creature enters or the creature it haunts dies, target player loses 2 life and you gain 2 life.",
       "power": {
         "type": "Literal",
         "value": 2

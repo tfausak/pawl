@@ -22,6 +22,7 @@
         }
       ],
       "name": "Flash Foliage",
+      "oracleText": "Cast this spell only during combat after blockers are declared.\nCreate a 1/1 green Saproling creature token that's blocking target creature attacking you.\nDraw a card.",
       "spell": {
         "modes": [
           {

@@ -8,6 +8,7 @@
         }
       ],
       "name": "Krark's Thumb",
+      "oracleText": "If you would flip a coin, instead flip two coins and ignore one.",
       "replacementEffects": [
         {
           "effect": {

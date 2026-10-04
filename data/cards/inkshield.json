@@ -26,6 +26,7 @@
         }
       ],
       "name": "Inkshield",
+      "oracleText": "Prevent all combat damage that would be dealt to you this turn. For each 1 damage prevented this way, create a 2/1 white and black Inkling creature token with flying.",
       "spell": {
         "modes": [
           {

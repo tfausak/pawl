@@ -39,6 +39,7 @@
         }
       ],
       "name": "Archnemesis",
+      "oracleText": "Enchant opponent\nWhenever you attack enchanted player, that player loses 2 life. You draw a card and gain 2 life.\nWhenever a player attacks you, you may attach this Aura to that player.",
       "triggeredAbilities": [
         {
           "condition": {

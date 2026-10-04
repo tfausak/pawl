@@ -26,6 +26,7 @@
         }
       ],
       "name": "Rhythm of the Wild",
+      "oracleText": "Creature spells you control can't be countered.\nNontoken creatures you control have riot. (They enter with your choice of a +1/+1 counter or haste.)",
       "playerAbilities": [
         {
           "effect": {

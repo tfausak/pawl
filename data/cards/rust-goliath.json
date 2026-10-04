@@ -47,6 +47,7 @@
         }
       ],
       "name": "Rust Goliath",
+      "oracleText": "Prototype {3}{G}{G} — 3/5 (You may cast this spell with different mana cost, color, and size. It keeps its abilities and types.)\nReach, trample",
       "power": {
         "type": "Literal",
         "value": 10

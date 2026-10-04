@@ -211,6 +211,7 @@
         }
       ],
       "name": "Mishra's Foundry",
+      "oracleText": "{T}: Add {C}.\n{2}: This land becomes a 2/2 Assembly-Worker artifact creature until end of turn. It's still a land.\n{1}, {T}: Target attacking Assembly-Worker gets +2/+2 until end of turn.",
       "typeLine": {
         "types": [
           {

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Kismet",
+      "oracleText": "Artifacts, creatures, and lands your opponents control enter tapped.",
       "replacementEffects": [
         {
           "effect": {

@@ -26,6 +26,7 @@
         }
       ],
       "name": "Lightmine Field",
+      "oracleText": "Whenever one or more creatures attack, this enchantment deals damage to each of those creatures equal to the number of attacking creatures.",
       "triggeredAbilities": [
         {
           "condition": {

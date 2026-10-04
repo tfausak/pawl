@@ -17,6 +17,7 @@
         }
       ],
       "name": "Boon Reflection",
+      "oracleText": "If you would gain life, you gain twice that much life instead.",
       "replacementEffects": [
         {
           "effect": {

@@ -13,6 +13,7 @@
         }
       ],
       "name": "Disarm",
+      "oracleText": "Unattach all Equipment from target creature.",
       "spell": {
         "modes": [
           {

@@ -22,6 +22,7 @@
         }
       ],
       "name": "Treasure Cruise",
+      "oracleText": "Delve (Each card you exile from your graveyard while casting this spell pays for {1}.)\nDraw three cards.",
       "spell": {
         "modes": [
           {

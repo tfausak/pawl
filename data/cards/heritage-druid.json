@@ -81,6 +81,7 @@
         }
       ],
       "name": "Heritage Druid",
+      "oracleText": "Tap three untapped Elves you control: Add {G}{G}{G}.",
       "power": {
         "type": "Literal",
         "value": 1

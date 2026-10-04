@@ -22,6 +22,7 @@
         }
       ],
       "name": "Aarakocra Sneak",
+      "oracleText": "Flying\nWhen this creature enters, you take the initiative.",
       "power": {
         "type": "Literal",
         "value": 1

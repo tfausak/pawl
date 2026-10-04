@@ -37,6 +37,7 @@
         }
       ],
       "name": "Archpriest of Shadows",
+      "oracleText": "Backup 1 (When this creature enters, put a +1/+1 counter on target creature. If that's another creature, it gains the following abilities until end of turn.)\nDeathtouch\nWhenever this creature deals combat damage to a player or battle, return target creature card from your graveyard to the battlefield.",
       "power": {
         "type": "Literal",
         "value": 4

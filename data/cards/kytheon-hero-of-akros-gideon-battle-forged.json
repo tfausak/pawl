@@ -64,6 +64,7 @@
         }
       ],
       "name": "Kytheon, Hero of Akros",
+      "oracleText": "At end of combat, if Kytheon and at least two other creatures attacked this combat, exile Kytheon, then return him to the battlefield transformed under his owner's control.\n{2}{W}: Kytheon gains indestructible until end of turn.",
       "power": {
         "type": "Literal",
         "value": 2
@@ -483,6 +484,7 @@
         "value": 3
       },
       "name": "Gideon, Battle-Forged",
+      "oracleText": "[+2]: Up to one target creature an opponent controls attacks Gideon during its controller's next turn if able.\n[+1]: Until your next turn, target creature gains indestructible. Untap that creature.\n[0]: Until end of turn, Gideon becomes a 4/4 Human Soldier creature with indestructible that's still a planeswalker. Prevent all damage that would be dealt to him this turn.",
       "typeLine": {
         "subtypes": [
           {

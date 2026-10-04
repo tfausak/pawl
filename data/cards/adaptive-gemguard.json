@@ -99,6 +99,7 @@
         }
       ],
       "name": "Adaptive Gemguard",
+      "oracleText": "Tap two untapped artifacts and/or creatures you control: Put a +1/+1 counter on this creature. Activate only as a sorcery.",
       "power": {
         "type": "Literal",
         "value": 3

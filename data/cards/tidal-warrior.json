@@ -68,6 +68,7 @@
         }
       ],
       "name": "Tidal Warrior",
+      "oracleText": "{T}: Target land becomes an Island until end of turn.",
       "power": {
         "type": "Literal",
         "value": 1

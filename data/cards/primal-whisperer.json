@@ -44,6 +44,7 @@
         }
       ],
       "name": "Primal Whisperer",
+      "oracleText": "This creature gets +2/+2 for each face-down creature on the battlefield.\nMorph {3}{G} (You may cast this card face down as a 2/2 creature for {3}. Turn it face up any time for its morph cost.)",
       "power": {
         "type": "Literal",
         "value": 2

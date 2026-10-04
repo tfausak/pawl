@@ -105,6 +105,7 @@
         }
       ],
       "name": "Alchemist's Gambit",
+      "oracleText": "Cleave {4}{U}{U}{R} (You may cast this spell for its cleave cost. If you do, remove the words in square brackets.)\nTake an extra turn after this one. During that turn, damage can't be prevented. [At the beginning of that turn's end step, you lose the game.]\nExile Alchemist's Gambit.",
       "spell": {
         "modes": [
           {

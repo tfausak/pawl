@@ -2,6 +2,7 @@
   "faces": [
     {
       "name": "Gerrard",
+      "oracleText": "At the beginning of your draw step, draw an additional card.",
       "triggeredAbilities": [
         {
           "condition": {

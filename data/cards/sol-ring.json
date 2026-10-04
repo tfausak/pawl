@@ -54,6 +54,7 @@
         }
       ],
       "name": "Sol Ring",
+      "oracleText": "{T}: Add {C}{C}.",
       "typeLine": {
         "types": [
           {

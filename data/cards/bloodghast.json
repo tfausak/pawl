@@ -35,6 +35,7 @@
         }
       ],
       "name": "Bloodghast",
+      "oracleText": "This creature can't block.\nThis creature has haste as long as an opponent has 10 or less life.\nLandfall — Whenever a land you control enters, you may return this card from your graveyard to the battlefield.",
       "power": {
         "type": "Literal",
         "value": 2

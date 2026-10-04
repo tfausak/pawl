@@ -34,6 +34,7 @@
         }
       ],
       "name": "Cho-Manno's Blessing",
+      "oracleText": "Flash\nEnchant creature\nAs this Aura enters, choose a color.\nEnchanted creature has protection from the chosen color. This effect doesn't remove this Aura.",
       "replacementEffects": [
         {
           "effect": {

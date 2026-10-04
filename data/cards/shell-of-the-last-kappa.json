@@ -125,6 +125,7 @@
         }
       ],
       "name": "Shell of the Last Kappa",
+      "oracleText": "{3}, {T}: Exile target instant or sorcery spell that targets you. (The spell has no effect.)\n{3}, {T}, Sacrifice Shell of the Last Kappa: You may cast a spell from among cards exiled with Shell of the Last Kappa without paying its mana cost.",
       "typeLine": {
         "supertypes": [
           {

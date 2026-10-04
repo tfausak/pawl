@@ -1,0 +1,23 @@
+{
+  "faces": [
+    {
+      "name": "Underground Sea",
+      "oracleText": "({T}: Add {U} or {B}.)",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Island"
+          },
+          {
+            "type": "Swamp"
+          }
+        ],
+        "types": [
+          {
+            "type": "Land"
+          }
+        ]
+      }
+    }
+  ]
+}

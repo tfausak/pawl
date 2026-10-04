@@ -37,6 +37,7 @@
         }
       ],
       "name": "True-Name Nemesis",
+      "oracleText": "As this creature enters, choose a player.\nThis creature has protection from the chosen player.",
       "power": {
         "type": "Literal",
         "value": 3

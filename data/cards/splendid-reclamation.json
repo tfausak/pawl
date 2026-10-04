@@ -17,6 +17,7 @@
         }
       ],
       "name": "Splendid Reclamation",
+      "oracleText": "Return all land cards from your graveyard to the battlefield tapped.",
       "spell": {
         "modes": [
           {

@@ -34,6 +34,7 @@
         }
       ],
       "name": "Venerable Warsinger",
+      "oracleText": "Vigilance, trample\nWhenever this creature deals combat damage to a player, you may return target creature card with mana value X or less from your graveyard to the battlefield, where X is the amount of damage this creature dealt to that player.",
       "power": {
         "type": "Literal",
         "value": 3

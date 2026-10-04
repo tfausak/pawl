@@ -14,6 +14,7 @@
         }
       ],
       "name": "Arcbound Overseer",
+      "oracleText": "At the beginning of your upkeep, put a +1/+1 counter on each creature you control with modular.\nModular 6 (This creature enters with six +1/+1 counters on it. When it dies, you may put its +1/+1 counters on target artifact creature.)",
       "power": {
         "type": "Literal",
         "value": 0

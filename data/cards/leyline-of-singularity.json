@@ -44,6 +44,7 @@
           ]
         }
       ],
+      "oracleText": "If this card is in your opening hand, you may begin the game with it on the battlefield.\nAll nonland permanents are legendary.",
       "staticAbilities": [
         {
           "affected": {

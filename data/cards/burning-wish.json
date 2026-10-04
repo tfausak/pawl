@@ -17,6 +17,7 @@
         }
       ],
       "name": "Burning Wish",
+      "oracleText": "You may reveal a sorcery card you own from outside the game and put it into your hand. Exile Burning Wish.",
       "spell": {
         "modes": [
           {

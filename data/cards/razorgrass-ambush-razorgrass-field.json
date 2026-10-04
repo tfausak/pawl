@@ -17,6 +17,7 @@
         }
       ],
       "name": "Razorgrass Ambush",
+      "oracleText": "Razorgrass Ambush deals 3 damage to target attacking or blocking creature.",
       "spell": {
         "modes": [
           {
@@ -112,6 +113,7 @@
         }
       ],
       "name": "Razorgrass Field",
+      "oracleText": "As this land enters, you may pay 3 life. If you don't, it enters tapped.\n{T}: Add {W}.",
       "replacementEffects": [
         {
           "effect": {

@@ -13,6 +13,7 @@
         }
       ],
       "name": "Loyal Sentry",
+      "oracleText": "When this creature blocks a creature, destroy that creature and this creature.",
       "power": {
         "type": "Literal",
         "value": 1

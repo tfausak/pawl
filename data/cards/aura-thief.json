@@ -22,6 +22,7 @@
         }
       ],
       "name": "Aura Thief",
+      "oracleText": "Flying\nWhen this creature dies, you gain control of all enchantments. (You don't get to move Auras.)",
       "power": {
         "type": "Literal",
         "value": 2

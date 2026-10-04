@@ -138,6 +138,7 @@
         }
       ],
       "name": "Strax, Sontaran Nurse",
+      "oracleText": "Vigilance, trample\nGrenades! — {2}, {T}, Sacrifice an artifact: Choose a player at random. When you do, Strax fights another target creature that player controls.\nGlory of Battle — Whenever Strax deals damage to a creature, put a +1/+1 counter on Strax.",
       "power": {
         "type": "Literal",
         "value": 5

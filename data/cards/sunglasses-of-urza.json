@@ -8,6 +8,7 @@
         }
       ],
       "name": "Sunglasses of Urza",
+      "oracleText": "You may spend white mana as though it were red mana.",
       "playerAbilities": [
         {
           "effect": {

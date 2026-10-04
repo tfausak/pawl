@@ -71,6 +71,7 @@
         }
       ],
       "name": "Daybreak Ranger",
+      "oracleText": "{T}: This creature deals 2 damage to target creature with flying.\nAt the beginning of each upkeep, if no spells were cast last turn, transform this creature.",
       "power": {
         "type": "Literal",
         "value": 2
@@ -224,6 +225,7 @@
         }
       ],
       "name": "Nightfall Predator",
+      "oracleText": "{R}, {T}: This creature fights target creature. (Each deals damage equal to its power to the other.)\nAt the beginning of each upkeep, if a player cast two or more spells last turn, transform this creature.",
       "power": {
         "type": "Literal",
         "value": 4

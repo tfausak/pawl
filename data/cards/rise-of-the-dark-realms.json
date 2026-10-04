@@ -26,6 +26,7 @@
         }
       ],
       "name": "Rise of the Dark Realms",
+      "oracleText": "Put all creature cards from all graveyards onto the battlefield under your control.",
       "spell": {
         "modes": [
           {

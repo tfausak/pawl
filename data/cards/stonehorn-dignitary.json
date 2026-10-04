@@ -17,6 +17,7 @@
         }
       ],
       "name": "Stonehorn Dignitary",
+      "oracleText": "When this creature enters, target opponent skips their next combat phase.",
       "power": {
         "type": "Literal",
         "value": 1

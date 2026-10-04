@@ -13,6 +13,7 @@
         }
       ],
       "name": "Stifle",
+      "oracleText": "Counter target activated or triggered ability. (Mana abilities can't be targeted.)",
       "spell": {
         "modes": [
           {

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Fumble",
+      "oracleText": "Return target creature to its owner's hand. Gain control of all Auras and Equipment that were attached to it, then attach them to another creature.",
       "spell": {
         "modes": [
           {

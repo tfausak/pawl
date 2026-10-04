@@ -105,6 +105,7 @@
         }
       ],
       "name": "Gilder Bairn",
+      "oracleText": "{2}{G/U}, {Q}: Double the number of each kind of counter on target permanent. ({Q} is the untap symbol.)",
       "power": {
         "type": "Literal",
         "value": 1

@@ -22,6 +22,7 @@
         }
       ],
       "name": "Brightspear Zealot",
+      "oracleText": "Vigilance\nThis creature gets +2/+0 as long as you've cast two or more spells this turn.",
       "power": {
         "type": "Literal",
         "value": 2

@@ -25,6 +25,7 @@
         }
       ],
       "name": "Apprentice Sharpshooter",
+      "oracleText": "Reach\nTraining (Whenever this creature attacks with another creature with greater power, put a +1/+1 counter on this creature.)",
       "power": {
         "type": "Literal",
         "value": 1

@@ -8,6 +8,7 @@
         }
       ],
       "name": "Inspiring Statuary",
+      "oracleText": "Nonartifact spells you cast have improvise. (Your artifacts can help cast those spells. Each artifact you tap after you're done activating mana abilities pays for {1}.)",
       "staticAbilities": [
         {
           "affected": {

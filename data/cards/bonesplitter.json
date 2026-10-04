@@ -24,6 +24,7 @@
         }
       ],
       "name": "Bonesplitter",
+      "oracleText": "Equipped creature gets +2/+0.\nEquip {1}",
       "staticAbilities": [
         {
           "affected": {

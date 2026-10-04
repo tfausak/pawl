@@ -17,6 +17,7 @@
         }
       ],
       "name": "Twisted Fealty",
+      "oracleText": "Gain control of target creature until end of turn. Untap that creature. It gains haste until end of turn.\nCreate a Wicked Role token attached to up to one target creature. (If you control another Role on it, put that one into the graveyard. Enchanted creature gets +1/+1. When this token is put into a graveyard, each opponent loses 1 life.)",
       "spell": {
         "modes": [
           {

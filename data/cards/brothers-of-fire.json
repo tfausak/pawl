@@ -102,6 +102,7 @@
         }
       ],
       "name": "Brothers of Fire",
+      "oracleText": "{1}{R}{R}: This creature deals 1 damage to any target and 1 damage to you.",
       "power": {
         "type": "Literal",
         "value": 2

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Soul's Fire",
+      "oracleText": "Target creature you control deals damage equal to its power to any target.",
       "spell": {
         "modes": [
           {

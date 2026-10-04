@@ -45,6 +45,7 @@
         }
       ],
       "name": "Augury Raven",
+      "oracleText": "Flying\nForetell {1}{U} (During your turn, you may pay {2} and exile this card from your hand face down. Cast it on a later turn for its foretell cost.)",
       "power": {
         "type": "Literal",
         "value": 3

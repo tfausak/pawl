@@ -22,6 +22,7 @@
         }
       ],
       "name": "Littjara Kinseekers",
+      "oracleText": "Changeling (This card is every creature type.)\nWhen this creature enters, if you control three or more creatures that share a creature type, put a +1/+1 counter on this creature, then scry 1.",
       "power": {
         "type": "Literal",
         "value": 2

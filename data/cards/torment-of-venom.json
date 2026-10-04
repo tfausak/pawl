@@ -26,6 +26,7 @@
         }
       ],
       "name": "Torment of Venom",
+      "oracleText": "Put three -1/-1 counters on target creature. Its controller loses 3 life unless they sacrifice another nonland permanent of their choice or discard a card.",
       "spell": {
         "modes": [
           {

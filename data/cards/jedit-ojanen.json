@@ -35,6 +35,7 @@
         }
       ],
       "name": "Jedit Ojanen",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 5

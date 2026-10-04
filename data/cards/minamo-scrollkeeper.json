@@ -22,6 +22,7 @@
         }
       ],
       "name": "Minamo Scrollkeeper",
+      "oracleText": "Defender\nYour maximum hand size is increased by one.",
       "playerAbilities": [
         {
           "effect": {

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Sinister Gnarlbark",
+      "oracleText": "At the beginning of your end step, draw a card and blight 1. (Put a -1/-1 counter on a creature you control.)",
       "power": {
         "type": "Literal",
         "value": 0

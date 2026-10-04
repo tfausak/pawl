@@ -2,6 +2,7 @@
   "faces": [
     {
       "name": "All in Good Time",
+      "oracleText": "When you set this scheme in motion, take an extra turn after this one. Schemes can't be set in motion that turn.",
       "triggeredAbilities": [
         {
           "condition": {

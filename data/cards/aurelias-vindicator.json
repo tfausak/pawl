@@ -70,6 +70,7 @@
         }
       ],
       "name": "Aurelia's Vindicator",
+      "oracleText": "Flying, lifelink, ward {2}\nDisguise {X}{3}{W}\nWhen this creature is turned face up, exile up to X other target creatures from the battlefield and/or creature cards from graveyards.\nWhen this creature leaves the battlefield, return the exiled cards to their owners' hands.",
       "power": {
         "type": "Literal",
         "value": 4

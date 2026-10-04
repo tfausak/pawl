@@ -41,6 +41,7 @@
         }
       ],
       "name": "High Ground",
+      "oracleText": "Each creature you control can block an additional creature each combat.",
       "typeLine": {
         "types": [
           {

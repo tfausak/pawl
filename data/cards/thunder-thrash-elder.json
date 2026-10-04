@@ -28,6 +28,7 @@
         }
       ],
       "name": "Thunder-Thrash Elder",
+      "oracleText": "Devour 3 (As this creature enters, you may sacrifice any number of creatures. It enters with three times that many +1/+1 counters on it.)",
       "power": {
         "type": "Literal",
         "value": 1

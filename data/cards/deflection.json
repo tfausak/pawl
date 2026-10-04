@@ -17,6 +17,7 @@
         }
       ],
       "name": "Deflection",
+      "oracleText": "Change the target of target spell with a single target.",
       "spell": {
         "modes": [
           {

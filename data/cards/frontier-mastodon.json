@@ -17,6 +17,7 @@
         }
       ],
       "name": "Frontier Mastodon",
+      "oracleText": "Ferocious — This creature enters with a +1/+1 counter on it if you control a creature with power 4 or greater.",
       "power": {
         "type": "Literal",
         "value": 3

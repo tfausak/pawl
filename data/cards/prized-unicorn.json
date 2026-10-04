@@ -27,6 +27,7 @@
         }
       ],
       "name": "Prized Unicorn",
+      "oracleText": "All creatures able to block this creature do so.",
       "power": {
         "type": "Literal",
         "value": 2

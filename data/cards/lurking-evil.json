@@ -155,6 +155,7 @@
         }
       ],
       "name": "Lurking Evil",
+      "oracleText": "Pay half your life, rounded up: This enchantment becomes a 4/4 Phyrexian Horror creature with flying.",
       "typeLine": {
         "types": [
           {

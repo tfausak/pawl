@@ -23,6 +23,7 @@
         }
       ],
       "name": "Khenra Eternal",
+      "oracleText": "Afflict 1 (Whenever this creature becomes blocked, defending player loses 1 life.)",
       "power": {
         "type": "Literal",
         "value": 2

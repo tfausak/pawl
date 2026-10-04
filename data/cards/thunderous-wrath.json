@@ -44,6 +44,7 @@
         }
       ],
       "name": "Thunderous Wrath",
+      "oracleText": "Thunderous Wrath deals 5 damage to any target.\nMiracle {R} (You may cast this card for its miracle cost when you draw it if it's the first card you drew this turn.)",
       "spell": {
         "modes": [
           {

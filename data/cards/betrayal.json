@@ -26,6 +26,7 @@
         }
       ],
       "name": "Betrayal",
+      "oracleText": "Enchant creature an opponent controls\nWhenever enchanted creature becomes tapped, you draw a card.",
       "triggeredAbilities": [
         {
           "condition": {

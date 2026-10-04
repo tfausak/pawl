@@ -85,6 +85,7 @@
         }
       ],
       "name": "Shivan Dragon",
+      "oracleText": "Flying\n{R}: This creature gets +1/+0 until end of turn.",
       "power": {
         "type": "Literal",
         "value": 5

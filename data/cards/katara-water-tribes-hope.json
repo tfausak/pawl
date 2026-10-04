@@ -118,6 +118,7 @@
         }
       ],
       "name": "Katara, Water Tribe's Hope",
+      "oracleText": "Vigilance\nWhen Katara enters, create a 1/1 white Ally creature token.\nWaterbend {X}: Creatures you control have base power and toughness X/X until end of turn. X can't be 0. Activate only during your turn. (While paying a waterbend cost, you can tap your artifacts and creatures to help. Each one pays for {1}.)",
       "power": {
         "type": "Literal",
         "value": 3

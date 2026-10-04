@@ -22,6 +22,7 @@
         }
       ],
       "name": "Thalia, Guardian of Thraben",
+      "oracleText": "First strike\nNoncreature spells cost {1} more to cast.",
       "playerAbilities": [
         {
           "effect": {

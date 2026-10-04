@@ -39,6 +39,7 @@
         }
       ],
       "name": "Baithook Angler",
+      "oracleText": "Disturb {1}{U} (You may cast this card from your graveyard transformed for its disturb cost.)",
       "power": {
         "type": "Literal",
         "value": 2
@@ -75,6 +76,7 @@
         }
       ],
       "name": "Hook-Haunt Drifter",
+      "oracleText": "Flying\nIf Hook-Haunt Drifter would be put into a graveyard from anywhere, exile it instead.",
       "power": {
         "type": "Literal",
         "value": 1

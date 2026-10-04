@@ -26,6 +26,7 @@
         }
       ],
       "name": "Pulmonic Sliver",
+      "oracleText": "All Sliver creatures have flying.\nAll Slivers have \"If this permanent would be put into a graveyard, you may put it on top of its owner's library instead.\"",
       "power": {
         "type": "Literal",
         "value": 3

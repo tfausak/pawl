@@ -13,6 +13,7 @@
         }
       ],
       "name": "Vapor Snag",
+      "oracleText": "Return target creature to its owner's hand. Its controller loses 1 life.",
       "spell": {
         "modes": [
           {

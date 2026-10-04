@@ -26,6 +26,7 @@
         }
       ],
       "name": "Drought",
+      "oracleText": "At the beginning of your upkeep, sacrifice this enchantment unless you pay {W}{W}.\nSpells cost an additional \"Sacrifice a Swamp\" to cast for each black mana symbol in their mana costs.\nActivated abilities cost an additional \"Sacrifice a Swamp\" to activate for each black mana symbol in their activation costs.",
       "playerAbilities": [
         {
           "effect": {

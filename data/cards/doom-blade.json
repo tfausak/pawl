@@ -17,6 +17,7 @@
         }
       ],
       "name": "Doom Blade",
+      "oracleText": "Destroy target nonblack creature.",
       "spell": {
         "modes": [
           {

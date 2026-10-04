@@ -67,6 +67,7 @@
         }
       ],
       "name": "Greed",
+      "oracleText": "{B}, Pay 2 life: Draw a card.",
       "typeLine": {
         "types": [
           {

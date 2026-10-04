@@ -140,6 +140,7 @@ theRingEmblem temptations =
         NonEmpty.singleton
           Face.MkFace
             { Face.name = theRingName,
+              Face.oracleText = Nothing,
               Face.manaCost = Nothing,
               Face.typeLine = TypeLine.empty,
               Face.power = Nothing,

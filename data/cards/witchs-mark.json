@@ -17,6 +17,7 @@
         }
       ],
       "name": "Witch's Mark",
+      "oracleText": "You may discard a card. If you do, draw two cards.\nCreate a Wicked Role token attached to up to one target creature you control. (If you control another Role on it, put that one into the graveyard. Enchanted creature gets +1/+1. When this token is put into a graveyard, each opponent loses 1 life.)",
       "spell": {
         "modes": [
           {

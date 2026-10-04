@@ -78,6 +78,7 @@
         }
       ],
       "name": "Explorer's Cache",
+      "oracleText": "This artifact enters with two +1/+1 counters on it.\nWhenever a creature you control with a +1/+1 counter on it dies, put a +1/+1 counter on this artifact.\n{T}: Move a +1/+1 counter from this artifact onto target creature. Activate only as a sorcery.",
       "replacementEffects": [
         {
           "effect": {

@@ -25,6 +25,7 @@
         }
       ],
       "name": "Commune with Lava",
+      "oracleText": "Exile the top X cards of your library. Until the end of your next turn, you may play those cards.",
       "spell": {
         "modes": [
           {

@@ -26,6 +26,7 @@
         }
       ],
       "name": "Phyrexian Rebirth",
+      "oracleText": "Destroy all creatures, then create an X/X colorless Phyrexian Horror artifact creature token, where X is the number of creatures destroyed this way.",
       "spell": {
         "modes": [
           {

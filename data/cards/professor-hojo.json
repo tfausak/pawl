@@ -17,6 +17,7 @@
         }
       ],
       "name": "Professor Hojo",
+      "oracleText": "The first activated ability you activate during your turn that targets a creature you control costs {2} less to activate.\nWhenever one or more creatures you control become the target of an activated ability, draw a card. This ability triggers only once each turn.",
       "playerAbilities": [
         {
           "effect": {

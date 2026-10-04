@@ -62,6 +62,7 @@
         }
       ],
       "name": "Protean Hydra",
+      "oracleText": "This creature enters with X +1/+1 counters on it.\nIf damage would be dealt to this creature, prevent that damage and remove that many +1/+1 counters from it.\nWhenever a +1/+1 counter is removed from this creature, put two +1/+1 counters on it at the beginning of the next end step.",
       "power": {
         "type": "Literal",
         "value": 0

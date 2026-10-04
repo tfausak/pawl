@@ -58,6 +58,7 @@
         }
       ],
       "name": "Auriok Replica",
+      "oracleText": "{W}, Sacrifice this creature: Prevent all damage a source of your choice would deal to you this turn.",
       "power": {
         "type": "Literal",
         "value": 2

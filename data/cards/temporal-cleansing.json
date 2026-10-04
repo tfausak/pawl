@@ -22,6 +22,7 @@
         }
       ],
       "name": "Temporal Cleansing",
+      "oracleText": "Convoke (Your creatures can help cast this spell. Each creature you tap while casting this spell pays for {1} or one mana of that creature's color.)\nThe owner of target nonland permanent puts it into their library second from the top or on the bottom.",
       "spell": {
         "modes": [
           {

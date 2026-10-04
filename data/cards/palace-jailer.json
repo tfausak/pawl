@@ -26,6 +26,7 @@
         }
       ],
       "name": "Palace Jailer",
+      "oracleText": "When this creature enters, you become the monarch.\nWhen this creature enters, exile target creature an opponent controls until an opponent becomes the monarch.",
       "power": {
         "type": "Literal",
         "value": 2

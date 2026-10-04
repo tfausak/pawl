@@ -86,6 +86,7 @@
         }
       ],
       "name": "Save Point",
+      "oracleText": "When this enchantment enters, draw a card.\nSacrifice this enchantment: Remove each creature from combat and untap each creature that attacked this turn. There is an additional combat phase after this one. Activate only during combat before combat damage has been dealt.",
       "triggeredAbilities": [
         {
           "condition": {

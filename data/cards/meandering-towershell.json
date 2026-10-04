@@ -87,6 +87,7 @@
         }
       ],
       "name": "Meandering Towershell",
+      "oracleText": "Islandwalk (This creature can't be blocked as long as defending player controls an Island.)\nWhenever this creature attacks, exile it. Return it to the battlefield under your control tapped and attacking at the beginning of the declare attackers step on your next turn.",
       "power": {
         "type": "Literal",
         "value": 5

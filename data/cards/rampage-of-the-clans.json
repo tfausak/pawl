@@ -17,6 +17,7 @@
         }
       ],
       "name": "Rampage of the Clans",
+      "oracleText": "Destroy all artifacts and enchantments. For each permanent destroyed this way, its controller creates a 3/3 green Centaur creature token.",
       "spell": {
         "modes": [
           {

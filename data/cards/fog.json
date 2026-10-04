@@ -13,6 +13,7 @@
         }
       ],
       "name": "Fog",
+      "oracleText": "Prevent all combat damage that would be dealt this turn.",
       "spell": {
         "modes": [
           {

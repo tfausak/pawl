@@ -68,6 +68,7 @@
         }
       ],
       "name": "Flaxen Intruder",
+      "oracleText": "Whenever this creature deals combat damage to a player, you may sacrifice it. When you do, destroy target artifact or enchantment.",
       "power": {
         "type": "Literal",
         "value": 1
@@ -163,6 +164,7 @@
         }
       ],
       "name": "Welcome Home",
+      "oracleText": "Create three 2/2 green Bear creature tokens. (Then exile this card. You may cast the creature later from exile.)",
       "spell": {
         "modes": [
           {

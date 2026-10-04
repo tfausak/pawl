@@ -114,6 +114,7 @@
         }
       ],
       "name": "Goblin Mutant",
+      "oracleText": "Trample\nThis creature can't attack if defending player controls an untapped creature with power 3 or greater.\nThis creature can't block creatures with power 3 or greater.",
       "power": {
         "type": "Literal",
         "value": 5

@@ -80,6 +80,7 @@
         }
       ],
       "name": "Apostle of Purifying Light",
+      "oracleText": "Protection from black (This creature can't be blocked, targeted, dealt damage, enchanted, or equipped by anything black.)\n{2}: Exile target card from a graveyard.",
       "power": {
         "type": "Literal",
         "value": 2

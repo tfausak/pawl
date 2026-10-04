@@ -8,6 +8,7 @@
         }
       ],
       "name": "Victor Mancha, Runaway",
+      "oracleText": "When Victor Mancha enters, exile target card from your graveyard. You may play it for as long as you control Victor Mancha.",
       "power": {
         "type": "Literal",
         "value": 4

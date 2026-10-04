@@ -40,6 +40,7 @@
         }
       ],
       "name": "Dragon's Prey",
+      "oracleText": "This spell costs {2} more to cast if it targets a Dragon.\nDestroy target creature.",
       "spell": {
         "modes": [
           {

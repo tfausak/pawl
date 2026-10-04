@@ -13,6 +13,7 @@
         }
       ],
       "name": "Death Ward",
+      "oracleText": "Regenerate target creature.",
       "spell": {
         "modes": [
           {

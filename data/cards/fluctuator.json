@@ -8,6 +8,7 @@
         }
       ],
       "name": "Fluctuator",
+      "oracleText": "Cycling abilities you activate cost {2} less to activate.",
       "playerAbilities": [
         {
           "effect": {

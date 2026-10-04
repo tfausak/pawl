@@ -13,6 +13,7 @@
         }
       ],
       "name": "Exploration",
+      "oracleText": "You may play an additional land on each of your turns.",
       "playerAbilities": [
         {
           "effect": {

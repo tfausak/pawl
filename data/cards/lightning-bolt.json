@@ -13,6 +13,7 @@
         }
       ],
       "name": "Lightning Bolt",
+      "oracleText": "Lightning Bolt deals 3 damage to any target.",
       "spell": {
         "modes": [
           {

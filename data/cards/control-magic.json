@@ -33,6 +33,7 @@
         }
       ],
       "name": "Control Magic",
+      "oracleText": "Enchant creature\nYou control enchanted creature.",
       "staticAbilities": [
         {
           "affected": {

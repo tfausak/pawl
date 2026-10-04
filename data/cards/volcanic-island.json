@@ -1,0 +1,23 @@
+{
+  "faces": [
+    {
+      "name": "Volcanic Island",
+      "oracleText": "({T}: Add {U} or {R}.)",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Island"
+          },
+          {
+            "type": "Mountain"
+          }
+        ],
+        "types": [
+          {
+            "type": "Land"
+          }
+        ]
+      }
+    }
+  ]
+}

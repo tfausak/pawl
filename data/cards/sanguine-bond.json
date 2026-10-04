@@ -26,6 +26,7 @@
         }
       ],
       "name": "Sanguine Bond",
+      "oracleText": "Whenever you gain life, target opponent loses that much life.",
       "triggeredAbilities": [
         {
           "condition": {

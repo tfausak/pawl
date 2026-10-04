@@ -30,6 +30,7 @@
         }
       ],
       "name": "Mandate of Peace",
+      "oracleText": "Cast this spell only during combat.\nYour opponents can't cast spells this turn.\nEnd the combat phase. (Remove all attackers and blockers from combat. Exile all spells and abilities from the stack, including this spell.)",
       "spell": {
         "modes": [
           {

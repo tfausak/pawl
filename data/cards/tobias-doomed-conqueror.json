@@ -31,6 +31,7 @@
         }
       ],
       "name": "Tobias, Doomed Conqueror",
+      "oracleText": "Flash\nWhen Tobias dies, for each nontoken creature you controlled that died this turn, create a 2/2 black Zombie creature token.",
       "power": {
         "type": "Literal",
         "value": 3

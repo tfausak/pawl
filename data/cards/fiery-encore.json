@@ -97,6 +97,7 @@
         }
       ],
       "name": "Fiery Encore",
+      "oracleText": "Discard a card, then draw a card. When you discard a nonland card this way, Fiery Encore deals damage equal to that card's mana value to target creature or planeswalker.\nStorm (When you cast this spell, copy it for each spell cast before it this turn.)",
       "spell": {
         "modes": [
           {

@@ -65,6 +65,7 @@
         }
       ],
       "name": "Full Throttle",
+      "oracleText": "After this main phase, there are two additional combat phases.\nAt the beginning of each combat this turn, untap all creatures that attacked this turn.",
       "spell": {
         "modes": [
           {

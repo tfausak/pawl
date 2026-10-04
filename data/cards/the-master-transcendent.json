@@ -162,6 +162,7 @@
         }
       ],
       "name": "The Master, Transcendent",
+      "oracleText": "When The Master enters, target player gets two rad counters.\n{T}: Put target creature card in a graveyard that was milled this turn onto the battlefield under your control. It's a green Mutant with base power and toughness 3/3. (It loses its other colors and creature types.)",
       "power": {
         "type": "Literal",
         "value": 2

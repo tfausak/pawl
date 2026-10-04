@@ -35,6 +35,7 @@
         }
       ],
       "name": "Preston Garvey, Minuteman",
+      "oracleText": "At the beginning of combat on your turn, create a green Aura enchantment token named Settlement attached to up to one target land you control. It has enchant land and \"Enchanted land has '{T}: Add one mana of any color.'\"\nWhenever Preston Garvey attacks, untap each enchanted permanent you control.",
       "power": {
         "type": "Literal",
         "value": 4

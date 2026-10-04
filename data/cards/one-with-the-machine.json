@@ -17,6 +17,7 @@
         }
       ],
       "name": "One with the Machine",
+      "oracleText": "Draw cards equal to the greatest mana value among artifacts you control.",
       "spell": {
         "modes": [
           {

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Cunning Wish",
+      "oracleText": "You may reveal an instant card you own from outside the game and put it into your hand. Exile Cunning Wish.",
       "spell": {
         "modes": [
           {

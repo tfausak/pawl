@@ -17,6 +17,7 @@
         }
       ],
       "name": "Giant Opportunity",
+      "oracleText": "You may sacrifice two Foods. If you do, create a 7/7 green Giant creature token. Otherwise, create three Food tokens. (They're artifacts with \"{2}, {T}, Sacrifice this token: You gain 3 life.\")",
       "spell": {
         "modes": [
           {

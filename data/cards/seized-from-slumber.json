@@ -45,6 +45,7 @@
         }
       ],
       "name": "Seized from Slumber",
+      "oracleText": "This spell costs {3} less to cast if it targets a tapped creature.\nDestroy target creature.",
       "spell": {
         "modes": [
           {

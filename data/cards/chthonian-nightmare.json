@@ -104,6 +104,7 @@
         }
       ],
       "name": "Chthonian Nightmare",
+      "oracleText": "When this enchantment enters, you get {E}{E}{E} (three energy counters).\nPay X {E}, Sacrifice a creature, Return this enchantment to its owner's hand: Return target creature card with mana value X from your graveyard to the battlefield. Activate only as a sorcery.",
       "triggeredAbilities": [
         {
           "condition": {

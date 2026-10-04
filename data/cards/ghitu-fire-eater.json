@@ -67,6 +67,7 @@
         }
       ],
       "name": "Ghitu Fire-Eater",
+      "oracleText": "{T}, Sacrifice this creature: It deals damage equal to its power to any target.",
       "power": {
         "type": "Literal",
         "value": 2

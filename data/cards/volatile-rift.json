@@ -38,6 +38,7 @@
         }
       ],
       "name": "Volatile Rift",
+      "oracleText": "Vivid — Whenever a creature card is put into your hand from your library, it perpetually gets +X/+0, where X is the number of colors among permanents you control.",
       "triggeredAbilities": [
         {
           "condition": {

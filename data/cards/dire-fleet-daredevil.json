@@ -22,6 +22,7 @@
         }
       ],
       "name": "Dire Fleet Daredevil",
+      "oracleText": "First strike\nWhen this creature enters, exile target instant or sorcery card from an opponent's graveyard. You may cast it this turn, and mana of any type can be spent to cast that spell. If that spell would be put into a graveyard, exile it instead.",
       "power": {
         "type": "Literal",
         "value": 2

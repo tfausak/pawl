@@ -22,6 +22,7 @@
         }
       ],
       "name": "Alms Collector",
+      "oracleText": "Flash\nIf an opponent would draw two or more cards, instead you and that player each draw a card.",
       "power": {
         "type": "Literal",
         "value": 3

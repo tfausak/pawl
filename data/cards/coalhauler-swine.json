@@ -26,6 +26,7 @@
         }
       ],
       "name": "Coalhauler Swine",
+      "oracleText": "Whenever this creature is dealt damage, it deals that much damage to each player.",
       "power": {
         "type": "Literal",
         "value": 4

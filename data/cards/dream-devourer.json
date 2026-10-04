@@ -17,6 +17,7 @@
         }
       ],
       "name": "Dream Devourer",
+      "oracleText": "Each nonland card in your hand without foretell has foretell. Its foretell cost is equal to its mana cost reduced by {2}. (During your turn, you may pay {2} and exile it from your hand face down. Cast it on a later turn for its foretell cost.)\nWhenever you foretell a card, this creature gets +2/+0 until end of turn.",
       "power": {
         "type": "Literal",
         "value": 0

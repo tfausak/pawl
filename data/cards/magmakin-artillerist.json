@@ -42,6 +42,7 @@
         }
       ],
       "name": "Magmakin Artillerist",
+      "oracleText": "Whenever you discard one or more cards, this creature deals that much damage to each opponent.\nCycling {1}{R} ({1}{R}, Discard this card: Draw a card.)\nWhen you cycle this card, it deals 1 damage to each opponent.",
       "power": {
         "type": "Literal",
         "value": 1

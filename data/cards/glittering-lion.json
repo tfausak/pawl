@@ -60,6 +60,7 @@
         }
       ],
       "name": "Glittering Lion",
+      "oracleText": "Prevent all damage that would be dealt to this creature.\n{3}: Until end of turn, this creature loses \"Prevent all damage that would be dealt to this creature.\" Any player may activate this ability.",
       "power": {
         "type": "Literal",
         "value": 2

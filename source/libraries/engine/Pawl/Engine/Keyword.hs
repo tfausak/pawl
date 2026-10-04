@@ -7511,6 +7511,7 @@ spiritToken =
         NonEmpty.singleton
           Face.MkFace
             { Face.name = CardName.MkCardName (Text.pack "Spirit Token"),
+              Face.oracleText = Nothing,
               Face.manaCost = Nothing,
               Face.typeLine =
                 TypeLine.MkTypeLine
@@ -7776,6 +7777,7 @@ servoToken =
         NonEmpty.singleton
           Face.MkFace
             { Face.name = CardName.MkCardName (Text.pack "Servo Token"),
+              Face.oracleText = Nothing,
               Face.manaCost = Nothing,
               Face.typeLine =
                 TypeLine.MkTypeLine
@@ -7985,6 +7987,7 @@ tokenCard name typeLine colors stats abilities =
         NonEmpty.singleton
           Face.MkFace
             { Face.name = CardName.MkCardName name,
+              Face.oracleText = Nothing,
               Face.manaCost = Nothing,
               Face.typeLine = typeLine,
               Face.power = fmap (Power.MkPower . Quantity.Literal . fst) stats,

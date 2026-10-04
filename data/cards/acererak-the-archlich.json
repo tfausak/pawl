@@ -17,6 +17,7 @@
         }
       ],
       "name": "Acererak the Archlich",
+      "oracleText": "When Acererak enters, if you haven't completed Tomb of Annihilation, return Acererak to its owner's hand and venture into the dungeon.\nWhenever Acererak attacks, for each opponent, you create a 2/2 black Zombie creature token unless that player sacrifices a creature of their choice.",
       "power": {
         "type": "Literal",
         "value": 5

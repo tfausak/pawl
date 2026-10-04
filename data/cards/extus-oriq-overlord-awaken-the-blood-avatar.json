@@ -40,6 +40,7 @@
         }
       ],
       "name": "Extus, Oriq Overlord",
+      "oracleText": "Double strike\nMagecraft — Whenever you cast or copy an instant or sorcery spell, return target nonlegendary creature card from your graveyard to your hand.",
       "power": {
         "type": "Literal",
         "value": 2
@@ -229,6 +230,7 @@
         }
       ],
       "name": "Awaken the Blood Avatar",
+      "oracleText": "As an additional cost to cast this spell, you may sacrifice any number of creatures. This spell costs {2} less to cast for each creature sacrificed this way.\nEach opponent sacrifices a creature of their choice. Create a 3/6 black and red Avatar creature token with haste and \"Whenever this token attacks, it deals 3 damage to each opponent.\"",
       "spell": {
         "modes": [
           {

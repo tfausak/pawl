@@ -24,6 +24,7 @@
         }
       ],
       "name": "Heirloom Blade",
+      "oracleText": "Equipped creature gets +3/+1.\nWhenever equipped creature dies, you may reveal cards from the top of your library until you reveal a creature card that shares a creature type with it. Put that card into your hand and the rest on the bottom of your library in a random order.\nEquip {1}",
       "staticAbilities": [
         {
           "affected": {

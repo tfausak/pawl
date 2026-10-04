@@ -135,6 +135,7 @@
           ]
         }
       ],
+      "oracleText": "You may reveal this card from your opening hand. If you do, at the beginning of the first upkeep, create a 1/1 red Phyrexian Goblin creature token with haste.\nWhen this creature enters, create X 1/1 red Phyrexian Goblin creature tokens with haste, where X is the number of creatures you control.",
       "power": {
         "type": "Literal",
         "value": 5

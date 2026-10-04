@@ -35,6 +35,7 @@
         }
       ],
       "name": "Nyxborn Rollicker",
+      "oracleText": "Bestow {1}{R} (If you cast this card for its bestow cost, it's an Aura spell with enchant creature. It becomes a creature again if it's not attached.)\nEnchanted creature gets +1/+1.",
       "power": {
         "type": "Literal",
         "value": 1

@@ -67,6 +67,7 @@
         }
       ],
       "name": "Words of Worship",
+      "oracleText": "{1}: The next time you would draw a card this turn, you gain 5 life instead.",
       "typeLine": {
         "types": [
           {

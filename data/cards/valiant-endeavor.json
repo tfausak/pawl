@@ -26,6 +26,7 @@
         }
       ],
       "name": "Valiant Endeavor",
+      "oracleText": "Roll two d6 and choose one result. Destroy each creature with power greater than or equal to that result. Then create a number of 2/2 white Knight creature tokens with vigilance equal to the other result.",
       "spell": {
         "modes": [
           {

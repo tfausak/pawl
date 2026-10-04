@@ -22,6 +22,7 @@
         }
       ],
       "name": "Arbiter of Knollridge",
+      "oracleText": "Vigilance\nWhen this creature enters, each player's life total becomes the highest life total among all players.",
       "power": {
         "type": "Literal",
         "value": 5

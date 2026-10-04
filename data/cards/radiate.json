@@ -26,6 +26,7 @@
         }
       ],
       "name": "Radiate",
+      "oracleText": "Choose target instant or sorcery spell that targets only a single permanent or player. Copy that spell for each other permanent or player the spell could target. Each copy targets a different one of those permanents and players.",
       "spell": {
         "modes": [
           {

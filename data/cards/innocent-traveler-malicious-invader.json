@@ -26,6 +26,7 @@
         }
       ],
       "name": "Innocent Traveler",
+      "oracleText": "At the beginning of your upkeep, any opponent may sacrifice a creature of their choice. If no one does, transform this creature.",
       "power": {
         "type": "Literal",
         "value": 1
@@ -124,6 +125,7 @@
         }
       ],
       "name": "Malicious Invader",
+      "oracleText": "Flying\nThis creature gets +2/+0 as long as an opponent controls a Human.",
       "power": {
         "type": "Literal",
         "value": 3

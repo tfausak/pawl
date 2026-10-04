@@ -35,6 +35,7 @@
         }
       ],
       "name": "Omniscience",
+      "oracleText": "You may cast spells from your hand without paying their mana costs.",
       "playerAbilities": [
         {
           "effect": {

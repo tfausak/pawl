@@ -17,6 +17,7 @@
         }
       ],
       "name": "Oreskos Sun Guide",
+      "oracleText": "Inspired — Whenever this creature becomes untapped, you gain 2 life.",
       "power": {
         "type": "Literal",
         "value": 2

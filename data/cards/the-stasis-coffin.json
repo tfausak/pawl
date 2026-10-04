@@ -61,6 +61,7 @@
         }
       ],
       "name": "The Stasis Coffin",
+      "oracleText": "{2}, {T}, Exile The Stasis Coffin: You gain protection from everything until your next turn.",
       "typeLine": {
         "supertypes": [
           {

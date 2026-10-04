@@ -29,6 +29,7 @@
         }
       ],
       "name": "Dalkovan Packbeasts",
+      "oracleText": "Vigilance\nMobilize 3 (Whenever this creature attacks, create three tapped and attacking 1/1 red Warrior creature tokens. Sacrifice them at the beginning of the next end step.)",
       "power": {
         "type": "Literal",
         "value": 0

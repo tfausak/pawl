@@ -69,6 +69,7 @@ soldierToken =
         NonEmpty.singleton
           Face.MkFace
             { Face.name = CardName.MkCardName (Text.pack "Human Soldier Token"),
+              Face.oracleText = Nothing,
               Face.manaCost = Nothing,
               Face.typeLine =
                 TypeLine.MkTypeLine

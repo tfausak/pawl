@@ -26,6 +26,7 @@
         }
       ],
       "name": "Wild Growth",
+      "oracleText": "Enchant land\nWhenever enchanted land is tapped for mana, its controller adds an additional {G}.",
       "triggeredAbilities": [
         {
           "condition": {

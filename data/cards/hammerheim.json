@@ -87,6 +87,7 @@
         }
       ],
       "name": "Hammerheim",
+      "oracleText": "{T}: Add {R}.\n{T}: Target creature loses all landwalk abilities until end of turn.",
       "typeLine": {
         "supertypes": [
           {

@@ -13,6 +13,7 @@
         }
       ],
       "name": "Sarcomancy",
+      "oracleText": "When this enchantment enters, create a 2/2 black Zombie creature token.\nAt the beginning of your upkeep, if there are no Zombies on the battlefield, this enchantment deals 1 damage to you.",
       "triggeredAbilities": [
         {
           "condition": {

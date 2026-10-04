@@ -57,6 +57,7 @@
         }
       ],
       "name": "Cackling Counterpart",
+      "oracleText": "Create a token that's a copy of target creature you control.\nFlashback {5}{U}{U} (You may cast this card from your graveyard for its flashback cost. Then exile it.)",
       "spell": {
         "modes": [
           {

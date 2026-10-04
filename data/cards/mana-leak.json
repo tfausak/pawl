@@ -17,6 +17,7 @@
         }
       ],
       "name": "Mana Leak",
+      "oracleText": "Counter target spell unless its controller pays {3}.",
       "spell": {
         "modes": [
           {

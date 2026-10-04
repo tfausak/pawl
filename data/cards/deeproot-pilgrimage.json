@@ -17,6 +17,7 @@
         }
       ],
       "name": "Deeproot Pilgrimage",
+      "oracleText": "Whenever one or more nontoken Merfolk you control become tapped, create a 1/1 blue Merfolk creature token with hexproof.",
       "triggeredAbilities": [
         {
           "condition": {

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Presence of the Master",
+      "oracleText": "Whenever a player casts an enchantment spell, counter it.",
       "triggeredAbilities": [
         {
           "condition": {

@@ -2,6 +2,7 @@
   "faces": [
     {
       "name": "Urborg, Tomb of Yawgmoth",
+      "oracleText": "Each land is a Swamp in addition to its other land types.",
       "staticAbilities": [
         {
           "affected": {

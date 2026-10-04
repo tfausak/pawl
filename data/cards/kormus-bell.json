@@ -8,6 +8,7 @@
         }
       ],
       "name": "Kormus Bell",
+      "oracleText": "All Swamps are 1/1 black creatures that are still lands.",
       "staticAbilities": [
         {
           "affected": {

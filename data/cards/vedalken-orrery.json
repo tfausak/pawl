@@ -8,6 +8,7 @@
         }
       ],
       "name": "Vedalken Orrery",
+      "oracleText": "You may cast spells as though they had flash.",
       "playerAbilities": [
         {
           "effect": {

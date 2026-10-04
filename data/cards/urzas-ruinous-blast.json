@@ -17,6 +17,7 @@
         }
       ],
       "name": "Urza's Ruinous Blast",
+      "oracleText": "(You may cast a legendary sorcery only if you control a legendary creature or planeswalker.)\nExile all nonland permanents that aren't legendary.",
       "spell": {
         "modes": [
           {

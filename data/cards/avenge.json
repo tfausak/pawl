@@ -61,6 +61,7 @@
         }
       ],
       "name": "Avenge",
+      "oracleText": "This spell costs {2} less to cast if a player attacked you during their last turn.\nDestroy all creatures. You gain 1 life for each creature destroyed this way.",
       "spell": {
         "modes": [
           {

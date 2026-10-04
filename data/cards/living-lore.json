@@ -23,6 +23,7 @@
         }
       ],
       "name": "Living Lore",
+      "oracleText": "As this creature enters, exile an instant or sorcery card from your graveyard.\nLiving Lore's power and toughness are each equal to the exiled card's mana value.\nWhenever this creature deals combat damage, you may sacrifice it. If you do, you may cast the exiled card without paying its mana cost.",
       "power": {
         "type": "Star"
       },

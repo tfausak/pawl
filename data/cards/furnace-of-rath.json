@@ -35,6 +35,7 @@
         }
       ],
       "name": "Furnace of Rath",
+      "oracleText": "If a source would deal damage to a permanent or player, it deals double that damage to that permanent or player instead.",
       "replacementEffects": [
         {
           "effect": {

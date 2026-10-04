@@ -39,6 +39,7 @@
         }
       ],
       "name": "Karplusan Minotaur",
+      "oracleText": "Cumulative upkeep—Flip a coin. (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.)\nWhenever you win a coin flip, this creature deals 1 damage to any target.\nWhenever you lose a coin flip, this creature deals 1 damage to any target of an opponent's choice.",
       "power": {
         "type": "Literal",
         "value": 3

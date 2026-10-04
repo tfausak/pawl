@@ -13,6 +13,7 @@
         }
       ],
       "name": "Goblin War Strike",
+      "oracleText": "Goblin War Strike deals damage to target player or planeswalker equal to the number of Goblins you control.",
       "spell": {
         "modes": [
           {

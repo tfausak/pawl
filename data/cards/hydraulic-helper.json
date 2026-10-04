@@ -72,6 +72,7 @@
         }
       ],
       "name": "Hydraulic Helper",
+      "oracleText": "Defender\n{T}: Add {U}. This mana can't be spent to cast a nonartifact spell.",
       "power": {
         "type": "Literal",
         "value": 2

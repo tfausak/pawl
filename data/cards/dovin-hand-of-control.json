@@ -94,6 +94,7 @@
         }
       ],
       "name": "Dovin, Hand of Control",
+      "oracleText": "Artifact, instant, and sorcery spells your opponents cast cost {1} more to cast.\n[−1]: Until your next turn, prevent all damage that would be dealt to and dealt by target permanent an opponent controls.",
       "playerAbilities": [
         {
           "effect": {

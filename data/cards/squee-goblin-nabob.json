@@ -17,6 +17,7 @@
         }
       ],
       "name": "Squee, Goblin Nabob",
+      "oracleText": "At the beginning of your upkeep, you may return this card from your graveyard to your hand.",
       "power": {
         "type": "Literal",
         "value": 1

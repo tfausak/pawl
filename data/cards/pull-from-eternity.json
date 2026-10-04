@@ -13,6 +13,7 @@
         }
       ],
       "name": "Pull from Eternity",
+      "oracleText": "Put target face-up exiled card into its owner's graveyard.",
       "spell": {
         "modes": [
           {

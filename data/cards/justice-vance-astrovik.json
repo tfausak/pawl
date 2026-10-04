@@ -22,6 +22,7 @@
         }
       ],
       "name": "Justice, Vance Astrovik",
+      "oracleText": "Flying\nWhen Justice enters, return up to one target nonland, nontoken permanent to its owner's hand.\nWhenever another nonland permanent you control is returned to its owner's hand, put a +1/+1 counter on Justice.",
       "power": {
         "type": "Literal",
         "value": 2

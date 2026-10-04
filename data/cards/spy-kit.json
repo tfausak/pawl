@@ -24,6 +24,7 @@
         }
       ],
       "name": "Spy Kit",
+      "oracleText": "Equipped creature gets +1/+1 and has all names of nonlegendary creature cards in addition to its name.\nEquip {2}",
       "staticAbilities": [
         {
           "affected": {

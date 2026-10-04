@@ -31,6 +31,7 @@
         }
       ],
       "name": "Trygon Predator",
+      "oracleText": "Flying\nWhenever this creature deals combat damage to a player, you may destroy target artifact or enchantment that player controls.",
       "power": {
         "type": "Literal",
         "value": 2

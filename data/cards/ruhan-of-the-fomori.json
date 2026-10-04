@@ -35,6 +35,7 @@
         }
       ],
       "name": "Ruhan of the Fomori",
+      "oracleText": "At the beginning of combat on your turn, choose an opponent at random. Ruhan attacks that player this combat if able.",
       "power": {
         "type": "Literal",
         "value": 7

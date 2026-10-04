@@ -31,6 +31,7 @@
         }
       ],
       "name": "Foriysian Brigade",
+      "oracleText": "This creature can block an additional creature each combat.",
       "power": {
         "type": "Literal",
         "value": 2

@@ -64,6 +64,7 @@
         }
       ],
       "name": "Smog Smasher",
+      "oracleText": "Menace\nStart your engines!\nWhenever one or more creatures you control deal combat damage to a player, conjure a duplicate of target nontoken creature into exile.\nMax speed — At the beginning of combat on your turn, put all cards exiled with this creature onto the battlefield. They gain haste. Sacrifice them at the beginning of the next end step.",
       "power": {
         "type": "Literal",
         "value": 4

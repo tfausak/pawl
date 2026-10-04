@@ -17,6 +17,7 @@
         }
       ],
       "name": "Commune with the Gods",
+      "oracleText": "Reveal the top five cards of your library. You may put a creature or enchantment card from among them into your hand. Put the rest into your graveyard.",
       "spell": {
         "modes": [
           {

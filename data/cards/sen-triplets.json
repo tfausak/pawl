@@ -35,6 +35,7 @@
         }
       ],
       "name": "Sen Triplets",
+      "oracleText": "At the beginning of your upkeep, choose target opponent. This turn, that player can't cast spells or activate abilities and plays with their hand revealed. You may play lands and cast spells from that player's hand this turn.",
       "power": {
         "type": "Literal",
         "value": 3

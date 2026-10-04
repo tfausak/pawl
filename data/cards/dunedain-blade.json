@@ -52,6 +52,7 @@
         }
       ],
       "name": "Dúnedain Blade",
+      "oracleText": "Equipped creature gets +2/+1.\nEquip Human {1}\nEquip {3} ({3}: Attach to target creature you control. Equip only as a sorcery.)",
       "staticAbilities": [
         {
           "affected": {

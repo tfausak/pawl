@@ -22,6 +22,7 @@
         }
       ],
       "name": "Wings of Velis Vel",
+      "oracleText": "Changeling (This card is every creature type.)\nUntil end of turn, target creature has base power and toughness 4/4, gains all creature types, and gains flying.",
       "spell": {
         "modes": [
           {

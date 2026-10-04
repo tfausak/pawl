@@ -31,6 +31,7 @@
         }
       ],
       "name": "Infernal Contract",
+      "oracleText": "Draw four cards. You lose half your life, rounded up.",
       "spell": {
         "modes": [
           {

@@ -18,6 +18,7 @@
         }
       ],
       "name": "Invasion of Dominaria",
+      "oracleText": "(As a Siege enters, choose an opponent to protect it. You and others can attack it. When it's defeated, exile it, then cast it transformed.)\nWhen this Siege enters, you gain 4 life and draw a card.",
       "triggeredAbilities": [
         {
           "condition": {
@@ -95,6 +96,7 @@
         }
       ],
       "name": "Serra Faithkeeper",
+      "oracleText": "Flying, vigilance",
       "power": {
         "type": "Literal",
         "value": 4

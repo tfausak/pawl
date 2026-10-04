@@ -17,6 +17,7 @@
         }
       ],
       "name": "Unbury",
+      "oracleText": "Choose one —\n• Return target creature card from your graveyard to your hand.\n• Return two target creature cards that share a creature type from your graveyard to your hand.",
       "spell": {
         "modes": [
           {

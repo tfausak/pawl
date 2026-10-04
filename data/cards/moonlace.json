@@ -13,6 +13,7 @@
         }
       ],
       "name": "Moonlace",
+      "oracleText": "Target spell or permanent becomes colorless.",
       "spell": {
         "modes": [
           {

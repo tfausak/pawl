@@ -2,6 +2,7 @@
   "faces": [
     {
       "name": "Look Skyward and Despair",
+      "oracleText": "When you set this scheme in motion, create a 5/5 red Dragon creature token with flying.",
       "triggeredAbilities": [
         {
           "condition": {

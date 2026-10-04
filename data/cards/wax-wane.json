@@ -13,6 +13,7 @@
         }
       ],
       "name": "Wax",
+      "oracleText": "Target creature gets +2/+2 until end of turn.",
       "spell": {
         "modes": [
           {
@@ -78,6 +79,7 @@
         }
       ],
       "name": "Wane",
+      "oracleText": "Destroy target enchantment.",
       "spell": {
         "modes": [
           {

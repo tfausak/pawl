@@ -17,6 +17,7 @@
         }
       ],
       "name": "Yedora, Grave Gardener",
+      "oracleText": "Whenever another nontoken creature you control dies, you may return it to the battlefield face down under its owner's control. It's a Forest land. (It has no other types or abilities.)",
       "power": {
         "type": "Literal",
         "value": 5

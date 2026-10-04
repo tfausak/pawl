@@ -47,6 +47,7 @@
         }
       ],
       "name": "Paleontologist's Pick-Axe",
+      "oracleText": "Whenever equipped creature attacks, draw a card, then discard a card.\nEquip {1}\nCraft with one or more creatures {5} ({5}, Exile this artifact, Exile one or more creatures you control and/or creature cards from your graveyard: Return this card transformed under its owner's control. Craft only as a sorcery.)",
       "triggeredAbilities": [
         {
           "condition": {
@@ -131,6 +132,7 @@
         }
       ],
       "name": "Dinosaur Headdress",
+      "oracleText": "When this Equipment enters, attach it to target creature you control.\nAs this Equipment becomes attached to a creature, choose an exiled creature card used to craft this Equipment.\nEquipped creature is a copy of the last chosen card.\nEquip {2}",
       "triggeredAbilities": [
         {
           "condition": {

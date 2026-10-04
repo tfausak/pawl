@@ -41,6 +41,7 @@
         }
       ],
       "name": "Osseous Exhale",
+      "oracleText": "As an additional cost to cast this spell, you may behold a Dragon. (You may choose a Dragon you control or reveal a Dragon card from your hand.)\nOsseous Exhale deals 5 damage to target attacking or blocking creature. If a Dragon was beheld, you gain 2 life.",
       "spell": {
         "modes": [
           {

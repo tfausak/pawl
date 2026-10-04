@@ -39,6 +39,7 @@
         }
       ],
       "name": "Think Twice",
+      "oracleText": "Draw a card.\nFlashback {2}{U} (You may cast this card from your graveyard for its flashback cost. Then exile it.)",
       "spell": {
         "modes": [
           {

@@ -189,6 +189,7 @@
         }
       ],
       "name": "Goldberry, River-Daughter",
+      "oracleText": "{T}: Move a counter of each kind not on Goldberry from another target permanent you control onto Goldberry.\n{U}, {T}: Move one or more counters from Goldberry onto another target permanent you control. If you do, draw a card.",
       "power": {
         "type": "Literal",
         "value": 1

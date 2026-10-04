@@ -2,6 +2,7 @@
   "faces": [
     {
       "name": "Bumper Cars",
+      "oracleText": "Visit — Target creature must be blocked this turn if able.",
       "triggeredAbilities": [
         {
           "condition": {

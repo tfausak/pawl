@@ -69,6 +69,7 @@
         }
       ],
       "name": "Realmbreaker's Grasp",
+      "oracleText": "Enchant artifact or creature\nEnchanted permanent can't attack or block, and its activated abilities can't be activated unless they're mana abilities.",
       "typeLine": {
         "subtypes": [
           {

@@ -22,6 +22,7 @@
         }
       ],
       "name": "Patrician Geist",
+      "oracleText": "Flying\nOther Spirits you control get +1/+1.\nSpells you cast from your graveyard cost {1} less to cast.",
       "playerAbilities": [
         {
           "effect": {

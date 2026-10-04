@@ -83,6 +83,7 @@
         }
       ],
       "name": "Aeon Chronicler",
+      "oracleText": "Aeon Chronicler's power and toughness are each equal to the number of cards in your hand.\nSuspend X—{X}{3}{U}. X can't be 0.\nWhenever a time counter is removed from this card while it's exiled, draw a card.",
       "power": {
         "type": "Star"
       },

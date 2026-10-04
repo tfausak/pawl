@@ -13,6 +13,7 @@
         }
       ],
       "name": "Fortifying Draught",
+      "oracleText": "You gain 2 life. Target creature gets +X/+X until end of turn, where X is the amount of life you gained this turn.",
       "spell": {
         "modes": [
           {

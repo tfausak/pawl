@@ -17,6 +17,7 @@
         }
       ],
       "name": "Imperial Recruiter",
+      "oracleText": "When this creature enters, search your library for a creature card with power 2 or less, reveal it, put it into your hand, then shuffle.",
       "power": {
         "type": "Literal",
         "value": 1

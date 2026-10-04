@@ -22,6 +22,7 @@
         }
       ],
       "name": "Sign in Blood",
+      "oracleText": "Target player draws two cards and loses 2 life.",
       "spell": {
         "modes": [
           {

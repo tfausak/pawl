@@ -57,6 +57,7 @@
         }
       ],
       "name": "Arbor Elf",
+      "oracleText": "{T}: Untap target Forest.",
       "power": {
         "type": "Literal",
         "value": 1

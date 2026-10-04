@@ -58,6 +58,7 @@
         }
       ],
       "name": "No-Regrets Egret",
+      "oracleText": "Flying\nAny time you could mulligan and No-Regrets Egret is in your hand, you may reveal No-Regrets Egret. If you do, look at the top two cards of your library. (Put those cards back in the same order. You can still mulligan.)",
       "power": {
         "type": "Literal",
         "value": 2

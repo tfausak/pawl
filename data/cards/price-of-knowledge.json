@@ -17,6 +17,7 @@
         }
       ],
       "name": "Price of Knowledge",
+      "oracleText": "Players have no maximum hand size.\nAt the beginning of each opponent's upkeep, this enchantment deals damage to that player equal to the number of cards in that player's hand.",
       "playerAbilities": [
         {
           "effect": {

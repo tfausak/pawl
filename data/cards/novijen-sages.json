@@ -105,6 +105,7 @@
         }
       ],
       "name": "Novijen Sages",
+      "oracleText": "Graft 4 (This creature enters with four +1/+1 counters on it. Whenever another creature enters, you may move a +1/+1 counter from this creature onto it.)\n{1}, Remove two +1/+1 counters from among creatures you control: Draw a card.",
       "power": {
         "type": "Literal",
         "value": 0

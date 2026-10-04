@@ -31,6 +31,7 @@
         }
       ],
       "name": "Beatrix, Loyal General",
+      "oracleText": "Vigilance (Attacking doesn't cause this creature to tap.)\nAt the beginning of combat on your turn, you may attach any number of Equipment you control to target creature you control.",
       "power": {
         "type": "Literal",
         "value": 4

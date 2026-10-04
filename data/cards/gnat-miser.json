@@ -13,6 +13,7 @@
         }
       ],
       "name": "Gnat Miser",
+      "oracleText": "Each opponent's maximum hand size is reduced by one.",
       "playerAbilities": [
         {
           "effect": {

@@ -22,6 +22,7 @@
         }
       ],
       "name": "Delivery Moogle",
+      "oracleText": "Flying\nWhen this creature enters, search your library and/or graveyard for an artifact card with mana value 2 or less, reveal it, and put it into your hand. If you search your library this way, shuffle.",
       "power": {
         "type": "Literal",
         "value": 3

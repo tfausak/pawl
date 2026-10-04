@@ -17,6 +17,7 @@
         }
       ],
       "name": "March of the Machines",
+      "oracleText": "Each noncreature artifact is an artifact creature with power and toughness each equal to its mana value. (Equipment that's a creature can't equip a creature.)",
       "staticAbilities": [
         {
           "affected": {

@@ -13,6 +13,7 @@
         }
       ],
       "name": "Magnetic Theft",
+      "oracleText": "Attach target Equipment to target creature. (Control of the Equipment doesn't change.)",
       "spell": {
         "modes": [
           {

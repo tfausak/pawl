@@ -47,6 +47,7 @@
         }
       ],
       "name": "Desperate Ritual",
+      "oracleText": "Add {R}{R}{R}.\nSplice onto Arcane {1}{R} (As you cast an Arcane spell, you may reveal this card from your hand and pay its splice cost. If you do, add this card's effects to that spell.)",
       "spell": {
         "modes": [
           {

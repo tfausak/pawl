@@ -73,6 +73,7 @@
         }
       ],
       "name": "Tattoo Ward",
+      "oracleText": "Enchant creature\nEnchanted creature gets +1/+1 and has protection from enchantments. This effect doesn't remove this Aura.\nSacrifice this Aura: Destroy target enchantment.",
       "staticAbilities": [
         {
           "affected": {

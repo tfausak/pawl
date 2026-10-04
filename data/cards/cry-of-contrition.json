@@ -18,6 +18,7 @@
         }
       ],
       "name": "Cry of Contrition",
+      "oracleText": "Target player discards a card.\nHaunt (When this spell card is put into a graveyard after resolving, exile it haunting target creature.)\nWhen the creature this card haunts dies, target player discards a card.",
       "spell": {
         "modes": [
           {

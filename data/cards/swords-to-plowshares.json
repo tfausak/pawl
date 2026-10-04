@@ -13,6 +13,7 @@
         }
       ],
       "name": "Swords to Plowshares",
+      "oracleText": "Exile target creature. Its controller gains life equal to its power.",
       "spell": {
         "modes": [
           {

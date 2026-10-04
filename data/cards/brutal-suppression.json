@@ -13,6 +13,7 @@
         }
       ],
       "name": "Brutal Suppression",
+      "oracleText": "Activated abilities of nontoken Rebels cost an additional \"Sacrifice a land\" to activate.",
       "playerAbilities": [
         {
           "effect": {

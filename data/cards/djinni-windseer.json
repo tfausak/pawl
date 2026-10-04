@@ -22,6 +22,7 @@
         }
       ],
       "name": "Djinni Windseer",
+      "oracleText": "Flying\nWhen this creature enters, roll a d20.\n1—9 | Scry 1.\n10—19 | Scry 2.\n20 | Scry 3.",
       "power": {
         "type": "Literal",
         "value": 3

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Copy Enchantment",
+      "oracleText": "You may have this enchantment enter as a copy of any enchantment on the battlefield.",
       "replacementEffects": [
         {
           "effect": {

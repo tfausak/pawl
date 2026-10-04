@@ -17,6 +17,7 @@
         }
       ],
       "name": "Ravenous Rats",
+      "oracleText": "When this creature enters, target opponent discards a card.",
       "power": {
         "type": "Literal",
         "value": 1

@@ -118,6 +118,7 @@
         }
       ],
       "name": "Cadaverous Bloom",
+      "oracleText": "Exile a card from your hand: Add {B}{B} or {G}{G}.",
       "typeLine": {
         "types": [
           {

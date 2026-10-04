@@ -17,6 +17,7 @@
         }
       ],
       "name": "Shimatsu the Bloodcloaked",
+      "oracleText": "As Shimatsu enters, sacrifice any number of permanents. Shimatsu enters with that many +1/+1 counters on it.",
       "power": {
         "type": "Literal",
         "value": 0

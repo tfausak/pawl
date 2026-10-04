@@ -23,6 +23,7 @@
         }
       ],
       "name": "Surging Dementia",
+      "oracleText": "Ripple 4 (When you cast this spell, you may reveal the top four cards of your library. You may cast spells with the same name as this spell from among those cards without paying their mana costs. Put the rest on the bottom of your library.)\nTarget player discards a card.",
       "spell": {
         "modes": [
           {

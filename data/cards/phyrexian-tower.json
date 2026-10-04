@@ -99,6 +99,7 @@
         }
       ],
       "name": "Phyrexian Tower",
+      "oracleText": "{T}: Add {C}.\n{T}, Sacrifice a creature: Add {B}{B}.",
       "typeLine": {
         "supertypes": [
           {

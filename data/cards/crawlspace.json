@@ -19,6 +19,7 @@
         }
       ],
       "name": "Crawlspace",
+      "oracleText": "No more than two creatures can attack you each combat.",
       "typeLine": {
         "types": [
           {

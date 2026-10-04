@@ -87,6 +87,7 @@
         }
       ],
       "name": "Spitfire Handler",
+      "oracleText": "This creature can't block creatures with power greater than this creature's power.\n{R}: This creature gets +1/+0 until end of turn.",
       "power": {
         "type": "Literal",
         "value": 1

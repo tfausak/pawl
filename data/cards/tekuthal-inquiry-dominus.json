@@ -140,6 +140,7 @@
         }
       ],
       "name": "Tekuthal, Inquiry Dominus",
+      "oracleText": "Flying\nIf you would proliferate, proliferate twice instead.\n{1}{U/P}{U/P}, Remove three counters from among other artifacts, creatures, and planeswalkers you control: Put an indestructible counter on Tekuthal. ({U/P} can be paid with either {U} or 2 life.)",
       "power": {
         "type": "Literal",
         "value": 3

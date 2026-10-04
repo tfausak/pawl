@@ -230,6 +230,7 @@
         }
       ],
       "name": "Calim, Djinn Emperor",
+      "oracleText": "Flying, ward {2}\nCalim's Breath — {1}{U}, Discard Calim: Tap up to one target nonland permanent. Draw a card. Then you may exile two other cards named Calim, Djinn Emperor from your graveyard. When you do, return Calim from your graveyard to the battlefield tapped.\nWhen you discard Calim, conjure a card named Calim, Djinn Emperor into your library seventh from the top.",
       "power": {
         "type": "Literal",
         "value": 5

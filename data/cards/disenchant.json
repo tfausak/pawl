@@ -17,6 +17,7 @@
         }
       ],
       "name": "Disenchant",
+      "oracleText": "Destroy target artifact or enchantment.",
       "spell": {
         "modes": [
           {

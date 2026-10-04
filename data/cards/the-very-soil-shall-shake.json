@@ -2,6 +2,7 @@
   "faces": [
     {
       "name": "The Very Soil Shall Shake",
+      "oracleText": "(An ongoing scheme remains face up until it's abandoned.)\nCreatures you control get +2/+2 and have trample.\nWhen a creature you control dies, abandon this scheme.",
       "staticAbilities": [
         {
           "affected": {

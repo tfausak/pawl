@@ -104,6 +104,7 @@
         }
       ],
       "name": "Sphinx of the Revelation",
+      "oracleText": "Flying, lifelink\nWhenever you gain life, you get that many {E} (energy counters).\n{W}{U}{U}, {T}, Pay X {E}: Draw X cards.",
       "power": {
         "type": "Literal",
         "value": 4

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Fulgent Distraction",
+      "oracleText": "Choose two target creatures. Tap those creatures, then unattach all Equipment from them.",
       "spell": {
         "modes": [
           {

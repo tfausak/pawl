@@ -19,6 +19,7 @@
         }
       ],
       "name": "Venerated Rotpriest",
+      "oracleText": "Toxic 1 (Players dealt combat damage by this creature also get a poison counter.)\nWhenever a creature you control becomes the target of a spell, target opponent gets a poison counter.",
       "power": {
         "type": "Literal",
         "value": 1

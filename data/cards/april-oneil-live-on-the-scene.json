@@ -25,6 +25,7 @@
         }
       ],
       "name": "April O'Neil, Live on the Scene",
+      "oracleText": "Whenever a Mutant, Ninja, or Turtle you control enters, investigate. (Create a Clue token. It's an artifact with \"{2}, Sacrifice this token: Draw a card.\")\nPartner—Character select",
       "power": {
         "type": "Literal",
         "value": 2

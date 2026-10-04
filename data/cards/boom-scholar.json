@@ -137,6 +137,7 @@
         }
       ],
       "name": "Boom Scholar",
+      "oracleText": "Exhaust abilities of other permanents you control cost {2} less to activate.\nExhaust — {4}{R}{G}: Creatures and Vehicles you control gain trample until end of turn. Put two +1/+1 counters on this creature. (Activate each exhaust ability only once.)",
       "playerAbilities": [
         {
           "effect": {

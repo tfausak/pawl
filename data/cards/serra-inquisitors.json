@@ -17,6 +17,7 @@
         }
       ],
       "name": "Serra Inquisitors",
+      "oracleText": "Whenever this creature blocks or becomes blocked by one or more black creatures, this creature gets +2/+0 until end of turn.",
       "power": {
         "type": "Literal",
         "value": 3

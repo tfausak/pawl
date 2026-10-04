@@ -55,6 +55,7 @@
         }
       ],
       "name": "Goblin Bookie",
+      "oracleText": "{R}, {T}: Reflip any coin or reroll any die. (Activate only any time it makes sense.)",
       "power": {
         "type": "Literal",
         "value": 1

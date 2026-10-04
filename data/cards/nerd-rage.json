@@ -24,6 +24,7 @@
         }
       ],
       "name": "Nerd Rage",
+      "oracleText": "Enchant creature\nWhen this Aura enters, draw two cards.\nEnchanted creature has \"You have no maximum hand size\" and \"Whenever this creature attacks, if you have ten or more cards in hand, it gets +10/+10 until end of turn.\"",
       "staticAbilities": [
         {
           "affected": {

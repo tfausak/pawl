@@ -26,6 +26,7 @@
         }
       ],
       "name": "Horned Cheetah",
+      "oracleText": "Whenever this creature deals damage, you gain that much life.",
       "power": {
         "type": "Literal",
         "value": 2

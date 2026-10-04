@@ -17,6 +17,7 @@
         }
       ],
       "name": "Explosive Entry",
+      "oracleText": "Destroy up to one target artifact. Put a +1/+1 counter on up to one target creature.",
       "spell": {
         "modes": [
           {

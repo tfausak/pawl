@@ -13,6 +13,7 @@
         }
       ],
       "name": "Red Elemental Blast",
+      "oracleText": "Choose one —\n• Counter target blue spell.\n• Destroy target blue permanent.",
       "spell": {
         "modes": [
           {

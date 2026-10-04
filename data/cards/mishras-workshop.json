@@ -83,6 +83,7 @@
         }
       ],
       "name": "Mishra's Workshop",
+      "oracleText": "{T}: Add {C}{C}{C}. Spend this mana only to cast artifact spells.",
       "typeLine": {
         "types": [
           {

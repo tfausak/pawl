@@ -106,6 +106,7 @@
         }
       ],
       "name": "Progenitus",
+      "oracleText": "Protection from everything\nIf Progenitus would be put into a graveyard from anywhere, reveal Progenitus and shuffle it into its owner's library instead.",
       "power": {
         "type": "Literal",
         "value": 10

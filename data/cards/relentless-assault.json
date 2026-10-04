@@ -26,6 +26,7 @@
         }
       ],
       "name": "Relentless Assault",
+      "oracleText": "Untap all creatures that attacked this turn. After this main phase, there is an additional combat phase followed by an additional main phase.",
       "spell": {
         "modes": [
           {

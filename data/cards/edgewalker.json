@@ -26,6 +26,7 @@
         }
       ],
       "name": "Edgewalker",
+      "oracleText": "Cleric spells you cast cost {W}{B} less to cast. This effect reduces only the amount of colored mana you pay. (For example, if you cast a Cleric spell with mana cost {1}{W}, it costs {1} to cast.)",
       "playerAbilities": [
         {
           "effect": {

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Norn's Decree",
+      "oracleText": "Whenever one or more creatures an opponent controls deal combat damage to you, that opponent gets a poison counter.\nWhenever a player attacks, if one or more players being attacked are poisoned, the attacking player draws a card.",
       "triggeredAbilities": [
         {
           "condition": {

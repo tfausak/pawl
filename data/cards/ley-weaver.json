@@ -74,6 +74,7 @@
         }
       ],
       "name": "Ley Weaver",
+      "oracleText": "Partner with Lore Weaver (When this creature enters, target player may put Lore Weaver into their hand from their library, then shuffle.)\n{T}: Untap two target lands.",
       "power": {
         "type": "Literal",
         "value": 2

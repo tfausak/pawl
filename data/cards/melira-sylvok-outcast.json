@@ -44,6 +44,7 @@
         }
       ],
       "name": "Melira, Sylvok Outcast",
+      "oracleText": "You can't get poison counters.\nCreatures you control can't have -1/-1 counters put on them.\nCreatures your opponents control lose infect.",
       "playerAbilities": [
         {
           "effect": {

@@ -51,6 +51,7 @@
         }
       ],
       "name": "Auntie Ool, Cursewretch",
+      "oracleText": "Ward—Blight 2. (To blight 2, a player puts two -1/-1 counters on a creature they control.)\nWhenever one or more -1/-1 counters are put on a creature, draw a card if you control that creature. If you don't control it, its controller loses 1 life.",
       "power": {
         "type": "Literal",
         "value": 4

@@ -13,6 +13,7 @@
         }
       ],
       "name": "Planar Void",
+      "oracleText": "Whenever another card is put into a graveyard from anywhere, exile that card.",
       "triggeredAbilities": [
         {
           "condition": {

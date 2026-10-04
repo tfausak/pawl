@@ -17,6 +17,7 @@
         }
       ],
       "name": "Bellowing Mauler",
+      "oracleText": "At the beginning of your end step, each player loses 4 life unless they sacrifice a nontoken creature of their choice.",
       "power": {
         "type": "Literal",
         "value": 4

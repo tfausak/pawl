@@ -1,0 +1,23 @@
+{
+  "faces": [
+    {
+      "name": "Badlands",
+      "oracleText": "({T}: Add {B} or {R}.)",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Mountain"
+          },
+          {
+            "type": "Swamp"
+          }
+        ],
+        "types": [
+          {
+            "type": "Land"
+          }
+        ]
+      }
+    }
+  ]
+}

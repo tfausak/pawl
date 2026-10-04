@@ -84,6 +84,7 @@
       },
       "manaCost": [],
       "name": "Summoner's Pact",
+      "oracleText": "Search your library for a green creature card, reveal it, put it into your hand, then shuffle.\nAt the beginning of your next upkeep, pay {2}{G}{G}. If you don't, you lose the game.",
       "spell": {
         "modes": [
           {

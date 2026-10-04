@@ -1488,6 +1488,8 @@ library executable
   import: library
   build-depends:
     bytestring ^>=0.12.2,
+    containers ^>=0.7,
+    directory ^>=1.3.8,
     pawl:benchmark,
     pawl:codec,
     pawl:json,
@@ -1496,6 +1498,7 @@ library executable
     pawl:registry,
     pawl:scenario,
     pawl:test,
+    pawl:types,
     text ^>=2.1.3,
 
   hs-source-dirs: source/libraries/executable
@@ -1665,6 +1668,7 @@ library registry
     directory ^>=1.3.8,
     pawl:codec,
     pawl:exceptions,
+    pawl:json,
     pawl:json-codec,
     pawl:slug,
     pawl:types,
@@ -1676,6 +1680,8 @@ library registry
   -- cabal-gild: discover source/libraries/registry
   exposed-modules:
     Pawl.DeckList
+    Pawl.Ingest
+    Pawl.Oracle
     Pawl.Registry
 
 -- Scenarios: a board, a timeline of decisions and checks, and the runner that
@@ -1852,6 +1858,7 @@ library test
     Pawl.MulliganSpec
     Pawl.MutateSpec
     Pawl.OmenSpec
+    Pawl.OracleSpec
     Pawl.OutsideTheGameSpec
     Pawl.PhasingSpec
     Pawl.PlanechaseSpec

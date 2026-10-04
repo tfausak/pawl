@@ -51,6 +51,7 @@
         }
       ],
       "name": "Zhao, Ruthless Admiral",
+      "oracleText": "Firebending 2 (Whenever this creature attacks, add {R}{R}. This mana lasts until end of combat.)\nWhenever you sacrifice another permanent, creatures you control get +1/+0 until end of turn.",
       "power": {
         "type": "Literal",
         "value": 3

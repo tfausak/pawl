@@ -17,6 +17,7 @@
         }
       ],
       "name": "Fall of the Hammer",
+      "oracleText": "Target creature you control deals damage equal to its power to another target creature.",
       "spell": {
         "modes": [
           {

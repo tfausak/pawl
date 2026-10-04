@@ -55,6 +55,7 @@
         }
       ],
       "name": "Necravolver",
+      "oracleText": "Kicker {1}{G} and/or {W} (You may pay an additional {1}{G} and/or {W} as you cast this spell.)\nIf this creature was kicked with its {1}{G} kicker, it enters with two +1/+1 counters on it and with trample.\nIf this creature was kicked with its {W} kicker, it enters with a +1/+1 counter on it and with \"Whenever this creature deals damage, you gain that much life.\"",
       "power": {
         "type": "Literal",
         "value": 2

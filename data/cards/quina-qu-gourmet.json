@@ -73,6 +73,7 @@
         }
       ],
       "name": "Quina, Qu Gourmet",
+      "oracleText": "If one or more tokens would be created under your control, those tokens plus a 1/1 green Frog creature token are created instead.\n{2}, Sacrifice a Frog: Put a +1/+1 counter on Quina.",
       "power": {
         "type": "Literal",
         "value": 2

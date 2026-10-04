@@ -8,6 +8,7 @@
         }
       ],
       "name": "Amulet of Safekeeping",
+      "oracleText": "Whenever you become the target of a spell or ability an opponent controls, counter that spell or ability unless its controller pays {1}.\nCreature tokens get -1/-0.",
       "staticAbilities": [
         {
           "affected": {

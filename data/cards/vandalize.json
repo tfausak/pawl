@@ -17,6 +17,7 @@
         }
       ],
       "name": "Vandalize",
+      "oracleText": "Choose one or both —\n• Destroy target artifact.\n• Destroy target land.",
       "spell": {
         "modes": [
           {

@@ -22,6 +22,7 @@
         }
       ],
       "name": "Dash Hopes",
+      "oracleText": "When you cast this spell, any player may pay 5 life. If a player does, counter Dash Hopes.\nCounter target spell.",
       "spell": {
         "modes": [
           {

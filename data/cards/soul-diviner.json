@@ -110,6 +110,7 @@
         }
       ],
       "name": "Soul Diviner",
+      "oracleText": "{T}, Remove a counter from an artifact, creature, land, or planeswalker you control: Draw a card.",
       "power": {
         "type": "Literal",
         "value": 2

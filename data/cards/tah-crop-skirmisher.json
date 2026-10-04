@@ -39,6 +39,7 @@
         }
       ],
       "name": "Tah-Crop Skirmisher",
+      "oracleText": "Embalm {3}{U} ({3}{U}, Exile this card from your graveyard: Create a token that's a copy of it, except it's a white Zombie Snake Warrior with no mana cost. Embalm only as a sorcery.)",
       "power": {
         "type": "Literal",
         "value": 2

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Deathknell Berserker",
+      "oracleText": "When this creature dies, if its power was 3 or greater, create a 2/2 black Zombie Berserker creature token.",
       "power": {
         "type": "Literal",
         "value": 2

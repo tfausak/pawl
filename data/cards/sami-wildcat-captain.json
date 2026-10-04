@@ -34,6 +34,7 @@
         }
       ],
       "name": "Sami, Wildcat Captain",
+      "oracleText": "Double strike, vigilance\nSpells you cast have affinity for artifacts. (They cost {1} less to cast for each artifact you control.)",
       "power": {
         "type": "Literal",
         "value": 4

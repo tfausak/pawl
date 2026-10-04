@@ -17,6 +17,7 @@
         }
       ],
       "name": "Birgi, God of Storytelling",
+      "oracleText": "Whenever you cast a spell, add {R}. Until end of turn, you don't lose this mana as steps and phases end.\nCreatures you control can boast twice during each of your turns rather than once.",
       "power": {
         "type": "Literal",
         "value": 3
@@ -60,6 +61,7 @@
         }
       ],
       "name": "Harnfel, Horn of Bounty",
+      "oracleText": "Discard a card: Exile the top two cards of your library. You may play those cards this turn.",
       "typeLine": {
         "supertypes": [
           {

@@ -125,6 +125,7 @@
         }
       ],
       "name": "Ooze Flux",
+      "oracleText": "{1}{G}, Remove one or more +1/+1 counters from among creatures you control: Create an X/X green Ooze creature token, where X is the number of +1/+1 counters removed this way.",
       "typeLine": {
         "types": [
           {

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Null Chamber",
+      "oracleText": "As this enchantment enters, you and an opponent each choose a card name other than a basic land card name.\nSpells with the chosen names can't be cast and lands with the chosen names can't be played.",
       "playerAbilities": [
         {
           "effect": {

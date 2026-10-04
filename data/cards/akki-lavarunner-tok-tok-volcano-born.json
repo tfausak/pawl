@@ -22,6 +22,7 @@
         }
       ],
       "name": "Akki Lavarunner",
+      "oracleText": "Haste\nWhenever this creature deals damage to an opponent, flip it.",
       "power": {
         "type": "Literal",
         "value": 1
@@ -91,6 +92,7 @@
         }
       ],
       "name": "Tok-Tok, Volcano Born",
+      "oracleText": "Protection from red\nIf a red source would deal damage to a player, it deals that much damage plus 1 to that player instead.",
       "power": {
         "type": "Literal",
         "value": 2

@@ -8,6 +8,7 @@
         }
       ],
       "name": "Meekstone",
+      "oracleText": "Creatures with power 3 or greater don't untap during their controllers' untap steps.",
       "typeLine": {
         "types": [
           {

@@ -26,6 +26,7 @@
         }
       ],
       "name": "Sakashima the Impostor",
+      "oracleText": "You may have Sakashima the Impostor enter as a copy of any creature on the battlefield, except its name is Sakashima the Impostor, it's legendary in addition to its other types, and it has \"{2}{U}{U}: Return Sakashima the Impostor to its owner's hand at the beginning of the next end step.\"",
       "power": {
         "type": "Literal",
         "value": 3

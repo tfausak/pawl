@@ -31,6 +31,7 @@
         }
       ],
       "name": "Aquatic Subtlety",
+      "oracleText": "Draw two cards, then put two cards from your hand on the bottom of your library in any order. Blue creature cards in your hand perpetually gain \"Evoke—Exile a blue card from your hand.\"",
       "spell": {
         "modes": [
           {

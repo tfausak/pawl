@@ -24,6 +24,7 @@
         }
       ],
       "name": "Curse of Inertia",
+      "oracleText": "Enchant player\nWhenever a player attacks enchanted player with one or more creatures, that attacking player may tap or untap target permanent of their choice.",
       "triggeredAbilities": [
         {
           "condition": {

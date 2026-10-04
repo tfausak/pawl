@@ -26,6 +26,7 @@
         }
       ],
       "name": "Garland, Royal Kidnapper",
+      "oracleText": "When Garland enters, target opponent becomes the monarch.\nWhenever an opponent becomes the monarch, gain control of target creature that player controls for as long as they're the monarch.\nCreatures you control but don't own get +2/+2 and can't be sacrificed.",
       "power": {
         "type": "Literal",
         "value": 3

@@ -8,6 +8,7 @@
         }
       ],
       "name": "Eager Construct",
+      "oracleText": "When this creature enters, each player may scry 1. (To scry 1, look at the top card of your library, then you may put that card on the bottom.)",
       "power": {
         "type": "Literal",
         "value": 2

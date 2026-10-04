@@ -99,6 +99,7 @@
         }
       ],
       "name": "Cho-Arrim Alchemist",
+      "oracleText": "{1}{W}{W}, {T}, Discard a card: The next time a source of your choice would deal damage to you this turn, prevent that damage. You gain life equal to the damage prevented this way.",
       "power": {
         "type": "Literal",
         "value": 1

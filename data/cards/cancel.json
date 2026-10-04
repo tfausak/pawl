@@ -26,6 +26,7 @@
         }
       ],
       "name": "Cancel",
+      "oracleText": "Counter target spell.",
       "spell": {
         "modes": [
           {

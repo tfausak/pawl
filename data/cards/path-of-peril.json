@@ -57,6 +57,7 @@
         }
       ],
       "name": "Path of Peril",
+      "oracleText": "Cleave {4}{W}{B} (You may cast this spell for its cleave cost. If you do, remove the words in square brackets.)\nDestroy all creatures [with mana value 2 or less].",
       "spell": {
         "modes": [
           {

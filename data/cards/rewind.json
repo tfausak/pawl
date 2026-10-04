@@ -26,6 +26,7 @@
         }
       ],
       "name": "Rewind",
+      "oracleText": "Counter target spell. Untap up to four lands.",
       "spell": {
         "modes": [
           {

@@ -41,6 +41,7 @@
         }
       ],
       "name": "Hinterland Drake",
+      "oracleText": "Flying\nThis creature can't block artifact creatures.",
       "power": {
         "type": "Literal",
         "value": 2

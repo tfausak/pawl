@@ -17,6 +17,7 @@
         }
       ],
       "name": "Ever-Watching Threshold",
+      "oracleText": "Whenever an opponent attacks, if they attacked you and/or a planeswalker you control, draw a card.",
       "triggeredAbilities": [
         {
           "condition": {

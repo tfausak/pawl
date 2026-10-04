@@ -26,6 +26,7 @@
         }
       ],
       "name": "Custodi Lich",
+      "oracleText": "When this creature enters, you become the monarch.\nWhenever you become the monarch, target player sacrifices a creature of their choice.",
       "power": {
         "type": "Literal",
         "value": 4

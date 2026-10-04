@@ -141,6 +141,7 @@
         }
       ],
       "name": "Baboon Spirit",
+      "oracleText": "Whenever another nontoken Spirit you control enters, create a 1/1 colorless Spirit creature token with \"This token can't block or be blocked by non-Spirit creatures.\"\n{3}{U}: Exile another target creature you control. Return it to the battlefield under its owner's control at the beginning of the next end step.",
       "power": {
         "type": "Literal",
         "value": 2

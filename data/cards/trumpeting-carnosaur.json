@@ -110,6 +110,7 @@
         }
       ],
       "name": "Trumpeting Carnosaur",
+      "oracleText": "Trample\nWhen this creature enters, discover 5.\n{2}{R}, Discard this card: It deals 3 damage to target creature or planeswalker.",
       "power": {
         "type": "Literal",
         "value": 7

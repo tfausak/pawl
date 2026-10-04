@@ -22,6 +22,7 @@
         }
       ],
       "name": "Cyber Conversion",
+      "oracleText": "Turn target creature face down. It's a 2/2 Cyberman artifact creature.",
       "spell": {
         "modes": [
           {

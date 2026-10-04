@@ -24,6 +24,7 @@
         }
       ],
       "name": "Rune of Mortality",
+      "oracleText": "Enchant permanent\nWhen this Aura enters, draw a card.\nAs long as enchanted permanent is a creature, it has deathtouch.\nAs long as enchanted permanent is an Equipment, it has \"Equipped creature has deathtouch.\"",
       "staticAbilities": [
         {
           "affected": {

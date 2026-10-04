@@ -74,6 +74,7 @@
         }
       ],
       "name": "Bone Mask",
+      "oracleText": "{2}, {T}: The next time a source of your choice would deal damage to you this turn, prevent that damage. Exile cards from the top of your library equal to the damage prevented this way.",
       "typeLine": {
         "types": [
           {

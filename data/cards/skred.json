@@ -13,6 +13,7 @@
         }
       ],
       "name": "Skred",
+      "oracleText": "Skred deals damage to target creature equal to the number of snow permanents you control.",
       "spell": {
         "modes": [
           {

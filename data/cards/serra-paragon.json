@@ -31,6 +31,7 @@
         }
       ],
       "name": "Serra Paragon",
+      "oracleText": "Flying\nOnce during each of your turns, you may play a land from your graveyard or cast a permanent spell with mana value 3 or less from your graveyard. If you do, it gains \"When this permanent is put into a graveyard from the battlefield, exile it and you gain 2 life.\"",
       "playerAbilities": [
         {
           "effect": {

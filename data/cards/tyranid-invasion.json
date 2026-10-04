@@ -17,6 +17,7 @@
         }
       ],
       "name": "Tyranid Invasion",
+      "oracleText": "Create a number of 3/3 green Tyranid Warrior creature tokens with trample equal to the number of opponents you have.",
       "spell": {
         "modes": [
           {

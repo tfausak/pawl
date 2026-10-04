@@ -28,6 +28,7 @@
         }
       ],
       "name": "Song of the Dryads",
+      "oracleText": "Enchant permanent\nEnchanted permanent is a colorless Forest land.",
       "staticAbilities": [
         {
           "affected": {

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Raised by Giants",
+      "oracleText": "Commander creatures you own have base power and toughness 10/10 and are Giants in addition to their other types.",
       "staticAbilities": [
         {
           "affected": {

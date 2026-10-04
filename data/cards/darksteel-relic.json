@@ -1,0 +1,21 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Indestructible"
+        }
+      ],
+      "manaCost": [],
+      "name": "Darksteel Relic",
+      "oracleText": "Indestructible (Effects that say \"destroy\" don't destroy this artifact.)",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}

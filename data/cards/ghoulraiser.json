@@ -26,6 +26,7 @@
         }
       ],
       "name": "Ghoulraiser",
+      "oracleText": "When this creature enters, return a Zombie card at random from your graveyard to your hand.",
       "power": {
         "type": "Literal",
         "value": 2

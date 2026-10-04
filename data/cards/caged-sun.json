@@ -8,6 +8,7 @@
         }
       ],
       "name": "Caged Sun",
+      "oracleText": "As this artifact enters, choose a color.\nCreatures you control of the chosen color get +1/+1.\nWhenever a land's ability causes you to add one or more mana of the chosen color, add an additional one mana of that color.",
       "replacementEffects": [
         {
           "effect": {

@@ -22,6 +22,7 @@
         }
       ],
       "name": "Thrilling Discovery",
+      "oracleText": "You gain 2 life. Then you may discard two cards. If you do, draw three cards.",
       "spell": {
         "modes": [
           {

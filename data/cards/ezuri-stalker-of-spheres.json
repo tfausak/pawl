@@ -26,6 +26,7 @@
         }
       ],
       "name": "Ezuri, Stalker of Spheres",
+      "oracleText": "When Ezuri enters, you may pay {3}. If you do, proliferate twice.\nWhenever you proliferate, draw a card.",
       "power": {
         "type": "Literal",
         "value": 3

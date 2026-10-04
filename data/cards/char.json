@@ -17,6 +17,7 @@
         }
       ],
       "name": "Char",
+      "oracleText": "Char deals 4 damage to any target and 2 damage to you.",
       "spell": {
         "modes": [
           {

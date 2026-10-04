@@ -106,6 +106,7 @@
         }
       ],
       "name": "Llanowar Augur",
+      "oracleText": "Sacrifice this creature: Target creature gets +3/+3 and gains trample until end of turn. Activate only during your upkeep.",
       "power": {
         "type": "Literal",
         "value": 0

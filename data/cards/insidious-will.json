@@ -26,6 +26,7 @@
         }
       ],
       "name": "Insidious Will",
+      "oracleText": "Choose one —\n• Counter target spell.\n• You may choose new targets for target spell.\n• Copy target instant or sorcery spell. You may choose new targets for the copy.",
       "spell": {
         "modes": [
           {

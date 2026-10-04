@@ -78,6 +78,7 @@
         }
       ],
       "name": "Thorin, Mountain-king",
+      "oracleText": "Trample\nWhen Thorin enters, attach any number of target Equipment you control to target creature you control. When one or more Equipment become attached to that creature this way, that creature deals damage equal to its power to up to one target creature.",
       "power": {
         "type": "Literal",
         "value": 3

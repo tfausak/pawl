@@ -31,6 +31,7 @@
         }
       ],
       "name": "Archfiend of Depravity",
+      "oracleText": "Flying\nAt the beginning of each opponent's end step, that player chooses up to two creatures they control, then sacrifices the rest.",
       "power": {
         "type": "Literal",
         "value": 5

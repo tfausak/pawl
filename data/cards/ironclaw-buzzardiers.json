@@ -81,6 +81,7 @@
         }
       ],
       "name": "Ironclaw Buzzardiers",
+      "oracleText": "This creature can't block creatures with power 2 or greater.\n{R}: This creature gains flying until end of turn.",
       "power": {
         "type": "Literal",
         "value": 2

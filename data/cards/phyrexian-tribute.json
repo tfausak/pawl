@@ -31,6 +31,7 @@
         }
       ],
       "name": "Phyrexian Tribute",
+      "oracleText": "As an additional cost to cast this spell, sacrifice two creatures.\nDestroy target artifact.",
       "spell": {
         "modes": [
           {

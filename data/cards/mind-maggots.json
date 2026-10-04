@@ -17,6 +17,7 @@
         }
       ],
       "name": "Mind Maggots",
+      "oracleText": "When this creature enters, discard any number of creature cards. For each card discarded this way, put two +1/+1 counters on this creature.",
       "power": {
         "type": "Literal",
         "value": 2

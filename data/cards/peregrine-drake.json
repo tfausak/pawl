@@ -22,6 +22,7 @@
         }
       ],
       "name": "Peregrine Drake",
+      "oracleText": "Flying\nWhen this creature enters, untap up to five lands.",
       "power": {
         "type": "Literal",
         "value": 2

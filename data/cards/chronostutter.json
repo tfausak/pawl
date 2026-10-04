@@ -17,6 +17,7 @@
         }
       ],
       "name": "Chronostutter",
+      "oracleText": "Put target creature into its owner's library second from the top.",
       "spell": {
         "modes": [
           {

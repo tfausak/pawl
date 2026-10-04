@@ -17,6 +17,7 @@
         }
       ],
       "name": "Embereth Shieldbreaker",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 2
@@ -54,6 +55,7 @@
         }
       ],
       "name": "Battle Display",
+      "oracleText": "Destroy target artifact. (Then exile this card. You may cast the creature later from exile.)",
       "spell": {
         "modes": [
           {

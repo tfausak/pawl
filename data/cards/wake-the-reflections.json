@@ -13,6 +13,7 @@
         }
       ],
       "name": "Wake the Reflections",
+      "oracleText": "Populate. (Create a token that's a copy of a creature token you control.)",
       "spell": {
         "modes": [
           {

@@ -26,6 +26,7 @@
         }
       ],
       "name": "Sporemound",
+      "oracleText": "Landfall — Whenever a land you control enters, create a 1/1 green Saproling creature token.",
       "power": {
         "type": "Literal",
         "value": 3

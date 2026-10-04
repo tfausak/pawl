@@ -17,6 +17,7 @@
         }
       ],
       "name": "Soul's Majesty",
+      "oracleText": "Draw cards equal to the power of target creature you control.",
       "spell": {
         "modes": [
           {

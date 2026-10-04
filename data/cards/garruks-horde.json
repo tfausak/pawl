@@ -31,6 +31,7 @@
         }
       ],
       "name": "Garruk's Horde",
+      "oracleText": "Trample\nPlay with the top card of your library revealed.\nYou may cast creature spells from the top of your library. (Do this only any time you could cast that creature spell. You still pay the spell's costs.)",
       "playerAbilities": [
         {
           "effect": {

@@ -117,6 +117,7 @@
         }
       ],
       "name": "Unerring Sling",
+      "oracleText": "{3}, {T}, Tap an untapped creature you control: This artifact deals damage equal to the tapped creature's power to target attacking or blocking creature with flying.",
       "typeLine": {
         "types": [
           {

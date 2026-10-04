@@ -26,6 +26,7 @@
         }
       ],
       "name": "A Realm Reborn",
+      "oracleText": "Other permanents you control have \"{T}: Add one mana of any color.\"",
       "staticAbilities": [
         {
           "affected": {

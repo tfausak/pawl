@@ -13,6 +13,7 @@
         }
       ],
       "name": "Concordant Crossroads",
+      "oracleText": "All creatures have haste.",
       "staticAbilities": [
         {
           "affected": {

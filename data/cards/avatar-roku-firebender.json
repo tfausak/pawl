@@ -114,6 +114,7 @@
         }
       ],
       "name": "Avatar Roku, Firebender",
+      "oracleText": "Whenever a player attacks, add six {R}. Until end of combat, you don't lose this mana as steps end.\n{R}{R}{R}: Target creature gets +3/+0 until end of turn.",
       "power": {
         "type": "Literal",
         "value": 6

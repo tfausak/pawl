@@ -49,6 +49,7 @@
         }
       ],
       "name": "Raffine, Scheming Seer",
+      "oracleText": "Flying, ward {1}\nWhenever you attack, target attacking creature connives X, where X is the number of attacking creatures. (Draw X cards, then discard X cards. Put a +1/+1 counter on that creature for each nonland card discarded this way.)",
       "power": {
         "type": "Literal",
         "value": 1

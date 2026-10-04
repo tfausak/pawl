@@ -26,6 +26,7 @@
         }
       ],
       "name": "Kindle the Carnage",
+      "oracleText": "Discard a card at random. If you do, Kindle the Carnage deals damage equal to that card's mana value to each creature. You may repeat this process any number of times.",
       "spell": {
         "modes": [
           {

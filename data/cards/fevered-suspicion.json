@@ -31,6 +31,7 @@
         }
       ],
       "name": "Fevered Suspicion",
+      "oracleText": "Each opponent exiles cards from the top of their library until they exile a nonland card. You may cast any number of spells from among those nonland cards without paying their mana costs.\nRebound (If you cast this spell from your hand, exile it as it resolves. At the beginning of your next upkeep, you may cast this card from exile without paying its mana cost.)",
       "spell": {
         "modes": [
           {

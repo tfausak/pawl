@@ -83,6 +83,7 @@
         }
       ],
       "name": "Soul Snare",
+      "oracleText": "{W}, Sacrifice this enchantment: Exile target creature that's attacking you or a planeswalker you control.",
       "typeLine": {
         "types": [
           {

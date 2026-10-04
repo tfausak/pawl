@@ -92,7 +92,13 @@ spec s = Spec.describe s "Pawl.Json.Number" $ do
       Spec.assertEq s (Builder.toString . Number.encode . Number.MkNumber $ Decimal.mkDecimal (-234) 0) "-234"
 
     Spec.it s "encodes with positive exponent" $ do
-      Spec.assertEq s (Builder.toString . Number.encode . Number.MkNumber $ Decimal.mkDecimal 345 2) "345e2"
+      Spec.assertEq s (Builder.toString . Number.encode . Number.MkNumber $ Decimal.mkDecimal 345 2) "34500"
+
+    Spec.it s "encodes Gleemax's cost in full" $ do
+      Spec.assertEq s (Builder.toString . Number.encode . Number.MkNumber $ Decimal.mkDecimal 1 6) "1000000"
+
+    Spec.it s "encodes with large positive exponent" $ do
+      Spec.assertEq s (Builder.toString . Number.encode . Number.MkNumber $ Decimal.mkDecimal 1 7) "1e7"
 
     Spec.it s "encodes with negative exponent" $ do
       Spec.assertEq s (Builder.toString . Number.encode . Number.MkNumber $ Decimal.mkDecimal 456 (-2)) "456e-2"

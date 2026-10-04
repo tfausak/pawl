@@ -26,6 +26,7 @@
         }
       ],
       "name": "Great Intelligence's Plan",
+      "oracleText": "Draw three cards. Then target opponent faces a villainous choice — They discard three cards, or you may cast a spell from your hand without paying its mana cost.",
       "spell": {
         "modes": [
           {

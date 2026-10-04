@@ -19,6 +19,7 @@
         }
       ],
       "name": "Spined Thopter",
+      "oracleText": "({U/P} can be paid with either {U} or 2 life.)\nFlying",
       "power": {
         "type": "Literal",
         "value": 2

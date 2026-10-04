@@ -13,6 +13,7 @@
         }
       ],
       "name": "Tarfire",
+      "oracleText": "Tarfire deals 2 damage to any target.",
       "spell": {
         "modes": [
           {

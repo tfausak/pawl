@@ -13,6 +13,7 @@
         }
       ],
       "name": "Fatal Blow",
+      "oracleText": "Destroy target creature that was dealt damage this turn. It can't be regenerated.",
       "spell": {
         "modes": [
           {

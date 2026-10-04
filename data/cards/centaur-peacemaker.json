@@ -26,6 +26,7 @@
         }
       ],
       "name": "Centaur Peacemaker",
+      "oracleText": "When this creature enters, each player gains 4 life.",
       "power": {
         "type": "Literal",
         "value": 3

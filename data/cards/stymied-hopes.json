@@ -17,6 +17,7 @@
         }
       ],
       "name": "Stymied Hopes",
+      "oracleText": "Counter target spell unless its controller pays {1}. Scry 1. (Look at the top card of your library. You may put that card on the bottom.)",
       "spell": {
         "modes": [
           {

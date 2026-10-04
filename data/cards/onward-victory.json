@@ -17,6 +17,7 @@
         }
       ],
       "name": "Onward",
+      "oracleText": "Target creature gets +X/+0 until end of turn, where X is its power.",
       "spell": {
         "modes": [
           {
@@ -90,6 +91,7 @@
         }
       ],
       "name": "Victory",
+      "oracleText": "Aftermath (Cast this spell only from your graveyard. Then exile it.)\nTarget creature gains double strike until end of turn.",
       "spell": {
         "modes": [
           {

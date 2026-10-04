@@ -33,6 +33,7 @@
         }
       ],
       "name": "Tectonic Reformation",
+      "oracleText": "Each land card in your hand has cycling {R}.\nCycling {2} ({2}, Discard this card: Draw a card.)",
       "staticAbilities": [
         {
           "affected": {

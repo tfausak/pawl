@@ -35,6 +35,7 @@
         }
       ],
       "name": "Fervent Charge",
+      "oracleText": "Whenever a creature you control attacks, it gets +2/+2 until end of turn.",
       "triggeredAbilities": [
         {
           "condition": {

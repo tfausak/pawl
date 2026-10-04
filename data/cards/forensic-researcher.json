@@ -121,6 +121,7 @@
         }
       ],
       "name": "Forensic Researcher",
+      "oracleText": "{T}: Untap another target permanent you control.\n{T}, Collect evidence 3: Tap target creature you don't control. (To collect evidence 3, exile cards with total mana value 3 or greater from your graveyard.)",
       "power": {
         "type": "Literal",
         "value": 1

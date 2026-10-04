@@ -36,6 +36,7 @@
         }
       ],
       "name": "Drownyard Behemoth",
+      "oracleText": "Flash (You may cast this spell any time you could cast an instant.)\nEmerge {7}{U} (You may cast this spell by sacrificing a creature and paying the emerge cost reduced by that creature's mana value.)\nThis creature has hexproof as long as it entered this turn.",
       "power": {
         "type": "Literal",
         "value": 5

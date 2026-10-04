@@ -66,6 +66,7 @@
         }
       ],
       "name": "Slaughter Drone",
+      "oracleText": "Devoid (This card has no color.)\n{C}: This creature gains deathtouch until end of turn. (Any amount of damage it deals to a creature is enough to destroy it. {C} represents colorless mana.)",
       "power": {
         "type": "Literal",
         "value": 2

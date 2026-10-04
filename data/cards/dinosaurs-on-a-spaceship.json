@@ -69,6 +69,7 @@
         }
       ],
       "name": "Dinosaurs on a Spaceship",
+      "oracleText": "Vigilance, trample\nOther Dinosaurs you control get +1/+1 and have vigilance and trample.\nSuspend 4—{3}{R}{W}\nWhenever a time counter is removed from this card while it's exiled, create a 2/2 red and white Dinosaur creature token with flying and haste.",
       "power": {
         "type": "Literal",
         "value": 7

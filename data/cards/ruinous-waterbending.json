@@ -87,6 +87,7 @@
         }
       ],
       "name": "Ruinous Waterbending",
+      "oracleText": "As an additional cost to cast this spell, you may waterbend {4}. (While paying a waterbend cost, you can tap your artifacts and creatures to help. Each one pays for {1}.)\nAll creatures get -2/-2 until end of turn. If this spell's additional cost was paid, whenever a creature dies this turn, you gain 1 life.",
       "spell": {
         "modes": [
           {

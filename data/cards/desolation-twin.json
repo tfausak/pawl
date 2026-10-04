@@ -4,17 +4,18 @@
       "manaCost": [
         {
           "type": "Generic",
-          "value": 10.0
+          "value": 10
         }
       ],
       "name": "Desolation Twin",
+      "oracleText": "When you cast this spell, create a 10/10 colorless Eldrazi creature token.",
       "power": {
         "type": "Literal",
-        "value": 10.0
+        "value": 10
       },
       "toughness": {
         "type": "Literal",
-        "value": 10.0
+        "value": 10
       },
       "triggeredAbilities": [
         {
@@ -36,11 +37,11 @@
                                 "name": "Eldrazi Token",
                                 "power": {
                                   "type": "Literal",
-                                  "value": 10.0
+                                  "value": 10
                                 },
                                 "toughness": {
                                   "type": "Literal",
-                                  "value": 10.0
+                                  "value": 10
                                 },
                                 "typeLine": {
                                   "subtypes": [

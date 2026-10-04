@@ -106,6 +106,7 @@
         }
       ],
       "name": "Kill-Suit Cultist",
+      "oracleText": "This creature attacks each combat if able.\n{B}, Sacrifice this creature: The next time damage would be dealt to target creature this turn, destroy that creature instead.",
       "power": {
         "type": "Literal",
         "value": 1

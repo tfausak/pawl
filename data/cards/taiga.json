@@ -1,0 +1,23 @@
+{
+  "faces": [
+    {
+      "name": "Taiga",
+      "oracleText": "({T}: Add {R} or {G}.)",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Forest"
+          },
+          {
+            "type": "Mountain"
+          }
+        ],
+        "types": [
+          {
+            "type": "Land"
+          }
+        ]
+      }
+    }
+  ]
+}

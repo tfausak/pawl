@@ -41,6 +41,7 @@
         }
       ],
       "name": "Green Slime",
+      "oracleText": "Flash\nWhen this creature enters, counter target activated or triggered ability from an artifact or enchantment source. If a permanent's ability is countered this way, destroy that permanent.\nForetell {G} (During your turn, you may pay {2} and exile this card from your hand face down. Cast it on a later turn for its foretell cost.)",
       "power": {
         "type": "Literal",
         "value": 2

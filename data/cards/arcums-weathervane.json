@@ -157,6 +157,7 @@
         }
       ],
       "name": "Arcum's Weathervane",
+      "oracleText": "{2}, {T}: Target snow land is no longer snow.\n{2}, {T}: Target nonsnow basic land becomes snow.",
       "typeLine": {
         "types": [
           {

@@ -97,6 +97,7 @@
         }
       ],
       "name": "Volrath's Curse",
+      "oracleText": "Enchant creature\nEnchanted creature can't attack or block, and its activated abilities can't be activated. That creature's controller may sacrifice a permanent of their choice for that player to ignore this effect until end of turn.\n{1}{U}: Return this Aura to its owner's hand.",
       "specialActions": [
         {
           "type": "IgnoreThisUntilEndOfTurn",

@@ -22,6 +22,7 @@
         }
       ],
       "name": "Squad Captain",
+      "oracleText": "Vigilance (Attacking doesn't cause this creature to tap.)\nThis creature enters with a +1/+1 counter on it for each other creature you control.",
       "power": {
         "type": "Literal",
         "value": 2

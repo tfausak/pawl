@@ -40,6 +40,7 @@
         }
       ],
       "name": "Coldsteel Heart",
+      "oracleText": "This artifact enters tapped.\nAs this artifact enters, choose a color.\n{T}: Add one mana of the chosen color.",
       "replacementEffects": [
         {
           "effect": {

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Living Wish",
+      "oracleText": "You may reveal a creature or land card you own from outside the game and put it into your hand. Exile Living Wish.",
       "spell": {
         "modes": [
           {

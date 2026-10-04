@@ -38,6 +38,7 @@
         }
       ],
       "name": "Burning-Tree Emissary",
+      "oracleText": "When this creature enters, add {R}{G}.",
       "power": {
         "type": "Literal",
         "value": 2

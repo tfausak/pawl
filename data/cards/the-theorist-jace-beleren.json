@@ -269,6 +269,7 @@
         }
       ],
       "name": "The Theorist, Jace Beleren",
+      "oracleText": "At the beginning of each opponent's draw step, you draw a card.\n[+1]: Create a 1/1 blue Illusion creature token.\n[−2]: For each opponent, return up to one target artifact or creature that player controls to its owner's hand.\n[−6]: Draw three cards. Then put X +1/+1 counters on each creature you control, where X is the number of cards in your hand.",
       "triggeredAbilities": [
         {
           "condition": {

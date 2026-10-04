@@ -17,6 +17,7 @@
         }
       ],
       "name": "Break Open",
+      "oracleText": "Turn target face-down creature an opponent controls face up.",
       "spell": {
         "modes": [
           {

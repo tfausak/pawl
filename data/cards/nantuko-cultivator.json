@@ -17,6 +17,7 @@
         }
       ],
       "name": "Nantuko Cultivator",
+      "oracleText": "When this creature enters, you may discard any number of land cards. Put that many +1/+1 counters on this creature and draw that many cards.",
       "power": {
         "type": "Literal",
         "value": 2

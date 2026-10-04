@@ -17,6 +17,7 @@
         }
       ],
       "name": "Don't Make a Sound",
+      "oracleText": "Counter target spell unless its controller pays {2}. If they do, surveil 2. (Look at the top two cards of your library, then put any number of them into your graveyard and the rest on top of your library in any order.)",
       "spell": {
         "modes": [
           {

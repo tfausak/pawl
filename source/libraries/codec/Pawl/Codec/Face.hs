@@ -91,6 +91,7 @@ modeCostsInRange f =
 codec :: (Typeable.Typeable card, Eq card) => Codec.Codec card -> Codec.Codec (Face.Face card)
 codec cardCodec = Fields.objectWith modeCostsInRange $ do
   name <- Fields.required "name" CardName.codec Face.name
+  oracleText <- Fields.defaulted "oracleText" Nothing (Common.maybe Common.text) Face.oracleText
   -- CR 205.1 puts a type line on every card and CR 114.3 gives an emblem no
   -- types at all, so the key is optional and its absence means the latter: an
   -- emblem's face is authored as the payload of Effect.CreateEmblem and decoded
@@ -184,6 +185,7 @@ codec cardCodec = Fields.objectWith modeCostsInRange $ do
   pure
     Face.MkFace
       { Face.name = name,
+        Face.oracleText = oracleText,
         Face.typeLine = typeLine,
         Face.manaCost = manaCost,
         Face.power = power,

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Total War",
+      "oracleText": "Whenever a player attacks with one or more creatures, destroy all untapped non-Wall creatures that player controls that didn't attack, except for creatures the player hasn't controlled continuously since the beginning of the turn.",
       "triggeredAbilities": [
         {
           "condition": {

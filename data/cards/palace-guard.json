@@ -28,6 +28,7 @@
         }
       ],
       "name": "Palace Guard",
+      "oracleText": "This creature can block any number of creatures.",
       "power": {
         "type": "Literal",
         "value": 1

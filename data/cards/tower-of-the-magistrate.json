@@ -98,6 +98,7 @@
         }
       ],
       "name": "Tower of the Magistrate",
+      "oracleText": "{T}: Add {C}.\n{1}, {T}: Target creature gains protection from artifacts until end of turn.",
       "typeLine": {
         "types": [
           {

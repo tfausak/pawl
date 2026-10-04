@@ -13,6 +13,7 @@
         }
       ],
       "name": "Tome Scour",
+      "oracleText": "Target player mills five cards.",
       "spell": {
         "modes": [
           {

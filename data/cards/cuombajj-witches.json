@@ -91,6 +91,7 @@
         }
       ],
       "name": "Cuombajj Witches",
+      "oracleText": "{T}: This creature deals 1 damage to any target and 1 damage to any target of an opponent's choice.",
       "power": {
         "type": "Literal",
         "value": 1
