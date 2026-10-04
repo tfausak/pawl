@@ -69,8 +69,10 @@ candidate value = do
 
 -- | Every face's Oracle text from the reduction's @texts@, keyed by card name
 -- (faces joined by " // ", as MTGJSON names a card) and face name; and, for a
--- face name only one face prints, by face name alone, for a card the pool
--- joins differently (Replenish is also a face of Eiganjo Dynastorian).
+-- face name only one text goes with, by face name alone, for a card the pool
+-- joins differently. A spell face reprinting a card (Replenish on Eiganjo
+-- Dynastorian) is that card, but MTGJSON can drop its reminder text there;
+-- Saw is a face of Smelt // Herd // Saw and a different card of its own.
 texts :: Value.Value -> Either Text.Text (Map.Map (Text.Text, Text.Text) Text.Text, Map.Map Text.Text Text.Text)
 texts value = do
   entries <- Common.asArray value >>= traverse entry

@@ -181,8 +181,9 @@ to agents as written. What it doesn't say:
 
 - A card whose whole text is keywords is ingested, never hand-written: `jq -f
   script/ingest/candidates.jq` over MTGJSON's `AtomicCards.json`, then `pawl
-  ingest` on the result. The same run fills in `oracleText`, which is optional,
-  on the pool's cards and names on stderr each one that disagrees with MTGJSON.
+  ingest` on the result. The same run gives every pool card its faces'
+  `oracleText` and names on stderr each pool card that disagrees with MTGJSON;
+  re-run it after adding cards by hand.
 
 - When no printing can reach the rule, write `data/cards/synthetic-*.json`.
   Search first: a real card wins whenever one exists, in the order regular >
