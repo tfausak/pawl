@@ -17,6 +17,7 @@
         }
       ],
       "name": "Hardened Berserker",
+      "oracleText": "Whenever this creature attacks, the next spell you cast this turn costs {1} less to cast.",
       "power": {
         "type": "Literal",
         "value": 3

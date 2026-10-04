@@ -66,6 +66,7 @@
         }
       ],
       "name": "Rod of Absorption",
+      "oracleText": "Whenever a player casts an instant or sorcery spell, exile it instead of putting it into a graveyard as it resolves.\n{X}, {T}, Sacrifice this artifact: You may cast any number of spells from among cards exiled with this artifact with total mana value X or less without paying their mana costs.",
       "triggeredAbilities": [
         {
           "condition": {

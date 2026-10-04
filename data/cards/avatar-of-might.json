@@ -86,6 +86,7 @@
         }
       ],
       "name": "Avatar of Might",
+      "oracleText": "If an opponent controls at least four more creatures than you, this spell costs {6} less to cast.\nTrample (This creature can deal excess combat damage to the player or planeswalker it's attacking.)",
       "power": {
         "type": "Literal",
         "value": 8
