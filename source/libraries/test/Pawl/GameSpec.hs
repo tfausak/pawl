@@ -361,12 +361,12 @@ arborBoard dryadArbor mTeferi =
 
 goldfishResult :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (Result.Result, GameState.GameState)
 goldfishResult s registry = do
-  matchup <- S.redRed (S.printingOf s registry)
+  matchup <- S.shortRedRed (S.printingOf s registry)
   pure (Engine.runMatchPure S.identityAnswer matchup)
 
 landState :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m GameState.GameState
 landState s registry = do
-  matchup <- S.redRed (S.printingOf s registry)
+  matchup <- S.shortRedRed (S.printingOf s registry)
   pure (snd (Engine.runGamePure S.playLandAnswer (Setup.emptyGame S.bothPlayers) (Engine.playFrom matchup)))
 
 -- Alice is active on turns 1, 3, 5, …; bob on 2, 4, 6, …. With CR 305.2's normal
@@ -382,24 +382,17 @@ turnsTaken pid gs =
 
 engineSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 engineSpec s registry = Spec.describe s "Engine" $ do
-  Spec.it s "goldfish game ends with the starting player winning" $ do
-    (result, _) <- goldfishResult s registry
+  -- One game per case rather than one per assertion: each is a whole game, and
+  -- the suite's slowest cases are these.
+  Spec.it s "goldfish game ends with the starting player winning, conserving cards" $ do
+    (result, gs) <- goldfishResult s registry
     Spec.assertEqWith s "winner" result (Result.Won S.alice)
+    Spec.assertEqWith s "objects" (Game.objectCount gs) 60
 
-  Spec.it s "card conservation holds at end" $ do
-    (_, gs) <- goldfishResult s registry
-    Spec.assertEqWith s "objects" (Game.objectCount gs) 120
-
-  Spec.it s "playing lands fills the battlefield" $ do
+  Spec.it s "playing lands fills the battlefield, conserving cards, at most one land per turn (CR 305.2)" $ do
     gs <- landState s registry
     Spec.assertBool s (not (null (Game.zoneMembers Zone.Battlefield S.alice gs))) "non-empty"
-
-  Spec.it s "land play conserves cards" $ do
-    gs <- landState s registry
-    Spec.assertEqWith s "objects" (Game.objectCount gs) 120
-
-  Spec.it s "CR 305.2 at most one land per turn" $ do
-    gs <- landState s registry
+    Spec.assertEqWith s "objects" (Game.objectCount gs) 60
     Spec.assertBool
       s
       ( Natural.length (Game.zoneMembers Zone.Battlefield S.alice gs) <= turnsTaken S.alice gs
