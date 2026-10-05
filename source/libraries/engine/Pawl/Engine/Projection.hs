@@ -917,8 +917,8 @@ addPT base delta = case (base, delta) of
 -- type.
 data Gathered = MkGathered
   { -- Which effect this part belongs to: Just (source, the ability's index) for a
-    -- static ability with parts in more than one layer, Nothing otherwise. CR
-    -- 613.6's affected-set decision is keyed on this pair and reused (projectWith).
+    -- static ability, Nothing otherwise. CR 613.6's affected-set decision is
+    -- keyed on this pair and reused (projectWith).
     gEffect :: !(Maybe (ObjectId, Natural)),
     gSource :: ObjectId,
     gAffected :: Affected.Affected,
@@ -2758,12 +2758,13 @@ abilitiesRemoved = abilitiesRemovedBy (const True)
 -- carrying one is never gated by this.
 --
 -- Each remover's affected set is judged at CR 613.6's decision point (gLowest),
--- not at layer 6. For a MULTI-PART remover it is not re-derived: decisionsUpTo
--- hands back projectWith's own memo, so this gate and the fold cannot drift.
--- Single-part removers are not memoized and keep the projectUpTo reading.
---
--- Not implemented: a single-part remover whose affected set another effect in
--- its own decision layer moves (#1008).
+-- not at layer 6. For a static ability's remover it is not re-derived:
+-- decisionsUpTo hands back projectWith's own memo, so this gate and the fold
+-- cannot drift, CR 613.8's order within the decision layer included. An unkeyed
+-- remover is a stored effect, whose set CR 611.2c fixed, so the projectUpTo
+-- reading answers it.
+-- Pawl.ProjectionSpec's "CR 613.8a Silencing Fog strips a creature whose flying
+-- a later Aura grants" proves the single-part case.
 --
 -- Not asked of the remover's own source: order WITHIN layer 6 is CR 613.7
 -- timestamp, settled by the fold. CR 305.7's gate asks a related question one
@@ -2814,9 +2815,9 @@ grantedDefiningParts m = case m of
   _ -> m NonEmpty.:| []
 
 -- One static ability's parts, ready to fold: CR 613.6's unit. (src, n) is the
--- key every part of a MULTI-part ability carries, so projectWith can tell that a
--- layer-4 part and a layer-7b part are one effect sharing one affected set. A
--- one-part ability carries no key.
+-- key every part carries, so projectWith can tell that a layer-4 part and a
+-- layer-7b part are one effect sharing one affected set, and so the fold's
+-- decision for a one-part ability reaches abilitiesRemovedBy too.
 --
 -- CR 612: text changes affecting the SOURCE rewrite each part's subtype words
 -- first.
@@ -2831,9 +2832,7 @@ grantedDefiningParts m = case m of
 gatherStatic :: (Layer -> Condition.Type.Condition -> Bool) -> ObjectId -> Timestamp -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> (Layer -> Bool) -> Natural -> StaticAbility.StaticAbility (GrantedAbility.GrantedAbility Card.Type.Card) -> [Gathered]
 gatherStatic functioning src ts changes removed n sa =
   let ms = staticParts changes sa
-      key = case ms of
-        _ NonEmpty.:| (_ : _) -> Just (src, n)
-        _ -> Nothing
+      key = Just (src, n)
       -- CR 613.6's decision point, computed once for the whole ability and
       -- copied onto each of its parts.
       lowest = minimum (fmap layer ms)
@@ -4758,7 +4757,7 @@ projectFrom cands oid gs = noValuePT (projectWith (const True) cands oid gs)
 projectUpTo :: Layer -> [Gathered] -> ObjectId -> GameState -> ProjectedCharacteristics
 projectUpTo bound = projectWith (< bound)
 
--- CR 613.6's answers, as the fold reached them, for every multi-part effect
+-- CR 613.6's answers, as the fold reached them, for every static ability's effect
 -- whose lowest layer is at or below `bound`: keyed by gEffect, True when the
 -- effect's affected set held `oid` at the layer it started to apply.
 --
