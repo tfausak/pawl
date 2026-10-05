@@ -31,6 +31,7 @@
         }
       ],
       "name": "The Elder Dragon War",
+      "oracleText": "Read ahead (Choose a chapter and start with that many lore counters. Add one after your draw step. Skipped chapters don't trigger. Sacrifice after III.)\nI — This Saga deals 2 damage to each creature and each opponent.\nII — Discard any number of cards, then draw that many cards.\nIII — Create a 4/4 red Dragon creature token with flying.",
       "triggeredAbilities": [
         {
           "condition": {

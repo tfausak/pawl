@@ -45,6 +45,7 @@
         }
       ],
       "name": "Owlin Shieldmage",
+      "oracleText": "Flying\nWard—Pay 3 life. (Whenever this creature becomes the target of a spell or ability an opponent controls, counter it unless that player pays 3 life.)",
       "power": {
         "type": "Literal",
         "value": 3

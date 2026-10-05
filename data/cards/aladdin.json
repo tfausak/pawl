@@ -143,6 +143,7 @@
         }
       ],
       "name": "Aladdin",
+      "oracleText": "{1}{R}{R}, {T}: Gain control of target artifact for as long as you control this creature.",
       "power": {
         "type": "Literal",
         "value": 1

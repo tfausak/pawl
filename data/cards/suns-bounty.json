@@ -39,6 +39,7 @@
         }
       ],
       "name": "Sun's Bounty",
+      "oracleText": "You gain 4 life.\nRecover {1}{W} (When a creature is put into your graveyard from the battlefield, you may pay {1}{W}. If you do, return this card from your graveyard to your hand. Otherwise, exile this card.)",
       "spell": {
         "modes": [
           {

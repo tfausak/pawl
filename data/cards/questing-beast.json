@@ -54,6 +54,7 @@
         }
       ],
       "name": "Questing Beast",
+      "oracleText": "Vigilance, deathtouch, haste\nQuesting Beast can't be blocked by creatures with power 2 or less.\nCombat damage that would be dealt by creatures you control can't be prevented.\nWhenever Questing Beast deals combat damage to an opponent, it deals that much damage to target planeswalker that player controls.",
       "playerAbilities": [
         {
           "effect": {

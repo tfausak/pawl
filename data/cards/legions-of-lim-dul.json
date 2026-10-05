@@ -48,6 +48,7 @@
         }
       ],
       "name": "Legions of Lim-Dûl",
+      "oracleText": "Snow swampwalk (This creature can't be blocked as long as defending player controls a snow Swamp.)",
       "power": {
         "type": "Literal",
         "value": 2

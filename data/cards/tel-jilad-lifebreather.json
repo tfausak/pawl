@@ -96,6 +96,7 @@
         }
       ],
       "name": "Tel-Jilad Lifebreather",
+      "oracleText": "{G}, {T}, Sacrifice a Forest: Regenerate target creature.",
       "power": {
         "type": "Literal",
         "value": 3

@@ -185,6 +185,7 @@
         }
       ],
       "name": "Jarad, Golgari Lich Lord",
+      "oracleText": "Jarad gets +1/+1 for each creature card in your graveyard.\n{1}{B}{G}, Sacrifice another creature: Each opponent loses life equal to the sacrificed creature's power.\nSacrifice a Swamp and a Forest: Return this card from your graveyard to your hand.",
       "power": {
         "type": "Literal",
         "value": 2

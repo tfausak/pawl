@@ -18,6 +18,7 @@
         }
       ],
       "name": "Circling Vultures",
+      "oracleText": "Flying\nYou may discard this card any time you could cast an instant.\nAt the beginning of your upkeep, sacrifice this creature unless you exile the top creature card of your graveyard.",
       "power": {
         "type": "Literal",
         "value": 3

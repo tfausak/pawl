@@ -23,6 +23,7 @@
         }
       ],
       "name": "Ministrant of Obligation",
+      "oracleText": "Afterlife 2 (When this creature dies, create two 1/1 white and black Spirit creature tokens with flying.)",
       "power": {
         "type": "Literal",
         "value": 2

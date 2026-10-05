@@ -22,6 +22,7 @@
         }
       ],
       "name": "Guildsworn Prowler",
+      "oracleText": "Deathtouch\nWhen this creature dies, if it wasn't blocking, draw a card.",
       "power": {
         "type": "Literal",
         "value": 2

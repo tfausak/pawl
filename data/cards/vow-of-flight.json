@@ -62,6 +62,7 @@
         }
       ],
       "name": "Vow of Flight",
+      "oracleText": "Enchant creature\nEnchanted creature gets +2/+2, has flying, and can't attack you or planeswalkers you control.",
       "staticAbilities": [
         {
           "affected": {

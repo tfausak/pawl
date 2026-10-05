@@ -98,6 +98,7 @@
         }
       ],
       "name": "Nessian Asp",
+      "oracleText": "Reach\n{6}{G}: Monstrosity 4. (If this creature isn't monstrous, put four +1/+1 counters on it and it becomes monstrous.)",
       "power": {
         "type": "Literal",
         "value": 4

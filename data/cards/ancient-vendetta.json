@@ -17,6 +17,7 @@
         }
       ],
       "name": "Ancient Vendetta",
+      "oracleText": "Choose a card name. Search target opponent's graveyard, hand, and library for up to four cards with that name and exile them. Then that player shuffles.",
       "spell": {
         "modes": [
           {

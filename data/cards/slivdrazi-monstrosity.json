@@ -153,6 +153,7 @@
         }
       ],
       "name": "Slivdrazi Monstrosity",
+      "oracleText": "Eldrazi you control are Slivers in addition to their other types.\nSlivers you control have devoid and annihilator 1.\n{3}: Create a 1/1 colorless Eldrazi Sliver creature token. It has \"Sacrifice this creature: Add {C}.\"",
       "power": {
         "type": "Literal",
         "value": 8

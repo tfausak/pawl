@@ -23,6 +23,7 @@
         }
       ],
       "name": "Branchblight Stalker",
+      "oracleText": "Toxic 2 (Players dealt combat damage by this creature also get two poison counters.)",
       "power": {
         "type": "Literal",
         "value": 3

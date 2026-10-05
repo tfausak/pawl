@@ -17,6 +17,7 @@
         }
       ],
       "name": "Merfolk Seer",
+      "oracleText": "When this creature dies, you may pay {1}{U}. If you do, draw a card.",
       "power": {
         "type": "Literal",
         "value": 2

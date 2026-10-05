@@ -35,6 +35,7 @@
         }
       ],
       "name": "Perennation",
+      "oracleText": "Return target permanent card from your graveyard to the battlefield with a hexproof counter and an indestructible counter on it.",
       "spell": {
         "modes": [
           {

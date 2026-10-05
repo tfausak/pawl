@@ -13,6 +13,7 @@
         }
       ],
       "name": "Soul Warden",
+      "oracleText": "Whenever another creature enters, you gain 1 life.",
       "power": {
         "type": "Literal",
         "value": 1

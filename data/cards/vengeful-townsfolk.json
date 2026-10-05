@@ -17,6 +17,7 @@
         }
       ],
       "name": "Vengeful Townsfolk",
+      "oracleText": "Whenever one or more other creatures you control die, put a +1/+1 counter on this creature.",
       "power": {
         "type": "Literal",
         "value": 3

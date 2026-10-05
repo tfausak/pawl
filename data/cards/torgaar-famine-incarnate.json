@@ -62,6 +62,7 @@
         }
       ],
       "name": "Torgaar, Famine Incarnate",
+      "oracleText": "As an additional cost to cast this spell, you may sacrifice any number of creatures. This spell costs {2} less to cast for each creature sacrificed this way.\nWhen Torgaar enters, up to one target player's life total becomes half their starting life total, rounded down.",
       "power": {
         "type": "Literal",
         "value": 7

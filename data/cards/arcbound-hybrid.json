@@ -17,6 +17,7 @@
         }
       ],
       "name": "Arcbound Hybrid",
+      "oracleText": "Haste\nModular 2 (This creature enters with two +1/+1 counters on it. When it dies, you may put its +1/+1 counters on target artifact creature.)",
       "power": {
         "type": "Literal",
         "value": 0

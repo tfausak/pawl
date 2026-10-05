@@ -75,6 +75,7 @@
         }
       ],
       "name": "Stalker Hag",
+      "oracleText": "Swampwalk, forestwalk (This creature can't be blocked as long as defending player controls a Swamp or a Forest.)",
       "power": {
         "type": "Literal",
         "value": 3

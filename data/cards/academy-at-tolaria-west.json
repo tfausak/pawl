@@ -2,6 +2,7 @@
   "faces": [
     {
       "name": "Academy at Tolaria West",
+      "oracleText": "At the beginning of your end step, if you have no cards in hand, draw seven cards.\nWhenever chaos ensues, discard your hand.",
       "triggeredAbilities": [
         {
           "condition": {

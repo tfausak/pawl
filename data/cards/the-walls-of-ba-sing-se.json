@@ -13,6 +13,7 @@
         }
       ],
       "name": "The Walls of Ba Sing Se",
+      "oracleText": "Defender\nOther permanents you control have indestructible.",
       "power": {
         "type": "Literal",
         "value": 0
@@ -51,7 +52,7 @@
       ],
       "toughness": {
         "type": "Literal",
-        "value": 30.0
+        "value": 30
       },
       "typeLine": {
         "subtypes": [

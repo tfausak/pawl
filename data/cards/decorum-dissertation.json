@@ -31,6 +31,7 @@
         }
       ],
       "name": "Decorum Dissertation",
+      "oracleText": "Target player draws two cards and loses 2 life.\nParadigm (Then exile this spell. After you first resolve a spell with this name, you may cast a copy of it from exile without paying its mana cost at the beginning of each of your first main phases.)",
       "spell": {
         "modes": [
           {

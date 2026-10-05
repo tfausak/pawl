@@ -22,6 +22,7 @@
         }
       ],
       "name": "Angel of Finality",
+      "oracleText": "Flying\nWhen this creature enters, exile target player's graveyard.",
       "power": {
         "type": "Literal",
         "value": 3

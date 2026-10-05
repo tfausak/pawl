@@ -26,6 +26,7 @@
         }
       ],
       "name": "Localized Destruction",
+      "oracleText": "You get {E} (an energy counter), then you may pay one or more {E}. If you do, each creature you control with power equal to the amount of {E} paid this way gains indestructible until end of turn.\nDestroy all creatures.",
       "spell": {
         "modes": [
           {

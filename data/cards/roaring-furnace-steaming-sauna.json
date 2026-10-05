@@ -17,6 +17,7 @@
         }
       ],
       "name": "Roaring Furnace",
+      "oracleText": "When you unlock this door, this Room deals damage equal to the number of cards in your hand to target creature an opponent controls.\n(You may cast either half. That door unlocks on the battlefield. As a sorcery, you may pay the mana cost of a locked door to unlock it.)",
       "triggeredAbilities": [
         {
           "condition": {
@@ -128,6 +129,7 @@
         }
       ],
       "name": "Steaming Sauna",
+      "oracleText": "You have no maximum hand size.\nAt the beginning of your end step, draw a card.\n(You may cast either half. That door unlocks on the battlefield. As a sorcery, you may pay the mana cost of a locked door to unlock it.)",
       "playerAbilities": [
         {
           "effect": {

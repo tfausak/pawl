@@ -1,0 +1,23 @@
+{
+  "faces": [
+    {
+      "name": "Savannah",
+      "oracleText": "({T}: Add {G} or {W}.)",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Forest"
+          },
+          {
+            "type": "Plains"
+          }
+        ],
+        "types": [
+          {
+            "type": "Land"
+          }
+        ]
+      }
+    }
+  ]
+}

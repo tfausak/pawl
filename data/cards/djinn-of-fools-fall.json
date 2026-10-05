@@ -42,6 +42,7 @@
         }
       ],
       "name": "Djinn of Fool's Fall",
+      "oracleText": "Flying\nPlot {3}{U} (You may pay {3}{U} and exile this card from your hand. Cast it as a sorcery on a later turn without paying its mana cost. Plot only as a sorcery.)",
       "power": {
         "type": "Literal",
         "value": 4

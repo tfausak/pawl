@@ -24,6 +24,7 @@
         }
       ],
       "name": "Banewasp Affliction",
+      "oracleText": "Enchant creature\nWhen enchanted creature dies, that creature's controller loses life equal to its toughness.",
       "triggeredAbilities": [
         {
           "condition": {

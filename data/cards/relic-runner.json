@@ -94,6 +94,7 @@
         }
       ],
       "name": "Relic Runner",
+      "oracleText": "This creature can't be blocked if you've cast a historic spell this turn. (Artifacts, legendaries, and Sagas are historic.)",
       "power": {
         "type": "Literal",
         "value": 2

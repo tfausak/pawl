@@ -91,6 +91,7 @@
         }
       ],
       "name": "Ransom Note",
+      "oracleText": "When this artifact enters, surveil 1.\n{2}, Sacrifice this artifact: Choose one —\n• Cloak the top card of your library.\n• Goad target creature.\n• Draw a card.",
       "triggeredAbilities": [
         {
           "condition": {

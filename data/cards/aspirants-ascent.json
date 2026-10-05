@@ -13,6 +13,7 @@
         }
       ],
       "name": "Aspirant's Ascent",
+      "oracleText": "Until end of turn, target creature gets +1/+3 and gains flying and toxic 1. (Players dealt combat damage by that creature also get a poison counter.)",
       "spell": {
         "modes": [
           {

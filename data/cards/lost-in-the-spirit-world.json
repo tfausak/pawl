@@ -17,6 +17,7 @@
         }
       ],
       "name": "Lost in the Spirit World",
+      "oracleText": "Return up to one target creature to its owner's hand. Create a 1/1 colorless Spirit creature token with \"This token can't block or be blocked by non-Spirit creatures.\"",
       "spell": {
         "modes": [
           {

@@ -13,6 +13,7 @@
         }
       ],
       "name": "Birthday Escape",
+      "oracleText": "Draw a card. The Ring tempts you.",
       "spell": {
         "modes": [
           {

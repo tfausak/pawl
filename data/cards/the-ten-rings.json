@@ -8,11 +8,12 @@
         }
       ],
       "name": "The Ten Rings",
+      "oracleText": "Your maximum hand size is ten.\nAt the beginning of your end step, if you have fewer than ten cards in hand, draw cards equal to the difference.",
       "playerAbilities": [
         {
           "effect": {
             "type": "SetMaximumHandSize",
-            "value": 10.0
+            "value": 10
           },
           "scope": {
             "type": "You"

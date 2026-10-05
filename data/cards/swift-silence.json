@@ -35,6 +35,7 @@
         }
       ],
       "name": "Swift Silence",
+      "oracleText": "Counter all other spells. Draw a card for each spell countered this way.",
       "spell": {
         "modes": [
           {

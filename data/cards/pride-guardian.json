@@ -18,6 +18,7 @@
         }
       ],
       "name": "Pride Guardian",
+      "oracleText": "Defender\nWhenever this creature blocks, you gain 3 life.",
       "power": {
         "type": "Literal",
         "value": 0

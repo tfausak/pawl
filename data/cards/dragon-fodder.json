@@ -17,6 +17,7 @@
         }
       ],
       "name": "Dragon Fodder",
+      "oracleText": "Create two 1/1 red Goblin creature tokens.",
       "spell": {
         "modes": [
           {

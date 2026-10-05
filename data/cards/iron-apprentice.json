@@ -8,6 +8,7 @@
         }
       ],
       "name": "Iron Apprentice",
+      "oracleText": "This creature enters with a +1/+1 counter on it.\nWhen this creature dies, if it had counters on it, put those counters on target creature you control.",
       "power": {
         "type": "Literal",
         "value": 0

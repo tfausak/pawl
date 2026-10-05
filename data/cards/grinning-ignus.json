@@ -92,6 +92,7 @@
         }
       ],
       "name": "Grinning Ignus",
+      "oracleText": "{R}, Return this creature to its owner's hand: Add {C}{C}{R}. Activate only as a sorcery.",
       "power": {
         "type": "Literal",
         "value": 2

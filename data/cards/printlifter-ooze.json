@@ -42,6 +42,7 @@
         }
       ],
       "name": "Printlifter Ooze",
+      "oracleText": "Deathtouch\nWhenever this creature or another creature you control is turned face up, create a 0/0 green Ooze creature token with trample. The token enters with X +1/+1 counters on it, where X is the number of other creatures you control.\nDisguise {3}{G}",
       "power": {
         "type": "Literal",
         "value": 2

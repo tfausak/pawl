@@ -166,6 +166,7 @@
         }
       ],
       "name": "Keys to the House",
+      "oracleText": "{1}, {T}, Sacrifice this artifact: Search your library for a basic land card, reveal it, put it into your hand, then shuffle.\n{3}, {T}, Sacrifice this artifact: Lock or unlock a door of target Room you control. Activate only as a sorcery.",
       "typeLine": {
         "types": [
           {

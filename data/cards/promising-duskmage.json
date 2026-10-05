@@ -17,6 +17,7 @@
         }
       ],
       "name": "Promising Duskmage",
+      "oracleText": "When this creature dies, if it had a +1/+1 counter on it, draw a card.",
       "power": {
         "type": "Literal",
         "value": 2

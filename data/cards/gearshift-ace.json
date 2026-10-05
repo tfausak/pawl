@@ -22,6 +22,7 @@
         }
       ],
       "name": "Gearshift Ace",
+      "oracleText": "First strike\nWhenever this creature crews a Vehicle, that Vehicle gains first strike until end of turn.",
       "power": {
         "type": "Literal",
         "value": 2

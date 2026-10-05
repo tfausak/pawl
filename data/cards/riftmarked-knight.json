@@ -78,6 +78,7 @@
         }
       ],
       "name": "Riftmarked Knight",
+      "oracleText": "Protection from black; flanking (Whenever a creature without flanking blocks this creature, the blocking creature gets -1/-1 until end of turn.)\nSuspend 3—{1}{W}{W}\nWhen the last time counter is removed from this card while it's exiled, create a 2/2 black Knight creature token with flanking, protection from white, and haste.",
       "power": {
         "type": "Literal",
         "value": 2

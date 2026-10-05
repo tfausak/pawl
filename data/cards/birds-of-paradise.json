@@ -50,6 +50,7 @@
         }
       ],
       "name": "Birds of Paradise",
+      "oracleText": "Flying\n{T}: Add one mana of any color.",
       "power": {
         "type": "Literal",
         "value": 0

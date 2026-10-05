@@ -13,6 +13,7 @@
         }
       ],
       "name": "Clearwater Goblet",
+      "oracleText": "Sunburst (This artifact enters with a charge counter on it for each color of mana spent to cast it.)\nAt the beginning of your upkeep, you may gain life equal to the number of charge counters on this artifact.",
       "triggeredAbilities": [
         {
           "condition": {

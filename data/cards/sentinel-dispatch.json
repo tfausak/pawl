@@ -2,6 +2,7 @@
   "faces": [
     {
       "name": "Sentinel Dispatch",
+      "oracleText": "(Start the game with this conspiracy face up in the command zone.)\nAt the beginning of the first upkeep, create a 1/1 colorless Construct artifact creature token with defender.",
       "triggeredAbilities": [
         {
           "condition": {

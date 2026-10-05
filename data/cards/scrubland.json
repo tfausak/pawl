@@ -1,0 +1,23 @@
+{
+  "faces": [
+    {
+      "name": "Scrubland",
+      "oracleText": "({T}: Add {W} or {B}.)",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Plains"
+          },
+          {
+            "type": "Swamp"
+          }
+        ],
+        "types": [
+          {
+            "type": "Land"
+          }
+        ]
+      }
+    }
+  ]
+}

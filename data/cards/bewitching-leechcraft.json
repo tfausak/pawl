@@ -24,6 +24,7 @@
         }
       ],
       "name": "Bewitching Leechcraft",
+      "oracleText": "Enchant creature\nWhen this Aura enters, tap enchanted creature.\nEnchanted creature has \"If this creature would untap during your untap step, remove a +1/+1 counter from it instead. If you do, untap it.\" (Otherwise, it doesn't untap.)",
       "staticAbilities": [
         {
           "affected": {

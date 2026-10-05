@@ -22,6 +22,7 @@
         }
       ],
       "name": "Treetop Sentries",
+      "oracleText": "Reach\nWhen this creature enters, you may forage. If you do, draw a card. (To forage, exile three cards from your graveyard or sacrifice a Food.)",
       "power": {
         "type": "Literal",
         "value": 2

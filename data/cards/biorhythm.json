@@ -26,6 +26,7 @@
         }
       ],
       "name": "Biorhythm",
+      "oracleText": "Each player's life total becomes the number of creatures they control.",
       "spell": {
         "modes": [
           {

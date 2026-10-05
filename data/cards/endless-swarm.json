@@ -40,6 +40,7 @@
         }
       ],
       "name": "Endless Swarm",
+      "oracleText": "Create a 1/1 green Snake creature token for each card in your hand.\nEpic (For the rest of the game, you can't cast spells. At the beginning of each of your upkeeps, copy this spell except for its epic ability.)",
       "spell": {
         "modes": [
           {

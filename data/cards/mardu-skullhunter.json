@@ -17,6 +17,7 @@
         }
       ],
       "name": "Mardu Skullhunter",
+      "oracleText": "This creature enters tapped.\nRaid — When this creature enters, if you attacked this turn, target opponent discards a card.",
       "power": {
         "type": "Literal",
         "value": 2

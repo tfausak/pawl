@@ -22,6 +22,7 @@
         }
       ],
       "name": "Iron Monger, Sadistic Tycoon",
+      "oracleText": "Flying\nWhenever a creature you control connives, put a +1/+1 counter on each Villain you control.",
       "power": {
         "type": "Literal",
         "value": 2

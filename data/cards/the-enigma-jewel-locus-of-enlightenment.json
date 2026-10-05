@@ -116,6 +116,7 @@
         }
       ],
       "name": "The Enigma Jewel",
+      "oracleText": "The Enigma Jewel enters tapped.\n{T}: Add {C}{C}. Spend this mana only to activate abilities.\nCraft with four or more nonlands with activated abilities {8}{U} ({8}{U}, Exile this artifact, Exile the four or more from among other permanents you control and/or cards in your graveyard: Return this card transformed under its owner's control. Craft only as a sorcery.)",
       "replacementEffects": [
         {
           "effect": {
@@ -151,6 +152,7 @@
         }
       ],
       "name": "Locus of Enlightenment",
+      "oracleText": "Locus of Enlightenment has each activated ability of the exiled cards used to craft it. You may activate each of those abilities only once each turn.\nWhenever you activate an ability that isn't a mana ability, copy it. You may choose new targets for the copy.",
       "staticAbilities": [
         {
           "affected": {

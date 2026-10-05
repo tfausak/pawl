@@ -25,6 +25,7 @@
         }
       ],
       "name": "Flock of Rabid Sheep",
+      "oracleText": "Flip X coins. For each flip you win, create a 2/2 green Sheep creature token named Rabid Sheep.",
       "spell": {
         "modes": [
           {

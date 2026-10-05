@@ -31,6 +31,7 @@
         }
       ],
       "name": "Resolute Archangel",
+      "oracleText": "Flying\nWhen this creature enters, if your life total is less than your starting life total, it becomes equal to your starting life total.",
       "power": {
         "type": "Literal",
         "value": 4

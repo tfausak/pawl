@@ -31,6 +31,7 @@
         }
       ],
       "name": "The Most Dangerous Gamer",
+      "oracleText": "Deathtouch\nWhenever The Most Dangerous Gamer enters or attacks, open an Attraction.\nWhenever you open an Attraction, put a +1/+1 counter on The Most Dangerous Gamer.\nWhenever you claim the prize of an Attraction, destroy target permanent.",
       "power": {
         "type": "Literal",
         "value": 2

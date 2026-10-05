@@ -75,6 +75,7 @@
         }
       ],
       "name": "Armored Galleon",
+      "oracleText": "This creature can't attack unless defending player controls an Island.",
       "power": {
         "type": "Literal",
         "value": 5

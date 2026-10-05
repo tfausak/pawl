@@ -31,6 +31,7 @@
         }
       ],
       "name": "Student of Warfare",
+      "oracleText": "Level up {W} ({W}: Put a level counter on this. Level up only as a sorcery.)\nLEVEL 2-6\n3/3\nFirst strike\nLEVEL 7+\n4/4\nDouble strike",
       "power": {
         "type": "Literal",
         "value": 1

@@ -18,6 +18,7 @@
         }
       ],
       "name": "Skymarcher Aspirant",
+      "oracleText": "Ascend (If you control ten or more permanents, you get the city's blessing for the rest of the game.)\nThis creature has flying as long as you have the city's blessing.",
       "power": {
         "type": "Literal",
         "value": 2

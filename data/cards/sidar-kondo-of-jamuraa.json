@@ -83,6 +83,7 @@
         }
       ],
       "name": "Sidar Kondo of Jamuraa",
+      "oracleText": "Flanking (Whenever a creature without flanking blocks this creature, the blocking creature gets -1/-1 until end of turn.)\nCreatures your opponents control without flying or reach can't block creatures with power 2 or less.\nPartner (You can have two commanders if both have partner.)",
       "power": {
         "type": "Literal",
         "value": 2

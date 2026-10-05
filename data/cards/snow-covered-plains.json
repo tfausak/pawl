@@ -1,0 +1,28 @@
+{
+  "faces": [
+    {
+      "name": "Snow-Covered Plains",
+      "oracleText": "({T}: Add {W}.)",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Plains"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Basic"
+          },
+          {
+            "type": "Snow"
+          }
+        ],
+        "types": [
+          {
+            "type": "Land"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -22,6 +22,7 @@
         }
       ],
       "name": "Staggershock",
+      "oracleText": "Staggershock deals 2 damage to any target.\nRebound (If you cast this spell from your hand, exile it as it resolves. At the beginning of your next upkeep, you may cast this card from exile without paying its mana cost.)",
       "spell": {
         "modes": [
           {

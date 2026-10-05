@@ -31,6 +31,7 @@
         }
       ],
       "name": "Yeva, Nature's Herald",
+      "oracleText": "Flash (You may cast this spell any time you could cast an instant.)\nYou may cast green creature spells as though they had flash.",
       "playerAbilities": [
         {
           "effect": {

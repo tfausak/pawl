@@ -17,6 +17,7 @@
         }
       ],
       "name": "Blessed Reversal",
+      "oracleText": "You gain 3 life for each creature attacking you.",
       "spell": {
         "modes": [
           {

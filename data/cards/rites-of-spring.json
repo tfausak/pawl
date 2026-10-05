@@ -17,6 +17,7 @@
         }
       ],
       "name": "Rites of Spring",
+      "oracleText": "Discard any number of cards. Search your library for up to that many basic land cards, reveal them, put them into your hand, then shuffle.",
       "spell": {
         "modes": [
           {

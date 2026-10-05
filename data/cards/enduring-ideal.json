@@ -31,6 +31,7 @@
         }
       ],
       "name": "Enduring Ideal",
+      "oracleText": "Search your library for an enchantment card, put it onto the battlefield, then shuffle.\nEpic (For the rest of the game, you can't cast spells. At the beginning of each of your upkeeps, copy this spell except for its epic ability.)",
       "spell": {
         "modes": [
           {

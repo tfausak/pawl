@@ -31,6 +31,7 @@
         }
       ],
       "name": "Burning-Rune Demon",
+      "oracleText": "Flying\nWhen this creature enters, you may search your library for exactly two cards not named Burning-Rune Demon that have different names. If you do, reveal those cards. An opponent chooses one of them. Put the chosen card into your hand and the other into your graveyard, then shuffle.",
       "power": {
         "type": "Literal",
         "value": 6

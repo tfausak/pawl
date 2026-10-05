@@ -39,6 +39,7 @@
         }
       ],
       "name": "Lightning Skelemental",
+      "oracleText": "Trample, haste\nWhenever this creature deals combat damage to a player, that player discards two cards.\nAt the beginning of the end step, sacrifice this creature.",
       "power": {
         "type": "Literal",
         "value": 6

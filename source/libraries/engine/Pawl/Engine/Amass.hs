@@ -78,6 +78,7 @@ armyToken subtype =
                   ( Text.unwords
                       (Maybe.maybeToList (Subtype.creatureTypeWord subtype) <> [Text.pack "Army", Text.pack "Token"])
                   ),
+              Face.oracleText = Nothing,
               Face.manaCost = Nothing,
               Face.typeLine =
                 TypeLine.MkTypeLine

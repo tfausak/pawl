@@ -17,6 +17,7 @@
         }
       ],
       "name": "Eyes of Gitaxias",
+      "oracleText": "Incubate 3. (Create an Incubator token with three +1/+1 counters on it and \"{2}: Transform this token.\" It transforms into a 0/0 Phyrexian artifact creature.)\nDraw a card.",
       "spell": {
         "modes": [
           {

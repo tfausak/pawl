@@ -145,6 +145,7 @@
         }
       ],
       "name": "Port of Karfell",
+      "oracleText": "This land enters tapped.\n{T}: Add {U}.\n{3}{U}{B}{B}, {T}, Sacrifice this land: Mill four cards, then return a creature card from your graveyard to the battlefield tapped. (To mill a card, put the top card of your library into your graveyard.)",
       "replacementEffects": [
         {
           "effect": {

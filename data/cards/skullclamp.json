@@ -24,6 +24,7 @@
         }
       ],
       "name": "Skullclamp",
+      "oracleText": "Equipped creature gets +1/-1.\nWhenever equipped creature dies, draw two cards.\nEquip {1}",
       "staticAbilities": [
         {
           "affected": {

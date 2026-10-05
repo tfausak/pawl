@@ -38,6 +38,7 @@
         }
       ],
       "name": "Splinter, Hamato Yoshi",
+      "oracleText": "Sneak {B} (You may cast this spell for {B} if you also return an unblocked attacker you control to hand during the declare blockers step. He enters tapped and attacking.)\nMenace (This creature can't be blocked except by two or more creatures.)\nOther Ninjas you control get +1/+1.",
       "power": {
         "type": "Literal",
         "value": 1

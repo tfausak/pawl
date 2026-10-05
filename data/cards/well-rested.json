@@ -24,6 +24,7 @@
         }
       ],
       "name": "Well Rested",
+      "oracleText": "Enchant creature\nEnchanted creature has \"Whenever this creature becomes untapped, put two +1/+1 counters on it, then you gain 2 life and draw a card. This ability triggers only once each turn.\"",
       "staticAbilities": [
         {
           "affected": {

@@ -59,6 +59,7 @@
         }
       ],
       "name": "Blightreaper Thallid",
+      "oracleText": "{3}{G/P}: Transform this creature. Activate only as a sorcery. ({G/P} can be paid with either {G} or 2 life.)",
       "power": {
         "type": "Literal",
         "value": 2
@@ -90,6 +91,7 @@
         }
       ],
       "name": "Blightsower Thallid",
+      "oracleText": "When this creature transforms into Blightsower Thallid or dies, create a 1/1 green Phyrexian Saproling creature token.",
       "power": {
         "type": "Literal",
         "value": 3

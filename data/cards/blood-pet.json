@@ -51,6 +51,7 @@
         }
       ],
       "name": "Blood Pet",
+      "oracleText": "Sacrifice this creature: Add {B}.",
       "power": {
         "type": "Literal",
         "value": 1

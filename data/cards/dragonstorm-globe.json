@@ -40,6 +40,7 @@
         }
       ],
       "name": "Dragonstorm Globe",
+      "oracleText": "Each Dragon you control enters with an additional +1/+1 counter on it.\n{T}: Add one mana of any color.",
       "replacementEffects": [
         {
           "effect": {

@@ -26,6 +26,7 @@
         }
       ],
       "name": "Aetherspouts",
+      "oracleText": "For each attacking creature, its owner puts it on their choice of the top or bottom of their library.",
       "spell": {
         "modes": [
           {

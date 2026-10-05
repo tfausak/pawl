@@ -25,6 +25,7 @@
         }
       ],
       "name": "Cram Session",
+      "oracleText": "You gain 4 life.\nLearn. (You may reveal a Lesson card you own from outside the game and put it into your hand, or discard a card to draw a card.)",
       "spell": {
         "modes": [
           {

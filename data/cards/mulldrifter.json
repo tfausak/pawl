@@ -42,6 +42,7 @@
         }
       ],
       "name": "Mulldrifter",
+      "oracleText": "Flying\nWhen this creature enters, draw two cards.\nEvoke {2}{U} (You may cast this spell for its evoke cost. If you do, it's sacrificed when it enters.)",
       "power": {
         "type": "Literal",
         "value": 2

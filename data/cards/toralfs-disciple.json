@@ -22,6 +22,7 @@
         }
       ],
       "name": "Toralf's Disciple",
+      "oracleText": "Haste\nWhenever Toralf's Disciple attacks, conjure four cards named Lightning Bolt into your library, then shuffle.",
       "power": {
         "type": "Literal",
         "value": 3

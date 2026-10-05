@@ -25,6 +25,7 @@
         }
       ],
       "name": "Rhuk, Hexgold Nabber",
+      "oracleText": "Trample, haste\nWhenever an equipped creature you control other than Rhuk attacks or dies, you may attach all Equipment attached to that creature to Rhuk.",
       "power": {
         "type": "Literal",
         "value": 2

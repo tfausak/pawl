@@ -165,6 +165,7 @@
         }
       ],
       "name": "Howlpack Piper",
+      "oracleText": "This spell can't be countered.\n{1}{G}, {T}: You may put a creature card from your hand onto the battlefield. If it's a Wolf or Werewolf, untap this creature. Activate only as a sorcery.\nDaybound (If a player casts no spells during their own turn, it becomes night next turn.)",
       "power": {
         "type": "Literal",
         "value": 2
@@ -201,6 +202,7 @@
         }
       ],
       "name": "Wildsong Howler",
+      "oracleText": "Whenever this creature enters or transforms into Wildsong Howler, look at the top six cards of your library. You may reveal a creature card from among them and put it into your hand. Put the rest on the bottom of your library in a random order.\nNightbound (If a player casts at least two spells during their own turn, it becomes day next turn.)",
       "power": {
         "type": "Literal",
         "value": 4

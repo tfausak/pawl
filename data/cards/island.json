@@ -2,6 +2,7 @@
   "faces": [
     {
       "name": "Island",
+      "oracleText": "({T}: Add {U}.)",
       "typeLine": {
         "subtypes": [
           {

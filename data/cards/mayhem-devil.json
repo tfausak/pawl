@@ -26,6 +26,7 @@
         }
       ],
       "name": "Mayhem Devil",
+      "oracleText": "Whenever a player sacrifices a permanent, this creature deals 1 damage to any target.",
       "power": {
         "type": "Literal",
         "value": 3

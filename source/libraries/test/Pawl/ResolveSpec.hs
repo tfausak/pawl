@@ -2612,6 +2612,7 @@ subgameSpellOn borrowed name effects gs0 =
       face =
         Face.MkFace
           { Face.name = CardName.MkCardName $ Text.pack name,
+            Face.oracleText = Nothing,
             Face.manaCost = Nothing,
             Face.typeLine = Face.typeLine (S.combinedFace borrowed),
             Face.power = Nothing,

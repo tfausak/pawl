@@ -20,6 +20,7 @@
         }
       ],
       "name": "Unholy Strength",
+      "oracleText": "Enchant creature\nEnchanted creature gets +2/+1.",
       "staticAbilities": [
         {
           "affected": {

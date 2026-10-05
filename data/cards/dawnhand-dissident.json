@@ -107,6 +107,7 @@
         }
       ],
       "name": "Dawnhand Dissident",
+      "oracleText": "{T}, Blight 1: Surveil 1.\n{T}, Blight 2: Exile target card from a graveyard.\nDuring your turn, you may cast creature spells from among cards you own exiled with this creature by removing three counters from among creatures you control in addition to paying their other costs.",
       "playerAbilities": [
         {
           "condition": {

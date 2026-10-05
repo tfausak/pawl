@@ -17,6 +17,7 @@
         }
       ],
       "name": "Follow the Lumarets",
+      "oracleText": "Infusion — Look at the top four cards of your library. You may reveal a creature or land card from among them and put it into your hand. If you gained life this turn, you may instead reveal two creature and/or land cards from among them and put them into your hand. Put the rest on the bottom of your library in a random order.",
       "spell": {
         "modes": [
           {

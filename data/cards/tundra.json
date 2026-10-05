@@ -1,0 +1,23 @@
+{
+  "faces": [
+    {
+      "name": "Tundra",
+      "oracleText": "({T}: Add {W} or {U}.)",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Island"
+          },
+          {
+            "type": "Plains"
+          }
+        ],
+        "types": [
+          {
+            "type": "Land"
+          }
+        ]
+      }
+    }
+  ]
+}

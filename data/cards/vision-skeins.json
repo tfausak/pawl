@@ -17,6 +17,7 @@
         }
       ],
       "name": "Vision Skeins",
+      "oracleText": "Each player draws two cards.",
       "spell": {
         "modes": [
           {

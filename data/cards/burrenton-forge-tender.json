@@ -65,6 +65,7 @@
         }
       ],
       "name": "Burrenton Forge-Tender",
+      "oracleText": "Protection from red\nSacrifice this creature: Prevent all damage a red source of your choice would deal this turn.",
       "power": {
         "type": "Literal",
         "value": 1

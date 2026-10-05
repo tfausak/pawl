@@ -34,6 +34,7 @@
         }
       ],
       "name": "Mutagen Connoisseur",
+      "oracleText": "Flying, vigilance\nThis creature gets +1/+0 for each transformed permanent you control.",
       "power": {
         "type": "Literal",
         "value": 0

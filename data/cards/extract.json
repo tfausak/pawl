@@ -13,6 +13,7 @@
         }
       ],
       "name": "Extract",
+      "oracleText": "Search target player's library for a card and exile it. Then that player shuffles.",
       "spell": {
         "modes": [
           {

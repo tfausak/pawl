@@ -20,6 +20,7 @@
         }
       ],
       "name": "Dismember",
+      "oracleText": "({B/P} can be paid with either {B} or 2 life.)\nTarget creature gets -5/-5 until end of turn.",
       "spell": {
         "modes": [
           {

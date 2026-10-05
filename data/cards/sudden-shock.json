@@ -22,6 +22,7 @@
         }
       ],
       "name": "Sudden Shock",
+      "oracleText": "Split second (As long as this spell is on the stack, players can't cast spells or activate abilities that aren't mana abilities.)\nSudden Shock deals 2 damage to any target.",
       "spell": {
         "modes": [
           {

@@ -162,6 +162,7 @@
         }
       ],
       "name": "Iron Spider, Stark Upgrade",
+      "oracleText": "Vigilance\n{T}: Put a +1/+1 counter on each artifact creature and/or Vehicle you control.\n{2}, Remove two +1/+1 counters from among artifacts you control: Draw a card.",
       "power": {
         "type": "Literal",
         "value": 2

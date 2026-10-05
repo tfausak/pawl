@@ -35,6 +35,7 @@
         }
       ],
       "name": "Luxior, Giada's Gift",
+      "oracleText": "Equipped creature gets +1/+1 for each counter on it.\nEquipped permanent isn't a planeswalker and is a creature in addition to its other types. (Loyalty abilities can still be activated.)\nEquip planeswalker {1}\nEquip {3}",
       "staticAbilities": [
         {
           "affected": {

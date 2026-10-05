@@ -13,6 +13,7 @@
         }
       ],
       "name": "Dungeon Crawler",
+      "oracleText": "This creature enters tapped.\nWhenever you complete a dungeon, you may return this card from your graveyard to your hand.",
       "power": {
         "type": "Literal",
         "value": 2

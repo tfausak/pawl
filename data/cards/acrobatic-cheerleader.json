@@ -17,6 +17,7 @@
         }
       ],
       "name": "Acrobatic Cheerleader",
+      "oracleText": "Survival — At the beginning of your second main phase, if this creature is tapped, put a flying counter on it. This ability triggers only once.",
       "power": {
         "type": "Literal",
         "value": 2

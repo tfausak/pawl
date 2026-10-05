@@ -143,6 +143,7 @@
         }
       ],
       "name": "Cavalier of Flame",
+      "oracleText": "{1}{R}: Creatures you control get +1/+0 and gain haste until end of turn.\nWhen this creature enters, discard any number of cards, then draw that many cards.\nWhen this creature dies, it deals X damage to each opponent and each planeswalker they control, where X is the number of land cards in your graveyard.",
       "power": {
         "type": "Literal",
         "value": 6

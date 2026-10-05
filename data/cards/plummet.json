@@ -17,6 +17,7 @@
         }
       ],
       "name": "Plummet",
+      "oracleText": "Destroy target creature with flying.",
       "spell": {
         "modes": [
           {

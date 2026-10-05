@@ -22,6 +22,7 @@
         }
       ],
       "name": "Shu Yun, the Silent Tempest",
+      "oracleText": "Prowess (Whenever you cast a noncreature spell, this creature gets +1/+1 until end of turn.)\nWhenever you cast a noncreature spell, you may pay {R/W}{R/W}. If you do, target creature gains double strike until end of turn.",
       "power": {
         "type": "Literal",
         "value": 3

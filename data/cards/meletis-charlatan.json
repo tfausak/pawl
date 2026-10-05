@@ -95,6 +95,7 @@
         }
       ],
       "name": "Meletis Charlatan",
+      "oracleText": "{2}{U}, {T}: The controller of target instant or sorcery spell copies it. That player may choose new targets for the copy.",
       "power": {
         "type": "Literal",
         "value": 2

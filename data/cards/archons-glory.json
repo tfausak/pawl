@@ -18,6 +18,7 @@
         }
       ],
       "name": "Archon's Glory",
+      "oracleText": "Bargain (You may sacrifice an artifact, enchantment, or token as you cast this spell.)\nTarget creature gets +2/+2 until end of turn. If this spell was bargained, that creature also gains flying and lifelink until end of turn.",
       "spell": {
         "modes": [
           {

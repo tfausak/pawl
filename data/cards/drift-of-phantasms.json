@@ -54,6 +54,7 @@
         }
       ],
       "name": "Drift of Phantasms",
+      "oracleText": "Defender (This creature can't attack.)\nFlying\nTransmute {1}{U}{U} ({1}{U}{U}, Discard this card: Search your library for a card with the same mana value as this card, reveal it, put it into your hand, then shuffle. Transmute only as a sorcery.)",
       "power": {
         "type": "Literal",
         "value": 0

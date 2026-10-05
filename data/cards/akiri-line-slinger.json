@@ -33,6 +33,7 @@
         }
       ],
       "name": "Akiri, Line-Slinger",
+      "oracleText": "First strike, vigilance\nAkiri gets +1/+0 for each artifact you control.\nPartner (You can have two commanders if both have partner.)",
       "power": {
         "type": "Literal",
         "value": 0

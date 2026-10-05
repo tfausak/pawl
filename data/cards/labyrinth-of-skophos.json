@@ -89,6 +89,7 @@
         }
       ],
       "name": "Labyrinth of Skophos",
+      "oracleText": "{T}: Add {C}.\n{4}, {T}: Remove target attacking or blocking creature from combat.",
       "typeLine": {
         "types": [
           {

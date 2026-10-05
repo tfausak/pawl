@@ -2,6 +2,7 @@
   "faces": [
     {
       "name": "Snow-Covered Swamp",
+      "oracleText": "({T}: Add {B}.)",
       "typeLine": {
         "subtypes": [
           {

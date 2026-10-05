@@ -22,6 +22,7 @@
         }
       ],
       "name": "Love Song of Night and Day",
+      "oracleText": "Read ahead (Choose a chapter and start with that many lore counters. Add one after your draw step. Skipped chapters don't trigger. Sacrifice after III.)\nI — You and target opponent each draw two cards.\nII — Create a 1/1 white Bird creature token with flying.\nIII — Put a +1/+1 counter on each of up to two target creatures.",
       "triggeredAbilities": [
         {
           "condition": {

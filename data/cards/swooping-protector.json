@@ -25,6 +25,7 @@
         }
       ],
       "name": "Swooping Protector",
+      "oracleText": "Flash\nFlying\nThis creature enters with a shield counter on it. (If it would be dealt damage or destroyed, remove a shield counter from it instead.)",
       "power": {
         "type": "Literal",
         "value": 2

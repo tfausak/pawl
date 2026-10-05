@@ -89,6 +89,7 @@
         }
       ],
       "name": "Oscorp Industries",
+      "oracleText": "This land enters tapped.\nWhen this land enters from a graveyard, you lose 2 life.\n{T}: Add {U}, {B}, or {R}.\nMayhem (You may play this card from your graveyard if you discarded it this turn. Timing rules still apply.)",
       "replacementEffects": [
         {
           "effect": {

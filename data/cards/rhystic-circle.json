@@ -78,6 +78,7 @@
         }
       ],
       "name": "Rhystic Circle",
+      "oracleText": "{1}: Any player may pay {1}. If no one does, the next time a source of your choice would deal damage to you this turn, prevent that damage.",
       "typeLine": {
         "types": [
           {

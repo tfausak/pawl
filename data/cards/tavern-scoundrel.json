@@ -64,6 +64,7 @@
         }
       ],
       "name": "Tavern Scoundrel",
+      "oracleText": "Whenever you win a coin flip, create two Treasure tokens. (They're artifacts with \"{T}, Sacrifice this token: Add one mana of any color.\")\n{1}, {T}, Sacrifice another permanent: Flip a coin.",
       "power": {
         "type": "Literal",
         "value": 1

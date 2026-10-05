@@ -207,6 +207,7 @@
         }
       ],
       "name": "Loot, the Pathfinder",
+      "oracleText": "Double strike, vigilance, haste\nExhaust — {G}, {T}: Add three mana of any one color. (Activate each exhaust ability only once.)\nExhaust — {U}, {T}: Draw three cards.\nExhaust — {R}, {T}: Loot deals 3 damage to any target.",
       "power": {
         "type": "Literal",
         "value": 2

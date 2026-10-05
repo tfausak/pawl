@@ -70,6 +70,7 @@
         }
       ],
       "name": "Agent's Toolkit",
+      "oracleText": "This artifact enters with a +1/+1 counter, a flying counter, a deathtouch counter, and a shield counter on it. (If it would be dealt damage or destroyed, remove a shield counter from it instead.)\nWhenever a creature you control enters, you may move a counter from this artifact onto that creature.\n{2}, Sacrifice this artifact: Draw a card.",
       "replacementEffects": [
         {
           "effect": {

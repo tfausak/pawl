@@ -13,6 +13,7 @@
         }
       ],
       "name": "Dwarven Mauler",
+      "oracleText": "Equip abilities you activate that target this creature cost {2} less to activate.",
       "playerAbilities": [
         {
           "effect": {

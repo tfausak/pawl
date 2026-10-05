@@ -91,6 +91,7 @@
         }
       ],
       "name": "Delighted Halfling",
+      "oracleText": "{T}: Add {C}.\n{T}: Add one mana of any color. Spend this mana only to cast a legendary spell, and that spell can't be countered.",
       "power": {
         "type": "Literal",
         "value": 1

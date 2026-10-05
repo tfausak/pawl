@@ -17,6 +17,7 @@
         }
       ],
       "name": "Transcantation",
+      "oracleText": "Target instant or sorcery spell becomes a copy of Lightning Bolt. Its controller may choose new targets for it.",
       "spell": {
         "modes": [
           {

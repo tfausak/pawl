@@ -31,6 +31,7 @@
         }
       ],
       "name": "Dryad Sophisticate",
+      "oracleText": "Nonbasic landwalk (This creature can't be blocked as long as defending player controls a nonbasic land.)",
       "power": {
         "type": "Literal",
         "value": 2

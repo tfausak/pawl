@@ -17,6 +17,7 @@
         }
       ],
       "name": "Switcheroo",
+      "oracleText": "Exchange control of two target creatures.",
       "spell": {
         "modes": [
           {

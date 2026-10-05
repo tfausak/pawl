@@ -17,6 +17,7 @@
         }
       ],
       "name": "Treasure Hunt",
+      "oracleText": "Reveal cards from the top of your library until you reveal a nonland card, then put all cards revealed this way into your hand.",
       "spell": {
         "modes": [
           {

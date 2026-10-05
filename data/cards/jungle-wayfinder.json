@@ -17,6 +17,7 @@
         }
       ],
       "name": "Jungle Wayfinder",
+      "oracleText": "When this creature enters, each player may search their library for a basic land card, reveal it, put it into their hand, then shuffle.",
       "power": {
         "type": "Literal",
         "value": 3

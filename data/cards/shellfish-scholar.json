@@ -126,6 +126,7 @@
         }
       ],
       "name": "Shellfish Scholar",
+      "oracleText": "Whenever Shellfish Scholar or another Rat you control enters, conjure a card named Think Twice into your graveyard.\nThreshold — {T}: Spells you cast from your graveyard this turn cost {2} less to cast. Activate only if seven or more cards are in your graveyard.",
       "power": {
         "type": "Literal",
         "value": 2

@@ -26,6 +26,7 @@
         }
       ],
       "name": "Bane of Progress",
+      "oracleText": "When this creature enters, destroy all artifacts and enchantments. Put a +1/+1 counter on this creature for each permanent destroyed this way.",
       "power": {
         "type": "Literal",
         "value": 2

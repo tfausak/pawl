@@ -22,6 +22,7 @@
         }
       ],
       "name": "Selfless Squire",
+      "oracleText": "Flash\nWhen this creature enters, prevent all damage that would be dealt to you this turn.\nWhenever damage that would be dealt to you is prevented, put that many +1/+1 counters on this creature.",
       "power": {
         "type": "Literal",
         "value": 1

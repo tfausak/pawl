@@ -31,6 +31,7 @@
         }
       ],
       "name": "Young Deathclaws",
+      "oracleText": "Menace (This creature can't be blocked except by two or more creatures.)\nEach creature card in your graveyard has scavenge. The scavenge cost is equal to its mana cost. (Exile a creature card from your graveyard and pay its mana cost: Put a number of +1/+1 counters equal to that card's power on target creature. Scavenge only as a sorcery.)",
       "power": {
         "type": "Literal",
         "value": 4

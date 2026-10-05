@@ -17,6 +17,7 @@
         }
       ],
       "name": "Auratouched Mage",
+      "oracleText": "When this creature enters, search your library for an Aura card that could enchant it. If this creature is still on the battlefield, put that Aura card onto the battlefield attached to it. Otherwise, reveal the Aura card and put it into your hand. Then shuffle.",
       "power": {
         "type": "Literal",
         "value": 3

@@ -22,6 +22,7 @@
         }
       ],
       "name": "Toxic Deluge",
+      "oracleText": "As an additional cost to cast this spell, pay X life.\nAll creatures get -X/-X until end of turn.",
       "spell": {
         "modes": [
           {

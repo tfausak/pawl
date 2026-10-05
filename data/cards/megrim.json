@@ -17,6 +17,7 @@
         }
       ],
       "name": "Megrim",
+      "oracleText": "Whenever an opponent discards a card, this enchantment deals 2 damage to that player.",
       "triggeredAbilities": [
         {
           "condition": {

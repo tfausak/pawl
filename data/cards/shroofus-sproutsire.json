@@ -22,6 +22,7 @@
         }
       ],
       "name": "Shroofus Sproutsire",
+      "oracleText": "Trample\nWhenever a Saproling you control deals combat damage to a player, create that many 1/1 green Saproling creature tokens.",
       "power": {
         "type": "Literal",
         "value": 1

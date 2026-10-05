@@ -13,6 +13,7 @@
         }
       ],
       "name": "Doomed Traveler",
+      "oracleText": "When this creature dies, create a 1/1 white Spirit creature token with flying.",
       "power": {
         "type": "Literal",
         "value": 1

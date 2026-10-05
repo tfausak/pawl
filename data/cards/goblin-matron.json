@@ -17,6 +17,7 @@
         }
       ],
       "name": "Goblin Matron",
+      "oracleText": "When this creature enters, you may search your library for a Goblin card, reveal that card, put it into your hand, then shuffle.",
       "power": {
         "type": "Literal",
         "value": 1

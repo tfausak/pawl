@@ -34,6 +34,7 @@
         }
       ],
       "name": "Wormfang Crab",
+      "oracleText": "This creature can't be blocked.\nWhen this creature enters, an opponent chooses a permanent you control other than this creature and exiles it.\nWhen this creature leaves the battlefield, return the exiled card to the battlefield under its owner's control.",
       "power": {
         "type": "Literal",
         "value": 3

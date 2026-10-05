@@ -22,6 +22,7 @@
         }
       ],
       "name": "Hymn to Tourach",
+      "oracleText": "Target player discards two cards at random.",
       "spell": {
         "modes": [
           {

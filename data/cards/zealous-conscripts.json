@@ -22,6 +22,7 @@
         }
       ],
       "name": "Zealous Conscripts",
+      "oracleText": "Haste\nWhen this creature enters, gain control of target permanent until end of turn. Untap that permanent. It gains haste until end of turn.",
       "power": {
         "type": "Literal",
         "value": 3

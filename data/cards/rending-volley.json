@@ -16,6 +16,7 @@
         }
       ],
       "name": "Rending Volley",
+      "oracleText": "This spell can't be countered.\nRending Volley deals 4 damage to target white or blue creature.",
       "spell": {
         "modes": [
           {

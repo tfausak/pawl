@@ -57,6 +57,7 @@
         }
       ],
       "name": "Lure",
+      "oracleText": "Enchant creature\nAll creatures able to block enchanted creature do so.",
       "typeLine": {
         "subtypes": [
           {

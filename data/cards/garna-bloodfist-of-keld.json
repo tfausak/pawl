@@ -35,6 +35,7 @@
         }
       ],
       "name": "Garna, Bloodfist of Keld",
+      "oracleText": "Whenever another creature you control dies, draw a card if it was attacking. Otherwise, Garna deals 1 damage to each opponent.",
       "power": {
         "type": "Literal",
         "value": 4

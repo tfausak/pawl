@@ -53,6 +53,7 @@
         }
       ],
       "name": "Thelonite Hermit",
+      "oracleText": "All Saprolings get +1/+1.\nMorph {3}{G}{G} (You may cast this card face down as a 2/2 creature for {3}. Turn it face up any time for its morph cost.)\nWhen this creature is turned face up, create four 1/1 green Saproling creature tokens.",
       "power": {
         "type": "Literal",
         "value": 1

@@ -76,6 +76,7 @@
         }
       ],
       "name": "Crown of the Ages",
+      "oracleText": "{4}, {T}: Attach target Aura attached to a creature to another creature.",
       "typeLine": {
         "types": [
           {

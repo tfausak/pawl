@@ -238,6 +238,7 @@
         }
       ],
       "name": "Kenessos, Priest of Thassa",
+      "oracleText": "If you would scry a number of cards, scry that many cards plus one instead.\n{3}{G/U}: Look at the top card of your library. If it's a Kraken, Leviathan, Octopus, or Serpent creature card, you may put it onto the battlefield. If you don't put the card onto the battlefield, you may put it on the bottom of your library.",
       "power": {
         "type": "Literal",
         "value": 1

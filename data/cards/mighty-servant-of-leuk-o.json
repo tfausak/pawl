@@ -37,6 +37,7 @@
         }
       ],
       "name": "Mighty Servant of Leuk-o",
+      "oracleText": "Trample\nWard—Discard a card.\nWhenever this Vehicle becomes crewed for the first time each turn, if it was crewed by exactly two creatures, it gains \"Whenever this creature deals combat damage to a player, draw two cards\" until end of turn.\nCrew 4",
       "power": {
         "type": "Literal",
         "value": 6

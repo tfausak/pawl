@@ -1,0 +1,23 @@
+{
+  "faces": [
+    {
+      "name": "Tropical Island",
+      "oracleText": "({T}: Add {G} or {U}.)",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Forest"
+          },
+          {
+            "type": "Island"
+          }
+        ],
+        "types": [
+          {
+            "type": "Land"
+          }
+        ]
+      }
+    }
+  ]
+}

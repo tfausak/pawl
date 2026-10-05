@@ -35,6 +35,7 @@
         }
       ],
       "name": "Rose Noble",
+      "oracleText": "Ward {2}\nWhenever you cast a Doctor spell or creature spell with doctor's companion, draw a card.\nDoctor's companion (You can have two commanders if the other is the Doctor.)",
       "power": {
         "type": "Literal",
         "value": 2

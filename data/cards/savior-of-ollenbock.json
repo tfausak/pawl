@@ -31,6 +31,7 @@
         }
       ],
       "name": "Savior of Ollenbock",
+      "oracleText": "Training (Whenever this creature attacks with another creature with greater power, put a +1/+1 counter on this creature.)\nWhenever this creature trains, exile up to one other target creature from the battlefield or creature card from a graveyard.\nWhen this creature leaves the battlefield, put the exiled cards onto the battlefield under their owners' control.",
       "power": {
         "type": "Literal",
         "value": 1

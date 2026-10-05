@@ -34,6 +34,7 @@
         }
       ],
       "name": "Breathless Knight",
+      "oracleText": "Flying, lifelink\nWhenever this creature or another creature you control enters, if that creature entered from a graveyard or you cast it from a graveyard, put a +1/+1 counter on this creature.",
       "power": {
         "type": "Literal",
         "value": 2

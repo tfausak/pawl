@@ -39,6 +39,7 @@
         }
       ],
       "name": "Cyclops Tyrant",
+      "oracleText": "Intimidate (This creature can't be blocked except by artifact creatures and/or creatures that share a color with it.)\nThis creature can't block creatures with power 2 or less.",
       "power": {
         "type": "Literal",
         "value": 3

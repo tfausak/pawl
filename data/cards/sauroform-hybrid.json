@@ -93,6 +93,7 @@
         }
       ],
       "name": "Sauroform Hybrid",
+      "oracleText": "{4}{G}{G}: Adapt 4. (If this creature has no +1/+1 counters on it, put four +1/+1 counters on it.)",
       "power": {
         "type": "Literal",
         "value": 2

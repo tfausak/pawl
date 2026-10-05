@@ -22,6 +22,7 @@
         }
       ],
       "name": "Bureau Headmaster",
+      "oracleText": "Equipment spells you cast cost {1} less to cast.\nEquip abilities you activate cost {1} less to activate.",
       "playerAbilities": [
         {
           "effect": {

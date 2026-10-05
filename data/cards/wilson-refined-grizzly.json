@@ -47,6 +47,7 @@
         }
       ],
       "name": "Wilson, Refined Grizzly",
+      "oracleText": "This spell can't be countered.\nReach, vigilance, trample\nWard {2} (Whenever this creature becomes the target of a spell or ability an opponent controls, counter it unless that player pays {2}.)\nChoose a Background (You can have a Background as a second commander.)",
       "power": {
         "type": "Literal",
         "value": 2

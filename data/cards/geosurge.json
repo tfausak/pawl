@@ -40,6 +40,7 @@
         }
       ],
       "name": "Geosurge",
+      "oracleText": "Add {R}{R}{R}{R}{R}{R}{R}. Spend this mana only to cast artifact or creature spells.",
       "spell": {
         "modes": [
           {

@@ -40,6 +40,7 @@
         }
       ],
       "name": "Storm of Memories",
+      "oracleText": "Storm (When you cast this spell, copy it for each spell cast before it this turn.)\nExile an instant or sorcery card with mana value 3 or less from your graveyard at random. You may cast it without paying its mana cost. If that spell would be put into a graveyard, exile it instead.",
       "spell": {
         "modes": [
           {

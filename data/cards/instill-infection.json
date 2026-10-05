@@ -17,6 +17,7 @@
         }
       ],
       "name": "Instill Infection",
+      "oracleText": "Put a -1/-1 counter on target creature.\nDraw a card.",
       "spell": {
         "modes": [
           {

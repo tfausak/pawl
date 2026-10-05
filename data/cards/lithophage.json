@@ -26,6 +26,7 @@
         }
       ],
       "name": "Lithophage",
+      "oracleText": "At the beginning of your upkeep, sacrifice this creature unless you sacrifice a Mountain.",
       "power": {
         "type": "Literal",
         "value": 7

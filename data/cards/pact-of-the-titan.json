@@ -75,6 +75,7 @@
       },
       "manaCost": [],
       "name": "Pact of the Titan",
+      "oracleText": "Create a 4/4 red Giant creature token.\nAt the beginning of your next upkeep, pay {4}{R}. If you don't, you lose the game.",
       "spell": {
         "modes": [
           {

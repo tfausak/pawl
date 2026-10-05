@@ -90,6 +90,7 @@
         }
       ],
       "name": "Flamerush Rider",
+      "oracleText": "Whenever this creature attacks, create a token that's a copy of another target attacking creature and that's tapped and attacking. Exile the token at end of combat.\nDash {2}{R}{R} (You may cast this spell for its dash cost. If you do, it gains haste, and it's returned from the battlefield to its owner's hand at the beginning of the next end step.)",
       "power": {
         "type": "Literal",
         "value": 3

@@ -49,6 +49,7 @@
         }
       ],
       "name": "Seeker of Slaanesh",
+      "oracleText": "Haste\nAllure of Slaanesh — Each opponent must attack with at least one creature each combat if able.",
       "power": {
         "type": "Literal",
         "value": 3

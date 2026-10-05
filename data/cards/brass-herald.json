@@ -8,6 +8,7 @@
         }
       ],
       "name": "Brass Herald",
+      "oracleText": "As this creature enters, choose a creature type.\nWhen this creature enters, reveal the top four cards of your library. Put all creature cards of the chosen type revealed this way into your hand and the rest on the bottom of your library in any order.\nCreatures of the chosen type get +1/+1.",
       "power": {
         "type": "Literal",
         "value": 2

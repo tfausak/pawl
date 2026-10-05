@@ -84,6 +84,7 @@
         }
       ],
       "name": "Everbark Shaman",
+      "oracleText": "{T}, Exile a Treefolk card from your graveyard: Search your library for up to two Forest cards, put them onto the battlefield tapped, then shuffle.",
       "power": {
         "type": "Literal",
         "value": 3

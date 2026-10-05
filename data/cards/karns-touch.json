@@ -22,6 +22,7 @@
         }
       ],
       "name": "Karn's Touch",
+      "oracleText": "Target noncreature artifact becomes an artifact creature with power and toughness each equal to its mana value until end of turn. (It retains its abilities.)",
       "spell": {
         "modes": [
           {

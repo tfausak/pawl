@@ -70,6 +70,7 @@
         }
       ],
       "name": "Generator Servant",
+      "oracleText": "{T}, Sacrifice this creature: Add {C}{C}. If any of that mana is spent on a creature spell, it gains haste until end of turn. (That creature can attack and {T} as soon as it comes under your control.)",
       "power": {
         "type": "Literal",
         "value": 2

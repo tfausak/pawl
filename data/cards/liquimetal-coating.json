@@ -57,6 +57,7 @@
         }
       ],
       "name": "Liquimetal Coating",
+      "oracleText": "{T}: Target permanent becomes an artifact in addition to its other types until end of turn.",
       "typeLine": {
         "types": [
           {

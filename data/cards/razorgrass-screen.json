@@ -23,6 +23,7 @@
         }
       ],
       "name": "Razorgrass Screen",
+      "oracleText": "Defender (This creature can't attack.)\nThis creature blocks each combat if able.",
       "power": {
         "type": "Literal",
         "value": 2

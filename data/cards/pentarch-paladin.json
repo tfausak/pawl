@@ -105,6 +105,7 @@
         }
       ],
       "name": "Pentarch Paladin",
+      "oracleText": "Flanking (Whenever a creature without flanking blocks this creature, the blocking creature gets -1/-1 until end of turn.)\nAs this creature enters, choose a color.\n{W}{W}, {T}: Destroy target permanent of the chosen color.",
       "power": {
         "type": "Literal",
         "value": 3

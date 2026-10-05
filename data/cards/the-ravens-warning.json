@@ -103,6 +103,7 @@
         }
       ],
       "name": "The Raven's Warning",
+      "oracleText": "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI — Create a 1/1 blue Bird creature token with flying. You gain 2 life.\nII — Whenever one or more creatures you control with flying deal combat damage to a player this turn, look at that player's hand and draw a card.\nIII — You may put a card you own from outside the game on top of your library.",
       "triggeredAbilities": [
         {
           "condition": {

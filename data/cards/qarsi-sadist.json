@@ -22,6 +22,7 @@
         }
       ],
       "name": "Qarsi Sadist",
+      "oracleText": "Exploit (When this creature enters, you may sacrifice a creature.)\nWhen this creature exploits a creature, target opponent loses 2 life and you gain 2 life.",
       "power": {
         "type": "Literal",
         "value": 1

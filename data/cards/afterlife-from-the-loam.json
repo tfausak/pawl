@@ -40,6 +40,7 @@
         }
       ],
       "name": "Afterlife from the Loam",
+      "oracleText": "Delve (Each card you exile from your graveyard while casting this spell pays for {1}.)\nFor each player, choose up to one target creature card in that player's graveyard. Put those cards onto the battlefield under your control. They're Zombies in addition to their other types.",
       "spell": {
         "modes": [
           {

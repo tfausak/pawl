@@ -17,6 +17,7 @@
         }
       ],
       "name": "Fanatic of Mogis",
+      "oracleText": "When this creature enters, it deals damage to each opponent equal to your devotion to red. (Each {R} in the mana costs of permanents you control counts toward your devotion to red.)",
       "power": {
         "type": "Literal",
         "value": 4

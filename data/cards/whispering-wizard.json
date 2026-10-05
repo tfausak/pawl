@@ -17,6 +17,7 @@
         }
       ],
       "name": "Whispering Wizard",
+      "oracleText": "Whenever you cast a noncreature spell, create a 1/1 white Spirit creature token with flying. This ability triggers only once each turn.",
       "power": {
         "type": "Literal",
         "value": 3

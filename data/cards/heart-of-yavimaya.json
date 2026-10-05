@@ -94,6 +94,7 @@
         }
       ],
       "name": "Heart of Yavimaya",
+      "oracleText": "If this land would enter, sacrifice a Forest instead. If you do, put this land onto the battlefield. If you don't, put it into its owner's graveyard.\n{T}: Add {G}.\n{T}: Target creature gets +1/+1 until end of turn.",
       "replacementEffects": [
         {
           "effect": {

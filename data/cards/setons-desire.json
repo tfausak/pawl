@@ -86,6 +86,7 @@
         }
       ],
       "name": "Seton's Desire",
+      "oracleText": "Enchant creature\nEnchanted creature gets +2/+2.\nThreshold — As long as there are seven or more cards in your graveyard, all creatures able to block enchanted creature do so.",
       "staticAbilities": [
         {
           "affected": {

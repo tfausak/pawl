@@ -54,6 +54,7 @@
         }
       ],
       "name": "Palladium Myr",
+      "oracleText": "{T}: Add {C}{C}.",
       "power": {
         "type": "Literal",
         "value": 2

@@ -74,6 +74,7 @@
         }
       ],
       "name": "Teardrop Kami",
+      "oracleText": "Sacrifice this creature: You may tap or untap target creature.",
       "power": {
         "type": "Literal",
         "value": 1

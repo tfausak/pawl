@@ -28,6 +28,7 @@
         }
       ],
       "name": "Bog Wraith",
+      "oracleText": "Swampwalk (This creature can't be blocked as long as defending player controls a Swamp.)",
       "power": {
         "type": "Literal",
         "value": 3

@@ -13,6 +13,7 @@
         }
       ],
       "name": "Dwell on the Past",
+      "oracleText": "Target player shuffles up to four target cards from their graveyard into their library.",
       "spell": {
         "modes": [
           {

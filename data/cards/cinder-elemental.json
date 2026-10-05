@@ -81,6 +81,7 @@
         }
       ],
       "name": "Cinder Elemental",
+      "oracleText": "{X}{R}, {T}, Sacrifice this creature: It deals X damage to any target.",
       "power": {
         "type": "Literal",
         "value": 2

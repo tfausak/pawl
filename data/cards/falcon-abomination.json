@@ -22,6 +22,7 @@
         }
       ],
       "name": "Falcon Abomination",
+      "oracleText": "Flying\nWhen this creature enters, create a 2/2 black Zombie creature token with decayed. (It can't block. When it attacks, sacrifice it at end of combat.)",
       "power": {
         "type": "Literal",
         "value": 2

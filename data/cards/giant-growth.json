@@ -13,6 +13,7 @@
         }
       ],
       "name": "Giant Growth",
+      "oracleText": "Target creature gets +3/+3 until end of turn.",
       "spell": {
         "modes": [
           {

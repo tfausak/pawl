@@ -17,6 +17,7 @@
         }
       ],
       "name": "Nature's Lore",
+      "oracleText": "Search your library for a Forest card, put that card onto the battlefield, then shuffle.",
       "spell": {
         "modes": [
           {

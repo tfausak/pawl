@@ -94,6 +94,7 @@
         }
       ],
       "name": "Godhead of Awe",
+      "oracleText": "Flying\nOther creatures have base power and toughness 1/1.",
       "power": {
         "type": "Literal",
         "value": 4

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Boil",
+      "oracleText": "Destroy all Islands.",
       "spell": {
         "modes": [
           {

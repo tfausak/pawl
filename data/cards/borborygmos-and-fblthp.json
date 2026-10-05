@@ -136,6 +136,7 @@
         }
       ],
       "name": "Borborygmos and Fblthp",
+      "oracleText": "Whenever Borborygmos and Fblthp enters or attacks, draw a card, then you may discard any number of land cards. When you discard one or more cards this way, Borborygmos and Fblthp deals twice that much damage to target creature.\n{1}{U}: Put Borborygmos and Fblthp into its owner's library third from the top.",
       "power": {
         "type": "Literal",
         "value": 6

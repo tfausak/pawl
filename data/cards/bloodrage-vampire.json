@@ -23,6 +23,7 @@
         }
       ],
       "name": "Bloodrage Vampire",
+      "oracleText": "Bloodthirst 1 (If an opponent was dealt damage this turn, this creature enters with a +1/+1 counter on it.)",
       "power": {
         "type": "Literal",
         "value": 3

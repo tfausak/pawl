@@ -22,6 +22,7 @@
         }
       ],
       "name": "Hunting Velociraptor",
+      "oracleText": "First strike\nDinosaur spells you cast have prowl {2}{R}. (You may cast a spell for its prowl cost if you dealt combat damage to a player this turn with a creature with any of its creature types.)",
       "power": {
         "type": "Literal",
         "value": 3

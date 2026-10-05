@@ -33,6 +33,7 @@
         }
       ],
       "name": "Barkhide Mauler",
+      "oracleText": "Cycling {2} ({2}, Discard this card: Draw a card.)",
       "power": {
         "type": "Literal",
         "value": 4

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Mogis's Marauder",
+      "oracleText": "When this creature enters, up to X target creatures each gain intimidate and haste until end of turn, where X is your devotion to black. (A creature with intimidate can't be blocked except by artifact creatures and/or creatures that share a color with it. Each {B} in the mana costs of permanents you control counts toward your devotion to black.)",
       "power": {
         "type": "Literal",
         "value": 2

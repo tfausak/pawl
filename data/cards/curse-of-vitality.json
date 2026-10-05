@@ -24,6 +24,7 @@
         }
       ],
       "name": "Curse of Vitality",
+      "oracleText": "Enchant player\nWhenever enchanted player is attacked, you gain 2 life. Each opponent attacking that player does the same.",
       "triggeredAbilities": [
         {
           "condition": {

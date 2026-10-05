@@ -79,6 +79,7 @@
         }
       ],
       "name": "Netter en-Dal",
+      "oracleText": "{W}, {T}, Discard a card: Target creature can't attack this turn.",
       "power": {
         "type": "Literal",
         "value": 1

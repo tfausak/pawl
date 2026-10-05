@@ -49,6 +49,7 @@
         }
       ],
       "name": "Norn's Annex",
+      "oracleText": "({W/P} can be paid with either {W} or 2 life.)\nCreatures can't attack you or planeswalkers you control unless their controller pays {W/P} for each of those creatures.",
       "typeLine": {
         "types": [
           {

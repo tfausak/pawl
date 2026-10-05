@@ -31,6 +31,7 @@
         }
       ],
       "name": "Direct Current",
+      "oracleText": "Direct Current deals 2 damage to any target.\nJump-start (You may cast this card from your graveyard by discarding a card in addition to paying its other costs. Then exile this card.)",
       "spell": {
         "modes": [
           {

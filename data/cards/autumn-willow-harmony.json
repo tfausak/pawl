@@ -31,6 +31,7 @@
         }
       ],
       "name": "Autumn Willow, Harmony",
+      "oracleText": "Hexproof\nWhen Autumn Willow enters, create a 1/1 green Forest Dryad land creature token. (It's affected by summoning sickness.)\nWhenever you tap a land creature for mana, add an additional {G}.",
       "power": {
         "type": "Literal",
         "value": 3

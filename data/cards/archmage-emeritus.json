@@ -26,6 +26,7 @@
         }
       ],
       "name": "Archmage Emeritus",
+      "oracleText": "Magecraft — Whenever you cast or copy an instant or sorcery spell, draw a card.",
       "power": {
         "type": "Literal",
         "value": 2

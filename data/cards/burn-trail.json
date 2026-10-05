@@ -22,6 +22,7 @@
         }
       ],
       "name": "Burn Trail",
+      "oracleText": "Burn Trail deals 3 damage to any target.\nConspire (As you cast this spell, you may tap two untapped creatures you control that share a color with it. When you do, copy it and you may choose a new target for the copy.)",
       "spell": {
         "modes": [
           {

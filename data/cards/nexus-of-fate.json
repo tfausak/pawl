@@ -26,6 +26,7 @@
         }
       ],
       "name": "Nexus of Fate",
+      "oracleText": "Take an extra turn after this one.\nIf Nexus of Fate would be put into a graveyard from anywhere, reveal Nexus of Fate and shuffle it into its owner's library instead.",
       "replacementEffects": [
         {
           "effect": {

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Deadbeat Attendant",
+      "oracleText": "When this creature enters, open an Attraction. (Put the top card of your Attraction deck onto the battlefield.)",
       "power": {
         "type": "Literal",
         "value": 1

@@ -33,6 +33,7 @@
         }
       ],
       "name": "Enormous Energy Blade",
+      "oracleText": "Equipped creature gets +4/+0.\nWhenever this Equipment becomes attached to a creature, tap that creature.\nEquip {2} ({2}: Attach to target creature you control. Equip only as a sorcery.)",
       "staticAbilities": [
         {
           "affected": {

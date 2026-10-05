@@ -31,6 +31,7 @@
         }
       ],
       "name": "Knight of Malice",
+      "oracleText": "First strike (This creature deals combat damage before creatures without first strike.)\nHexproof from white (This creature can't be the target of white spells or abilities your opponents control.)\nThis creature gets +1/+0 as long as any player controls a white permanent.",
       "power": {
         "type": "Literal",
         "value": 2

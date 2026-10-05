@@ -26,6 +26,7 @@
         }
       ],
       "name": "Aetherplasm",
+      "oracleText": "Whenever this creature blocks a creature, you may return this creature to its owner's hand. If you do, you may put a creature card from your hand onto the battlefield blocking that creature.",
       "power": {
         "type": "Literal",
         "value": 1

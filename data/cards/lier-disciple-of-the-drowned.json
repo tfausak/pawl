@@ -26,6 +26,7 @@
         }
       ],
       "name": "Lier, Disciple of the Drowned",
+      "oracleText": "Spells can't be countered.\nEach instant and sorcery card in your graveyard has flashback. The flashback cost is equal to that card's mana cost.",
       "playerAbilities": [
         {
           "effect": {

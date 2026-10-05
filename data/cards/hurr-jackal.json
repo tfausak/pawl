@@ -56,6 +56,7 @@
         }
       ],
       "name": "Hurr Jackal",
+      "oracleText": "{T}: Target creature can't be regenerated this turn.",
       "power": {
         "type": "Literal",
         "value": 1

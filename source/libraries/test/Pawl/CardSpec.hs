@@ -380,6 +380,7 @@ vanillaFace :: String -> TypeLine.TypeLine -> Face.Face Card.Type.Card
 vanillaFace name typeLine =
   Face.MkFace
     { Face.name = CardName.MkCardName $ Text.pack name,
+      Face.oracleText = Nothing,
       Face.manaCost = Nothing,
       Face.typeLine = typeLine,
       Face.power = Nothing,

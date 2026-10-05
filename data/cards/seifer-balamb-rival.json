@@ -31,6 +31,7 @@
         }
       ],
       "name": "Seifer, Balamb Rival",
+      "oracleText": "First strike\nWhenever you attack a player, goad target creature that player controls.\nWhenever a creature attacking one of your opponents becomes blocked by two or more creatures, that attacking creature gains deathtouch until end of turn.",
       "power": {
         "type": "Literal",
         "value": 4

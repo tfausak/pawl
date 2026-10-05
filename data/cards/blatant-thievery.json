@@ -35,6 +35,7 @@
         }
       ],
       "name": "Blatant Thievery",
+      "oracleText": "For each opponent, gain control of target permanent that player controls.",
       "spell": {
         "modes": [
           {

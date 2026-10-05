@@ -26,6 +26,7 @@
         }
       ],
       "name": "Clever Impersonator",
+      "oracleText": "You may have this creature enter as a copy of any nonland permanent on the battlefield.",
       "power": {
         "type": "Literal",
         "value": 0

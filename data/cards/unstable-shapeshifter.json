@@ -17,6 +17,7 @@
         }
       ],
       "name": "Unstable Shapeshifter",
+      "oracleText": "Whenever another creature enters, this creature becomes a copy of that creature, except it has this ability.",
       "power": {
         "type": "Literal",
         "value": 0

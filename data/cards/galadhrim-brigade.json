@@ -39,6 +39,7 @@
         }
       ],
       "name": "Galadhrim Brigade",
+      "oracleText": "Squad {1}{G} (As an additional cost to cast this spell, you may pay {1}{G} any number of times. When this creature enters, create that many tokens that are copies of it.)\nOther Elves you control get +1/+1.",
       "power": {
         "type": "Literal",
         "value": 2

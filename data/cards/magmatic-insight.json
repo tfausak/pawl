@@ -27,6 +27,7 @@
         }
       ],
       "name": "Magmatic Insight",
+      "oracleText": "As an additional cost to cast this spell, discard a land card.\nDraw two cards.",
       "spell": {
         "modes": [
           {

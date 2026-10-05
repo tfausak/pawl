@@ -35,6 +35,7 @@
         }
       ],
       "name": "Skewer the Critics",
+      "oracleText": "Spectacle {R} (You may cast this spell for its spectacle cost rather than its mana cost if an opponent lost life this turn.)\nSkewer the Critics deals 3 damage to any target.",
       "spell": {
         "modes": [
           {

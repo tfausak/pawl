@@ -42,6 +42,7 @@
         }
       ],
       "name": "Prison Barricade",
+      "oracleText": "Defender (This creature can't attack.)\nKicker {1}{W} (You may pay an additional {1}{W} as you cast this spell.)\nIf this creature was kicked, it enters with a +1/+1 counter on it and with \"This creature can attack as though it didn't have defender.\"",
       "power": {
         "type": "Literal",
         "value": 1

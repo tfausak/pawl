@@ -20,6 +20,7 @@
         }
       ],
       "name": "Sky Tether",
+      "oracleText": "Enchant creature\nEnchanted creature has defender and loses flying.",
       "staticAbilities": [
         {
           "affected": {

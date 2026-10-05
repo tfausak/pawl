@@ -31,6 +31,7 @@
         }
       ],
       "name": "Lam, Storm Crane Elder",
+      "oracleText": "Prowess\nWhenever you cast a noncreature spell, conjure a card named Monastery Mentor onto the battlefield.",
       "power": {
         "type": "Literal",
         "value": 3

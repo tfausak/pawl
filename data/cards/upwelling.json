@@ -17,6 +17,7 @@
         }
       ],
       "name": "Upwelling",
+      "oracleText": "Players don't lose unspent mana as steps and phases end.",
       "playerAbilities": [
         {
           "effect": {

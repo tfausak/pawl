@@ -70,6 +70,7 @@
         }
       ],
       "name": "Oracle's Attendants",
+      "oracleText": "{T}: All damage that would be dealt to target creature this turn by a source of your choice is dealt to this creature instead.",
       "power": {
         "type": "Literal",
         "value": 1

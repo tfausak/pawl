@@ -17,6 +17,7 @@
         }
       ],
       "name": "Flunk",
+      "oracleText": "Target creature gets -X/-X until end of turn, where X is 7 minus the number of cards in that creature's controller's hand.",
       "spell": {
         "modes": [
           {

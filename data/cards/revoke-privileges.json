@@ -100,6 +100,7 @@
         }
       ],
       "name": "Revoke Privileges",
+      "oracleText": "Enchant creature\nEnchanted creature can't attack, block, or crew Vehicles.",
       "typeLine": {
         "subtypes": [
           {

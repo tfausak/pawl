@@ -121,6 +121,7 @@
         }
       ],
       "name": "Hopeful Initiate",
+      "oracleText": "Training (Whenever this creature attacks with another creature with greater power, put a +1/+1 counter on this creature.)\n{2}{W}, Remove two +1/+1 counters from among creatures you control: Destroy target artifact or enchantment.",
       "power": {
         "type": "Literal",
         "value": 1

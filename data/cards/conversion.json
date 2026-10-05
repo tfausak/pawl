@@ -26,6 +26,7 @@
         }
       ],
       "name": "Conversion",
+      "oracleText": "At the beginning of your upkeep, sacrifice this enchantment unless you pay {W}{W}.\nAll Mountains are Plains.",
       "staticAbilities": [
         {
           "affected": {

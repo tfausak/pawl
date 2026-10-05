@@ -35,6 +35,7 @@
         }
       ],
       "name": "Carry Away",
+      "oracleText": "Enchant Equipment\nWhen this Aura enters, unattach enchanted Equipment.\nYou control enchanted Equipment.",
       "staticAbilities": [
         {
           "affected": {

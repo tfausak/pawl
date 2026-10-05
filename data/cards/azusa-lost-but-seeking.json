@@ -17,6 +17,7 @@
         }
       ],
       "name": "Azusa, Lost but Seeking",
+      "oracleText": "You may play two additional lands on each of your turns.",
       "playerAbilities": [
         {
           "effect": {

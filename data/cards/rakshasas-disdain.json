@@ -17,6 +17,7 @@
         }
       ],
       "name": "Rakshasa's Disdain",
+      "oracleText": "Counter target spell unless its controller pays {1} for each card in your graveyard.",
       "spell": {
         "modes": [
           {

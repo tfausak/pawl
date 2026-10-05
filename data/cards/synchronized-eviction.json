@@ -79,6 +79,7 @@
         }
       ],
       "name": "Synchronized Eviction",
+      "oracleText": "This spell costs {2} less to cast if you control at least two creatures that share a creature type.\nPut target nonland permanent into its owner's library second from the top.",
       "spell": {
         "modes": [
           {

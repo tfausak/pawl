@@ -26,6 +26,7 @@
         }
       ],
       "name": "Morality Shift",
+      "oracleText": "Exchange your graveyard and library. Then shuffle your library.",
       "spell": {
         "modes": [
           {

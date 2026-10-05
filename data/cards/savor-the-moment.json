@@ -26,6 +26,7 @@
         }
       ],
       "name": "Savor the Moment",
+      "oracleText": "Take an extra turn after this one. Skip the untap step of that turn.",
       "spell": {
         "modes": [
           {

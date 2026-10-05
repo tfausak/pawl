@@ -17,6 +17,7 @@
         }
       ],
       "name": "Summon: Choco/Mog",
+      "oracleText": "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after IV.)\nI, II, III, IV — Stampede! — Other creatures you control get +1/+0 until end of turn.",
       "power": {
         "type": "Literal",
         "value": 3

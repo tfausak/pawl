@@ -25,6 +25,7 @@
         }
       ],
       "name": "Sunpearl Kirin",
+      "oracleText": "Flash\nFlying\nWhen this creature enters, return up to one other target nonland permanent you control to its owner's hand. If it was a token, draw a card.",
       "power": {
         "type": "Literal",
         "value": 2

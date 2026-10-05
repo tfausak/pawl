@@ -29,6 +29,7 @@
         }
       ],
       "name": "Cathartic Reunion",
+      "oracleText": "As an additional cost to cast this spell, discard two cards.\nDraw three cards.",
       "spell": {
         "modes": [
           {

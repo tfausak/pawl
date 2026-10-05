@@ -36,6 +36,7 @@
         }
       },
       "name": "Explosive Derailment",
+      "oracleText": "Spree (Choose one or more additional costs.)\n+ {2} — Explosive Derailment deals 4 damage to target creature.\n+ {2} — Destroy target artifact.",
       "spell": {
         "modes": [
           {

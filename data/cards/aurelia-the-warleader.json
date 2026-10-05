@@ -55,6 +55,7 @@
         }
       ],
       "name": "Aurelia, the Warleader",
+      "oracleText": "Flying, vigilance, haste\nWhenever Aurelia attacks for the first time each turn, untap all creatures you control. After this phase, there is an additional combat phase.",
       "power": {
         "type": "Literal",
         "value": 3

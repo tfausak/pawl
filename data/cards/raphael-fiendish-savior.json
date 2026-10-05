@@ -31,6 +31,7 @@
         }
       ],
       "name": "Raphael, Fiendish Savior",
+      "oracleText": "Flying\nOther Demons, Devils, Imps, and Tieflings you control get +1/+1 and have lifelink.\nAt the beginning of each end step, if a creature card was put into your graveyard from anywhere this turn, create a 1/1 red Devil creature token with \"When this token dies, it deals 1 damage to any target.\"",
       "power": {
         "type": "Literal",
         "value": 4

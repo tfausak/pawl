@@ -22,6 +22,7 @@
         }
       ],
       "name": "Evidence Examiner",
+      "oracleText": "At the beginning of combat on your turn, you may collect evidence 4. (Exile cards with total mana value 4 or greater from your graveyard.)\nWhenever you collect evidence, investigate. (Create a Clue token. It's an artifact with \"{2}, Sacrifice this token: Draw a card.\")",
       "power": {
         "type": "Literal",
         "value": 2

@@ -75,6 +75,7 @@
         }
       ],
       "name": "Barkhide Troll",
+      "oracleText": "This creature enters with a +1/+1 counter on it.\n{1}, Remove a +1/+1 counter from this creature: This creature gains hexproof until end of turn. (It can't be the target of spells or abilities your opponents control.)",
       "power": {
         "type": "Literal",
         "value": 2

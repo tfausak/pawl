@@ -17,6 +17,7 @@
         }
       ],
       "name": "Exhume",
+      "oracleText": "Each player puts a creature card from their graveyard onto the battlefield.",
       "spell": {
         "modes": [
           {

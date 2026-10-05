@@ -24,6 +24,7 @@
         }
       ],
       "name": "Pariah",
+      "oracleText": "Enchant creature\nAll damage that would be dealt to you is dealt to enchanted creature instead.",
       "replacementEffects": [
         {
           "effect": {

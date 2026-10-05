@@ -44,6 +44,7 @@
           ]
         }
       ],
+      "oracleText": "If this card is in your opening hand, you may begin the game with it on the battlefield.\nWhenever you cast an instant or sorcery spell that targets only a single creature you control, copy that spell. You may choose new targets for the copy.",
       "triggeredAbilities": [
         {
           "condition": {

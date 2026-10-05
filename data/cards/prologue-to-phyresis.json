@@ -17,6 +17,7 @@
         }
       ],
       "name": "Prologue to Phyresis",
+      "oracleText": "Each opponent gets a poison counter.\nDraw a card.",
       "spell": {
         "modes": [
           {

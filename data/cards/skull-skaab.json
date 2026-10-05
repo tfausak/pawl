@@ -27,6 +27,7 @@
         }
       ],
       "name": "Skull Skaab",
+      "oracleText": "Exploit (When this creature enters, you may sacrifice a creature.)\nWhenever a creature you control exploits a nontoken creature, create a 2/2 black Zombie creature token.",
       "power": {
         "type": "Literal",
         "value": 2

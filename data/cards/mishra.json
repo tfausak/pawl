@@ -2,6 +2,7 @@
   "faces": [
     {
       "name": "Mishra",
+      "oracleText": "If a creature you control would deal damage, it deals double that damage instead.",
       "replacementEffects": [
         {
           "effect": {

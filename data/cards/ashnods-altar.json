@@ -63,6 +63,7 @@
         }
       ],
       "name": "Ashnod's Altar",
+      "oracleText": "Sacrifice a creature: Add {C}{C}.",
       "typeLine": {
         "types": [
           {

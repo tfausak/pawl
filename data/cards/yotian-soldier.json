@@ -13,6 +13,7 @@
         }
       ],
       "name": "Yotian Soldier",
+      "oracleText": "Vigilance",
       "power": {
         "type": "Literal",
         "value": 1

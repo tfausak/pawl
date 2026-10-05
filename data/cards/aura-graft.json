@@ -17,6 +17,7 @@
         }
       ],
       "name": "Aura Graft",
+      "oracleText": "Gain control of target Aura that's attached to a permanent. Attach it to another permanent it can enchant.",
       "spell": {
         "modes": [
           {

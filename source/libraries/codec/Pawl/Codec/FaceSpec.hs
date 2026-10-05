@@ -130,6 +130,7 @@ baseFace :: Face.Face Card.Card
 baseFace =
   Face.MkFace
     { Face.name = CardName.MkCardName $ Text.pack "Test Card",
+      Face.oracleText = Nothing,
       Face.manaCost = Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]),
       Face.typeLine = TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Creature) Set.empty,
       Face.power = Just (Power.MkPower (Quantity.Literal 1)),
@@ -188,6 +189,7 @@ minimalFace :: Face.Face Card.Card
 minimalFace =
   Face.MkFace
     { Face.name = CardName.MkCardName (Text.pack "Mountain"),
+      Face.oracleText = Nothing,
       Face.manaCost = Nothing,
       Face.typeLine = TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Land) Set.empty,
       Face.power = Nothing,

@@ -17,6 +17,7 @@
         }
       ],
       "name": "Bad Moon",
+      "oracleText": "Black creatures get +1/+1.",
       "staticAbilities": [
         {
           "affected": {

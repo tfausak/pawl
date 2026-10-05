@@ -87,6 +87,7 @@
         }
       ],
       "name": "Faerie Macabre",
+      "oracleText": "Flying\nDiscard this card: Exile up to two target cards from graveyards.",
       "power": {
         "type": "Literal",
         "value": 2

@@ -22,6 +22,7 @@
         }
       ],
       "name": "Child of Night",
+      "oracleText": "Lifelink",
       "power": {
         "type": "Literal",
         "value": 2

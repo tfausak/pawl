@@ -64,6 +64,7 @@
         }
       ],
       "name": "Blazing Archon",
+      "oracleText": "Flying\nCreatures can't attack you.",
       "power": {
         "type": "Literal",
         "value": 5

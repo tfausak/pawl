@@ -108,6 +108,7 @@
         }
       ],
       "name": "Hargilde, Kindly Runechanter",
+      "oracleText": "{T}: Add {C}{C}. Spend this mana only to cast artifact spells or activate abilities of artifacts.\nPartner—Friends forever (You can have two commanders if both have this ability.)",
       "power": {
         "type": "Literal",
         "value": 2

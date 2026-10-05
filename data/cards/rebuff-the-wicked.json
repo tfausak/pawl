@@ -13,6 +13,7 @@
         }
       ],
       "name": "Rebuff the Wicked",
+      "oracleText": "Counter target spell that targets a permanent you control.",
       "spell": {
         "modes": [
           {

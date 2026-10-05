@@ -32,6 +32,7 @@
         }
       ],
       "name": "Wolverine Pack",
+      "oracleText": "Rampage 2 (Whenever this creature becomes blocked, it gets +2/+2 until end of turn for each creature blocking it beyond the first.)",
       "power": {
         "type": "Literal",
         "value": 2

@@ -55,6 +55,7 @@
         }
       ],
       "name": "Avarice Totem",
+      "oracleText": "{5}: Exchange control of this artifact and target nonland permanent.",
       "typeLine": {
         "types": [
           {

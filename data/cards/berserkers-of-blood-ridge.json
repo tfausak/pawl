@@ -27,6 +27,7 @@
         }
       ],
       "name": "Berserkers of Blood Ridge",
+      "oracleText": "This creature attacks each combat if able.",
       "power": {
         "type": "Literal",
         "value": 4

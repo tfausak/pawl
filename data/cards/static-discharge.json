@@ -17,6 +17,7 @@
         }
       ],
       "name": "Static Discharge",
+      "oracleText": "Starting intensity 3\nThis sorcery deals damage equal to its intensity to any target. Then cards you own named Static Discharge intensify by 1.",
       "spell": {
         "modes": [
           {

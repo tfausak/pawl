@@ -17,6 +17,7 @@
         }
       ],
       "name": "Sage of Shaila's Claim",
+      "oracleText": "When this creature enters, you get {E}{E}{E} (three energy counters).",
       "power": {
         "type": "Literal",
         "value": 2

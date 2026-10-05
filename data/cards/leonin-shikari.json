@@ -17,6 +17,7 @@
         }
       ],
       "name": "Leonin Shikari",
+      "oracleText": "You may activate equip abilities any time you could cast an instant.",
       "playerAbilities": [
         {
           "effect": {

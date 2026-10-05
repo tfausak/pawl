@@ -2,6 +2,7 @@
   "faces": [
     {
       "name": "Selenia",
+      "oracleText": "Creatures you control have vigilance.",
       "staticAbilities": [
         {
           "affected": {

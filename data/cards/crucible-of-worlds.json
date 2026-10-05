@@ -8,6 +8,7 @@
         }
       ],
       "name": "Crucible of Worlds",
+      "oracleText": "You may play lands from your graveyard.",
       "playerAbilities": [
         {
           "effect": {

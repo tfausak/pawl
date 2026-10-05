@@ -17,6 +17,7 @@
         }
       ],
       "name": "Eccentric Farmer",
+      "oracleText": "When this creature enters, mill three cards, then you may return a land card from your graveyard to your hand. (To mill three cards, put the top three cards of your library into your graveyard.)",
       "power": {
         "type": "Literal",
         "value": 2

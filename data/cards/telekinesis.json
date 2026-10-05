@@ -22,6 +22,7 @@
         }
       ],
       "name": "Telekinesis",
+      "oracleText": "Tap target creature. Prevent all combat damage that would be dealt by that creature this turn. It doesn't untap during its controller's next two untap steps.",
       "spell": {
         "modes": [
           {

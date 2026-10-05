@@ -30,6 +30,7 @@
         }
       ],
       "name": "Starforged Sword",
+      "oracleText": "Gift a tapped Fish (You may promise an opponent a gift as you cast this spell. If you do, when it enters, they create a tapped 1/1 blue Fish creature token.)\nWhen this Equipment enters, if the gift was promised, attach this Equipment to target creature you control.\nEquipped creature gets +3/+3 and loses flying.\nEquip {3}",
       "staticAbilities": [
         {
           "affected": {

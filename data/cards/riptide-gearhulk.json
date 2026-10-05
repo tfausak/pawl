@@ -52,6 +52,7 @@
         }
       ],
       "name": "Riptide Gearhulk",
+      "oracleText": "Double strike\nProwess (Whenever you cast a noncreature spell, this creature gets +1/+1 until end of turn.)\nWhen this creature enters, for each opponent, put up to one target nonland permanent that player controls into its owner's library third from the top.",
       "power": {
         "type": "Literal",
         "value": 2

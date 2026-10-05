@@ -106,6 +106,7 @@
         }
       ],
       "name": "Izoni, Center of the Web",
+      "oracleText": "Menace\nWhenever Izoni enters or attacks, you may collect evidence 4. If you do, create two 2/1 black and green Spider creature tokens with reach and menace.\nSacrifice four tokens: Surveil 2, then draw two cards. You gain 2 life.",
       "power": {
         "type": "Literal",
         "value": 5

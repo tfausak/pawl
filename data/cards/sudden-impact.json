@@ -17,6 +17,7 @@
         }
       ],
       "name": "Sudden Impact",
+      "oracleText": "Sudden Impact deals damage to target player equal to the number of cards in that player's hand.",
       "spell": {
         "modes": [
           {

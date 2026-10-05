@@ -39,6 +39,7 @@
         }
       ],
       "name": "Cyclonic Rift",
+      "oracleText": "Return target nonland permanent you don't control to its owner's hand.\nOverload {6}{U} (You may cast this spell for its overload cost. If you do, change \"target\" in its text to \"each.\")",
       "spell": {
         "modes": [
           {

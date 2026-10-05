@@ -1,0 +1,28 @@
+{
+  "faces": [
+    {
+      "name": "Snow-Covered Island",
+      "oracleText": "({T}: Add {U}.)",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Island"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Basic"
+          },
+          {
+            "type": "Snow"
+          }
+        ],
+        "types": [
+          {
+            "type": "Land"
+          }
+        ]
+      }
+    }
+  ]
+}

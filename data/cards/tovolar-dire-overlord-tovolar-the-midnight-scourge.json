@@ -31,6 +31,7 @@
         }
       ],
       "name": "Tovolar, Dire Overlord",
+      "oracleText": "Whenever a Wolf or Werewolf you control deals combat damage to a player, draw a card.\nAt the beginning of your upkeep, if you control three or more Wolves and/or Werewolves, it becomes night. Then transform any number of Human Werewolves you control.\nDaybound",
       "power": {
         "type": "Literal",
         "value": 3
@@ -385,6 +386,7 @@
         }
       ],
       "name": "Tovolar, the Midnight Scourge",
+      "oracleText": "Whenever a Wolf or Werewolf you control deals combat damage to a player, draw a card.\n{X}{R}{G}: Target Wolf or Werewolf you control gets +X/+0 and gains trample until end of turn.\nNightbound",
       "power": {
         "type": "Literal",
         "value": 4

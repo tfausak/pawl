@@ -26,6 +26,7 @@
         }
       ],
       "name": "Kongming, \"Sleeping Dragon\"",
+      "oracleText": "Other creatures you control get +1/+1.",
       "power": {
         "type": "Literal",
         "value": 2

@@ -34,6 +34,7 @@
         }
       ],
       "name": "Eligeth, Crossroads Augur",
+      "oracleText": "Flying\nIf you would scry a number of cards, draw that many cards instead.\nPartner (You can have two commanders if both have partner.)",
       "power": {
         "type": "Literal",
         "value": 5

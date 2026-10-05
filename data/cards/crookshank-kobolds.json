@@ -1,0 +1,34 @@
+{
+  "faces": [
+    {
+      "colorIndicator": [
+        {
+          "type": "Red"
+        }
+      ],
+      "manaCost": [],
+      "name": "Crookshank Kobolds",
+      "oracleText": "",
+      "power": {
+        "type": "Literal",
+        "value": 0
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 1
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Kobold"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

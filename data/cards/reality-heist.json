@@ -37,6 +37,7 @@
         }
       ],
       "name": "Reality Heist",
+      "oracleText": "Affinity for artifacts (This spell costs {1} less to cast for each artifact you control.)\nLook at the top seven cards of your library. You may reveal up to two artifact cards from among them and put them into your hand. Put the rest on the bottom of your library in a random order.",
       "spell": {
         "modes": [
           {

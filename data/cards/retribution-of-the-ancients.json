@@ -102,6 +102,7 @@
         }
       ],
       "name": "Retribution of the Ancients",
+      "oracleText": "{B}, Remove X +1/+1 counters from among creatures you control: Target creature gets -X/-X until end of turn.",
       "typeLine": {
         "types": [
           {

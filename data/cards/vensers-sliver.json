@@ -8,6 +8,7 @@
         }
       ],
       "name": "Venser's Sliver",
+      "oracleText": "",
       "power": {
         "type": "Literal",
         "value": 3

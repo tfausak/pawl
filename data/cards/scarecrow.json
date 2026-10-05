@@ -66,6 +66,7 @@
         }
       ],
       "name": "Scarecrow",
+      "oracleText": "{6}, {T}: Prevent all damage that would be dealt to you this turn by creatures with flying.",
       "power": {
         "type": "Literal",
         "value": 2

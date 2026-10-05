@@ -8,6 +8,7 @@
         }
       ],
       "name": "Tablet of the Guilds",
+      "oracleText": "As this artifact enters, choose two colors.\nWhenever you cast a spell, if it's at least one of the chosen colors, you gain 1 life for each of the chosen colors it is.",
       "replacementEffects": [
         {
           "effect": {

@@ -18,6 +18,7 @@
         }
       ],
       "name": "Tinybones, the Pickpocket",
+      "oracleText": "Deathtouch\nWhenever Tinybones deals combat damage to a player, you may cast target nonland permanent card from that player's graveyard, and mana of any type can be spent to cast that spell.",
       "power": {
         "type": "Literal",
         "value": 1

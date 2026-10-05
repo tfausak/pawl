@@ -17,6 +17,7 @@
         }
       ],
       "name": "Worship",
+      "oracleText": "If you control a creature, damage that would reduce your life total to less than 1 reduces it to 1 instead.",
       "replacementEffects": [
         {
           "condition": {

@@ -22,6 +22,7 @@
         }
       ],
       "name": "Redirect",
+      "oracleText": "You may choose new targets for target spell.",
       "spell": {
         "modes": [
           {

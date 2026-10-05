@@ -17,6 +17,7 @@
         }
       ],
       "name": "Spikeshell Harrier",
+      "oracleText": "When this creature enters, return target creature or Vehicle an opponent controls to its owner's hand. If that opponent's speed is greater than each other player's speed, reduce that opponent's speed by 1. This effect can't reduce their speed below 1.",
       "power": {
         "type": "Literal",
         "value": 4

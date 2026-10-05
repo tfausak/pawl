@@ -22,6 +22,7 @@
         }
       ],
       "name": "Crimson Roc",
+      "oracleText": "Flying\nWhenever this creature blocks a creature without flying, this creature gets +1/+0 and gains first strike until end of turn.",
       "power": {
         "type": "Literal",
         "value": 2

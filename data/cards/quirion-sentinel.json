@@ -17,6 +17,7 @@
         }
       ],
       "name": "Quirion Sentinel",
+      "oracleText": "When this creature enters, add one mana of any color.",
       "power": {
         "type": "Literal",
         "value": 2

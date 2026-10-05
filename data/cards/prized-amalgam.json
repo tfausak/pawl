@@ -76,6 +76,7 @@
         }
       ],
       "name": "Prized Amalgam",
+      "oracleText": "Whenever a creature enters, if it entered from your graveyard or you cast it from your graveyard, return this card from your graveyard to the battlefield tapped at the beginning of the next end step.",
       "power": {
         "type": "Literal",
         "value": 3

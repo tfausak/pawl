@@ -33,6 +33,7 @@
         }
       ],
       "name": "Glamer Spinners",
+      "oracleText": "Flash\nFlying\nWhen this creature enters, attach all Auras enchanting target permanent to another permanent with the same controller.",
       "power": {
         "type": "Literal",
         "value": 2

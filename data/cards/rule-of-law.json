@@ -17,6 +17,7 @@
         }
       ],
       "name": "Rule of Law",
+      "oracleText": "Each player can't cast more than one spell each turn.",
       "playerAbilities": [
         {
           "effect": {

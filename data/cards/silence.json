@@ -13,6 +13,7 @@
         }
       ],
       "name": "Silence",
+      "oracleText": "Your opponents can't cast spells this turn.",
       "spell": {
         "modes": [
           {

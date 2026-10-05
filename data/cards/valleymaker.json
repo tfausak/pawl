@@ -150,6 +150,7 @@
         }
       ],
       "name": "Valleymaker",
+      "oracleText": "{T}, Sacrifice a Mountain: This creature deals 3 damage to target creature.\n{T}, Sacrifice a Forest: Choose a player. That player adds {G}{G}{G}.",
       "power": {
         "type": "Literal",
         "value": 5

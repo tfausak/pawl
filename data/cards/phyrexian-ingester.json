@@ -17,6 +17,7 @@
         }
       ],
       "name": "Phyrexian Ingester",
+      "oracleText": "Imprint — When this creature enters, you may exile target nontoken creature.\nThis creature gets +X/+Y, where X is the exiled creature card's power and Y is its toughness.",
       "power": {
         "type": "Literal",
         "value": 3

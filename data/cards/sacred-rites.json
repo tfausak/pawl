@@ -13,6 +13,7 @@
         }
       ],
       "name": "Sacred Rites",
+      "oracleText": "Discard any number of cards. Creatures you control get +0/+1 until end of turn for each card discarded this way.",
       "spell": {
         "modes": [
           {

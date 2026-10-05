@@ -31,6 +31,7 @@
         }
       ],
       "name": "Savanti Romero, Time's Exile",
+      "oracleText": "Trample\nAt the beginning of combat on your turn, put a +1/+1 counter on Savanti Romero. Then you draw X cards and lose X life, where X is the number of counters on Savanti Romero.",
       "power": {
         "type": "Literal",
         "value": 4

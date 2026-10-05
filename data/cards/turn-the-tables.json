@@ -26,6 +26,7 @@
         }
       ],
       "name": "Turn the Tables",
+      "oracleText": "All combat damage that would be dealt to you this turn is dealt to target attacking creature instead.",
       "spell": {
         "modes": [
           {

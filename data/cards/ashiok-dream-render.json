@@ -118,6 +118,7 @@
         }
       ],
       "name": "Ashiok, Dream Render",
+      "oracleText": "Spells and abilities your opponents control can't cause their controller to search their library.\n[−1]: Target player mills four cards. Then exile each opponent's graveyard.",
       "playerAbilities": [
         {
           "effect": {

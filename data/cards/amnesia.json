@@ -35,6 +35,7 @@
         }
       ],
       "name": "Amnesia",
+      "oracleText": "Target player reveals their hand and discards all nonland cards.",
       "spell": {
         "modes": [
           {

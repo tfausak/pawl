@@ -22,6 +22,7 @@
         }
       ],
       "name": "Anger",
+      "oracleText": "Haste\nAs long as this card is in your graveyard and you control a Mountain, creatures you control have haste.",
       "power": {
         "type": "Literal",
         "value": 2

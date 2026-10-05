@@ -26,6 +26,7 @@
       ],
       "minimumX": 1,
       "name": "Ornate Imitations",
+      "oracleText": "For each number between 1 and X, conjure a duplicate of a random creature card with that mana value onto the battlefield. X can't be 0.",
       "spell": {
         "modes": [
           {

@@ -24,6 +24,7 @@
         }
       ],
       "name": "Curse of Shallow Graves",
+      "oracleText": "Enchant player\nWhenever a player attacks enchanted player with one or more creatures, that attacking player may create a tapped 2/2 black Zombie creature token.",
       "triggeredAbilities": [
         {
           "condition": {

@@ -44,6 +44,7 @@
           ]
         }
       ],
+      "oracleText": "If this card is in your opening hand, you may begin the game with it on the battlefield.\nYou have hexproof. (You can't be the target of spells or abilities your opponents control.)",
       "playerAbilities": [
         {
           "effect": {

@@ -76,6 +76,7 @@
         }
       ],
       "name": "Evra, Halcyon Witness",
+      "oracleText": "Lifelink\n{4}: Exchange your life total with Evra's power.",
       "power": {
         "type": "Literal",
         "value": 4

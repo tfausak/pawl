@@ -37,6 +37,7 @@
         }
       ],
       "name": "Curse of the Nightly Hunt",
+      "oracleText": "Enchant player\nCreatures enchanted player controls attack each combat if able.",
       "typeLine": {
         "subtypes": [
           {

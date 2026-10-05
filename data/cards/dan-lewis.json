@@ -22,6 +22,7 @@
         }
       ],
       "name": "Dan Lewis",
+      "oracleText": "Noncreature, non-Equipment artifacts you control are Equipment in addition to their other types and have \"Equipped creature gets +1/+0\" and equip {1}.\nDoctor's companion (You can have two commanders if the other is the Doctor.)",
       "power": {
         "type": "Literal",
         "value": 2

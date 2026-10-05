@@ -46,6 +46,7 @@
         }
       ],
       "name": "Neverwinter Hydra",
+      "oracleText": "As this creature enters, roll X d6. It enters with a number of +1/+1 counters on it equal to the total of those results.\nTrample\nWard {4} (Whenever this creature becomes the target of a spell or ability an opponent controls, counter it unless that player pays {4}.)",
       "power": {
         "type": "Literal",
         "value": 0

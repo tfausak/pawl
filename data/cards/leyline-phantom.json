@@ -17,6 +17,7 @@
         }
       ],
       "name": "Leyline Phantom",
+      "oracleText": "When this creature deals combat damage, return it to its owner's hand. (Return it only if it survived combat.)",
       "power": {
         "type": "Literal",
         "value": 5

@@ -76,6 +76,7 @@
         }
       ],
       "name": "Yavimaya Steelcrusher",
+      "oracleText": "Enlist (As this creature attacks, you may tap a nonattacking creature you control without summoning sickness. When you do, add its power to this creature's until end of turn.)\n{1}, Sacrifice this creature: Destroy target artifact.",
       "power": {
         "type": "Literal",
         "value": 2

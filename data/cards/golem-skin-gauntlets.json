@@ -24,6 +24,7 @@
         }
       ],
       "name": "Golem-Skin Gauntlets",
+      "oracleText": "Equipped creature gets +1/+0 for each Equipment attached to it.\nEquip {2} ({2}: Attach to target creature you control. Equip only as a sorcery.)",
       "staticAbilities": [
         {
           "affected": {

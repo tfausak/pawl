@@ -65,6 +65,7 @@
         }
       ],
       "name": "Crabomination",
+      "oracleText": "Emerge from artifact {5}{B}{B} (You may cast this spell by sacrificing an artifact and paying the emerge cost reduced by that artifact's mana value.)\nWhen this creature enters, target opponent exiles the top card of their library, a card at random from their graveyard, and a card at random from their hand. You may cast a spell from among cards exiled this way without paying its mana cost.",
       "power": {
         "type": "Literal",
         "value": 5

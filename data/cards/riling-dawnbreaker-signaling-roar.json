@@ -25,6 +25,7 @@
         }
       ],
       "name": "Riling Dawnbreaker",
+      "oracleText": "Flying, vigilance\nAt the beginning of combat on your turn, another target creature you control gets +1/+0 until end of turn.",
       "power": {
         "type": "Literal",
         "value": 3
@@ -142,6 +143,7 @@
         }
       ],
       "name": "Signaling Roar",
+      "oracleText": "Create a 2/2 white Soldier creature token. (Then shuffle this card into its owner's library.)",
       "spell": {
         "modes": [
           {

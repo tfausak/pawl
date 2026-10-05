@@ -8,6 +8,7 @@
         }
       ],
       "name": "All Is Dust",
+      "oracleText": "Each player sacrifices all permanents they control that are one or more colors.",
       "spell": {
         "modes": [
           {

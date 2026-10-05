@@ -74,6 +74,7 @@
         }
       ],
       "name": "Decorated Griffin",
+      "oracleText": "Flying\n{1}{W}: Prevent the next 1 combat damage that would be dealt to you this turn.",
       "power": {
         "type": "Literal",
         "value": 2

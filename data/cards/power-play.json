@@ -3,6 +3,7 @@
     {
       "claimsStartingPlayer": true,
       "name": "Power Play",
+      "oracleText": "(Start the game with this conspiracy face up in the command zone.)\nYou are the starting player. If multiple players would be the starting player, one of those players is chosen at random.",
       "typeLine": {
         "types": [
           {

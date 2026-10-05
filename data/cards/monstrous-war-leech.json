@@ -64,6 +64,7 @@
         }
       ],
       "name": "Monstrous War-Leech",
+      "oracleText": "Kicker {U} (You may pay an additional {U} as you cast this spell.)\nAs this creature enters, if it was kicked, mill four cards. (To mill a card, put the top card of your library into your graveyard.)\nMonstrous War-Leech's power and toughness are each equal to the greatest mana value among cards in your graveyard.",
       "power": {
         "type": "Star"
       },

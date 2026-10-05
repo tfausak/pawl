@@ -17,6 +17,7 @@
         }
       ],
       "name": "Clarion Spirit",
+      "oracleText": "Whenever you cast your second spell each turn, create a 1/1 white Spirit creature token with flying.",
       "power": {
         "type": "Literal",
         "value": 2

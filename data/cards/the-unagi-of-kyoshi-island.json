@@ -50,6 +50,7 @@
         }
       ],
       "name": "The Unagi of Kyoshi Island",
+      "oracleText": "Flash\nWard—Waterbend {4}. (Whenever this creature becomes the target of a spell or ability an opponent controls, counter it unless that player pays {4}. They can tap their artifacts and creatures to help. Each one pays for {1}.)\nWhenever an opponent draws their second card each turn, you draw two cards.",
       "power": {
         "type": "Literal",
         "value": 5

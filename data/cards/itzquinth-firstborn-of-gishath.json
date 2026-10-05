@@ -105,6 +105,7 @@
         }
       ],
       "name": "Itzquinth, Firstborn of Gishath",
+      "oracleText": "Haste\nWhen Itzquinth enters, you may pay {2}. When you do, target Dinosaur you control deals damage equal to its power to another target creature.",
       "power": {
         "type": "Literal",
         "value": 2

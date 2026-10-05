@@ -85,7 +85,7 @@
             "components": [
               {
                 "type": "RemoveLoyaltyFromThis",
-                "value": 10.0
+                "value": 10
               }
             ],
             "mana": []
@@ -105,7 +105,7 @@
                           },
                           "quantity": {
                             "type": "Literal",
-                            "value": 20.0
+                            "value": 20
                           }
                         }
                       }
@@ -153,6 +153,7 @@
         }
       ],
       "name": "Jace Beleren",
+      "oracleText": "[+2]: Each player draws a card.\n[−1]: Target player draws a card.\n[−10]: Target player mills twenty cards.",
       "typeLine": {
         "subtypes": [
           {

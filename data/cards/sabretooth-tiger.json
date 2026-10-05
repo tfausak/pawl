@@ -22,6 +22,7 @@
         }
       ],
       "name": "Sabretooth Tiger",
+      "oracleText": "First strike",
       "power": {
         "type": "Literal",
         "value": 2

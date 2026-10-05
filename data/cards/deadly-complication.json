@@ -26,6 +26,7 @@
         }
       ],
       "name": "Deadly Complication",
+      "oracleText": "Choose one or both —\n• Destroy target creature.\n• Put a +1/+1 counter on target suspected creature you control. You may have it become no longer suspected.",
       "spell": {
         "modes": [
           {

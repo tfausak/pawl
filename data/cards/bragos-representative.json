@@ -17,6 +17,7 @@
         }
       ],
       "name": "Brago's Representative",
+      "oracleText": "While voting, you get an additional vote. (The votes can be for different choices or for the same choice.)",
       "playerAbilities": [
         {
           "effect": {

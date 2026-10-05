@@ -54,6 +54,7 @@
         }
       ],
       "name": "Stuffy Doll",
+      "oracleText": "Indestructible\nAs this creature enters, choose a player.\nWhenever this creature is dealt damage, it deals that much damage to the chosen player.\n{T}: This creature deals 1 damage to itself.",
       "power": {
         "type": "Literal",
         "value": 0

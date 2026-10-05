@@ -27,6 +27,7 @@
         }
       ],
       "name": "Kishla Skimmer",
+      "oracleText": "Flying\nWhenever a card leaves your graveyard during your turn, draw a card. This ability triggers only once each turn.",
       "power": {
         "type": "Literal",
         "value": 2

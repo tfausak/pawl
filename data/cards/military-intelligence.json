@@ -17,6 +17,7 @@
         }
       ],
       "name": "Military Intelligence",
+      "oracleText": "Whenever you attack with two or more creatures, draw a card.",
       "triggeredAbilities": [
         {
           "condition": {

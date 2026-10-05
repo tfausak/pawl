@@ -17,6 +17,7 @@
         }
       ],
       "name": "Sinister Reflections",
+      "oracleText": "Conjure a duplicate of each of up to two target nontoken creatures you control into your hand.",
       "spell": {
         "modes": [
           {

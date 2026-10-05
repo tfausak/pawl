@@ -38,6 +38,7 @@
         }
       ],
       "name": "Aegis of the Legion",
+      "oracleText": "Equipped creature gets +1/+1 and has mentor. (Whenever it attacks, put a +1/+1 counter on target attacking creature with lesser power.)\nWhenever equipped creature mentors a creature, put a shield counter on that creature. (If that creature would be dealt damage or destroyed, remove a shield counter from it instead.)\nEquip {3}",
       "staticAbilities": [
         {
           "affected": {

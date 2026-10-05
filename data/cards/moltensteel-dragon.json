@@ -76,6 +76,7 @@
         }
       ],
       "name": "Moltensteel Dragon",
+      "oracleText": "({R/P} can be paid with either {R} or 2 life.)\nFlying\n{R/P}: This creature gets +1/+0 until end of turn.",
       "power": {
         "type": "Literal",
         "value": 4

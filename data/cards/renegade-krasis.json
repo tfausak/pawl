@@ -31,6 +31,7 @@
         }
       ],
       "name": "Renegade Krasis",
+      "oracleText": "Evolve (Whenever a creature you control enters, if that creature has greater power or toughness than this creature, put a +1/+1 counter on this creature.)\nWhenever this creature evolves, put a +1/+1 counter on each other creature you control with a +1/+1 counter on it.",
       "power": {
         "type": "Literal",
         "value": 3

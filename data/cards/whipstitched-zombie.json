@@ -17,6 +17,7 @@
         }
       ],
       "name": "Whipstitched Zombie",
+      "oracleText": "At the beginning of your upkeep, sacrifice this creature unless you pay {B}.",
       "power": {
         "type": "Literal",
         "value": 2

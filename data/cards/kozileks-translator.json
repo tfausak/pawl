@@ -63,6 +63,7 @@
         }
       ],
       "name": "Kozilek's Translator",
+      "oracleText": "Devoid (This card has no color.)\nPay 1 life: Add {C}. Activate only once each turn. ({C} represents colorless mana.)",
       "power": {
         "type": "Literal",
         "value": 3

@@ -36,6 +36,7 @@
         }
       ],
       "name": "Thromok the Insatiable",
+      "oracleText": "Devour X, where X is the number of creatures devoured this way (As this creature enters, you may sacrifice any number of creatures. It enters with X +1/+1 counters on it for each of those creatures.)",
       "power": {
         "type": "Literal",
         "value": 0

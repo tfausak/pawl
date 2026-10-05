@@ -2,6 +2,7 @@
   "faces": [
     {
       "name": "Vesuva",
+      "oracleText": "You may have this land enter tapped as a copy of any land on the battlefield.",
       "replacementEffects": [
         {
           "effect": {

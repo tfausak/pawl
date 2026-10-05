@@ -13,6 +13,7 @@
         }
       ],
       "name": "Patriar's Humiliation",
+      "oracleText": "Target creature perpetually loses all abilities, then Patriar's Humiliation deals damage to it equal to the number of creatures you control.",
       "spell": {
         "modes": [
           {

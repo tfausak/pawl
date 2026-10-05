@@ -17,6 +17,7 @@
         }
       ],
       "name": "Runic Repetition",
+      "oracleText": "Return target exiled card with flashback you own to your hand.",
       "spell": {
         "modes": [
           {

@@ -26,6 +26,7 @@
         }
       ],
       "name": "Ivory Mask",
+      "oracleText": "You have shroud. (You can't be the target of spells or abilities.)",
       "playerAbilities": [
         {
           "effect": {

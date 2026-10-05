@@ -66,6 +66,7 @@
       ],
       "manaCost": [],
       "name": "Welding Jar",
+      "oracleText": "Sacrifice this artifact: Regenerate target artifact.",
       "typeLine": {
         "types": [
           {

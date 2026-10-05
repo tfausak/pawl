@@ -26,6 +26,7 @@
         }
       ],
       "name": "Ripjaw Raptor",
+      "oracleText": "Enrage — Whenever this creature is dealt damage, draw a card.",
       "power": {
         "type": "Literal",
         "value": 4

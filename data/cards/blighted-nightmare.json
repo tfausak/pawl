@@ -133,6 +133,7 @@
         }
       ],
       "name": "Blighted Nightmare",
+      "oracleText": "When this enchantment enters, creature cards in your graveyard perpetually get +1/+1.\nBlight X, Return this enchantment to its owner's hand: Return target creature card with mana value X or less from your graveyard to the battlefield. X can't be greater than the greatest toughness among creatures you control. Activate only as a sorcery.",
       "triggeredAbilities": [
         {
           "condition": {

@@ -26,6 +26,7 @@
         }
       ],
       "name": "Time Warp",
+      "oracleText": "Target player takes an extra turn after this one.",
       "spell": {
         "modes": [
           {

@@ -51,6 +51,7 @@
         }
       ],
       "name": "Endurance",
+      "oracleText": "Flash\nReach\nWhen this creature enters, up to one target player puts all the cards from their graveyard on the bottom of their library in a random order.\nEvoke—Exile a green card from your hand.",
       "power": {
         "type": "Literal",
         "value": 3

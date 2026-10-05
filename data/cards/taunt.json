@@ -13,6 +13,7 @@
         }
       ],
       "name": "Taunt",
+      "oracleText": "During target player's next turn, creatures that player controls attack you if able.",
       "spell": {
         "modes": [
           {

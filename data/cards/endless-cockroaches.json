@@ -26,6 +26,7 @@
         }
       ],
       "name": "Endless Cockroaches",
+      "oracleText": "When this creature dies, return it to its owner's hand.",
       "power": {
         "type": "Literal",
         "value": 1

@@ -8,6 +8,7 @@
         }
       ],
       "name": "Eon Hub",
+      "oracleText": "Players skip their upkeep steps.",
       "replacementEffects": [
         {
           "effect": {

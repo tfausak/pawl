@@ -111,6 +111,7 @@
         }
       ],
       "name": "Grim Hireling",
+      "oracleText": "Whenever one or more creatures you control deal combat damage to a player, create two Treasure tokens.\n{B}, Sacrifice X Treasures: Target creature gets -X/-X until end of turn. Activate only as a sorcery.",
       "power": {
         "type": "Literal",
         "value": 3

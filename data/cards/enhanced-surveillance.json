@@ -69,6 +69,7 @@
         }
       ],
       "name": "Enhanced Surveillance",
+      "oracleText": "You may look at an additional two cards each time you surveil.\nExile this enchantment: Shuffle your graveyard into your library.",
       "playerAbilities": [
         {
           "effect": {

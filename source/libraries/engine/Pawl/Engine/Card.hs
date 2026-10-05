@@ -109,6 +109,7 @@ faceDownFace :: FaceDownCharacteristics.FaceDownCharacteristics (GrantedAbility.
 faceDownFace listed =
   Face.MkFace
     { Face.name = CardName.MkCardName Text.empty,
+      Face.oracleText = Nothing,
       Face.manaCost = Nothing,
       Face.typeLine = FaceDownCharacteristics.typeLine listed,
       Face.power = FaceDownCharacteristics.power listed,
