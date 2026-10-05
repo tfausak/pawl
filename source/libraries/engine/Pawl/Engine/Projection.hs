@@ -1903,7 +1903,7 @@ textLayerOf oid gs =
                       gModification = m
                     }
               else Nothing
-   in fst (projectDecidingFrom copiableCharacteristics (<= Layer.Text) (Maybe.mapMaybe candidate (GameState.continuousEffects gs)) oid gs)
+   in fst (projectDeciding (<= Layer.Text) (Maybe.mapMaybe candidate (GameState.continuousEffects gs)) oid gs)
 
 -- The CR 612 word swap a modification makes, for CR 613.8a's exact test between
 -- two of them (projectDecidingFrom's changesText).
@@ -4200,19 +4200,19 @@ projectWith admits cands =
 -- here and cannot be re-derived from a layer-bounded view without contradicting
 -- either CR 613.6 or CR 613.7/613.8.
 projectDeciding :: (Layer -> Bool) -> [Gathered] -> ObjectId -> GameState -> (ProjectedCharacteristics, Map (ObjectId, Natural) Bool)
-projectDeciding = projectDecidingFrom copiableCharacteristics
+projectDeciding = projectDecidingFrom noncreaturePT copiableCharacteristics
 
 -- CR 612.5: the seed textBoxAt folds an exchange partner from -- its copiable
 -- values while it exists, and CR 608.2h's record of them once it has left.
 textBoxSeed :: ObjectId -> GameState -> ProjectedCharacteristics
 textBoxSeed oid gs = maybe (copiableCharacteristics oid gs) LastKnown.copiable (lastKnownOf oid gs)
 
--- projectDeciding with the CR 613.2c seed named, for textBoxAt's one departure
--- from copiableCharacteristics.
-projectDecidingFrom :: (ObjectId -> GameState -> ProjectedCharacteristics) -> (Layer -> Bool) -> [Gathered] -> ObjectId -> GameState -> (ProjectedCharacteristics, Map (ObjectId, Natural) Bool)
+-- projectDeciding with its closing gate and its CR 613.2c seed named: `snapshot`
+-- departs from the gate, and textBoxAt from copiableCharacteristics.
+projectDecidingFrom :: (ObjectId -> GameState -> ProjectedCharacteristics -> ProjectedCharacteristics) -> (ObjectId -> GameState -> ProjectedCharacteristics) -> (Layer -> Bool) -> [Gathered] -> ObjectId -> GameState -> (ProjectedCharacteristics, Map (ObjectId, Natural) Bool)
 -- Candidates-in, then a worker taking the object: everything derived from the
 -- candidate list alone is bound before `oid`, so projectAll shares it.
-projectDecidingFrom seedOf admits cands =
+projectDecidingFrom finish seedOf admits cands =
   let -- Layers 4, 5 and 7a are always visited, even with no gathered effect there:
       -- an object's own CDAs are not gathered candidates.
       layers = filter admits (Set.toAscList (Set.insert Layer.Type (Set.insert Layer.Color (Set.insert Layer.CharacteristicPT (Set.fromList (fmap gLayer cands))))))
@@ -4241,7 +4241,7 @@ projectDecidingFrom seedOf admits cands =
       -- (CR 608.2h), since Exchange of Words' ruling keeps the survivor's text box
       -- until the enchantment itself goes. Pawl.ProjectionSpec's "CR 612.5 the
       -- Sentry keeps the ping after the Sorcerer dies" proves it.
-      textBoxAt ts gs o = fst (projectDecidingFrom textBoxSeed (<= Layer.Text) (filter (\c -> gLayer c /= Layer.Text || gTimestamp c < ts) cands) o gs)
+      textBoxAt ts gs o = fst (projectDecidingFrom noncreaturePT textBoxSeed (<= Layer.Text) (filter (\c -> gLayer c /= Layer.Text || gTimestamp c < ts) cands) o gs)
       countsItsOwnLayer c = not (Set.disjoint (modificationReads (gModification c)) (Map.findWithDefault Set.empty (gLayer c) writesByLayer))
       forObject oid gs =
         let -- One grant walk per projected object, shared by every affected-set
@@ -4289,6 +4289,9 @@ projectDecidingFrom seedOf admits cands =
                   -- drift on the same question. The substitution ITSELF is proved by
                   -- Pawl.PowerToughnessSpec's Glorious Anthem case.
                   seeded = noValueAt lyr (seedFor oid partial)
+                  -- `seeded` as appliesTo judges a partial, for the branch below
+                  -- where nothing is movable.
+                  gatedSeed = noncreaturePT oid gs seeded
                   -- CR 613.6: the affected set is asked ONCE per effect, at the
                   -- lowest layer it reaches, and remembered for its other layers.
                   -- Object-parameterised, like applyUnit and applyOne below: the
@@ -4304,9 +4307,16 @@ projectDecidingFrom seedOf admits cands =
                   -- every caller; the branch below where nothing is movable calls
                   -- affectsGiven with `bounded` itself, which is the same answer
                   -- there because no effect on it can move any other's set.
+                  --
+                  -- The partial is judged through CR 208.3's gate, which every
+                  -- board's accumulator leaves to its readers (see `snapshot`).
+                  -- A regression fence, like gatedSeed's and changesMagnitude's:
+                  -- every set in the pool that reads power also asks for a
+                  -- creature, which a noncreature already fails, so dropping all
+                  -- three leaves the suite green (2026-10-05).
                   appliesTo viewOf o ds pc u = case uEffect u of
                     Just k | Just answer <- Map.lookup k ds -> answer
-                    _ -> affectsWith grants viewOf (uSource u) o (uAffected u) pc gs
+                    _ -> affectsWith grants viewOf (uSource u) o (uAffected u) (noncreaturePT o gs pc) gs
                   -- Fold every part of ONE effect landing in this layer, in the
                   -- order the card lists them (CR 613.6). The ViewOf is the SAME
                   -- for every object the effect reaches, so a count inside it
@@ -4386,9 +4396,14 @@ projectDecidingFrom seedOf admits cands =
                   -- the projected object. Terminates for projectUpTo's reason: a
                   -- snapshot admits strictly fewer layers.
                   --
-                  -- Not implemented: a snapshot carries CR 208.3's noncreature P/T
-                  -- gate, which the projected object's mid-fold partial does not
-                  -- (#1111).
+                  -- UNGATED, like `seeded`: CR 208.3's noncreature P/T gate is
+                  -- applied by each reader (appliesTo, viewOfBoard,
+                  -- changesMagnitude), since layer 4 can make a permanent with
+                  -- printed numbers a creature partway through this layer. A
+                  -- snapshot gated at the layer's start would read the Vehicle
+                  -- March animates as powerless, which Pawl.ProjectionSpec's "CR
+                  -- 613.8a a set reading power depends on animating a Vehicle"
+                  -- proves wrong.
                   --
                   -- CR 208.5's substitution, at the same gate `seeded` takes it:
                   -- these partials are what `resolve` applies each effect to, so a
@@ -4398,7 +4413,7 @@ projectDecidingFrom seedOf admits cands =
                   -- afterwards. Proved by Pawl.PowerToughnessSpec's "CR 208.5
                   -- mid-fold under an anthem".
                   snapshot o =
-                    let (p, d) = projectDeciding (\l -> admits l && l < lyr) cands o gs
+                    let (p, d) = projectDecidingFrom (\_ _ -> id) copiableCharacteristics (\l -> admits l && l < lyr) cands o gs
                      in (noValueAt lyr (seedFor o p), d)
                   -- Keyed rather than an association list, because resolve's ViewOf
                   -- looks an object up once per candidate a Count folds over.
@@ -4532,11 +4547,11 @@ projectDecidingFrom seedOf admits cands =
                           changesMagnitude (i, a) (_, b) =
                             let after = appliedEverywhere b
                                 afterView = viewOfBoard after
-                                writtenPT p = (PC.power p, PC.toughness p)
+                                writtenPT o p = let g = noncreaturePT o gs p in (PC.power g, PC.toughness g)
                              in any
                                   ( \(o, p, _, ans) ->
                                       answerFor ans i
-                                        && writtenPT (uApply a view boxes o p) /= writtenPT (uApply a afterView boxes o p)
+                                        && writtenPT o (uApply a view boxes o p) /= writtenPT o (uApply a afterView boxes o p)
                                   )
                                   boards
                           -- CR 613.8a clause (b)'s last limb again, for an
@@ -4675,7 +4690,7 @@ projectDecidingFrom seedOf admits cands =
                     Nothing -> ds
                     Just k
                       | gLayer c /= lyr || Map.member k ds -> ds
-                      | otherwise -> Map.insert k (affectsWith grants bounded (gSource c) oid (gAffected c) seeded gs) ds
+                      | otherwise -> Map.insert k (affectsWith grants bounded (gSource c) oid (gAffected c) gatedSeed gs) ds
                in if movableHere
                     then resolve (seeded, decided) otherBoards (zip [0 :: Int ..] pendingHere)
                     else
@@ -4695,12 +4710,12 @@ projectDecidingFrom seedOf admits cands =
                       -- contiguity survives and effectUnits still finds each unit.
                       let decided2 = List.foldl' remember decided cands
                           applies c = case gEffect c of
-                            Nothing -> affectsWith grants bounded (gSource c) oid (gAffected c) seeded gs
+                            Nothing -> affectsWith grants bounded (gSource c) oid (gAffected c) gatedSeed gs
                             Just k -> Map.findWithDefault False k decided2
                           ordered = effectUnits (List.sortOn gTimestamp (filter applies here))
                        in (List.foldl' (applyUnit bounded (const Nothing) oid) seeded ordered, decided2)
             (folded, decisions) = List.foldl' applyLayer (seedOf oid gs, Map.empty) layers
-         in (withAnnouncedX oid gs (noncreaturePT oid gs folded), decisions)
+         in (withAnnouncedX oid gs (finish oid gs folded), decisions)
    in forObject
 
 -- CR 208.3: a noncreature permanent has no power or toughness, and only on the
