@@ -207,7 +207,7 @@ setupSpec s registry = Spec.describe s "Setup" $ do
     Spec.assertEqWith s "active" (GameState.activePlayer gs) S.alice
 
   Spec.it s "runMatch derives the players from the matchup (#24)" $ do
-    matchup <- S.redRed (S.printingOf s registry)
+    matchup <- S.shortRedRed (S.printingOf s registry)
     let (result, final) = Engine.runMatchPure S.identityAnswer matchup
     Spec.assertBool s (Maybe.isJust (GameState.result final)) "has a result"
     Spec.assertEqWith s "both players have a life total" (Map.size (GameState.players final)) 2
