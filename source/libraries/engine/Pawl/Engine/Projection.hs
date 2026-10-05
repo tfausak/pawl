@@ -1340,8 +1340,9 @@ affectsBase source oid a gs = affectsGiven (baseView gs) source oid a (copiableC
 
 -- The ViewOf that reads every object at its BASE characteristics, for a caller
 -- feeding the projection rather than reading it. fullView and viewUpTo are the
--- counterparts. Nothing for an id naming no object. Swapping this for fullView
--- leaves the whole suite green: no printing reaches it (gap #1757).
+-- counterparts. Nothing for an id naming no object. Pawl.ProjectionSpec's
+-- Synthetic Entwined Grove pair proves the bound: read through fullView, an
+-- Aura's host re-enters the gather and the case never finishes.
 baseView :: GameState -> Count.ViewOf
 baseView gs oid =
   if Map.member oid (GameState.objects gs)
@@ -4456,12 +4457,11 @@ projectDecidingFrom seedOf admits cands =
                           -- same-layer candidate's affected set, which no effect at
                           -- this layer has been applied to -- see reachable above.
                           --
-                          -- A REGRESSION FENCE rather than a proved behaviour: A
-                          -- Tale for the Ages' CR 303.4b "enchanted creatures you
-                          -- control" does reach this reader from a CR
-                          -- 613.8-movable layer, but no board makes the bounded
-                          -- reading and a full one disagree, so swapping this for
-                          -- fullView leaves the suite green (gap #1757).
+                          -- A peer's OWN peers come off the same board.
+                          -- Pawl.ProjectionSpec's Synthetic Gilded Trellis case
+                          -- proves it: read through fullView, an Equipment's
+                          -- host's attachments re-project the Equipment from
+                          -- inside its own fold, and the case never finishes.
                           viewOfBoard board o = case Map.lookup o board of
                             Just (p, _) -> Just (viewOfCharacteristics (viewOfBoard board) o (noValueAt lyr (noncreaturePT o gs p)) (controllerOf o gs) (countersOf o gs) gs)
                             Nothing -> bounded o
