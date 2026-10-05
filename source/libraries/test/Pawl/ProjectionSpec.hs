@@ -429,6 +429,23 @@ chorusBadMoon chorus badMoon bogWraith childOfNight chorusFirst =
       (childId, gs) = S.addPermanent childOfNight S.alice g2
    in (wraithId, childId, gs)
 
+-- Synthetic Giants' Banner, a Craw Wurm under Kenrith's Transformation, bob's
+-- uncrewed Consulate Dreadnought and, when given, March of the Machines, in
+-- that timestamp order (fresh timestamps ascend with placement; S.attach mints
+-- none).
+--
+-- Synthetic (#1111): no printed static ability inside CR 613's layers picks its
+-- affected set by power, and only layer 4 can make a permanent with printed
+-- numbers a creature partway through the layer that reads them.
+bannerVehicle :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Maybe Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+bannerVehicle banner wurm kenrith dreadnought march =
+  let (_, g1) = S.addPermanent banner S.alice (Setup.emptyGame S.bothPlayers)
+      (wurmId, g2) = S.addPermanent wurm S.alice g1
+      (auraId, g3) = S.addPermanent kenrith S.alice g2
+      (vehicleId, g4) = S.addPermanent dreadnought S.bob (S.attach auraId wurmId g3)
+      gs = maybe g4 (\m -> snd (S.addPermanent m S.alice g4)) march
+   in (wurmId, vehicleId, gs)
+
 -- Synthetic Artificers' Ascent, two Goblin Pikers and a Presence of Gond on the
 -- first of them, all alice's. `ascentFirst` controls the timestamp order (fresh
 -- timestamps ascend with placement). Returns the enchanted Piker, the bare one,
@@ -2199,6 +2216,37 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "the Wraith is its printed 3/3" (Projection.toughnessOf wraithId gs) (Just 3)
     Spec.assertEqWith s "the Child is its printed 2/1" (Projection.powerOf childId gs) (Just 2)
     Spec.assertEqWith s "the Child is its printed 2/1" (Projection.toughnessOf childId gs) (Just 1)
+
+  -- CR 613.8a clause (b)'s "what it applies to", witnessed only at a permanent
+  -- CR 208.3 holds without power until layer 4 animates it. See bannerVehicle
+  -- for the board and why the Banner is synthetic.
+  --
+  -- The Banner depends on March, since March makes bob's Vehicle a creature
+  -- with its printed 7 power at layer 4; so CR 613.8b applies Kenrith's
+  -- Transformation, then March, then the Banner, and the Wurm is an Elk Giant.
+  -- The dependency is seen only on the Vehicle's board, which projecting the
+  -- WURM reads as a snapshot: one that had already cleared the Vehicle's power
+  -- at layer 4's start missed it and left the Wurm an Elk alone.
+  Spec.it s "CR 613.8a a set reading power depends on animating a Vehicle, at every permanent" $ do
+    banner <- S.printingOf s registry "Synthetic Giants' Banner"
+    wurm <- S.printingOf s registry "Craw Wurm"
+    kenrith <- S.printingOf s registry "Kenrith's Transformation"
+    dreadnought <- S.printingOf s registry "Consulate Dreadnought"
+    march <- S.printingOf s registry "March of the Machines"
+    let (wurmId, vehicleId, gs) = bannerVehicle banner wurm kenrith dreadnought (Just march)
+    Spec.assertEqWith s "CR 613.8b: Kenrith's Transformation, March, then the Banner: an Elk Giant" (Projection.subtypesOf wurmId gs) (Set.fromList [Subtype.Type.Elk, Subtype.Type.Giant])
+    Spec.assertEqWith s "the Vehicle, animated at its printed 7, is a Giant too" (Projection.subtypesOf vehicleId gs) (Set.fromList [Subtype.Type.Vehicle, Subtype.Type.Giant])
+
+  -- The control: no March, so nothing waits and CR 613.7's timestamp order puts
+  -- the Banner's Giant before the Elk setter wipes it (CR 205.1a).
+  Spec.it s "CR 613.8a control: no March, so the Banner applies first and the Wurm is an Elk alone" $ do
+    banner <- S.printingOf s registry "Synthetic Giants' Banner"
+    wurm <- S.printingOf s registry "Craw Wurm"
+    kenrith <- S.printingOf s registry "Kenrith's Transformation"
+    dreadnought <- S.printingOf s registry "Consulate Dreadnought"
+    let (wurmId, vehicleId, gs) = bannerVehicle banner wurm kenrith dreadnought Nothing
+    Spec.assertEqWith s "timestamp order: the Banner, then the Elk setter" (Projection.subtypesOf wurmId gs) (Set.singleton Subtype.Type.Elk)
+    Spec.assertEqWith s "the uncrewed Vehicle has no power, so is no Giant (CR 208.3)" (Projection.subtypesOf vehicleId gs) (Set.singleton Subtype.Type.Vehicle)
 
   -- CR 613.8a clause (b)'s "what it applies to", where the aspect that moves the
   -- set is an ABILITY rather than a type. See ascentGond for the board and why

@@ -275,10 +275,10 @@ prohibitionSpec s registry = Spec.describe s "Prohibition" $ do
 -- the printed numbers put under the threshold is caught once an anthem pushes it
 -- over.
 --
--- Reading the full projection is also why this is not the producer #1111 wants:
--- that defect is in the within-layer ordering decision, which reads a mid-fold
--- partial, and CR 613.11 keeps an untap prohibition out of the fold entirely
--- (see #1111).
+-- Reading the full projection is also why this cannot reach the within-layer
+-- ordering decision, which reads a mid-fold partial: CR 613.11 keeps an untap
+-- prohibition out of the fold entirely. Pawl.ProjectionSpec's bannerVehicle is
+-- the set that filters on power inside it.
 --
 -- Meekstone's own "creatures" conjunct is faithful to the printed word rather
 -- than discriminating: Affected.Matching is battlefield-gated, CR 208.3 gives a
