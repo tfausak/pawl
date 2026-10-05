@@ -327,6 +327,44 @@ rootedWardings forest piker pacifism wardings ashaya wardingsFirst =
           else snd (S.addPermanent wardings S.alice (snd (S.addPermanent ashaya S.alice g)))
    in (pacifismId, place attached, snd (S.addPermanent wardings S.alice attached))
 
+-- A basic Forest with a Wild Growth on it, Synthetic Entwined Grove and Blood
+-- Moon, all alice's. `groveFirst` controls the timestamp order. Returns the
+-- Wild Growth's id, the Forest's, and the board.
+--
+-- The Grove makes the Wild Growth a nonbasic land, which moves it into Blood
+-- Moon's set, so Blood Moon depends on the Grove (CR 613.8a) and its Mountain
+-- lands last in either order. Two land-subtype setters on one board is what
+-- makes CR 305.7's gate (Projection.appliedSetEffects) ask whether the Grove
+-- reaches the Wild Growth -- a question about the Forest, read through
+-- Projection.baseView.
+entwinedGrove :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+entwinedGrove forest wildGrowth grove bloodMoon groveFirst =
+  let (forestId, g1) = S.addPermanent forest S.alice (Setup.emptyGame S.bothPlayers)
+      (growthId, g2) = S.addPermanent wildGrowth S.alice g1
+      attached = S.attach growthId forestId g2
+      place g =
+        if groveFirst
+          then snd (S.addPermanent bloodMoon S.alice (snd (S.addPermanent grove S.alice g)))
+          else snd (S.addPermanent grove S.alice (snd (S.addPermanent bloodMoon S.alice g)))
+   in (growthId, forestId, place attached)
+
+-- A Goblin Piker carrying a Bonesplitter, and Synthetic Gilded Trellis, all
+-- alice's, built twice: with a Pacifism on the Piker as well, and without.
+-- Returns the Bonesplitter's id and the two boards.
+--
+-- The Trellis' set reads TWO attachments deep: the Equipment's host, then what
+-- is attached to that host -- the Bonesplitter itself among them, first, since
+-- it entered first. Inside the layer-4 fold the second hop goes through
+-- `resolve`'s running board (Projection.projectDecidingFrom's viewOfBoard).
+gildedTrellis :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState, GameState.GameState)
+gildedTrellis piker bonesplitter pacifism trellis =
+  let (pikerId, g1) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
+      (splitterId, g2) = S.addPermanent bonesplitter S.alice g1
+      equipped = S.attach splitterId pikerId g2
+      (pacifismId, g3) = S.addPermanent pacifism S.alice equipped
+      enchanted = S.attach pacifismId pikerId g3
+   in (splitterId, snd (S.addPermanent trellis S.alice enchanted), snd (S.addPermanent trellis S.alice equipped))
+
 -- A basic Forest, a Merfolk Seer, a Lord of Atlantis and Ashaya, all alice's,
 -- built twice: once as-is and once with a Blood Moon added last. Returns the
 -- Seer's id and the two boards.
@@ -2057,6 +2095,40 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     let (pacifismId, gs, _) = rootedWardings forest piker pacifism wardings ashaya False
     Spec.assertBool s (Set.member CardType.Land (Projection.cardTypesOf pacifismId gs)) "still a land, order-independent"
     Spec.assertBool s (Set.member Subtype.Type.Forest (Projection.subtypesOf pacifismId gs)) "still a Forest, order-independent"
+
+  -- The proving pair for CR 305.7's gate reading an Aura's host at BASE
+  -- characteristics (Projection.baseView): read through a full projection, the
+  -- host re-enters the gather that asks, and neither case finishes.
+  Spec.it s "CR 613.8a the Grove makes a Wild Growth a Forest land, then Blood Moon a Mountain (Grove older)" $ do
+    forest <- S.printingOf s registry "Forest"
+    wildGrowth <- S.printingOf s registry "Wild Growth"
+    grove <- S.printingOf s registry "Synthetic Entwined Grove"
+    bloodMoon <- S.printingOf s registry "Blood Moon"
+    let (growthId, forestId, gs) = entwinedGrove forest wildGrowth grove bloodMoon True
+    Spec.assertEqWith s "the Wild Growth is a Mountain land" (Projection.cardTypesOf growthId gs, Projection.subtypesOf growthId gs) (Set.fromList [CardType.Enchantment, CardType.Land], Set.fromList [Subtype.Type.Aura, Subtype.Type.Mountain])
+    Spec.assertBool s (null (Projection.triggeredAbilitiesOf growthId gs)) "and CR 305.7 took its mana trigger"
+    Spec.assertEqWith s "the basic Forest is untouched" (Projection.subtypesOf forestId gs) (Set.singleton Subtype.Type.Forest)
+
+  Spec.it s "CR 613.8b Blood Moon still waits for the Grove with the timestamps swapped (Blood Moon older)" $ do
+    forest <- S.printingOf s registry "Forest"
+    wildGrowth <- S.printingOf s registry "Wild Growth"
+    grove <- S.printingOf s registry "Synthetic Entwined Grove"
+    bloodMoon <- S.printingOf s registry "Blood Moon"
+    let (growthId, _, gs) = entwinedGrove forest wildGrowth grove bloodMoon False
+    Spec.assertEqWith s "still a Mountain land, order-independent" (Projection.cardTypesOf growthId gs, Projection.subtypesOf growthId gs) (Set.fromList [CardType.Enchantment, CardType.Land], Set.fromList [Subtype.Type.Aura, Subtype.Type.Mountain])
+    Spec.assertBool s (null (Projection.triggeredAbilitiesOf growthId gs)) "still no mana trigger"
+
+  -- The proving case for `resolve` reading a peer's attachments off its running
+  -- board: read through a full projection, the Bonesplitter is re-projected from
+  -- inside its own layer-4 fold, and the case never finishes.
+  Spec.it s "CR 303.4b an Equipment on an enchanted creature joins the Trellis' set" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    pacifism <- S.printingOf s registry "Pacifism"
+    trellis <- S.printingOf s registry "Synthetic Gilded Trellis"
+    let (splitterId, enchanted, bare) = gildedTrellis piker bonesplitter pacifism trellis
+    Spec.assertEqWith s "with Pacifism on the Piker, the Bonesplitter is a Forest land" (Projection.cardTypesOf splitterId enchanted, Projection.subtypesOf splitterId enchanted) (Set.fromList [CardType.Artifact, CardType.Land], Set.fromList [Subtype.Type.Equipment, Subtype.Type.Forest])
+    Spec.assertEqWith s "and with no Aura there, it stays an artifact" (Projection.cardTypesOf splitterId bare) (Set.singleton CardType.Artifact)
 
   Spec.it s "CR 305.7 Ashaya's own type change reaches herself, and Blood Moon then reaches her" $ do
     forest <- S.printingOf s registry "Forest"
