@@ -1067,6 +1067,28 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         Spec.assertBool s (not (Projection.isCreatureOf moonId unsung)) "control: uncoated, the Song does not animate Bad Moon"
         Spec.assertEqWith s "control: so the anthem still pumps the Wraith to 4/4" (Projection.powerOf wraithId unsung) (Just 4)
 
+  -- The single-part sibling of the Titania's Song case: Silencing Fog's whole
+  -- effect is the removal, and its set reads flying, which layer 6 itself
+  -- writes. Arcanum Wings, later, is Kongming's only flying; CR 613.8a makes the
+  -- Fog wait for it, so the Fog strips Kongming and its anthem with it. The
+  -- Bears are the bystander that makes the anthem observable.
+  Spec.it s "CR 613.8a Silencing Fog strips a creature whose flying a later Aura grants" $ do
+    fog <- S.printingOf s registry "Synthetic Silencing Fog"
+    kongming <- S.printingOf s registry "Kongming, \"Sleeping Dragon\""
+    bears <- S.printingOf s registry "Grizzly Bears"
+    wings <- S.printingOf s registry "Arcanum Wings"
+    let (_, g0) = S.addPermanent fog S.bob (Setup.emptyGame S.bothPlayers)
+        (kongmingId, g1) = S.addPermanent kongming S.alice g0
+        (bearsId, g2) = S.addPermanent bears S.alice g1
+        (wingsId, g3) = S.addPermanent wings S.alice g2
+        fogged = S.attach wingsId kongmingId g3
+        -- The control: the same board with the Wings on nothing, so Kongming
+        -- never flies and the Fog passes it over.
+        grounded = g3
+    Spec.assertEqWith s "CR 613.1f: Kongming's anthem is gone, so the Bears are 2/2" (Projection.powerOf bearsId fogged) (Just 2)
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying kongmingId fogged)) "CR 613.1f: and Kongming lost the flying the Wings gave it"
+    Spec.assertEqWith s "control: unwinged, Kongming keeps its anthem and the Bears are 3/3" (Projection.powerOf bearsId grounded) (Just 3)
+
   Spec.it s "CR 704.5g Humility's toughness drop makes an already-damaged creature die" $ do
     warMammoth <- S.printingOf s registry "War Mammoth"
     mountain <- S.printingOf s registry "Mountain"
