@@ -23,7 +23,7 @@ import qualified Pawl.Types.PermissionVerb as PermissionVerb
 -- and reaches no other graveyard for it.
 --
 -- The Filter reads the PRINTED card in the zone, so a continuous effect changing
--- a card's own characteristics there is invisible to the narrowing (#1859).
+-- a card's own characteristics there is invisible to the narrowing (#4712).
 -- The LIMIT is the permission's own, which is what makes the whole record the
 -- key Pawl.Types.GameState.castPermissionsUsedThisTurn spends: two Assemble the
 -- Players grant two budgets, and the source object beside this value is what

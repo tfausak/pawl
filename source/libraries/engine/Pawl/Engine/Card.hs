@@ -802,7 +802,7 @@ castableFaces card = case Card.layout card of
   -- Read off the front face's PRINTED keywords, which is CR 712.11d's own scope
   -- and the posture Pawl.Engine.Cast.castableSpells takes for rule 702.37a's morph
   -- ability. A more than meets the eye or disturb ability GRANTED to a card in a
-  -- zone is not expanded here (gap #1859).
+  -- zone is not expanded here (gap #4706).
   --
   -- The other roads to a back face still do not come through this list. An effect
   -- allowing the card to be cast "transformed" names the face itself --
