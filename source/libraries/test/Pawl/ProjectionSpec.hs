@@ -63,6 +63,7 @@ import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CounterName as CounterName
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Effect as Effect
@@ -209,9 +210,8 @@ humilityTimestamp humility gs =
 -- Two synthetic nonbasic lands, each printing "OTHER nonbasic lands are [type]", so each
 -- sits inside the other's affected set and the two form a CR 613.8a dependency
 -- loop. "Other" (a Not IsSource conjunct) keeps each out of its OWN affected set,
--- which isolates rule 613.8b: a land that stripped itself would raise the separate
--- and unsettled question of whether an effect that removes the ability generating
--- it keeps applying (#945), and this pair asks only about the loop. `lunarFirst` controls which is older -- fresh timestamps ascend with
+-- which isolates rule 613.8b; reflexiveMoon below is the land inside its own
+-- set. `lunarFirst` controls which is older -- fresh timestamps ascend with
 -- placement -- and rule 613.8b makes the older one the winner, so unlike
 -- bloodMoonUrborg below the answer is deliberately order-DEPENDENT.
 wasteLoop :: Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
@@ -226,6 +226,38 @@ wasteLoop lunar tidal lunarFirst =
           let (t, g1) = S.addPermanent tidal S.alice base
               (l, g2) = S.addPermanent lunar S.alice g1
            in (l, t, g2)
+
+-- Synthetic Reflexive Moon ("Nonbasic lands are Mountains. Creatures are
+-- artifacts in addition to their other types."), a Tundra and a Grizzly Bears,
+-- all alice's. The Moon is a nonbasic land, so inside its own first ability's
+-- set.
+reflexiveMoon :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+reflexiveMoon moon tundra bears =
+  let (moonId, g1) = S.addPermanent moon S.alice (Setup.emptyGame S.bothPlayers)
+      (tundraId, g2) = S.addPermanent tundra S.alice g1
+      (bearsId, g3) = S.addPermanent bears S.alice g2
+   in (moonId, tundraId, bearsId, g3)
+
+-- A basic Forest, a Tundra, a Grizzly Bears, Ashaya and Zhao, the Moon Slayer
+-- with a conqueror counter, all alice's. `ashayaFirst` controls the timestamp
+-- order. Returns the Forest, Tundra, Bears, Ashaya and Zhao ids.
+ashayaZhao :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> ([ObjectId.ObjectId], GameState.GameState)
+ashayaZhao forest tundra bears ashaya zhao ashayaFirst =
+  let (forestId, g1) = S.addPermanent forest S.alice (Setup.emptyGame S.bothPlayers)
+      (tundraId, g2) = S.addPermanent tundra S.alice g1
+      (bearsId, g3) = S.addPermanent bears S.alice g2
+      ((ashayaId, zhaoId), g4) =
+        if ashayaFirst
+          then
+            let (a, h1) = S.addPermanent ashaya S.alice g3
+                (z, h2) = S.addPermanent zhao S.alice h1
+             in ((a, z), h2)
+          else
+            let (z, h1) = S.addPermanent zhao S.alice g3
+                (a, h2) = S.addPermanent ashaya S.alice h1
+             in ((a, z), h2)
+      conqueror = CounterKind.Named (CounterName.UnsafeMkCounterName (Text.pack "conqueror"))
+   in ([forestId, tundraId, bearsId, ashayaId, zhaoId], S.addCounter conqueror 1 zhaoId g4)
 
 -- Two Synthetic Echoing Mimics and a Goblin Piker, all Alice's, with the
 -- state-based actions swept. Each Mimic's CDA reads the other's power, which is
@@ -1662,6 +1694,56 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     let (lunarId, tidalId, gs) = wasteLoop lunar tidal False
     Spec.assertEqWith s "the older Tidal Waste applies: Lunar is an Island" (Projection.subtypesOf lunarId gs) (Set.singleton Subtype.Type.Island)
     Spec.assertEqWith s "and Tidal is untouched" (Projection.subtypesOf tidalId gs) Set.empty
+
+  -- CR 613.1 starts layer 4 from the printed values, so the Moon's setter exists
+  -- as its effect starts to apply, and CR 613.6 keeps it applying through its
+  -- own CR 305.7 strip: the Moon and the Tundra are both Mountains. Scryfall
+  -- `t:land o:/(is|are) (a |an )?(plains|islands?|swamps?|mountains?|forests?)\b/
+  -- -o:"in addition"`, 2026-10-06, no hit, hence the synthetic.
+  Spec.it s "CR 305.7/613.6 a land inside its own Mountain set keeps that setter applying" $ do
+    moon <- S.printingOf s registry "Synthetic Reflexive Moon"
+    tundra <- S.printingOf s registry "Tundra"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    let (moonId, tundraId, _, gs) = reflexiveMoon moon tundra bears
+        red = ManaSymbol.OfType (ManaType.Colored Color.Red)
+    Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [red, red]) gs) "both lands tap for {R} (CR 305.6)"
+    Spec.assertEqWith s "the Moon is a Mountain" (Projection.subtypesOf moonId gs) (Set.singleton Subtype.Type.Mountain)
+    Spec.assertEqWith s "and so is the Tundra" (Projection.subtypesOf tundraId gs) (Set.singleton Subtype.Type.Mountain)
+
+  -- The other half: CR 613.6 spares only the setter. The Moon's second ability
+  -- is layer 4 too, and depends on the setter (CR 613.8a: applying it strips
+  -- the second), so the setter applies first and the second never does.
+  Spec.it s "CR 305.7/613.6 a land inside its own Mountain set loses its other abilities" $ do
+    moon <- S.printingOf s registry "Synthetic Reflexive Moon"
+    tundra <- S.printingOf s registry "Tundra"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    let (_, _, bearsId, gs) = reflexiveMoon moon tundra bears
+    Spec.assertEqWith s "the Bears are not made an artifact" (Projection.cardTypesOf bearsId gs) (Set.singleton CardType.Creature)
+
+  -- CR 613.8a between Ashaya's type add (A) and Zhao's setter (Z), both layer 4,
+  -- neither characteristic-defining. Z depends on A: applying A makes every
+  -- nontoken creature alice controls a land, moving them into "nonbasic lands".
+  -- A does not depend on Z: before A no creature is a land, so Z reaches nothing
+  -- of Ashaya. No loop, so CR 613.8b applies A then Z in either timestamp order.
+  -- Z then strips Ashaya's text (CR 305.7) -- A already applied, and the 7a CDA
+  -- had not started, so Ashaya is 0/0 -- and Zhao's own, sparing Z itself (CR
+  -- 613.6). The basic Forest stays outside both sets.
+  Spec.it s "CR 613.8a/613.6 Ashaya makes Zhao a land inside its own Mountain set, in either order" $ do
+    forest <- S.printingOf s registry "Forest"
+    tundra <- S.printingOf s registry "Tundra"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+    zhao <- S.printingOf s registry "Zhao, the Moon Slayer"
+    Monad.forM_ [True, False] $ \ashayaFirst -> case ashayaZhao forest tundra bears ashaya zhao ashayaFirst of
+      ([forestId, tundraId, bearsId, ashayaId, zhaoId], gs) -> do
+        let order = if ashayaFirst then " (Ashaya older)" else " (Zhao older)"
+            mountainLand oid = Set.member CardType.Land (Projection.cardTypesOf oid gs) && Set.member Subtype.Type.Mountain (Projection.subtypesOf oid gs) && not (Set.member Subtype.Type.Forest (Projection.subtypesOf oid gs))
+        Spec.assertBool s (all mountainLand [bearsId, ashayaId, zhaoId]) ("the Bears, Ashaya and Zhao are Mountain lands, not Forests" <> order)
+        Spec.assertEqWith s ("the Tundra is a Mountain" <> order) (Projection.subtypesOf tundraId gs) (Set.singleton Subtype.Type.Mountain)
+        Spec.assertEqWith s ("the basic Forest is untouched" <> order) (Projection.subtypesOf forestId gs) (Set.singleton Subtype.Type.Forest)
+        Spec.assertEqWith s ("Ashaya's CDA is stripped" <> order) (Projection.toughnessOf ashayaId gs) (Just 0)
+        Spec.assertBool s (Map.null (Projection.keywordsOf zhaoId gs)) ("Zhao loses menace" <> order)
+      _ -> Spec.assertFailure s "five ids"
 
   -- CR 613.8a's "what it applies to" limb closing a loop: Verdant makes a Plains
   -- a Forest, which moves Tidal's set, and Tidal makes Verdant (a Forest) an
