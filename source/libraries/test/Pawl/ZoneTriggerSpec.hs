@@ -100,6 +100,7 @@ import qualified Pawl.Types.ManaAdded as ManaAdded
 import qualified Pawl.Types.ManaAddedCause as ManaAddedCause
 import qualified Pawl.Types.ManaSpecification as ManaSpecification
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.ManifestedDread as ManifestedDread
 import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
@@ -2327,6 +2328,11 @@ representativeEvents cond =
         -- the floor for the wrong keyword action.
         TriggerCondition.PlayerSurveils _ -> one (GameEvent.Surveiled S.bob)
         TriggerCondition.PlayerProliferates _ -> one (GameEvent.Proliferated S.bob)
+        -- TWO: CR 701.62b's manifest dread that binned nothing, and one that
+        -- binned a card, which is what parts the floor from the ceiling.
+        TriggerCondition.PlayerManifestsDread _ ->
+          noTable (GameEvent.ManifestedDread (ManifestedDread.MkManifestedDread S.bob Seq.empty))
+            NonEmpty.:| [noTable (GameEvent.ManifestedDread (ManifestedDread.MkManifestedDread S.bob (Seq.singleton arrived)))]
         TriggerCondition.PlayerRollsDice _ -> one (GameEvent.DiceRolled S.bob)
         -- CR 706.2's per-die event, carrying the number the condition states.
         TriggerCondition.PlayerRollsResult watched -> one (GameEvent.DieResultSettled DieResult.MkDieResult {DieResult.roller = S.bob, DieResult.result = DieResult.result watched})
@@ -2607,6 +2613,8 @@ everyTriggerCondition =
     TriggerCondition.PlayerSurveils PlayerRelation.Opponent,
     TriggerCondition.PlayerProliferates PlayerRelation.You,
     TriggerCondition.PlayerProliferates PlayerRelation.Opponent,
+    TriggerCondition.PlayerManifestsDread PlayerRelation.You,
+    TriggerCondition.PlayerManifestsDread PlayerRelation.Opponent,
     TriggerCondition.PlayerRollsDice PlayerRelation.You,
     TriggerCondition.PlayerRollsDice PlayerRelation.Opponent,
     TriggerCondition.PlayerRollsResult DieResult.MkDieResult {DieResult.roller = PlayerRelation.You, DieResult.result = 6},

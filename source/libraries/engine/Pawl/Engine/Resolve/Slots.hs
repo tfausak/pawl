@@ -880,6 +880,7 @@ effectObjectRefs effect = case effect of
   Effect.Recruit -> []
   Effect.Learn -> []
   Effect.Cloak {} -> []
+  Effect.ManifestDread {} -> []
   Effect.Venture {} -> []
   Effect.PlayerSacrifices {} -> []
   Effect.Vote {} -> []
@@ -1095,6 +1096,8 @@ effectPlayerRefs effect = case effect of
   Effect.Learn -> []
   -- CR 701.58a's own reference: whose library the top card comes off.
   Effect.Cloak ref -> [ref]
+  -- CR 701.62a's: whose library the two cards come off.
+  Effect.ManifestDread ref -> [ref]
   Effect.Venture {} -> []
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices players _ _) -> [players]
   -- CR 701.38a's specified player, the seat the vote starts with.
@@ -1231,6 +1234,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.Recruit -> Map.empty
   Effect.Learn -> Map.empty
   Effect.Cloak {} -> Map.empty
+  Effect.ManifestDread {} -> Map.empty
   Effect.Venture {} -> Map.empty
   Effect.ExileHandThenDraw -> Map.empty
   Effect.NoteManaSpent -> Map.empty
@@ -2027,6 +2031,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.Recruit -> True
   Effect.Learn -> True
   Effect.Cloak {} -> True
+  Effect.ManifestDread {} -> True
   Effect.Venture {} -> True
   Effect.ExileHandThenDraw -> True
   Effect.NoteManaSpent -> True
@@ -2314,6 +2319,7 @@ readsX =
         Effect.Recruit -> False
         Effect.Learn -> False
         Effect.Cloak {} -> False
+        Effect.ManifestDread {} -> False
         Effect.Venture {} -> False
         Effect.ExileHandThenDraw -> False
         Effect.NoteManaSpent -> False
@@ -2574,6 +2580,7 @@ boundSlots effect = case effect of
   Effect.Recruit -> Set.empty
   Effect.Learn -> Set.empty
   Effect.Cloak {} -> Set.empty
+  Effect.ManifestDread {} -> Set.empty
   Effect.Venture {} -> Set.empty
   Effect.ExileHandThenDraw -> Set.empty
   Effect.NoteManaSpent -> Set.empty

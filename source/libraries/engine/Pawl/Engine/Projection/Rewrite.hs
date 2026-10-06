@@ -596,6 +596,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Recruit -> effect
   Effect.Learn -> effect
   Effect.Cloak {} -> effect
+  Effect.ManifestDread {} -> effect
   -- CR 612.2's gate, and this arm is where it bites rather than where it is
   -- restated: the payload IS a subtype word (CR 701.49d's quality), but a pair
   -- reaching it would have to come from a Pawl.Types.SubtypeFamily, and that type
@@ -1966,6 +1967,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PlayerCompletesDungeon _ -> condition
   TriggerCondition.PlayerSurveils _ -> condition
   TriggerCondition.PlayerProliferates _ -> condition
+  TriggerCondition.PlayerManifestsDread _ -> condition
   TriggerCondition.PlayerRollsDice _ -> condition
   TriggerCondition.PlayerRollsResult _ -> condition
   TriggerCondition.Visit -> condition

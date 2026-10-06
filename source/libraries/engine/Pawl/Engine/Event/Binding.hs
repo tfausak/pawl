@@ -49,6 +49,7 @@ import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.ManaAbilityResolved as ManaAbilityResolved
+import qualified Pawl.Types.ManifestedDread as ManifestedDread
 import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Moved as Moved
 import Pawl.Types.ObjectId (ObjectId)
@@ -478,6 +479,14 @@ eventBindingsOver board gs bearerBecame becameInGraveyard bearer you cond event 
   -- event, summed across the group by batchBindings.
   (TriggerCondition.PlayerDiscardsCards _, GameEvent.Discarded _) ->
     Binding.setEventAmount 1 Map.empty
+  -- CR 701.62a's "a card you put into your graveyard this way" (Paranormal
+  -- Analyst): the graveyard incarnations the event carries, under CR 400.7e's
+  -- `became` -- one as the single binding, several (a CR 701.40f refusal sends
+  -- both looked-at cards) as a group, and none binding nothing.
+  (TriggerCondition.PlayerManifestsDread _, GameEvent.ManifestedDread ev) -> case ManifestedDread.cards ev of
+    Seq.Empty -> Map.empty
+    only Seq.:<| Seq.Empty -> Binding.setBecame only Map.empty
+    every -> Binding.setBecameGroup every Map.empty
   -- CR 702.86a's "defending player": CR 508.5 resolves that phrase through what
   -- the attacking creature is attacking, and Pawl.Engine.Combat.declareAttackers
   -- stamped the answer onto the event as the declaration was written down. The
@@ -1267,6 +1276,10 @@ eventBindingSlots cond = case cond of
   TriggerCondition.SelfBecomesPlotted -> Set.empty
   TriggerCondition.PermanentExplores _ -> Set.empty
   TriggerCondition.PermanentConnives _ -> Set.empty
+  -- Empty as a floor: CR 701.62b fires on a manifest dread that put nothing into
+  -- the graveyard, which binds nothing. The `became` it binds otherwise is
+  -- eventBindingSlotsSometimes'.
+  TriggerCondition.PlayerManifestsDread _ -> Set.empty
   -- Nothing here either, and for the group above's reason: CR 701.68d's event
   -- names the blighting player, and Synthetic Blight Chronicler's payload points
   -- at no one -- it draws and drains its own controller. CR 701.68c's "blighted
@@ -1989,7 +2002,7 @@ eventBindingSlots cond = case cond of
 -- PRESCRIBES, not the silent no-op the lint exists to catch. Every other reader
 -- wants the floor, a slot bound sometimes being no guarantee at all.
 --
--- Five arms and no more, which is a fact about eventBindings above rather than
+-- Seven arms and no more, which is a fact about eventBindings above rather than
 -- a convenience. Two of them are CR 400.7e's public-zone proviso, standing on
 -- the two conditions CR 603.6c admits every destination for. The third is
 -- PermanentSacrificed, where CR 400.7e's new object is not on the event at all
@@ -1997,6 +2010,8 @@ eventBindingSlots cond = case cond of
 -- 603.1b's AnyOf, where what parts the ceiling from the floor is the BRANCHES
 -- disagreeing rather than any one event's shape. The fifth is CardLeavesZone
 -- with no destination, whose Binding.handArrival turns on the event's `to`.
+-- The sixth is SelfTurnedFaceUp, whose X only a cost carrying one binds, and
+-- the seventh PlayerManifestsDread, whose cards CR 701.62b fires without.
 -- The other two conditional arms turn on GAME STATE instead --
 -- AttachedCreatureDies on CR 400.7f's arrival and PermanentReturnedToHand on CR
 -- 608.2h's record -- and the floor claims both outright, each for the reasons
@@ -2058,4 +2073,9 @@ eventBindingSlotsSometimes cond = case cond of
   -- permanent up had an X in it (Warbreak Trumpeter's morph {X}{X}{R}), and never
   -- down an effect's road up, which chose none.
   TriggerCondition.SelfTurnedFaceUp -> Set.singleton Binding.variableX
+  -- CR 701.62a's cards put into the graveyard, which an empty or one-card
+  -- library, or a replacement sending the card elsewhere, leaves without any.
+  -- data/cards/paranormal-analyst.json is the reader, and finding nothing there
+  -- is the rule's own answer.
+  TriggerCondition.PlayerManifestsDread _ -> Set.singleton Binding.became
   _ -> Set.empty

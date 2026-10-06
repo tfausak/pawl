@@ -298,7 +298,9 @@ facingPlayers = SlotName.MkSlotName (Text.pack "thoseFacing")
 -- CR 712.21c makes an effect that finds what it became find both cards. The
 -- shape follows -- a recipient for one (setBecame), a group for several
 -- (setBecameGroup) -- and Pawl.Engine.Event.Binding.setBecameArrivals is where the
--- choice is made and justified.
+-- choice is made and justified. CR 701.62a's "a card you put into your
+-- graveyard this way" (Paranormal Analyst) is the other plural: a CR 701.40f
+-- refusal puts both looked-at cards there.
 became :: SlotName
 became = SlotName.MkSlotName (Text.pack "became")
 
@@ -1217,10 +1219,11 @@ setHandArrival oid = Map.insert handArrival (toObject oid)
 setPreventedDamageSources :: Set ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setPreventedDamageSources oids = Map.insert preventedDamageSource (toRecipients (Set.map Recipient.ToObject oids))
 
--- setBecame for CR 712.21c's plural: the SEVERAL cards a melded permanent became
--- as it left the battlefield, bound as a group so an ObjectRef.InSlot reader acts
--- on each of them. Pawl.Engine.Event.Binding.setBecameArrivals is the one caller and says
--- why the shape differs from setBecame's.
+-- setBecame for a plural: the SEVERAL cards a melded permanent became as it left
+-- the battlefield (CR 712.21c), or that a manifest dread put into a graveyard (CR
+-- 701.62a), bound as a group so an ObjectRef.InSlot reader acts on each of them.
+-- Pawl.Engine.Event.Binding.setBecameArrivals says why the shape differs from
+-- setBecame's.
 setBecameGroup :: Seq ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setBecameGroup oids = Map.insert became (toObjects oids)
 

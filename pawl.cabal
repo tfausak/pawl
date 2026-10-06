@@ -796,6 +796,8 @@ library codec
     Pawl.Codec.ManaTypeSpec
     Pawl.Codec.ManaUnit
     Pawl.Codec.ManaUnitSpec
+    Pawl.Codec.ManifestedDread
+    Pawl.Codec.ManifestedDreadSpec
     Pawl.Codec.Meld
     Pawl.Codec.MeldSource
     Pawl.Codec.MeldSourceSpec
@@ -1428,6 +1430,7 @@ library engine
     Pawl.Engine.ManaCount
     Pawl.Engine.ManaFilter
     Pawl.Engine.ManaRider
+    Pawl.Engine.ManifestDread
     Pawl.Engine.Modal
     Pawl.Engine.Monarch
     Pawl.Engine.MoveDuration
@@ -2327,6 +2330,7 @@ library types
     Pawl.Types.ManaType
     Pawl.Types.ManaUnit
     Pawl.Types.ManaWindow
+    Pawl.Types.ManifestedDread
     Pawl.Types.Meld
     Pawl.Types.MeldSource
     Pawl.Types.Mentored

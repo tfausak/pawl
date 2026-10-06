@@ -2518,6 +2518,7 @@ castOf event = case event of
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.Proliferated _ -> Nothing
+  GameEvent.ManifestedDread {} -> Nothing
   GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
@@ -2629,6 +2630,7 @@ abilityResolved event = case event of
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.Proliferated _ -> Nothing
+  GameEvent.ManifestedDread {} -> Nothing
   GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
@@ -2731,6 +2733,7 @@ discardOf event = case event of
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.Proliferated _ -> Nothing
+  GameEvent.ManifestedDread {} -> Nothing
   GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
@@ -2862,6 +2865,7 @@ movedChange event = case event of
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.Proliferated _ -> Nothing
+  GameEvent.ManifestedDread {} -> Nothing
   GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
@@ -2983,6 +2987,7 @@ damageDealt event = case event of
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.Proliferated _ -> Nothing
+  GameEvent.ManifestedDread {} -> Nothing
   GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
@@ -3269,6 +3274,7 @@ lifeGainOf event = case event of
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.Proliferated _ -> Nothing
+  GameEvent.ManifestedDread {} -> Nothing
   GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing

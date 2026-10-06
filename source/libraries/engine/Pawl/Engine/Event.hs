@@ -812,6 +812,7 @@ damageOf event = case event of
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.Proliferated _ -> Nothing
+  GameEvent.ManifestedDread {} -> Nothing
   GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
@@ -900,6 +901,7 @@ revealOf event = case event of
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.Proliferated _ -> Nothing
+  GameEvent.ManifestedDread {} -> Nothing
   GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
@@ -9010,6 +9012,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.RingTemptsPlayer _ -> False
   TriggerCondition.PlayerSurveils _ -> False
   TriggerCondition.PlayerProliferates _ -> False
+  TriggerCondition.PlayerManifestsDread _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
   TriggerCondition.PermanentExplores _ -> False
   TriggerCondition.PermanentConnives _ -> False
@@ -9605,6 +9608,7 @@ abilityTriggeredOf event = case event of
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.Proliferated _ -> Nothing
+  GameEvent.ManifestedDread {} -> Nothing
   GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing

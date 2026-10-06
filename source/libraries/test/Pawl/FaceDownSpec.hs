@@ -104,9 +104,10 @@
 -- {4}{W}", the pool's plainest disguise creature. It is the only card here whose
 -- face-down listing is not CR 708.2a's default, the ward {2} CR 702.168b names.
 --
--- Soul Summons is MANIFEST's card, one of the two here whose permanent never
--- passes through the stack (Manifest Dread below is the other). {1}{W} Sorcery,
--- "Manifest the top card of your library" (CR 701.40a) -- one clause,
+-- Soul Summons is MANIFEST's card, one of the two whose permanent never passes
+-- through the stack (Manifest Dread, in data/scenarios/face-down, is the
+-- other). {1}{W} Sorcery, "Manifest the top card of your library" (CR
+-- 701.40a) -- one clause,
 -- transcribed whole, and preferred over Write into Being, whose
 -- look-at-two-and-choose prompt is beside CR 708.3.
 -- Thragtusk is the card underneath it; summonsBoard says why that one, and

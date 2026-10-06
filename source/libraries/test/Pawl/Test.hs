@@ -373,6 +373,7 @@ import qualified Pawl.Codec.ManaSpendingSpec
 import qualified Pawl.Codec.ManaSymbolSpec
 import qualified Pawl.Codec.ManaTypeSpec
 import qualified Pawl.Codec.ManaUnitSpec
+import qualified Pawl.Codec.ManifestedDreadSpec
 import qualified Pawl.Codec.MeldSourceSpec
 import qualified Pawl.Codec.MeldSpec
 import qualified Pawl.Codec.MentoredSpec
@@ -1207,6 +1208,7 @@ spec s registry = do
   Pawl.Codec.MillCountRewriteSpec.spec s
   Pawl.Codec.MillSpec.spec s
   Pawl.Codec.MillTallySpec.spec s
+  Pawl.Codec.ManifestedDreadSpec.spec s
   Pawl.Codec.MilledSpec.spec s
   Pawl.Codec.ModalSpec.spec s
   Pawl.Codec.ModeIndexSpec.spec s

@@ -161,6 +161,7 @@ zoneFunctionedFrom itself delayed effect = case effect of
   Effect.Recruit -> Nothing
   Effect.Learn -> Nothing
   Effect.Cloak {} -> Nothing
+  Effect.ManifestDread {} -> Nothing
   Effect.Venture {} -> Nothing
   Effect.ExileHandThenDraw -> Nothing
   Effect.NoteManaSpent -> Nothing
