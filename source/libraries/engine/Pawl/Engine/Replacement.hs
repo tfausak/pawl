@@ -3235,12 +3235,9 @@ preventionBy inert candidate before after = case (ReplacementCandidate.effect ca
                 Just
                   Prevention.MkPrevention
                     { Prevention.by = ReplacementCandidate.identity candidate,
-                      -- CR 120.1's source of the damage that did not happen,
-                      -- read off the event as PROPOSED for the recipient's
-                      -- reason below.
-                      Prevention.source = DamageEvent.source de,
-                      -- ONE ENTRY, this event's own: the recipient of the event
-                      -- as PROPOSED, which is the reading CR 615.13 asks for --
+                      -- ONE ENTRY, this event's own: CR 120.1's source and the
+                      -- recipient of the event as PROPOSED, which is the reading
+                      -- CR 615.13 asks for --
                       -- its ability watches "damage that WOULD be dealt [and] is
                       -- prevented". Damage CAN now be redirected
                       -- (DamageRewrite.Redirect), and the two readings still
@@ -3251,7 +3248,7 @@ preventionBy inert candidate before after = case (ReplacementCandidate.effect ca
                       --
                       -- Zero on the CR 615.12 path, which `applyInertly` makes
                       -- exact: it hands the event back whole, so `now` is `was`.
-                      Prevention.amounts = Map.singleton (DamageEvent.target de) (was - now),
+                      Prevention.amounts = Map.singleton (DamageEvent.source de) (Map.singleton (DamageEvent.target de) (was - now)),
                       -- CR 615.5's additional effect, carried out of the loop
                       -- so a caller that CAN run effects finds it. Copied, not
                       -- inspected: this module never asks what the rider is.
@@ -3294,16 +3291,16 @@ printedBy candidate = case candidate of
     ReplacementProvenance.Printed -> Just (PermanentCandidate.source permanent)
 
 -- CR 615.13: collapse a batch's per-event preventions to one entry per applying
--- INSTANCE, carrying what that instance prevented for each recipient.
+-- INSTANCE, carrying what that instance prevented from each source to each
+-- recipient.
 --
 -- Keyed on the instance alone, which is the rule's own unit: 615.13 counts one
 -- application of one prevention effect "to one or more simultaneous damage
--- events", whoever those events were addressed to. Divine Deflection is the
--- producer that tells the two readings apart -- one shield over a player and the
--- permanents they control -- and a batch spending its pool across both runs CR
--- 615.5's rider ONCE with the total, which Pawl.ReplacementSpec's "the rider
--- deals its 3 in ONE event" proves by counting the rider's damage events rather
--- than summing them.
+-- events", whoever those events were addressed to. A shield over a player and
+-- the permanents they control is the producer that tells the two readings
+-- apart: one source's hits on both run CR 615.5's rider ONCE with that source's
+-- total, which Pawl.DamageReplacementSpec's Comeuppance "come back as ONE 5"
+-- proves by counting the rider's damage events rather than summing them.
 --
 -- The recipients survive as the KEYS of the collapsed amount rather than as part
 -- of the key, because a trigger scoped to one of them still has to read its own
@@ -3322,28 +3319,23 @@ printedBy candidate = case candidate of
 --
 -- Only the AMOUNTS are summed. CR 615.5's rider is a property of the INSTANCE,
 -- and the key already fixes the instance, so every entry merged here carries the
--- same rider and taking either side is taking the same value -- which is also
--- the rule: one application of one prevention effect runs its additional effect
--- once, with the total it prevented.
+-- same rider and taking either side is taking the same value.
 --
--- The SOURCE is neither summed nor keyed on, and a merged entry keeps one of the
--- sources merged into it. Samite Ministration -- the one card in data/cards/
--- whose CR 615.13 trigger reads the source -- cannot tell that apart from the
--- rule, its shield naming ONE source under CR 609.7a, so a key already fixed to
--- one instance is fixed to one source too. Not implemented: a shield covering two
--- DIFFERENT sources in one batch, where rule 615.13's one prevention has two
--- sources and this reports one (#2287). Keying on the source instead would report
--- two preventions where that rule counts one, which is the wrong trade and the
--- design call the issue is left open for.
+-- The SOURCE is not keyed on either: it is the OUTER key of the collapsed amount,
+-- beside the recipients within it, so one application covering two sources --
+-- Comeuppance stopping two attackers in one combat damage step -- is still ONE
+-- prevention under rule 615.13, and keeps both sources and each one's share.
+-- Pawl.DamageReplacementSpec's Comeuppance group proves the rider's per-source
+-- read and its Judgment of Alexander group the trigger's.
 groupPreventions :: [Prevention] -> [Prevention]
 groupPreventions ps =
-  let merge (a1, s1, r1) (a2, _, _) = (Map.unionWith (+) a1 a2, s1, r1)
+  let merge (a1, r1) (a2, _) = (Map.unionWith (Map.unionWith (+)) a1 a2, r1)
       keyed =
         Map.fromListWith
           merge
-          (fmap (\p -> (Prevention.by p, (Prevention.amounts p, Prevention.source p, Prevention.rider p))) ps)
-      rebuild (by, (amounts, source, rider)) =
-        Prevention.MkPrevention {Prevention.by = by, Prevention.source = source, Prevention.amounts = amounts, Prevention.rider = rider}
+          (fmap (\p -> (Prevention.by p, (Prevention.amounts p, Prevention.rider p))) ps)
+      rebuild (by, (amounts, rider)) =
+        Prevention.MkPrevention {Prevention.by = by, Prevention.amounts = amounts, Prevention.rider = rider}
    in fmap rebuild (Map.toAscList keyed)
 
 -- CR 615.7: when two or more applicable sources would deal damage to a shielded

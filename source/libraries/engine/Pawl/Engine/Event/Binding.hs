@@ -11,6 +11,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Numeric.Natural
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -39,10 +40,12 @@ import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamagePrevented as DamagePrevented
 import qualified Pawl.Types.Discarded as Discarded
 import qualified Pawl.Types.Exploited as Exploited
+import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.GameEvent (GameEvent)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.ManaAbilityResolved as ManaAbilityResolved
@@ -607,7 +610,7 @@ eventBindingsOver board gs bearerBecame becameInGraveyard bearer you cond event 
       ( sum
           ( Map.filterWithKey
               (\recipient _ -> maybe False (PlayerRelation.holds (Game.teams gs) relation you) (Target.playerOf recipient))
-              (DamagePrevented.amounts prevented)
+              (Map.unionsWith (+) (DamagePrevented.amounts prevented))
           )
       )
       Map.empty
@@ -620,14 +623,21 @@ eventBindingsOver board gs bearerBecame becameInGraveyard bearer you cond event 
   -- acts on a target it chooses, never on whoever the prevented damage was
   -- addressed to.
   --
-  -- CR 120.1's SOURCE is, and it is the one thing this condition's payload can
-  -- name that the arm above's cannot: New Way Forward's "that source's
-  -- controller" points at the object that would have dealt the damage, which the
-  -- record already carries. Not bound on the DamageToPlayerPrevented arm, whose
-  -- printed sentences all speak about the recipient's side; a printing there that
-  -- named the source would want the same stamp.
-  (TriggerCondition.SelfPreventsDamage _, GameEvent.DamagePrevented prevented) ->
-    Binding.setPreventedDamageSource (DamagePrevented.source prevented) (Binding.setEventAmount (sum (DamagePrevented.amounts prevented)) Map.empty)
+  -- CR 120.1's SOURCES are, and they are the one thing this condition's payload
+  -- can name that the arm above's cannot: New Way Forward's "that source's
+  -- controller" points at the object that would have dealt the damage. EVERY
+  -- source the condition's Filter admits is bound, together, and the amount is
+  -- theirs: CR 615.13 fires once for one application however many sources it
+  -- covered, so Judgment of Alexander's "that creature" over two prevented
+  -- attackers names both, and a source the Filter refuses -- a noncreature one
+  -- there -- is no part of either. Re-asked against the Filter here exactly as
+  -- the match arm asks it (admittedPreventedSources). Not bound on the
+  -- DamageToPlayerPrevented arm, whose printed sentences all speak about the
+  -- recipient's side; a printing there that named the source would want the
+  -- same stamp.
+  (TriggerCondition.SelfPreventsDamage f, GameEvent.DamagePrevented prevented) ->
+    let admitted = admittedPreventedSources (SourceContext.sourceContext gs (Just you) bearer) gs f prevented
+     in Binding.setPreventedDamageSources (Map.keysSet admitted) (Binding.setEventAmount (sum (fmap sum admitted)) Map.empty)
   -- CR 119.9's "that much": how much life the gain was, which CR 603.2 makes part
   -- of the event that fired the trigger -- Sanguine Bond's "target opponent loses
   -- that much life". The SAME slot the prevention arm above stamps, one printed
@@ -1138,6 +1148,19 @@ admittedDepartures gs bearer you p = Seq.filter admits . Moved.departures
     admits departed = case Projection.viewWithLastKnown departed gs departed of
       Nothing -> False
       Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view (CardLeavesZone.filter p)
+
+-- CR 615.13 / 120.1: the sources of one prevention that a SelfPreventsDamage
+-- Filter admits, each with its per-recipient share, read off CR 608.2h's last
+-- known information since a source may have left by now. A source whose share
+-- is 0 is not admitted: rule 615.13 fires where some damage "is prevented", and
+-- CR 615.12's inert application prevented none of that source's. `context` is
+-- the caller's, so the match arm can pass the delayed ability's slot objects
+-- (CR 603.7c).
+admittedPreventedSources :: Filter.Context -> GameState -> Filter.Type.Filter Keyword.Type.Keyword -> DamagePrevented.DamagePrevented -> Map.Map ObjectId (Map.Map Recipient.Recipient Numeric.Natural.Natural)
+admittedPreventedSources context gs f = Map.filterWithKey admits . DamagePrevented.amounts
+  where
+    admits damager share =
+      sum share > 0 && maybe False (\view -> Filter.matches context view f) (Projection.viewWithLastKnown damager gs damager)
 
 -- The attackers `attacker` declared that the condition's Filter admits, CR
 -- 508.3c's "a creature that player controls" read through Combat.joinedUnder

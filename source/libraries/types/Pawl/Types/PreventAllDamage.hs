@@ -7,6 +7,7 @@ import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 
 -- | CR 615.1 / 615.3's UNBOUNDED prevention shield: over whom, of what kind,
 -- for how long, and CR 615.5's additional effect riding it.
@@ -54,17 +55,16 @@ data PreventAllDamage effect = MkPreventAllDamage
     -- this description and @ref@ are the two ends rather than two spellings of
     -- one, which Synthetic Selective Muzzle is what proves. What that costs on the DealtTo side
     -- is that the two ARE alternatives there, @ref@ being a recipient too.
-    --
-    -- No PLAYER half beside it, where Pawl.Types.PreventNextDamage carries
-    -- @whoRecipient@. Printings that want both halves exist -- Safe Passage's
-    -- "prevent all damage that would be dealt to you and creatures you control
-    -- this turn" -- and they are written as TWO of these effects. CR 120.3's
-    -- recipient is a player or a permanent, so the two legs never admit the same
-    -- damage event, and CR 615.1's shield has no amount for them to share: two
-    -- rows prevent exactly the damage one two-legged row would. CR 615.7's
-    -- countdown is where that argument fails, its counted amount being the shared
-    -- thing, which is why the field lives there and not here.
     whatRecipient :: Maybe (Filter.Filter Keyword.Keyword),
+    -- | The PLAYER half of that same description -- Comeuppance's "dealt to you"
+    -- -- as CR 109.5's relation, DISJOINED with @whatRecipient@ on the one row
+    -- this installs, as Pawl.Types.PreventNextDamage's field of the same name
+    -- is. One row rather than two because CR 615.5's rider runs per application
+    -- per source: one source hitting you and your planeswalker at once is one
+    -- application of Comeuppance's shield, and Pawl.DamageReplacementSpec's
+    -- Comeuppance group proves the rider runs once for it. Read on the DealtTo
+    -- side only, like @chosenSource@.
+    whoRecipient :: Maybe PlayerRelation.PlayerRelation,
     -- | Which SIDE of the damage event the objects @ref@ names sit on -- the
     -- recipients (Inkshield, Selfless Squire) or the SOURCE (Dovin, Hand of
     -- Control's "and dealt by target permanent"). DealtTo for every shield that

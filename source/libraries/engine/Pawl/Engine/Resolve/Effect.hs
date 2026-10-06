@@ -7692,7 +7692,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               State.modify' $ \g0 ->
                 let amount = Integer.toNaturalSaturating n
                  in List.foldl' (installDamageRow legal (Filter.slotObjects context) controller source duration kind (DamageRewrite.PreventNext amount) Uses.Unlimited rider (Filter.Type.And []) describedRecipient) g0 (fmap (\recipient -> (recipient, sourceChoice)) rows)
-  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration kind ref whatRecipient direction sourceFilter printedSource riderEffects) -> do
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration kind ref whatRecipient whoRecipient direction sourceFilter printedSource riderEffects) -> do
     -- CR 615.1 / 615.3: one floating shield per object the ref names, with no
     -- amount to count down. PreventNextDamage's row but for its rewrite, hence
     -- the shared `installDamageRow`; CR 615.7's "reduced to 0" terminator does
@@ -7701,7 +7701,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- 120.1a); the source side is an ObjectId and needs no such translation.
     --
     -- ONE ROW ALTOGETHER for a card that DESCRIBES its recipients instead (Pack
-    -- Leader's "to Dogs you control"), PreventNextDamage's split exactly: CR
+    -- Leader's "to Dogs you control", Comeuppance's "to you and planeswalkers you
+    -- control"), PreventNextDamage's split exactly: CR
     -- 611.2c leaves that set live, so the row carries the predicate and
     -- Replacement re-asks it at each damage event rather than sweeping it here.
     -- A DealtTo card writing both spellings is read as the description alone;
@@ -7723,7 +7724,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- The empty `ref` is what tells it apart from CR 608.2b's gone target,
         -- which is a card that DID name a recipient and lost it: that one keeps
         -- installing nothing.
-        rows = if Maybe.isJust whatRecipient || Maybe.isNothing ref then [Nothing] else fmap Just recipients
+        rows = if Maybe.isJust whatRecipient || Maybe.isJust whoRecipient || Maybe.isNothing ref then [Nothing] else fmap Just recipients
         -- CR 615.5's additional effect. With no amount to count down, "this way"
         -- is what THIS application prevented, which Prevention.amounts carries.
         rider = preventionRider chosen controller source riderEffects
@@ -7775,7 +7776,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- stricter than printed rather than weaker, which a row watching
             -- every source would be.
             (Just _, Nothing) -> pure ()
-            _ -> State.modify' $ \g0 -> List.foldl' (installDamageRow legal (Filter.slotObjects context) controller source duration kind DamageRewrite.PreventAll Uses.Unlimited rider printedSource (whatRecipient, Nothing)) g0 (fmap (\recipient -> (recipient, sourceChoice)) rows)
+            _ -> State.modify' $ \g0 -> List.foldl' (installDamageRow legal (Filter.slotObjects context) controller source duration kind DamageRewrite.PreventAll Uses.Unlimited rider printedSource (whatRecipient, whoRecipient)) g0 (fmap (\recipient -> (recipient, sourceChoice)) rows)
   Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance duration ref sourceFilter riderEffects) -> do
     -- CR 615.8: install a shield that prevents ONE instance of damage from the
     -- chosen source. The rewrite is PreventAll -- "regardless of how much damage
@@ -10359,31 +10360,30 @@ runPreventionRiders runSubgame = do
 -- One queued prevention's additional effect; nothing runs unless the prevention
 -- carries a rider.
 --
--- CR 615.5's "amount of damage that was prevented" is the SUM over the
--- recipients this one application covered, rule 615.13 counting the application
--- and not the recipients (Divine Deflection throws one lot of 3, not a 2 and a
--- 1). A Quantity.InSlot read of the reserved Binding.eventAmount slot, published through
--- GameState.ambientAmounts rather than bound onto an object, because the shielded
--- recipient may be a PLAYER. Restored rather than cleared, so this cannot clobber
--- an outer amount.
---
--- CR 120.1's source of the prevented damage -- Deflecting Palm's "that source"
--- -- is bound under the reserved Binding.preventedDamageSource beside the
--- rider's own slots: an object, so unlike the amount it has somewhere to be
--- bound. Not implemented: an application covering several sources binds one
--- of them (#2287).
+-- Run ONCE PER SOURCE the application covered, ascending by id, each run with
+-- that source bound under the reserved Binding.preventedDamageSource and that
+-- source's own amount: Comeuppance deals each attacker the damage prevented from
+-- it, and Deflecting Palm's "that source's controller" reads the one source
+-- bound. CR 615.5's "amount of damage that was prevented" is the SUM over the
+-- recipients this application covered from that source, rule 615.13 counting
+-- the application and not the recipients (Divine Deflection throws one lot of
+-- 3, not a 2 and a 1). The amount is a Quantity.InSlot read of the reserved
+-- Binding.eventAmount slot, published through GameState.ambientAmounts rather
+-- than bound onto an object, because the shielded recipient may be a PLAYER.
+-- Restored rather than cleared, so this cannot clobber an outer amount.
 --
 -- `resolving` and `source` are both the rider's own source (CR 113.7). Every slot
 -- the rider names is treated as a LEGAL target, CR 608.2b having been applied
 -- when the installing spell resolved.
 runPreventionRider :: Game Result -> Prevention.Prevention -> Game ()
-runPreventionRider runSubgame prevention = Foldable.for_ (Prevention.rider prevention) $ \rider -> do
-  was <- State.gets GameState.ambientAmounts
-  State.modify' (\gs -> gs {GameState.ambientAmounts = Map.insert Binding.eventAmount (sum (Prevention.amounts prevention)) was})
-  let targets = Map.insert Binding.preventedDamageSource (Set.singleton (Recipient.ToObject (Prevention.source prevention))) (PreventionRider.targets rider)
-      src = PreventionRider.source rider
-  Monad.void (runCarrying runSubgame src (PreventionRider.controller rider) Map.empty targets (PreventionRider.effects rider))
-  State.modify' (\gs -> gs {GameState.ambientAmounts = was})
+runPreventionRider runSubgame prevention = Foldable.for_ (Prevention.rider prevention) $ \rider ->
+  Foldable.for_ (Map.toAscList (Prevention.amounts prevention)) $ \(damager, share) -> do
+    was <- State.gets GameState.ambientAmounts
+    State.modify' (\gs -> gs {GameState.ambientAmounts = Map.insert Binding.eventAmount (sum share) was})
+    let targets = Map.insert Binding.preventedDamageSource (Set.singleton (Recipient.ToObject damager)) (PreventionRider.targets rider)
+        src = PreventionRider.source rider
+    Monad.void (runCarrying runSubgame src (PreventionRider.controller rider) Map.empty targets (PreventionRider.effects rider))
+    State.modify' (\gs -> gs {GameState.ambientAmounts = was})
 
 -- CR 614.1c: run the effects of every as-enters rewrite that has applied and not
 -- run yet. Drains GameState.pendingEntryEffects, which Pawl.Engine.Event filled

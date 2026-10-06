@@ -10,6 +10,7 @@ import qualified Pawl.Codec.Duration as Duration
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.ObjectRef as ObjectRef
+import qualified Pawl.Codec.PlayerRelation as PlayerRelation
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
@@ -37,6 +38,7 @@ codec effectCodec = Fields.object $ do
   kind <- Fields.defaulted "kind" Nothing (Common.maybe DamageKind.codec) PreventAllDamage.kind
   ref <- Fields.defaulted "ref" Nothing (Common.maybe ObjectRef.codec) PreventAllDamage.ref
   whatRecipient <- Fields.defaulted "whatRecipient" Nothing (Common.maybe (Filter.codec Keyword.codec)) PreventAllDamage.whatRecipient
+  whoRecipient <- Fields.defaulted "whoRecipient" Nothing (Common.maybe PlayerRelation.codec) PreventAllDamage.whoRecipient
   direction <- Fields.defaulted "direction" DamageDirection.DealtTo DamageDirection.codec PreventAllDamage.direction
   chosenSource <- Fields.defaulted "chosenSource" Nothing (Common.maybe (Filter.codec Keyword.codec)) PreventAllDamage.chosenSource
   whatSource <- Fields.defaulted "whatSource" (Filter.And []) (Filter.codec Keyword.codec) PreventAllDamage.whatSource
@@ -47,6 +49,7 @@ codec effectCodec = Fields.object $ do
         PreventAllDamage.kind = kind,
         PreventAllDamage.ref = ref,
         PreventAllDamage.whatRecipient = whatRecipient,
+        PreventAllDamage.whoRecipient = whoRecipient,
         PreventAllDamage.direction = direction,
         PreventAllDamage.chosenSource = chosenSource,
         PreventAllDamage.whatSource = whatSource,

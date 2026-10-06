@@ -127,9 +127,9 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented (CandidateId.OfFloating (FloatingCandidate.MkFloatingCandidate (ObjectId.MkObjectId 4) (Timestamp.MkTimestamp 6))) (ObjectId.MkObjectId 9) (Map.singleton (Recipient.ToPlayer (PlayerId.MkPlayerId 1)) 3)))
-      ( "{\"type\":\"DamagePrevented\",\"value\":{\"by\":{\"type\":\"OfFloating\",\"value\":{\"source\":4,\"timestamp\":6}},\"source\":9,"
-          <> "\"amounts\":[{\"key\":{\"type\":\"ToPlayer\",\"value\":1},\"value\":3}]}}"
+      (GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented (CandidateId.OfFloating (FloatingCandidate.MkFloatingCandidate (ObjectId.MkObjectId 4) (Timestamp.MkTimestamp 6))) (Map.singleton (ObjectId.MkObjectId 9) (Map.singleton (Recipient.ToPlayer (PlayerId.MkPlayerId 1)) 3))))
+      ( "{\"type\":\"DamagePrevented\",\"value\":{\"by\":{\"type\":\"OfFloating\",\"value\":{\"source\":4,\"timestamp\":6}},"
+          <> "\"amounts\":[{\"key\":9,\"value\":[{\"key\":{\"type\":\"ToPlayer\",\"value\":1},\"value\":3}]}]}}"
       )
   Spec.it s "StepBegan" $
     Common.assertCodec
