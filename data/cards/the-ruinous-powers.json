@@ -1,0 +1,178 @@
+{
+  "faces": [
+    {
+      "delayedAbilities": {
+        "its owner loses life": {
+          "condition": {
+            "type": "SpellCast",
+            "value": {
+              "filter": {
+                "type": "And",
+                "value": [
+                  {
+                    "type": "ControlledBy",
+                    "value": {
+                      "type": "You"
+                    }
+                  },
+                  {
+                    "type": "IsBound",
+                    "value": "exiled"
+                  }
+                ]
+              },
+              "scope": {
+                "type": "EachTurn"
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "LoseLife",
+                        "value": {
+                          "player": {
+                            "type": "OwnerOfBound",
+                            "value": "exiled"
+                          },
+                          "quantity": {
+                            "type": "AgainstSlot",
+                            "value": {
+                              "quantity": {
+                                "type": "ManaValue"
+                              },
+                              "slot": "exiled"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "The Ruinous Powers",
+      "oracleText": "At the beginning of your upkeep, choose an opponent at random. Exile the top card of that player's library. Until end of turn, you may play that card and you may spend mana as though it were mana of any color to cast it. When you cast a spell this way, its owner loses life equal to its mana value.",
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "StepBegins",
+            "value": {
+              "phase": {
+                "type": "Beginning",
+                "value": {
+                  "type": "Upkeep"
+                }
+              },
+              "scope": {
+                "type": "ControllersTurn"
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "ChoosePlayerAtRandom",
+                        "value": {
+                          "scope": {
+                            "type": "Opponents"
+                          },
+                          "slot": "opponent"
+                        }
+                      },
+                      {
+                        "type": "MoveToZone",
+                        "value": {
+                          "ref": {
+                            "type": "TopOfLibrary",
+                            "value": {
+                              "count": {
+                                "type": "Literal",
+                                "value": 1
+                              },
+                              "player": {
+                                "type": "InSlot",
+                                "value": "opponent"
+                              }
+                            }
+                          },
+                          "slot": "exiled",
+                          "zone": {
+                            "type": "Exile"
+                          }
+                        }
+                      },
+                      {
+                        "type": "GrantPlayFromExile",
+                        "value": {
+                          "duration": {
+                            "type": "UntilEndOfTurn"
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "exiled"
+                          },
+                          "spending": {
+                            "type": "AnyColor"
+                          }
+                        }
+                      },
+                      {
+                        "type": "ArmDelayedTrigger",
+                        "value": {
+                          "name": "its owner loses life"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}

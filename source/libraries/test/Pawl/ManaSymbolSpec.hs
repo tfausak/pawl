@@ -575,6 +575,19 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
           (Mana.spend [] ManaSpending.AsProduced 0 (ManaCost.MkManaCost [twoOrRed]) (Mana.Type.MkMana [red, colorless, colorless]))
           (Just (Mana.Type.MkMana [colorless, colorless], 0))
 
+  -- CR 609.4b's "as though it were mana of any color", which The Ruinous
+  -- Powers grants on its exiled card: a colorless unit pays {U}, and a red one
+  -- still cannot pay {C}, where ManaSpending.AnyType would let it.
+  Spec.it s "CR 609.4b mana spent as though it were of any color pays {U} with {C} but not {C} with {R}" $ do
+    let unitOf t = ManaUnit.MkManaUnit {ManaUnit.manaType = t, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing}
+        costOf t = ManaCost.MkManaCost [ManaSymbol.OfType t]
+        pool t = Mana.Type.MkMana [unitOf t]
+        spentUnder spending demand supply = fmap fst (Mana.spend [] spending 0 (costOf demand) (pool supply))
+    Spec.assertEqWith s "{C} pays {U} under any color" (spentUnder ManaSpending.AnyColor (ManaType.Colored Color.Blue) ManaType.Colorless) (Just (Mana.Type.MkMana []))
+    Spec.assertEqWith s "{R} does not pay {C} under any color" (spentUnder ManaSpending.AnyColor ManaType.Colorless (ManaType.Colored Color.Red)) Nothing
+    Spec.assertEqWith s "{R} pays {C} under any type" (spentUnder ManaSpending.AnyType ManaType.Colorless (ManaType.Colored Color.Red)) (Just (Mana.Type.MkMana []))
+    Spec.assertEqWith s "{C} does not pay {U} as produced" (spentUnder ManaSpending.AsProduced (ManaType.Colored Color.Blue) ManaType.Colorless) Nothing
+
   -- CR 601.2b: "If a cost that will be paid as the spell is being cast
   -- includes hybrid mana symbols, the player announces the nonhybrid
   -- equivalent cost they intend to pay." CR 118.13a places that as the

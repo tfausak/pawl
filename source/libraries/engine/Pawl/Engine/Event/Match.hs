@@ -572,7 +572,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           let entrant = ZoneChange.object zc
            in case postEventView board gs entrant of
                 Nothing -> False
-                Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view f
+                Just view -> Filter.matches bearerContext view f
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
@@ -1435,7 +1435,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
         && ( let damager = DamageEvent.source ev
               in case postEventView board gs damager of
                    Nothing -> False
-                   Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view (PermanentDealsCombatDamageToPlayer.filter p)
+                   Just view -> Filter.matches bearerContext view (PermanentDealsCombatDamageToPlayer.filter p)
            )
     GameEvent.Moved {} -> False
     GameEvent.StepBegan {} -> False
@@ -2569,7 +2569,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
       | oid == bearer ->
           let admits attacked = case Projection.viewWithLastKnown bearer gs attacked of
                 Nothing -> False
-                Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view f
+                Just view -> Filter.matches bearerContext view f
            in case target of
                 AttackTarget.OfPlayer _ -> False
                 AttackTarget.OfPlaneswalker attacked -> admits attacked
@@ -2675,7 +2675,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
       | count == 1 ->
           case Projection.viewWithLastKnown attacker gs attacker of
             Nothing -> False
-            Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view f
+            Just view -> Filter.matches bearerContext view f
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BecameBlocking {} -> False
     GameEvent.BlocksDeclared {} -> False
@@ -2872,7 +2872,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared attacker _ _ _ _) ->
       case Projection.viewWithLastKnown attacker gs attacker of
         Nothing -> False
-        Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view f
+        Just view -> Filter.matches bearerContext view f
     GameEvent.BecameBlocking {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
@@ -3651,7 +3651,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- card in the pool reaches that.
   TriggerCondition.SelfAttacksWhile condition ->
     matchesTriggerGiven bindings board gs bearer you (TriggerCondition.SelfAttacks TriggerFrequency.EveryTime) event
-      && Condition.holds (Projection.viewWithLastKnownAnywhere gs) (SourceContext.sourceContext gs (Just you) bearer) gs bearer condition
+      && Condition.holds (Projection.viewWithLastKnownAnywhere gs) bearerContext gs bearer condition
   -- CR 702.171b: SelfAttacks' declaration event, narrowed by the bearer
   -- carrying the saddled designation AT THAT MOMENT. Read off
   -- Object.designations rather than through the projection, rule 702.171b
@@ -3840,7 +3840,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared blocker _) ->
       case Projection.viewWithLastKnown blocker gs blocker of
         Nothing -> False
-        Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view f
+        Just view -> Filter.matches bearerContext view f
     GameEvent.BecameBlocking {} -> False
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
@@ -3950,7 +3950,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           let attacker = BecameBlocking.attacker b
            in case Projection.viewWithLastKnown attacker gs attacker of
                 Nothing -> False
-                Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view f
+                Just view -> Filter.matches bearerContext view f
     GameEvent.BecameBlocking {} -> False
     -- CR 509.3a's grouped event is the once-per-combat one, and matching it here
     -- would lose a blocker's second attacker.
@@ -4150,7 +4150,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   TriggerCondition.SelfBlocksOneOrMore f -> case event of
     GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared blocker _)
       | blocker == bearer ->
-          let admits attacker = maybe False (\view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view f) (Projection.viewWithLastKnown attacker gs attacker)
+          let admits attacker = maybe False (\view -> Filter.matches bearerContext view f) (Projection.viewWithLastKnown attacker gs attacker)
               blocked =
                 fmap
                   fst
@@ -4360,7 +4360,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
       | attacker == bearer ->
           case Projection.viewWithLastKnown blocker gs blocker of
             Nothing -> False
-            Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view f
+            Just view -> Filter.matches bearerContext view f
     GameEvent.BecameBlocking {} -> False
     GameEvent.BlocksDeclared {} -> False
     -- The GROUPED event is CR 509.3c's, and matching it here would collapse two
@@ -4464,7 +4464,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.attacker = attacker}) ->
       case Projection.viewWithLastKnown attacker gs attacker of
         Nothing -> False
-        Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view f
+        Just view -> Filter.matches bearerContext view f
     GameEvent.BlocksDeclared {} -> False
     -- The GROUPED event is CR 509.3c's, and matching it here would collapse two
     -- blockers into one trigger.
@@ -4568,7 +4568,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- the same batch -- and a batch is one Resolve.Create's tokens, minted from one
   -- spec, which no Filter can tell apart.
   TriggerCondition.SelfBecomesBlockedByOneOrMore f ->
-    let admits blocker = maybe False (\view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view f) (Projection.viewWithLastKnown blocker gs blocker)
+    let admits blocker = maybe False (\view -> Filter.matches bearerContext view f) (Projection.viewWithLastKnown blocker gs blocker)
      in case event of
           GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked attacker _ _)
             | attacker == bearer -> any admits (Set.toList (Map.findWithDefault Set.empty bearer (Combat.blockers (GameState.combat gs))))
@@ -5425,7 +5425,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
             && let arrived = ZoneChange.object zc
                 in case Projection.viewWithLastKnown arrived gs arrived of
                      Nothing -> False
-                     Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view f
+                     Just view -> Filter.matches bearerContext view f
      in case event of
           GameEvent.Moved (Moved.MkMoved zc _ _ _ _) -> admits zc
           GameEvent.CardArrived zc -> admits zc
@@ -5635,7 +5635,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           let deceased = ZoneChange.departed zc
            in case Projection.viewWithLastKnown deceased gs deceased of
                 Nothing -> False
-                Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view f
+                Just view -> Filter.matches bearerContext view f
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
@@ -5999,7 +5999,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   TriggerCondition.PermanentsBecomeTapped f -> case event of
     GameEvent.BecameTapped tapped -> case Map.lookup tapped board of
       Nothing -> False
-      Just candidate -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) (Projection.sampledView tapped candidate gs) f
+      Just candidate -> Filter.matches bearerContext (Projection.sampledView tapped candidate gs) f
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
     GameEvent.ManaAdded _ -> False
@@ -6402,7 +6402,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
         | PlayerRelation.holds (Game.teams gs) relation you tapper && producedSpecified gs bearer specified (TappedForMana.mana tapped) ->
             case Projection.viewWithLastKnown (TappedForMana.permanent tapped) gs (TappedForMana.permanent tapped) of
               Nothing -> False
-              Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view f
+              Just view -> Filter.matches bearerContext view f
         | otherwise -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
@@ -6495,7 +6495,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
       | PlayerRelation.holds (Game.teams gs) relation you (ManaAdded.player added) && producedSpecified gs bearer specified (ManaAdded.mana added) ->
           case Projection.viewWithLastKnown (ManaAdded.source added) gs (ManaAdded.source added) of
             Nothing -> False
-            Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view f
+            Just view -> Filter.matches bearerContext view f
       | otherwise -> False
     GameEvent.TappedForMana _ -> False
     GameEvent.ManaAbilityResolved _ -> False
@@ -6797,7 +6797,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   TriggerCondition.PermanentLeavesTheBattlefield f ->
     let admits departed = case Projection.viewWithLastKnown departed gs departed of
           Nothing -> False
-          Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view f
+          Just view -> Filter.matches bearerContext view f
      in case event of
           GameEvent.Moved (Moved.MkMoved zc _ _ _ _)
             | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc /= Zone.Battlefield ->
@@ -6909,7 +6909,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   TriggerCondition.PermanentReturnedToHand f ->
     let admits departed = case Projection.viewWithLastKnown departed gs departed of
           Nothing -> False
-          Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view f
+          Just view -> Filter.matches bearerContext view f
      in case event of
           GameEvent.Moved (Moved.MkMoved zc _ _ _ _)
             | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Hand ->
@@ -7247,7 +7247,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
             && let arrived = ZoneChange.object zc
                 in case Projection.viewWithLastKnown arrived gs arrived of
                      Nothing -> False
-                     Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view f
+                     Just view -> Filter.matches bearerContext view f
      in case event of
           GameEvent.Moved (Moved.MkMoved zc _ _ _ _) -> admits zc
           GameEvent.CardArrived zc -> admits zc
@@ -7680,7 +7680,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
         && ( let damager = DamagePrevented.source prevented
               in case Projection.viewWithLastKnown damager gs damager of
                    Nothing -> False
-                   Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view f
+                   Just view -> Filter.matches bearerContext view f
            )
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
@@ -8252,7 +8252,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.CountersPut (CounterChange.MkCounterChange oid kind _ _)
       | kind == wanted -> case Projection.viewWithLastKnown oid gs oid of
           Nothing -> False
-          Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view f
+          Just view -> Filter.matches bearerContext view f
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -8376,7 +8376,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
             -- event happened in this same settle, so the phase standing now is
             -- its phase.
             && maybe True (`Turn.inWindow` GameState.phase gs) window
-            && Filter.matches (SourceContext.sourceContext gs (Just you) bearer) (Projection.viewOfSpell controller spell gs) f
+            && Filter.matches bearerContext (Projection.viewOfSpell controller spell gs) f
      in case event of
           GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _ castFrom _) -> case Game.lookupObject spell gs of
             Nothing -> False
@@ -8390,7 +8390,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
                 -- Clarion Spirit's "your SECOND spell each turn", asked LAST so the
                 -- log walk happens only for a cast the rest of the condition
                 -- already admits.
-                && maybe True (castOrdinal (SourceContext.sourceContext gs (Just you) bearer) f fromZone spell gs ==) ordinal
+                && maybe True (castOrdinal bearerContext f fromZone spell gs ==) ordinal
           -- Magecraft's "or copy" (CR 707.10): the player who copied the spell,
           -- the copy's controller, is the one whose "you copy" this is -- not
           -- the copied spell's. data/scenarios/copy's
@@ -8816,7 +8816,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
         Nothing -> False
         Just candidate ->
           maybe True (== BecameTarget.kind t) (PermanentsBecomeTargeted.kind c)
-            && Filter.matches (SourceContext.sourceContext gs (Just you) bearer) (Projection.sampledView oid candidate gs) (PermanentsBecomeTargeted.filter c)
+            && Filter.matches bearerContext (Projection.sampledView oid candidate gs) (PermanentsBecomeTargeted.filter c)
     GameEvent.BecameAttached {} -> False
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
@@ -9242,7 +9242,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
                       (Transformed.characteristics transformed)
                       live {Filter.controller = Transformed.controller transformed}
                in Filter.matches
-                    (SourceContext.sourceContext gs (Just you) bearer)
+                    bearerContext
                     sampled {Filter.attachedViews = Maybe.mapMaybe (Projection.viewWithLastKnownAnywhere gs) (Set.toAscList (Transformed.attachments transformed))}
                     f
     GameEvent.TurnedFaceUp _ -> False
@@ -9360,7 +9360,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   TriggerCondition.PermanentTurnedFaceUp f -> case event of
     GameEvent.TurnedFaceUp t -> case Projection.viewWithLastKnown (TurnedFaceUp.object t) gs (TurnedFaceUp.object t) of
       Nothing -> False
-      Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view f
+      Just view -> Filter.matches bearerContext view f
     GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
@@ -9450,7 +9450,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   TriggerCondition.PermanentTurnedFaceDown f -> case event of
     GameEvent.TurnedFaceDown oid -> case Projection.viewWithLastKnown oid gs oid of
       Nothing -> False
-      Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view f
+      Just view -> Filter.matches bearerContext view f
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
@@ -10102,7 +10102,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- gone and filed no last known information, about which no Filter can answer.
   TriggerCondition.CreatureExploits (CreatureExploits.MkCreatureExploits exploiterFilter exploitedFilter) -> case event of
     GameEvent.Exploited (Exploited.MkExploited exploiter exploited) ->
-      let context = SourceContext.sourceContext gs (Just you) bearer
+      let context = bearerContext
           admits oid f = maybe False (\view -> Filter.matches context view f) (Projection.viewWithLastKnown oid gs oid)
        in admits exploiter exploiterFilter && admits exploited exploitedFilter
     GameEvent.Trained _ -> False
@@ -10385,7 +10385,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
       | got /= wanted -> False
       | otherwise -> case Projection.viewWithLastKnown oid gs oid of
           Nothing -> False
-          Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view f
+          Just view -> Filter.matches bearerContext view f
     GameEvent.Evolved _ -> False
     GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
@@ -10601,7 +10601,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           let victim = PermanentWasSacrificed.permanent ev
            in case Projection.viewWithLastKnown victim gs victim of
                 Nothing -> False
-                Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view f
+                Just view -> Filter.matches bearerContext view f
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -12374,7 +12374,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Plotted _ -> False
     GameEvent.Explored explorer -> case Projection.viewWithLastKnown explorer gs explorer of
       Nothing -> False
-      Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view f
+      Just view -> Filter.matches bearerContext view f
     GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
@@ -12470,7 +12470,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Explored _ -> False
     GameEvent.Connived conniver -> case Projection.viewWithLastKnown conniver gs conniver of
       Nothing -> False
-      Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view f
+      Just view -> Filter.matches bearerContext view f
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -12648,7 +12648,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
       Recipient.objectOf (BecameAttached.host a) == Just bearer
         && ( case Projection.viewWithLastKnown (BecameAttached.attachment a) gs (BecameAttached.attachment a) of
                Nothing -> False
-               Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view f
+               Just view -> Filter.matches bearerContext view f
            )
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
@@ -12753,7 +12753,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
                Nothing -> False
                Just host -> case Projection.viewWithLastKnown host gs host of
                  Nothing -> False
-                 Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view f
+                 Just view -> Filter.matches bearerContext view f
            )
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
@@ -12854,7 +12854,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
                Nothing -> False
                Just host -> case Projection.viewWithLastKnown host gs host of
                  Nothing -> False
-                 Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view f
+                 Just view -> Filter.matches bearerContext view f
            )
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
@@ -13878,6 +13878,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
+  where
+    -- CR 603.7c: a delayed ability's filters read the objects its creating
+    -- effect named, The Ruinous Powers' "a spell [cast] this way". `bindings`
+    -- is empty for every other trigger, so their slot atoms stay vacuous.
+    bearerContext = (SourceContext.sourceContext gs (Just you) bearer) {Filter.slotObjects = Binding.slotObjects bindings}
 
 -- CR 106.12a's second half: did an activation that produced @produced@ produce
 -- the mana this condition specified? The narrowing half of the

@@ -53,6 +53,7 @@ import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CostReduction as CostReduction
+import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.DuringPhase as DuringPhase
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
@@ -2552,21 +2553,29 @@ choosePlayPermission pid oid options = case options of
 -- to have named anything, and for CR 608.2g's offer, which binds the spell
 -- through Pawl.Types.OfferCast's `slot` instead.
 --
--- The floating replacement store is the only captured environment rewritten. A
--- delayed triggered ability captures one too (Pawl.Types.DelayedTrigger); not
--- implemented there (#1961). Elkin Lair arms one beside its grant, and cannot
--- observe the gap: its one read of a played card is Quantity.PlayedBy,
--- which GameState.cardsPlayed answers for either incarnation.
+-- Both captured environments the granting effect can leave behind are
+-- rewritten: the floating replacement store's, and a delayed triggered
+-- ability's (CR 603.7c), The Ruinous Powers' "when you cast a spell this way,
+-- its owner loses life equal to its mana value". Proved by the scenario
+-- cr-400-7h-a-delayed-trigger-armed-beside-the-grant-follows-the-spell.
 followIntoSpell :: Maybe ExilePlayPermission.ExilePlayPermission -> ObjectId -> ObjectId -> GameState -> GameState
 followIntoSpell permission old new gs = case permission of
   Nothing -> gs
   Just granted ->
     let rename oid = if oid == old then new else oid
+        grantedBy = (== ExilePlayPermission.source granted)
         follow row
-          | ActiveReplacement.source row == ExilePlayPermission.source granted =
+          | grantedBy (ActiveReplacement.source row) =
               row {ActiveReplacement.slots = fmap (Set.map rename) (ActiveReplacement.slots row)}
           | otherwise = row
-     in gs {GameState.replacements = fmap follow (GameState.replacements gs)}
+        followDelayed entry
+          | grantedBy (DelayedTrigger.source entry) =
+              entry {DelayedTrigger.bindings = fmap (Binding.renameObject old new) (DelayedTrigger.bindings entry)}
+          | otherwise = entry
+     in gs
+          { GameState.replacements = fmap follow (GameState.replacements gs),
+            GameState.delayedTriggers = fmap followDelayed (GameState.delayedTriggers gs)
+          }
 
 -- CR 702.33g/702.113b's own scope: a Quantity naming a CAST-ANNOUNCEMENT fact
 -- rather than a board or resolution one -- Quantity.WasKicked (CR 702.33d's
