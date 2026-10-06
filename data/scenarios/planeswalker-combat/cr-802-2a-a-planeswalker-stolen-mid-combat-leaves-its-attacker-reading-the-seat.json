@@ -32,7 +32,8 @@
             "ready": true
           },
           {
-            "card": "Island"
+            "card": "Island",
+            "label": "bi0"
           },
           {
             "card": "Island",
@@ -137,8 +138,8 @@
             "$confiscate"
           ],
           "mana": [
+            "$bi0",
             "$bi1",
-            "$bi2",
             null
           ]
         }
