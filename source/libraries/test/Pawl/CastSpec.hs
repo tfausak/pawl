@@ -4481,12 +4481,14 @@ keptFaceDownSpec s registry = Spec.describe s "KeptFaceDown" $ do
   let label = Label.MkLabel . Text.pack
       idOf name built = maybe (Spec.assertFailure s ("no " <> name)) pure (Map.lookup (label name) (Staged.objects built))
       -- alice's main phase: Synthetic Wellspring Growth on `land`, `mine` beside
-      -- it, `held` in hand, and Thunderous Wrath on top of three Pikers.
-      board land mine held =
+      -- it, `held` in hand, and `top` on three Pikers -- Thunderous Wrath unless
+      -- said otherwise.
+      board = boardTopped "Thunderous Wrath"
+      boardTopped top land mine held =
         let alice =
               (S.battlefield S.alice ([S.ready (S.aliased "land" (S.permanent land)), (S.permanent "Synthetic Wellspring Growth") {Placement.attached = Just (label "land")}] <> mine))
                 { Seat.hand = Seq.fromList (fmap (\(alias, name) -> S.aliased alias (S.cardSetup name)) held),
-                  Seat.library = Seq.fromList (S.cardSetup "Thunderous Wrath" : replicate 3 (S.cardSetup "Goblin Piker"))
+                  Seat.library = Seq.fromList (S.cardSetup top : replicate 3 (S.cardSetup "Goblin Piker"))
                 }
          in S.board (alice NonEmpty.:| [S.battlefield S.bob [S.aliased "victim" (S.permanent "Goblin Piker")]]) S.alice S.precombatMain
       -- Pays with `source` alone, discards a card `pick` names if one is offered,
@@ -4569,6 +4571,27 @@ keptFaceDownSpec s registry = Spec.describe s "KeptFaceDown" $ do
         Spec.assertEqWith s "the Wrath was the card discarded" (length (wrathIn Zone.Graveyard after)) 1
         Spec.assertEqWith s "and the Piker stayed in hand" (Game.zoneMembers Zone.Hand S.alice after) [piker]
       abilities -> Spec.assertFailure s ("expected one ability on Netter en-Dal, got " <> show (length abilities))
+  -- CR 121.8's "no characteristics" reaches the abilities a card states for a
+  -- hand: Progenitus's "would be put into a graveyard from anywhere" row. Drawn
+  -- face down and discarded to Netter en-Dal's cost, it has no such row, so it
+  -- stays in the graveyard; the control holds it from the start, where the row
+  -- shuffles it into the library.
+  let progenitusIn zone gs = filter (named "Progenitus" gs) (Game.zoneMembers zone S.alice gs)
+      discardProgenitus top held = do
+        built <- S.buildBoardOrFail s registry (boardTopped top "Plains" [S.ready (S.aliased "netter" (S.permanent "Netter en-Dal"))] held)
+        land <- idOf "land" built
+        piker <- idOf "piker" built
+        netter <- idOf "netter" built
+        let gs = Staged.state built
+        case Activatable.abilitiesFor netter gs of
+          [ability] -> pure (S.runPure (answerer land (/= piker)) gs (Activate.activateAbility S.alice netter ability))
+          abilities -> Spec.assertFailure s ("expected one ability on Netter en-Dal, got " <> show (length abilities))
+  Spec.it s "CR 121.8 a face-down Progenitus discarded mid-activation has no graveyard replacement" $ do
+    after <- discardProgenitus "Progenitus" [("piker", "Goblin Piker")]
+    Spec.assertEqWith s "Progenitus stays in alice's graveyard: with no characteristics it had no row to apply" (length (progenitusIn Zone.Graveyard after)) 1
+  Spec.it s "CR 121.8 a face-down Progenitus discarded mid-activation has no graveyard replacement (control)" $ do
+    after <- discardProgenitus "Goblin Piker" [("piker", "Goblin Piker"), ("progenitus", "Progenitus")]
+    Spec.assertEqWith s "held from the start, Progenitus's row shuffles it into the library instead" (length (progenitusIn Zone.Library after), length (progenitusIn Zone.Graveyard after)) (1, 0)
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do

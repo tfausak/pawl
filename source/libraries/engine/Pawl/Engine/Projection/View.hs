@@ -1416,10 +1416,8 @@ spellFaceOf oid gs =
 -- storing no copy effect skips copiableSnapshotOf's lookups.
 --
 -- Nothing for a card CR 121.8 keeps face down, baseCharacteristics' reason: it
--- has no abilities to read. A REGRESSION FENCE: no card in data/cards has an
--- ability that functions in a hand while a payment is under way, so dropping the
--- guard leaves the suite green; a drawn Simian Spirit Guide is the card that
--- would observe it.
+-- has no abilities to read, including a row it states for a hand.
+-- Pawl.CastSpec's face-down Progenitus pair proves it.
 abilityFaceOf :: ObjectId -> Object.Object -> GameState -> Maybe (Face.Face Card.Type.Card)
 abilityFaceOf oid obj gs
   | Game.keptFaceDown oid gs = Nothing
