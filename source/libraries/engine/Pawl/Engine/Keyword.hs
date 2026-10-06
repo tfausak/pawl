@@ -3611,8 +3611,8 @@ morphCosts keywords =
         _ -> Nothing
    in Set.toAscList (Set.fromList (Maybe.mapMaybe costOf (Set.toAscList keywords)))
 
--- CR 702.168a / 702.168d: the DISGUISE cost -- what a face-down permanent's
--- controller pays to turn it face up as CR 116.2b's special action -- or Nothing
+-- CR 702.168a / 702.168d: the DISGUISE costs -- what a face-down permanent's
+-- controller may pay to turn it face up as CR 116.2b's special action -- empty
 -- when the card has no disguise ability. NOT the cost of the disguise CAST,
 -- which rule 702.168a fixes at {3} for every printing, so that one comes from
 -- Cost.faceDownCost as morph's does.
@@ -3626,15 +3626,15 @@ morphCosts keywords =
 -- abilities is turnable by either procedure at either cost, and one function
 -- answering for both would charge whichever the Set happened to hold first.
 --
--- ONE cost per card: the ascending-least printed instance. Not implemented: a
--- card printing disguise twice at two costs, whose dearer cost is unreachable
--- (#1831).
-disguiseCost :: Set Keyword -> Maybe (Cost Keyword)
-disguiseCost keywords =
+-- A LIST for morphCosts' reason: rule 702.168 states no limit on how many
+-- disguise abilities a card has (Synthetic Twice-Masked Envoy). Distinct costs
+-- only.
+disguiseCosts :: Set Keyword -> [Cost Keyword]
+disguiseCosts keywords =
   let costOf keyword = case keyword of
         Keyword.Disguise cost -> Just cost
         _ -> Nothing
-   in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
+   in Set.toAscList (Set.fromList (Maybe.mapMaybe costOf (Set.toAscList keywords)))
 
 -- CR 601.2b: the OPTIONAL additional cost this keyword ability lets its spell's
 -- controller pay as they cast it, paired with how many times its rule lets it be
@@ -3845,12 +3845,12 @@ escalateCosts keywords =
 -- Nothing when the card has no buyback. Offered at CR 601.2b and added to
 -- whichever candidate cost was announced (CR 601.2f).
 --
--- A Maybe where optionalCosts above is a list, disguiseCost's shape: rule 702.27a
--- states one cost and one payment of it, and Scryfall kw:buyback, 2026-09-07,
--- has no printing with two -- a card printing "Buyback [cost 1]" and "Buyback
--- [cost 2]" the way Sunscape Battlemage prints two kickers would refute this and
--- would want optionalCosts' list. First in ascending Set order, disguiseCost's tie
--- break, which no printing reaches.
+-- A Maybe where optionalCosts above is a list: rule 702.27a states one cost and
+-- one payment of it, and Scryfall kw:buyback, 2026-09-07, has no printing with
+-- two -- a card printing "Buyback [cost 1]" and "Buyback [cost 2]" the way
+-- Sunscape Battlemage prints two kickers would refute this and would want
+-- optionalCosts' list. First in ascending Set order, a tie break no
+-- printing reaches.
 buybackCost :: Set Keyword -> Maybe (Cost Keyword)
 buybackCost keywords =
   let costOf keyword = case keyword of
@@ -3870,13 +3870,13 @@ splices keywords =
 -- CR 702.62a: the suspend ability this card prints -- the N and the cost of CR
 -- 116.2f's special action together -- or Nothing when the card has no suspend.
 --
--- BOTH FIELDS at once, where plotCost below answers a cost alone: rule 702.62a's
+-- BOTH FIELDS at once, where plotCosts below answers costs alone: rule 702.62a's
 -- N is what the exile puts on the card, and Pawl.Engine.Suspend needs the two in
 -- the same breath.
 --
--- A wildcard, and ONE ability per card (the ascending-least), disguiseCost's
--- shape. No printing has two. A granted suspend prints neither half, so it is
--- skipped: it has no special action to offer.
+-- A wildcard, and ONE ability per card (the ascending-least). No printing has
+-- two. A granted suspend prints neither half, so it is skipped: it has no
+-- special action to offer.
 suspend :: Set Keyword -> Maybe (Suspend.Suspend Keyword)
 suspend keywords =
   let abilityOf keyword = case keyword of
@@ -3894,25 +3894,24 @@ suspendKeyword keywords =
         _ -> False
    in List.find isSuspend (Set.toAscList keywords)
 
--- CR 702.170a: what CR 116.2k's special action costs, or Nothing when the card has
--- no plot.
+-- CR 702.170a: what CR 116.2k's special action may cost, one entry per distinct
+-- plot cost the card has; empty when it has no plot.
 --
 -- The cost of the ACTION and never of the cast: rule 702.170d makes the later cast
 -- free, so nothing consults this from Pawl.Engine.Cost.
 --
--- A wildcard, and ONE cost per card (the ascending-least), disguiseCost's shape.
--- Not implemented: a card printing plot twice at two costs, whose dearer cost
--- is unreachable (#1831).
-plotCost :: Set Keyword -> Maybe (Cost Keyword)
-plotCost keywords =
+-- A wildcard, and a LIST, morphCosts' shape: each plot ability is its own
+-- special action at its own cost (Synthetic Twice-Wanted Outlaw).
+plotCosts :: Set Keyword -> [Cost Keyword]
+plotCosts keywords =
   let costOf keyword = case keyword of
         Keyword.Plot cost -> Just cost
         _ -> Nothing
-   in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
+   in Set.toAscList (Set.fromList (Maybe.mapMaybe costOf (Set.toAscList keywords)))
 
--- CR 702.143a: what a card's own foretell keyword says it is CAST for, or
--- Nothing when the card has no foretell. The cost of the CAST and never of the
--- special action, plotCost's mirror: CR 116.2h fixes the action's cost at {2} for
+-- CR 702.143a: what a card's own foretell keywords say it may be CAST for, empty
+-- when the card has no foretell. The cost of the CAST and never of the special
+-- action, plotCosts' mirror: CR 116.2h fixes the action's cost at {2} for
 -- every printing, so Pawl.Engine.Foretell mints that itself.
 --
 -- Not the only cost a foretold card may be cast for: CR 702.143d lets an effect
@@ -3923,15 +3922,14 @@ plotCost keywords =
 -- (Dream Devourer's grant): Pawl.Engine.Cost.foretellCostFor settles it against
 -- a face.
 --
--- A wildcard, and ONE cost per card (the ascending-least), disguiseCost's
--- shape. Not implemented: a card printing foretell twice at two costs, whose
--- dearer cost is unreachable (#1831).
-foretellCost :: Set Keyword -> Maybe (ForetellCost Keyword)
-foretellCost keywords =
+-- A wildcard, and a LIST, morphCosts' shape: rule 702.143a's "any foretell cost
+-- it has" (Synthetic Twice-Foretold Omen). Distinct payloads only.
+foretellCosts :: Set Keyword -> [ForetellCost Keyword]
+foretellCosts keywords =
   let costOf keyword = case keyword of
         Keyword.Foretell cost -> Just cost
         _ -> Nothing
-   in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
+   in Set.toAscList (Set.fromList (Maybe.mapMaybe costOf (Set.toAscList keywords)))
 
 -- | What CR 702.51a, CR 702.66a and CR 702.126a let a caster spend rather than
 -- pay one stated mana of a spell's total cost. A CLASSIFICATION of the payment,

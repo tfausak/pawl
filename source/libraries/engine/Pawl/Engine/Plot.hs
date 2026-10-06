@@ -24,7 +24,6 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.Map.Strict as Map
-import qualified Data.Maybe as Maybe
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
@@ -75,7 +74,7 @@ plotCostsOf pid oid gs = case Game.cardOfHandMember oid gs of
   Nothing -> []
   Just card ->
     let face = Card.combined card
-        own = Maybe.maybeToList (Keyword.plotCost (Map.keysSet (Projection.keywordsOf oid gs)))
+        own = Keyword.plotCosts (Map.keysSet (Projection.keywordsOf oid gs))
         granted = Cost.Type.MkCost (Face.manaCost face) []
         inHand = elem oid (Game.zoneMembers Zone.Hand pid gs)
         fromPile =

@@ -107,9 +107,11 @@ morphCostsOf oid gs =
   foldMap (Keyword.morphCosts . Face.keywordSet) (Game.faceUpCastingFaceOf oid gs)
 
 -- CR 702.168d: "show all players what the permanent's disguise cost WOULD BE if
--- it were face up". Nothing when the card underneath has no disguise ability,
--- which is the rule's own parenthesis -- "if the permanent wouldn't have a
--- disguise cost if it were face up, it can't be turned face up this way".
+-- it were face up", one entry per distinct disguise cost the card prints
+-- (Keyword.disguiseCosts). Empty when the card underneath has no disguise
+-- ability, which is the rule's own parenthesis -- "if the permanent wouldn't
+-- have a disguise cost if it were face up, it can't be turned face up this
+-- way".
 --
 -- morphCostsOf with rule 702.168d's price list in place of rule 702.37e's, and
 -- every note above applies here word for word: the read goes through
@@ -117,10 +119,9 @@ morphCostsOf oid gs =
 -- keywords away, and the rule's counterfactual is what licenses it. The face-down
 -- permanent's ONE keyword is the ward CR 702.168b listed, which is not the
 -- ability this asks about.
-disguiseCostOf :: ObjectId -> GameState -> Maybe (Cost Keyword)
-disguiseCostOf oid gs = do
-  face <- Game.faceUpCastingFaceOf oid gs
-  Keyword.disguiseCost (Face.keywordSet face)
+disguiseCostsOf :: ObjectId -> GameState -> [Cost Keyword]
+disguiseCostsOf oid gs =
+  foldMap (Keyword.disguiseCosts . Face.keywordSet) (Game.faceUpCastingFaceOf oid gs)
 
 -- CR 701.40b and CR 701.58b, which say it in the same words: "show all players
 -- that the card representing that permanent IS A CREATURE CARD and what THAT
@@ -156,7 +157,7 @@ creatureCardCostOf oid gs = do
 costsOf :: TurnUpProcedure -> ObjectId -> GameState -> [Cost Keyword]
 costsOf procedure oid gs = case procedure of
   TurnUpProcedure.Morph -> morphCostsOf oid gs
-  TurnUpProcedure.Disguise -> Maybe.maybeToList (disguiseCostOf oid gs)
+  TurnUpProcedure.Disguise -> disguiseCostsOf oid gs
   TurnUpProcedure.Manifest -> Maybe.maybeToList (creatureCardCostOf oid gs)
   -- CR 701.58b's price list is rule 701.40b's, so the same reader answers both.
   TurnUpProcedure.Cloak -> Maybe.maybeToList (creatureCardCostOf oid gs)

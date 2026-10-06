@@ -1640,7 +1640,7 @@ spellCostsOf face =
 -- turned-face-up ability.
 turnUpCostsOf :: Face.Face Card.Type.Card -> [Cost.Type.Cost Keyword.Keyword]
 turnUpCostsOf face =
-  KeywordEngine.morphCosts (Face.keywordSet face) <> Maybe.maybeToList (KeywordEngine.disguiseCost (Face.keywordSet face))
+  KeywordEngine.morphCosts (Face.keywordSet face) <> KeywordEngine.disguiseCosts (Face.keywordSet face)
 
 -- A turned-face-up triggered ability, the one CR 702.37f and CR 702.168e give
 -- the X chosen for the cost.

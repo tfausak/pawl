@@ -2501,6 +2501,30 @@ disguiseSpec s registry =
               Spec.assertEqWith s "CR 110.5 it is face up" (fmap Object.facing (Game.lookupObject permanent up)) (Just Facing.FaceUp)
               Spec.assertEqWith s "CR 702.168d five more mana paid, eight in all" (S.tappedCount S.alice up) 8
 
+        -- THE PROVING TEST for a card's every disguise cost. Synthetic
+        -- Twice-Masked Envoy prints Disguise {1}{W} and Disguise {1}{U}; cast
+        -- face down off three Forests, then a Forest and a Plains, or a Forest
+        -- and an Island, arrive, so each board pays exactly one of the two.
+        Spec.it s "CR 702.168d a card printing disguise twice turns face up for either cost" $ do
+          forest <- S.printingOf s registry "Forest"
+          plains <- S.printingOf s registry "Plains"
+          island <- S.printingOf s registry "Island"
+          envoy <- S.printingOf s registry "Synthetic Twice-Masked Envoy"
+          let (gs, oid) = morphBoard forest envoy 3
+              (cast, entered) = castAndResolve envoy disguised gs oid
+              withLand land = snd (S.addPermanent forest S.alice (snd (S.addPermanent land S.alice cast)))
+          case entered of
+            Nothing -> Spec.assertFailure s "the disguise cast did not reach the battlefield"
+            Just permanent -> do
+              let upWith land = S.runPure S.identityAnswer (withLand land) (FaceDown.turnFaceUp S.manaPerformer S.alice TurnUpProcedure.Disguise permanent)
+                  white = upWith plains
+                  blue = upWith island
+              Spec.assertEqWith s "CR 702.168d a Plains turns it face up for {1}{W}" (fmap Object.facing (Game.lookupObject permanent white)) (Just Facing.FaceUp)
+              Spec.assertEqWith s "CR 702.168d an Island turns it face up for {1}{U}" (fmap Object.facing (Game.lookupObject permanent blue)) (Just Facing.FaceUp)
+              Spec.assertEqWith s "CR 702.168d the printed 4/3" (S.powerToughnessOf permanent white) (Just (4, 3))
+              Spec.assertEqWith s "{3} then {1}{W}" (S.tappedCount S.alice white) 5
+              Spec.assertEqWith s "{3} then {1}{U}" (S.tappedCount S.alice blue) 5
+
         -- The negative on the same axis, differing in ONE Plains: seven buy the
         -- {3} cast and leave four, which is one short of {4}{W}, so the action is
         -- not offered at all. A cheaper price would put it back on the menu.
