@@ -1760,7 +1760,7 @@ eventTriggers events gs =
       -- Pawl.ZoneTriggerSpec's "CR 613.1f Yixlid Jailer keeps a milled Narcomoeba
       -- from triggering" proves it. A card whose ability face has no such
       -- ability is projected only for a keyword grant, so a triggered ability an
-      -- effect GRANTS in a graveyard is not seen (gap #1859).
+      -- effect GRANTS in a graveyard is not seen (gap #4708).
       -- The controller is the OWNER, CR 113.8's second clause: a card in a
       -- graveyard has no controller (CR 108.4).
       --
@@ -1822,7 +1822,7 @@ eventTriggers events gs =
       -- leaves-your-graveyard trigger, which only this source serves, and
       -- Pawl.ZoneTriggerSpec's "CR 603.10a Oglor's perpetual grant fires as the
       -- milled card leaves the graveyard" proves it -- where `inGraveyards`'
-      -- ability-face gate would miss one (gap #1859). Not `abilitiesOf` either,
+      -- ability-face gate would miss one (gap #4708). Not `abilitiesOf` either,
       -- and not `graveyardTriggeredAbilitiesOf`, which `inGraveyards` does consult:
       -- both abilities on that roster -- CR 702.59a's recover and CR 702.55a's
       -- haunt on an instant or sorcery -- move the card they are on, and an id
@@ -1889,7 +1889,7 @@ eventTriggers events gs =
       -- (`exileGrantInForce`).
       --
       -- Not implemented: a triggered ability granted to a card in exile with no
-      -- keyword behind it, which that gate does not consult (#1859).
+      -- keyword behind it, which that gate does not consult (#4708).
       --
       -- The controller is the OWNER (CR 108.4a), for `inGraveyards`' reason: CR
       -- 108.4 gives a card in exile no controller at all, so Blind Hunter's "you

@@ -1535,7 +1535,7 @@ inCastableZone pid oid name gs =
 -- card lacks a projection in the hand or graveyard it is asked from -- CR 613.1
 -- names no zone and Projection.viewOfObject reaches every one of them. The two
 -- can differ only for an effect granting or removing a supertype there (CR
--- 205.4b) -- the off-battlefield printed read (gap #1859), which no card in the
+-- 205.4b) -- the off-battlefield printed read (gap #4707), which no card in the
 -- pool reaches.
 legendaryRestrictionOk :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
 legendaryRestrictionOk pid oid name gs = case proposedFace oid name gs of
@@ -1567,7 +1567,7 @@ controlsLegendaryCreatureOrPlaneswalker pid gs =
 --
 -- The exact counterweight to permissionsOf below, but read off the card rather
 -- than through the projection (CR 113.6e; an effect granting or removing a
--- printed restriction there is missed, #1859).
+-- printed restriction there is missed, #4707).
 -- ALL of them must hold, which is what CR 601.3's "no ... prohibits"
 -- means; one permission, by contrast, suffices.
 --
@@ -1831,6 +1831,9 @@ couldBeginToCast pid oid name gs =
 -- is in force on the object (CR 613.1f); the projection is asked only of a
 -- face printing one. Pawl.CastSpec's "CR 702.37a an Ainok Tracker that
 -- perpetually lost all abilities cannot be cast face down" proves it.
+--
+-- Not implemented: a morph or disguise GRANTED to a face printing neither is
+-- never offered (#4713).
 castFacings :: ObjectId -> Face.Face Card.Type.Card -> GameState -> [Facing.Facing]
 castFacings oid face gs =
   let has present = present && not (PC.lostAllAbilities (Projection.project oid gs))
@@ -1979,7 +1982,7 @@ permitsCastFromGraveyard pid oid face gs =
 -- disturb away there. Pawl.TransformSpec's "CR 702.146a / 613.1f under Yixlid
 -- Jailer a buried Baithook Angler offers no disturb cast" proves it.
 -- A disturb GRANTED to a card printing none is still never proposed, since
--- Pawl.Engine.Card.castableFaces reads the printed front face (gap #1859).
+-- Pawl.Engine.Card.castableFaces reads the printed front face (gap #4706).
 permitsDisturb :: ObjectId -> Face.Face Card.Type.Card -> GameState -> Bool
 permitsDisturb oid face gs = case Game.cardOf oid gs of
   Nothing -> False
@@ -3163,7 +3166,7 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                   -- Off the FACE being cast, never through the projection, which
                   -- is printedRestrictionsOk's reading and carries its caveat --
                   -- an effect granting or removing the sentence is missed
-                  -- (CR 113.6e, #1859).
+                  -- (CR 113.6e, #4707).
                   mCeiling = Cost.maximumX pid sid face bestowedGs
               -- CR 601.2b's announcement is free of the board -- any Natural --
               -- but the player making it is told what the board can pay, and

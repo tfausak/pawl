@@ -239,7 +239,7 @@ import qualified Pawl.Types.ZoneScope as ZoneScope
 --
 -- Not implemented: beyond the cast scan's triggered abilities and the keywords
 -- the cast itself reads (Cost.spellKeywords), which go through the projection,
--- what is read while the object is on the STACK stays printed (#1859).
+-- what is read while the object is on the STACK stays printed (#4707).
 
 -- CR 702.70b: multiple instances of poisonous each trigger separately, so this
 -- returns one ability PER INSTANCE -- `Poisonous 1` twice is two abilities and two
@@ -3146,7 +3146,7 @@ escapeCosts keywords =
 -- double-faced card's front face" and the spell it permits is the back face.
 -- Pawl.Engine.Cast.permitsDisturb projects that face where the card lies;
 -- Pawl.Engine.Cost.candidateCostsGiven reads it printed, so a disturb ability
--- GRANTED to a card in a graveyard is not priced (gap #1859).
+-- GRANTED to a card in a graveyard is not priced (gap #4706).
 disturbCosts :: Set Keyword -> [Cost Keyword]
 disturbCosts keywords =
   let costOf keyword = case keyword of
