@@ -1749,6 +1749,7 @@ bareAbility condition =
     { TriggeredAbility.condition = condition,
       TriggeredAbility.modal = Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.name = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
     }
 

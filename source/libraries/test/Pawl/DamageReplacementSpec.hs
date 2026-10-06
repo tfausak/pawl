@@ -798,8 +798,7 @@ jaredCarthalionSpec s registry = Spec.describe s "Jared Carthalion, True Heir (C
 -- The first sentence is the ability being removed, and CR 614.1 / 615.1 make it a
 -- static ability's continuous effect rather than an activated or a triggered one
 -- -- so the name the second sentence quotes hangs on PrintedReplacement.name,
--- where Gliding Licid's hangs on ActivatedAbility.name. The two are the whole of
--- what Modification.LoseNamedAbility reaches.
+-- where Gliding Licid's hangs on ActivatedAbility.name.
 --
 -- The card's LAST sentence, "Any player may activate this ability", is CR
 -- 602.1b's activation instruction and pawl carries it on

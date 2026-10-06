@@ -82,6 +82,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
                 (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Create (Create.MkCreate (Quantity.Literal 1) (Text.pack "Zombie Token") EntryRiders.defaultValue Nothing (PlayerRef.Relative PlayerRelation.You)))))) Map.empty))
                 (ModeSelection.ChooseExactly 1),
             TriggeredAbility.intervening = Nothing,
+            TriggeredAbility.name = Nothing,
             TriggeredAbility.limit = TriggerLimit.Unlimited
           }
       )
@@ -108,6 +109,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
                         (Quantity.Literal 0)
                     )
                 ),
+            TriggeredAbility.name = Nothing,
             TriggeredAbility.limit = TriggerLimit.Unlimited
           }
       )
@@ -130,6 +132,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
                       (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "token")), SacrificeEffect.sacrificer = Sacrificer.EffectController, SacrificeEffect.sacrificed = Nothing})))) Map.empty))
                       (ModeSelection.ChooseExactly 1),
                   TriggeredAbility.intervening = Nothing,
+                  TriggeredAbility.name = Nothing,
                   TriggeredAbility.limit = TriggerLimit.Unlimited
                 }
             ),
@@ -141,6 +144,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
                       (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Untap (ObjectRef.EachMatching Filter.AttackedThisTurn))))) Map.empty))
                       (ModeSelection.ChooseExactly 1),
                   TriggeredAbility.intervening = Nothing,
+                  TriggeredAbility.name = Nothing,
                   TriggeredAbility.limit = TriggerLimit.Unlimited
                 }
             )
@@ -161,6 +165,24 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
               (Seq.singleton (Mode.MkMode Seq.empty Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
       " {\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}} "
+  -- CR 613.1f: the name a LoseNamedAbility removal joins to.
+  Spec.it s "a named ability carries its name" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.SelfEnters,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode Seq.empty Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Just (AbilityName.MkAbilityName (Text.pack "vigil")),
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
+      " {\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]},\"name\":\"vigil\"} "

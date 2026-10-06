@@ -161,6 +161,7 @@ increaseAbility =
       -- the data because the rule states it, and enforced from there like every
       -- other rider: Event.withinTriggerLimit reads the CR 603.3b log, which
       -- records a sourceless trigger under its controller.
+      TriggeredAbility.name = Nothing,
       TriggeredAbility.limit = TriggerLimit.OncePerTurn
     }
 

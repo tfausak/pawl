@@ -1195,6 +1195,7 @@ delayedSpec s registry =
                   { TriggeredAbility.condition = TriggerCondition.SelfEnters,
                     TriggeredAbility.modal = Modal.MkModal {Modal.modes = Seq.singleton onlyMode, Modal.selection = ModeSelection.ChooseExactly 1},
                     TriggeredAbility.intervening = Nothing,
+                    TriggeredAbility.name = Nothing,
                     TriggeredAbility.limit = TriggerLimit.Unlimited
                   }
               -- Stands in for a modal arming spell's own captured chosenModes --
