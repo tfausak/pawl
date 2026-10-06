@@ -685,7 +685,7 @@ foretellBoard island raven traveler =
 --
 -- LORE WEAVER ({3}{U}) is the card the trigger exiles, and it prints NO foretell
 -- of its own: that is the whole of what makes the granted cost observable, since
--- a card with foretell would be castable off Pawl.Engine.Keyword.foretellCost
+-- a card with foretell would be castable off Pawl.Engine.Keyword.foretellCosts
 -- whether or not the effect gave it anything.
 --
 -- The DOOMED TRAVELER is in the library rather than the hand, so the trigger's
@@ -986,6 +986,66 @@ foretelling s registry = Spec.describe s "CR 116.2h Augury Raven" $ do
         1
       Spec.assertEqWith s "exile is empty" (length (GameState.exile resolved)) 0
       Spec.assertEqWith s "and all four Islands are tapped: {2} for the action, {1}{U} for the cast" (S.tappedCount S.alice resolved) 4
+
+-- THE PROVING TEST for a card's every plot cost. Synthetic Twice-Wanted Outlaw
+-- {2}{R} prints Plot {R} and Plot {U}. One land per board, a Mountain or an
+-- Island, so each pays exactly one of the two and neither cost dominates; the
+-- plotted exile is read first, since it is the behaviour.
+twiceWanted :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+twiceWanted s registry = Spec.describe s "CR 702.170a Synthetic Twice-Wanted Outlaw" $ do
+  Spec.it s "either printed plot cost buys the action" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    outlaw <- S.printingOf s registry "Synthetic Twice-Wanted Outlaw"
+    let costOf color = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored color)])) []
+        boardOf lands = case S.addHandCard outlaw S.alice (List.foldl' (\g land -> snd (S.addPermanent land S.alice g)) (S.landsInPlay mountain 0) lands) of
+          (oid, g) -> (oid, g {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice})
+        plottedFor land color =
+          let (oid, gs) = boardOf [land]
+           in snd (State.evalState (Engine.runGame (takeThenPass (Action.Type.Plot oid (costOf color))) gs Engine.priorityLoop) [])
+        isPlotted gs = Maybe.isJust (Object.plotted =<< (\oid -> Game.lookupObject oid gs) =<< soleExile gs)
+        onMountain = plottedFor mountain Color.Red
+        onIsland = plottedFor island Color.Blue
+        (bothId, both) = boardOf [mountain, island]
+    Spec.assertBool s (isPlotted onMountain) "CR 702.170a a Mountain plots it for {R}"
+    Spec.assertBool s (isPlotted onIsland) "CR 702.170a an Island plots it for {U}"
+    Spec.assertEqWith s "the Mountain paid" (S.tappedCount S.alice onMountain) 1
+    Spec.assertEqWith s "the Island paid" (S.tappedCount S.alice onIsland) 1
+    Spec.assertBool
+      s
+      (all (`List.elem` plotsOf bothId (Action.legalActions S.alice both)) [Action.Type.Plot bothId (costOf Color.Red), Action.Type.Plot bothId (costOf Color.Blue)])
+      "with both lands, both actions are offered"
+
+-- THE PROVING TEST for a card's every foretell cost, CR 702.143a's "any foretell
+-- cost it has". Synthetic Twice-Foretold Omen {3}{U} prints Foretell {1}{U} and
+-- Foretell {R} and draws two. Two Islands pay CR 116.2h's {2}; on the later turn
+-- a Mountain alone, or two Islands alone, pay exactly one foretell cost. The
+-- draw is read first, since it is the behaviour.
+twiceForetold :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+twiceForetold s registry = Spec.describe s "CR 702.143a Synthetic Twice-Foretold Omen" $ do
+  Spec.it s "a foretold card is cast for either printed foretell cost" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    traveler <- S.printingOf s registry "Doomed Traveler"
+    omen <- S.printingOf s registry "Synthetic Twice-Foretold Omen"
+    let (omenId, gs0) = S.addHandCard omen S.alice (S.landsInPlay island 2)
+        gs = (stockLibraries traveler gs0) {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+        after = snd (State.evalState (Engine.runGame (takeThenPass (Action.Type.Foretell omenId)) gs Engine.priorityLoop) [])
+        later = after {GameState.turnNumber = GameState.turnNumber after + 1}
+        withLands = List.foldl' (\g land -> snd (S.addPermanent land S.alice g)) later
+    case soleExile after of
+      Nothing -> Spec.assertFailure s "the Omen was not foretold"
+      Just exiledId -> do
+        let castOn lands =
+              let landed = withLands lands
+               in (landed, S.runPure S.castAnswer landed (S.cast S.alice exiledId >> Stack.resolveTop))
+            drew (landed, resolved) = S.handSize S.alice resolved - S.handSize S.alice landed
+            red = castOn [mountain]
+            blue = castOn [island, island]
+        Spec.assertEqWith s "CR 702.143a a Mountain casts it for {R}, and it draws two" (drew red) 2
+        Spec.assertEqWith s "CR 702.143a two Islands cast it for {1}{U}, and it draws two" (drew blue) 2
+        Spec.assertEqWith s "{2} for the action, {R} for the cast" (S.tappedCount S.alice (snd red)) 3
+        Spec.assertEqWith s "{2} for the action, {1}{U} for the cast" (S.tappedCount S.alice (snd blue)) 4
 
 -- Rift Bolt (TSP 165) {2}{R} Sorcery, "Rift Bolt deals 3 damage to any target. /
 -- Suspend 1--{R}" -- checked against Scryfall, 2026-09-07. CR 702.62's three
@@ -1758,7 +1818,9 @@ spec s registry = do
   volrathsCurse s registry
   plotting s registry
   plottingFromLibrary s registry
+  twiceWanted s registry
   foretelling s registry
+  twiceForetold s registry
   makeForetold s registry
   makeForetoldPerFace s registry
   foretoldSpell s registry

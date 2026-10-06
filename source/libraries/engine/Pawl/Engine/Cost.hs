@@ -895,9 +895,10 @@ candidateCostsGiven permitted pid name oid gs =
                 -- effect may give a foretold card a cost of its own (Ethereal
                 -- Valkyrie), which grantedForetellCost settles from the reduction
                 -- that effect stated, beside whatever the card's own foretell
-                -- keyword prints. Both are offered, the granted one first. A card
-                -- foretold with NEITHER is offered nothing and is not castable,
-                -- which is that clause read at zero.
+                -- keyword prints, each of which is its own cost (Synthetic
+                -- Twice-Foretold Omen). All are offered, the granted one first. A
+                -- card foretold with NEITHER is offered nothing and is not
+                -- castable, which is that clause read at zero.
                 --
                 -- The granted cost is settled against THIS face, which is the whole
                 -- reason the object carries the reduction rather than a cost: CR
@@ -909,7 +910,7 @@ candidateCostsGiven permitted pid name oid gs =
                   | Maybe.isJust (Object.foretold obj) ->
                       fmap
                         (untagged . withAdditional)
-                        (Maybe.maybeToList (grantedForetellCost face obj) <> Maybe.maybeToList (foretellCostFor face =<< Keyword.foretellCost (Face.keywordSet face)))
+                        (Maybe.maybeToList (grantedForetellCost face obj) <> Maybe.mapMaybe (foretellCostFor face) (Keyword.foretellCosts (Face.keywordSet face)))
                 -- CR 118.9a: a CR 601.3 permission that states an alternative
                 -- cost -- "without paying its mana cost" (Extract Power), rule
                 -- 701.65a's {2}, or a waterbend (Hama, the Bloodbender) --

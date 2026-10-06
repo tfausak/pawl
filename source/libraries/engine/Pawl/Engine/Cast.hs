@@ -1852,7 +1852,7 @@ castFacings oid face gs =
           -- printing with both would be the card that refutes it, and the rules
           -- allow one (CR 701.58c and CR 701.58d put both procedures on one
           -- permanent).
-          <> ( if has (Maybe.isJust (Keyword.disguiseCost (Face.keywordSet face)))
+          <> ( if has (not (null (Keyword.disguiseCosts (Face.keywordSet face))))
                  then [Facing.FaceDown FaceDownState.MkFaceDownState {FaceDownState.reason = FaceDownReason.Disguised, FaceDownState.listed = FaceDownCharacteristics.disguisedValue}]
                  else []
              )

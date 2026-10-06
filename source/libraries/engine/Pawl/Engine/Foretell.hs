@@ -61,7 +61,7 @@ import qualified Pawl.Types.Zone as Zone
 -- Minted here rather than read off Keyword.Foretell, which is the whole
 -- difference from Pawl.Engine.Plot.plotCostsOf: rule 116.2h fixes this amount for
 -- every printing, and the keyword's own payload is the later CAST's cost
--- (Pawl.Engine.Keyword.foretellCost). Pawl.Engine.Cost.faceDownCost is the same
+-- (Pawl.Engine.Keyword.foretellCosts). Pawl.Engine.Cost.faceDownCost is the same
 -- shape one rule over -- an amount rule 702.37a states rather than any card.
 actionCost :: Cost Keyword
 actionCost =
@@ -70,7 +70,7 @@ actionCost =
       Cost.Type.components = []
     }
 
--- Does this object have foretell at all, and with what payload? Nothing for a
+-- Does this object have foretell at all, and with what payloads? Empty for a
 -- hand member with no card behind it -- a token, an ability.
 --
 -- Read through the projection (CR 613.1f), since the ability functions in the
@@ -78,19 +78,19 @@ actionCost =
 -- nonland card in your hand without foretell has foretell". Pawl.SpecialActionSpec's
 -- Devourer pair proves it.
 --
--- Returns the CAST cost the keyword carries, though this module spends it only
+-- Returns the CAST costs the keywords carry, though this module spends it only
 -- as foretell's stamp: what it answers for canForetell is "is the keyword
 -- there".
-foretellCostOf :: ObjectId -> GameState -> Maybe (ForetellCost Keyword)
-foretellCostOf oid gs = do
-  _ <- Game.cardOfHandMember oid gs
-  Keyword.foretellCost (Map.keysSet (Projection.keywordsOf oid gs))
+foretellCostsOf :: ObjectId -> GameState -> [ForetellCost Keyword]
+foretellCostsOf oid gs = case Game.cardOfHandMember oid gs of
+  Nothing -> []
+  Just _ -> Keyword.foretellCosts (Map.keysSet (Projection.keywordsOf oid gs))
 
 -- CR 702.143a / 116.2h: may this player foretell this card right now? Three
 -- conjuncts, each a clause of the rule:
 --
 --   * the card is in THIS PLAYER'S HAND with foretell on it ("exile a card with
---     foretell from their hand"), which foretellCostOf and the zone test settle
+--     foretell from their hand"), which foretellCostsOf and the zone test settle
 --     together;
 --   * the window is THIS PLAYER'S OWN TURN -- "any time a player has priority
 --     during their turn". Nothing more: rule 702.143a asks for neither a main
@@ -110,7 +110,7 @@ foretellCostOf oid gs = do
 -- none: legalActions is asked only of the priority holder.
 canForetell :: PlayerId -> ObjectId -> GameState -> Bool
 canForetell pid oid gs =
-  Maybe.isJust (foretellCostOf oid gs)
+  not (null (foretellCostsOf oid gs))
     && elem oid (Game.zoneMembers Zone.Hand pid gs)
     && Turn.isActive gs pid
     && Cost.canPay PaymentSubject.ForNeither pid oid actionCost gs
@@ -175,7 +175,7 @@ foretell perform pid oid = do
           -- with more than one only for a melded permanent leaving the
           -- battlefield (CR 712.21), and this action exiles a card from a hand.
           exiled <- Event.changeZoneEntering oid Zone.Exile LibraryPosition.defaultValue riders Nothing
-          Monad.forM_ exiled (State.modify' . becomeForetold (reductionOf =<< foretellCostOf oid before))
+          Monad.forM_ exiled (State.modify' . becomeForetold (Maybe.listToMaybe (Maybe.mapMaybe reductionOf (foretellCostsOf oid before))))
           -- CR 702.143c: "foretelling a card" is this special action.
           Monad.unless (null exiled) (State.modify' (Event.recordEvent (GameEvent.Foretold pid)))
 
@@ -187,7 +187,8 @@ foretell perform pid oid = do
 -- A STATED cost is not stamped: the exiled card's own face still prints it.
 -- What would refute that is an effect granting a stated foretell cost in a hand;
 -- Scryfall @o:"foretell" -kw:foretell@, 2026-09-26, names none (Dream Devourer
--- and Bohn, Beguiling Balladeer both grant the reduction).
+-- and Bohn, Beguiling Balladeer both grant the reduction). Both grant the same
+-- {2}, so the first reduction is the only one.
 reductionOf :: ForetellCost Keyword -> Maybe ManaCost.ManaCost
 reductionOf payload = case payload of
   ForetellCost.Stated _ -> Nothing

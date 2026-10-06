@@ -146,9 +146,9 @@ data Action
     -- as CR 116.2a's land play is.
     --
     -- Carries the PLOT COST beside the card, TurnFaceUp's argument: a card with
-    -- two plot abilities (its own, and the one Fblthp, Lost on the Range grants
-    -- the top card of a library) offers two actions at two prices, and the
-    -- player picks one. Validated by membership in Pawl.Engine.Plot.plotCostsOf,
+    -- two plot abilities (two printed, or its own and the one Fblthp, Lost on the
+    -- Range grants the top card of a library) offers two actions at two prices,
+    -- and the player picks one. Validated by membership in Pawl.Engine.Plot.plotCostsOf,
     -- Activate's posture; two equal costs are one action.
     --
     -- WHICH HALF is not carried either, where Cast and Play both carry a name. CR
