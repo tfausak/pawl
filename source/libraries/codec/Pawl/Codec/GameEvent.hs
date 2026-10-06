@@ -34,6 +34,7 @@ import qualified Pawl.Codec.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Codec.LifeChange as LifeChange
 import qualified Pawl.Codec.ManaAbilityResolved as ManaAbilityResolved
 import qualified Pawl.Codec.ManaAdded as ManaAdded
+import qualified Pawl.Codec.ManifestedDread as ManifestedDread
 import qualified Pawl.Codec.Mentored as Mentored
 import qualified Pawl.Codec.Milled as Milled
 import qualified Pawl.Codec.Moved as Moved
@@ -120,6 +121,7 @@ codec =
       Arm.payload "DungeonCompleted" PlayerId.codec GameEvent.DungeonCompleted (\x -> case x of GameEvent.DungeonCompleted y -> Just y; _ -> Nothing),
       Arm.payload "Surveiled" PlayerId.codec GameEvent.Surveiled (\x -> case x of GameEvent.Surveiled y -> Just y; _ -> Nothing),
       Arm.payload "Proliferated" PlayerId.codec GameEvent.Proliferated (\x -> case x of GameEvent.Proliferated y -> Just y; _ -> Nothing),
+      Arm.payload "ManifestedDread" ManifestedDread.codec GameEvent.ManifestedDread (\x -> case x of GameEvent.ManifestedDread y -> Just y; _ -> Nothing),
       Arm.payload "DiceRolled" PlayerId.codec GameEvent.DiceRolled (\x -> case x of GameEvent.DiceRolled y -> Just y; _ -> Nothing),
       Arm.payload "DieResultSettled" (DieResult.codec PlayerId.codec) GameEvent.DieResultSettled (\x -> case x of GameEvent.DieResultSettled y -> Just y; _ -> Nothing),
       Arm.payload "RolledToVisit" (DieResult.codec PlayerId.codec) GameEvent.RolledToVisit (\x -> case x of GameEvent.RolledToVisit y -> Just y; _ -> Nothing),
@@ -217,6 +219,7 @@ tagOf x = case x of
   GameEvent.DungeonCompleted {} -> "DungeonCompleted"
   GameEvent.Surveiled {} -> "Surveiled"
   GameEvent.Proliferated {} -> "Proliferated"
+  GameEvent.ManifestedDread {} -> "ManifestedDread"
   GameEvent.DiceRolled {} -> "DiceRolled"
   GameEvent.DieResultSettled {} -> "DieResultSettled"
   GameEvent.RolledToVisit {} -> "RolledToVisit"

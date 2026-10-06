@@ -2494,6 +2494,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Cloak (PlayerRef.Relative PlayerRelation.You))
       " {\"type\":\"Cloak\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}} "
+  -- CR 701.62a: Manifest Dread's "manifest dread", the instructed player its
+  -- payload (Unwanted Remake's "its controller manifests dread").
+  Spec.it s "ManifestDread" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.ManifestDread (PlayerRef.Relative PlayerRelation.You))
+      " {\"type\":\"ManifestDread\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}} "
   -- CR 701.49: the plain keyword action, whose payload is absent -- rule 701.49
   -- fixes the venturer, and CR 701.49a lets the player choose from every dungeon
   -- card they own, leaving an author nothing to write.

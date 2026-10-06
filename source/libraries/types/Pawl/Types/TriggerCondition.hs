@@ -572,6 +572,10 @@ data TriggerCondition
   | -- | CR 701.34a: "whenever you proliferate" (Scheming Aspirant), against
     -- GameEvent.Proliferated.
     PlayerProliferates PlayerRelation.PlayerRelation
+  | -- | CR 701.62b: "whenever you manifest dread" (Paranormal Analyst), against
+    -- GameEvent.ManifestedDread, binding the cards it put into the graveyard
+    -- under Binding.became.
+    PlayerManifestsDread PlayerRelation.PlayerRelation
   | -- | CR 706.1: "whenever you roll one or more dice" (Feywild Trickster). The
     -- event and not the result, which is what lets CR 706.7's planar die fire it.
     --

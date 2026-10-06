@@ -82,6 +82,7 @@ import qualified Pawl.Types.ManaAbilityResolved as ManaAbilityResolved
 import qualified Pawl.Types.ManaAdded as ManaAdded
 import qualified Pawl.Types.ManaSpecification as ManaSpecification
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.ManifestedDread as ManifestedDread
 import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
@@ -276,6 +277,7 @@ countersRemovedFrom bearer wanted event = case event of
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.Proliferated _ -> Nothing
+  GameEvent.ManifestedDread {} -> Nothing
   GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
@@ -417,6 +419,7 @@ boundDeparts bindings destinations slot event = case event of
   GameEvent.DungeonCompleted _ -> False
   GameEvent.Surveiled _ -> False
   GameEvent.Proliferated _ -> False
+  GameEvent.ManifestedDread {} -> False
   GameEvent.DiceRolled _ -> False
   GameEvent.DieResultSettled _ -> False
   GameEvent.RolledToVisit _ -> False
@@ -517,6 +520,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -624,6 +628,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -714,6 +719,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -816,6 +822,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -908,6 +915,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -998,6 +1006,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -1096,6 +1105,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -1195,6 +1205,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -1283,6 +1294,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -1380,6 +1392,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -1487,6 +1500,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -1599,6 +1613,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -1708,6 +1723,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -1803,6 +1819,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -1897,6 +1914,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -2000,6 +2018,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -2104,6 +2123,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -2204,6 +2224,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -2303,6 +2324,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -2403,6 +2425,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -2515,6 +2538,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -2625,6 +2649,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -2727,6 +2752,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -2827,6 +2853,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -2923,6 +2950,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -3061,6 +3089,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -3182,6 +3211,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -3264,6 +3294,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -3365,6 +3396,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -3491,6 +3523,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -3596,6 +3629,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -3713,6 +3747,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -3800,6 +3835,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -3891,6 +3927,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -4006,6 +4043,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -4099,6 +4137,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -4209,6 +4248,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -4306,6 +4346,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -4414,6 +4455,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -4517,6 +4559,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -4681,6 +4724,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.DungeonCompleted _ -> False
           GameEvent.Surveiled _ -> False
           GameEvent.Proliferated _ -> False
+          GameEvent.ManifestedDread {} -> False
           GameEvent.DiceRolled _ -> False
           GameEvent.DieResultSettled _ -> False
           GameEvent.RolledToVisit _ -> False
@@ -4848,6 +4892,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.DungeonCompleted _ -> False
           GameEvent.Surveiled _ -> False
           GameEvent.Proliferated _ -> False
+          GameEvent.ManifestedDread {} -> False
           GameEvent.DiceRolled _ -> False
           GameEvent.DieResultSettled _ -> False
           GameEvent.RolledToVisit _ -> False
@@ -4943,6 +4988,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -5036,6 +5082,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -5132,6 +5179,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -5233,6 +5281,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -5342,6 +5391,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -5479,6 +5529,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.DungeonCompleted _ -> False
           GameEvent.Surveiled _ -> False
           GameEvent.Proliferated _ -> False
+          GameEvent.ManifestedDread {} -> False
           GameEvent.DiceRolled _ -> False
           GameEvent.DieResultSettled _ -> False
           GameEvent.RolledToVisit _ -> False
@@ -5576,6 +5627,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -5687,6 +5739,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -5849,6 +5902,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -5965,6 +6019,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -6055,6 +6110,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -6129,6 +6185,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -6246,6 +6303,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -6361,6 +6419,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -6455,6 +6514,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -6552,6 +6612,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -6612,6 +6673,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -6708,6 +6770,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -6810,6 +6873,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.DungeonCompleted _ -> False
           GameEvent.Surveiled _ -> False
           GameEvent.Proliferated _ -> False
+          GameEvent.ManifestedDread {} -> False
           GameEvent.DiceRolled _ -> False
           GameEvent.DieResultSettled _ -> False
           GameEvent.RolledToVisit _ -> False
@@ -6922,6 +6986,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.DungeonCompleted _ -> False
           GameEvent.Surveiled _ -> False
           GameEvent.Proliferated _ -> False
+          GameEvent.ManifestedDread {} -> False
           GameEvent.DiceRolled _ -> False
           GameEvent.DieResultSettled _ -> False
           GameEvent.RolledToVisit _ -> False
@@ -7066,6 +7131,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -7137,6 +7203,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.DungeonCompleted _ -> False
           GameEvent.Surveiled _ -> False
           GameEvent.Proliferated _ -> False
+          GameEvent.ManifestedDread {} -> False
           GameEvent.DiceRolled _ -> False
           GameEvent.DieResultSettled _ -> False
           GameEvent.RolledToVisit _ -> False
@@ -7301,6 +7368,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.DungeonCompleted _ -> False
           GameEvent.Surveiled _ -> False
           GameEvent.Proliferated _ -> False
+          GameEvent.ManifestedDread {} -> False
           GameEvent.DiceRolled _ -> False
           GameEvent.DieResultSettled _ -> False
           GameEvent.RolledToVisit _ -> False
@@ -7400,6 +7468,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -7498,6 +7567,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -7618,6 +7688,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -7732,6 +7803,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -7840,6 +7912,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -7948,6 +8021,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -8023,6 +8097,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -8129,6 +8204,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -8267,6 +8343,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -8431,6 +8508,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.DungeonCompleted _ -> False
           GameEvent.Surveiled _ -> False
           GameEvent.Proliferated _ -> False
+          GameEvent.ManifestedDread {} -> False
           GameEvent.DiceRolled _ -> False
           GameEvent.DieResultSettled _ -> False
           GameEvent.RolledToVisit _ -> False
@@ -8548,6 +8626,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -8606,6 +8685,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -8711,6 +8791,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -8826,6 +8907,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -8943,6 +9025,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -9041,6 +9124,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -9141,6 +9225,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -9275,6 +9360,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -9391,6 +9477,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -9481,6 +9568,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -9568,6 +9656,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -9662,6 +9751,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -9751,6 +9841,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -9851,6 +9942,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -9939,6 +10031,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -10033,6 +10126,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -10135,6 +10229,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -10232,6 +10327,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -10325,6 +10421,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -10416,6 +10513,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -10521,6 +10619,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -10633,6 +10732,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -10770,6 +10870,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -10858,6 +10959,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -10951,6 +11053,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -11084,6 +11187,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -11177,6 +11281,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -11269,6 +11374,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted completer -> PlayerRelation.holds (Game.teams gs) relation you completer
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -11358,6 +11464,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -11446,6 +11553,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled surveiller -> PlayerRelation.holds (Game.teams gs) relation you surveiller
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -11533,6 +11641,96 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated proliferator -> PlayerRelation.holds (Game.teams gs) relation you proliferator
+    GameEvent.ManifestedDread {} -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
+    GameEvent.RolledToVisit _ -> False
+    GameEvent.PlanarDieRolled _ -> False
+    GameEvent.SchemeSetInMotion _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+    GameEvent.BecameUntapped _ -> False
+    GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
+    GameEvent.ManaAbilityResolved _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.RingTempted _ -> False
+    GameEvent.Blighted _ -> False
+    GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
+    GameEvent.CollectedEvidence _ -> False
+    GameEvent.GaveGift _ -> False
+    GameEvent.AttractionOpened _ -> False
+    GameEvent.PrizeClaimed _ -> False
+    GameEvent.Earthbent _ -> False
+    GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
+    GameEvent.ActivatedAbilityResolved _ -> False
+    GameEvent.TriggeredAbilityResolved _ -> False
+    GameEvent.CardArrived _ -> False
+  -- CR 701.62b: Paranormal Analyst's "whenever you manifest dread", which an
+  -- empty library still fires -- why it watches the keyword action's own event
+  -- rather than the moves inside it.
+  TriggerCondition.PlayerManifestsDread relation -> case event of
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.TookInitiative _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mutated _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Exploited {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.BecameCrewed _ -> False
+    GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
+    GameEvent.Crewed _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.LostTheGame _ -> False
+    GameEvent.DungeonCompleted _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread ev -> PlayerRelation.holds (Game.teams gs) relation you (ManifestedDread.player ev)
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -11633,6 +11831,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled roller -> PlayerRelation.holds (Game.teams gs) relation you roller
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -11721,6 +11920,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled settled ->
       DieResult.result settled == DieResult.result watched
@@ -11812,6 +12012,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit rolled ->
@@ -11902,6 +12103,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit {} -> False
@@ -11989,6 +12191,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit {} -> False
@@ -12082,6 +12285,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -12175,6 +12379,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -12268,6 +12473,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -12365,6 +12571,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -12460,6 +12667,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -12552,6 +12760,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -12658,6 +12867,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -12763,6 +12973,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -12863,6 +13074,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -12957,6 +13169,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -13050,6 +13263,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -13138,6 +13352,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -13225,6 +13440,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -13312,6 +13528,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -13399,6 +13616,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -13486,6 +13704,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -13580,6 +13799,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -13672,6 +13892,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -13758,6 +13979,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
@@ -13845,6 +14067,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False

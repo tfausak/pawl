@@ -175,6 +175,7 @@ codec =
           Arm.payload "PlayerLosesGame" PlayerRelation.codec TriggerCondition.PlayerLosesGame (\x -> case x of TriggerCondition.PlayerLosesGame y -> Just y; _ -> Nothing),
           Arm.payload "PlayerSurveils" PlayerRelation.codec TriggerCondition.PlayerSurveils (\x -> case x of TriggerCondition.PlayerSurveils y -> Just y; _ -> Nothing),
           Arm.payload "PlayerProliferates" PlayerRelation.codec TriggerCondition.PlayerProliferates (\x -> case x of TriggerCondition.PlayerProliferates y -> Just y; _ -> Nothing),
+          Arm.payload "PlayerManifestsDread" PlayerRelation.codec TriggerCondition.PlayerManifestsDread (\x -> case x of TriggerCondition.PlayerManifestsDread y -> Just y; _ -> Nothing),
           Arm.payload "PlayerRollsDice" PlayerRelation.codec TriggerCondition.PlayerRollsDice (\x -> case x of TriggerCondition.PlayerRollsDice y -> Just y; _ -> Nothing),
           Arm.payload "PlayerRollsResult" (DieResult.codec PlayerRelation.codec) TriggerCondition.PlayerRollsResult (\x -> case x of TriggerCondition.PlayerRollsResult y -> Just y; _ -> Nothing),
           Arm.nullary "Visit" TriggerCondition.Visit,
@@ -338,6 +339,7 @@ tagOf x = case x of
   TriggerCondition.PlayerLosesGame {} -> "PlayerLosesGame"
   TriggerCondition.PlayerSurveils {} -> "PlayerSurveils"
   TriggerCondition.PlayerProliferates {} -> "PlayerProliferates"
+  TriggerCondition.PlayerManifestsDread {} -> "PlayerManifestsDread"
   TriggerCondition.PlayerRollsDice {} -> "PlayerRollsDice"
   TriggerCondition.PlayerRollsResult {} -> "PlayerRollsResult"
   TriggerCondition.Visit {} -> "Visit"

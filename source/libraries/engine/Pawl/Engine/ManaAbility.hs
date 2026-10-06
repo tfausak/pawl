@@ -337,6 +337,7 @@ manaProduced effect = case effect of
   Effect.Recruit -> Nothing
   Effect.Learn -> Nothing
   Effect.Cloak {} -> Nothing
+  Effect.ManifestDread {} -> Nothing
   Effect.Venture {} -> Nothing
   Effect.ExileHandThenDraw -> Nothing
   Effect.NoteManaSpent -> Nothing
@@ -531,6 +532,7 @@ playerChoice effect = case effect of
   Effect.Recruit -> Nothing
   Effect.Learn -> Nothing
   Effect.Cloak {} -> Nothing
+  Effect.ManifestDread {} -> Nothing
   Effect.Venture {} -> Nothing
   Effect.ExileHandThenDraw -> Nothing
   Effect.NoteManaSpent -> Nothing
@@ -771,6 +773,8 @@ movesLibraryCard effect = case effect of
   -- CR 701.58a takes the top card of a library and puts it onto the
   -- battlefield, so an ability that cloaks is no mana ability.
   Effect.Cloak {} -> True
+  -- CR 701.62a manifests a library card and bins the rest.
+  Effect.ManifestDread {} -> True
   Effect.Venture {} -> False
   Effect.PlayerSacrifices {} -> False
   Effect.Vote {} -> False

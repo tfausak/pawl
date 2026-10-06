@@ -162,69 +162,11 @@
                   {
                     "effects": [
                       {
-                        "type": "LookAt",
+                        "type": "ManifestDread",
                         "value": {
-                          "ref": {
-                            "type": "TopOfLibrary",
-                            "value": {
-                              "count": {
-                                "type": "Literal",
-                                "value": 2
-                              },
-                              "player": {
-                                "type": "Relative",
-                                "value": {
-                                  "type": "You"
-                                }
-                              }
-                            }
-                          },
-                          "slot": "looked"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "effects": [
-                      {
-                        "type": "MoveToZone",
-                        "value": {
-                          "ref": {
-                            "type": "ChosenCardFromAmong",
-                            "value": {
-                              "filter": {
-                                "type": "And",
-                                "value": []
-                              },
-                              "slot": "looked"
-                            }
-                          },
-                          "riders": {
-                            "faceDown": {
-                              "listed": {},
-                              "reason": {
-                                "type": "Manifested"
-                              }
-                            }
-                          },
-                          "zone": {
-                            "type": "Battlefield"
-                          }
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "effects": [
-                      {
-                        "type": "MoveToZone",
-                        "value": {
-                          "ref": {
-                            "type": "InSlot",
-                            "value": "looked"
-                          },
-                          "zone": {
-                            "type": "Graveyard"
+                          "type": "Relative",
+                          "value": {
+                            "type": "You"
                           }
                         }
                       }

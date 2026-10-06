@@ -56,6 +56,7 @@ import qualified Pawl.Types.ManaAdded as ManaAdded
 import qualified Pawl.Types.ManaAddedCause as ManaAddedCause
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.ManifestedDread as ManifestedDread
 import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Milled as Milled
 import qualified Pawl.Types.Moved as Moved
@@ -557,6 +558,14 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.Proliferated (PlayerId.MkPlayerId 3))
       " {\"type\":\"Proliferated\",\"value\":3} "
+  -- CR 701.62b. The cards the process put into the graveyard ride along, the
+  -- "this way" a trigger on it reads back.
+  Spec.it s "ManifestedDread" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.ManifestedDread (ManifestedDread.MkManifestedDread (PlayerId.MkPlayerId 1) (Seq.fromList [ObjectId.MkObjectId 5])))
+      " {\"type\":\"ManifestedDread\",\"value\":{\"player\":1,\"cards\":[5]}} "
   -- CR 706.1. One player id and no result: CR 706.7's planar die fires the
   -- trigger while every reader of a numerical result ignores it, so the number
   -- is not part of this entry.

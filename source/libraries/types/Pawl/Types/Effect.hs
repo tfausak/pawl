@@ -767,6 +767,9 @@ data Effect card ability
     -- library, where CR 110.2a puts the permanent under the instructed player's
     -- control rather than the library owner's (#3855).
     Cloak PlayerRef.PlayerRef
+  | -- | CR 701.62a: the players the PlayerRef names each manifest dread,
+    -- performed by Pawl.Engine.ManifestDread.manifestDread as one procedure.
+    ManifestDread PlayerRef.PlayerRef
   | -- | CR 701.49: the resolving controller ventures into the dungeon,
     -- performed by Pawl.Engine.Dungeon.venture. The payload is CR 701.49d's
     -- "[quality]", a CR 205.3p dungeon type rather than a Filter.

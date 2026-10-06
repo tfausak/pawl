@@ -58,6 +58,7 @@ import qualified Pawl.Engine.Initiative as Initiative
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Learn as Learn
 import qualified Pawl.Engine.Mana as Mana
+import qualified Pawl.Engine.ManifestDread as ManifestDread
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Monarch as Monarch
 import qualified Pawl.Engine.MoveDuration as MoveDuration
@@ -3465,6 +3466,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   -- empty simply has none: CR 609.3 leaves the rest of the effect to do as much
   -- as it can rather than CR 608.2d refusing the instruction.
   Effect.Cloak {} -> False
+  Effect.ManifestDread {} -> False
   Effect.Venture {} -> False
   -- CR 608.2d / 701.21a: a player controlling fewer permanents the edict matches
   -- than it counts cannot sacrifice that many. Through
@@ -9746,6 +9748,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     gs <- State.get
     let named = Set.fromList (playerRefPlayers legal controller gs ref)
     Monad.mapM_ Cloak.cloak (filter (`Set.member` named) (Game.apnapOrder gs))
+  -- CR 701.62a: the named players each manifest dread, the keyword action being
+  -- Pawl.Engine.ManifestDread.manifestDread's, choice and event alike. APNAP
+  -- orders the several, the Cloak arm's reason.
+  Effect.ManifestDread ref -> do
+    gs <- State.get
+    let named = Set.fromList (playerRefPlayers legal controller gs ref)
+    Monad.mapM_ (ManifestDread.manifestDread source) (filter (`Set.member` named) (Game.apnapOrder gs))
   -- CR 701.49: the whole keyword action, which Pawl.Engine.Dungeon owns.
   Effect.Venture quality -> Dungeon.venture controller quality
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters ref kind quantity) -> do

@@ -735,6 +735,7 @@ playerRefPositions =
         ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary (Just (plantedPlayer "si")) (NonEmpty.singleton (plantedRef "si"))), [plantedPlayer "si"]),
         ("shuffle", Effect.Shuffle (plantedPlayer "sh"), [plantedPlayer "sh"]),
         ("cloak", Effect.Cloak (plantedPlayer "ck"), [plantedPlayer "ck"]),
+        ("manifestDread", Effect.ManifestDread (plantedPlayer "md"), [plantedPlayer "md"]),
         ("choose-permanents", Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents (plantedPlayer "cp") (AnyNumberMatching.MkAnyNumberMatching (Filter.Type.And []) Nothing) (SlotName.MkSlotName (Text.pack "cp"))), [plantedPlayer "cp"]),
         ("discard-any-number", Effect.Discard (Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard (plantedPlayer "da") (AnyNumberMatching.MkAnyNumberMatching (Filter.Type.And []) Nothing) Nothing)), [plantedPlayer "da"]),
         ("player-sacrifices", Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices (plantedPlayer "ps") (Filter.Type.And []) one), [plantedPlayer "ps"]),
@@ -1139,6 +1140,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.RingTemptsPlayer _ -> []
   TriggerCondition.PlayerSurveils _ -> []
   TriggerCondition.PlayerProliferates _ -> []
+  TriggerCondition.PlayerManifestsDread _ -> []
   TriggerCondition.PlayerRollsDice _ -> []
   TriggerCondition.PlayerRollsResult _ -> []
   TriggerCondition.Visit -> []
@@ -1275,6 +1277,7 @@ ownCounts effect = case effect of
   Effect.Recruit -> []
   Effect.Learn -> []
   Effect.Cloak {} -> []
+  Effect.ManifestDread {} -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.NoteManaSpent -> []
@@ -1805,6 +1808,7 @@ effectNestedEffects effect = case effect of
   Effect.Recruit -> []
   Effect.Learn -> []
   Effect.Cloak {} -> []
+  Effect.ManifestDread {} -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.NoteManaSpent -> []
@@ -2323,6 +2327,7 @@ effectReplacements effect = case effect of
   Effect.Recruit -> []
   Effect.Learn -> []
   Effect.Cloak {} -> []
+  Effect.ManifestDread {} -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.NoteManaSpent -> []
@@ -2820,6 +2825,7 @@ effectMintedFaces effect = case effect of
   Effect.Recruit -> []
   Effect.Learn -> []
   Effect.Cloak {} -> []
+  Effect.ManifestDread {} -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.NoteManaSpent -> []
@@ -4431,6 +4437,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.RingTemptsPlayer _ -> []
   TriggerCondition.PlayerSurveils _ -> []
   TriggerCondition.PlayerProliferates _ -> []
+  TriggerCondition.PlayerManifestsDread _ -> []
   TriggerCondition.PlayerRollsDice _ -> []
   TriggerCondition.PlayerRollsResult _ -> []
   TriggerCondition.Visit -> []
@@ -4686,6 +4693,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.PlayerCompletesDungeon _ -> []
   TriggerCondition.PlayerSurveils _ -> []
   TriggerCondition.PlayerProliferates _ -> []
+  TriggerCondition.PlayerManifestsDread _ -> []
   TriggerCondition.PlayerRollsDice _ -> []
   TriggerCondition.PlayerRollsResult _ -> []
   TriggerCondition.Visit -> []
@@ -5887,6 +5895,7 @@ effectFilters effect = case effect of
   Effect.Recruit -> []
   Effect.Learn -> []
   Effect.Cloak {} -> []
+  Effect.ManifestDread {} -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.NoteManaSpent -> []
