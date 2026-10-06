@@ -1,0 +1,149 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Comeuppance",
+      "oracleText": "Prevent all damage that would be dealt to you and planeswalkers you control this turn by sources you don't control. If damage from a creature source is prevented this way, Comeuppance deals that much damage to that creature. If damage from a noncreature source is prevented this way, Comeuppance deals that much damage to the source's controller.",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "PreventAllDamage",
+                    "value": {
+                      "duration": {
+                        "type": "UntilEndOfTurn"
+                      },
+                      "riders": [
+                        {
+                          "type": "DealDamage",
+                          "value": {
+                            "parts": [
+                              {
+                                "quantity": {
+                                  "type": "InSlot",
+                                  "value": "thatMuch"
+                                },
+                                "ref": {
+                                  "type": "EachCardFromAmong",
+                                  "value": {
+                                    "filter": {
+                                      "type": "HasCardType",
+                                      "value": {
+                                        "type": "Creature"
+                                      }
+                                    },
+                                    "slot": "thatDamageSource"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "type": "ForEach",
+                          "value": {
+                            "body": [
+                              {
+                                "type": "DealDamage",
+                                "value": {
+                                  "parts": [
+                                    {
+                                      "quantity": {
+                                        "type": "InSlot",
+                                        "value": "thatMuch"
+                                      },
+                                      "ref": {
+                                        "type": "Players",
+                                        "value": {
+                                          "type": "ControllerOfBound",
+                                          "value": "noncreatureSource"
+                                        }
+                                      }
+                                    }
+                                  ]
+                                }
+                              }
+                            ],
+                            "ref": {
+                              "type": "EachCardFromAmong",
+                              "value": {
+                                "filter": {
+                                  "type": "Not",
+                                  "value": {
+                                    "type": "HasCardType",
+                                    "value": {
+                                      "type": "Creature"
+                                    }
+                                  }
+                                },
+                                "slot": "thatDamageSource"
+                              }
+                            },
+                            "slot": "noncreatureSource"
+                          }
+                        }
+                      ],
+                      "whatRecipient": {
+                        "type": "And",
+                        "value": [
+                          {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Planeswalker"
+                            }
+                          },
+                          {
+                            "type": "ControlledBy",
+                            "value": {
+                              "type": "You"
+                            }
+                          }
+                        ]
+                      },
+                      "whatSource": {
+                        "type": "Not",
+                        "value": {
+                          "type": "ControlledBy",
+                          "value": {
+                            "type": "You"
+                          }
+                        }
+                      },
+                      "whoRecipient": {
+                        "type": "You"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}

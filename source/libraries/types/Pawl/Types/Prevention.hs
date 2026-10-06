@@ -22,22 +22,21 @@ import qualified Pawl.Types.Recipient as Recipient
 -- "prevented this way" compares against (Phyrexian Vindicator; see
 -- Pawl.Types.DamagePrevented).
 --
--- `source` is CR 120.1's source of the damage that did not happen, read off the
--- event as PROPOSED, exactly as the recipients are: rule 615.13 watches "damage
--- that WOULD be dealt [and] is prevented", so the event as offered is the one it
--- describes. Carried so Pawl.Types.DamagePrevented can carry it, a source filter
--- being the one question that rule's trigger can ask that `by` does not settle.
---
--- Not a grouping key, unlike `by`: see Pawl.Engine.Replacement.groupPreventions.
---
--- `amounts` is what this instance stopped, PER RECIPIENT, which is the whole
--- point of the type: the CR 616.1 loop's own answer is the SURVIVING event, and
--- a caller holding only that cannot tell a prevented 3 from an event that was
--- never proposed. Its sum is rule 615.5's "that much" -- one application's
--- additional effect runs once with the total -- while the map keeps the reading
--- a trigger scoped to one recipient needs ("damage that would be dealt to YOU",
--- Selfless Squire). A recipient's entry may be 0: CR 615.12's inert application
--- is on this map at 0 so that its rider still queues.
+-- `amounts` is what this instance stopped, PER SOURCE and, within a source, PER
+-- RECIPIENT. CR 615.13 counts one application however many simultaneous events
+-- and sources it covered, so the sources are the outer KEYS rather than part of
+-- the grouping key (see Pawl.Engine.Replacement.groupPreventions): Comeuppance
+-- stopping two attackers at once is one prevention with two sources. A source's
+-- inner sum is CR 615.5's "that much" for that source, since the rider runs once
+-- per source (Pawl.Engine.Resolve.Effect.runPreventionRider); the inner map keeps
+-- the reading a trigger scoped to one recipient needs ("damage that would be
+-- dealt to YOU", Selfless Squire). The CR 120.1 source and the recipient are both
+-- read off the event as PROPOSED: rule 615.13 watches "damage that WOULD be dealt
+-- [and] is prevented", so the event as offered is the one it describes, and the
+-- CR 616.1 loop's own answer is the SURVIVING event, from which a caller cannot
+-- tell a prevented 3 from an event that was never proposed. An entry may be 0:
+-- CR 615.12's inert application is on this map at 0 so that its rider still
+-- queues.
 --
 -- `rider` is CR 615.5's additional effect, carried off the applying row so it
 -- outlives it -- a CR 615.7 shield spent to 0 is dropped in the very application
@@ -47,8 +46,7 @@ import qualified Pawl.Types.Recipient as Recipient
 -- it.
 data Prevention = MkPrevention
   { by :: CandidateId.CandidateId,
-    source :: ObjectId.ObjectId,
-    amounts :: Map.Map Recipient.Recipient Natural,
+    amounts :: Map.Map ObjectId.ObjectId (Map.Map Recipient.Recipient Natural),
     rider :: Maybe PreventionRider.PreventionRider
   }
   deriving (Eq, Ord, Show)

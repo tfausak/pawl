@@ -1,0 +1,148 @@
+{
+  "faces": [
+    {
+      "delayedAbilities": {
+        "damage from a creature": {
+          "condition": {
+            "type": "SelfPreventsDamage",
+            "value": {
+              "type": "HasCardType",
+              "value": {
+                "type": "Creature"
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "ForEach",
+                        "value": {
+                          "body": [
+                            {
+                              "type": "DealDamage",
+                              "value": {
+                                "dealer": "commander",
+                                "parts": [
+                                  {
+                                    "quantity": {
+                                      "type": "AgainstSlot",
+                                      "value": {
+                                        "quantity": {
+                                          "type": "Power"
+                                        },
+                                        "slot": "commander"
+                                      }
+                                    },
+                                    "ref": {
+                                      "type": "InSlot",
+                                      "value": "thatDamageSource"
+                                    }
+                                  }
+                                ]
+                              }
+                            }
+                          ],
+                          "ref": {
+                            "type": "EachMatching",
+                            "value": {
+                              "type": "And",
+                              "value": [
+                                {
+                                  "type": "IsCommander"
+                                },
+                                {
+                                  "type": "HasCardType",
+                                  "value": {
+                                    "type": "Creature"
+                                  }
+                                },
+                                {
+                                  "type": "ControlledBy",
+                                  "value": {
+                                    "type": "You"
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          "slot": "commander"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Judgment of Alexander",
+      "oracleText": "Prevent all damage that would be dealt to you this turn by sources your opponents control. Whenever damage from a creature is prevented this way, each commander creature you control deals damage equal to its power to that creature.",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "PreventAllDamage",
+                    "value": {
+                      "duration": {
+                        "type": "UntilEndOfTurn"
+                      },
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "you"
+                      },
+                      "whatSource": {
+                        "type": "ControlledBy",
+                        "value": {
+                          "type": "Opponent"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "type": "ArmDelayedTrigger",
+                    "value": {
+                      "duration": {
+                        "type": "UntilEndOfTurn"
+                      },
+                      "name": "damage from a creature"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}
