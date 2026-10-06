@@ -340,7 +340,7 @@ participants event =
         GameEvent.Moved m -> one (moved (Moved.change m))
         GameEvent.CardArrived zc -> one (moved zc)
         GameEvent.DamageDealt d -> ([DamageEvent.source d], []) <> recipient (DamageEvent.target d)
-        GameEvent.DamagePrevented p -> ([DamagePrevented.source p], []) <> foldMap recipient (Map.keys (DamagePrevented.amounts p))
+        GameEvent.DamagePrevented p -> (Map.keys (DamagePrevented.amounts p), []) <> foldMap (foldMap recipient . Map.keys) (DamagePrevented.amounts p)
         GameEvent.StepBegan b -> player (StepBegan.player b)
         GameEvent.SpellCast c -> ([SpellWasCast.spell c], [SpellWasCast.player c])
         GameEvent.SpellCopied c -> ([SpellWasCopied.copy c], [SpellWasCopied.player c])
