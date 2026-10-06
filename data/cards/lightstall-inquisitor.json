@@ -1,0 +1,119 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Vigilance"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Lightstall Inquisitor",
+      "oracleText": "Vigilance\nWhen this creature enters, each opponent exiles a card from their hand and may play that card for as long as it remains exiled. Each spell cast this way costs {1} more to cast. Each land played this way enters tapped.",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 1
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfEnters"
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "ForEach",
+                        "value": {
+                          "body": [
+                            {
+                              "type": "MoveToZone",
+                              "value": {
+                                "ref": {
+                                  "type": "ChosenCardInHand",
+                                  "value": {
+                                    "filter": {
+                                      "type": "And",
+                                      "value": []
+                                    },
+                                    "player": {
+                                      "type": "InSlot",
+                                      "value": "opponent"
+                                    }
+                                  }
+                                },
+                                "slot": "exiled",
+                                "zone": {
+                                  "type": "Exile"
+                                }
+                              }
+                            },
+                            {
+                              "type": "GrantPlayFromExile",
+                              "value": {
+                                "duration": {
+                                  "type": "Indefinite"
+                                },
+                                "increase": 1,
+                                "landEnters": {
+                                  "type": "Tapped"
+                                },
+                                "player": {
+                                  "type": "InSlot",
+                                  "value": "opponent"
+                                },
+                                "ref": {
+                                  "type": "InSlot",
+                                  "value": "exiled"
+                                }
+                              }
+                            }
+                          ],
+                          "ref": {
+                            "type": "EachOpponent"
+                          },
+                          "slot": "opponent"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Angel"
+          },
+          {
+            "type": "Wizard"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

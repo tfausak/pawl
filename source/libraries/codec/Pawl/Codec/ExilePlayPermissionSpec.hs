@@ -12,6 +12,7 @@ import qualified Pawl.Types.PermissionCost as PermissionCost
 import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.TapState as TapState
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.ExilePlayPermission" $ do
@@ -31,9 +32,11 @@ spec s = Spec.describe s "Pawl.Codec.ExilePlayPermission" $ do
           ExilePlayPermission.alternativeCost = Nothing,
           ExilePlayPermission.condition = Nothing,
           ExilePlayPermission.origin = PlayPermissionOrigin.Adventure,
-          ExilePlayPermission.verb = PermissionVerb.Play
+          ExilePlayPermission.verb = PermissionVerb.Play,
+          ExilePlayPermission.increase = 0,
+          ExilePlayPermission.landEnters = TapState.Untapped
         }
-      " {\"player\":1,\"source\":2,\"expiry\":{\"type\":\"Never\"},\"spending\":{\"type\":\"AsProduced\"},\"alternativeCost\":null,\"condition\":null,\"origin\":{\"type\":\"Adventure\"},\"verb\":{\"type\":\"Play\"}} "
+      " {\"player\":1,\"source\":2,\"expiry\":{\"type\":\"Never\"},\"spending\":{\"type\":\"AsProduced\"},\"alternativeCost\":null,\"condition\":null,\"origin\":{\"type\":\"Adventure\"},\"verb\":{\"type\":\"Play\"},\"increase\":0,\"landEnters\":{\"type\":\"Untapped\"}} "
   -- CR 601.3 with CR 118.14's rider, the shape Dire Fleet Daredevil writes: a
   -- granted permission lasting until end of turn, mana of any type spendable on
   -- it.
@@ -49,9 +52,11 @@ spec s = Spec.describe s "Pawl.Codec.ExilePlayPermission" $ do
           ExilePlayPermission.alternativeCost = Nothing,
           ExilePlayPermission.condition = Nothing,
           ExilePlayPermission.origin = PlayPermissionOrigin.Granted,
-          ExilePlayPermission.verb = PermissionVerb.Play
+          ExilePlayPermission.verb = PermissionVerb.Play,
+          ExilePlayPermission.increase = 0,
+          ExilePlayPermission.landEnters = TapState.Untapped
         }
-      " {\"player\":3,\"source\":4,\"expiry\":{\"type\":\"AtCleanup\"},\"spending\":{\"type\":\"AnyType\"},\"alternativeCost\":null,\"condition\":null,\"origin\":{\"type\":\"Granted\"},\"verb\":{\"type\":\"Play\"}} "
+      " {\"player\":3,\"source\":4,\"expiry\":{\"type\":\"AtCleanup\"},\"spending\":{\"type\":\"AnyType\"},\"alternativeCost\":null,\"condition\":null,\"origin\":{\"type\":\"Granted\"},\"verb\":{\"type\":\"Play\"},\"increase\":0,\"landEnters\":{\"type\":\"Untapped\"}} "
   -- CR 118.9's waiver, the shape Extract Power writes: a granted permission
   -- lasting as long as the card remains exiled, with the mana cost waived -- an
   -- alternative cost of nothing. The two riders are independent, so this one
@@ -68,8 +73,28 @@ spec s = Spec.describe s "Pawl.Codec.ExilePlayPermission" $ do
           ExilePlayPermission.alternativeCost = Just (PermissionCost.InsteadOfManaCost (ManaCost.MkManaCost [])),
           ExilePlayPermission.condition = Nothing,
           ExilePlayPermission.origin = PlayPermissionOrigin.Granted,
-          ExilePlayPermission.verb = PermissionVerb.Play
+          ExilePlayPermission.verb = PermissionVerb.Play,
+          ExilePlayPermission.increase = 0,
+          ExilePlayPermission.landEnters = TapState.Untapped
         }
-      " {\"player\":5,\"source\":6,\"expiry\":{\"type\":\"Never\"},\"spending\":{\"type\":\"AsProduced\"},\"alternativeCost\":{\"type\":\"InsteadOfManaCost\",\"value\":[]},\"condition\":null,\"origin\":{\"type\":\"Granted\"},\"verb\":{\"type\":\"Play\"}} "
+      " {\"player\":5,\"source\":6,\"expiry\":{\"type\":\"Never\"},\"spending\":{\"type\":\"AsProduced\"},\"alternativeCost\":{\"type\":\"InsteadOfManaCost\",\"value\":[]},\"condition\":null,\"origin\":{\"type\":\"Granted\"},\"verb\":{\"type\":\"Play\"},\"increase\":0,\"landEnters\":{\"type\":\"Untapped\"}} "
+  -- Lightstall Inquisitor's: CR 601.2f's increase and CR 614.1d's tapped entry.
+  Spec.it s "a granted permission with Lightstall Inquisitor's riders" $
+    Common.assertCodec
+      s
+      ExilePlayPermission.codec
+      ExilePlayPermission.MkExilePlayPermission
+        { ExilePlayPermission.player = PlayerId.MkPlayerId 7,
+          ExilePlayPermission.source = ObjectId.MkObjectId 8,
+          ExilePlayPermission.expiry = Expiry.Never,
+          ExilePlayPermission.spending = ManaSpending.AsProduced,
+          ExilePlayPermission.alternativeCost = Nothing,
+          ExilePlayPermission.condition = Nothing,
+          ExilePlayPermission.origin = PlayPermissionOrigin.Granted,
+          ExilePlayPermission.verb = PermissionVerb.Play,
+          ExilePlayPermission.increase = 1,
+          ExilePlayPermission.landEnters = TapState.Tapped
+        }
+      " {\"player\":7,\"source\":8,\"expiry\":{\"type\":\"Never\"},\"spending\":{\"type\":\"AsProduced\"},\"alternativeCost\":null,\"condition\":null,\"origin\":{\"type\":\"Granted\"},\"verb\":{\"type\":\"Play\"},\"increase\":1,\"landEnters\":{\"type\":\"Tapped\"}} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s ExilePlayPermission.codec

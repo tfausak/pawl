@@ -1,5 +1,6 @@
 module Pawl.Types.GrantPlayFromExile where
 
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.ManaSpending as ManaSpending
@@ -7,6 +8,7 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PermissionCost as PermissionCost
 import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.TapState as TapState
 
 -- | The payload of Pawl.Types.Effect's GrantPlayFromExile arm: which objects the
 -- permission covers, whose it is, how long it lasts, and how its holder may pay
@@ -54,6 +56,12 @@ data GrantPlayFromExile = MkGrantPlayFromExile
     -- | CR 601.3 / 305.9: Ragavan, Nimble Pilferer\'s "you may CAST that card"
     -- is Cast, which never lets an exiled land be played; Galvanic Relay\'s
     -- "you may PLAY that card" is Play.
-    verb :: PermissionVerb.PermissionVerb
+    verb :: PermissionVerb.PermissionVerb,
+    -- | CR 601.2f: the generic mana each spell cast under it costs more --
+    -- Lightstall Inquisitor\'s "each spell cast this way costs {1} more".
+    increase :: Natural.Natural,
+    -- | CR 400.7i / 614.1d: how a land played under it enters -- Lightstall
+    -- Inquisitor\'s "each land played this way enters tapped".
+    landEnters :: TapState.TapState
   }
   deriving (Eq, Ord, Show)

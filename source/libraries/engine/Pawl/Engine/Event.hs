@@ -5619,8 +5619,12 @@ changeZoneEnteringIn asOf batch source oid requestedDest position riders under =
 -- alice play a land out of bob's hand, and the CR 108.4a fallback this used to
 -- pass would have handed bob the permanent; see #2169. Identical wherever the two
 -- seats coincide, which is every other land play.
-changeZoneShowing :: Maybe PlayerId -> ObjectId -> Zone -> Maybe CardName.CardName -> Game (Seq.Seq ObjectId)
-changeZoneShowing under oid requestedDest shown = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty under shown Facing.FaceUp False CarryOver.NotCarried False Seq.empty
+--
+-- `tapped` is CR 614.1d's "enters tapped" a permission states for the land
+-- played under it (Pawl.Types.ExilePlayPermission.landEnters), seeded on the
+-- proposed event as changeZoneEntering's rider is.
+changeZoneShowing :: Maybe PlayerId -> ObjectId -> Zone -> Maybe CardName.CardName -> TapState.TapState -> Game (Seq.Seq ObjectId)
+changeZoneShowing under oid requestedDest shown tapped = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing tapped Map.empty under shown Facing.FaceUp False CarryOver.NotCarried False Seq.empty
 
 -- changeZoneShowing for a move that puts the object into its destination FACE
 -- DOWN -- the CR 110.5b "unless a spell or ability says otherwise" that morph is.
@@ -7035,10 +7039,11 @@ arrangeComponents pid dest components =
 --
 -- Not implemented: CR 400.7b for a static grant to spells that is no
 -- permission's rider (Zinnia, Valley's Voice's offspring): nothing stores one,
--- so there is no row here to re-key (gap #3635). CR 400.7i for an exile
--- permission's rider is unimplemented too, on the land-play path (gap #2398).
--- CR 400.7g is implemented, on Pawl.Engine.Cast.keywordsBefore and
--- Pawl.Types.Object.castGrant rather than here.
+-- so there is no row here to re-key (gap #3635).
+--
+-- CR 400.7g is implemented on Pawl.Engine.Cast.keywordsBefore and
+-- Pawl.Types.Object.castGrant, and CR 400.7i for an exile permission's rider
+-- on Pawl.Engine.Cast.playLand's entry, rather than here.
 carryOver :: CarryOver.CarryOver -> ObjectId -> ObjectId -> Game ()
 carryOver carrying oldId newId = case carrying of
   CarryOver.NotCarried -> pure ()

@@ -1,5 +1,6 @@
 module Pawl.Types.ExilePlayPermission where
 
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.ManaSpending as ManaSpending
@@ -8,6 +9,7 @@ import qualified Pawl.Types.PermissionCost as PermissionCost
 import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.TapState as TapState
 
 -- | CR 601.3: "a player can begin to cast a spell only if a rule or effect
 -- allows that player to cast it" -- one such effect's permission, held on the
@@ -97,6 +99,12 @@ data ExilePlayPermission = MkExilePlayPermission
     -- | CR 601.3 / 305.9: whether the permission also lets an exiled land be
     -- played (Play) or only lets a spell be cast (Cast). Read by
     -- Pawl.Engine.Cast.permitsLandPlayFromExile.
-    verb :: PermissionVerb.PermissionVerb
+    verb :: PermissionVerb.PermissionVerb,
+    -- | CR 601.2f: the generic mana each spell cast under it costs more --
+    -- Lightstall Inquisitor\'s "each spell cast this way costs {1} more".
+    increase :: Natural.Natural,
+    -- | CR 400.7i / 614.1d: how a land played under it enters -- Lightstall
+    -- Inquisitor\'s "each land played this way enters tapped".
+    landEnters :: TapState.TapState
   }
   deriving (Eq, Ord, Show)

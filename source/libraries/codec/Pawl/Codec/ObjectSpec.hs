@@ -194,7 +194,9 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
                   ExilePlayPermission.alternativeCost = Just (PermissionCost.InsteadOfManaCost (ManaCost.MkManaCost [])),
                   ExilePlayPermission.condition = Nothing,
                   ExilePlayPermission.origin = PlayPermissionOrigin.Granted,
-                  ExilePlayPermission.verb = PermissionVerb.Cast
+                  ExilePlayPermission.verb = PermissionVerb.Cast,
+                  ExilePlayPermission.increase = 1,
+                  ExilePlayPermission.landEnters = TapState.Tapped
                 },
           Object.plotted = Just 0,
           Object.foretold = Just 15,
@@ -263,7 +265,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"timestamp\":10,\"face\":\"Delver of Secrets\",\"turnedOverAt\":11"
           <> ",\"worldSince\":12"
           <> ",\"playableFromExile\":{\"player\":13,\"source\":14,\"expiry\":{\"type\":\"AtCleanup\"}"
-          <> ",\"spending\":{\"type\":\"AnyType\"},\"alternativeCost\":{\"type\":\"InsteadOfManaCost\",\"value\":[]},\"condition\":null,\"origin\":{\"type\":\"Granted\"},\"verb\":{\"type\":\"Cast\"}}"
+          <> ",\"spending\":{\"type\":\"AnyType\"},\"alternativeCost\":{\"type\":\"InsteadOfManaCost\",\"value\":[]},\"condition\":null,\"origin\":{\"type\":\"Granted\"},\"verb\":{\"type\":\"Cast\"},\"increase\":1,\"landEnters\":{\"type\":\"Tapped\"}}"
           <> ",\"plotted\":0,\"foretold\":15"
           <> ",\"foretellCostReduction\":[{\"type\":\"Generic\",\"value\":29}]"
           <> ",\"warped\":28,\"preparedCopyOf\":26"
