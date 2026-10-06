@@ -106,7 +106,7 @@
       "do": {
         "Answer": {
           "prompt": "ChooseManaSource",
-          "with": "$f2"
+          "with": "$f1"
         }
       }
     },
