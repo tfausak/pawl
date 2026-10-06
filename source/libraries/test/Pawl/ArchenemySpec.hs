@@ -47,7 +47,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Archenemy" $ do
     soil <- S.printingOf s registry "The Very Soil Shall Shake"
     let alices = (Deck.fromCards (Map.singleton forest 20)) {Deck.schemes = Map.fromList [(look, 2), (soil, 1)]}
         bobs = Deck.fromCards (Map.singleton forest 20)
-        started = S.runPure S.identityAnswer (Setup.emptyGame S.bothPlayers) (Setup.newGame Resolve.performHandAction ((S.alice, alices) NonEmpty.:| [(S.bob, bobs)]))
+        started = S.runPure S.identityAnswer (Setup.emptyGame S.bothPlayers) (Setup.newGame (Resolve.performHandAction Resolve.noSubgame) ((S.alice, alices) NonEmpty.:| [(S.bob, bobs)]))
     Spec.assertEqWith s "CR 904.5 alice has 40 life and bob 20" (S.lifeOf S.alice started, S.lifeOf S.bob started) (Just 40, Just 20)
     Spec.assertEqWith s "CR 904.4 all three schemes are in her scheme deck" (length (Archenemy.deckOf S.alice started)) 3
     Spec.assertEqWith s "none is face up" (Archenemy.faceUp started) []
@@ -61,7 +61,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Archenemy" $ do
     look <- S.printingOf s registry "Look Skyward and Despair"
     let plain = Deck.fromCards (Map.singleton forest 20)
         schemer = plain {Deck.schemes = Map.singleton look 2}
-        started bobs = S.runPure S.identityAnswer (Setup.emptyGame S.threePlayers) (Setup.newGame Resolve.performHandAction ((S.alice, plain) NonEmpty.:| [(S.bob, bobs), (S.carol, schemer)]))
+        started bobs = S.runPure S.identityAnswer (Setup.emptyGame S.threePlayers) (Setup.newGame (Resolve.performHandAction Resolve.noSubgame) ((S.alice, plain) NonEmpty.:| [(S.bob, bobs), (S.carol, schemer)]))
         sides gs = (fmap (`Game.opponentsOf` gs) [S.alice, S.bob, S.carol], Turn.sharesTurn gs S.alice S.bob)
     Spec.assertEqWith s "CR 904.6 carol takes the first turn, the cyclic order kept" (GameState.activePlayer (started plain), GameState.turnOrder (started plain)) (S.carol, [S.carol, S.alice, S.bob])
     Spec.assertEqWith s "CR 904.2 alice and bob are teammates sharing turns, each carol's opponent" (sides (started plain)) ([[S.carol], [S.carol], [S.alice, S.bob]], True)
@@ -82,7 +82,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Archenemy" $ do
         teamed shared =
           let gs = Setup.emptyGame S.threePlayers
            in gs {GameState.settings = (GameState.settings gs) {GameSettings.sharedTeamLife = shared}}
-        started shared = S.runPure S.identityAnswer (teamed shared) (Setup.newGame Resolve.performHandAction ((S.alice, alices) NonEmpty.:| [(S.bob, commanderDeck), (S.carol, commanderDeck)]))
+        started shared = S.runPure S.identityAnswer (teamed shared) (Setup.newGame (Resolve.performHandAction Resolve.noSubgame) ((S.alice, alices) NonEmpty.:| [(S.bob, commanderDeck), (S.carol, commanderDeck)]))
         lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
         struck = S.runPure S.identityAnswer (started True) (Event.changeLife S.bob (-7))
         poisoned = S.settleSba (S.addPlayerCounter PlayerCounterKind.Poison 10 S.carol struck)

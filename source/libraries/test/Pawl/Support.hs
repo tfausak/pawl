@@ -829,10 +829,11 @@ withEffect oid m gs =
   let (ts, gs1) = Game.freshTimestamp gs
    in withEffectAt oid ts m gs1
 
--- The one CR 103.5b performer (Pawl.Engine.Resolve.Effect.performHandAction), so a test
--- that only wants a game set up does not have to reach into Pawl.Engine.Resolve for it.
+-- The one CR 103.5b performer (Pawl.Engine.Resolve.Effect.performHandAction) with
+-- the live loop's subgame runner, so a test that only wants a game set up does
+-- not have to reach into Pawl.Engine.Resolve for it.
 performer :: HandActionPerformer.HandActionPerformer
-performer = Resolve.performHandAction
+performer = Resolve.performHandAction Engine.playSubgame
 
 -- The one CR 405.6c performer (Pawl.Engine.Resolve.Effect.performManaAbility), which
 -- every payment path takes as a parameter, so a test that pays a cost does not

@@ -533,11 +533,11 @@ runTurnBasedActions phase = do
       needSecond <- Damage.dealCombatDamage
       -- CR 614.1a: what a run-effects rewrite put in a replaced event's place
       -- runs HERE, before the step's SBA check and before the riders below.
-      Resolve.runDamageRewriteEffects
+      Resolve.runDamageRewriteEffects playSubgame
       -- CR 615.5's "immediately afterward": a shield this wave spent runs its
       -- additional effect HERE, before the step's SBA check, so Test of Faith's
       -- +1/+1 counters are on the blocker before CR 704.5g asks about lethality.
-      Resolve.runPreventionRiders
+      Resolve.runPreventionRiders playSubgame
       Monad.when needSecond $
         State.modify' (\gs -> gs {GameState.remaining = Turn.spliceSecondDamage (GameState.remaining gs)})
     -- CR 505.4 / 703.4f / 714.3c: a lore counter onto each Saga its controller
@@ -1173,7 +1173,7 @@ performSettle = do
   -- CR 614.1c: an as-enters rewrite that ran an effect queued it, Event being
   -- unable to run one. Drained FIRST, so the effects land before the SBA pass --
   -- Monstrous War-Leech's mill decides what CR 704.5f then reads.
-  Resolve.runEntryEffects
+  Resolve.runEntryEffects playSubgame
   swept <- Expiry.sweepConditional
   -- CR 610.3's second one-shot effect, Palace Jailer's and Banisher Priest's
   -- alike: a return zone change is not something an Expiry sweep can perform.
@@ -2161,7 +2161,7 @@ playSubgame = do
     Trans.lift
       ( Program.mapProgram
           (Asked.under parent)
-          (State.runStateT (Setup.startGameFromCards Resolve.performHandAction Set.empty >> playGame) sub0)
+          (State.runStateT (Setup.startGameFromCards (Resolve.performHandAction playSubgame) Set.empty >> playGame) sub0)
       )
   -- CR 729.4a. This frame is the only one holding both games, which is why the
   -- departures are applied from here and not from inside either of them
@@ -2198,5 +2198,5 @@ playSubgame = do
 
 playFrom :: NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> Game Result
 playFrom matchup = do
-  Setup.newGame Resolve.performHandAction matchup
+  Setup.newGame (Resolve.performHandAction playSubgame) matchup
   playGame

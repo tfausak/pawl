@@ -2476,7 +2476,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = do
   -- CR 614.1c: the as-enters effects of what this instruction put onto the
   -- battlefield, before the next instruction reads the board. After the window
   -- above, so what they exile is filed by their own windows, not this one's.
-  runEntryEffects
+  runEntryEffects runSubgame
 
 -- CR 702.167c: the cards exiled to pay the cost of the craft ability resolving
 -- as `resolving` (Binding.craftMaterials), linked to the permanent it put onto
@@ -3677,10 +3677,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           Damage.applyDamage rewritten
           -- CR 614.1a: what a run-effects rewrite put in a replaced event's place
           -- runs inside this resolution too, and before the riders below.
-          runDamageRewriteEffects
+          runDamageRewriteEffects runSubgame
           -- CR 615.5's "immediately afterward": a shield this damage spent runs
           -- its additional effect inside this resolution.
-          runPreventionRiders
+          runPreventionRiders runSubgame
   -- CR 701.14. Every clause of the rule is one line here, and none of them is a
   -- read of what the effect IS: the amounts come off the projection, the kind is
   -- data, and the pair guard is arithmetic on two Maybes.
@@ -3739,8 +3739,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- ordinary damage event, so a rewrite or a shield that applied to it
           -- runs inside this resolution rather than waiting for the next one.
           -- CR 614.1a's instead-effects first, then CR 615.5's riders.
-          runDamageRewriteEffects
-          runPreventionRiders
+          runDamageRewriteEffects runSubgame
+          runPreventionRiders runSubgame
       _ -> pure ()
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref each) -> do
     -- The affected objects are enumerated once, by the same sweep every
@@ -4394,7 +4394,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     let exempted = case exempt of
           Nothing -> Set.empty
           Just ref -> Set.fromList (objectRefObjects legal resolving controller source gs ref)
-    Setup.restartGame performHandAction exempted controller
+    Setup.restartGame (performHandAction runSubgame) exempted controller
   -- CR 729.1/729.5: run the nested game to completion, then bind its outcome.
   --
   -- CR 729.1b: what the main game may read is the subgame's WINNER, so the slot
@@ -10333,11 +10333,11 @@ applyEffect = applyEffectWith noSubgame
 -- Test of Faith ends as a 4/4 rather than dying to CR 704.5g first. Emptied
 -- BEFORE the riders run, so a rider whose own damage is prevented appends to a
 -- fresh queue instead of being re-run here.
-runPreventionRiders :: Game ()
-runPreventionRiders = do
+runPreventionRiders :: Game Result -> Game ()
+runPreventionRiders runSubgame = do
   queued <- State.gets GameState.pendingPreventionRiders
   State.modify' (\gs -> gs {GameState.pendingPreventionRiders = Seq.empty})
-  Foldable.traverse_ runPreventionRider queued
+  Foldable.traverse_ (runPreventionRider runSubgame) queued
 
 -- One queued prevention's additional effect; nothing runs unless the prevention
 -- carries a rider.
@@ -10359,15 +10359,13 @@ runPreventionRiders = do
 -- `resolving` and `source` are both the rider's own source (CR 113.7). Every slot
 -- the rider names is treated as a LEGAL target, CR 608.2b having been applied
 -- when the installing spell resolved.
-runPreventionRider :: Prevention.Prevention -> Game ()
-runPreventionRider prevention = Foldable.for_ (Prevention.rider prevention) $ \rider -> do
+runPreventionRider :: Game Result -> Prevention.Prevention -> Game ()
+runPreventionRider runSubgame prevention = Foldable.for_ (Prevention.rider prevention) $ \rider -> do
   was <- State.gets GameState.ambientAmounts
   State.modify' (\gs -> gs {GameState.ambientAmounts = Map.insert Binding.eventAmount (sum (Prevention.amounts prevention)) was})
   let targets = Map.insert Binding.preventedDamageSource (Set.singleton (Recipient.ToObject (Prevention.source prevention))) (PreventionRider.targets rider)
       src = PreventionRider.source rider
-  Foldable.traverse_
-    (applyEffect src src (PreventionRider.controller rider) targets targets)
-    (PreventionRider.effects rider)
+  Monad.void (runCarrying runSubgame src (PreventionRider.controller rider) Map.empty targets (PreventionRider.effects rider))
   State.modify' (\gs -> gs {GameState.ambientAmounts = was})
 
 -- CR 614.1c: run the effects of every as-enters rewrite that has applied and not
@@ -10381,11 +10379,11 @@ runPreventionRider prevention = Foldable.for_ (Prevention.rider prevention) $ \r
 -- power is read after its own sweep" proves it. Pawl.Engine.Engine.performSettle
 -- runs it for every other road onto the battlefield (a permanent spell, a land
 -- play), before the SBA pass and the trigger scan.
-runEntryEffects :: Game ()
-runEntryEffects = do
+runEntryEffects :: Game Result -> Game ()
+runEntryEffects runSubgame = do
   queued <- State.gets GameState.pendingEntryEffects
   State.modify' (\gs -> gs {GameState.pendingEntryEffects = Seq.empty})
-  Foldable.traverse_ runEntryEffect queued
+  Foldable.traverse_ (runEntryEffect runSubgame) queued
 
 -- One entered permanent's as-enters effects, in printed order.
 --
@@ -10396,8 +10394,8 @@ runEntryEffects = do
 -- CR 107.3m: an X these effects read is the one announced for the spell that
 -- became the permanent (Neverwinter Hydra's "roll X d6"), bound on the permanent
 -- only while they run, since that clause makes the permanent's own X 0.
-runEntryEffect :: PendingEntryEffect.PendingEntryEffect -> Game ()
-runEntryEffect pending = do
+runEntryEffect :: Game Result -> PendingEntryEffect.PendingEntryEffect -> Game ()
+runEntryEffect runSubgame pending = do
   let oid = PendingEntryEffect.object pending
       setX value gs = gs {GameState.objects = Map.adjust (\o -> o {Object.bindings = Map.alter (const value) Binding.variableX (Object.bindings o)}) oid (GameState.objects gs)}
   entering <- State.gets (Game.lookupObject oid)
@@ -10409,15 +10407,7 @@ runEntryEffect pending = do
   outer <- State.gets GameState.enteringBeside
   beside <- State.gets (enteredBeside oid)
   State.modify' (\gs -> gs {GameState.enteringBeside = Set.union outer beside})
-  Foldable.traverse_
-    ( applyEffect
-        oid
-        oid
-        (PendingEntryEffect.controller pending)
-        Map.empty
-        Map.empty
-    )
-    (PendingEntryEffect.effects pending)
+  Monad.void (runCarrying runSubgame oid (PendingEntryEffect.controller pending) Map.empty Map.empty (PendingEntryEffect.effects pending))
   State.modify' (\gs -> gs {GameState.enteringBeside = outer})
   Foldable.for_ announced $ \_ -> State.modify' (setX before)
   State.modify' (Trigger.resampleEntry oid)
@@ -10460,35 +10450,34 @@ enteredBeside oid gs = case Trigger.entryGroup oid gs of
 -- What that ordering does NOT give is CR 614.1's own placement, inside the
 -- event; no card in the pool can observe the difference, every producer's
 -- effects being destructions the SBA pass would reach anyway.
-runDamageRewriteEffects :: Game ()
-runDamageRewriteEffects = do
+runDamageRewriteEffects :: Game Result -> Game ()
+runDamageRewriteEffects runSubgame = do
   queued <- State.gets GameState.pendingDamageEffects
   State.modify' (\gs -> gs {GameState.pendingDamageEffects = Seq.empty})
-  Foldable.traverse_ runDamageRewriteEffect queued
+  Foldable.traverse_ (runDamageRewriteEffect runSubgame) queued
 
 -- One replaced damage event's effects, in printed order.
 --
 -- `resolving` and `source` are both the row's own source (CR 113.7),
 -- runPreventionRider's posture. Every slot the row carries is treated as a LEGAL
 -- target, CR 608.2b having been applied when the installing ability resolved.
-runDamageRewriteEffect :: PendingDamageEffect.PendingDamageEffect -> Game ()
-runDamageRewriteEffect pending =
+runDamageRewriteEffect :: Game Result -> PendingDamageEffect.PendingDamageEffect -> Game ()
+runDamageRewriteEffect runSubgame pending =
   let targets = PendingDamageEffect.targets pending
       src = PendingDamageEffect.source pending
-   in Foldable.traverse_
-        (applyEffect src src (PendingDamageEffect.controller pending) targets targets)
-        (PendingDamageEffect.effects pending)
+   in Monad.void (runCarrying runSubgame src (PendingDamageEffect.controller pending) Map.empty targets (PendingDamageEffect.effects pending))
 
 -- CR 103.5b / CR 103.6: perform the effects of an action a card grants from a
 -- player's hand. Pawl.Engine.Mulligan's window loops reach this through the
 -- HandActionPerformer parameter (see Pawl.Types.HandActionPerformer).
 --
 -- The action does not use the stack, so there is nothing to put on it and no
--- modes to bind. Stands on the noSubgame floor: no hand action starts a subgame.
-performHandAction :: HandActionPerformer.HandActionPerformer
-performHandAction source player =
+-- modes to bind.
+performHandAction :: Game Result -> HandActionPerformer.HandActionPerformer
+performHandAction runSubgame source player =
   Monad.mapM_
-    ( applyEffect
+    ( applyEffectWith
+        runSubgame
         source
         source
         player
@@ -10784,8 +10773,8 @@ withRollingDie sides act = do
 -- Pawl.Types.ManaAbilityPerformer parameter: CR 405.6c's other effects of the
 -- activated mana ability being paid, and CR 605.4a's triggered mana ability.
 --
--- Both stand on the noSubgame floor, performHandAction's reason: no mana ability
--- starts a subgame (#1900).
+-- Not implemented: both stand on the noSubgame floor, so a mana ability that
+-- plays a subgame reports a draw (#1900).
 performManaAbility :: ManaAbilityPerformer.ManaAbilityPerformer
 performManaAbility =
   ManaAbilityPerformer.MkManaAbilityPerformer
@@ -10875,27 +10864,37 @@ performTriggeredManaAbility pending = case PendingTrigger.source pending of
 -- data/cards/ reads (#3124).
 performManaAbilityEffects :: ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> Game (Map.Map SlotName (Set Recipient))
 performManaAbilityEffects source controller =
-  let manaAbilityBindings =
-        Map.fromList
-          [ (Binding.triggerSource, Set.singleton (Recipient.ToObject source)),
-            (Binding.you, Set.singleton (Recipient.ToPlayer controller))
-          ]
-      holderBindings gs = case Game.lookupObject source gs of
+  -- CR 109.5's "you" is the player who activated the ability, and the reserved
+  -- self slot is CR 113.7's source. Both are bound here rather than read off an
+  -- object, because there is no ability object carrying them:
+  -- Pawl.Engine.Activate.activateAbility stamps them for every ability that does
+  -- go on the stack.
+  runCarrying noSubgame source controller $
+    Map.fromList
+      [ (Binding.triggerSource, Set.singleton (Recipient.ToObject source)),
+        (Binding.you, Set.singleton (Recipient.ToPlayer controller))
+      ]
+
+-- CR 608.2c: run instructions that have no stack object in printed order, with
+-- `holder` both resolving and source (CR 113.7), carrying what each one binds
+-- onto `holder` into the slot maps of the next -- the re-read resolveSpellWith
+-- makes off the stack object before each effect. PlaySubgame's winner is what a
+-- following Draw reads (Synthetic Threshold of Legends). `fixed` is unioned in
+-- under every instruction; the slots an instruction defines are cleared off
+-- `holder` first, so a stale value cannot stand in for one it never bound.
+runCarrying :: (Foldable t) => Game Result -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Set Recipient) -> t (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Game (Map.Map SlotName (Set Recipient))
+runCarrying runSubgame holder controller fixed =
+  let holderBindings gs = case Game.lookupObject holder gs of
         Just obj -> Object.bindings obj
-        Nothing -> Map.findWithDefault Map.empty source (GameState.detachedBindings gs)
+        Nothing -> Map.findWithDefault Map.empty holder (GameState.detachedBindings gs)
       run bound effect = do
         let defined = boundSlots effect
-            -- CR 109.5's "you" is the player who activated the ability, and the
-            -- reserved self slot is CR 113.7's source. Both are bound here rather
-            -- than read off an object, because there is no ability object carrying
-            -- them: Pawl.Engine.Activate.activateAbility stamps them for every
-            -- ability that does go on the stack.
-            env = Map.union bound manaAbilityBindings
+            env = Map.union bound fixed
         State.modify' $ \gs ->
-          (overHolderBindings source (`Map.withoutKeys` defined) gs)
-            { GameState.detachedBindings = Map.adjust (`Map.withoutKeys` defined) source (GameState.detachedBindings gs)
+          (overHolderBindings holder (`Map.withoutKeys` defined) gs)
+            { GameState.detachedBindings = Map.adjust (`Map.withoutKeys` defined) holder (GameState.detachedBindings gs)
             }
-        applyEffect source source controller env env effect
+        applyEffectWith runSubgame holder holder controller env env effect
         after <- State.get
         pure (Map.union (Map.restrictKeys (Binding.targetsOf (holderBindings after)) defined) bound)
    in Monad.foldM run
@@ -10988,15 +10987,16 @@ isCardInAGraveyard oid gs = case Game.lookupObject oid gs of
   Just obj -> Object.zone obj == Zone.Graveyard && not (Game.isToken oid gs)
 
 -- The default runner for the resolutions the live loop does not drive: a
--- PlaySubgame effect reports a draw and binds nothing. Pawl.Engine.Engine's
--- priority loop passes the real runner to BOTH halves of CR 729.1a's "spell or
--- ability" (resolveSpellWith, resolveModesWith), which is every object that
--- resolves off the stack.
+-- PlaySubgame effect reports a draw and binds nothing. Pawl.Engine.Engine passes
+-- the real runner to BOTH halves of CR 729.1a's "spell or ability"
+-- (resolveSpellWith, resolveModesWith), and to the instructions that never reach
+-- the stack: CR 614.1c's as-enters effects, CR 615.5's prevention riders, CR
+-- 614.1a's damage-replacement effects and CR 103.5b/103.6's hand actions.
+-- Pawl.GameSpec's "CR 614.1c / 729.1b gameplay: an as-enters subgame's winner
+-- draws a card" proves the as-enters road.
 --
--- Not implemented: a subgame started by an instruction that never reaches the
--- stack -- CR 103.5b/103.6's hand actions (performHandAction), CR 615.5's
--- prevention riders and CR 614.1c's as-enters effects all fold the bare
--- applyEffect and land here (#1900).
+-- Not implemented: a subgame started by a mana ability's effects
+-- (performManaAbility), which fold the bare applyEffect and land here (#1900).
 noSubgame :: Game Result
 noSubgame = pure Result.Drawn
 

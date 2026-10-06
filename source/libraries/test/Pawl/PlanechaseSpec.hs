@@ -51,7 +51,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Planechase" $ do
     tazeem <- S.printingOf s registry "Tazeem"
     let alices = (Deck.fromCards (Map.singleton forest 20)) {Deck.planes = Set.fromList [academy, tazeem]}
         bobs = Deck.fromCards (Map.singleton forest 20)
-        started = S.runPure S.identityAnswer (Setup.emptyGame S.bothPlayers) (Setup.newGame Resolve.performHandAction ((S.alice, alices) NonEmpty.:| [(S.bob, bobs)]))
+        started = S.runPure S.identityAnswer (Setup.emptyGame S.bothPlayers) (Setup.newGame (Resolve.performHandAction Resolve.noSubgame) ((S.alice, alices) NonEmpty.:| [(S.bob, bobs)]))
     Spec.assertEqWith s "one plane is face up" (length (Planechase.faceUp started)) 1
     Spec.assertEqWith s "and the other is still alice's planar deck" (length (Planechase.deckOf S.alice started)) 1
     Spec.assertEqWith s "and neither is in her library" (length (Game.zoneMembers Zone.Library S.alice started)) 13

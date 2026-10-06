@@ -138,7 +138,7 @@ started swamp attractions =
       answering p = case p of
         Prompt.Shuffle ids -> State.modify' (ids :) >> pure (reverse ids)
         _ -> pure (S.identityAnswer p)
-      ((_, after), shuffles) = State.runState (Engine.runGame answering (Setup.emptyGame S.bothPlayers) (Setup.newGame Resolve.performHandAction ((S.alice, deck) NonEmpty.:| [(S.bob, Deck.fromCards (Map.singleton swamp 10))]))) []
+      ((_, after), shuffles) = State.runState (Engine.runGame answering (Setup.emptyGame S.bothPlayers) (Setup.newGame (Resolve.performHandAction Resolve.noSubgame) ((S.alice, deck) NonEmpty.:| [(S.bob, Deck.fromCards (Map.singleton swamp 10))]))) []
    in (after, reverse shuffles)
 
 -- The board every visit case starts from: alice controls `attraction` and a
@@ -292,7 +292,7 @@ newGameSpec s registry = Spec.describe s "A new game" $ do
     cars <- S.printingOf s registry "Bumper Cars"
     let (board, _, _, _) = visitBoard piker (carsA cars)
         gs = withAttractions S.alice [carsF cars] board
-        restarted = S.runPure S.identityAnswer gs (Setup.restartGame Resolve.performHandAction Set.empty S.alice)
+        restarted = S.runPure S.identityAnswer gs (Setup.restartGame (Resolve.performHandAction Resolve.noSubgame) Set.empty S.alice)
         lights = Set.fromList (fmap (`Game.lightsOf` restarted) (Attraction.deckOf S.alice restarted))
     Spec.assertEqWith s "both Bumper Cars are in alice's Attraction deck" lights (Set.fromList [Set.fromList [2, 3, 6], Set.fromList [4, 5, 6]])
     Spec.assertEqWith s "and neither is on the battlefield" (S.countOnBattlefieldByName bumperCars S.alice restarted) 0
@@ -302,7 +302,7 @@ newGameSpec s registry = Spec.describe s "A new game" $ do
     cars <- S.printingOf s registry "Bumper Cars"
     let (board, _, _, faceUp) = visitBoard piker (carsA cars)
         parent = withAttractions S.alice [carsF cars] board
-        sub = S.runPure S.identityAnswer (Setup.subgameStateFrom S.alice parent) (Setup.startGameFromCards Resolve.performHandAction Set.empty)
+        sub = S.runPure S.identityAnswer (Setup.subgameStateFrom S.alice parent) (Setup.startGameFromCards (Resolve.performHandAction Resolve.noSubgame) Set.empty)
         back = Setup.funnelBack sub parent
     Spec.assertEqWith s "CR 729.2a: the deck is in the subgame" (fmap (`Game.lightsOf` sub) (Attraction.deckOf S.alice sub)) [Set.fromList [4, 5, 6]]
     Spec.assertBool s (Maybe.isNothing (Game.lookupObject faceUp sub)) "and the face-up one stayed behind"
