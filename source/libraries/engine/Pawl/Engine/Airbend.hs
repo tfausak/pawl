@@ -24,6 +24,7 @@
 module Pawl.Engine.Airbend where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Pawl.Engine.Binding as Binding
 import Pawl.Types.Card (Card)
 import Pawl.Types.Effect (Effect)
@@ -79,7 +80,8 @@ exile ref =
               EntryRiders.exiledFaceDown = False,
               EntryRiders.attachedTo = Nothing,
               EntryRiders.faceDown = Nothing,
-              EntryRiders.noted = False
+              EntryRiders.noted = False,
+              EntryRiders.characteristics = Seq.empty
             },
         MoveToZone.slot = Just Binding.airbentObjects,
         MoveToZone.origin = Nothing,

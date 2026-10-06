@@ -55,6 +55,7 @@ import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Rounding as Rounding
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
+import qualified Pawl.Types.StoredResult as StoredResult
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Times as Times
@@ -579,6 +580,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- number in place of the 0/1. A mark set with no number reads 0, which is what
         -- every designation but a "Monstrosity X" is.
         Quantity.DesignationValue d -> fmap (toInteger . Map.findWithDefault 0 d . Filter.designationValues) mView
+        Quantity.StoredResultsOfSameValue -> fmap (toInteger . greatestOfOneValue . Filter.storedResults) mView
         -- CR 716.2d is applied HERE and nowhere else: a permanent with no level reads
         -- as level 1 for every rule and effect that asks, so the default belongs at the
         -- one read rather than in the field Filter.classLevel reports.
@@ -1291,6 +1293,7 @@ objectSlots quantity = case quantity of
   Quantity.ObjectCountersOfAnyKind -> Set.empty
   Quantity.HasDesignation _ -> Set.empty
   Quantity.DesignationValue _ -> Set.empty
+  Quantity.StoredResultsOfSameValue -> Set.empty
   Quantity.ClassLevel -> Set.empty
   Quantity.WasKicked -> Set.empty
   Quantity.WasForetold -> Set.empty
@@ -1571,6 +1574,7 @@ readsX quantity = case quantity of
   Quantity.ObjectCountersOfAnyKind -> False
   Quantity.HasDesignation _ -> False
   Quantity.DesignationValue _ -> False
+  Quantity.StoredResultsOfSameValue -> False
   Quantity.ClassLevel -> False
   Quantity.WasKicked -> False
   Quantity.WasForetold -> False
@@ -1765,3 +1769,10 @@ controlClockOf :: GameState -> ObjectId -> Map.Map PlayerId.PlayerId ControlCloc
 controlClockOf gs oid = case Game.lookupObject oid gs of
   Just object -> Object.controlClock object
   Nothing -> maybe Map.empty LastKnown.controlClock (Map.lookup oid (GameState.lastKnown gs))
+
+-- | CR 706.8a: the greatest number of these stored results sharing one value.
+-- Grouped by VALUE alone, since Centaur of Attention's "of the same value" asks
+-- nothing of the kind of die; no stored result is 0.
+greatestOfOneValue :: Map.Map StoredResult.StoredResult Natural -> Natural
+greatestOfOneValue stored =
+  Foldable.foldl' max 0 (Map.fromListWith (+) [(StoredResult.value result, n) | (result, n) <- Map.toList stored])

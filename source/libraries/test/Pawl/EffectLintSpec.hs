@@ -259,6 +259,7 @@ ownQuantities effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.Reroll -> []
+  Effect.RerollStoredResults _ -> []
   Effect.ChooseCardName _ -> []
   Effect.FromOutsideTheGame _ -> []
   Effect.ExileThisSpell -> []
@@ -471,6 +472,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.ObjectCountersOfAnyKind -> False
   Quantity.Type.HasDesignation {} -> False
   Quantity.Type.DesignationValue {} -> False
+  Quantity.Type.StoredResultsOfSameValue -> False
   Quantity.Type.ClassLevel -> False
   Quantity.Type.WasKicked -> False
   Quantity.Type.WasForetold -> False
@@ -1378,6 +1380,7 @@ effectObjectRefs effect =
         Effect.ExileAllGraveyards -> []
         Effect.Proliferate -> []
         Effect.Reroll -> []
+        Effect.RerollStoredResults _ -> []
         Effect.ChooseCardName {} -> []
         Effect.FromOutsideTheGame {} -> []
         Effect.ExileThisSpell -> []
@@ -2119,6 +2122,8 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           Effect.TurnFaceUp slot -> [slot]
           Effect.BecomesBlocked slot -> [slot]
           Effect.Designate (Designate.MkDesignate _ slot _) -> [slot]
+          Effect.RollDie rollDie -> Foldable.toList (RollDie.store rollDie)
+          Effect.RerollStoredResults slot -> [slot]
           Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ slot) -> [slot]
           Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _ slot) -> [slot]
           Effect.Evolve slot -> [slot]
@@ -2805,6 +2810,24 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     -- Guards against a vacuous sweep. Magar of the Magic Strings notes one.
     Spec.assertBool s (any (anyFace (any notes . cardResolutionEffects) . Printing.card) ps) "the pool has a card noting the card it moves"
     Spec.assertEqWith s "only a move onto the battlefield notes a card (CR 707.14)" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 611.2e speaks about a resolution putting a NONTOKEN permanent onto the
+  -- battlefield, so its effects ride the MoveToZone road alone and only to the
+  -- battlefield; Event's Create arms do not read them.
+  Spec.it s "only a move onto the battlefield enters under CR 611.2e effects" $ do
+    ps <- S.allPrintings s
+    let carries riders = not (Seq.null (EntryRiders.characteristics riders))
+        offends effect = case effect of
+          Effect.MoveToZone (MoveToZone.MkMoveToZone _ zone riders _ _ _ _) -> carries riders && zone /= Zone.Battlefield
+          Effect.Create (Create.MkCreate _ _ riders _ _) -> carries riders
+          Effect.CreateCopy (CreateCopy.MkCreateCopy _ _ riders _ _) -> carries riders
+          _ -> False
+        defines effect = case effect of
+          Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _ _) -> carries riders
+          _ -> False
+        offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
+    -- Guards against a vacuous sweep. Bronzehide Lion returns as an Aura.
+    Spec.assertBool s (any (anyFace (any defines . cardResolutionEffects) . Printing.card) ps) "the pool has a card returning a permanent under CR 611.2e effects"
+    Spec.assertEqWith s "only a move onto the battlefield enters under CR 611.2e effects" (fmap (S.nameOf . Printing.card) offenders) []
   -- Effect.CreateCopy carries the SAME EntryRiders record Create and MoveToZone
   -- do, but Pawl.Engine.Resolve's arm reads only CR 122.6's `counters`, CR
   -- 110.5b's `tapped`, CR 508.4's `attacking` and CR 509.4's `blocking` --

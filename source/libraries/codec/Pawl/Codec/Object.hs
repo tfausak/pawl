@@ -32,6 +32,7 @@ import qualified Pawl.Codec.RoomHalf as RoomHalf
 import qualified Pawl.Codec.RoomIndex as RoomIndex
 import qualified Pawl.Codec.Sickness as Sickness
 import qualified Pawl.Codec.Source as Source
+import qualified Pawl.Codec.StoredResult as StoredResult
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.TapState as TapState
 import qualified Pawl.Codec.Timestamp as Timestamp
@@ -123,6 +124,7 @@ codec = Fields.object $ do
   unlockedHalves <- Fields.defaulted "unlockedHalves" Set.empty (Common.set RoomHalf.codec) Object.unlockedHalves
   designations <- Fields.defaulted "designations" Set.empty (Common.set Designation.codec) Object.designations
   designationValues <- Fields.defaulted "designationValues" Map.empty (Common.keyedList designationValue) Object.designationValues
+  storedResults <- Fields.defaulted "storedResults" Map.empty (Common.multiset StoredResult.codec) Object.storedResults
   paidCosts <- Fields.defaulted "paidCosts" Map.empty (Common.multiset Keyword.codec) Object.paidCosts
   tributePaid <- Fields.defaulted "tributePaid" False Common.boolean Object.tributePaid
   bestowed <- Fields.defaulted "bestowed" False Common.boolean Object.bestowed
@@ -185,6 +187,7 @@ codec = Fields.object $ do
         Object.unlockedHalves = unlockedHalves,
         Object.designations = designations,
         Object.designationValues = designationValues,
+        Object.storedResults = storedResults,
         Object.paidCosts = paidCosts,
         Object.tributePaid = tributePaid,
         Object.bestowed = bestowed,

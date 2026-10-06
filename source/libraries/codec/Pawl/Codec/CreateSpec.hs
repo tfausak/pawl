@@ -1,6 +1,7 @@
 module Pawl.Codec.CreateSpec where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Create as Create
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -38,7 +39,8 @@ plain =
       EntryRiders.exiledFaceDown = False,
       EntryRiders.attachedTo = Nothing,
       EntryRiders.faceDown = Nothing,
-      EntryRiders.noted = False
+      EntryRiders.noted = False,
+      EntryRiders.characteristics = Seq.empty
     }
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()

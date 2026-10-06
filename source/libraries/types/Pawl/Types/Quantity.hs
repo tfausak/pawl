@@ -126,6 +126,10 @@ data Quantity
     -- became designated with -- "monstrosity X", read back by another ability of
     -- the same permanent. A mark set with no number reads 0.
     DesignationValue Designation.Designation
+  | -- | CR 706.8a: the greatest number of stored results on the object this
+    -- quantity is evaluated against that share one value, whatever their kinds
+    -- of die; no stored result reads 0 (Centaur of Attention).
+    StoredResultsOfSameValue
   | -- | CR 716.2b: the level of the object this quantity is evaluated against;
     -- no level reads 1 (CR 716.2d, Pawl.Types.ClassLevel.defaulted).
     ClassLevel

@@ -1,0 +1,97 @@
+{
+  "description": "CR 611.2e Bronzehide Lion returns as an Aura on the creature its controller chooses, never a creature",
+  "note": "Three creatures alice controls are legal hosts and bob's Piker is not, so the CR 303.4f prompt is a real choice; alice names the Bears. Soul Warden would gain alice 1 life for a creature entering and Balemurk Leech drains bob 1 for an enchantment entering, so the two life totals say which the Lion was as it entered. The activation proves the granted ability is the one the Aura has: it makes the Bears indestructible and not the Lion.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Bronzehide Lion", "label": "lion", "ready": true },
+          { "card": "Grizzly Bears", "label": "bears", "ready": true },
+          { "card": "Soul Warden", "label": "warden", "ready": true },
+          { "card": "Balemurk Leech", "label": "leech", "ready": true },
+          { "card": "Mountain", "label": "mountain", "ready": true },
+          { "card": "Forest", "label": "forest", "ready": true },
+          { "card": "Plains", "label": "plains", "ready": true }
+        ],
+        "hand": [
+          { "card": "Lightning Bolt", "label": "bolt" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker", "ready": true }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": { "Answer": { "prompt": "ChooseAttachment", "with": "$bears" } }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": { "Cast": { "object": "$bolt", "targets": ["$lion"], "mana": ["$mountain", null] } }
+    },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": { "View": { "of": "AttachedTo", "object": "Bronzehide Lion", "is": "$bears" } }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": { "Types": { "object": "Bronzehide Lion", "types": ["Enchantment"] } }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": { "Subtypes": { "object": "Bronzehide Lion", "subtypes": ["Aura"] } }
+    },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": { "Life": { "player": "alice", "life": 20 } }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": { "Life": { "player": "bob", "life": 19 } }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": { "Activate": { "object": "Bronzehide Lion", "mana": ["$forest", "$plains"] } }
+    },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": { "Keywords": { "object": "$bears", "keyword": { "type": "Indestructible" }, "count": 1 } }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": { "Keywords": { "object": "Bronzehide Lion", "keyword": { "type": "Indestructible" }, "count": 0 } }
+    }
+  ]
+}

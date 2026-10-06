@@ -54,27 +54,18 @@
                         "type": "InSlot",
                         "value": "target"
                       },
-                      "slot": "returned",
+                      "riders": {
+                        "characteristics": [
+                          {
+                            "type": "AddCreatureSubtype",
+                            "value": {
+                              "type": "Zombie"
+                            }
+                          }
+                        ]
+                      },
                       "zone": {
                         "type": "Battlefield"
-                      }
-                    }
-                  },
-                  {
-                    "type": "ModifyTarget",
-                    "value": {
-                      "duration": {
-                        "type": "Indefinite"
-                      },
-                      "modification": {
-                        "type": "AddCreatureSubtype",
-                        "value": {
-                          "type": "Zombie"
-                        }
-                      },
-                      "ref": {
-                        "type": "InSlot",
-                        "value": "returned"
                       }
                     }
                   }

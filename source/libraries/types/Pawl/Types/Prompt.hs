@@ -61,6 +61,7 @@ import qualified Pawl.Types.RollAdjustment as RollAdjustment
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SearchPlace as SearchPlace
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.StoredResult as StoredResult
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.TimeTravelChoice as TimeTravelChoice
@@ -148,6 +149,13 @@ data Prompt r where
   -- raised where every result is the same number, which no card can tell from
   -- either answer.
   ChooseDieResult :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty Natural.Natural -> Prompt Natural.Natural
+  -- | CR 706.8b: how many of each stored result on the object the seat
+  -- rerolls (Centaur of Attention's "reroll any number of this creature's
+  -- stored results"); the Map is what the object has, the answer clamped to
+  -- it. Stored results of one kind and value are indistinguishable, so the
+  -- answer counts them rather than naming one. Raised for one candidate too,
+  -- "any number" including none.
+  ChooseStoredRerolls :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Map.Map StoredResult.StoredResult Natural.Natural -> Prompt (Map.Map StoredResult.StoredResult Natural.Natural)
   -- | CR 706.2b's first step: whether a reroll a permanent offers is taken
   -- (Clam-I-Am's "you may reroll that die"). A choice and not a roll, so it
   -- carries a Decider and the seat where RollDie above carries neither.

@@ -313,8 +313,10 @@ repetitionQuantities repetition = case repetition of
 -- a card may write as anything a Quantity spells. A position the three walkers
 -- below would otherwise pass over -- every arm that reads a rider matches it as
 -- `_` -- so the reads are spelled out here and each walker goes through this.
+-- CR 611.2e's effects carry theirs through Projection.quantitiesOf, as
+-- ModifyTarget's modification does.
 riderQuantities :: EntryRiders.EntryRiders Quantity.Type.Quantity ability -> [Quantity.Type.Quantity]
-riderQuantities = Map.elems . EntryRiders.counters
+riderQuantities riders = Map.elems (EntryRiders.counters riders) <> foldMap Projection.quantitiesOf (EntryRiders.characteristics riders)
 
 -- The Quantity a MoveToZone's placement carries, CR 401.7's depth: Unexpectedly
 -- Absent's X. The walkers read it beside riderQuantities.
@@ -858,6 +860,7 @@ effectObjectRefs effect = case effect of
   Effect.NoteManaSpent -> []
   Effect.Proliferate -> []
   Effect.Reroll -> []
+  Effect.RerollStoredResults _ -> []
   Effect.ChooseCardName {} -> []
   Effect.Bolster {} -> []
   Effect.Amass {} -> []
@@ -1071,6 +1074,7 @@ effectPlayerRefs effect = case effect of
   Effect.NoteManaSpent -> []
   Effect.Proliferate -> []
   Effect.Reroll -> []
+  Effect.RerollStoredResults _ -> []
   Effect.ChooseCardName (ChooseCardName.MkChooseCardName ref _) -> [ref]
   Effect.Bolster {} -> []
   Effect.Amass {} -> []
@@ -1197,6 +1201,8 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.ExileAllGraveyards -> Map.empty
   Effect.Proliferate -> Map.empty
   Effect.Reroll -> Map.empty
+  -- A READ: the slot names the permanent whose stored results are rerolled.
+  Effect.RerollStoredResults slot -> oneSlot slot
   -- CR 201.4's name is not an object, so the choice binds no slot of its own and
   -- the restriction Filter names none either -- a Filter reads a slot only
   -- through Filter.boundSlots, and no card writes one of those atoms here. The
@@ -2001,6 +2007,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.ExileAllGraveyards -> True
   Effect.Proliferate -> True
   Effect.Reroll -> True
+  Effect.RerollStoredResults _ -> True
   Effect.ChooseCardName _ -> True
   Effect.FromOutsideTheGame _ -> True
   Effect.ExileThisSpell -> True
@@ -2286,6 +2293,7 @@ readsX =
         Effect.ExileAllGraveyards -> False
         Effect.Proliferate -> False
         Effect.Reroll -> False
+        Effect.RerollStoredResults _ -> False
         -- No Quantity: rule 201.4 chooses one name and states no count.
         Effect.ChooseCardName _ -> False
         Effect.FromOutsideTheGame _ -> False
@@ -2536,6 +2544,7 @@ boundSlots effect = case effect of
   Effect.ExileAllGraveyards -> Set.empty
   Effect.Proliferate -> Set.empty
   Effect.Reroll -> Set.empty
+  Effect.RerollStoredResults _ -> Set.empty
   -- Binds nothing: the name goes on the SOURCE (Object.chosenNames) and is read
   -- back off it by Filter.HasChosenName, so no slot carries it.
   Effect.ChooseCardName _ -> Set.empty
