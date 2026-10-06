@@ -1580,10 +1580,11 @@ waterbendsAsCost =
 
 -- Does this cost sacrifice a permanent the payer CHOOSES? revealsAsCost's shape
 -- exactly: CR 601.2h's payment binds Binding.sacrificedPermanent
--- (Pawl.Engine.Cost.payComponent's Sacrifice arm), and both carriers fold it on --
--- Pawl.Engine.Activate for Jarad, Golgari Lich Lord's activation cost and
--- Pawl.Engine.Cast for Fling's additional cost -- so an object whose cost has such
--- a component may read the slot and one whose cost has not may not. Asked of both
+-- (Pawl.Engine.Cost.payComponent's Sacrifice arm), and each payer folds it on --
+-- Pawl.Engine.Activate for Jarad, Golgari Lich Lord's activation cost,
+-- Pawl.Engine.Cast for Fling's additional cost, and payGateBound's fold for a
+-- cost paid at resolution -- so an object whose cost has such a component may
+-- read the slot and one whose cost has not may not. Asked of both
 -- halves of the lint, here for a spell and in AbilitySlotLintSpec for an
 -- activation.
 --
@@ -1664,6 +1665,17 @@ payGateCostsOf modal =
     loopGates effect = case effect of
       Effect.ForEach loop -> Maybe.maybeToList (ForEach.payGate loop) <> concatMap loopGates (ForEach.body loop)
       _ -> []
+
+-- The reserved slot a CR 118.12 cost this payload offers binds onto the
+-- resolving object as it is paid (Pawl.Engine.Resolve.Effect.foldPaid), so
+-- Feed the Pack's "the sacrificed creature's toughness" is an ordinary slot
+-- read. Every carrier's lint grants it: spells, activations and triggers all
+-- resolve through that fold.
+payGateBound :: Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Set.Set SlotName.SlotName
+payGateBound modal =
+  if any sacrificesAsCost (payGateCostsOf modal)
+    then Set.singleton Binding.sacrificedPermanent
+    else Set.empty
 
 -- Every Count reachable from a combat restriction: only CR 508.1c's / CR
 -- 509.1b's "unless some condition is met" carries one, and the subject beside it
@@ -6647,6 +6659,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         --     Pawl.Engine.Resolve.Slots.effectViewOf, the permanent being in a
         --     graveyard by then. activatedAbilityOffends grants the same exemption
         --     against the same `sacrificesAsCost` for Jarad, Golgari Lich Lord.
+        --   * the slot a CR 118.12 cost paid at resolution binds, per
+        --     `payGateBound`.
         cardOffends card =
           let announcedX =
                 if any declaresVariable (spellCostsOf card)
@@ -6672,7 +6686,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 if any waterbendsAsCost (spellCostsOf card)
                   then Set.singleton Binding.waterbendCost
                   else Set.empty
-           in modalSlotsOffend (Set.unions [Set.fromList [Binding.you, Binding.triggerSource], announcedX, revealed, sacrificed, beheld, collected, waterbent]) (Face.spell card)
+           in modalSlotsOffend (Set.unions [Set.fromList [Binding.you, Binding.triggerSource], announcedX, revealed, sacrificed, beheld, collected, waterbent, payGateBound (Face.spell card)]) (Face.spell card)
         offenders =
           filter
             (anyFace cardOffends . Printing.card)

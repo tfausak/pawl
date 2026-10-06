@@ -29,7 +29,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Pawl.CardSpec (anyFace, cardAuthoredEffects, cardCounts, cardResolutionEffects, collectsEvidenceAsCost, declaresVariable, effectCounts, grantedActivatedAbilities, lintMode, modalActivated, modalSlotsOffend, oneEffectActivated, oneEffectTrigger, removesCountersAsCost, sacrificesAsCost, spellCostsOf, triggerConditionSlots, waterbendsAsCost)
+import Pawl.CardSpec (anyFace, cardAuthoredEffects, cardCounts, cardResolutionEffects, collectsEvidenceAsCost, declaresVariable, effectCounts, grantedActivatedAbilities, lintMode, modalActivated, modalSlotsOffend, oneEffectActivated, oneEffectTrigger, payGateBound, removesCountersAsCost, sacrificesAsCost, spellCostsOf, triggerConditionSlots, waterbendsAsCost)
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
@@ -217,6 +217,8 @@ modalCountsOffend modal =
 --   * Resolve.definedSlots covers a slot the ability's own effects MINT rather
 --     than read: a Create's token (CR 603.7c's "it"), a PlaySubgame's winner.
 --     The same exemption every carrier takes.
+--   * payGateBound, the slot a CR 118.12 cost paid at resolution binds (Feed the
+--     Pack). Every carrier takes that one too.
 --   * the ability's own declared target slots (CR 601.2c / 700.2c) are the
 --     ordinary chosen targets -- the side modalSlotsOffend compares AGAINST, one
 --     MODE's at a time, so a mode reading a slot only another mode declares is
@@ -237,7 +239,8 @@ triggeredAbilityOffendsGiven inherited ability =
         [ inherited,
           Set.fromList [Binding.triggerSource, Binding.you, Binding.thisAbility],
           Event.eventBindingSlots (TriggeredAbility.condition ability),
-          Event.eventBindingSlotsSometimes (TriggeredAbility.condition ability)
+          Event.eventBindingSlotsSometimes (TriggeredAbility.condition ability),
+          payGateBound (TriggeredAbility.modal ability)
         ]
     )
     (TriggeredAbility.modal ability)
@@ -285,6 +288,9 @@ triggeredAbilityOffendsGiven inherited ability =
 --     states the same thing about a spell's cost.
 --   * Resolve.definedSlots, the slot an effect of this ability MINTS rather than
 --     reads. The same exemption every sibling carrier takes.
+--   * payGateBound, the slot its own CR 118.12 cost binds as the ability
+--     resolves -- written on the same ability object, by Resolve rather than
+--     Activate.
 --
 -- What is NOT on it is the point:
 --
@@ -338,7 +344,7 @@ activatedAbilityOffends ability =
         if removesCountersAsCost (ActivatedAbility.cost ability)
           then Set.singleton Binding.removedCounters
           else Set.empty
-   in modalSlotsOffend (Set.unions [Set.fromList [Binding.triggerSource, Binding.you, Binding.thisAbility], announcedX, sacrificed, tapped, tappedForTotal, exiled, discarded, removed]) (ActivatedAbility.modal ability)
+   in modalSlotsOffend (Set.unions [Set.fromList [Binding.triggerSource, Binding.you, Binding.thisAbility], announcedX, sacrificed, tapped, tappedForTotal, exiled, discarded, removed, payGateBound (ActivatedAbility.modal ability)]) (ActivatedAbility.modal ability)
 
 -- Does this cost tap permanents the payer CHOOSES? sacrificesAsCost's shape, and
 -- the same reason: CR 601.2h's payment binds Binding.tappedPermanent
