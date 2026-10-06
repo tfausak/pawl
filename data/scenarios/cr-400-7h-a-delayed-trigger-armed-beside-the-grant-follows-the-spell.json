@@ -1,0 +1,163 @@
+{
+  "description": "CR 400.7h a delayed trigger armed beside the grant follows the spell",
+  "note": "The Ruinous Powers exiles bob's Azure Drake and arms 'when you cast a spell this way'. Alice first casts Goblin Piker from her hand, which is not cast this way, so neither player loses life for it; the Drake, cast with Mountains under 'any color', makes its owner bob lose 4, its mana value on the stack. Without CR 400.7h's follow the trigger names the card left in exile and never fires.",
+  "board": {
+    "active": "alice",
+    "step": "Upkeep",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "The Ruinous Powers"
+          },
+          {
+            "card": "Mountain",
+            "label": "m1"
+          },
+          {
+            "card": "Mountain",
+            "label": "m2"
+          },
+          {
+            "card": "Mountain",
+            "label": "m3"
+          },
+          {
+            "card": "Mountain",
+            "label": "m4"
+          },
+          {
+            "card": "Mountain",
+            "label": "m5"
+          },
+          {
+            "card": "Mountain",
+            "label": "m6"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker"
+          }
+        ],
+        "library": [
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          {
+            "card": "Azure Drake",
+            "label": "drake"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "bob",
+          "zone": "Exile",
+          "is": [
+            "Azure Drake"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$piker",
+          "mana": [
+            "$m1",
+            "$m2",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "Goblin Piker"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "Azure Drake",
+          "mana": [
+            "$m3",
+            "$m4",
+            "$m5",
+            "$m6"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "bob",
+          "life": 16
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "alice",
+          "life": 20
+        }
+      }
+    }
+  ]
+}

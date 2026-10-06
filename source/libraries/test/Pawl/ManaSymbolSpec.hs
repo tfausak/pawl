@@ -186,6 +186,21 @@ celestialDawnSpec s registry = Spec.describe s "Celestial Dawn" $ do
     Spec.assertBool s paid "and the payment really taps it"
     Spec.assertEqWith s "with nothing left floating" (poolSize S.alice after) 0
 
+ruinousPowersSpec :: (Monad m) => Spec.Spec m n -> n ()
+ruinousPowersSpec s = Spec.describe s "The Ruinous Powers" $ do
+  -- CR 609.4b's "as though it were mana of any color", which The Ruinous
+  -- Powers grants on its exiled card: a colorless unit pays {U}, and a red one
+  -- still cannot pay {C}, where ManaSpending.AnyType would let it.
+  Spec.it s "CR 609.4b mana spent as though it were of any color pays {U} with {C} but not {C} with {R}" $ do
+    let unitOf t = ManaUnit.MkManaUnit {ManaUnit.manaType = t, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing}
+        costOf t = ManaCost.MkManaCost [ManaSymbol.OfType t]
+        pool t = Mana.Type.MkMana [unitOf t]
+        spentUnder spending demand supply = fmap fst (Mana.spend [] spending 0 (costOf demand) (pool supply))
+    Spec.assertEqWith s "{C} pays {U} under any color" (spentUnder ManaSpending.AnyColor (ManaType.Colored Color.Blue) ManaType.Colorless) (Just (Mana.Type.MkMana []))
+    Spec.assertEqWith s "{R} does not pay {C} under any color" (spentUnder ManaSpending.AnyColor ManaType.Colorless (ManaType.Colored Color.Red)) Nothing
+    Spec.assertEqWith s "{R} pays {C} under any type" (spentUnder ManaSpending.AnyType ManaType.Colorless (ManaType.Colored Color.Red)) (Just (Mana.Type.MkMana []))
+    Spec.assertEqWith s "{C} does not pay {U} as produced" (spentUnder ManaSpending.AsProduced (ManaType.Colored Color.Blue) ManaType.Colorless) Nothing
+
 -- CR 609.4b's non-"only" clause ADDS a way to spend the mana rather than
 -- replacing what it is. Sunglasses of Urza ({3} Artifact, "You may spend white
 -- mana as though it were red mana.") names red and not white, so the two readings
@@ -2066,6 +2081,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   snowSpec s registry
   snowSymbolSpec s registry
   celestialDawnSpec s registry
+  ruinousPowersSpec s
   sunglassesOfUrzaSpec s registry
   spendChoiceSpec s registry
   bergStriderSpec s registry

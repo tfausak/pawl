@@ -1131,12 +1131,14 @@ data Context = MkContext
     -- resolution that installed the row being over -- and all four go through
     -- contextWithSlots below. Pawl.Engine.Cost's candidate pools are a fifth
     -- producer, off the announced stack object's bindings (Cost.announcedSlots):
-    -- CR 601.2c chooses the targets before CR 601.2h pays.
+    -- CR 601.2c chooses the targets before CR 601.2h pays. A sixth is
+    -- Pawl.Engine.Event.Match.matchesTriggerGiven, off a delayed ability's
+    -- captured environment (CR 603.7c).
     --
     -- Outside those, contextFor leaves it empty, and every atom that reads it
     -- (IsBound, SameNameAsBound, IsControllerOfBound, Quantity.AgainstSlot) is then vacuously False or Nothing rather than
     -- raising. That is honest wherever no announcement is in flight -- the layer
-    -- fold, trigger matching, a cost paid with nothing announced, combat
+    -- fold, matching a trigger that captured nothing, a cost paid with nothing announced, combat
     -- declarations, duration expiry -- and it was not honest of every
     -- in-resolution caller until each took its context from the caller instead:
     -- Pawl.Engine.Projection.freezeQuantities first, then Resolve's
