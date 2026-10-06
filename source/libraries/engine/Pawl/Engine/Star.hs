@@ -56,6 +56,7 @@ substituteStar star quantity = case quantity of
   Quantity.ObjectCountersOfAnyKind -> quantity
   Quantity.HasDesignation _ -> quantity
   Quantity.DesignationValue _ -> quantity
+  Quantity.StoredResultsOfSameValue -> quantity
   Quantity.ClassLevel -> quantity
   Quantity.WasKicked -> quantity
   Quantity.WasForetold -> quantity

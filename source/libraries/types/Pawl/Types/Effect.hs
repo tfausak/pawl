@@ -672,6 +672,10 @@ data Effect card ability
   | -- | CR 706.2b: throw again the die whose modification step is open, taking
     -- the new number as its natural result (Goblin Bookie's "reroll any die").
     Reroll
+  | -- | CR 706.8b: the controller chooses any number of the stored results on
+    -- the slot's permanent and rerolls them (Centaur of Attention). Choose, not
+    -- target.
+    RerollStoredResults SlotName.SlotName
   | -- | CR 705.1: flip a coin, and bind CR 705.2's outcome at the payload's slot
     -- for a later clause of the same resolution to gate on (Winter Sky). The
     -- call is a choice and the outcome is not, so the two prompts differ in
@@ -681,6 +685,9 @@ data Effect card ability
     -- hand, then draw that many -- "that many" being the hand size before the
     -- exile, which is why it is one opcode.
     ExileHandThenDraw
+  | -- | CR 607.2e: note, for the source, the type and amount of mana spent to
+    -- activate this ability (Ice Cauldron), replacing any earlier note.
+    NoteManaSpent
   | -- | CR 701.34a: choose any number of permanents and/or players that have a
     -- counter, then give each one additional counter of each kind it already
     -- has. Choose, not target, so the set is picked on resolution.

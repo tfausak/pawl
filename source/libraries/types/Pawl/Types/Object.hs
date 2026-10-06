@@ -31,6 +31,7 @@ import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.StoredResult as StoredResult
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
@@ -499,6 +500,18 @@ data Object = MkObject
     -- Per-incarnation, `designations` above's route and each rule's own "until it
     -- leaves the battlefield".
     designationValues :: Map.Map Designation.Designation Natural.Natural,
+    -- | CR 706.8a: the die results stored on this permanent, as a multiset --
+    -- two stored results of the same kind and value are indistinguishable, so
+    -- each is a count. Written by Effect.RollDie's `store` and replaced by
+    -- Effect.RerollStoredResults (CR 706.8b); Quantity.StoredResultsOfSameValue
+    -- reads it back.
+    --
+    -- Not a copiable value (CR 707.2) and per-incarnation (CR 400.7), for
+    -- chosenColors's reasons.
+    --
+    -- Not implemented: CR 607.5's fresh link for a storing ability acquired by
+    -- a copy effect, which should not see results stored before (#4729).
+    storedResults :: Map.Map StoredResult.StoredResult Natural.Natural,
     -- | CR 601.2b: how many times did this SPELL's controller declare each
     -- optional additional cost a keyword ability offers -- kicker and multikicker
     -- (CR 702.33a/c), squad (CR 702.157a), offspring (CR 702.175a)? Stamped by
@@ -919,6 +932,7 @@ newIncarnation object =
       unlockedHalves = Set.empty,
       designations = Set.empty,
       designationValues = Map.empty,
+      storedResults = Map.empty,
       paidCosts = Map.empty,
       -- CR 702.104b's record is written back by nothing: rule 702.104a's ability
       -- functions only as the creature ENTERS, and the permanent it produces is

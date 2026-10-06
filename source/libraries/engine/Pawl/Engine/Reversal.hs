@@ -120,6 +120,7 @@ withoutAnnouncement before entry closed = do
   outsideCopies <- setOf GameState.outsideCopies
   namedCopyChoices <- mapOf GameState.namedCopyChoices
   notedCards <- mapOf GameState.notedCards
+  notedMana <- mapOf GameState.notedMana
   nextPrintingId <- newest GameState.nextPrintingId
   nextTimestamp <- newest GameState.nextTimestamp
   lastChoice <- newest GameState.lastChoice
@@ -240,6 +241,7 @@ withoutAnnouncement before entry closed = do
         GameState.outsideCopies = outsideCopies,
         GameState.namedCopyChoices = namedCopyChoices,
         GameState.notedCards = notedCards,
+        GameState.notedMana = notedMana,
         GameState.nextPrintingId = nextPrintingId,
         GameState.nextTimestamp = nextTimestamp,
         GameState.lastChoice = lastChoice,
@@ -374,6 +376,7 @@ objectWith before entry closed = do
   unlockedHalves <- field Object.unlockedHalves
   designations <- field Object.designations
   designationValues <- field Object.designationValues
+  storedResults <- field Object.storedResults
   paidCosts <- field Object.paidCosts
   tributePaid <- field Object.tributePaid
   bestowed <- field Object.bestowed
@@ -434,6 +437,7 @@ objectWith before entry closed = do
         Object.unlockedHalves = unlockedHalves,
         Object.designations = designations,
         Object.designationValues = designationValues,
+        Object.storedResults = storedResults,
         Object.paidCosts = paidCosts,
         Object.tributePaid = tributePaid,
         Object.bestowed = bestowed,

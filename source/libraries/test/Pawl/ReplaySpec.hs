@@ -104,7 +104,7 @@ oneMana :: Color.Color -> ManaOption.ManaOption
 oneMana color =
   let -- CR 109.5's "you", which is what a basic land's intrinsic ability means
       -- by "add" (Pawl.Codec.ManaAddition.defaultPlayer).
-      yield = Map.singleton (PlayerRef.Relative PlayerRelation.You) (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing}])
+      yield = Map.singleton (PlayerRef.Relative PlayerRelation.You) (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing, ManaUnit.sourceLastExiled = Nothing}])
    in ManaOption.MkManaOption
         { ManaOption.cost = Mana.intrinsicManaCost,
           ManaOption.restrictions = [],
@@ -1075,7 +1075,7 @@ combatReplaySpec s =
         -- transcript like any other. The pair differs in one field, so a decode
         -- returning the head would pass one leg by accident.
         Spec.it s "ChooseManaToSpend round-trips through the transcript" $ do
-          let plain = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing}
+          let plain = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing, ManaUnit.sourceLastExiled = Nothing}
               snow = plain {ManaUnit.tags = Set.singleton ProductionTag.Snow}
               p = Prompt.ChooseManaToSpend decider S.alice (plain NonEmpty.:| [snow])
           Spec.assertEqWith s "the plain one round trips" (Replay.decode p (Replay.encode p plain)) (Just plain)
@@ -1417,7 +1417,7 @@ combatReplaySpec s =
           let p = Prompt.ChooseManaType decider S.alice oid (ManaType.Colored Color.White NonEmpty.:| [ManaType.Colored Color.Blue])
           Spec.assertEqWith s "mismatch" (Replay.decode p (Response.AnnouncedHybridHalf (ManaType.Colored Color.White))) Nothing
         Spec.it s "a short mana-type transcript returns the first candidate offered" $
-          -- CR 105.4: every offered type is one Mana.producedTypes offered, so the
+          -- CR 105.4: every offered type is one Mana.produced offered, so the
           -- head is legal.
           Spec.assertEqWith
             s

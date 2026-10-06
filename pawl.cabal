@@ -1188,6 +1188,8 @@ library codec
     Pawl.Codec.StepBeganSpec
     Pawl.Codec.StepBegins
     Pawl.Codec.StepBeginsSpec
+    Pawl.Codec.StoredResult
+    Pawl.Codec.StoredResultSpec
     Pawl.Codec.Subtype
     Pawl.Codec.SubtypeFamily
     Pawl.Codec.SubtypeFamilySpec
@@ -2544,6 +2546,7 @@ library types
     Pawl.Types.Status
     Pawl.Types.StepBegan
     Pawl.Types.StepBegins
+    Pawl.Types.StoredResult
     Pawl.Types.Subtype
     Pawl.Types.SubtypeFamily
     Pawl.Types.SubtypesAre

@@ -1111,6 +1111,7 @@ handAppend printing pid gs =
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
             Object.designationValues = Map.empty,
+            Object.storedResults = Map.empty,
             Object.paidCosts = Map.empty,
             Object.tributePaid = False,
             Object.bestowed = False,
@@ -2457,7 +2458,8 @@ floating color =
       ManaUnit.retention = ManaRetention.Ordinary,
       ManaUnit.restriction = Nothing,
       ManaUnit.rider = Nothing,
-      ManaUnit.sourceChosenSubtype = Nothing
+      ManaUnit.sourceChosenSubtype = Nothing,
+      ManaUnit.sourceLastExiled = Nothing
     }
 
 -- CR 302.6: as if the object had been under alice's control since her turn began.

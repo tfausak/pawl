@@ -258,6 +258,7 @@ ownQuantities effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.Reroll -> []
+  Effect.RerollStoredResults _ -> []
   Effect.ChooseCardName _ -> []
   Effect.FromOutsideTheGame _ -> []
   Effect.ExileThisSpell -> []
@@ -279,6 +280,7 @@ ownQuantities effect = case effect of
   Effect.Cloak {} -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
+  Effect.NoteManaSpent -> []
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> [quantity]
   Effect.Vote {} -> []
   Effect.RestartGame _ -> []
@@ -469,6 +471,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.ObjectCountersOfAnyKind -> False
   Quantity.Type.HasDesignation {} -> False
   Quantity.Type.DesignationValue {} -> False
+  Quantity.Type.StoredResultsOfSameValue -> False
   Quantity.Type.ClassLevel -> False
   Quantity.Type.WasKicked -> False
   Quantity.Type.WasForetold -> False
@@ -1376,6 +1379,7 @@ effectObjectRefs effect =
         Effect.ExileAllGraveyards -> []
         Effect.Proliferate -> []
         Effect.Reroll -> []
+        Effect.RerollStoredResults _ -> []
         Effect.ChooseCardName {} -> []
         Effect.FromOutsideTheGame {} -> []
         Effect.ExileThisSpell -> []
@@ -1402,6 +1406,7 @@ effectObjectRefs effect =
         Effect.Cloak {} -> []
         Effect.Venture {} -> []
         Effect.ExileHandThenDraw -> []
+        Effect.NoteManaSpent -> []
         Effect.PlayerSacrifices {} -> []
         Effect.Vote {} -> []
         -- CR 727.5's exemption, optional: a card saying nothing about it exempts
@@ -2116,6 +2121,8 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           Effect.TurnFaceUp slot -> [slot]
           Effect.BecomesBlocked slot -> [slot]
           Effect.Designate (Designate.MkDesignate _ slot _) -> [slot]
+          Effect.RollDie rollDie -> Foldable.toList (RollDie.store rollDie)
+          Effect.RerollStoredResults slot -> [slot]
           Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ slot) -> [slot]
           Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _ slot) -> [slot]
           Effect.Evolve slot -> [slot]

@@ -6,12 +6,13 @@ import qualified Pawl.Types.ManaType as ManaType
 -- One fixed type -- Llanowar Elves' "Add {G}"; one mana of a colour the producing
 -- player chooses (Birds of Paradise), which CR 105.4 restricts to the five
 -- colours, never colourless; the colour an earlier linked ability chose
--- (Coldsteel Heart); or the snow mana symbol CR 106.11 rewrites.
+-- (Coldsteel Heart); the snow mana symbol CR 106.11 rewrites; or the mana an
+-- earlier linked ability noted (Ice Cauldron).
 --
 -- Data hanging off the one AddMana opcode rather than a second opcode: "add one
 -- mana" is a single instruction, and what varies is a payload saying how its type
 -- is determined. Nothing in the rules core cases on this -- it asks
--- Mana.producedTypes for the options and prompts among them, which is the only
+-- Mana.produced for the options and prompts among them, which is the only
 -- obligation a future constructor ("of any type") would carry.
 data ManaProduction
   = OfType ManaType.ManaType
@@ -24,7 +25,7 @@ data ManaProduction
     -- Read off Object.chosenColors, which is where CR 614.1c's entry rewrite
     -- writes -- the same field Modification.AddChosenColor reads for Painter's
     -- Servant, and the same link CR 607.2d describes. NOT A CHOICE: the colour is
-    -- already settled, so producedTypes offers one option and nothing prompts,
+    -- already settled, so Mana.produced offers one option and nothing prompts,
     -- which is what separates this from AnyColor.
     --
     -- No colour chosen yields NO option rather than a fallback colour. A
@@ -35,7 +36,7 @@ data ManaProduction
   | -- | CR 106.11: an effect that would add mana represented by a snow mana
     -- symbol adds that much COLORLESS mana instead. One symbol, one mana, so
     -- "add {S}{S}" is two of these exactly as "add {C}{C}" is two OfType
-    -- Colorless -- Pawl.Engine.Mana.producedTypes is where the rewrite happens.
+    -- Colorless -- Pawl.Engine.Mana.produced is where the rewrite happens.
     --
     -- NOT spelled `OfType Colorless` in card data, even though the mana that
     -- reaches the pool is identical. The two differ in what they transcribe: a
@@ -49,4 +50,7 @@ data ManaProduction
     -- other production -- and a nonsnow permanent that adds {S} adds mana that
     -- cannot pay {S}.
     SnowSymbol
+  | -- | CR 607.2e: the run of mana a linked ability noted for the source
+    -- (GameState.notedMana), Ice Cauldron's; the count repeats the whole run.
+    Noted
   deriving (Eq, Ord, Show)

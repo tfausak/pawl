@@ -614,6 +614,7 @@ filterNames oid criterion = case criterion of
   Filter.HasChosenName -> False
   Filter.HasChosenColor -> False
   Filter.HasChosenSubtype -> False
+  Filter.IsLastExiledWithSource -> False
   Filter.OfChosenPlayer -> False
   Filter.IsPlayer _relation -> False
   Filter.IsControllerOfBound _slot -> True
@@ -699,10 +700,11 @@ filterNames oid criterion = case criterion of
 --   * The per-object budgets and notes: GameState.activatedThisTurn (CR
 --     602.5b), castPermissionsUsedThisTurn (CR 601.3), rollModifiersUsedThisTurn
 --     (CR 706.2), namedCopyChoices (CR 707.13), notedCards (CR 707.14),
---     keptFaceDown (CR 121.8) and outsideCopies (CR 400.11), each keyed by the
---     object it is about; and the logs triggeredThisGame (a "triggers only
---     once" rider's spent triggerings), activationsThisTurn (CR 602.2) and
---     attacksInOwnLastTurn (CR 508.1a), by the object each entry names.
+--     notedMana (CR 607.2e), keptFaceDown (CR 121.8) and outsideCopies (CR
+--     400.11), each keyed by the object it is about; and the logs
+--     triggeredThisGame (a "triggers only once" rider's spent triggerings),
+--     activationsThisTurn (CR 602.2) and attacksInOwnLastTurn (CR 508.1a), by
+--     the object each entry names.
 --
 -- phasedOut and exiledUntilMonarch can never name a CANDIDATE through the one
 -- caller (Pawl.Engine.Cost's mana-source window): both key on an object not on
@@ -729,6 +731,9 @@ filterNames oid criterion = case criterion of
 -- green. The line stays because a row does name its key; do not read the green as
 -- coverage. The per-object budgets, notes and logs are fences too: no board in
 -- the suite gives one of two otherwise identical mana sources such a row.
+-- notedMana's cannot: Ice Cauldron's noted mana pays only for the card it
+-- exiled, so a Cauldron whose mana any payment admits is already named by that
+-- card's exiledWith row.
 namedByRelation :: ObjectId -> GameState -> Bool
 namedByRelation oid gs =
   let relates names = any (\(key, value) -> key == oid || Set.member oid (names value)) . Map.toList
@@ -748,6 +753,7 @@ namedByRelation oid gs =
         || keyed (GameState.rollModifiersUsedThisTurn gs)
         || keyed (GameState.namedCopyChoices gs)
         || keyed (GameState.notedCards gs)
+        || keyed (GameState.notedMana gs)
         || maybe False keyed (GameState.keptFaceDown gs)
         || Set.member oid (GameState.outsideCopies gs)
         || any (triggeredNames oid) (GameState.triggeredThisGame gs)

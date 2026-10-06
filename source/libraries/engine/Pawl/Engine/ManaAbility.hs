@@ -317,6 +317,7 @@ manaProduced effect = case effect of
   Effect.ExileAllGraveyards -> Nothing
   Effect.Proliferate -> Nothing
   Effect.Reroll -> Nothing
+  Effect.RerollStoredResults _ -> Nothing
   Effect.ChooseCardName _ -> Nothing
   Effect.FromOutsideTheGame _ -> Nothing
   Effect.ExileThisSpell -> Nothing
@@ -338,6 +339,7 @@ manaProduced effect = case effect of
   Effect.Cloak {} -> Nothing
   Effect.Venture {} -> Nothing
   Effect.ExileHandThenDraw -> Nothing
+  Effect.NoteManaSpent -> Nothing
   Effect.PlayerSacrifices {} -> Nothing
   Effect.Vote {} -> Nothing
   Effect.RestartGame _ -> Nothing
@@ -509,6 +511,7 @@ playerChoice effect = case effect of
   Effect.ExileAllGraveyards -> Nothing
   Effect.Proliferate -> Nothing
   Effect.Reroll -> Nothing
+  Effect.RerollStoredResults _ -> Nothing
   Effect.ChooseCardName _ -> Nothing
   Effect.FromOutsideTheGame _ -> Nothing
   Effect.ExileThisSpell -> Nothing
@@ -530,6 +533,7 @@ playerChoice effect = case effect of
   Effect.Cloak {} -> Nothing
   Effect.Venture {} -> Nothing
   Effect.ExileHandThenDraw -> Nothing
+  Effect.NoteManaSpent -> Nothing
   Effect.PlayerSacrifices {} -> Nothing
   Effect.Vote {} -> Nothing
   Effect.RestartGame _ -> Nothing
@@ -709,6 +713,7 @@ movesLibraryCard effect = case effect of
   Effect.Shuffle {} -> False
   -- The draw half.
   Effect.ExileHandThenDraw -> True
+  Effect.NoteManaSpent -> False
   -- CR 727.2 / 103.3: every card involved in the restarted game is in the new
   -- game, which starts by shuffling each player's deck into their library.
   Effect.RestartGame _ -> True
@@ -736,6 +741,7 @@ movesLibraryCard effect = case effect of
   Effect.ExileAllGraveyards -> False
   Effect.Proliferate -> False
   Effect.Reroll -> False
+  Effect.RerollStoredResults _ -> False
   Effect.ChooseCardName _ -> False
   -- CR 400.11: the card comes from OUTSIDE THE GAME, which is not a zone at all
   -- and so is not a library. CR 605.1a's fourth clause asks about libraries, and

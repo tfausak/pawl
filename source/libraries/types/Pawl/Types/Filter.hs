@@ -297,6 +297,10 @@ data Filter keyword
     -- off the source instead of written on the card, and vacuously False where the
     -- source has chosen none.
     HasChosenSubtype
+  | -- | CR 607.2a: the candidate is the last card exiled with the source, as
+    -- baked onto a mana unit at production (ManaUnit.sourceLastExiled) -- Ice
+    -- Cauldron's "only to cast the last card exiled with this artifact".
+    IsLastExiledWithSource
   | -- | CR 702.16k: the candidate is an object the protection carrier's chosen
     -- player controls, or one they own that no other player controls.
     OfChosenPlayer

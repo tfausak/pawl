@@ -45,6 +45,7 @@ import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.LastKnown as LastKnown
 import qualified Pawl.Codec.LoggedEvent as LoggedEvent
 import qualified Pawl.Codec.Mana as Mana
+import qualified Pawl.Codec.ManaType as ManaType
 import qualified Pawl.Codec.ModifiedRoll as ModifiedRoll
 import qualified Pawl.Codec.MonarchWatch as MonarchWatch
 import qualified Pawl.Codec.Object as Object
@@ -186,6 +187,7 @@ codec resolve = Fields.object $ do
   outsideCopies <- Fields.defaulted "outsideCopies" Set.empty (Common.set ObjectId.codec) GameState.outsideCopies
   namedCopyChoices <- Fields.defaulted "namedCopyChoices" Map.empty (Common.naturalMap ObjectId.codec (Common.set CardName.codec)) GameState.namedCopyChoices
   notedCards <- Fields.defaulted "notedCards" Map.empty (Common.naturalMap ObjectId.codec PrintingId.codec) GameState.notedCards
+  notedMana <- Fields.defaulted "notedMana" Map.empty (Common.naturalMap ObjectId.codec (Common.seq ManaType.codec)) GameState.notedMana
   nextPrintingId <- Fields.required "nextPrintingId" PrintingId.codec GameState.nextPrintingId
   nextTimestamp <- Fields.required "nextTimestamp" Timestamp.codec GameState.nextTimestamp
   lastChoice <- Fields.required "lastChoice" Timestamp.codec GameState.lastChoice
@@ -299,6 +301,7 @@ codec resolve = Fields.object $ do
         GameState.outsideCopies = outsideCopies,
         GameState.namedCopyChoices = namedCopyChoices,
         GameState.notedCards = notedCards,
+        GameState.notedMana = notedMana,
         GameState.nextPrintingId = nextPrintingId,
         GameState.nextTimestamp = nextTimestamp,
         GameState.lastChoice = lastChoice,

@@ -139,6 +139,7 @@ zoneFunctionedFrom itself delayed effect = case effect of
   Effect.ExileAllGraveyards -> Nothing
   Effect.Proliferate -> Nothing
   Effect.Reroll -> Nothing
+  Effect.RerollStoredResults _ -> Nothing
   Effect.ChooseCardName _ -> Nothing
   Effect.FromOutsideTheGame _ -> Nothing
   -- CR 608.2n: the spell exiles ITSELF, so this says nothing about where an
@@ -162,6 +163,7 @@ zoneFunctionedFrom itself delayed effect = case effect of
   Effect.Cloak {} -> Nothing
   Effect.Venture {} -> Nothing
   Effect.ExileHandThenDraw -> Nothing
+  Effect.NoteManaSpent -> Nothing
   Effect.PlayerSacrifices {} -> Nothing
   Effect.Vote {} -> Nothing
   Effect.RestartGame _ -> Nothing

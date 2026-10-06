@@ -1247,6 +1247,7 @@ ownCounts effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.Reroll -> []
+  Effect.RerollStoredResults _ -> []
   Effect.ChooseCardName _ -> []
   Effect.FromOutsideTheGame _ -> []
   Effect.ExileThisSpell -> []
@@ -1275,6 +1276,7 @@ ownCounts effect = case effect of
   Effect.Cloak {} -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
+  Effect.NoteManaSpent -> []
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> quantityCounts quantity
   Effect.Vote {} -> []
   Effect.RestartGame _ -> []
@@ -1782,6 +1784,7 @@ effectNestedEffects effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.Reroll -> []
+  Effect.RerollStoredResults _ -> []
   Effect.ChooseCardName _ -> []
   Effect.FromOutsideTheGame _ -> []
   Effect.ExileThisSpell -> []
@@ -1803,6 +1806,7 @@ effectNestedEffects effect = case effect of
   Effect.Cloak {} -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
+  Effect.NoteManaSpent -> []
   Effect.PlayerSacrifices {} -> []
   Effect.Vote {} -> []
   Effect.RestartGame {} -> []
@@ -2298,6 +2302,7 @@ effectReplacements effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.Reroll -> []
+  Effect.RerollStoredResults _ -> []
   Effect.ChooseCardName _ -> []
   Effect.FromOutsideTheGame _ -> []
   Effect.ExileThisSpell -> []
@@ -2319,6 +2324,7 @@ effectReplacements effect = case effect of
   Effect.Cloak {} -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
+  Effect.NoteManaSpent -> []
   Effect.PlayerSacrifices {} -> []
   Effect.Vote {} -> []
   Effect.RestartGame _ -> []
@@ -2791,6 +2797,7 @@ effectMintedFaces effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.Reroll -> []
+  Effect.RerollStoredResults _ -> []
   Effect.ChooseCardName _ -> []
   Effect.FromOutsideTheGame _ -> []
   Effect.ExileThisSpell -> []
@@ -2814,6 +2821,7 @@ effectMintedFaces effect = case effect of
   Effect.Cloak {} -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
+  Effect.NoteManaSpent -> []
   Effect.PlayerSacrifices {} -> []
   Effect.Vote {} -> []
   Effect.RestartGame _ -> []
@@ -4016,6 +4024,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.IsActivePlayer _ -> []
   Quantity.Type.HasDesignation _ -> []
   Quantity.Type.DesignationValue _ -> []
+  Quantity.Type.StoredResultsOfSameValue -> []
   Quantity.Type.ClassLevel -> []
   Quantity.Type.WasKicked -> []
   Quantity.Type.WasForetold -> []
@@ -4805,6 +4814,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.HasChosenColor -> []
   -- Reads no slot either: CR 205.3's subtype arrives on Filter.Context.
   Filter.Type.HasChosenSubtype -> []
+  Filter.Type.IsLastExiledWithSource -> []
   -- Reads no slot at all: rule 702.16k's player arrives on Filter.Context.
   Filter.Type.OfChosenPlayer -> []
   Filter.Type.IsPlayer _ -> []
@@ -5834,6 +5844,7 @@ effectFilters effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.Reroll -> []
+  Effect.RerollStoredResults _ -> []
   -- CR 201.4a's restriction, and the WISH's frame: what judges it is
   -- Pawl.Interpreter.legalCardName, on the far side of
   -- Pawl.Engine.Engine.runGameAsked, and it matches a printed FACE
@@ -5875,6 +5886,7 @@ effectFilters effect = case effect of
   Effect.Cloak {} -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
+  Effect.NoteManaSpent -> []
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ f quantity) -> unframed [f] <> frame Unframed (quantityFilters quantity)
   -- Unframed, PlayerSacrifices' answer and for its reason: rule 701.38b's
   -- listed choices are judged against each candidate on the battlefield, which
@@ -7365,9 +7377,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     ps <- S.allPrintings s
     let abilitiesOf p = fmap ((,) (Face.name (S.combinedFace p))) (Face.activatedAbilities (S.combinedFace p))
         abilities = concatMap abilitiesOf ps
+        -- CR 607.2e's note reads what the {X} was PAID with rather than X
+        -- itself, Ice Cauldron's ruling, so it declares an X no effect reads.
+        notesSpent ab = elem Effect.NoteManaSpent (Modal.allEffects (ActivatedAbility.modal ab))
         offends (_, ab) =
-          (Resolve.readsX (Modal.allEffects (ActivatedAbility.modal ab)) || modalReadsAnnouncedX (ActivatedAbility.modal ab))
-            /= declaresVariable (ActivatedAbility.cost ab)
+          let readsIt = Resolve.readsX (Modal.allEffects (ActivatedAbility.modal ab)) || modalReadsAnnouncedX (ActivatedAbility.modal ab)
+              declared = declaresVariable (ActivatedAbility.cost ab)
+           in readsIt /= declared && not (declared && notesSpent ab)
     -- Guards the sweep against passing vacuously, in both directions: an empty
     -- pool of abilities, and a pool in which no activation cost declares an X at
     -- all (where the lint would hold for every card by agreeing on False).

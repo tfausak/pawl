@@ -97,7 +97,7 @@ data ManaSymbol
     --
     -- The other two neighbours are done, and both are elsewhere. CR 106.11 --
     -- adding mana represented by {S} -- is Pawl.Types.ManaProduction.SnowSymbol,
-    -- rewritten to colorless mana by Pawl.Engine.Mana.producedTypes. CR 118.7g --
+    -- rewritten to colorless mana by Pawl.Engine.Mana.produced. CR 118.7g --
     -- a reduction BY {S}, which the rule turns back into a plain generic
     -- reduction -- is why Pawl.Engine.Cost.applyAdjustments asks costGenericOf on
     -- the cost side and reducingGenericOf on the reduction side.

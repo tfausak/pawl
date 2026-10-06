@@ -26,7 +26,8 @@ spec s = Spec.describe s "Pawl.Codec.RollDie" $ do
           RollDie.slot = SlotName.MkSlotName (Text.pack "result"),
           RollDie.other = Nothing,
           RollDie.roller = PlayerScope.You,
-          RollDie.highest = Nothing
+          RollDie.highest = Nothing,
+          RollDie.store = Nothing
         }
       " {\"sides\":20,\"slot\":\"result\"} "
   -- CR 706.2's first sentence: the instruction's own modifier, which an
@@ -43,7 +44,8 @@ spec s = Spec.describe s "Pawl.Codec.RollDie" $ do
           RollDie.slot = SlotName.MkSlotName (Text.pack "result"),
           RollDie.other = Nothing,
           RollDie.roller = PlayerScope.You,
-          RollDie.highest = Nothing
+          RollDie.highest = Nothing,
+          RollDie.store = Nothing
         }
       " {\"modifier\":{\"type\":\"Literal\",\"value\":3},\"sides\":20,\"slot\":\"result\"} "
   -- CR 706.1's count beside CR 706.4's second reading, the Endeavor cycle's wire
@@ -61,7 +63,8 @@ spec s = Spec.describe s "Pawl.Codec.RollDie" $ do
           RollDie.slot = SlotName.MkSlotName (Text.pack "chosen"),
           RollDie.other = Just (SlotName.MkSlotName (Text.pack "other")),
           RollDie.roller = PlayerScope.You,
-          RollDie.highest = Nothing
+          RollDie.highest = Nothing,
+          RollDie.store = Nothing
         }
       " {\"count\":{\"type\":\"Literal\",\"value\":2},\"other\":\"other\",\"sides\":6,\"slot\":\"chosen\"} "
   -- CR 706.4's total, Neverwinter Hydra's wire form: the one reading that is
@@ -78,7 +81,8 @@ spec s = Spec.describe s "Pawl.Codec.RollDie" $ do
           RollDie.slot = SlotName.MkSlotName (Text.pack "total"),
           RollDie.other = Nothing,
           RollDie.roller = PlayerScope.You,
-          RollDie.highest = Nothing
+          RollDie.highest = Nothing,
+          RollDie.store = Nothing
         }
       " {\"count\":{\"type\":\"InSlot\",\"value\":\"X\"},\"reading\":{\"type\":\"Total\"},\"sides\":6,\"slot\":\"total\"} "
   -- CR 706.1's roller and the players who rolled highest, Chaos Dragon's wire
@@ -95,7 +99,26 @@ spec s = Spec.describe s "Pawl.Codec.RollDie" $ do
           RollDie.slot = SlotName.MkSlotName (Text.pack "result"),
           RollDie.other = Nothing,
           RollDie.roller = PlayerScope.EachPlayer,
-          RollDie.highest = Just (SlotName.MkSlotName (Text.pack "highest"))
+          RollDie.highest = Just (SlotName.MkSlotName (Text.pack "highest")),
+          RollDie.store = Nothing
         }
       " {\"highest\":\"highest\",\"roller\":{\"type\":\"EachPlayer\"},\"sides\":20,\"slot\":\"result\"} "
+  -- CR 706.8a's store, Centaur of Attention's wire form: the field elides
+  -- everywhere else.
+  Spec.it s "five dice stored on the permanent" $
+    Common.assertCodec
+      s
+      RollDie.codec
+      RollDie.MkRollDie
+        { RollDie.sides = 6,
+          RollDie.count = Quantity.Literal 5,
+          RollDie.modifier = Nothing,
+          RollDie.reading = DiceReading.ChooseOne,
+          RollDie.slot = SlotName.MkSlotName (Text.pack "result"),
+          RollDie.other = Nothing,
+          RollDie.roller = PlayerScope.You,
+          RollDie.highest = Nothing,
+          RollDie.store = Just (SlotName.MkSlotName (Text.pack "self"))
+        }
+      " {\"count\":{\"type\":\"Literal\",\"value\":5},\"sides\":6,\"slot\":\"result\",\"store\":\"self\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s RollDie.codec

@@ -277,6 +277,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.HasChosenName -> 0
   Filter.Type.HasChosenColor -> 0
   Filter.Type.HasChosenSubtype -> 0
+  Filter.Type.IsLastExiledWithSource -> 0
   Filter.Type.OfChosenPlayer -> 0
   Filter.Type.IsControllerOfBound _ -> 0
   -- Zero for the nullary atoms' reason, a payload over: CR 400.1's card count is
@@ -762,6 +763,16 @@ grantedChosenColors card =
 -- Origins). The colour has no such reading, so the two lists differ.
 hasChosenSubtypeCounts :: Face.Face Card.Type.Card -> (Int, Int)
 hasChosenSubtypeCounts = chosenValueCounts (ManaRestrictionFramed : chosenValuePositions) hasChosenSubtypeTag
+
+-- CR 607.2a's last-exiled atom, spelled once.
+isLastExiledWithSourceTag :: Text.Text
+isLastExiledWithSourceTag = Text.pack "IsLastExiledWithSource"
+
+-- The atom is answerable only in CR 106.6's restriction, where
+-- Pawl.Engine.Mana.admitsUnder fills Filter.Context.sourceLastExiled off the
+-- mana unit (Ice Cauldron); everywhere else it is a silent False.
+isLastExiledWithSourceCounts :: Face.Face Card.Type.Card -> (Int, Int)
+isLastExiledWithSourceCounts = chosenValueCounts [ManaRestrictionFramed] isLastExiledWithSourceTag
 
 -- Two offences under one name, hasChosenNameOffends' two: an atom outside the
 -- admitted positions, or the traversal and the codec disagreeing about how many
@@ -3328,6 +3339,31 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
           "and the codec counts exactly the atoms the traversal does"
           (fmap (\(_, card) -> jsonAtoms tag (Codec.encode (Face.Codec.codec Card.codec) card)) (rejected buried <> accepted buried))
           (fmap (const 1) (rejected buried <> accepted buried))
+
+  -- CR 607.2a's last exiled card: answerable in a mana restriction alone. Ice
+  -- Cauldron is accepted rather than skipped, and the same atom moved into an
+  -- activated ability's target slot is rejected, so the lint is not vacuous.
+  Spec.it s "CR 607.2a no card asks IsLastExiledWithSource outside a mana restriction" $ do
+    ps <- S.allPrintings s
+    Spec.assertEqWith
+      s
+      "the atom sits only in a mana restriction"
+      (fmap (S.nameOf . Printing.card) (filter (anyFace (chosenValueOffends isLastExiledWithSourceCounts isLastExiledWithSourceTag) . Printing.card) ps))
+      []
+    cauldron <- S.printingOf s registry "Ice Cauldron"
+    Spec.assertEqWith s "Ice Cauldron's atom is framed by a mana restriction" (isLastExiledWithSourceCounts (S.combinedFace cauldron)) (1, 0)
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    let slot = SlotName.MkSlotName (Text.pack "target")
+        aimed =
+          Modal.MkModal
+            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton slot (TargetSlot.required Pool.Permanents (Just Filter.Type.IsLastExiledWithSource)))))
+            (ModeSelection.ChooseExactly 1)
+        planted = (S.combinedFace sorcerer) {Face.activatedAbilities = fmap (\a -> a {ActivatedAbility.modal = aimed}) (Face.activatedAbilities (S.combinedFace sorcerer))}
+    Spec.assertEqWith
+      s
+      "and a target slot asking it is rejected"
+      (chosenValueOffends isLastExiledWithSourceCounts isLastExiledWithSourceTag planted, isLastExiledWithSourceCounts planted)
+      (True, (0, 1))
 
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Card" $ do

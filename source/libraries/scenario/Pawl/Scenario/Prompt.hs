@@ -69,6 +69,7 @@ deciderOf prompt = case prompt of
   Prompt.ChooseVoteWord decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseMovedCounter decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseMovedCounters decider _ _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseStoredRerolls decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseMovedCountersAtLeastOne decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseDistributedMovedCounters decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseMovedCounterOrNone decider _ _ _ _ -> Just (Decider.unwrap decider)
@@ -234,6 +235,7 @@ kindOf prompt = Text.pack $ case prompt of
   Prompt.ChooseVoteWord {} -> "ChooseVoteWord"
   Prompt.ChooseMovedCounter {} -> "ChooseMovedCounter"
   Prompt.ChooseMovedCounters {} -> "ChooseMovedCounters"
+  Prompt.ChooseStoredRerolls {} -> "ChooseStoredRerolls"
   Prompt.ChooseMovedCountersAtLeastOne {} -> "ChooseMovedCountersAtLeastOne"
   Prompt.ChooseDistributedMovedCounters {} -> "ChooseDistributedMovedCounters"
   Prompt.ChooseMovedCounterOrNone {} -> "ChooseMovedCounterOrNone"

@@ -102,6 +102,7 @@ encode p answer = case p of
   Prompt.ChooseDelayedTriggerEvent {} -> Response.ChoseDelayedTriggerEvent answer
   Prompt.ChooseMovedCounter {} -> Response.ChoseMovedCounter answer
   Prompt.ChooseMovedCounters {} -> Response.ChoseMovedCounters answer
+  Prompt.ChooseStoredRerolls {} -> Response.ChoseStoredRerolls answer
   Prompt.ChooseMovedCountersAtLeastOne {} -> Response.ChoseMovedCountersAtLeastOne answer
   Prompt.ChooseDistributedMovedCounters {} -> Response.ChoseDistributedMovedCounters answer
   Prompt.ChooseMovedCounterOrNone {} -> Response.ChoseMovedCounterOrNone answer
@@ -375,6 +376,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseMovedCounters {} -> case response of
     Response.ChoseMovedCounters counters -> Just counters
+    _ -> Nothing
+  Prompt.ChooseStoredRerolls {} -> case response of
+    Response.ChoseStoredRerolls rerolled -> Just rerolled
     _ -> Nothing
   Prompt.ChooseMovedCountersAtLeastOne {} -> case response of
     Response.ChoseMovedCountersAtLeastOne counters -> Just counters
@@ -885,6 +889,8 @@ defaultAnswer p = case p of
   -- the maximal one -- a default that emptied the first object would rewrite a
   -- board rather than leave it alone.
   Prompt.ChooseMovedCounters {} -> Map.empty
+  -- CR 706.8b's "any number" includes none: reroll nothing.
+  Prompt.ChooseStoredRerolls {} -> Map.empty
   -- CR 122.5 again, and the one counter-moving default that DOES move something:
   -- "one or more" excludes none, so the least-eventful legal answer is a single
   -- counter of the first kind offered rather than the empty map above.
@@ -1051,7 +1057,7 @@ defaultAnswer p = case p of
   Prompt.ChooseEncode {} -> Nothing
   -- CR 105.1: any of the five colours is a legal answer.
   Prompt.ChooseColor _ _ _ colors -> NonEmpty.head colors
-  -- CR 105.4: every candidate is a type Mana.producedTypes offered, so the head
+  -- CR 105.4: every candidate is a type Mana.produced offered, so the head
   -- is legal -- the same filter-not-trust fallback Resolve's arm applies to a
   -- wrong answer.
   Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates

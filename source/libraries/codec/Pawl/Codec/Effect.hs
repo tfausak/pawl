@@ -144,6 +144,7 @@ codec cardCodec abilityCodec =
           Arm.nullary "ExileAllGraveyards" Effect.ExileAllGraveyards,
           Arm.nullary "Proliferate" Effect.Proliferate,
           Arm.nullary "Reroll" Effect.Reroll,
+          Arm.payload "RerollStoredResults" SlotName.codec Effect.RerollStoredResults (\x -> case x of Effect.RerollStoredResults y -> Just y; _ -> Nothing),
           Arm.payload "ChooseCardName" ChooseCardName.codec Effect.ChooseCardName (\x -> case x of Effect.ChooseCardName y -> Just y; _ -> Nothing),
           Arm.payload "FromOutsideTheGame" FromOutsideTheGame.codec Effect.FromOutsideTheGame (\x -> case x of Effect.FromOutsideTheGame y -> Just y; _ -> Nothing),
           Arm.nullary "ExileThisSpell" Effect.ExileThisSpell,
@@ -163,6 +164,7 @@ codec cardCodec abilityCodec =
           Arm.payload "Cloak" PlayerRef.codec Effect.Cloak (\x -> case x of Effect.Cloak y -> Just y; _ -> Nothing),
           Arm.optionalPayload "Venture" Subtype.codec Effect.Venture (\x -> case x of Effect.Venture y -> Just y; _ -> Nothing),
           Arm.nullary "ExileHandThenDraw" Effect.ExileHandThenDraw,
+          Arm.nullary "NoteManaSpent" Effect.NoteManaSpent,
           Arm.payload "PlayerSacrifices" PlayerSacrifices.codec Effect.PlayerSacrifices (\x -> case x of Effect.PlayerSacrifices y -> Just y; _ -> Nothing),
           Arm.payload "Vote" Vote.codec Effect.Vote (\x -> case x of Effect.Vote y -> Just y; _ -> Nothing),
           Arm.optionalPayload "RestartGame" ObjectRef.codec Effect.RestartGame (\x -> case x of Effect.RestartGame y -> Just y; _ -> Nothing),
@@ -315,6 +317,7 @@ tagOf x = case x of
   Effect.ExileAllGraveyards {} -> "ExileAllGraveyards"
   Effect.Proliferate {} -> "Proliferate"
   Effect.Reroll {} -> "Reroll"
+  Effect.RerollStoredResults {} -> "RerollStoredResults"
   Effect.ChooseCardName {} -> "ChooseCardName"
   Effect.FromOutsideTheGame {} -> "FromOutsideTheGame"
   Effect.ExileThisSpell {} -> "ExileThisSpell"
@@ -334,6 +337,7 @@ tagOf x = case x of
   Effect.Cloak {} -> "Cloak"
   Effect.Venture {} -> "Venture"
   Effect.ExileHandThenDraw {} -> "ExileHandThenDraw"
+  Effect.NoteManaSpent {} -> "NoteManaSpent"
   Effect.PlayerSacrifices {} -> "PlayerSacrifices"
   Effect.Vote {} -> "Vote"
   Effect.RestartGame {} -> "RestartGame"

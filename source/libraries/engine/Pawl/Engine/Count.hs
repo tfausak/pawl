@@ -375,6 +375,7 @@ bakePerspective viewOf context gs candidate predicate =
         Filter.Type.HasChosenName -> predicate
         Filter.Type.HasChosenColor -> predicate
         Filter.Type.HasChosenSubtype -> predicate
+        Filter.Type.IsLastExiledWithSource -> predicate
         Filter.Type.OfChosenPlayer -> predicate
         Filter.Type.IsPlayer _ -> predicate
         Filter.Type.IsAttacking -> predicate
@@ -1273,6 +1274,7 @@ viewOfSnapshot deploy mController mOwner isToken counters snapshot =
       -- CR 701.37c's X rides the designation, so a past event records none --
       -- `designations` above, same sentence.
       Filter.designationValues = Map.empty,
+      Filter.storedResults = Map.empty,
       -- CR 716.2b: a designation too, which a ProjectedCharacteristics does not
       -- carry and never could, so a past event records none -- `designations`
       -- above, same sentence.

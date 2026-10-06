@@ -3345,6 +3345,7 @@ filterReads f = case f of
   -- Reads the candidate's SUBTYPES, HasSubtype's answer: the chosen half arrives
   -- on the Context baked at production, and CR 613.1d's layer writes the other.
   Filter.Type.HasChosenSubtype -> Set.singleton Subtypes
+  Filter.Type.IsLastExiledWithSource -> Set.empty
   -- Reads the candidate's CONTROLLER, SameControllerAsBound's answer above: rule
   -- 702.16k's other half is an owner, which CR 108.3 never projects.
   Filter.Type.OfChosenPlayer -> Set.singleton Controller
@@ -3675,6 +3676,7 @@ filterReadsPeers f = case f of
   -- at production; the candidate's own subtypes come from its partial, so no PEER
   -- is projected.
   Filter.Type.HasChosenSubtype -> False
+  Filter.Type.IsLastExiledWithSource -> False
   -- The carrier's chosen player arrives on the Context; the candidate's own
   -- controller and owner are read off its view, so no PEER is projected.
   Filter.Type.OfChosenPlayer -> False
@@ -3996,6 +3998,7 @@ quantityReads q = case q of
   Quantity.Type.ObjectCountersOfAnyKind -> Set.empty
   Quantity.Type.HasDesignation _ -> Set.empty
   Quantity.Type.DesignationValue _ -> Set.empty
+  Quantity.Type.StoredResultsOfSameValue -> Set.empty
   Quantity.Type.ClassLevel -> Set.empty
   Quantity.Type.WasKicked -> Set.empty
   Quantity.Type.WasForetold -> Set.empty

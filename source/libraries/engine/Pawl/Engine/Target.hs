@@ -491,7 +491,9 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- A THUNK, like its siblings.
             Filter.sourceChosenColors = Game.chosenColorsWithLastKnown source gs,
             -- The field above's sibling for "the chosen type" (From the Rubble).
-            Filter.sourceChosenSubtype = Game.chosenSubtypeWithLastKnown source gs
+            Filter.sourceChosenSubtype = Game.chosenSubtypeWithLastKnown source gs,
+            -- CR 607.2a's last exiled card is the MANA unit's, never a slot's.
+            Filter.sourceLastExiled = Nothing
           }
       evaluated = amount >>= Quantity.evaluate (Projection.fullView gs) base gs source
    in -- CR 202.3 / 601.2c: the slot's own computed mana-value bound, evaluated

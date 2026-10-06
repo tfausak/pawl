@@ -364,6 +364,7 @@ import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.SpellWasCopied as SpellWasCopied
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
+import qualified Pawl.Types.StoredResult as StoredResult
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TapState as TapState
@@ -3455,8 +3456,10 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.RollDie {} -> False
   Effect.FlipCoin {} -> False
   Effect.ExileHandThenDraw {} -> False
+  Effect.NoteManaSpent {} -> False
   Effect.Proliferate {} -> False
   Effect.Reroll -> False
+  Effect.RerollStoredResults _ -> False
   Effect.ChooseCardName {} -> False
   Effect.Bolster {} -> False
   Effect.Amass {} -> False
@@ -3872,7 +3875,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- both printings that write one (Boseiju, Who Shelters All and Delighted
   -- Halfling) are mana abilities and take the inline CR 605.3b road instead, so
   -- neutralising this line leaves the whole suite green. CR 106.6a states it
-  -- anyway, which is why the line is here.
+  -- anyway, which is why the line is here. The CR 607.2a sourceLastExiled stamp
+  -- is a fence for the same reason: Ice Cauldron, its one producer, is a mana
+  -- ability too.
   Effect.AddMana (ManaAddition.MkManaAddition ref production count retention restriction rider) -> do
     gs0 <- State.get
     -- CR 106.3: how many units this ONE instruction adds, read off the board at
@@ -3881,6 +3886,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- for CR 605.3b's inline road, so the offer and the addition measure one
     -- board. A negative count adds nothing, and an undeterminable one reads 0.
     let howMany = max 0 (Integer.toIntSaturating (Maybe.fromMaybe 0 (Quantity.evaluateFor (effectViewOf source legal gs0) (effectContext gs0 controller source legal (slotBindings resolving gs0)) gs0 resolving source count)))
+        unitOf manaType =
+          ManaUnit.MkManaUnit
+            { ManaUnit.manaType = manaType,
+              ManaUnit.tags = Mana.productionTagsGiven Map.empty source gs0,
+              ManaUnit.retention = retention,
+              ManaUnit.restriction = restriction,
+              ManaUnit.rider = rider,
+              ManaUnit.sourceChosenSubtype = Mana.sourceChosenSubtypeOf source gs0,
+              ManaUnit.sourceLastExiled = Mana.lastExiledWith source gs0
+            }
         -- CR 605.1b's event, per recipient. Nothing is recorded where the
         -- instruction added no mana: an addition of none is no addition, and CR
         -- 605.1b's clause is about mana that arrived.
@@ -3898,27 +3913,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       )
                   )
               )
-    case Mana.producedTypes source gs0 production of
-      -- One settled type needs no question; the COUNT is how many units this one
-      -- instruction adds, and a clause adding mana of two DIFFERENT types writes
-      -- two effects, run in printed order (CR 608.2c).
-      [manaType] ->
-        let unit =
-              ManaUnit.MkManaUnit
-                { ManaUnit.manaType = manaType,
-                  ManaUnit.tags = Mana.productionTagsGiven Map.empty source gs0,
-                  ManaUnit.retention = retention,
-                  ManaUnit.restriction = restriction,
-                  ManaUnit.rider = rider,
-                  ManaUnit.sourceChosenSubtype = Mana.sourceChosenSubtypeOf source gs0
-                }
+    case Mana.produced source gs0 production of
+      -- A settled run needs no question; the COUNT is how many times this one
+      -- instruction adds it, and a clause adding mana of two DIFFERENT types
+      -- writes two effects, run in printed order (CR 608.2c) -- except CR
+      -- 607.2e's noted run, which is one instruction of mixed types (Ice
+      -- Cauldron). An empty run is CR 607.2d's "the chosen color" with nothing
+      -- chosen, or nothing noted: adding nothing is the honest answer.
+      Mana.Settles run ->
+        let units = concat (replicate howMany (fmap unitOf run))
             recipients = playerRefPlayers legal controller gs0 ref
-         in do
-              State.modify' (\gs -> foldr (\pid -> Mana.addMana pid (replicate howMany unit)) gs recipients)
-              Monad.mapM_ (\pid -> recordAdded pid (Set.singleton manaType)) recipients
-      -- No type at all is CR 607.2d's "the chosen color" with nothing chosen:
-      -- adding nothing is the honest answer.
-      [] -> pure ()
+         in Monad.unless (null run) $ do
+              State.modify' (\gs -> foldr (\pid -> Mana.addMana pid units) gs recipients)
+              Monad.mapM_ (\pid -> recordAdded pid (Set.fromList run)) recipients
       -- Several types is CR 105.4's choice, and it is the RECIPIENT's: CR 106.3
       -- has the effect instruct a player to add the mana, and CR 106.4 puts it in
       -- that player's pool. CR 101.4: several recipients are asked in APNAP
@@ -3929,9 +3936,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- CR 105.4's choice is made ONCE for the whole instruction, which is what
       -- "two mana of any one color they choose" says (Stadium Vendors): the
       -- count replicates the unit the answer settled rather than asking again.
-      first : second : more ->
-        let offered = first NonEmpty.:| (second : more)
-            named = playerRefPlayers legal controller gs0 ref
+      Mana.Offers offered ->
+        let named = playerRefPlayers legal controller gs0 ref
             ordered = filter (\pid -> List.elem pid named) (Game.apnapOrder gs0)
             recipients = ordered <> filter (\pid -> List.notElem pid ordered) named
          in Monad.forM_ recipients $ \pid -> do
@@ -3940,17 +3946,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- Filtered, not trusted: an answer naming a type never offered
               -- falls back to the first candidate, since the instruction is
               -- mandatory and must put mana in a pool.
-              let manaType = if List.elem answer (NonEmpty.toList offered) then answer else first
-                  unit =
-                    ManaUnit.MkManaUnit
-                      { ManaUnit.manaType = manaType,
-                        ManaUnit.tags = Mana.productionTagsGiven Map.empty source gs0,
-                        ManaUnit.retention = retention,
-                        ManaUnit.restriction = restriction,
-                        ManaUnit.rider = rider,
-                        ManaUnit.sourceChosenSubtype = Mana.sourceChosenSubtypeOf source gs0
-                      }
-              State.modify' (Mana.addMana pid (replicate howMany unit))
+              let manaType = if List.elem answer (NonEmpty.toList offered) then answer else NonEmpty.head offered
+              State.modify' (Mana.addMana pid (replicate howMany (unitOf manaType)))
               recordAdded pid (Set.singleton manaType)
   -- CR 608.2c's instruction, carried out by somebody other than this spell's
   -- controller: Drain Power's first sentence has the TARGETED player activate a
@@ -4380,6 +4377,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     let handIds = Game.zoneMembers Zone.Hand controller gs
     Monad.void (Event.changeZonesTogether (fmap (\oid -> (oid, Zone.Exile)) handIds))
     Monad.replicateM_ (length handIds) (Event.drawCard controller)
+  -- CR 607.2e: the note is the ACTIVATION's CR 602.2b payment -- recorded on
+  -- the ability object as Object.manaSpent -- filed against the SOURCE, whose linked
+  -- mana ability reads it back (ManaProduction.Noted). Ice Cauldron's ruling
+  -- counts the mana spent and not X, so a cost reduction changes nothing.
+  Effect.NoteManaSpent -> do
+    spent <- State.gets (foldMap (Mana.Type.unwrap . Object.manaSpent) . Game.lookupObject resolving)
+    State.modify' (\gs -> gs {GameState.notedMana = Map.insert source (Seq.fromList (fmap ManaUnit.manaType spent)) (GameState.notedMana gs)})
   -- CR 727.1/727.1a: restart the game, with this ability's controller as the new
   -- starting player; the rebuild lives in Setup, reached through a generic opcode
   -- rather than Karn's identity. CR 727.4: this resolves several frames deep, and
@@ -4607,11 +4611,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         rollers = filter (\pid -> Game.inRangeOf controller pid before && PlayerEffect.inScope pid controller before (RollDie.roller rollDie)) (Game.apnapOrder before)
     rolled <- Monad.forM rollers $ \roller -> do
       (results, throwers) <- throwDice runSubgame roller sides named perDie
-      used <- case RollDie.reading rollDie of
+      used <- case (RollDie.store rollDie, RollDie.reading rollDie) of
+        -- CR 706.8a: a storing instruction keeps every result rather than
+        -- using one, so CR 706.4's reading is never asked.
+        (Just _, _) -> pure Nothing
         -- CR 706.4's total: every result read at once, so there is nothing to
         -- choose, and the total of no dice is zero rather than unbound.
-        DiceReading.Total -> pure (Just (sum results))
-        DiceReading.ChooseOne -> Monad.forM (NonEmpty.nonEmpty results) $ \offered -> do
+        (Nothing, DiceReading.Total) -> pure (Just (sum results))
+        (Nothing, DiceReading.ChooseOne) -> Monad.forM (NonEmpty.nonEmpty results) $ \offered -> do
           gs <- State.get
           -- CR 706.4: WHICH result the instruction uses, where it threw more
           -- than one ("roll two d6 and choose one result"). A choice and not a
@@ -4647,6 +4654,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         State.modify' (bindPlayerSlot resolving slot (Set.fromList [roller | (roller, Just m, _, _) <- rolled, m == n]))
     Foldable.for_ rolled $ \(roller, _, throwers, results) ->
       Monad.unless (null results) (recordRoll roller throwers results)
+    -- CR 706.8a: every kept result, noted with its kind of die, on the slot's
+    -- permanent.
+    Foldable.for_ (RollDie.store rollDie >>= \slot -> legalOne slot legal >>= Recipient.objectOf) $ \target ->
+      State.modify' (storeOn target sides (foldMap (\(_, _, _, results) -> results) rolled))
   -- CR 706.2b's reroll, thrown by the ability Goblin Bookie activates inside
   -- throwDice's window: the same die, the new face filtered back to
   -- CR 706.1a's range, and handed back through GameState.rerolledTo. No window
@@ -4662,6 +4673,27 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       let face = if again >= 1 && again <= dieSides then again else 1
       State.modify' (\g -> g {GameState.rerolledTo = Just face})
       State.modify' (Event.recordEvent (GameEvent.DiceRolled controller))
+  -- CR 706.8b: the controller chooses which of the slot's stored results to
+  -- reroll, rolls one die of each noted kind per result through throwDice --
+  -- so CR 706.2's modifiers and CR 614.1a's replacements reach it, and each
+  -- kind's throw records CR 706.1's event -- and the new results replace the
+  -- old.
+  Effect.RerollStoredResults slot -> Foldable.for_ (legalOne slot legal >>= Recipient.objectOf) $ \target -> do
+    gs <- State.get
+    let stored = foldMap Object.storedResults (Game.lookupObject target gs)
+    Monad.unless (Map.null stored) $ do
+      answer <- Game.choose (Prompt.ChooseStoredRerolls (Decide.deciderFor controller gs) controller target stored)
+      -- FILTERED, NOT TRUSTED: each count clamped to what the object holds.
+      let rerolled = Map.filter (> 0) (Map.intersectionWith min answer stored)
+          kinds = Map.fromListWith (+) [(StoredResult.sides result, n) | (result, n) <- Map.toList rerolled]
+      thrown <- Monad.forM (Map.toList kinds) $ \(dieSides, n) -> do
+        (results, throwers) <- throwDice runSubgame controller dieSides n (pure 0)
+        Monad.unless (null results) (recordRoll controller throwers results)
+        pure (dieSides, results)
+      -- Swapped only once every die is up, in the rule's order.
+      let unstore o = o {Object.storedResults = Map.differenceWith (\have gone -> if have > gone then Just (have - gone) else Nothing) (Object.storedResults o) rerolled}
+      State.modify' (\g -> g {GameState.objects = Map.adjust unstore target (GameState.objects g)})
+      Foldable.for_ thrown $ \(dieSides, results) -> State.modify' (storeOn target dieSides results)
   -- CR 705.1's flip, in RollDie's holder and for its reason: bindAmountSlot's
   -- `source` is the resolving object, and on a SPELL -- which Winter Sky is --
   -- `source` and `resolving` are the same object, so the ambiguity the arm above
@@ -7464,6 +7496,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       -- CR 701.37c's X rides the designation, so it is zeroed
                       -- with it -- `designations` above, same sentence.
                       Object.designationValues = Map.empty,
+                      Object.storedResults = Map.empty,
                       -- CR 707.10 copies the alternative cost, but a copy isn't
                       -- CAST, so it keeps evoke's record and not escape's.
                       Object.castUsing = Keyword.copiedCastUsing (Object.castUsing obj),
@@ -10496,6 +10529,19 @@ performHandAction runSubgame source player =
 -- `perDie` is the instruction's own modifier (CR 706.2). Shared by
 -- Effect.RollDie's arm and CR 701.52a's roll to visit, which records nothing
 -- here: each caller records its own events.
+-- | CR 706.8a: note each of these results of a die of `sides` on `target` as
+-- a stored result. Only a PERMANENT holds stored results, so an object no
+-- longer on the battlefield is left alone.
+storeOn :: ObjectId -> Natural -> [Natural] -> GameState -> GameState
+storeOn target sides results gs =
+  let noted :: Map.Map StoredResult.StoredResult Natural
+      noted = Map.fromListWith (+) [(StoredResult.MkStoredResult {StoredResult.sides = sides, StoredResult.value = result}, 1) | result <- results]
+      store o =
+        if Object.zone o == Zone.Battlefield
+          then o {Object.storedResults = Map.unionWith (+) noted (Object.storedResults o)}
+          else o
+   in gs {GameState.objects = Map.adjust store target (GameState.objects gs)}
+
 -- | CR 706.1's roll, as the log records it once throwDice's results are
 -- settled.
 recordRoll :: PlayerId -> [PlayerId] -> [Natural] -> Game ()

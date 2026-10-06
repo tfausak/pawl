@@ -857,8 +857,10 @@ effectObjectRefs effect = case effect of
   Effect.RollDie {} -> []
   Effect.FlipCoin {} -> []
   Effect.ExileHandThenDraw -> []
+  Effect.NoteManaSpent -> []
   Effect.Proliferate -> []
   Effect.Reroll -> []
+  Effect.RerollStoredResults _ -> []
   Effect.ChooseCardName {} -> []
   Effect.Bolster {} -> []
   Effect.Amass {} -> []
@@ -1069,8 +1071,10 @@ effectPlayerRefs effect = case effect of
   Effect.RollDie {} -> []
   Effect.FlipCoin {} -> []
   Effect.ExileHandThenDraw -> []
+  Effect.NoteManaSpent -> []
   Effect.Proliferate -> []
   Effect.Reroll -> []
+  Effect.RerollStoredResults _ -> []
   Effect.ChooseCardName (ChooseCardName.MkChooseCardName ref _) -> [ref]
   Effect.Bolster {} -> []
   Effect.Amass {} -> []
@@ -1197,6 +1201,8 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.ExileAllGraveyards -> Map.empty
   Effect.Proliferate -> Map.empty
   Effect.Reroll -> Map.empty
+  -- A READ: the slot names the permanent whose stored results are rerolled.
+  Effect.RerollStoredResults slot -> oneSlot slot
   -- CR 201.4's name is not an object, so the choice binds no slot of its own and
   -- the restriction Filter names none either -- a Filter reads a slot only
   -- through Filter.boundSlots, and no card writes one of those atoms here. The
@@ -1227,6 +1233,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.Cloak {} -> Map.empty
   Effect.Venture {} -> Map.empty
   Effect.ExileHandThenDraw -> Map.empty
+  Effect.NoteManaSpent -> Map.empty
   -- The players are effectPlayerRefs' half, joined at the head above.
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> quantitySlots quantity
   -- The object vote's listed choices are a Filter and nothing else: the starter
@@ -2000,6 +2007,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.ExileAllGraveyards -> True
   Effect.Proliferate -> True
   Effect.Reroll -> True
+  Effect.RerollStoredResults _ -> True
   Effect.ChooseCardName _ -> True
   Effect.FromOutsideTheGame _ -> True
   Effect.ExileThisSpell -> True
@@ -2021,6 +2029,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.Cloak {} -> True
   Effect.Venture {} -> True
   Effect.ExileHandThenDraw -> True
+  Effect.NoteManaSpent -> True
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Vote {} -> True
   Effect.RestartGame _ -> True
@@ -2284,6 +2293,7 @@ readsX =
         Effect.ExileAllGraveyards -> False
         Effect.Proliferate -> False
         Effect.Reroll -> False
+        Effect.RerollStoredResults _ -> False
         -- No Quantity: rule 201.4 chooses one name and states no count.
         Effect.ChooseCardName _ -> False
         Effect.FromOutsideTheGame _ -> False
@@ -2306,6 +2316,7 @@ readsX =
         Effect.Cloak {} -> False
         Effect.Venture {} -> False
         Effect.ExileHandThenDraw -> False
+        Effect.NoteManaSpent -> False
         Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> Quantity.readsX quantity
         Effect.Vote {} -> False
         Effect.RestartGame _ -> False
@@ -2533,6 +2544,7 @@ boundSlots effect = case effect of
   Effect.ExileAllGraveyards -> Set.empty
   Effect.Proliferate -> Set.empty
   Effect.Reroll -> Set.empty
+  Effect.RerollStoredResults _ -> Set.empty
   -- Binds nothing: the name goes on the SOURCE (Object.chosenNames) and is read
   -- back off it by Filter.HasChosenName, so no slot carries it.
   Effect.ChooseCardName _ -> Set.empty
@@ -2564,6 +2576,7 @@ boundSlots effect = case effect of
   Effect.Cloak {} -> Set.empty
   Effect.Venture {} -> Set.empty
   Effect.ExileHandThenDraw -> Set.empty
+  Effect.NoteManaSpent -> Set.empty
   Effect.PlayerSacrifices {} -> Set.empty
   -- CR 701.38a: the objects tied for most votes, for the later effect that
   -- acts on them (Council's Judgment's exile). For a word vote it is one slot

@@ -18,7 +18,7 @@ data ManaSpecification
     -- linked to its "As this artifact enters, choose a color".
     --
     -- A permanent with no colour chosen narrows to nothing rather than to every
-    -- colour, Pawl.Engine.Mana.producedTypes' posture for ManaProduction.Chosen
+    -- colour, Pawl.Engine.Mana.produced's posture for ManaProduction.Chosen
     -- and for its reason: inventing one would be the engine making a player's
     -- choice.
     ChosenColor

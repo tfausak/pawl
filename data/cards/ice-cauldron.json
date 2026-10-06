@@ -1,0 +1,189 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "TapThis"
+              }
+            ],
+            "mana": [
+              {
+                "type": "Variable"
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "MoveToZone",
+                        "value": {
+                          "ref": {
+                            "type": "ChosenCardInHand",
+                            "value": {
+                              "filter": {
+                                "type": "Not",
+                                "value": {
+                                  "type": "HasCardType",
+                                  "value": {
+                                    "type": "Land"
+                                  }
+                                }
+                              },
+                              "player": {
+                                "type": "Relative",
+                                "value": {
+                                  "type": "You"
+                                }
+                              }
+                            }
+                          },
+                          "slot": "exiled",
+                          "zone": {
+                            "type": "Exile"
+                          }
+                        }
+                      },
+                      {
+                        "type": "GrantPlayFromExile",
+                        "value": {
+                          "duration": {
+                            "type": "Indefinite"
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "exiled"
+                          },
+                          "verb": {
+                            "type": "Cast"
+                          }
+                        }
+                      }
+                    ],
+                    "optionality": {
+                      "type": "Optional"
+                    }
+                  },
+                  {
+                    "effects": [
+                      {
+                        "type": "PutCounters",
+                        "value": {
+                          "kind": {
+                            "type": "Named",
+                            "value": "charge"
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "self"
+                          }
+                        }
+                      },
+                      {
+                        "type": "NoteManaSpent"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "restrictions": [
+            {
+              "type": "OnlyIf",
+              "value": {
+                "type": "Compares",
+                "value": {
+                  "comparison": {
+                    "type": "Exactly"
+                  },
+                  "measured": {
+                    "type": "ObjectCounters",
+                    "value": {
+                      "type": "Named",
+                      "value": "charge"
+                    }
+                  },
+                  "threshold": {
+                    "type": "Literal",
+                    "value": 0
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "TapThis"
+              },
+              {
+                "type": "RemoveCountersFromThis",
+                "value": {
+                  "count": 1,
+                  "kind": {
+                    "type": "Named",
+                    "value": "charge"
+                  }
+                }
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "AddMana",
+                        "value": {
+                          "production": {
+                            "type": "Noted"
+                          },
+                          "restriction": {
+                            "casts": {
+                              "type": "IsLastExiledWithSource"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        }
+      ],
+      "name": "Ice Cauldron",
+      "oracleText": "{X}, {T}: You may exile a nonland card from your hand. You may cast that card for as long as it remains exiled. Put a charge counter on this artifact and note the type and amount of mana spent to pay this activation cost. Activate only if there are no charge counters on this artifact.\n{T}, Remove a charge counter from this artifact: Add this artifact's last noted type and amount of mana. Spend this mana only to cast the last card exiled with this artifact.",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}

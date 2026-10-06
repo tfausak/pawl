@@ -103,6 +103,7 @@ codec keywordCodec =
       Arm.nullary "HasChosenName" Filter.HasChosenName,
       Arm.nullary "HasChosenColor" Filter.HasChosenColor,
       Arm.nullary "HasChosenSubtype" Filter.HasChosenSubtype,
+      Arm.nullary "IsLastExiledWithSource" Filter.IsLastExiledWithSource,
       Arm.nullary "OfChosenPlayer" Filter.OfChosenPlayer,
       Arm.nullary "IsAttacking" Filter.IsAttacking,
       Arm.payload "IsAttackingPlayer" PlayerRelation.codec Filter.IsAttackingPlayer (\x -> case x of Filter.IsAttackingPlayer y -> Just y; _ -> Nothing),
@@ -233,6 +234,7 @@ tagOf x = case x of
   Filter.HasChosenName {} -> "HasChosenName"
   Filter.HasChosenColor {} -> "HasChosenColor"
   Filter.HasChosenSubtype {} -> "HasChosenSubtype"
+  Filter.IsLastExiledWithSource {} -> "IsLastExiledWithSource"
   Filter.OfChosenPlayer {} -> "OfChosenPlayer"
   Filter.IsAttacking {} -> "IsAttacking"
   Filter.IsAttackingPlayer {} -> "IsAttackingPlayer"

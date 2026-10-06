@@ -22,7 +22,8 @@ import qualified Pawl.Types.RollDie as RollDie
 -- to nothing, and `reading` to the choice, for the same reason: every roll but
 -- the Endeavor cycle's and Neverwinter Hydra's throws one die and reads one
 -- result. CR 706.1's `roller` elides to the controller and `highest` to
--- nothing: only Chaos Dragon has every player roll.
+-- nothing: only Chaos Dragon has every player roll. CR 706.8a's `store` elides
+-- to nothing: only Centaur of Attention stores its results.
 codec :: Codec.Codec RollDie.RollDie
 codec = Fields.object $ do
   sides <- Fields.required "sides" Common.natural RollDie.sides
@@ -33,4 +34,5 @@ codec = Fields.object $ do
   other <- Fields.defaulted "other" Nothing (Common.maybe SlotName.codec) RollDie.other
   roller <- Fields.defaulted "roller" RollDie.defaultRoller PlayerScope.codec RollDie.roller
   highest <- Fields.defaulted "highest" Nothing (Common.maybe SlotName.codec) RollDie.highest
-  pure RollDie.MkRollDie {RollDie.sides = sides, RollDie.count = count, RollDie.modifier = modifier, RollDie.reading = reading, RollDie.slot = slot, RollDie.other = other, RollDie.roller = roller, RollDie.highest = highest}
+  store <- Fields.defaulted "store" Nothing (Common.maybe SlotName.codec) RollDie.store
+  pure RollDie.MkRollDie {RollDie.sides = sides, RollDie.count = count, RollDie.modifier = modifier, RollDie.reading = reading, RollDie.slot = slot, RollDie.other = other, RollDie.roller = roller, RollDie.highest = highest, RollDie.store = store}

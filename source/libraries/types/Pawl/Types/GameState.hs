@@ -44,6 +44,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ModifiedRoll as ModifiedRoll
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.Object as Object
@@ -324,6 +325,10 @@ data GameState = MkGameState
     -- (EntryRiders.noted). Keyed by id, so neither CR 400.7's new object nor a
     -- copy of the object knows it.
     notedCards :: Map.Map ObjectId.ObjectId PrintingId.PrintingId,
+    -- | CR 607.2e: the type and amount of mana an ability noted for each object
+    -- (Effect.NoteManaSpent), the last note replacing the one before. Keyed by
+    -- id, so CR 400.7's new object knows none (Ice Cauldron).
+    notedMana :: Map.Map ObjectId.ObjectId (Seq.Seq ManaType.ManaType),
     nextPrintingId :: PrintingId.PrintingId,
     -- | CR 613.7: the monotonic source of timestamps for objects and stored
     -- continuous effects. See Timestamp.

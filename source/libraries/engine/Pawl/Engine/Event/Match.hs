@@ -13892,7 +13892,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
 -- CR 607.2d's link is resolved by reading Object.chosenColors off the BEARER,
 -- which is the object the triggered ability is on: Gauntlet of Power's "of the
 -- chosen color" means the colour its own "As this artifact enters, choose a
--- color" settled. Pawl.Engine.Mana.producedTypes resolves ManaProduction.Chosen
+-- color" settled. Pawl.Engine.Mana.produced resolves ManaProduction.Chosen
 -- the same way and off the same field, and a permanent with nothing chosen
 -- narrows to nothing here for that function's reason -- a colour the engine
 -- invented would be a player's choice made for them.

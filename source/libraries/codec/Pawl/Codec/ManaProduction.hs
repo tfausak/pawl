@@ -12,7 +12,8 @@ codec =
     [ Arm.payload "OfType" ManaType.codec ManaProduction.OfType (\x -> case x of ManaProduction.OfType y -> Just y; _ -> Nothing),
       Arm.nullary "AnyColor" ManaProduction.AnyColor,
       Arm.nullary "Chosen" ManaProduction.Chosen,
-      Arm.nullary "SnowSymbol" ManaProduction.SnowSymbol
+      Arm.nullary "SnowSymbol" ManaProduction.SnowSymbol,
+      Arm.nullary "Noted" ManaProduction.Noted
     ]
 
 tagOf :: ManaProduction.ManaProduction -> String
@@ -21,3 +22,4 @@ tagOf x = case x of
   ManaProduction.AnyColor {} -> "AnyColor"
   ManaProduction.Chosen {} -> "Chosen"
   ManaProduction.SnowSymbol {} -> "SnowSymbol"
+  ManaProduction.Noted {} -> "Noted"
