@@ -84,6 +84,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.Result (Result)
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.WhenSpent as WhenSpent
 import qualified Pawl.Types.Zone as Zone
 
@@ -733,7 +734,9 @@ finishSpell oid face controller = do
           -- excludes the Adventure half from.
           ExilePlayPermission.origin = PlayPermissionOrigin.Adventure,
           -- CR 715.3d: "that player may play it".
-          ExilePlayPermission.verb = PermissionVerb.Play
+          ExilePlayPermission.verb = PermissionVerb.Play,
+          ExilePlayPermission.increase = 0,
+          ExilePlayPermission.landEnters = TapState.Untapped
         }
 
 -- The no-subgame spell resolver (Stack's default path and every direct caller).

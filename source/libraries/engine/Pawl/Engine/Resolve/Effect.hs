@@ -5680,7 +5680,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   --
   -- NOT gated on the object being in exile: CR 601.3's permissions are not
   -- zone-scoped, so a zone test would be the rules core reading the effect.
-  Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile duration player ref spending alternativeCost condition verb) ->
+  Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile duration player ref spending alternativeCost condition verb increase landEnters) ->
     State.modify' $ \gs ->
       -- The sweep every ObjectRef-taking opcode shares: a player recipient, an
       -- illegal slot (CR 608.2b) and a set that matched nothing all arrive empty.
@@ -5713,7 +5713,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                         -- it": a card said this, not rule 715.3d, so the Adventure
                         -- exclusion does not reach it.
                         ExilePlayPermission.origin = PlayPermissionOrigin.Granted,
-                        ExilePlayPermission.verb = verb
+                        ExilePlayPermission.verb = verb,
+                        -- CR 601.2f and CR 614.1d, carried from the opcode
+                        -- unread; Pawl.Engine.Cost and Pawl.Engine.Cast.playLand
+                        -- act on them.
+                        ExilePlayPermission.increase = increase,
+                        ExilePlayPermission.landEnters = landEnters
                       }
                   grant o = o {Object.playableFromExile = Just permission}
                in gs {GameState.objects = foldr (Map.adjust grant) (GameState.objects gs) targets}

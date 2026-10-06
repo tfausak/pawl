@@ -22,10 +22,11 @@ module Pawl.Types.CarryOver where
 --
 -- Not implemented: CR 400.7b for a static grant to spells that is no
 -- permission's rider (Zinnia, Valley's Voice's offspring): nothing stores one,
--- so no constructor here could carry it (gap #3635). CR 400.7i for an exile
--- permission's rider is unimplemented too, on the land-play path (gap #2398).
+-- so no constructor here could carry it (gap #3635).
+--
 -- CR 400.7g's carriers are Pawl.Engine.Cast.keywordsBefore and
--- Pawl.Types.Object.castGrant, and it is implemented.
+-- Pawl.Types.Object.castGrant, and CR 400.7i's for an exile permission's rider
+-- is Pawl.Engine.Cast.playLand's entry; neither comes through here.
 data CarryOver
   = Carried
   | NotCarried
