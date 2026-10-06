@@ -105,6 +105,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Hybrid as Hybrid
+import qualified Pawl.Types.HybridPhyrexian as HybridPhyrexian
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.LoyaltyKind as LoyaltyKind
@@ -1932,22 +1933,15 @@ announceReductions pid oid gs cost adjustments =
 
 -- CR 118.7e's "one half of that symbol", written as the reduction each half
 -- would be: a coloured or colourless half is an OfType, a generic half a
--- Generic. Nothing for every symbol CR 107.4e does not call hybrid, and
--- DEDUPLICATED so the degenerate `Hybrid t t` offers one half, not two.
+-- Generic. Nothing for every symbol with one way to reduce, and DEDUPLICATED so
+-- the degenerate `Hybrid t t` offers one half, not two.
 --
 -- CR 107.4f's Phyrexian symbol is NOT here: CR 118.7f gives such a reduction one
 -- mana of the symbol's colour with no choice, which reducingManaTypeOf reads
--- directly.
---
--- Not implemented: a reduction written with a HYBRID Phyrexian symbol, which CR
--- 118.7e and CR 118.7f do not between them settle -- one names a half to choose
--- and the other one colour to take, and rule 107.4f's symbol answers to both
--- descriptions. Scryfall `o:/\{[WUBRG]\/[WUBRG]\/P\}/` (rules text; that
--- search excludes reminder text) and `mana:{G/U/P}` with its nine siblings,
--- 2026-08-20: the second returns the four compleated planeswalkers and the first
--- nothing, so every printing of the symbol is in a MANA COST. The card that
--- would refute this is one printing a hybrid Phyrexian symbol in a cost
--- reduction (#1995).
+-- directly. The HYBRID Phyrexian symbol is here, as its two colours: CR 107.4f
+-- makes it both, so CR 118.7f's one mana of its colour needs one chosen, and CR
+-- 118.7e gives that choice to the payer. Its 2 life is no half, since neither
+-- rule reduces a cost by life.
 reductionHalvesOf :: ManaSymbol.ManaSymbol -> Maybe [ManaSymbol.ManaSymbol]
 reductionHalvesOf symbol = case symbol of
   ManaSymbol.Generic _ -> Nothing
@@ -1956,7 +1950,8 @@ reductionHalvesOf symbol = case symbol of
   ManaSymbol.MonocoloredHybrid manaType ->
     Just [ManaSymbol.OfType manaType, ManaSymbol.Generic Mana.monocoloredHybridGeneric]
   ManaSymbol.Phyrexian _ -> Nothing
-  ManaSymbol.HybridPhyrexian _ -> Nothing
+  ManaSymbol.HybridPhyrexian (HybridPhyrexian.MkHybridPhyrexian a b) ->
+    Just (ListUtils.nubOrd [ManaSymbol.OfType (ManaType.Colored a), ManaSymbol.OfType (ManaType.Colored b)])
   ManaSymbol.Snow -> Nothing
   -- {X} offers no halves to choose between, CR 107.3 making it a value a player
   -- announces rather than a way of paying one symbol. Reached with the symbol
@@ -6750,9 +6745,7 @@ applyAdjustments adjustments cost =
         ManaSymbol.MonocoloredHybrid _ -> 0
         -- CR 118.7f gives a Phyrexian reduction to the typed side whole.
         ManaSymbol.Phyrexian _ -> 0
-        -- Nothing generic here either, for reductionHalvesOf's reason: rule
-        -- 118.7e's and rule 118.7f's readings of this symbol disagree, and
-        -- neither of them makes it generic mana.
+        -- Neither of its halves is generic mana (reductionHalvesOf).
         ManaSymbol.HybridPhyrexian _ -> 0
         -- CR 118.7g: a snow-symbol reduction is that much GENERIC mana. THE arm
         -- this side exists for; CR 107.4h is about the other side.
@@ -6813,10 +6806,8 @@ applyAdjustments adjustments cost =
         -- where the two sides part company -- unlike CR 118.7e's hybrid this asks
         -- the player nothing, the symbol naming exactly one colour.
         ManaSymbol.Phyrexian color -> Just (ManaType.Colored color)
-        -- Nothing, reductionHalvesOf's arm: rule 118.7f's "that symbol's color"
-        -- is singular and this symbol has two, so answering either would be the
-        -- engine choosing. Stricter than a settled reading -- such a reduction
-        -- reduces nothing -- and no card prints one (#1995).
+        -- The hybrid arms' reason: its two colours are halves the payer chooses
+        -- between (reductionHalvesOf), so one still spelled {G/U/P} is unasked.
         ManaSymbol.HybridPhyrexian _ -> Nothing
         -- CR 118.7g makes an {S} reduction GENERIC mana, so reducingGenericOf's
         -- Snow arm is where it lands.

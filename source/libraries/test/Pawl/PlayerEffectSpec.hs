@@ -141,6 +141,7 @@ import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Hybrid as Hybrid
+import qualified Pawl.Types.HybridPhyrexian as HybridPhyrexian
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -524,6 +525,17 @@ adjustmentSpec s =
         "{2/B} offers {B} and {2}"
         (Cost.reductionHalvesOf (ManaSymbol.MonocoloredHybrid (ManaType.Colored Color.Black)))
         (Just [black, ManaSymbol.Generic 2])
+
+    -- CR 107.4f's hybrid Phyrexian symbol offers its two colours and not its 2
+    -- life (Cost.reductionHalvesOf says why). The scenarios
+    -- cr-118-7e-a-g-u-p-reduction-* and cr-118-7e-the-same-g-u-p-reduction-*
+    -- prove each half against Synthetic Hybrid Phyrexian Discount.
+    Spec.it s "CR 118.7e a hybrid Phyrexian reduction offers its two colours" $
+      Spec.assertEqWith
+        s
+        "{G/U/P} offers {G} and {U}"
+        (Cost.reductionHalvesOf (ManaSymbol.HybridPhyrexian (HybridPhyrexian.MkHybridPhyrexian Color.Green Color.Blue)))
+        (Just [green, blue])
 
     -- The symbols CR 118.7e does NOT reach, and each for its own reason: a
     -- printed amount of generic mana and a plain coloured symbol have one half
