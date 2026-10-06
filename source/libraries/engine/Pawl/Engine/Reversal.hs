@@ -130,6 +130,7 @@ withoutAnnouncement before entry closed = do
   landsPlayed <- mapOf GameState.landsPlayed
   cardsPlayed <- mapOf GameState.cardsPlayed
   drawsThisTurn <- mapOf GameState.drawsThisTurn
+  keptFaceDown <- one GameState.keptFaceDown
   departedThisTurn <- setOf GameState.departedThisTurn
   activatedThisTurn <- mapOfMaps GameState.activatedThisTurn
   -- An append-only log, `events`' shape: the announcement's own activation
@@ -247,6 +248,7 @@ withoutAnnouncement before entry closed = do
         GameState.landsPlayed = landsPlayed,
         GameState.cardsPlayed = cardsPlayed,
         GameState.drawsThisTurn = drawsThisTurn,
+        GameState.keptFaceDown = keptFaceDown,
         GameState.departedThisTurn = departedThisTurn,
         GameState.activatedThisTurn = activatedThisTurn,
         GameState.activationsThisTurn = activationsThisTurn,

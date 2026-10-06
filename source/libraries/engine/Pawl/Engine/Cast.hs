@@ -2258,7 +2258,7 @@ castSpell perform = castSpellWith perform True False [] ManaSpending.AsProduced
 -- permission's rider by `spendingWith`, one step ahead of CR 601.2a's move for
 -- `spendingFor`'s reason.
 castSpellWith :: ManaAbilityPerformer.ManaAbilityPerformer -> Bool -> Bool -> [CandidateCost.CandidateCost] -> ManaSpending -> PlayerId -> ObjectId -> CardName.CardName -> Facing.Facing -> Game ()
-castSpellWith perform timed offered applied widened pid oid name facing = do
+castSpellWith perform timed offered applied widened pid oid name facing = Event.announcing $ do
   -- CR 406.3a, run BEFORE `before` is read and so before CR 601.2e's rewind
   -- captures it: the turn happens just before the announcement rather than
   -- inside it, so a cast the player backs out of leaves the card face up.
@@ -3475,12 +3475,9 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                           -- the payment because that is when the payment knows
                           -- them, and onto the SPELL because that is the object
                           -- whose effects read it, Pawl.Engine.Activate's route
-                          -- one carrier over.
-                          --
-                          -- Not implemented: the OTHER payers still drop the map
-                          -- -- a CR 118.12 cost paid during a resolution cannot
-                          -- be read by a later clause of the same resolution
-                          -- (#1872).
+                          -- one carrier over. CR 118.12's payment during a
+                          -- resolution is folded the same way
+                          -- (Pawl.Engine.Resolve.Effect.foldPaid).
                           State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setPaid bound (Object.bindings o)}) sid (GameState.objects g)})
                           -- CR 702.51c: the creatures tapped to pay for mana in
                           -- this spell's total cost convoked it, so the relation
@@ -3585,6 +3582,10 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                           -- the designation names rides Source.OfCard across CR
                           -- 400.7's fresh id.
                           Monad.when (castFrom == Just Zone.Command) (State.modify' (Commander.recordCast pid sid))
+                          -- CR 121.8: the spell has become cast, so a card drawn
+                          -- while it was being cast turns face up and its reveal
+                          -- is offered -- last, past everything that can reject.
+                          Event.turnUpKeptDraws
 
 -- CR 702.34a's SECOND static ability -- exile this card instead of putting it
 -- anywhere else any time it would leave the stack -- installed onto the spell's
