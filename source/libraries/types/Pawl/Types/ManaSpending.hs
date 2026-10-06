@@ -14,8 +14,8 @@ module Pawl.Types.ManaSpending where
 --
 -- A TYPE and not a Bool, because the axis has a second point the rules already
 -- write: "spend mana as though it were mana of any color" (CR 609.4b's own
--- wording) permits five types where AnyType permits CR 106.1b's six. Celestial
--- Dawn prints that wording, and it is NOT a constructor here -- see below.
+-- wording), AnyColor below. Celestial Dawn's per-player sentence of that
+-- wording is NOT a constructor here -- see below.
 --
 -- Not a per-PLAYER setting: rule 118.14's last sentence scopes the permission to
 -- the spells cast under the effect that granted it ("this applies only to mana
@@ -42,4 +42,8 @@ data ManaSpending
     -- rule 118.14 says nothing about provenance -- so a snow demand still wants a
     -- snow supply under this permission (Pawl.Engine.Mana.relax).
     AnyType
+  | -- | CR 609.4b's "as though it were mana of any color" (The Ruinous Powers):
+    -- a demand naming a color is served by any mana, colorless included; a
+    -- demand for colorless mana is not relaxed.
+    AnyColor
   deriving (Bounded, Enum, Eq, Ord, Show)

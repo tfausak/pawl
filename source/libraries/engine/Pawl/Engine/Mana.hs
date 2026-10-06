@@ -1242,6 +1242,12 @@ relax :: ManaSpending -> Demand -> Demand
 relax spending demand = case spending of
   ManaSpending.AsProduced -> demand
   ManaSpending.AnyType -> demand {demandTypes = everyManaType}
+  -- CR 609.4b: mana spent as though it were of any color pays a colored demand
+  -- whatever it is, colorless included (Mycosynth Lattice's ruling), but is
+  -- never spent as though it were colorless, so {C} keeps its demand.
+  ManaSpending.AnyColor
+    | any (/= ManaType.Colorless) (Set.toList (demandTypes demand)) -> demand {demandTypes = everyManaType}
+    | otherwise -> demand
 
 -- CR 106.1b: the six types of mana. Written out rather than derived, for the
 -- reason producedTypes writes out CR 105.1's five: the enumeration IS the rule.

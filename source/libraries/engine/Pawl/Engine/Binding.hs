@@ -1532,3 +1532,24 @@ mergeBinding a b =
       Binding.copy = Binding.copy a <|> Binding.copy b,
       Binding.objects = Binding.objects a <|> Binding.objects b
     }
+
+-- CR 400.7h: `binding` with every naming of `old` renamed to `new`, each
+-- recipient keeping its kind. Built field by field, as mergeBinding is, so a
+-- new field is a missing-field error here rather than silently kept.
+renameObject :: ObjectId -> ObjectId -> Binding -> Binding
+renameObject old new binding =
+  let rename oid = if oid == old then new else oid
+      renameRecipient recipient = case recipient of
+        Recipient.ToCreature oid -> Recipient.ToCreature (rename oid)
+        Recipient.ToPlaneswalker oid -> Recipient.ToPlaneswalker (rename oid)
+        Recipient.ToBattle oid -> Recipient.ToBattle (rename oid)
+        Recipient.ToObject oid -> Recipient.ToObject (rename oid)
+        Recipient.ToPlayer pid -> Recipient.ToPlayer pid
+        Recipient.ToPile pile -> Recipient.ToPile pile
+   in Binding.MkBinding
+        { Binding.targets = fmap (Set.map renameRecipient) (Binding.targets binding),
+          Binding.amount = Binding.amount binding,
+          Binding.modes = Binding.modes binding,
+          Binding.copy = Binding.copy binding,
+          Binding.objects = fmap (fmap rename) (Binding.objects binding)
+        }
