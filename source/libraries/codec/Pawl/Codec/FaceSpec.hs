@@ -118,7 +118,7 @@ minimalModal =
 -- is a well-typed TriggeredAbility Card.
 minimalTriggeredAbility :: TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)
 minimalTriggeredAbility =
-  TriggeredAbility.MkTriggeredAbility TriggerCondition.SelfEnters minimalModal Nothing TriggerLimit.Unlimited
+  TriggeredAbility.MkTriggeredAbility TriggerCondition.SelfEnters minimalModal Nothing Nothing TriggerLimit.Unlimited
 
 -- | Every required field set to a simple value, 'manaCost', 'power' and
 -- 'toughness' set to non-default values, and every other defaulted field left at

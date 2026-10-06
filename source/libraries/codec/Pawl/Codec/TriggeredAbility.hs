@@ -4,6 +4,7 @@ module Pawl.Codec.TriggeredAbility where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Typeable as Typeable
+import qualified Pawl.Codec.AbilityName as AbilityNameCodec
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.Modal as Modal
 import qualified Pawl.Codec.TriggerCondition as TriggerCondition
@@ -22,12 +23,14 @@ codec cardCodec abilityCodec = Fields.object $ do
   condition <- Fields.required "condition" TriggerCondition.codec TriggeredAbility.condition
   modal <- Fields.required "modal" (Modal.codec cardCodec abilityCodec) TriggeredAbility.modal
   intervening <- Fields.defaulted "intervening" Nothing (Common.maybe Condition.codec) TriggeredAbility.intervening
+  name <- Fields.defaulted "name" Nothing (Common.maybe AbilityNameCodec.codec) TriggeredAbility.name
   limit <- Fields.defaulted "limit" TriggerLimit.Unlimited TriggerLimit.codec TriggeredAbility.limit
   pure
     TriggeredAbility.MkTriggeredAbility
       { TriggeredAbility.condition = condition,
         TriggeredAbility.modal = modal,
         TriggeredAbility.intervening = intervening,
+        TriggeredAbility.name = name,
         TriggeredAbility.limit = limit
       }
 

@@ -2596,6 +2596,7 @@ oneEffectTrigger condition effect =
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.name = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
     }
 
@@ -7743,6 +7744,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                   )
                   (ModeSelection.ChooseExactly 1),
               TriggeredAbility.intervening = Nothing,
+              TriggeredAbility.name = Nothing,
               TriggeredAbility.limit = TriggerLimit.Unlimited
             }
         arm face = face {Face.triggeredAbilities = offending : Face.triggeredAbilities face}
@@ -7852,6 +7854,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                     { TriggeredAbility.condition = TriggerCondition.SelfDies,
                       TriggeredAbility.modal = declaring slot,
                       TriggeredAbility.intervening = Nothing,
+                      TriggeredAbility.name = Nothing,
                       TriggeredAbility.limit = TriggerLimit.Unlimited
                     }
                 ]

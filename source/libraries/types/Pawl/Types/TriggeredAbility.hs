@@ -1,5 +1,6 @@
 module Pawl.Types.TriggeredAbility where
 
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -17,6 +18,10 @@ data TriggeredAbility card ability = MkTriggeredAbility
     -- AGAIN on resolution (CR 608.2a removes the ability from the stack if it has
     -- become false). Nothing for every ability without one.
     intervening :: Maybe Condition.Condition,
+    -- | The name another clause of the same card uses to refer to this ability,
+    -- or Nothing; the same reference Pawl.Types.ActivatedAbility.name is, read
+    -- by CR 613.1f's Modification.LoseNamedAbility.
+    name :: Maybe AbilityName.AbilityName,
     -- | Whispering Wizard's "This ability triggers only once each turn" and
     -- Acrobatic Cheerleader's "This ability triggers only once". A rider on the
     -- ABILITY rather than a narrowing of the event, which is why it sits here and
