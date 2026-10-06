@@ -9943,12 +9943,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- watermark -- so this is a watermark bump, which is also what makes rule
     -- 724.1f's exception fall out: everything recorded after this line is an
     -- ability that triggered DURING the process, and stays unscanned until the
-    -- cleanup step settles.
-    --
-    -- UNOBSERVED, and said plainly rather than left to look tested: Time Stop
-    -- resolves at a priority boundary, which has just settled, so nothing is
-    -- pending here. The pool holds no producer that can leave one -- Day's
-    -- Undoing draws seven before its own end-the-turn clause (#2067).
+    -- cleanup step settles. Ultima over a Doomed Traveler proves it
+    -- (Pawl.TurnSpec, "CR 724.1a a trigger pending when the turn ends ceases to
+    -- exist").
     State.modify' $ \gs ->
       gs
         { GameState.scannedThrough = Natural.length (GameState.events gs),

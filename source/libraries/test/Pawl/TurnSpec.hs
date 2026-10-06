@@ -1122,6 +1122,27 @@ endTurnSpec s registry = Spec.describe s "EndTheTurn" $ do
     ((gs, _, divine), _, _) <- board
     let after = fst (runTurn castingFirst gs)
     Spec.assertEqWith s "alice's Divination is still in her hand" (fmap Object.zone (Game.lookupObject divine after)) (Just Zone.Hand)
+  -- CR 724.1a, through Ultima ({3}{W}{W} Sorcery, "Destroy all artifacts and
+  -- creatures. End the turn."): Doomed Traveler's dies ability triggers during the
+  -- first sentence and is still pending when the second begins, so it ceases to
+  -- exist and no Spirit is ever made.
+  Spec.it s "CR 724.1a a trigger pending when the turn ends ceases to exist" $ do
+    plains <- S.printingOf s registry "Plains"
+    ultima <- S.printingOf s registry "Ultima"
+    traveler <- S.printingOf s registry "Doomed Traveler"
+    let (_, gs1) = S.addPermanent traveler S.alice (S.landsInPlay plains 5)
+        (_, gs2) = S.addHandCard ultima S.alice gs1
+        staged =
+          gs2
+            { GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice,
+              GameState.phase = Phase.PrecombatMain,
+              GameState.remaining = afterPrecombatMain
+            }
+        after = fst (runTurn castingFirst staged)
+    Spec.assertEqWith s "the turn ended" (GameState.turnNumber after) (GameState.turnNumber staged + 1)
+    Spec.assertEqWith s "Doomed Traveler died" (namesIn Zone.Graveyard S.alice after) [Just (S.printingName traveler)]
+    Spec.assertEqWith s "alice controls no Spirit token" (namesIn Zone.Battlefield S.alice after) (replicate 5 (Just (S.printingName plains)))
 
 -- alice, active and mid-combat at the DECLARE BLOCKERS step with her Goblin
 -- Piker already attacking, holding Mandate of Peace ({1}{W} Instant, "Cast this

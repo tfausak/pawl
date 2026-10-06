@@ -107,7 +107,7 @@
     {"turn": 3, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
     {"turn": 3, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
     {"turn": 3, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Battlefield", "card": "Angel Token", "count": 1}}},
-    {"turn": 3, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$benalia-2", "mana": ["$plains-3", "$plains-4", "$plains-5", null]}}},
+    {"turn": 3, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$benalia-2", "mana": ["$plains-1", "$plains-2", "$plains-3", null]}}},
     {"turn": 3, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
     {"turn": 3, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
     {"turn": 5, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": []}},
