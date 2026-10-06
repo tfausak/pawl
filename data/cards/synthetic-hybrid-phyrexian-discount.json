@@ -1,0 +1,51 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        }
+      ],
+      "name": "Synthetic Hybrid Phyrexian Discount",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "ReduceSpellCost",
+            "value": {
+              "reduction": [
+                {
+                  "type": "HybridPhyrexian",
+                  "value": {
+                    "left": {
+                      "type": "Green"
+                    },
+                    "right": {
+                      "type": "Blue"
+                    }
+                  }
+                }
+              ],
+              "whichSpells": {
+                "type": "HasColor",
+                "value": {
+                  "type": "Green"
+                }
+              }
+            }
+          },
+          "scope": {
+            "type": "You"
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}
