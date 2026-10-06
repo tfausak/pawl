@@ -21,6 +21,7 @@ import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.FaceDown as FaceDown
@@ -34,21 +35,37 @@ import Pawl.ManaSpec (alicePermanents, atLife, castFrom, isActivationOf, optionO
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
+import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
+import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
+import qualified Pawl.Types.ActiveCopy as ActiveCopy
+import qualified Pawl.Types.ActiveEvasion as ActiveEvasion
+import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
+import qualified Pawl.Types.ActiveUntapProhibition as ActiveUntapProhibition
+import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Condition as Condition
+import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.IgnoredAbility as IgnoredAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -70,10 +87,12 @@ import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import qualified Pawl.Types.RoomHalf as RoomHalf
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
+import qualified Pawl.Types.While as While
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 118.3 on the supply side again, for a repeatable ability whose cost spends no
@@ -1566,22 +1585,213 @@ interchangeableSourcesSpec s registry = Spec.describe s "Interchangeable mana so
     Spec.assertBool s paid "the {G} was paid"
     Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
 
-  -- The gate over GameState.continuousEffects is still BOARD-WIDE rather than
-  -- pairwise, where the id-keyed relations below are searched: a stored
-  -- continuous effect anywhere retires the elision, because deciding a pair
-  -- against one means asking every effect whether it names one of them, over an
-  -- Affected that may be a Filter rather than a set of ids (#1969). Here the
-  -- effect sits on the Bonesplitter, which is attached to nothing, so the three
-  -- Elves still agree field for field and projection for projection -- and are
-  -- still asked about.
-  Spec.it s "CR 601.2g a stored continuous effect anywhere retires the elision" $ do
+  -- Pawl.Engine.Interchangeable.namedByStored SEARCHES a stored continuous
+  -- effect for the two ids rather than requiring GameState.continuousEffects
+  -- empty. Here the effect sits on the Bonesplitter, which is attached to
+  -- nothing, so it says nothing about any Elf and the three are still one
+  -- option. The +0/+0 changes no projection, so the control below differs from
+  -- this board in the row's affected set alone.
+  Spec.it s "CR 611.2c a stored continuous effect that names no Elf leaves the elision standing" $ do
     elf <- S.printingOf s registry "Llanowar Elves"
     splitter <- S.printingOf s registry "Bonesplitter"
     let (elves, plain) = elfBoard elf 3
         (weapon, armed) = S.addPermanent splitter S.alice plain
-        board = S.withEffect weapon (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 1) (Quantity.Literal 1))) armed
+        board = S.withEffect weapon nothingMore armed
         (offers, paid, after) = greenWindow board
+    Spec.assertEqWith s "asked once, and the three Elves are one candidate" (fmap length offers) [1]
+    Spec.assertBool s paid "the {G} was paid"
+    Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
+
+  -- The control: CR 611.2c's affected set names ONE Elf. The +0/+0 leaves its
+  -- projection the same as its neighbours', so only the search tells it apart --
+  -- conservatively, since a row about an object is taken to matter to it.
+  Spec.it s "CR 611.2c an Elf a stored continuous effect names is a candidate of its own" $ do
+    elf <- S.printingOf s registry "Llanowar Elves"
+    splitter <- S.printingOf s registry "Bonesplitter"
+    let (elves, plain) = elfBoard elf 3
+        (_, armed) = S.addPermanent splitter S.alice plain
+        board = S.withEffect (NonEmpty.head elves) nothingMore armed
+        (offers, paid, after) = greenWindow board
+    Spec.assertEqWith s "asked once, with the named Elf beside the two that are alike" (fmap length offers) [2]
+    Spec.assertEqWith s "and the three Elves project identically" (fmap (`S.powerToughnessOf` board) (NonEmpty.toList elves)) (replicate 3 (Just (1, 1)))
+    Spec.assertBool s paid "the {G} was paid"
+    Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
+
+  -- CR 613.7a: an object's static abilities apply at its timestamp, so a
+  -- layered row stamped between two Elves orders against them differently.
+  -- The row names only bob's Bears; what moves between the two boards is its
+  -- timestamp. Conservative: a Llanowar Elves has no static ability to order.
+  Spec.it s "CR 613.7a a stored continuous effect stamped between two Elves parts them" $ do
+    elf <- S.printingOf s registry "Llanowar Elves"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    let (first, one) = S.addPermanent elf S.alice (Setup.emptyGame S.bothPlayers)
+        (bear, withBears) = S.addPermanent bears S.bob one
+        addTwo gs = let (second, g1) = S.addPermanent elf S.alice gs; (third, g2) = S.addPermanent elf S.alice g1 in ([first, second, third], g2)
+        (elves, between) = addTwo (S.withEffect bear nothingMore withBears)
+        (_, afterAll) = fmap (S.withEffect bear nothingMore) (addTwo withBears)
+        (offers, paid, after) = greenWindow between
+        (aligned, _, _) = greenWindow afterAll
+    Spec.assertEqWith s "asked once, with the first Elf beside the two stamped after the row" (fmap length offers) [2]
+    Spec.assertEqWith s "and stamped after all three, the Elves are one candidate" (fmap length aligned) [1]
+    Spec.assertBool s paid "the {G} was paid"
+    Spec.assertEqWith s "off exactly one Elf" (tappedCount elves after) 1
+
+  -- CR 611.2b: "for as long as" carries a Condition, which the search does not
+  -- read, so a row lasting that long might name anything -- every Elf is a
+  -- candidate of its own though the row is about bob's Bears.
+  Spec.it s "CR 611.2b a stored row with a conditional duration retires the elision" $ do
+    elf <- S.printingOf s registry "Llanowar Elves"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    let (elves, plain) = elfBoard elf 3
+        (bear, withBears) = S.addPermanent bears S.bob plain
+        board = S.withEffect bear nothingMore withBears
+        conditional = board {GameState.continuousEffects = fmap (\row -> row {ContinuousEffect.expiry = Expiry.While (While.MkWhile S.alice (Condition.All []))}) (GameState.continuousEffects board)}
+        (offers, paid, after) = greenWindow conditional
+        (plainOffers, _, _) = greenWindow board
     Spec.assertEqWith s "asked once, with all three Elves on offer" (fmap length offers) [3]
+    Spec.assertEqWith s "and the same row until end of turn leaves them one candidate" (fmap length plainOffers) [1]
+    Spec.assertBool s paid "the {G} was paid"
+    Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
+
+  -- CR 701.19c: a "can't be regenerated" row is one of the flat rows namedByStored
+  -- searches. On bob's Bears it says nothing about the Elves.
+  Spec.it s "CR 701.19c a can't-be-regenerated row on another creature leaves the elision standing" $ do
+    elf <- S.printingOf s registry "Llanowar Elves"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    let (elves, plain) = elfBoard elf 3
+        (bear, withBears) = S.addPermanent bears S.bob plain
+        (offers, paid, after) = greenWindow (unregeneratable bear bear withBears)
+    Spec.assertEqWith s "asked once, and the three Elves are one candidate" (fmap length offers) [1]
+    Spec.assertBool s paid "the {G} was paid"
+    Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
+
+  -- The control: the row on an Elf, which regenerating would tell apart and no
+  -- projection shows.
+  Spec.it s "CR 701.19c an Elf that can't be regenerated is a candidate of its own" $ do
+    elf <- S.printingOf s registry "Llanowar Elves"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    let (elves, plain) = elfBoard elf 3
+        (bear, withBears) = S.addPermanent bears S.bob plain
+        (offers, paid, after) = greenWindow (unregeneratable bear (NonEmpty.head elves) withBears)
+    Spec.assertEqWith s "asked once, with the marked Elf beside the two that are alike" (fmap length offers) [2]
+    Spec.assertBool s paid "the {G} was paid"
+    Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
+
+  -- The other flat rows namedByStored searches, each naming one Elf from bob's
+  -- Bears, and each a difference no projection shows: the Elf a row names is a
+  -- candidate of its own.
+  Spec.it s "CR 509.1b an Elf that can't block is a candidate of its own" $ do
+    offers <- namedRowOffers s registry $ \bear elf gs ->
+      let (ts, gs1) = Game.freshTimestamp gs
+       in gs1 {GameState.blockProhibitions = [ActiveBlockProhibition.MkActiveBlockProhibition bear ts Expiry.AtCleanup elf]}
+    Spec.assertEqWith s "asked once, with the named Elf beside the two that are alike" offers [2]
+
+  Spec.it s "CR 502.3 an Elf that will not untap by a stored row is a candidate of its own" $ do
+    offers <- namedRowOffers s registry $ \bear elf gs ->
+      let (ts, gs1) = Game.freshTimestamp gs
+       in gs1 {GameState.untapProhibitions = [ActiveUntapProhibition.MkActiveUntapProhibition bear ts Expiry.AtCleanup elf]}
+    Spec.assertEqWith s "asked once, with the named Elf beside the two that are alike" offers [2]
+
+  Spec.it s "CR 508.1c an Elf that can't attack is a candidate of its own" $ do
+    offers <- namedRowOffers s registry $ \bear elf gs ->
+      let (ts, gs1) = Game.freshTimestamp gs
+       in gs1 {GameState.attackProhibitions = [ActiveAttackProhibition.MkActiveAttackProhibition bear S.bob ts Expiry.AtCleanup (RestrictedCreatures.Named elf) Nothing]}
+    Spec.assertEqWith s "asked once, with the named Elf beside the two that are alike" offers [2]
+
+  Spec.it s "CR 509.1c an Elf that must block the Bears is a candidate of its own" $ do
+    offers <- namedRowOffers s registry $ \bear elf gs ->
+      let (ts, gs1) = Game.freshTimestamp gs
+       in gs1 {GameState.blockRequirements = [ActiveBlockRequirement.MkActiveBlockRequirement bear ts Expiry.AtCleanup elf bear]}
+    Spec.assertEqWith s "asked once, with the named Elf beside the two that are alike" offers [2]
+
+  Spec.it s "CR 116.2d an Elf whose ability a player ignores is a candidate of its own" $ do
+    offers <- namedRowOffers s registry $ \_ elf gs ->
+      gs {GameState.ignoredAbilities = [IgnoredAbility.MkIgnoredAbility S.bob elf (AbilityName.MkAbilityName (Text.pack "mana")) Expiry.AtCleanup]}
+    Spec.assertEqWith s "asked once, with the named Elf beside the two that are alike" offers [2]
+
+  -- A copy of itself: CR 707.2's copiable values are the ones it already has, so
+  -- only the row's object set tells it apart.
+  Spec.it s "CR 707.2 an Elf a stored copy effect names is a candidate of its own" $ do
+    offers <- namedRowOffers s registry $ \bear elf gs ->
+      let (ts, gs1) = Game.freshTimestamp gs
+       in gs1 {GameState.copyEffects = [ActiveCopy.MkActiveCopy bear ts Expiry.AtCleanup (Set.singleton elf) (Projection.project elf gs)]}
+    Spec.assertEqWith s "asked once, with the named Elf beside the two that are alike" offers [2]
+
+  -- CR 509.1b / 611.2c: Veiling Oddity's "creatures can't be blocked this turn"
+  -- is stored as ONE row over a class, a Filter rather than a set of ids. The
+  -- class names no particular creature, so the Elves are still alike.
+  Spec.it s "CR 509.1b Veiling Oddity's stored evasion leaves the elision standing" $ do
+    elf <- S.printingOf s registry "Llanowar Elves"
+    oddity <- S.printingOf s registry "Veiling Oddity"
+    let (elves, plain) = elfBoard elf 3
+        (exiled, withOddity) = S.addExiledCard oddity S.alice plain
+        (offers, paid, after) = greenWindow (evasion exiled (Filter.HasCardType CardType.Creature) withOddity)
+    Spec.assertEqWith s "asked once, and the three Elves are one candidate" (fmap length offers) [1]
+    Spec.assertBool s paid "the {G} was paid"
+    Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
+
+  -- The control: the same row with its class baked down to one Elf
+  -- (Filter.IsObject, the runtime-only atom Pawl.Engine.Filter.bakeBound writes).
+  Spec.it s "CR 509.1b an Elf a stored evasion's class names is a candidate of its own" $ do
+    elf <- S.printingOf s registry "Llanowar Elves"
+    oddity <- S.printingOf s registry "Veiling Oddity"
+    let (elves, plain) = elfBoard elf 3
+        (exiled, withOddity) = S.addExiledCard oddity S.alice plain
+        (offers, paid, after) = greenWindow (evasion exiled (Filter.IsObject (NonEmpty.head elves)) withOddity)
+    Spec.assertEqWith s "asked once, with the named Elf beside the two that are alike" (fmap length offers) [2]
+    Spec.assertBool s paid "the {G} was paid"
+    Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
+
+  -- CR 506.4: a combat in progress is searched rather than required empty. Bob's
+  -- Bears attacking alice involves no Elf, so the three are still alike.
+  Spec.it s "CR 506.4 a combat the Elves are not in leaves the elision standing" $ do
+    elf <- S.printingOf s registry "Llanowar Elves"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    let (elves, plain) = elfBoard elf 3
+        (bear, withBears) = S.addPermanent bears S.bob plain
+        (offers, paid, after) = greenWindow (inCombat bear Nothing withBears)
+    Spec.assertEqWith s "asked once, and the three Elves are one candidate" (fmap length offers) [1]
+    Spec.assertBool s paid "the {G} was paid"
+    Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
+
+  -- The control: one Elf BLOCKS the Bears. Declaring a blocker taps nothing
+  -- (CR 509.1), so the blocking Elf is equal whole and in projection to the two
+  -- beside it, and only the combat record says otherwise -- tapping it for mana
+  -- leaves it blocking, tapping another does not.
+  Spec.it s "CR 509.1g a blocking Elf is a candidate of its own" $ do
+    elf <- S.printingOf s registry "Llanowar Elves"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    let (elves, plain) = elfBoard elf 3
+        (bear, withBears) = S.addPermanent bears S.bob plain
+        board = inCombat bear (Just (NonEmpty.head elves)) withBears
+        (offers, paid, after) = greenWindow board
+    Spec.assertEqWith s "asked once, with the blocking Elf beside the two that are alike" (fmap length offers) [2]
+    Spec.assertEqWith s "and the three Elves project identically" (fmap (`S.powerToughnessOf` board) (NonEmpty.toList elves)) (replicate 3 (Just (1, 1)))
+    Spec.assertBool s paid "the {G} was paid"
+    Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
+
+  -- CR 608.2i: "attacked this turn" is read off the turn's log, which neither the
+  -- Elf's record nor its projection carries -- an Elf untapped after attacking
+  -- is otherwise equal to one that never did. The log naming bob's Bears says
+  -- nothing about the Elves.
+  Spec.it s "CR 608.2i a creature that attacked this turn leaves the Elves alike" $ do
+    elf <- S.printingOf s registry "Llanowar Elves"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    let (elves, plain) = elfBoard elf 3
+        (bear, withBears) = S.addPermanent bears S.bob plain
+        (offers, paid, after) = greenWindow (attacked bear S.bob S.alice withBears)
+    Spec.assertEqWith s "asked once, and the three Elves are one candidate" (fmap length offers) [1]
+    Spec.assertBool s paid "the {G} was paid"
+    Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
+
+  -- The control: the log names one Elf as an attacker this turn.
+  Spec.it s "CR 608.2i an Elf that attacked this turn is a candidate of its own" $ do
+    elf <- S.printingOf s registry "Llanowar Elves"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    let (elves, plain) = elfBoard elf 3
+        (_, withBears) = S.addPermanent bears S.bob plain
+        (offers, paid, after) = greenWindow (attacked (NonEmpty.head elves) S.alice S.bob withBears)
+    Spec.assertEqWith s "asked once, with the Elf that attacked beside the two that are alike" (fmap length offers) [2]
     Spec.assertBool s paid "the {G} was paid"
     Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
 
@@ -1665,6 +1875,61 @@ haunts hauntingCard haunted gs =
   gs
     { GameState.haunting = Map.insert hauntingCard haunted (GameState.haunting gs)
     }
+
+-- The lengths of what CR 601.2g's window offered on three Elves and bob's
+-- Bears once `write` has stored a row about the Bears and the first Elf.
+namedRowOffers :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> (ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState) -> m [Int]
+namedRowOffers s registry write = do
+  elf <- S.printingOf s registry "Llanowar Elves"
+  bears <- S.printingOf s registry "Grizzly Bears"
+  let (elves, plain) = elfBoard elf 3
+      (bear, withBears) = S.addPermanent bears S.bob plain
+      (offers, _, _) = greenWindow (write bear (NonEmpty.head elves) withBears)
+  pure (fmap length offers)
+
+-- A +0/+0: a stored continuous effect that changes no projection, so a board
+-- carrying one differs from its control only in what the row names.
+nothingMore :: Modification.Modification ability
+nothingMore = Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 0) (Quantity.Literal 0))
+
+-- A fixture write standing in for a "can't be regenerated this turn" rider's
+-- resolution (CR 701.19c): the stored row, from this source, on this creature.
+unregeneratable :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+unregeneratable source oid gs =
+  let (ts, gs1) = Game.freshTimestamp gs
+      row = ActiveUnregeneratable.MkActiveUnregeneratable {ActiveUnregeneratable.source = source, ActiveUnregeneratable.timestamp = ts, ActiveUnregeneratable.expiry = Expiry.AtCleanup, ActiveUnregeneratable.object = oid}
+   in gs1 {GameState.unregeneratables = row : GameState.unregeneratables gs1}
+
+-- A fixture write standing in for Veiling Oddity's trigger resolving: the one
+-- CR 509.1b row Pawl.Engine.Resolve.Effect stores for ForbidBeingBlocked, over
+-- this class, from this source, until end of turn.
+evasion :: ObjectId.ObjectId -> Filter.Filter Keyword.Keyword -> GameState.GameState -> GameState.GameState
+evasion source affected gs =
+  let (ts, gs1) = Game.freshTimestamp gs
+      row = ActiveEvasion.MkActiveEvasion {ActiveEvasion.source = source, ActiveEvasion.controller = S.alice, ActiveEvasion.timestamp = ts, ActiveEvasion.expiry = Expiry.AtCleanup, ActiveEvasion.affected = affected}
+   in gs1 {GameState.evasions = row : GameState.evasions gs1}
+
+-- Bob's attacker declared at alice and, when given, the creature blocking it
+-- (CR 508.1, 509.1) -- the combat record, and nothing tapped or moved.
+inCombat :: ObjectId.ObjectId -> Maybe ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+inCombat attacker blocker gs =
+  let blocking = maybe Set.empty Set.singleton blocker
+   in gs
+        { GameState.combat =
+            Combat.emptyCombat
+              { Combat.Type.attackers = Map.singleton attacker (AttackTarget.OfPlayer S.alice),
+                Combat.Type.declaredAttackers = Set.singleton attacker,
+                Combat.Type.blockers = Map.singleton attacker blocking,
+                Combat.Type.declaredBlockers = blocking,
+                Combat.Type.blockersDeclared = True
+              }
+        }
+
+-- The turn's log holding one declaration (CR 508.1a): this creature attacked
+-- the second player for the first.
+attacked :: ObjectId.ObjectId -> PlayerId.PlayerId -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+attacked attacker by against =
+  S.withEvents [GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared attacker against (AttackTarget.OfPlayer against) 1 by)]
 
 -- A fixture write standing in for Elvish Hunter's resolution, sicken's shape.
 freeze :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState

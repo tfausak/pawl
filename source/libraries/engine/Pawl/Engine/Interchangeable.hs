@@ -14,26 +14,59 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Pawl.Engine.Filter as Filter.Engine
+import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection.View
+import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
+import qualified Pawl.Types.ActiveActivationProhibition as ActiveActivationProhibition
+import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
+import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
+import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
+import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
+import qualified Pawl.Types.ActiveCopy as ActiveCopy
+import qualified Pawl.Types.ActiveEvasion as ActiveEvasion
+import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
+import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
+import qualified Pawl.Types.ActiveUntapProhibition as ActiveUntapProhibition
+import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.AimedAt as AimedAt
+import qualified Pawl.Types.AimedPlayers as AimedPlayers
+import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.Combat as Combat
+import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.ExileLink as ExileLink
+import qualified Pawl.Types.Expiry as Expiry
+import qualified Pawl.Types.Filter as Filter
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.IgnoredAbility as IgnoredAbility
+import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.ObjectSnapshot as ObjectSnapshot
+import qualified Pawl.Types.PastActivation as PastActivation
 import qualified Pawl.Types.PhasedOut as PhasedOut
+import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import qualified Pawl.Types.ReturnWatch as ReturnWatch
+import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.Timestamp as Timestamp
+import qualified Pawl.Types.TriggerSource as TriggerSource
 
 -- | Whether choosing between these two objects is choosing between options the
 -- game cannot tell apart. Takes the projection rather than computing it, so a
 -- caller enumerating candidates pays for one Pawl.Engine.Projection.projectAll
 -- and not one per pair.
 --
--- CONSERVATIVE IN THREE WAYS, because a wrong answer here silently makes a
+-- CONSERVATIVE IN FOUR WAYS, because a wrong answer here silently makes a
 -- player's choice for them.
 --
 --   * The objects are compared WHOLE, by Object's derived Eq over every field
@@ -41,37 +74,64 @@ import qualified Pawl.Types.Timestamp as Timestamp
 --     default, and can only ever make this answer False -- the opposite posture
 --     to a hand-kept list of fields that must agree, which a new field would
 --     leave unread. The timestamp is the one field two distinct objects never
---     share, and with the board quiet (below) nothing reads their relative
---     order: there is no continuous effect to sequence, and the two projections
---     are required to be equal anyway.
+--     share; what reads it is layeredBetween's question below.
 --   * The projections must agree, which is what an Equipment or an Aura shows up
 --     in -- Bonesplitter's +2/+0 makes one Llanowar Elves a 3/1 and the other a
---     1/1.
---   * The board must be QUIET. Every game-state container that can name one
---     object and not another is required to be EMPTY rather than searched for
---     these two ids, so one stored effect anywhere retires the elision for the
---     whole board. The ID-KEYED RELATIONS are the exception, and are
---     SEARCHED instead -- namedByRelation below.
+--     1/1. So must what their two Filter views read off the turn's log (CR
+--     608.2i: attacked, dealt damage, entered this turn), so no Filter anywhere
+--     -- printed or stored -- answers a look-back atom differently of the two.
+--   * Nothing else may name either object: no other object (namedByAnother),
+--     no id-keyed relation (namedByRelation), and no stored row or combat
+--     assignment (namedByStored). Each of those SEARCHES for the two ids, so a
+--     row about some third object leaves the pair alike.
+--   * The board must be QUIET: the containers whose rows carry a whole effect
+--     or ability -- a replacement, a delayed trigger, a pending effect -- are
+--     required EMPTY instead, so one such row anywhere retires the elision for
+--     the whole board.
 --
--- Not implemented: the containers quiet still requires empty. Deciding a pair
--- against a stored continuous effect, a replacement, a player, block or attack
--- row, a regeneration prohibition, an ignore, a delayed trigger, a prevention
--- rider, a pending entry effect or a combat assignment means asking each of
--- those whether it names one of the two, which is a per-type traversal this does
--- not have (#1969).
+-- Not implemented: searching a replacement, a delayed trigger, a prevention
+-- rider or a pending damage or entry effect for the two ids, or a granted
+-- ability, a full text, a non-literal quantity or a conditional or paid
+-- duration on a searched row. Each holds an effect or ability tree no traversal
+-- here reads, so quiet requires the first set empty and namedByStored answers
+-- "might name" for the second (#1969).
 objects :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> ObjectId -> Bool
 objects pcs gs a b =
   let sameObject = case (Map.lookup a (GameState.objects gs), Map.lookup b (GameState.objects gs)) of
         (Just x, Just y) -> x {Object.timestamp = Object.timestamp y} == y
         _ -> False
+      grants = Projection.View.controlGrants gs
+      viewOf oid = Projection.viewOfObjectGiven pcs grants oid gs
+      -- Every View field Pawl.Engine.Projection.View fills from the turn's log
+      -- (CR 608.2i). Hand-kept: a new look-back field owes a line here.
+      lookBack view =
+        ( Filter.Engine.attackedThisTurn view,
+          Filter.Engine.milledThisTurn view,
+          Filter.Engine.dealtDamageThisTurn view,
+          Filter.Engine.enteredThisTurn view,
+          Filter.Engine.crewedThisTurn view,
+          Filter.Engine.convokedThisTurn view,
+          Filter.Engine.saddledThisTurn view
+        )
+      sameView = lookBack (viewOf a) == lookBack (viewOf b)
+      -- Keyed by every permanent alike, so compared rather than searched.
+      sameSample m = Map.lookup a m == Map.lookup b m
+      sameSamples =
+        sameSample (GameState.controlSample gs)
+          && all sameSample (Map.elems (GameState.battlefieldWhenTriggered gs))
    in a == b
         || ( quiet gs
                && Map.lookup a pcs == Map.lookup b pcs
                && sameObject
+               && sameView
+               && sameSamples
                && not (namedByRelation a gs)
                && not (namedByRelation b gs)
                && not (namedByAnother a gs)
                && not (namedByAnother b gs)
+               && not (namedByStored a gs)
+               && not (namedByStored b gs)
+               && not (layeredBetween a b gs)
            )
 
 -- | One candidate per interchangeability class, keeping the FIRST of each in the
@@ -85,76 +145,64 @@ representatives pcs gs candidates =
         [] -> candidates
         first : rest -> first NonEmpty.:| rest
 
--- Whether the board stores nothing that could name one object and not another,
--- BAR the id-keyed relations namedByRelation searches instead.
+-- Whether the board stores nothing this module cannot search -- a row holding
+-- a whole effect or ability, or entry bookkeeping.
 --
--- Both lists are HAND-KEPT, and nothing forces a new GameState field into
--- either, so the account below covers the whole record. The fields NOT read
--- anywhere here, and why each is safe to leave unread:
+-- The lists here, in namedByRelation and in namedByStored are HAND-KEPT, and
+-- nothing forces a new GameState field into any of them, so the account below
+-- covers the rest of the record. The fields NOT read anywhere in this module,
+-- and why each is safe to leave unread:
 --
 --   * The zones and GameState.objects hold every object symmetrically, and what
 --     one object says about another is namedByAnother's question.
 --   * GameState.players, GameState.manaPool, GameState.pendingControl,
 --     GameState.control (keyed by a player, and every PlayerControl on the stack
 --     names a Decider, a lifetime and rule 723.7's restriction -- no object),
---     GameState.monarch,
---     GameState.initiative, GameState.drewFromEmpty,
---     GameState.extraTurns and the per-player counters (landsPlayed,
---     drawsThisTurn, departedThisTurn, spellsCastLastTurn, castsLastTurn,
---     resolvedNames) are
---     keyed by or valued at a PLAYER and name no object.
+--     GameState.monarch, GameState.initiative, GameState.drewFromEmpty,
+--     GameState.loopInvolvement, GameState.extraTurns and the per-player
+--     counters (landsPlayed, drawsThisTurn, departedThisTurn,
+--     spellsCastLastTurn, castsLastTurn, resolvedNames) are keyed by or valued
+--     at a PLAYER and name no object.
 --   * GameState.lastKnown is about objects that have LEFT, and so is
 --     GameState.castsBeforeThisTurn: its spells were cast on an earlier turn,
 --     and CR 500.2 ends no step while the stack holds one.
---   * GameState.events, GameState.attacksInOwnLastTurn (a snapshot of the log's
---     attacks), GameState.controlSample and
---     GameState.battlefieldWhenTriggered are bookkeeping, and pawl has neither a
---     tap game event nor a tap trigger condition, so nothing scans them because
---     of a choice made here.
+--     GameState.stackArchive is keyed by stack objects that have left too, and
+--     its bindings are read only on behalf of a stack object or a delayed
+--     trigger (CR 608.2h), which namedByAnother and quiet already cover.
+--   * GameState.events is read here through the two Filter views objects
+--     compares, which is where a Filter's look-back atoms read it; an event
+--     the choice itself writes names whichever object was chosen, alike.
+--     GameState.controlSample (CR 603.2's control diff) and
+--     GameState.battlefieldWhenTriggered (CR 603.10's look-back) are keyed by
+--     every permanent alike, so objects COMPARES the two entries in each
+--     rather than searching for the ids.
 --   * GameState.outsideObjects (CR 729.4) is keyed by ids belonging to a game
 --     this one is nested inside, and its value names no object -- an owner, a
---     printing and a face-up/face-down status (CR 110.5); the
---     id supplies of the two games are disjoint (Setup.funnelBack takes the max),
---     so no key of it can be a candidate.
---   * GameState.ambientAmounts is keyed by slot and valued at a number.
---   * The turn, phase, priority, result, daytime, signal, supply and printing
---     fields describe the GAME rather than any object.
+--     printing and a face-up/face-down status (CR 110.5); the id supplies of
+--     the two games are disjoint (Setup.funnelBack takes the max), so no key of
+--     it can be a candidate.
+--   * GameState.ambientAmounts is keyed by slot and valued at a number, and
+--     GameState.referenceNames is keyed by a Filter and valued at names.
+--   * The turn, phase, priority, result, daytime, signal, supply, printing,
+--     event-group, scan-cursor, subgame and die-roll fields describe the GAME
+--     rather than any object.
 --
--- GameState.copyEffects, GameState.unregeneratables, GameState.blockProhibitions,
--- GameState.attackProhibitions, GameState.activationProhibitions and
--- GameState.untapProhibitions ARE listed below, for the reason every other listed
--- field is: a row names one object and not another (CR 613.1a, CR 701.19c, CR
--- 509.1b, CR 508.1c, CR 602.2, CR 502.3), so two creatures
--- alike in every characteristic are told apart by which of them a row covers.
---
--- GameState.evasions is listed although its rows name a class rather than an
--- object (CR 611.2c): requiring it empty is the side that cannot make a
--- player's choice, the reason given for the entry bookkeeping below.
+-- GameState.evasions is searched (namedByStored) although its rows name a
+-- class rather than an object (CR 611.2c): the class is a Filter, and
+-- filterNames answers for it.
 --
 -- GameState.enteringCounters, GameState.copyExceptionCounters,
--- GameState.enteringTogether, GameState.detachedBindings and
--- GameState.broughtIn are listed below because each holds ObjectIds, and NOT
--- because any board reaches this with one of them non-empty: the first two are
--- empty outside an entry loop, the third outside a CR
--- 608.2f action, and the other two are CR 729's subgame bookkeeping.
--- They are in the list rather than in the account above because requiring a
--- field empty is the direction that cannot make a player's choice, so an
--- unreachable row is the cheap side to be wrong on.
+-- GameState.enteringTogether, GameState.arrivals, GameState.detachedBindings
+-- and GameState.broughtIn are listed below because each holds ObjectIds, and
+-- NOT because any board reaches this with one of them non-empty: the first
+-- two are empty outside an entry loop, the next two outside a CR 608.2f action
+-- or an arrival, and the last two are CR 729's subgame bookkeeping. They are
+-- in the list rather than in the account above because requiring a field empty
+-- is the direction that cannot make a player's choice, so an unreachable row
+-- is the cheap side to be wrong on.
 quiet :: GameState -> Bool
 quiet gs =
-  null (GameState.continuousEffects gs)
-    && null (GameState.copyEffects gs)
-    && null (GameState.replacements gs)
-    && null (GameState.playerEffects gs)
-    && null (GameState.blockRequirements gs)
-    && null (GameState.attackRequirements gs)
-    && null (GameState.unregeneratables gs)
-    && null (GameState.blockProhibitions gs)
-    && null (GameState.attackProhibitions gs)
-    && null (GameState.activationProhibitions gs)
-    && null (GameState.untapProhibitions gs)
-    && null (GameState.evasions gs)
-    && null (GameState.ignoredAbilities gs)
+  null (GameState.replacements gs)
     && Seq.null (GameState.delayedTriggers gs)
     && Seq.null (GameState.pendingPreventionRiders gs)
     && Seq.null (GameState.pendingDamageEffects gs)
@@ -168,43 +216,468 @@ quiet gs =
     && Map.null (GameState.copyExceptionCounters gs)
     && Map.null (GameState.detachedBindings gs)
     && Maybe.isNothing (GameState.enteringTogether gs)
-    && GameState.combat gs == noCombat
+    && Maybe.isNothing (GameState.arrivals gs)
 
--- An empty Combat, so that "nothing is in combat" is one equality over every
--- field of that record rather than a list of the fields that hold an object --
--- a CONSTRUCTION, so -Wmissing-fields names a new Combat field here.
+-- Whether a stored row, or the combat in progress, MIGHT name this object.
+-- "Might", because the answer is True wherever a row holds something this
+-- module does not read through -- the side that cannot make a player's choice.
 --
--- Duplicates Pawl.Engine.Combat.emptyCombat, which cannot be imported: that
--- module depends on Pawl.Engine.Cost, and Pawl.Engine.Cost depends on this one.
-noCombat :: Combat.Combat
-noCombat =
-  Combat.MkCombat
-    { Combat.attackers = Map.empty,
-      Combat.blockers = Map.empty,
-      Combat.struckFirst = Nothing,
-      Combat.joinedUnder = Map.empty,
-      Combat.attackedUnder = Map.empty,
-      Combat.attackedControlledBy = Map.empty,
-      Combat.attacked = Set.empty,
-      Combat.declaredAttacked = Set.empty,
-      Combat.declaredAttackedBy = Map.empty,
-      Combat.declaredAttackedThisStep = Set.empty,
-      Combat.declaredAttackers = Set.empty,
-      Combat.declaredBlockers = Set.empty,
-      Combat.blockersDeclared = False,
-      Combat.attackingNothing = Set.empty,
-      Combat.blockingNothing = Set.empty,
-      Combat.removedDefending = Map.empty,
-      Combat.defenders = []
-    }
+-- Every row type is matched POSITIONALLY, so a field added to one is an arity
+-- error here rather than an ObjectId this silently stops reading.
+--
+-- A row's SOURCE is read alongside its subject, since the source frames the
+-- row's Filters (IsSource, the source comparisons) and a row whose source is
+-- one of the two treats the pair differently through it.
+namedByStored :: ObjectId -> GameState -> Bool
+namedByStored oid gs =
+  combatNames oid (GameState.combat gs)
+    || any (continuousNames oid gs) (GameState.continuousEffects gs)
+    || any (copyNames oid) (GameState.copyEffects gs)
+    || any (playerEffectRowNames oid) (GameState.playerEffects gs)
+    || any (blockRequirementNames oid) (GameState.blockRequirements gs)
+    || any (attackRequirementNames oid) (GameState.attackRequirements gs)
+    || any (unregeneratableNames oid) (GameState.unregeneratables gs)
+    || any (blockProhibitionNames oid) (GameState.blockProhibitions gs)
+    || any (attackProhibitionNames oid) (GameState.attackProhibitions gs)
+    || any (activationProhibitionNames oid) (GameState.activationProhibitions gs)
+    || any (untapProhibitionNames oid) (GameState.untapProhibitions gs)
+    || any (evasionNames oid) (GameState.evasions gs)
+    || any (ignoredNames oid) (GameState.ignoredAbilities gs)
+
+-- CR 613.7a: an object's static abilities apply at its own timestamp, so a
+-- stored layered row stamped strictly BETWEEN the two can apply after one's
+-- abilities and before the other's -- and which of the two is left once the
+-- other is gone can then change what the board projects. Conservative: asked
+-- whether or not either object has a static ability at all.
+layeredBetween :: ObjectId -> ObjectId -> GameState -> Bool
+layeredBetween a b gs = case (Map.lookup a (GameState.objects gs), Map.lookup b (GameState.objects gs)) of
+  (Just x, Just y) ->
+    let lo = min (Object.timestamp x) (Object.timestamp y)
+        hi = max (Object.timestamp x) (Object.timestamp y)
+        between ts = lo < ts && ts < hi
+     in any (between . ContinuousEffect.timestamp) (GameState.continuousEffects gs)
+          || any (between . ActiveCopy.timestamp) (GameState.copyEffects gs)
+  _ -> True
+
+-- Whether the combat in progress names this object, as an attacker, a blocker
+-- or an attacked planeswalker or battle (CR 506.4, 508, 509). Positional, so
+-- a new Combat field is an arity error here.
+combatNames :: ObjectId -> Combat.Combat -> Bool
+combatNames oid combat = case combat of
+  Combat.MkCombat attackers blockers struckFirst joinedUnder attackedUnder attackedControlledBy attacked declaredAttacked declaredAttackedBy declaredAttackedThisStep declaredAttackers declaredBlockers _blockersDeclared attackingNothing blockingNothing removedDefending _defenders ->
+    Map.member oid attackers
+      || any (attackTargetNames oid) (Map.elems attackers)
+      || Map.member oid blockers
+      || any (Set.member oid) (Map.elems blockers)
+      || maybe False (Set.member oid) struckFirst
+      || Map.member oid joinedUnder
+      || Map.member oid attackedUnder
+      || Map.member oid attackedControlledBy
+      || any (attackTargetNames oid) attacked
+      || any (attackTargetNames oid) declaredAttacked
+      || any (any (attackTargetNames oid)) (Map.elems declaredAttackedBy)
+      || any (attackTargetNames oid) declaredAttackedThisStep
+      || Set.member oid declaredAttackers
+      || Set.member oid declaredBlockers
+      || Set.member oid attackingNothing
+      || Set.member oid blockingNothing
+      || Map.member oid removedDefending
+
+attackTargetNames :: ObjectId -> AttackTarget.AttackTarget -> Bool
+attackTargetNames oid target = case target of
+  AttackTarget.OfPlayer _player -> False
+  AttackTarget.OfPlaneswalker walker -> walker == oid
+  AttackTarget.OfBattle battle -> battle == oid
+
+continuousNames :: ObjectId -> GameState -> ContinuousEffect.ContinuousEffect card -> Bool
+continuousNames oid gs row = case row of
+  ContinuousEffect.MkContinuousEffect source _timestamp expiry modification affected ->
+    source == oid || expiryNames expiry || modificationNames oid modification || affectedNames oid source gs affected
+
+-- CR 707.2: the snapshot is copiable values, which hold printed text and no
+-- runtime id, exactly as a printed card does.
+copyNames :: ObjectId -> ActiveCopy.ActiveCopy -> Bool
+copyNames oid row = case row of
+  ActiveCopy.MkActiveCopy source _timestamp expiry copied _snapshot ->
+    source == oid || expiryNames expiry || Set.member oid copied
+
+playerEffectRowNames :: ObjectId -> ActivePlayerEffect.ActivePlayerEffect -> Bool
+playerEffectRowNames oid row = case row of
+  ActivePlayerEffect.MkActivePlayerEffect source _controller _timestamp expiry _scope effect ->
+    source == oid || expiryNames expiry || playerEffectNames oid effect
+
+blockRequirementNames :: ObjectId -> ActiveBlockRequirement.ActiveBlockRequirement -> Bool
+blockRequirementNames oid row = case row of
+  ActiveBlockRequirement.MkActiveBlockRequirement source _timestamp expiry blocker attacker ->
+    source == oid || expiryNames expiry || blocker == oid || attacker == oid
+
+attackRequirementNames :: ObjectId -> ActiveAttackRequirement.ActiveAttackRequirement -> Bool
+attackRequirementNames oid row = case row of
+  ActiveAttackRequirement.MkActiveAttackRequirement source _controller _timestamp expiry attacker defender ->
+    source == oid || expiryNames expiry || restrictedNames oid attacker || attackTargetNames oid defender
+
+unregeneratableNames :: ObjectId -> ActiveUnregeneratable.ActiveUnregeneratable -> Bool
+unregeneratableNames oid row = case row of
+  ActiveUnregeneratable.MkActiveUnregeneratable source _timestamp expiry object ->
+    source == oid || expiryNames expiry || object == oid
+
+blockProhibitionNames :: ObjectId -> ActiveBlockProhibition.ActiveBlockProhibition -> Bool
+blockProhibitionNames oid row = case row of
+  ActiveBlockProhibition.MkActiveBlockProhibition source _timestamp expiry object ->
+    source == oid || expiryNames expiry || object == oid
+
+-- AimedAt names players and target kinds, never an object.
+attackProhibitionNames :: ObjectId -> ActiveAttackProhibition.ActiveAttackProhibition -> Bool
+attackProhibitionNames oid row = case row of
+  ActiveAttackProhibition.MkActiveAttackProhibition source _controller _timestamp expiry affected aimedAt ->
+    source == oid || expiryNames expiry || restrictedNames oid affected || maybe False aimedAtNames aimedAt
+
+aimedAtNames :: AimedAt.AimedAt -> Bool
+aimedAtNames aimed = case aimed of
+  AimedAt.MkAimedAt defenders _kinds -> case defenders of
+    AimedPlayers.Scoped _scope -> False
+    AimedPlayers.EachInSlot _slot -> False
+    AimedPlayers.BoundPlayer _player -> False
+
+activationProhibitionNames :: ObjectId -> ActiveActivationProhibition.ActiveActivationProhibition -> Bool
+activationProhibitionNames oid row = case row of
+  ActiveActivationProhibition.MkActiveActivationProhibition source _timestamp expiry object ->
+    source == oid || expiryNames expiry || object == oid
+
+untapProhibitionNames :: ObjectId -> ActiveUntapProhibition.ActiveUntapProhibition -> Bool
+untapProhibitionNames oid row = case row of
+  ActiveUntapProhibition.MkActiveUntapProhibition source _timestamp expiry object ->
+    source == oid || expiryNames expiry || object == oid
+
+evasionNames :: ObjectId -> ActiveEvasion.ActiveEvasion -> Bool
+evasionNames oid row = case row of
+  ActiveEvasion.MkActiveEvasion source _controller _timestamp expiry affected ->
+    source == oid || expiryNames expiry || filterNames oid affected
+
+-- CR 116.2d: the ignored ability is its source's, so the source is the subject.
+ignoredNames :: ObjectId -> IgnoredAbility.IgnoredAbility -> Bool
+ignoredNames oid row = case row of
+  IgnoredAbility.MkIgnoredAbility _player source _ability expiry ->
+    source == oid || expiryNames expiry
+
+restrictedNames :: ObjectId -> RestrictedCreatures.RestrictedCreatures ObjectId -> Bool
+restrictedNames oid restricted = case restricted of
+  RestrictedCreatures.Named named -> named == oid
+  RestrictedCreatures.Matching criterion -> filterNames oid criterion
+
+-- Whether a row's lifetime might name an object. CR 611.2b's "for as long as"
+-- carries a Condition and CR 611.2a's "until a player pays" a Cost, and this
+-- reads neither, so both answer "might name"; every other arm is a player, a
+-- turn, a step or a stamp.
+expiryNames :: Expiry.Expiry -> Bool
+expiryNames expiry = case expiry of
+  Expiry.AtCleanup -> False
+  Expiry.Never -> False
+  Expiry.Perpetual -> False
+  Expiry.While _while -> True
+  Expiry.AtTurnOf _player -> False
+  Expiry.AtUpkeepOf _player -> False
+  Expiry.AtEndOfTurnOf _after -> False
+  Expiry.DuringTurnOf _after -> False
+  Expiry.DuringExtraTurn _stamp -> False
+  Expiry.AtEndOf _selector -> False
+  Expiry.AtEndOfCombatOn _after -> False
+  Expiry.WhenPaid _paid -> True
+  Expiry.WhenUsed -> False
+
+-- CR 611.2c: who a stored continuous effect applies to. A fixed set is
+-- searched; a predicate is filterNames' question; CR 303.4m's "enchanted"
+-- reads the source's host, which namedByAnother also reads from the other end.
+affectedNames :: ObjectId -> ObjectId -> GameState -> Affected.Affected -> Bool
+affectedNames oid source gs affected = case affected of
+  Affected.TheseObjects held -> Set.member oid held
+  Affected.Matching criterion -> filterNames oid criterion
+  Affected.MatchingAnywhere criterion -> filterNames oid criterion
+  Affected.MatchingOffBattlefield criterion -> filterNames oid criterion
+  Affected.Attached -> (Map.lookup source (GameState.objects gs) >>= Object.attachedTo >>= Recipient.objectOf) == Just oid
+  Affected.AttachedPlayerControls criterion -> filterNames oid criterion
+  -- CR 611.3d: the card a permission was used for is read off a record this
+  -- does not search.
+  Affected.PlayedThisWay _duration -> True
+
+-- Whether what a stored effect DOES might name an object. An atom carrying a
+-- type, a colour, a player, a literal or a keyword without a payload names
+-- none. A granted ability, a full text, a cast permission, an enchant ability
+-- and a computed quantity each hold a tree this does not read, so each answers
+-- "might name".
+modificationNames :: ObjectId -> Modification.Modification ability -> Bool
+modificationNames oid modification = case modification of
+  Modification.GainKeyword keyword -> keywordNames keyword
+  Modification.GainKeywordAtManaCost _keyword -> False
+  Modification.GainEnchant _slot -> True
+  Modification.LoseEnchant _slot -> True
+  Modification.GainCastingPermission _permission -> True
+  Modification.GainAbility _ability -> True
+  -- CR 702.165a: the source's own abilities, which are printed text.
+  Modification.GainAbilitiesOfSource _except -> False
+  Modification.GainCraftMaterialAbilities _restrictions -> True
+  Modification.LoseAllAbilities -> False
+  Modification.LoseNamedAbility _name -> False
+  -- Removal matches the keyword by equality and never evaluates a payload.
+  Modification.LoseKeyword _keyword -> False
+  Modification.LoseKeywordFamily _family -> False
+  Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness power toughness) -> any quantityNames power || any quantityNames toughness
+  Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness power toughness) -> quantityNames power || quantityNames toughness
+  Modification.SetLandSubtype _subtype -> False
+  Modification.SetLandSubtypeToChosen -> False
+  Modification.AddLandSubtype _subtype -> False
+  Modification.SetCreatureSubtype _subtype -> False
+  Modification.AddCreatureSubtype _subtype -> False
+  Modification.AddEveryCreatureSubtype -> False
+  Modification.LoseEveryCreatureSubtype -> False
+  Modification.AddSubtype _subtype -> False
+  Modification.AddCardType _cardType -> False
+  Modification.SetCardType _cardType -> False
+  Modification.LoseCardType _cardType -> False
+  Modification.AddSupertype _supertype -> False
+  Modification.RemoveSupertype _supertype -> False
+  Modification.ChangeSubtypeWord _change -> False
+  -- CR 612.5: the pair exchanging is the row's affected set.
+  Modification.ExchangeTextBoxes -> False
+  Modification.AddNamesMatching criterion -> filterNames oid criterion
+  Modification.HasFullText _text -> True
+  Modification.SetController _player -> False
+  Modification.SetControllerToSource -> False
+  Modification.SetColor _colors -> False
+  Modification.AddColor _colors -> False
+  Modification.AddChosenColor -> False
+  Modification.SwitchPowerToughness -> False
+  Modification.AssignCombatDamageWithToughness -> False
+  Modification.GrantsStationToughness -> False
+  Modification.Intensify amount -> quantityNames amount
+
+-- A literal names nothing; every other Quantity arm reads a slot, a count or
+-- an object this does not search.
+quantityNames :: Quantity.Quantity -> Bool
+quantityNames quantity = case quantity of
+  Quantity.Literal _n -> False
+  _ -> True
+
+-- CR 702: a keyword without a payload names nothing. One with a payload may
+-- carry a Filter, a cost or a quantity, so it answers "might name". The list is
+-- the payload-free keywords a resolution grants; any other keyword lands on
+-- the conservative side.
+keywordNames :: Keyword.Keyword -> Bool
+keywordNames keyword = case keyword of
+  Keyword.Changeling -> False
+  Keyword.Deathtouch -> False
+  Keyword.Defender -> False
+  Keyword.DoubleStrike -> False
+  Keyword.Fear -> False
+  Keyword.FirstStrike -> False
+  Keyword.Flash -> False
+  Keyword.Flying -> False
+  Keyword.Haste -> False
+  Keyword.Indestructible -> False
+  Keyword.Infect -> False
+  Keyword.Intimidate -> False
+  Keyword.Lifelink -> False
+  Keyword.Menace -> False
+  Keyword.Prowess -> False
+  Keyword.Reach -> False
+  Keyword.Shadow -> False
+  Keyword.Shroud -> False
+  Keyword.Skulk -> False
+  Keyword.Trample -> False
+  Keyword.Vigilance -> False
+  Keyword.Wither -> False
+  _ -> True
+
+-- Whether a player effect might name an object. The atoms that carry a Filter
+-- defer to filterNames; the cost, permission, damage-pattern and zone records
+-- answer "might name" unread.
+playerEffectNames :: ObjectId -> PlayerEffect.PlayerEffect -> Bool
+playerEffectNames oid effect = case effect of
+  PlayerEffect.CantCastSpells -> False
+  PlayerEffect.CantActivateAbilities _designator -> False
+  PlayerEffect.CantCastMoreThan _n -> False
+  PlayerEffect.IncreaseSpellCost _increase -> True
+  PlayerEffect.IncreaseActivationCost _increase -> True
+  PlayerEffect.ReduceSpellCost _reduce -> True
+  PlayerEffect.ReduceActivationCost _reduce -> True
+  PlayerEffect.AddActivationCost _add -> True
+  PlayerEffect.AlternativeActivationCost _alternative -> True
+  PlayerEffect.AddSpellCost _add -> True
+  PlayerEffect.PlayAdditionalLands _n -> False
+  PlayerEffect.NoMaximumHandSize -> False
+  PlayerEffect.SetMaximumHandSize _n -> False
+  PlayerEffect.IncreaseMaximumHandSize _n -> False
+  PlayerEffect.ReduceMaximumHandSize _n -> False
+  PlayerEffect.DontLoseUnspentMana _mana -> False
+  PlayerEffect.LoseLifeForUnspentMana -> False
+  PlayerEffect.SpendManaAsThough _spend -> True
+  PlayerEffect.CantBeTargetedBy _scope -> False
+  PlayerEffect.HasProtectionFrom criterion -> filterNames oid criterion
+  PlayerEffect.CastAsThoughItHadFlash criterion -> filterNames oid criterion
+  PlayerEffect.MayPlayAsThoughItHadFlash criterion -> filterNames oid criterion
+  PlayerEffect.ActivateKeywordAtInstantSpeed _designator -> False
+  PlayerEffect.ActivateLoyaltyAtInstantSpeed criterion -> filterNames oid criterion
+  PlayerEffect.CantBeCountered criterion -> filterNames oid criterion
+  PlayerEffect.DamageCantBePrevented _pattern -> True
+  PlayerEffect.DamageCantBeRedirected _pattern -> True
+  PlayerEffect.CantSearchLibraries _searching -> False
+  PlayerEffect.CantBecomeMonarch -> False
+  PlayerEffect.CantSetSchemesInMotion -> False
+  PlayerEffect.CantAttackWithCreatures -> False
+  PlayerEffect.CantCastMatching criterion -> filterNames oid criterion
+  PlayerEffect.CastOnlyAtSorcerySpeed -> False
+  PlayerEffect.CantPlayLands criterion -> filterNames oid criterion
+  PlayerEffect.CastFrom _permission -> True
+  PlayerEffect.PlayLandsFrom _zone -> True
+  PlayerEffect.PlotFrom _permission -> True
+  PlayerEffect.CastFromHandWithoutPayingManaCost criterion -> filterNames oid criterion
+  PlayerEffect.CantGetCounters _kind -> False
+  PlayerEffect.StateCoinFlip _flip -> False
+  PlayerEffect.ModifyDieRoll _roll -> True
+  PlayerEffect.AdditionalVotes _n -> False
+  PlayerEffect.AdditionalSurveilCards _n -> False
+  PlayerEffect.CantGainLife -> False
+  PlayerEffect.CantLoseLife -> False
+
+-- Whether a Filter might single this object out from one alike in every other
+-- respect.
+--
+-- Two objects equal whole bar the timestamp, projecting alike, named by no
+-- other object, relation, stored row or combat assignment, present every atom
+-- the same Pawl.Engine.Filter.View in all but three respects, so an atom reading
+-- none of them answers the same of both, now and after either is chosen:
+--
+--   * IDENTITY: IsObject names an id outright.
+--   * The turn's EVENT LOG: the look-back atoms (AttackedThisTurn,
+--     MilledThisTurn, DealtDamageThisTurn, EnteredThisTurn, the
+--     crewed/convoked/saddled-the-source atoms) and EnteredWithSource
+--     (GameState.enteredWith) read a record kept per object id.
+--   * A RESOLUTION CONTEXT a stored row does not fix: the slot atoms, the
+--     target-slot amount atoms, the attach and search subject atoms,
+--     CantCrewVehicles and AttachedNoLaterThanSource's baked set.
+--
+-- No atom reads a timestamp. The source comparisons read the row's source,
+-- which namedByStored checks is neither object; the combat atoms read the
+-- combat combatNames searches; the attachment atoms read the candidate's own
+-- attachedTo, which whole-object Eq compares, or another object's, which
+-- namedByAnother searches. A nested Filter is asked of some OTHER object --
+-- a host, a target, a source, a represented card, an attacher, a permanent a
+-- player counts -- which may be one of the two, so it is recursed into.
+filterNames :: ObjectId -> Filter.Filter keyword -> Bool
+filterNames oid criterion = case criterion of
+  Filter.HasCardType _cardType -> False
+  Filter.HasSupertype _supertype -> False
+  Filter.HasColor _color -> False
+  Filter.SharesColorWithSource -> False
+  Filter.HasSubtype _subtype -> False
+  Filter.HasName _name -> False
+  Filter.HasNameOriginallyPrintedIn _expansion -> False
+  Filter.HasKeyword _keyword -> False
+  Filter.HasKeywordFamily _family -> False
+  Filter.PowerAtLeast _n -> False
+  Filter.PowerAtMost _n -> False
+  Filter.ToughnessGreaterThanPower -> False
+  Filter.PowerLessThanSource -> False
+  Filter.PowerGreaterThanSource -> False
+  Filter.PowerAtLeastSourceToughness -> False
+  Filter.PowerIsAmountInSlot _slot -> True
+  Filter.PowerAtLeastAmountInSlot _slot -> True
+  Filter.ManaValueAtMost _n -> False
+  Filter.ManaValueLessThanSource -> False
+  Filter.ManaValueEqualToSource -> False
+  Filter.ManaValueIsEven -> False
+  Filter.ManaValueAtMostAmount -> True
+  Filter.ManaValueEqualToAmount -> True
+  Filter.ControlledBy _relation -> False
+  Filter.ControlledByDefendingPlayer -> False
+  Filter.ControlledByBound _slot -> True
+  Filter.ControlledByPlayer _player -> False
+  Filter.ControlledByRecipient -> False
+  Filter.OwnedBy _relation -> False
+  Filter.OwnedByRecipient -> False
+  Filter.IsSource -> False
+  Filter.IsObject named -> named == oid
+  Filter.TargetsSource -> False
+  Filter.TargetsOnlySource -> False
+  Filter.TargetsOnlyOne nested -> filterNames oid nested
+  Filter.HasSingleTarget -> False
+  Filter.TargetsMatching nested -> filterNames oid nested
+  Filter.TargetsPlayer _relation -> False
+  Filter.IsBound _slot -> True
+  Filter.SameNameAsBound _slot -> True
+  Filter.SameNameAsSource -> False
+  Filter.SameOwnerAsSource -> False
+  Filter.SameControllerAsBound _slot -> True
+  Filter.SameControllerAsHostOfBound _slot -> True
+  Filter.SharesCreatureTypeWithBound _slot -> True
+  Filter.ToughnessLessThanBound _slot -> True
+  Filter.HasChosenName -> False
+  Filter.HasChosenColor -> False
+  Filter.HasChosenSubtype -> False
+  Filter.OfChosenPlayer -> False
+  Filter.IsPlayer _relation -> False
+  Filter.IsControllerOfBound _slot -> True
+  Filter.ControlsMoreThanYou _margin nested -> filterNames oid nested
+  Filter.CardsInGraveyardAtLeast _n -> False
+  Filter.IsAttacking -> False
+  Filter.IsAttackingPlayer _relation -> False
+  Filter.IsAttackingPlaneswalker _relation -> False
+  Filter.IsAttackingBattle _relation -> False
+  Filter.DeclaredAttackedThisCombat -> False
+  Filter.IsBlocking -> False
+  Filter.IsBlocked -> False
+  Filter.DeclaredAttackerThisCombat -> False
+  Filter.DeclaredBlockerThisCombat -> False
+  Filter.AttackedThisTurn -> True
+  Filter.MilledThisTurn -> True
+  Filter.CantCrewVehicles -> True
+  Filter.CrewedSourceThisTurn -> True
+  Filter.ConvokedSourceThisTurn -> True
+  Filter.SaddledSourceThisTurn -> True
+  Filter.DealtDamageThisTurn -> True
+  Filter.EnteredThisTurn -> True
+  Filter.ControlledSinceTurnBegan -> False
+  Filter.AttachedTo nested -> filterNames oid nested
+  Filter.HasAttached nested -> filterNames oid nested
+  Filter.IsAttachedToSource -> False
+  Filter.IsAttachedToEvaluated -> False
+  Filter.IsHostOfSource -> False
+  Filter.EnteredWithSource -> True
+  Filter.AttachedNoLaterThanSource -> True
+  Filter.CanHostSubject -> True
+  Filter.CanAttachToSubject -> True
+  Filter.HostOfSubjectHasCardType _cardType -> True
+  Filter.IsToken -> False
+  Filter.IsCommander -> False
+  Filter.IsActivatedAbility -> False
+  Filter.IsAbility -> False
+  Filter.IsEmblem -> False
+  Filter.FromSource nested -> filterNames oid nested
+  Filter.IsTapped -> False
+  Filter.IsFaceDown -> False
+  Filter.RepresentedByCard nested -> filterNames oid nested
+  Filter.IsExiledFaceDown -> False
+  Filter.Transformed -> False
+  Filter.IsRingBearer -> False
+  Filter.IsPaired -> False
+  Filter.IsPairedWithSource -> False
+  Filter.IsBlockedBySource -> False
+  Filter.HasDesignation _designation -> False
+  Filter.HasCounters _kind -> False
+  Filter.HasCountersOfAnyKind -> False
+  Filter.HasNonManaActivatedAbility -> False
+  Filter.HasActivatedAbility -> False
+  Filter.IsInZone _zone -> False
+  Filter.WasCastFrom _zone -> False
+  Filter.TagWasSpent _tag -> False
+  Filter.And nested -> any (filterNames oid) nested
+  Filter.Or nested -> any (filterNames oid) nested
+  Filter.Not nested -> filterNames oid nested
 
 -- Whether one of the board's ID-KEYED RELATIONS names this object. Each is
 -- a Map from an object to what the game remembers about it, so the ids a row
 -- names are its KEY plus whatever ids its value holds -- and both are read here,
--- which is what makes searching them exact rather than merely likely. What quiet
--- still requires empty is either a container whose rows name objects through a
--- nested structure (a Filter, an Expiry, an effect) no traversal here can bound,
--- or one that is empty at every window this is reached from anyway.
+-- which is what makes searching them exact rather than merely likely.
 --
 --   * GameState.phasedOut (CR 702.26b), keyed by the phased-out permanent, its
 --     value the player it phased out under.
@@ -221,6 +694,15 @@ noCombat =
 --     naming the object CR 607.2a's or CR 607.2b's link names.
 --   * GameState.exilePiles (CR 406.4), keyed by the card in exile face down, its
 --     value the stamp of the pile it is in.
+--   * GameState.enteredWith (CR 400.7), keyed by the permanent, its value the
+--     source whose effect put it onto the battlefield.
+--   * The per-object budgets and notes: GameState.activatedThisTurn (CR
+--     602.5b), castPermissionsUsedThisTurn (CR 601.3), rollModifiersUsedThisTurn
+--     (CR 706.2), namedCopyChoices (CR 707.13), notedCards (CR 707.14),
+--     keptFaceDown (CR 121.8) and outsideCopies (CR 400.11), each keyed by the
+--     object it is about; and the logs triggeredThisGame (a "triggers only
+--     once" rider's spent triggerings), activationsThisTurn (CR 602.2) and
+--     attacksInOwnLastTurn (CR 508.1a), by the object each entry names.
 --
 -- phasedOut and exiledUntilMonarch can never name a CANDIDATE through the one
 -- caller (Pawl.Engine.Cost's mana-source window): both key on an object not on
@@ -233,11 +715,11 @@ noCombat =
 -- object" is the honest reading of the rule and requiring emptiness makes an
 -- unrelated phased-out permanent decide a pair it says nothing about.
 --
--- The haunting arm's VALUE side is the proved one: Pawl.ManaSpec's "an Elf a
--- haunting card in exile haunts is a candidate of its own" is a haunt row naming
--- one of three otherwise identical Elves, beside "a haunt row that names none of
--- them leaves the elision standing", which is the same board with the row's
--- value moved.
+-- The haunting arm's VALUE side is the proved one: Pawl.ManaSourceSpec's "an
+-- Elf a haunting card in exile haunts is a candidate of its own" is a haunt row
+-- naming one of three otherwise identical Elves, beside "a haunt row that names
+-- none of them leaves the elision standing", which is the same board with the
+-- row's value moved.
 --
 -- The KEY side is a regression fence rather than a proof, and so is exiledWith's
 -- value side, encoded's whole arm and exilePiles' whole arm. Every one of these relations keys on an
@@ -245,10 +727,12 @@ noCombat =
 -- GameState.battlefield excludes (CR 702.26b) -- so no key can ever be a
 -- mana-source candidate, and neutering `key == oid` below leaves the whole suite
 -- green. The line stays because a row does name its key; do not read the green as
--- coverage.
+-- coverage. The per-object budgets, notes and logs are fences too: no board in
+-- the suite gives one of two otherwise identical mana sources such a row.
 namedByRelation :: ObjectId -> GameState -> Bool
 namedByRelation oid gs =
   let relates names = any (\(key, value) -> key == oid || Set.member oid (names value)) . Map.toList
+      keyed = Map.member oid
    in relates phasedOutNames (GameState.phasedOut gs)
         || relates monarchWatchNames (GameState.exiledUntilMonarch gs)
         || relates returnWatchNames (GameState.movedUntilSourceLeaves gs)
@@ -256,8 +740,19 @@ namedByRelation oid gs =
         || relates Set.singleton (GameState.encoded gs)
         || relates (Set.singleton . ExileLink.source) (GameState.exiledWith gs)
         || relates pileNames (GameState.exilePiles gs)
+        || relates Set.singleton (GameState.enteredWith gs)
         -- CR 305.1 / 601.2a: keyed by the spell or permanent a play made, too.
-        || relates (const Set.empty) (GameState.cardsPlayed gs)
+        || keyed (GameState.cardsPlayed gs)
+        || keyed (GameState.activatedThisTurn gs)
+        || keyed (GameState.castPermissionsUsedThisTurn gs)
+        || keyed (GameState.rollModifiersUsedThisTurn gs)
+        || keyed (GameState.namedCopyChoices gs)
+        || keyed (GameState.notedCards gs)
+        || maybe False keyed (GameState.keptFaceDown gs)
+        || Set.member oid (GameState.outsideCopies gs)
+        || any (triggeredNames oid) (GameState.triggeredThisGame gs)
+        || any (activationNames oid) (GameState.activationsThisTurn gs)
+        || any (any (attackedLastTurnNames oid)) (Map.elems (GameState.attacksInOwnLastTurn gs))
 
 -- The objects a GameState.phasedOut row names BEYOND its key: none, since CR
 -- 702.26a's stored value is the player the permanent phased out under.
@@ -291,6 +786,29 @@ pileNames :: Timestamp.Timestamp -> Set.Set ObjectId
 pileNames stamp = case stamp of
   Timestamp.MkTimestamp _n -> Set.empty
 
+-- Whether a spent "triggers only once" triggering names this object as its
+-- source. Positional for phasedOutNames' reason.
+triggeredNames :: ObjectId -> AbilityTriggered.AbilityTriggered -> Bool
+triggeredNames oid entry = case entry of
+  AbilityTriggered.MkAbilityTriggered source _controller _ability -> case source of
+    TriggerSource.OfObject object -> object == oid
+    TriggerSource.Sourceless -> False
+
+-- Whether a CR 602.2 activation this turn names this object, as its source or
+-- among its targets. Positional for phasedOutNames' reason.
+activationNames :: ObjectId -> PastActivation.PastActivation -> Bool
+activationNames oid entry = case entry of
+  PastActivation.MkPastActivation _activator source _keyword _kind targets ->
+    any (\snapshot -> ObjectSnapshot.object snapshot == oid) (source : targets)
+
+-- Whether an attack declared in its player's last turn (CR 508.1a) names this
+-- object, as the attacker or the planeswalker or battle attacked. Positional
+-- for phasedOutNames' reason.
+attackedLastTurnNames :: ObjectId -> AttackerDeclared.AttackerDeclared -> Bool
+attackedLastTurnNames oid entry = case entry of
+  AttackerDeclared.MkAttackerDeclared attacker _defender target _count _attackingPlayer ->
+    attacker == oid || attackTargetNames oid target
+
 -- Whether any OTHER object names this one: an Aura or Equipment attached to it,
 -- which CR 303.4 stores on the rider rather than on the host, and a spell or
 -- ability on the stack that took it as a target (CR 601.2c) or that named it as
@@ -299,14 +817,14 @@ pileNames stamp = case stamp of
 --
 -- A spell's targets reach Object.bindings only as CR 601.2i finishes the cast,
 -- so the window CR 601.2g opens for that same cast cannot see them; every
--- earlier spell on the stack is visible. Pawl.ManaSpec's "an Elf a spell on the
+-- earlier spell on the stack is visible. Pawl.ManaSourceSpec's "an Elf a spell on the
 -- stack targets is a candidate of its own" case is the two-step proof.
 --
 -- The ATTACHMENT arm is proved rather than a fence, and Betrayal ({U} Aura,
 -- "Whenever enchanted creature becomes tapped, you draw a card") is what proves
 -- it: it changes nothing about its host, so the enchanted permanent projects
 -- exactly like the one beside it, and only this line tells the two apart.
--- Pawl.ManaSpec's "an Elf enchanted by an Aura that changes nothing about it is
+-- Pawl.ManaSourceSpec's "an Elf enchanted by an Aura that changes nothing about it is
 -- still a candidate of its own" is the case, and it asserts the identical
 -- projection alongside the offer so the reason is pinned as well as the answer.
 namedByAnother :: ObjectId -> GameState -> Bool
