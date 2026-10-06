@@ -4249,13 +4249,22 @@ criteriaOf component = case component of
 -- is nested in, whose own reversal then offers them too.
 reverseIllegal :: [ManaWindow.ManaWindow] -> GameState -> Game [ObjectId]
 reverseIllegal windows before =
-  let asks window = not (null (ManaWindow.activated window))
+  let -- CR 733.1: "players may not reverse actions that moved cards to a
+      -- library [or] from a library to any zone other than the stack". A
+      -- window whose abilities did -- a CR 605.1b triggered mana ability that
+      -- draws (Synthetic Wellspring Growth) -- stands unasked, and whole, as
+      -- every window answers (gap #3134).
+      movedLibraryCard window =
+        let held gs = Set.fromList (foldMap Foldable.toList (GameState.library gs))
+         in held (ManaWindow.opened window) /= held (ManaWindow.closed window)
+      standing window = not (null (ManaWindow.activated window)) && movedLibraryCard window
+      asks window = not (null (ManaWindow.activated window)) && not (movedLibraryCard window)
       -- Every combination of answers, as one keep-or-not flag per window; a
-      -- window with nothing to offer is never kept.
-      combinations = traverse (\window -> if asks window then [True, False] else [False]) windows
+      -- window with nothing to offer is never kept, and a standing one always.
+      combinations = traverse (\window -> if asks window then [True, False] else [standing window]) windows
       composed = traverse (\keeps -> fmap ((,) keeps) (composeReversal before (zip windows keeps))) combinations
    in case (filter (asks . snd) (zip [0 :: Int ..] windows), composed) of
-        ([], _) -> [] <$ restoreKeepingLibraryActions before
+        ([], _) | not (any standing windows) -> [] <$ restoreKeepingLibraryActions before
         -- No state answers some combination where two sides wrote one leaf to
         -- two values, so the whole action goes back unasked (Pawl.Engine.Reversal
         -- says why that is conservative rather than invented).
@@ -4270,7 +4279,7 @@ reverseIllegal windows before =
           -- Pawl.Engine.Engine.checkMandatoryLoop's gap underflows on. The
           -- scenario cost/cr-733-1-an-underpaid-curtain-of-light-reverses-its-plains
           -- is the proof.
-          let flags answers = [Maybe.fromMaybe (asks window) (lookup i answers) | (i, window) <- zip [0 :: Int ..] windows]
+          let flags answers = [Maybe.fromMaybe (asks window || standing window) (lookup i answers) | (i, window) <- zip [0 :: Int ..] windows]
               settle answers =
                 Monad.forM_
                   (lookup (flags answers) table)
@@ -4451,11 +4460,11 @@ announceSubstitutionsReading slots substituting pid oid cost = case Cost.mana co
 -- go back only if the payer says so (`reverseIllegal` above).
 --
 -- Rule 733.1's MOVE limb -- an action that moved cards to or from a library may
--- NOT be reversed -- needs no arm here, and by two rules rather than by luck.
--- The window holds mana abilities alone, and CR 605.1a disqualifies an ability
--- whose cost or effect moves a card to or from a library
--- (Pawl.Engine.ManaAbility.costMovesLibraryCard is the cost half), so nothing
--- in it can make such a move. The components can -- MillCards is the one that
+-- NOT be reversed -- reaches the window through CR 605.1b alone: CR 605.1a
+-- disqualifies an ACTIVATED ability whose cost or effect moves a card to or from
+-- a library (Pawl.Engine.ManaAbility.costMovesLibraryCard is the cost half), but
+-- a triggered mana ability may draw, and `reverseIllegal` leaves a window that
+-- moved one standing. The components can -- MillCards is the one that
 -- does -- but CR 601.2h pays those in a SECOND pass (paidInSecondPass below),
 -- and `payComponent` refuses a MillCards only short of cards, which the gate
 -- measured and the window cannot change, so no failure can follow one within

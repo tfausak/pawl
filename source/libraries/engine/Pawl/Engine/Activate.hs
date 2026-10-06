@@ -103,7 +103,7 @@ revealIfHidden pid srcId = do
 -- in the log claiming otherwise. Everything else reads `gs`, the state as of the
 -- announcement.
 activateAbility :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> Game ()
-activateAbility pid srcId ability = do
+activateAbility pid srcId ability = Event.announcing $ do
   before <- State.get
   -- CR 602.2a's own order: the reveal is part of announcing, and so precedes
   -- the ability becoming an object on the stack (the rest of that same rule).
@@ -509,6 +509,10 @@ activateAbility pid srcId ability = do
                   -- After the payment for Cast.castSpell's reason: everything
                   -- above can still restore `before` and unwind the activation.
                   Event.becameTarget announced abilId StackObjectKind.ActivatedAbility pid chosen
+                  -- CR 121.8: the ability has become activated (CR 602.2b), so
+                  -- a card drawn while paying for it turns face up and its
+                  -- reveal is offered.
+                  Event.turnUpKeptDraws
                 -- CR 733.1: the payment reversed the activation back to
                 -- `before` itself, keeping what the payer chose to keep of the
                 -- mana window.

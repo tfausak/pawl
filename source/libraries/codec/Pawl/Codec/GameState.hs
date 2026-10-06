@@ -194,6 +194,7 @@ codec resolve = Fields.object $ do
   landsPlayed <- Fields.defaulted "landsPlayed" Map.empty (Common.naturalMap PlayerId.codec Common.natural) GameState.landsPlayed
   cardsPlayed <- Fields.defaulted "cardsPlayed" Map.empty (Common.naturalMap ObjectId.codec PlayerId.codec) GameState.cardsPlayed
   drawsThisTurn <- Fields.defaulted "drawsThisTurn" Map.empty (Common.naturalMap PlayerId.codec Common.natural) GameState.drawsThisTurn
+  keptFaceDown <- Fields.defaulted "keptFaceDown" Nothing (Common.maybe (Common.naturalMap ObjectId.codec Common.natural)) GameState.keptFaceDown
   departedThisTurn <- Fields.defaulted "departedThisTurn" Set.empty (Common.set PlayerId.codec) GameState.departedThisTurn
   -- Common.repeats, for Pawl.Codec.Object's activatedOnce reason.
   activatedThisTurn <- Fields.defaulted "activatedThisTurn" Map.empty (Common.naturalMap ObjectId.codec (Common.repeats (ActivatedAbility.codec Card.codec (GrantedAbility.codec Card.codec)))) GameState.activatedThisTurn
@@ -306,6 +307,7 @@ codec resolve = Fields.object $ do
         GameState.landsPlayed = landsPlayed,
         GameState.cardsPlayed = cardsPlayed,
         GameState.drawsThisTurn = drawsThisTurn,
+        GameState.keptFaceDown = keptFaceDown,
         GameState.departedThisTurn = departedThisTurn,
         GameState.activatedThisTurn = activatedThisTurn,
         GameState.activationsThisTurn = activationsThisTurn,

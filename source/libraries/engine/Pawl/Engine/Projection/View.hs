@@ -1414,27 +1414,35 @@ spellFaceOf oid gs =
 -- Walked per card in every hand and library on every projection behind
 -- Pawl.Engine.Projection.mayStateZone, so an object carrying no stamp on a board
 -- storing no copy effect skips copiableSnapshotOf's lookups.
+--
+-- Nothing for a card CR 121.8 keeps face down, baseCharacteristics' reason: it
+-- has no abilities to read. A REGRESSION FENCE: no card in data/cards has an
+-- ability that functions in a hand while a payment is under way, so dropping the
+-- guard leaves the suite green; a drawn Simian Spirit Guide is the card that
+-- would observe it.
 abilityFaceOf :: ObjectId -> Object.Object -> GameState -> Maybe (Face.Face Card.Type.Card)
-abilityFaceOf oid obj gs =
-  let stamped =
-        if Maybe.isNothing (Game.copyStampOf obj) && not (Object.flipped obj) && null (GameState.copyEffects gs)
-          then Nothing
-          else copiableSnapshotOf oid gs
-      overlay face pc =
-        face
-          { Face.typeLine = TypeLine.MkTypeLine (PC.supertypes pc) (PC.cardTypes pc) (PC.subtypes pc),
-            Face.keywords = PC.keywords pc,
-            Face.staticAbilities = PC.staticAbilities pc,
-            Face.playerAbilities = PC.playerAbilities pc,
-            Face.specialActions = PC.specialActions pc,
-            Face.activatedAbilities = PC.activatedAbilities pc,
-            Face.replacementEffects = PC.replacementEffects pc,
-            Face.triggeredAbilities = PC.triggeredAbilities pc,
-            Face.enchant = PC.enchant pc,
-            Face.castingPermissions = PC.castingPermissions pc,
-            Face.spell = PC.spell pc
-          }
-   in fmap (\face -> maybe face (overlay face) stamped) (Game.faceOfObject gs obj)
+abilityFaceOf oid obj gs
+  | Game.keptFaceDown oid gs = Nothing
+  | otherwise =
+      let stamped =
+            if Maybe.isNothing (Game.copyStampOf obj) && not (Object.flipped obj) && null (GameState.copyEffects gs)
+              then Nothing
+              else copiableSnapshotOf oid gs
+          overlay face pc =
+            face
+              { Face.typeLine = TypeLine.MkTypeLine (PC.supertypes pc) (PC.cardTypes pc) (PC.subtypes pc),
+                Face.keywords = PC.keywords pc,
+                Face.staticAbilities = PC.staticAbilities pc,
+                Face.playerAbilities = PC.playerAbilities pc,
+                Face.specialActions = PC.specialActions pc,
+                Face.activatedAbilities = PC.activatedAbilities pc,
+                Face.replacementEffects = PC.replacementEffects pc,
+                Face.triggeredAbilities = PC.triggeredAbilities pc,
+                Face.enchant = PC.enchant pc,
+                Face.castingPermissions = PC.castingPermissions pc,
+                Face.spell = PC.spell pc
+              }
+       in fmap (\face -> maybe face (overlay face) stamped) (Game.faceOfObject gs obj)
 
 -- `abilityFaceOf` for a caller that holds only the id.
 abilityFaceOfId :: ObjectId -> GameState -> Maybe (Face.Face Card.Type.Card)
@@ -1760,6 +1768,12 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
   -- projection. CR 110.5d keeps this apart from Object.facing, which is CR
   -- 708's face-down PERMANENT and reaches the projection through Game.faceOf.
   Just _ | any Object.exiledFaceDown (Game.lookupObject oid gs) -> noCharacteristics
+  -- CR 121.8: so is a card drawn while a spell is being cast or an ability
+  -- activated, until it becomes cast or activated. Pawl.Engine.Cost's
+  -- discardCandidates reads this seam, which is how the card "can't be used to
+  -- pay any part of the cost ... that would require ... specific
+  -- characteristics", and a "discard a card" it still pays.
+  Just _ | Game.keptFaceDown oid gs -> noCharacteristics
   Just face ->
     -- CR 718.3b's swap sits OUTSIDE the record rather than in four of its fields,
     -- so that CR 718.5's "remain the same" is visible as the default: everything
