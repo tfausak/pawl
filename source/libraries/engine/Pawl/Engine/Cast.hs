@@ -2519,6 +2519,10 @@ playLand offered pid oid mName = do
 -- CR 400.7i / 614.1d: how a land `pid` plays out of exile under the card's own
 -- permission enters (ExilePlayPermission.landEnters); untapped for a land
 -- anywhere else or one that permission does not let `pid` play.
+--
+-- Not implemented: the rider as a CR 614.1d replacement competing with an
+-- "enters untapped" one under CR 616.1; it seeds the move's tap state instead
+-- (#4737).
 exileLandEntry :: PlayerId -> ObjectId -> GameState -> TapState.TapState
 exileLandEntry pid oid gs = case Game.lookupObject oid gs of
   Just obj
