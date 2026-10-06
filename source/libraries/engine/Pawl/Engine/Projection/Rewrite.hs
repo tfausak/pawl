@@ -1022,7 +1022,7 @@ rewriteEffect pairs effect = case effect of
     Effect.ForEach (ForEach.MkForEach (rewriteObjectRef pairs ref) membership slot (fmap (rewriteEffect pairs) body) individually (fmap (rewritePayGate pairs) gate))
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo slot body) ->
     Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo slot (fmap (rewriteEffect pairs) body))
-  Effect.Repeat (Repeat.MkRepeat chooser body) -> Effect.Repeat (Repeat.MkRepeat chooser (fmap (rewriteEffect pairs) body))
+  Effect.Repeat (Repeat.MkRepeat chooser body gate) -> Effect.Repeat (Repeat.MkRepeat chooser (fmap (rewriteEffect pairs) body) (fmap (rewriteCondition pairs) gate))
   Effect.RepeatIf (RepeatIf.MkRepeatIf process condition ifHolds) ->
     Effect.RepeatIf (RepeatIf.MkRepeatIf (fmap (rewriteEffect pairs) process) (rewriteCondition pairs condition) (fmap (rewriteEffect pairs) ifHolds))
   Effect.Heal ref -> Effect.Heal (rewriteObjectRef pairs ref)

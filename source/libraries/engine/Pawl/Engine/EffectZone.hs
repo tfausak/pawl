@@ -334,7 +334,7 @@ zoneFunctionedFrom itself delayed effect = case effect of
   -- card in the pool writes such a body.
   Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom itself delayed) (Foldable.toList body))
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom itself delayed) (Foldable.toList body))
-  Effect.Repeat (Repeat.MkRepeat _ body) -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom itself delayed) (Foldable.toList body))
+  Effect.Repeat (Repeat.MkRepeat _ body _) -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom itself delayed) (Foldable.toList body))
   Effect.RepeatIf (RepeatIf.MkRepeatIf process _ ifHolds) -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom itself delayed) (Foldable.toList (process <> ifHolds)))
   Effect.Heal _ -> Nothing
   Effect.ChooseNewTargets _ -> Nothing
