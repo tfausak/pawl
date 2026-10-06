@@ -1002,7 +1002,8 @@ plusReductions amounts adjustments =
 
 -- CR 601.2f's increases and reductions for a SPELL being cast: the ones CARDS
 -- generate (Pawl.Engine.PlayerEffect, plus the spell's own text through
--- selfReductions below) plus CR 903.8's commander tax. The tax joins the
+-- selfReductions below) plus CR 903.8's commander tax and the increase an exile
+-- permission states (permissionIncrease). The tax joins the
 -- INCREASES rather than the printed mana cost, rule 903.8 wording it "plus {2}
 -- for each previous time", so a reduction still applies afterwards.
 --
@@ -1028,10 +1029,36 @@ spellAdjustments targets pid oid gs =
               CostAdjustments.increases adjustments
                 <> [sum [n | ManaSymbol.Generic n <- ManaCost.unwrap amount] | (CostDirection.More, amount) <- self]
           }
-      commanderTax = Commander.tax pid oid gs
-   in if commanderTax == 0
-        then withSelf
-        else withSelf {CostAdjustments.increases = commanderTax : CostAdjustments.increases withSelf}
+      owed = filter (/= 0) [Commander.tax pid oid gs, permissionIncrease pid oid gs]
+   in withSelf {CostAdjustments.increases = owed <> CostAdjustments.increases withSelf}
+
+-- CR 601.2f: the increase the CR 601.3 permission an exiled `oid` carries puts on
+-- `pid`'s cast of it -- Lightstall Inquisitor's "each spell cast this way costs
+-- {1} more". Zero for a card anywhere else, or one whose permission is not
+-- `pid`'s or not open (Expiry.permissionOpen), candidateCostsGiven's exile arm's
+-- scoping.
+--
+-- Asked of the PRE-MOVE card, Commander.tax's reason: the permission is on the
+-- card in exile and CR 400.7's spell on the stack has none, so this answers the
+-- gate here and Pawl.Engine.Cast.castSpellWith folds it into the candidates
+-- before CR 601.2a's move (raiseCandidate).
+permissionIncrease :: PlayerId -> ObjectId -> GameState -> Natural
+permissionIncrease pid oid gs = case Game.lookupObject oid gs of
+  Just obj
+    | Object.zone obj == Zone.Exile,
+      Just permission <- Object.playableFromExile obj,
+      Expiry.permissionOpen pid permission gs ->
+        ExilePlayPermission.increase permission
+  _ -> 0
+
+-- CR 601.2f: permissionIncrease added to one candidate's mana part,
+-- Commander.taxCandidates' shape and reason. A cost with no mana part stays
+-- unpayable.
+raiseCandidate :: PlayerId -> ObjectId -> GameState -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
+raiseCandidate pid oid gs cost =
+  let owed = permissionIncrease pid oid gs
+      add (ManaCost.MkManaCost symbols) = ManaCost.MkManaCost (symbols <> [ManaSymbol.Generic owed])
+   in if owed == 0 then cost else cost {Cost.mana = fmap add (Cost.mana cost)}
 
 -- CR 601.2f / 113.6d: the reductions a spell's OWN text applies to its
 -- own cost -- the sentence Thrasta, Tempest's Roar prints out, and the one CR

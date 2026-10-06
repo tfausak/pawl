@@ -9,6 +9,7 @@ import qualified Pawl.Codec.ObjectRef as ObjectRef
 import qualified Pawl.Codec.PermissionCost as PermissionCost
 import qualified Pawl.Codec.PermissionVerb as PermissionVerb
 import qualified Pawl.Codec.PlayerRef as PlayerRef
+import qualified Pawl.Codec.TapState as TapState
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
@@ -17,6 +18,7 @@ import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.PermissionVerb as PermissionVerb.Type
 import qualified Pawl.Types.PlayerRef as PlayerRef.Type
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.TapState as TapState.Type
 
 -- | A bare object keyed by the record's field names, with each rider elided when
 -- it is the default -- Pawl.Codec.OfferCast's posture with its CastOffer, and
@@ -34,6 +36,8 @@ codec = Fields.object $ do
   alternativeCost <- Fields.defaulted "alternativeCost" Nothing (Common.maybe PermissionCost.codec) GrantPlayFromExile.alternativeCost
   condition <- Fields.defaulted "condition" Nothing (Common.maybe Condition.codec) GrantPlayFromExile.condition
   verb <- Fields.defaulted "verb" PermissionVerb.Type.Play PermissionVerb.codec GrantPlayFromExile.verb
+  increase <- Fields.defaulted "increase" 0 Common.natural GrantPlayFromExile.increase
+  landEnters <- Fields.defaulted "landEnters" TapState.Type.Untapped TapState.codec GrantPlayFromExile.landEnters
   pure
     GrantPlayFromExile.MkGrantPlayFromExile
       { GrantPlayFromExile.duration = duration,
@@ -42,5 +46,7 @@ codec = Fields.object $ do
         GrantPlayFromExile.spending = spending,
         GrantPlayFromExile.alternativeCost = alternativeCost,
         GrantPlayFromExile.condition = condition,
-        GrantPlayFromExile.verb = verb
+        GrantPlayFromExile.verb = verb,
+        GrantPlayFromExile.increase = increase,
+        GrantPlayFromExile.landEnters = landEnters
       }

@@ -102,6 +102,7 @@ import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.Splice as Splice
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.Uses as Uses
@@ -2301,7 +2302,11 @@ castSpellWith perform timed offered applied widened pid oid name facing = Event.
           -- {2} folded in here and {2} added as an increase reach the same total
           -- -- and a cost reduction still applies to it, which is what rule
           -- 601.2f's order says and what Commander decks expect.
-          taxed = Commander.taxCandidates pid oid before
+          --
+          -- CR 601.2f's increase an exile permission states rides along for the
+          -- same reason (Cost.raiseCandidate): the permission is on the card in
+          -- exile, and `sid` has none.
+          taxed = Commander.taxCandidates pid oid before . Cost.raiseCandidate pid oid before
           -- CR 601.2b's candidates, each still carrying the keyword ability
           -- that offered it (Cost.candidateCostsFor). The tag is what CR
           -- 702.34a's "if the flashback cost was paid" is asked of once the
@@ -2464,10 +2469,10 @@ landDropOpen pid gs =
 -- first and enters with it up. NOT changeZoneEntering, where CR 712.14b turns a
 -- put-onto-the-battlefield instruction away: playing a land is a special action.
 --
--- Not implemented: CR 400.7i for an exile permission, the land half of the
--- sentence followIntoSpell keeps for spells (CR 400.7h) -- the rest of that
--- effect cannot find the permanent the land card became, so a rider on it has
--- nothing to attach to (gap #2398). A player permission's rider is `riders`
+-- CR 400.7i / 614.1d: a land played under an exile permission (rather than
+-- under a player permission, or under the instruction of `offered`) enters as
+-- that permission's `landEnters` says -- Lightstall Inquisitor's "each land
+-- played this way enters tapped". A player permission's rider is `riders`
 -- below.
 playLand :: Bool -> PlayerId -> ObjectId -> Maybe CardName.CardName -> Game ()
 playLand offered pid oid mName = do
@@ -2489,13 +2494,14 @@ playLand offered pid oid mName = do
       then pure Nothing
       else choosePlayPermission pid oid (PlayerEffect.landPermissionOptions (\src -> not (null (Event.permissionRiders src before oid))) pid oid before)
   let riders played = foldMap (\(src, _) -> Event.permissionRiders src before played) permission
+      entering = if Maybe.isNothing permission && not offered then exileLandEntry pid oid before else TapState.Untapped
   -- CR 110.2 / 305.1: the permanent enters under the player who PLAYED it, which
   -- is not the card's owner once a permission opens somebody else's hand (Sen
   -- Triplets); see #2169.
   -- CR 614.1a: a land an EntryRewrite.SacrificeToEnter turns into the graveyard
   -- was still played, so it spends the permission as a land that arrived does.
   State.modify' (\g -> g {GameState.refusedEntries = Just Set.empty})
-  moved <- Event.changeZoneShowing (Just pid) oid Zone.Battlefield mName
+  moved <- Event.changeZoneShowing (Just pid) oid Zone.Battlefield mName entering
   refused <- State.gets (maybe False (Set.member oid) . GameState.refusedEntries)
   State.modify' (\g -> g {GameState.refusedEntries = Nothing})
   Monad.unless (Seq.null moved && not refused) $ do
@@ -2509,6 +2515,22 @@ playLand offered pid oid mName = do
   -- flagging. CR 305.4: the only tally, an effect that PUTS a land onto the
   -- battlefield not being one.
   State.modify' (\g -> g {GameState.landsPlayed = Map.insertWith (+) pid 1 (GameState.landsPlayed g)})
+
+-- CR 400.7i / 614.1d: how a land `pid` plays out of exile under the card's own
+-- permission enters (ExilePlayPermission.landEnters); untapped for a land
+-- anywhere else or one that permission does not let `pid` play.
+--
+-- Not implemented: the rider as a CR 614.1d replacement competing with an
+-- "enters untapped" one under CR 616.1; it seeds the move's tap state instead
+-- (#4737).
+exileLandEntry :: PlayerId -> ObjectId -> GameState -> TapState.TapState
+exileLandEntry pid oid gs = case Game.lookupObject oid gs of
+  Just obj
+    | Object.zone obj == Zone.Exile,
+      permitsLandPlayFromExile pid oid gs,
+      Just permission <- Object.playableFromExile obj ->
+        ExilePlayPermission.landEnters permission
+  _ -> TapState.Untapped
 
 -- CR 601.3: PlayerEffect.castPermissionOptions for a cast of `oid` out of
 -- `zone`, open without a grant where the exiled card carries a permission of
