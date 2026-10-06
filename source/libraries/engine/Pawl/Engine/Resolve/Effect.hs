@@ -364,6 +364,7 @@ import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.SpellWasCopied as SpellWasCopied
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
+import qualified Pawl.Types.StoredResult as StoredResult
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TapState as TapState
@@ -3454,6 +3455,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.ExileHandThenDraw {} -> False
   Effect.Proliferate {} -> False
   Effect.Reroll -> False
+  Effect.RerollStoredResults _ -> False
   Effect.ChooseCardName {} -> False
   Effect.Bolster {} -> False
   Effect.Amass {} -> False
@@ -4604,11 +4606,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         rollers = filter (\pid -> Game.inRangeOf controller pid before && PlayerEffect.inScope pid controller before (RollDie.roller rollDie)) (Game.apnapOrder before)
     rolled <- Monad.forM rollers $ \roller -> do
       (results, throwers) <- throwDice runSubgame roller sides named perDie
-      used <- case RollDie.reading rollDie of
+      used <- case (RollDie.store rollDie, RollDie.reading rollDie) of
+        -- CR 706.8a: a storing instruction keeps every result rather than
+        -- using one, so CR 706.4's reading is never asked.
+        (Just _, _) -> pure Nothing
         -- CR 706.4's total: every result read at once, so there is nothing to
         -- choose, and the total of no dice is zero rather than unbound.
-        DiceReading.Total -> pure (Just (sum results))
-        DiceReading.ChooseOne -> Monad.forM (NonEmpty.nonEmpty results) $ \offered -> do
+        (Nothing, DiceReading.Total) -> pure (Just (sum results))
+        (Nothing, DiceReading.ChooseOne) -> Monad.forM (NonEmpty.nonEmpty results) $ \offered -> do
           gs <- State.get
           -- CR 706.4: WHICH result the instruction uses, where it threw more
           -- than one ("roll two d6 and choose one result"). A choice and not a
@@ -4644,6 +4649,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         State.modify' (bindPlayerSlot resolving slot (Set.fromList [roller | (roller, Just m, _, _) <- rolled, m == n]))
     Foldable.for_ rolled $ \(roller, _, throwers, results) ->
       Monad.unless (null results) (recordRoll roller throwers results)
+    -- CR 706.8a: every kept result, noted with its kind of die, on the slot's
+    -- permanent.
+    Foldable.for_ (RollDie.store rollDie >>= \slot -> legalOne slot legal >>= Recipient.objectOf) $ \target ->
+      State.modify' (storeOn target sides (foldMap (\(_, _, _, results) -> results) rolled))
   -- CR 706.2b's reroll, thrown by the ability Goblin Bookie activates inside
   -- throwDice's window: the same die, the new face filtered back to
   -- CR 706.1a's range, and handed back through GameState.rerolledTo. No window
@@ -4659,6 +4668,27 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       let face = if again >= 1 && again <= dieSides then again else 1
       State.modify' (\g -> g {GameState.rerolledTo = Just face})
       State.modify' (Event.recordEvent (GameEvent.DiceRolled controller))
+  -- CR 706.8b: the controller chooses which of the slot's stored results to
+  -- reroll, rolls one die of each noted kind per result through throwDice --
+  -- so CR 706.2's modifiers and CR 614.1a's replacements reach it, and each
+  -- kind's throw records CR 706.1's event -- and the new results replace the
+  -- old.
+  Effect.RerollStoredResults slot -> Foldable.for_ (legalOne slot legal >>= Recipient.objectOf) $ \target -> do
+    gs <- State.get
+    let stored = foldMap Object.storedResults (Game.lookupObject target gs)
+    Monad.unless (Map.null stored) $ do
+      answer <- Game.choose (Prompt.ChooseStoredRerolls (Decide.deciderFor controller gs) controller target stored)
+      -- FILTERED, NOT TRUSTED: each count clamped to what the object holds.
+      let rerolled = Map.filter (> 0) (Map.intersectionWith min answer stored)
+          kinds = Map.fromListWith (+) [(StoredResult.sides result, n) | (result, n) <- Map.toList rerolled]
+      thrown <- Monad.forM (Map.toList kinds) $ \(dieSides, n) -> do
+        (results, throwers) <- throwDice runSubgame controller dieSides n (pure 0)
+        Monad.unless (null results) (recordRoll controller throwers results)
+        pure (dieSides, results)
+      -- Swapped only once every die is up, in the rule's order.
+      let unstore o = o {Object.storedResults = Map.differenceWith (\have gone -> if have > gone then Just (have - gone) else Nothing) (Object.storedResults o) rerolled}
+      State.modify' (\g -> g {GameState.objects = Map.adjust unstore target (GameState.objects g)})
+      Foldable.for_ thrown $ \(dieSides, results) -> State.modify' (storeOn target dieSides results)
   -- CR 705.1's flip, in RollDie's holder and for its reason: bindAmountSlot's
   -- `source` is the resolving object, and on a SPELL -- which Winter Sky is --
   -- `source` and `resolving` are the same object, so the ambiguity the arm above
@@ -7461,6 +7491,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       -- CR 701.37c's X rides the designation, so it is zeroed
                       -- with it -- `designations` above, same sentence.
                       Object.designationValues = Map.empty,
+                      Object.storedResults = Map.empty,
                       -- CR 707.10 copies the alternative cost, but a copy isn't
                       -- CAST, so it keeps evoke's record and not escape's.
                       Object.castUsing = Keyword.copiedCastUsing (Object.castUsing obj),
@@ -10496,6 +10527,19 @@ performHandAction runSubgame source player =
 -- `perDie` is the instruction's own modifier (CR 706.2). Shared by
 -- Effect.RollDie's arm and CR 701.52a's roll to visit, which records nothing
 -- here: each caller records its own events.
+-- | CR 706.8a: note each of these results of a die of `sides` on `target` as
+-- a stored result. Only a PERMANENT holds stored results, so an object no
+-- longer on the battlefield is left alone.
+storeOn :: ObjectId -> Natural -> [Natural] -> GameState -> GameState
+storeOn target sides results gs =
+  let noted :: Map.Map StoredResult.StoredResult Natural
+      noted = Map.fromListWith (+) [(StoredResult.MkStoredResult {StoredResult.sides = sides, StoredResult.value = result}, 1) | result <- results]
+      store o =
+        if Object.zone o == Zone.Battlefield
+          then o {Object.storedResults = Map.unionWith (+) noted (Object.storedResults o)}
+          else o
+   in gs {GameState.objects = Map.adjust store target (GameState.objects gs)}
+
 -- | CR 706.1's roll, as the log records it once throwDice's results are
 -- settled.
 recordRoll :: PlayerId -> [PlayerId] -> [Natural] -> Game ()

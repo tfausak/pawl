@@ -557,6 +557,7 @@ rewriteEffect pairs effect = case effect of
   Effect.ExileAllGraveyards -> effect
   Effect.Proliferate -> effect
   Effect.Reroll -> effect
+  Effect.RerollStoredResults _ -> effect
   -- CR 612.1: rule 201.4a's restriction is printed card text, so a text-changer
   -- rewrites it exactly as it rewrites a search's filter above.
   Effect.ChooseCardName (ChooseCardName.MkChooseCardName ref restriction) -> Effect.ChooseCardName (ChooseCardName.MkChooseCardName ref (Filter.rewrite pairs restriction))
@@ -2118,6 +2119,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.IsActivePlayer _ -> quantity
   Quantity.Type.HasDesignation _ -> quantity
   Quantity.Type.DesignationValue _ -> quantity
+  Quantity.Type.StoredResultsOfSameValue -> quantity
   Quantity.Type.ClassLevel -> quantity
   Quantity.Type.WasKicked -> quantity
   Quantity.Type.WasForetold -> quantity

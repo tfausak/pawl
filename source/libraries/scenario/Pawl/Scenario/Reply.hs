@@ -33,6 +33,7 @@ import qualified Pawl.Codec.PrintingId as Codec.PrintingId
 import qualified Pawl.Codec.Reference as Codec.Reference
 import qualified Pawl.Codec.Reply as Codec.Reply
 import qualified Pawl.Codec.SlotName as Codec.SlotName
+import qualified Pawl.Codec.StoredResult as Codec.StoredResult
 import qualified Pawl.Codec.Subtype as Codec.Subtype
 import qualified Pawl.Codec.Zone as Codec.Zone
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -320,6 +321,7 @@ shapeOf prompt = case prompt of
   Prompt.ChooseVoteWord {} -> viaCodec Codec.SlotName.codec
   Prompt.ChooseMovedCounter {} -> counterKind
   Prompt.ChooseMovedCounters {} -> mapOf counterKind natural
+  Prompt.ChooseStoredRerolls {} -> mapOf (viaCodec Codec.StoredResult.codec) natural
   Prompt.ChooseMovedCountersAtLeastOne {} -> mapOf counterKind natural
   Prompt.ChooseDistributedMovedCounters {} -> mapOf object (mapOf counterKind natural)
   Prompt.ChooseMovedCounterOrNone {} -> maybeOf counterKind

@@ -374,6 +374,7 @@ objectWith before entry closed = do
   unlockedHalves <- field Object.unlockedHalves
   designations <- field Object.designations
   designationValues <- field Object.designationValues
+  storedResults <- field Object.storedResults
   paidCosts <- field Object.paidCosts
   tributePaid <- field Object.tributePaid
   bestowed <- field Object.bestowed
@@ -434,6 +435,7 @@ objectWith before entry closed = do
         Object.unlockedHalves = unlockedHalves,
         Object.designations = designations,
         Object.designationValues = designationValues,
+        Object.storedResults = storedResults,
         Object.paidCosts = paidCosts,
         Object.tributePaid = tributePaid,
         Object.bestowed = bestowed,

@@ -374,6 +374,7 @@ dirtied pid object =
       Object.unlockedHalves = Set.singleton RoomHalf.RightHalf,
       Object.designations = Set.singleton Designation.Renowned,
       Object.designationValues = Map.empty,
+      Object.storedResults = Map.empty,
       Object.detainedUntil = Set.singleton pid,
       Object.goadedBy = Set.empty,
       Object.doesNotUntapFor = 3,

@@ -47,6 +47,7 @@ import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Splice as Splice
+import qualified Pawl.Types.StoredResult as StoredResult
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.Suspend as Suspend
@@ -641,6 +642,11 @@ data View = MkView
     -- membership and the value are asked by different atoms, and only
     -- "monstrosity X" sets one at all.
     designationValues :: Map.Map Designation.Designation Natural.Natural,
+    -- CR 706.8a: the die results stored on this candidate, read straight off
+    -- Object.storedResults and empty where there is no object to read it off,
+    -- `designationValues` above's route. Its one reader is Pawl.Engine.Quantity's
+    -- StoredResultsOfSameValue arm (Centaur of Attention).
+    storedResults :: Map.Map StoredResult.StoredResult Natural.Natural,
     -- CR 716.2b: the level designation on this candidate, or Nothing for the
     -- overwhelming majority of permanents, which have never been given one. Read
     -- straight off Object.classLevel, for `designations` above's reason -- rule
@@ -937,6 +943,7 @@ playerView pid =
       -- CR 701.37c's X belongs to a mark a player cannot have -- `designations`
       -- above, same sentence.
       designationValues = Map.empty,
+      storedResults = Map.empty,
       -- CR 716.2b: a level is a designation A PERMANENT can have, and a player is
       -- not one -- `designations` above, same sentence.
       classLevel = Nothing,

@@ -45,6 +45,7 @@ import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.StoredResult as StoredResult
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
@@ -101,6 +102,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.unlockedHalves = Set.empty,
           Object.designations = Set.empty,
           Object.designationValues = Map.empty,
+          Object.storedResults = Map.empty,
           Object.paidCosts = Map.empty,
           Object.tributePaid = False,
           Object.bestowed = False,
@@ -208,6 +210,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.unlockedHalves = Set.singleton RoomHalf.LeftHalf,
           Object.designations = Set.singleton Designation.Renowned,
           Object.designationValues = Map.singleton Designation.Monstrous 26,
+          Object.storedResults = Map.singleton StoredResult.MkStoredResult {StoredResult.sides = 6, StoredResult.value = 4} 2,
           Object.paidCosts =
             Map.singleton
               (Keyword.Squad Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 24]), Cost.components = []})
@@ -268,6 +271,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"ventureRoom\":18,\"classLevel\":2,\"unlockedHalves\":[{\"type\":\"LeftHalf\"}]"
           <> ",\"designations\":[{\"type\":\"Renowned\"}]"
           <> ",\"designationValues\":[{\"designation\":{\"type\":\"Monstrous\"},\"value\":26}]"
+          <> ",\"storedResults\":[{\"key\":{\"sides\":6,\"value\":4},\"value\":2}]"
           <> ",\"paidCosts\":[{\"key\":{\"type\":\"Squad\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":24}]}},\"value\":25}]"
           <> ",\"tributePaid\":true"
           <> ",\"bestowed\":true"
