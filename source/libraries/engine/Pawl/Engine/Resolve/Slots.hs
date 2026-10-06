@@ -1841,12 +1841,10 @@ overRelations f re = case re of
 -- program must answer here rather than have its reads go undeclared. The two
 -- rewrite types are asked through exhaustive helpers below for the same reason.
 --
--- NO BOARD OBSERVES IT: the pool's one nested program is Kill-Suit Cultist's
--- destruction of a slot, and the DamageR pattern beside it names that same slot
--- (Filter.IsBound), so the capture already carries it and neutralizing this
--- answer leaves the suite green. A regression fence rather than a proven
--- behaviour; what would prove it is a card whose nested effect reads a slot its
--- row's pattern does not name (#1962).
+-- Proved by Synthetic Proxy Strike's scenario under data/scenarios/
+-- damage-replacement/, whose nested Destroy reads a slot its DamageR pattern
+-- does not name: dropping this answer leaves that slot unannounced at cast (CR
+-- 601.2c) and uncaptured at install (CR 609.7a).
 replacementRowEffects :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 replacementRowEffects re = case re of
   ReplacementEffect.EntryR (EntryR.MkEntryR _ rewrite) -> entryRewriteEffects rewrite

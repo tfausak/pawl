@@ -1484,11 +1484,11 @@ rewriteReplacementEffect pairs effect = case effect of
 --
 -- NO BOARD OBSERVES IT: the pool's one printed destination is
 -- Filter.IsHostOfSource (Pariah), which names no subtype for CR 612.1 to swap,
--- and the pool's one nested program is Kill-Suit Cultist's destruction of a
--- slot, which names none either -- so mutating either arm away leaves the suite
--- green. Both are the rule rather than a proven behaviour: a card redirecting to
--- "the enchanted Goblin" would prove the first. Exhaustive rather than a
--- wildcard, rewriteReplacementEffect's posture.
+-- and the pool's nested programs (Kill-Suit Cultist, Synthetic Proxy Strike)
+-- destroy a slot, which names none either -- so mutating either arm away
+-- leaves the suite green. Both are the rule rather than a proven behaviour: a
+-- card redirecting to "the enchanted Goblin" would prove the first. Exhaustive
+-- rather than a wildcard, rewriteReplacementEffect's posture.
 rewriteDamageRewrite :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> DamageRewrite.DamageRewrite (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> DamageRewrite.DamageRewrite (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
 rewriteDamageRewrite pairs rewrite = case rewrite of
   DamageRewrite.RedirectMatching f -> DamageRewrite.RedirectMatching (Filter.rewrite pairs f)
