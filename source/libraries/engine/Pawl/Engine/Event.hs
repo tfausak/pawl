@@ -4583,7 +4583,8 @@ runEntry given oid = do
     Just _ -> if hosted then Nothing else Just EntryRefusal.Unhosted
 
 -- CR 303.4f for an object that is an Aura only once its entry loop has run --
--- Copy Enchantment entering as a copy of Unholy Strength (CR 707.5, 614.12a).
+-- Copy Enchantment entering as a copy of Unholy Strength (CR 707.5, 614.12a) --
+-- or only once it is placed, under CR 611.2e's entry rider (Bronzehide Lion).
 -- changeZoneAttaching's gate asks the same question BEFORE the move, of an
 -- object that is already an Aura; this one asks it of whatever entered
 -- unattached and is an Aura now, so a seeded Aura and one that gate already
@@ -5494,15 +5495,17 @@ changeZone oid requestedDest = Monad.void (changeZoneReturning oid requestedDest
 -- choose among, and running the entry loop first would fire CR 614.1c's
 -- as-enters abilities for a card that never enters.
 changeZoneEntering :: ObjectId -> Zone -> LibraryPosition.LibraryPosition -> EntryRiders.EntryRiders Natural (GrantedAbility.Type.GrantedAbility Card.Type.Card) -> Maybe PlayerId -> Game (Seq.Seq ObjectId)
-changeZoneEntering = changeZoneEnteringIn Nothing Set.empty
+changeZoneEntering oid = changeZoneEnteringIn Nothing Set.empty oid oid
 
 -- changeZoneEntering for ONE MEMBER of a CR 608.2f batch: `asOf` and `batch` are
 -- applyReplacementsIn's, and Pawl.Engine.Resolve's Effect.MoveToZone arm is the
 -- only caller that supplies either. A separate door rather than two more
 -- parameters on changeZoneEntering, changeZoneInBatch's shape one door over: the
--- lone moves have no batch to name.
-changeZoneEnteringIn :: Maybe GameState -> Set ObjectId -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> EntryRiders.EntryRiders Natural (GrantedAbility.Type.GrantedAbility Card.Type.Card) -> Maybe PlayerId -> Game (Seq.Seq ObjectId)
-changeZoneEnteringIn asOf batch oid requestedDest position riders under = do
+-- lone moves have no batch to name. `source` is the instructing effect's, the
+-- source of the CR 611.2e effects the riders' `characteristics` create; the lone
+-- doors' riders are built by rules and carry none, so they pass the moving object.
+changeZoneEnteringIn :: Maybe GameState -> Set ObjectId -> ObjectId -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> EntryRiders.EntryRiders Natural (GrantedAbility.Type.GrantedAbility Card.Type.Card) -> Maybe PlayerId -> Game (Seq.Seq ObjectId)
+changeZoneEnteringIn asOf batch source oid requestedDest position riders under = do
   -- CR 614.12b: this member is moving now, so it no longer owes anything to an
   -- earlier member's choice (see amongPending).
   State.modify' (\g -> g {GameState.enteringPending = Map.delete oid (GameState.enteringPending g)})
@@ -5571,7 +5574,7 @@ changeZoneEnteringIn asOf batch oid requestedDest position riders under = do
   if refused
     then pure Seq.empty
     else do
-      entered <- changeZoneAttaching asOf batch oid requestedDest position Nothing (EntryRiders.tapped riders) (EntryRiders.counters riders) under2 shown facing (EntryRiders.exiledFaceDown riders) CarryOver.NotCarried False
+      entered <- changeZoneAttaching asOf batch oid requestedDest position Nothing (EntryRiders.tapped riders) (EntryRiders.counters riders) under2 shown facing (EntryRiders.exiledFaceDown riders) CarryOver.NotCarried False (fmap ((,) source) (EntryRiders.characteristics riders))
       Monad.forM_ noted $ \printingId ->
         State.modify' $ \g -> g {GameState.notedCards = foldr (`Map.insert` printingId) (GameState.notedCards g) entered}
       pure entered
@@ -5615,7 +5618,7 @@ changeZoneEnteringIn asOf batch oid requestedDest position riders under = do
 -- pass would have handed bob the permanent; see #2169. Identical wherever the two
 -- seats coincide, which is every other land play.
 changeZoneShowing :: Maybe PlayerId -> ObjectId -> Zone -> Maybe CardName.CardName -> Game (Seq.Seq ObjectId)
-changeZoneShowing under oid requestedDest shown = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty under shown Facing.FaceUp False CarryOver.NotCarried False
+changeZoneShowing under oid requestedDest shown = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty under shown Facing.FaceUp False CarryOver.NotCarried False Seq.empty
 
 -- changeZoneShowing for a move that puts the object into its destination FACE
 -- DOWN -- the CR 110.5b "unless a spell or ability says otherwise" that morph is.
@@ -5641,7 +5644,7 @@ changeZoneShowing under oid requestedDest shown = changeZoneAttaching Nothing Se
 -- than being stored. Turning the permanent face up is what makes it observable
 -- again (CR 708.8).
 changeZoneFaceDown :: ObjectId -> Zone -> Maybe CardName.CardName -> Game (Seq.Seq ObjectId)
-changeZoneFaceDown oid requestedDest shown = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing shown (Facing.faceDown FaceDownReason.Morphed) False CarryOver.NotCarried False
+changeZoneFaceDown oid requestedDest shown = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing shown (Facing.faceDown FaceDownReason.Morphed) False CarryOver.NotCarried False Seq.empty
 
 -- CR 601.2a's move: the card goes onto the stack and "that player becomes its
 -- controller". The caster is carried BY THE MOVE, for the reason CR 709.3a
@@ -5667,7 +5670,7 @@ changeZoneCasting caster oid requestedDest shown facing = do
   gs <- State.get
   if Set.member oid (GameState.outsideCopies gs)
     then castFromOutside caster oid requestedDest shown facing
-    else changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty (Just caster) shown facing False CarryOver.NotCarried False
+    else changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty (Just caster) shown facing False CarryOver.NotCarried False Seq.empty
 
 -- CR 601.2a from outside the game (CR 400.11): "moves that copy of a card from
 -- where it is to the stack". The CR 614 loop runs, since a replacement keyed on
@@ -5727,7 +5730,7 @@ changeZoneInBatch asOf oid requestedDest = Monad.void (changeZoneInBatchReturnin
 -- search's and a surveil's batches (Resolve.Effect.putFound, applySurveil) for
 -- the cards they moved.
 changeZoneInBatchReturning :: GameState -> ObjectId -> Zone -> Game (Seq.Seq ObjectId)
-changeZoneInBatchReturning asOf oid requestedDest = changeZoneAttaching (Just asOf) Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried False
+changeZoneInBatchReturning asOf oid requestedDest = changeZoneAttaching (Just asOf) Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried False Seq.empty
 
 -- CR 608.2f / 610.3d: move every member of `moves` under the rules' defaults as
 -- ONE event, answering each member's CR 400.7 ids in order. The batch door for a
@@ -5745,7 +5748,7 @@ changeZonesTogether moves = simultaneously . together $ do
   let entering = [oid | (oid, Zone.Battlefield) <- moves]
       step (sofar, acc) (oid, dest) = do
         State.modify' (\g -> g {GameState.enteringPending = Map.delete oid (GameState.enteringPending g)})
-        new <- changeZoneAttaching (Just before) sofar oid dest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried False
+        new <- changeZoneAttaching (Just before) sofar oid dest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried False Seq.empty
         pure (foldr Set.insert sofar new, new : acc)
   fmap (reverse . snd) (amongPending Nothing entering (Monad.foldM step (Set.empty, []) moves))
 
@@ -5798,7 +5801,7 @@ millFromReturningTaken pid n
           pure (cards, arrived)
 
 changeZoneReturning :: ObjectId -> Zone -> Game (Seq.Seq ObjectId)
-changeZoneReturning oid requestedDest = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried False
+changeZoneReturning oid requestedDest = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried False Seq.empty
 
 -- changeZoneReturning for CR 608.2n's own move, "as the final part of an instant
 -- or sorcery spell's resolution". The ONE door that stamps
@@ -5809,7 +5812,7 @@ changeZoneReturning oid requestedDest = changeZoneAttaching Nothing Set.empty oi
 -- A separate door rather than a parameter on changeZoneReturning, for the reason
 -- changeZoneInBatch is one: the caller is Pawl.Engine.Resolve.finishSpell alone.
 changeZoneResolvingReturning :: ObjectId -> Zone -> Game (Seq.Seq ObjectId)
-changeZoneResolvingReturning oid requestedDest = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried True
+changeZoneResolvingReturning oid requestedDest = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried True Seq.empty
 
 -- changeZoneReturning with an attachment seed. Per CR 303.4 attachment is a
 -- property of entering, not a step after it: the CR 614.1c entry replacement loop
@@ -5868,11 +5871,30 @@ changeZoneResolvingReturning oid requestedDest = changeZoneAttaching Nothing Set
 -- `discarded` is CR 701.9a's cause, Nothing for every door but
 -- discardReturning; it rides the proposed event so a redirect watching a
 -- discard (ZoneChangePattern.whenDiscarded) sees it.
-changeZoneAttaching :: Maybe GameState -> Set ObjectId -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> Maybe Recipient.Recipient -> TapState.TapState -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> Maybe PlayerId -> Maybe CardName.CardName -> Facing.Facing -> Bool -> CarryOver.CarryOver -> Bool -> Game (Seq.Seq ObjectId)
+--
+-- `defining` is CR 611.2e's effects, each with its source: empty for every
+-- door but changeZoneEntering, and stored only on a battlefield arrival.
+changeZoneAttaching :: Maybe GameState -> Set ObjectId -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> Maybe Recipient.Recipient -> TapState.TapState -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> Maybe PlayerId -> Maybe CardName.CardName -> Facing.Facing -> Bool -> CarryOver.CarryOver -> Bool -> Seq.Seq (ObjectId, Modification.Modification (GrantedAbility.Type.GrantedAbility Card.Type.Card)) -> Game (Seq.Seq ObjectId)
 changeZoneAttaching = changeZoneWithCause Nothing
 
-changeZoneWithCause :: Maybe DiscardCause.DiscardCause -> Maybe GameState -> Set ObjectId -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> Maybe Recipient.Recipient -> TapState.TapState -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> Maybe PlayerId -> Maybe CardName.CardName -> Facing.Facing -> Bool -> CarryOver.CarryOver -> Bool -> Game (Seq.Seq ObjectId)
-changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition seed tapped entering under shown facing concealed carrying resolving = do
+-- CR 611.2e: one of the instruction's "is" effects over the permanent just
+-- placed, stored as a resolution's continuous effect would be (CR 611.2a's
+-- indefinite duration, CR 613.7b's fresh timestamp).
+storeEntryEffect :: ObjectId -> GameState -> (ObjectId, Modification.Modification (GrantedAbility.Type.GrantedAbility Card.Type.Card)) -> GameState
+storeEntryEffect entered gs (source, modification) =
+  let (ts, gs1) = Game.freshTimestamp gs
+      effect =
+        ContinuousEffect.MkContinuousEffect
+          { ContinuousEffect.source = source,
+            ContinuousEffect.timestamp = ts,
+            ContinuousEffect.expiry = Expiry.Type.Never,
+            ContinuousEffect.modification = modification,
+            ContinuousEffect.affected = Affected.TheseObjects (Set.singleton entered)
+          }
+   in gs1 {GameState.continuousEffects = effect : GameState.continuousEffects gs1}
+
+changeZoneWithCause :: Maybe DiscardCause.DiscardCause -> Maybe GameState -> Set ObjectId -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> Maybe Recipient.Recipient -> TapState.TapState -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> Maybe PlayerId -> Maybe CardName.CardName -> Facing.Facing -> Bool -> CarryOver.CarryOver -> Bool -> Seq.Seq (ObjectId, Modification.Modification (GrantedAbility.Type.GrantedAbility Card.Type.Card)) -> Game (Seq.Seq ObjectId)
+changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition seed tapped entering under shown facing concealed carrying resolving defining = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure Seq.empty
@@ -6395,8 +6417,9 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
           -- Pawl.Engine.Card.isAura reads, and the two now differ: Cloudform GRANTS
           -- itself the Aura subtype (Modification.AddSubtype) and the enchant
           -- ability that goes with it (Modification.GainEnchant). Unobserved here
-          -- all the same -- Cloudform grants both while already on the battlefield,
-          -- so no board in this pool has a granted Aura ENTERING one.
+          -- all the same: Cloudform grants both while already on the battlefield,
+          -- and an Aura made by CR 611.2e's entry rider (Bronzehide Lion) is not
+          -- one on this pre-move board, so seatEnteringAura seats it instead.
           --
           -- `entryFacing` and not the projection is what answers CR 708.2a, and the
           -- distinction matters: the projection sees the object in the zone it is
@@ -6721,6 +6744,14 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                     -- third, via Projection.counterGathered (CR 614.12); none of the
                     -- three is fed by an entering permanent's own pending counters
                     -- today.
+                    -- CR 611.2e: the instruction's "is" effects apply simultaneously
+                    -- with entering, so they are stored before the CR 614.1c entry
+                    -- loop, the counters and the Moved event, each later than the
+                    -- permanent's own timestamp (CR 613.7n). An Aura they make is
+                    -- seated by seatEnteringAura (CR 303.4f, 303.4g), and a refusal
+                    -- rolls them back with the move. The Bronzehide Lion scenarios
+                    -- under data/scenarios/aura prove it.
+                    State.modify' (\g -> List.foldl' (storeEntryEffect newId) g defining)
                     Monad.mapM_ (uncurry (addEnteringCounters newId)) (Map.toAscList entering)
                     refusal <- runEntry batch newId
                     case refusal of
@@ -8798,7 +8829,7 @@ discardReturning cause pid oid = do
   -- READ BEFORE THE MOVE: CR 400.7 deletes this incarnation, so the hand card's
   -- own keywords are unreadable by the time the funnel returns.
   let madness = Keyword.madnessCosts (Projection.handMintingKeywordsOf oid before)
-  moved <- changeZoneWithCause (Just cause) Nothing Set.empty oid Zone.Graveyard LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried False
+  moved <- changeZoneWithCause (Just cause) Nothing Set.empty oid Zone.Graveyard LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried False Seq.empty
   after <- State.get
   -- CR 702.35a's "exiled THIS WAY": which redirect the CR 616.1 loop applied,
   -- not where the card wound up. GameState.exiledWith is the funnel's own record

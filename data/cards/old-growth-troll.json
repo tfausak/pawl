@@ -1,0 +1,317 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Trample"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Old-Growth Troll",
+      "oracleText": "Trample\nWhen Old-Growth Troll dies, if it was a creature, return it to the battlefield. It's an Aura enchantment with enchant Forest you control and \"Enchanted Forest has '{T}: Add {G}{G}' and '{1}, {T}, Sacrifice this land: Create a tapped 4/4 green Troll Warrior creature token with trample.'\"",
+      "power": {
+        "type": "Literal",
+        "value": 4
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 4
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "PermanentDies",
+            "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "IsSource"
+                },
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Creature"
+                  }
+                }
+              ]
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "MoveToZone",
+                        "value": {
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "became"
+                          },
+                          "riders": {
+                            "characteristics": [
+                              {
+                                "type": "SetCardType",
+                                "value": {
+                                  "type": "Enchantment"
+                                }
+                              },
+                              {
+                                "type": "AddSubtype",
+                                "value": {
+                                  "type": "Aura"
+                                }
+                              },
+                              {
+                                "type": "GainEnchant",
+                                "value": {
+                                  "filter": {
+                                    "type": "And",
+                                    "value": [
+                                      {
+                                        "type": "HasSubtype",
+                                        "value": {
+                                          "type": "Forest"
+                                        }
+                                      },
+                                      {
+                                        "type": "ControlledBy",
+                                        "value": {
+                                          "type": "You"
+                                        }
+                                      }
+                                    ]
+                                  },
+                                  "pool": {
+                                    "type": "Permanents"
+                                  }
+                                }
+                              },
+                              {
+                                "type": "GainAbility",
+                                "value": {
+                                  "type": "Static",
+                                  "value": {
+                                    "affected": {
+                                      "type": "Matching",
+                                      "value": {
+                                        "type": "And",
+                                        "value": [
+                                          {
+                                            "type": "HasSubtype",
+                                            "value": {
+                                              "type": "Forest"
+                                            }
+                                          },
+                                          {
+                                            "type": "HasAttached",
+                                            "value": {
+                                              "type": "IsSource"
+                                            }
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "modifications": [
+                                      {
+                                        "type": "GainAbility",
+                                        "value": {
+                                          "type": "Activated",
+                                          "value": {
+                                            "cost": {
+                                              "components": [
+                                                {
+                                                  "type": "TapThis"
+                                                }
+                                              ],
+                                              "mana": []
+                                            },
+                                            "modal": {
+                                              "modes": [
+                                                {
+                                                  "clauses": [
+                                                    {
+                                                      "effects": [
+                                                        {
+                                                          "type": "AddMana",
+                                                          "value": {
+                                                            "count": {
+                                                              "type": "Literal",
+                                                              "value": 2
+                                                            },
+                                                            "production": {
+                                                              "type": "OfType",
+                                                              "value": {
+                                                                "type": "Colored",
+                                                                "value": {
+                                                                  "type": "Green"
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+                                                      ]
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          }
+                                        }
+                                      },
+                                      {
+                                        "type": "GainAbility",
+                                        "value": {
+                                          "type": "Activated",
+                                          "value": {
+                                            "cost": {
+                                              "components": [
+                                                {
+                                                  "type": "TapThis"
+                                                },
+                                                {
+                                                  "type": "SacrificeThis"
+                                                }
+                                              ],
+                                              "mana": [
+                                                {
+                                                  "type": "Generic",
+                                                  "value": 1
+                                                }
+                                              ]
+                                            },
+                                            "modal": {
+                                              "modes": [
+                                                {
+                                                  "clauses": [
+                                                    {
+                                                      "effects": [
+                                                        {
+                                                          "type": "Create",
+                                                          "value": {
+                                                            "card": {
+                                                              "faces": [
+                                                                {
+                                                                  "colorIndicator": [
+                                                                    {
+                                                                      "type": "Green"
+                                                                    }
+                                                                  ],
+                                                                  "keywords": [
+                                                                    {
+                                                                      "type": "Trample"
+                                                                    }
+                                                                  ],
+                                                                  "name": "Troll Warrior Token",
+                                                                  "power": {
+                                                                    "type": "Literal",
+                                                                    "value": 4
+                                                                  },
+                                                                  "toughness": {
+                                                                    "type": "Literal",
+                                                                    "value": 4
+                                                                  },
+                                                                  "typeLine": {
+                                                                    "subtypes": [
+                                                                      {
+                                                                        "type": "Troll"
+                                                                      },
+                                                                      {
+                                                                        "type": "Warrior"
+                                                                      }
+                                                                    ],
+                                                                    "types": [
+                                                                      {
+                                                                        "type": "Creature"
+                                                                      }
+                                                                    ]
+                                                                  }
+                                                                }
+                                                              ]
+                                                            },
+                                                            "quantity": {
+                                                              "type": "Literal",
+                                                              "value": 1
+                                                            },
+                                                            "riders": {
+                                                              "tapped": {
+                                                                "type": "Tapped"
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+                                                      ]
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          }
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          "zone": {
+                            "type": "Battlefield"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Troll"
+          },
+          {
+            "type": "Warrior"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

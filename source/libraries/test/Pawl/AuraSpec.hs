@@ -2285,8 +2285,9 @@ couldEnchantSpec s registry = Spec.describe s "CouldEnchant" $ do
 -- What the rest of the pool needs BESIDES this arm, from Scryfall o:"with enchant"
 -- and o:"becomes an Aura", 2026-08-23: the twelve Licids are covered by licidSpec
 -- below, Gliding Licid being the one in data/cards/; Bronzehide Lion, Old-Growth
--- Troll and Harold and Bob, First Numens choose their host AS THEY RETURN
--- (#2099); Necromancy's enchant filter names the Aura that put the creature onto
+-- Troll and Harold and Bob, First Numens choose their host AS THEY RETURN,
+-- CR 611.2e's entry rider, proved by their scenarios under
+-- data/scenarios/aura; Necromancy's enchant filter names the Aura that put the creature onto
 -- the battlefield; and Last Voyage of the _____ is an un-set card.
 grantedEnchantSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 grantedEnchantSpec s registry = Spec.describe s "GrantedEnchant" $ do

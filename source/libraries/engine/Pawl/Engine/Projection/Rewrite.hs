@@ -2209,7 +2209,9 @@ rewriteEntryRiders pairs riders =
         Map.mapKeysWith (\greater lesser -> Quantity.Type.Plus (Plus.MkPlus lesser greater)) (Filter.rewriteCounterKind pairs)
           . fmap (rewriteQuantity pairs)
           $ EntryRiders.counters riders,
-      EntryRiders.faceDown = fmap (\state -> state {FaceDownState.listed = rewriteListing pairs (FaceDownState.listed state)}) (EntryRiders.faceDown riders)
+      EntryRiders.faceDown = fmap (\state -> state {FaceDownState.listed = rewriteListing pairs (FaceDownState.listed state)}) (EntryRiders.faceDown riders),
+      -- CR 612.1 over CR 611.2e's effects, ModifyTarget's modification rewrite.
+      EntryRiders.characteristics = fmap (rewriteModification pairs) (EntryRiders.characteristics riders)
     }
 
 -- CR 612.1 over a CR 708.2 listing's quoted abilities, which are printed on the

@@ -1,0 +1,236 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Reach"
+        },
+        {
+          "type": "Vigilance"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Harold and Bob, First Numens",
+      "oracleText": "Reach, vigilance\nWhen Harold and Bob dies, if it was a creature, return it to the battlefield. It's an Aura enchantment with enchant Forest you control and \"Enchanted Forest has '{T}: Add three mana of any one color. You get two rad counters.'\" Harold and Bob loses all other abilities.",
+      "power": {
+        "type": "Literal",
+        "value": 3
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 3
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "PermanentDies",
+            "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "IsSource"
+                },
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Creature"
+                  }
+                }
+              ]
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "MoveToZone",
+                        "value": {
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "became"
+                          },
+                          "riders": {
+                            "characteristics": [
+                              {
+                                "type": "SetCardType",
+                                "value": {
+                                  "type": "Enchantment"
+                                }
+                              },
+                              {
+                                "type": "AddSubtype",
+                                "value": {
+                                  "type": "Aura"
+                                }
+                              },
+                              {
+                                "type": "LoseAllAbilities"
+                              },
+                              {
+                                "type": "GainEnchant",
+                                "value": {
+                                  "filter": {
+                                    "type": "And",
+                                    "value": [
+                                      {
+                                        "type": "HasSubtype",
+                                        "value": {
+                                          "type": "Forest"
+                                        }
+                                      },
+                                      {
+                                        "type": "ControlledBy",
+                                        "value": {
+                                          "type": "You"
+                                        }
+                                      }
+                                    ]
+                                  },
+                                  "pool": {
+                                    "type": "Permanents"
+                                  }
+                                }
+                              },
+                              {
+                                "type": "GainAbility",
+                                "value": {
+                                  "type": "Static",
+                                  "value": {
+                                    "affected": {
+                                      "type": "Matching",
+                                      "value": {
+                                        "type": "And",
+                                        "value": [
+                                          {
+                                            "type": "HasSubtype",
+                                            "value": {
+                                              "type": "Forest"
+                                            }
+                                          },
+                                          {
+                                            "type": "HasAttached",
+                                            "value": {
+                                              "type": "IsSource"
+                                            }
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "modifications": [
+                                      {
+                                        "type": "GainAbility",
+                                        "value": {
+                                          "type": "Activated",
+                                          "value": {
+                                            "cost": {
+                                              "components": [
+                                                {
+                                                  "type": "TapThis"
+                                                }
+                                              ],
+                                              "mana": []
+                                            },
+                                            "modal": {
+                                              "modes": [
+                                                {
+                                                  "clauses": [
+                                                    {
+                                                      "effects": [
+                                                        {
+                                                          "type": "AddMana",
+                                                          "value": {
+                                                            "count": {
+                                                              "type": "Literal",
+                                                              "value": 3
+                                                            },
+                                                            "production": {
+                                                              "type": "AnyColor"
+                                                            }
+                                                          }
+                                                        },
+                                                        {
+                                                          "type": "GainPlayerCounters",
+                                                          "value": {
+                                                            "kind": {
+                                                              "type": "Rad"
+                                                            },
+                                                            "player": {
+                                                              "type": "Relative",
+                                                              "value": {
+                                                                "type": "You"
+                                                              }
+                                                            },
+                                                            "quantity": {
+                                                              "type": "Literal",
+                                                              "value": 2
+                                                            }
+                                                          }
+                                                        }
+                                                      ]
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          }
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          "zone": {
+                            "type": "Battlefield"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Mutant"
+          },
+          {
+            "type": "Treefolk"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

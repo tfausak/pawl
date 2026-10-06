@@ -22,6 +22,7 @@ module Pawl.Engine.Cloak where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -55,6 +56,7 @@ riders =
       EntryRiders.exiledFaceDown = False,
       EntryRiders.attachedTo = Nothing,
       EntryRiders.noted = False,
+      EntryRiders.characteristics = Seq.empty,
       EntryRiders.faceDown =
         Just
           FaceDownState.MkFaceDownState

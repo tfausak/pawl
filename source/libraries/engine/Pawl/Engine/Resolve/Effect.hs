@@ -2140,7 +2140,10 @@ freezeRiders viewOf context gs resolving source riders =
         Just n | n > 0 -> Just (Integer.toNaturalSaturating n)
         _ -> Nothing
    in riders
-        { EntryRiders.counters = Map.mapMaybe frozen (EntryRiders.counters riders)
+        { EntryRiders.counters = Map.mapMaybe frozen (EntryRiders.counters riders),
+          -- CR 608.2h / 611.2d, ModifyTarget's freeze: a quantity that cannot
+          -- be evaluated now leaves its effect unstored.
+          EntryRiders.characteristics = Seq.fromList (Maybe.mapMaybe (Projection.freezeQuantities gs resolving source context) (Foldable.toList (EntryRiders.characteristics riders)))
         }
 
 -- The amount ONE RECIPIENT of a per-player instruction reads, which need not be
@@ -5058,7 +5061,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- watched the battlefield and could match a member of such a batch would
         -- separate them.
         moveOne mAttack mBlocked frozen before (sofar, acc) (target, (position, above)) = do
-          mNew <- Event.changeZoneEnteringIn (Just before) sofar target zone position frozen (Just controller)
+          mNew <- Event.changeZoneEnteringIn (Just before) sofar source target zone position frozen (Just controller)
           -- CR 614.6: the move was cancelled, or the id was already gone (CR
           -- 603.7c). Nothing entered, so there is nothing to bind.
           Monad.forM_ mNew $ \newId -> do
@@ -5562,7 +5565,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             Just seed <- host >>= \h -> Attach.attachmentFor card h before ->
               Event.simultaneously $ do
                 Event.changeZoneInBatch before source Zone.Hand
-                Monad.void (Event.changeZoneAttaching (Just before) Set.empty card Zone.Battlefield LibraryPosition.defaultValue (Just seed) TapState.Untapped Map.empty (Just controller) Nothing Facing.FaceUp False CarryOver.NotCarried False)
+                Monad.void (Event.changeZoneAttaching (Just before) Set.empty card Zone.Battlefield LibraryPosition.defaultValue (Just seed) TapState.Untapped Map.empty (Just controller) Nothing Facing.FaceUp False CarryOver.NotCarried False Seq.empty)
         _ -> pure ()
   -- CR 701.24: shuffle the objects the refs name into their OWNERS' libraries. Two
   -- steps: CR 400.7's move through the same changeZone funnel every destination
@@ -11296,7 +11299,7 @@ attachFound asOf searcher host cardId = do
     Nothing -> pure []
     Just seed ->
       Foldable.toList
-        <$> Event.changeZoneAttaching (Just asOf) Set.empty cardId Zone.Battlefield LibraryPosition.defaultValue (Just seed) TapState.Untapped Map.empty (Just searcher) Nothing Facing.FaceUp False CarryOver.NotCarried False
+        <$> Event.changeZoneAttaching (Just asOf) Set.empty cardId Zone.Battlefield LibraryPosition.defaultValue (Just seed) TapState.Untapped Map.empty (Just searcher) Nothing Facing.FaceUp False CarryOver.NotCarried False Seq.empty
 
 -- Put a found card onto the battlefield, untapped or tapped as the card says.
 --
@@ -11311,7 +11314,7 @@ attachFound asOf searcher host cardId = do
 putOntoBattlefield :: GameState -> PlayerId -> TapState.TapState -> ObjectId -> Game [ObjectId]
 putOntoBattlefield asOf searcher tapped cardId =
   Foldable.toList
-    <$> Event.changeZoneAttaching (Just asOf) Set.empty cardId Zone.Battlefield LibraryPosition.defaultValue Nothing tapped Map.empty (Just searcher) Nothing Facing.FaceUp False CarryOver.NotCarried False
+    <$> Event.changeZoneAttaching (Just asOf) Set.empty cardId Zone.Battlefield LibraryPosition.defaultValue Nothing tapped Map.empty (Just searcher) Nothing Facing.FaceUp False CarryOver.NotCarried False Seq.empty
 
 -- Write a whole new order back to a player's library: the shuffle after a CR
 -- 701.23 search, and CR 701.22a's scry, CR 701.25a's surveil and CR 701.29a's

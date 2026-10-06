@@ -313,8 +313,10 @@ repetitionQuantities repetition = case repetition of
 -- a card may write as anything a Quantity spells. A position the three walkers
 -- below would otherwise pass over -- every arm that reads a rider matches it as
 -- `_` -- so the reads are spelled out here and each walker goes through this.
+-- CR 611.2e's effects carry theirs through Projection.quantitiesOf, as
+-- ModifyTarget's modification does.
 riderQuantities :: EntryRiders.EntryRiders Quantity.Type.Quantity ability -> [Quantity.Type.Quantity]
-riderQuantities = Map.elems . EntryRiders.counters
+riderQuantities riders = Map.elems (EntryRiders.counters riders) <> foldMap Projection.quantitiesOf (EntryRiders.characteristics riders)
 
 -- The Quantity a MoveToZone's placement carries, CR 401.7's depth: Unexpectedly
 -- Absent's X. The walkers read it beside riderQuantities.

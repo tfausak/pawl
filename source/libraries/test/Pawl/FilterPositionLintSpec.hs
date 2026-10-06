@@ -1866,11 +1866,18 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
       "Tamiyo's Compleation's tap and unattach are framed too"
       (hostOfSourceCounts (S.combinedFace compleation))
       (2, 0)
+    -- And the quoted ability Bronzehide Lion's CR 611.2e return grants it.
+    lion <- S.printingOf s registry "Bronzehide Lion"
+    Spec.assertEqWith
+      s
+      "Bronzehide Lion's granted indestructible is framed too"
+      (hostOfSourceCounts (S.combinedFace lion))
+      (1, 0)
     Spec.assertEqWith
       s
       "and they are the pool's only ones"
       (sum (fmap (uncurry (+) . hostOfSourceCounts . S.combinedFace) ps))
-      10
+      11
     -- The rejected side, which the sweep above cannot show while the pool has no
     -- offender: the same atom planted in a target slot -- the position a card
     -- author would most plausibly reach for -- IS counted as elsewhere.
