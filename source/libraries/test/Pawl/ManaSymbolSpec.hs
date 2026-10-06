@@ -130,7 +130,7 @@ celestialDawnSpec s registry = Spec.describe s "Celestial Dawn" $ do
   -- spent AS without making a nonsnow mana snow.
   Spec.it s "CR 107.4h the clause does not make a nonsnow white mana pay {S}" $ do
     dawn <- S.printingOf s registry "Celestial Dawn"
-    let snowWhite = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.White, ManaUnit.tags = Set.singleton ProductionTag.Snow, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing}
+    let snowWhite = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.White, ManaUnit.tags = Set.singleton ProductionTag.Snow, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing, ManaUnit.sourceLastExiled = Nothing}
         (plainBoard, _) = dawnBoards dawn [plainOf (ManaType.Colored Color.White)]
         (snowBoard, _) = dawnBoards dawn [snowWhite]
     Spec.assertBool s (not (payable S.alice snowCost plainBoard)) "the nonsnow white mana does not pay {S}"
@@ -192,7 +192,7 @@ ruinousPowersSpec s = Spec.describe s "The Ruinous Powers" $ do
   -- Powers grants on its exiled card: a colorless unit pays {U}, and a red one
   -- still cannot pay {C}, where ManaSpending.AnyType would let it.
   Spec.it s "CR 609.4b mana spent as though it were of any color pays {U} with {C} but not {C} with {R}" $ do
-    let unitOf t = ManaUnit.MkManaUnit {ManaUnit.manaType = t, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing}
+    let unitOf t = ManaUnit.MkManaUnit {ManaUnit.manaType = t, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing, ManaUnit.sourceLastExiled = Nothing}
         costOf t = ManaCost.MkManaCost [ManaSymbol.OfType t]
         pool t = Mana.Type.MkMana [unitOf t]
         spentUnder spending demand supply = fmap fst (Mana.spend [] spending 0 (costOf demand) (pool supply))
@@ -258,7 +258,8 @@ snowRed =
       ManaUnit.retention = ManaRetention.Ordinary,
       ManaUnit.restriction = Nothing,
       ManaUnit.rider = Nothing,
-      ManaUnit.sourceChosenSubtype = Nothing
+      ManaUnit.sourceChosenSubtype = Nothing,
+      ManaUnit.sourceLastExiled = Nothing
     }
 
 -- CR 107.4h: "When used in a cost, the snow mana symbol {S} represents a cost
@@ -350,7 +351,7 @@ snowSpec s registry = Spec.describe s "Snow" $ do
 -- {S}" into when the source is not snow, and the unit every assertion below
 -- compares against.
 plainColorless :: ManaUnit.ManaUnit
-plainColorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing}
+plainColorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing, ManaUnit.sourceLastExiled = Nothing}
 
 -- CR 106.11: "If an effect would add mana represented by one or more snow mana
 -- symbols to a player's mana pool, that much colorless mana is added to that
@@ -582,8 +583,8 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
   -- settle every {2/X} through `announce` first -- so this calls `spend`
   -- directly, as a fence under the rule Mana.resolutions still states.
   Spec.it s "CR 601.2b with nothing announced, spend takes a {2/R}'s one-mana half" $
-    let red = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing}
-        colorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing}
+    let red = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing, ManaUnit.sourceLastExiled = Nothing}
+        colorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing, ManaUnit.sourceLastExiled = Nothing}
      in Spec.assertEqWith
           s
           "the {R} is spent and both {C} remain -- the other half would spend both {C} and leave the {R}"

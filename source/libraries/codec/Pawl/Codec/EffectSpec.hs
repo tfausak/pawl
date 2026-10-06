@@ -2256,6 +2256,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       Effect.ExileHandThenDraw
       " {\"type\":\"ExileHandThenDraw\"} "
+  Spec.it s "NoteManaSpent" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Effect.NoteManaSpent
+      " {\"type\":\"NoteManaSpent\"} "
   Spec.it s "Proliferate" $
     Common.assertJsonCodec
       s

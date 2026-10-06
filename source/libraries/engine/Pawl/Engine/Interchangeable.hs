@@ -221,6 +221,8 @@ noCombat =
 --     naming the object CR 607.2a's or CR 607.2b's link names.
 --   * GameState.exilePiles (CR 406.4), keyed by the card in exile face down, its
 --     value the stamp of the pile it is in.
+--   * GameState.notedMana (CR 607.2e), keyed by the object a note was made for,
+--     its value mana types.
 --
 -- phasedOut and exiledUntilMonarch can never name a CANDIDATE through the one
 -- caller (Pawl.Engine.Cost's mana-source window): both key on an object not on
@@ -240,12 +242,18 @@ noCombat =
 -- value moved.
 --
 -- The KEY side is a regression fence rather than a proof, and so is exiledWith's
--- value side, encoded's whole arm and exilePiles' whole arm. Every one of these relations keys on an
+-- value side, encoded's whole arm and exilePiles' whole arm. Every one of these relations but
+-- notedMana keys on an
 -- object that is not on the battlefield -- an exiled incarnation, or a permanent
 -- GameState.battlefield excludes (CR 702.26b) -- so no key can ever be a
 -- mana-source candidate, and neutering `key == oid` below leaves the whole suite
 -- green. The line stays because a row does name its key; do not read the green as
 -- coverage.
+--
+-- notedMana's key IS a battlefield permanent, and its arm is a fence too: Ice
+-- Cauldron's noted mana pays only for the card it exiled, so a Cauldron whose
+-- mana any payment admits is already named by that card's exiledWith row, so
+-- no board observes the arm.
 namedByRelation :: ObjectId -> GameState -> Bool
 namedByRelation oid gs =
   let relates names = any (\(key, value) -> key == oid || Set.member oid (names value)) . Map.toList
@@ -258,6 +266,10 @@ namedByRelation oid gs =
         || relates pileNames (GameState.exilePiles gs)
         -- CR 305.1 / 601.2a: keyed by the spell or permanent a play made, too.
         || relates (const Set.empty) (GameState.cardsPlayed gs)
+        -- CR 607.2e: keyed by the permanent a note was made for, which IS a
+        -- mana-source candidate: two Ice Cauldrons noting different mana add
+        -- different mana.
+        || relates (const Set.empty) (GameState.notedMana gs)
 
 -- The objects a GameState.phasedOut row names BEYOND its key: none, since CR
 -- 702.26a's stored value is the player the permanent phased out under.

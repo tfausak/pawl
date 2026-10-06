@@ -298,6 +298,7 @@ emptyGame order =
           GameState.outsideCopies = Set.empty,
           GameState.namedCopyChoices = Map.empty,
           GameState.notedCards = Map.empty,
+          GameState.notedMana = Map.empty,
           GameState.nextPrintingId = PrintingId.MkPrintingId 0,
           GameState.nextTimestamp = Timestamp.MkTimestamp 0,
           GameState.lastChoice = Timestamp.MkTimestamp 0,
@@ -1086,6 +1087,8 @@ restartGame perform exempt starter = do
             GameState.exiledWith = Map.restrictKeys (GameState.exiledWith gs) exempt,
             -- CR 727.1: nothing stays on the battlefield through a restart.
             GameState.enteredWith = Map.empty,
+            -- CR 607.2e's notes, made for permanents the restart removed.
+            GameState.notedMana = Map.empty,
             -- CR 406.4's pile, kept for exactly the cards the line above keeps
             -- and cleared with the rest: a pile is about a card still in exile.
             GameState.exilePiles = Map.restrictKeys (GameState.exilePiles gs) exempt,
@@ -1335,6 +1338,7 @@ subgameStateFrom starter parent =
           GameState.exiledWith = Map.empty,
           GameState.enteredWith = Map.empty,
           GameState.exilePiles = Map.empty,
+          GameState.notedMana = Map.empty,
           -- CR 729.1a: the subgame is its own game and starts from turn 1, so
           -- the main game's pending extra turns are not in it. Its own copy
           -- sits untouched in the outer frame, still waiting when the subgame

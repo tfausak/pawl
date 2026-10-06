@@ -45,6 +45,7 @@ import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.ExileLink as ExileLink
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -227,16 +228,30 @@ noActivations = Activations.MkActivations {Activations.times = 0, Activations.cl
 -- offers no choice; none at all when nothing has been chosen, which for
 -- Coldsteel Heart cannot happen on a permanent that entered (CR 614.1c) and is
 -- not a colour for the engine to invent when it does.
-producedTypes :: ObjectId -> GameState -> ManaProduction -> [ManaType]
-producedTypes oid gs production = case production of
-  ManaProduction.OfType manaType -> [manaType]
+--
+-- CR 607.2e's noted mana is the one SETTLED production of more than one unit:
+-- Ice Cauldron adds the run its linked ability noted for it
+-- (GameState.notedMana), types mixed, and none where nothing is noted.
+produced :: ObjectId -> GameState -> ManaProduction -> Produced
+produced oid gs production = case production of
+  ManaProduction.OfType manaType -> Settles [manaType]
   ManaProduction.AnyColor ->
-    fmap
-      ManaType.Colored
-      [Color.White, Color.Blue, Color.Black, Color.Red, Color.Green]
+    Offers
+      (fmap ManaType.Colored (Color.White NonEmpty.:| [Color.Blue, Color.Black, Color.Red, Color.Green]))
   ManaProduction.Chosen ->
-    fmap ManaType.Colored (Set.toList (foldMap Object.chosenColors (Game.lookupObject oid gs)))
-  ManaProduction.SnowSymbol -> [ManaType.Colorless]
+    case fmap ManaType.Colored (Set.toList (foldMap Object.chosenColors (Game.lookupObject oid gs))) of
+      first : second : more -> Offers (first NonEmpty.:| (second : more))
+      settled -> Settles settled
+  ManaProduction.SnowSymbol -> Settles [ManaType.Colorless]
+  ManaProduction.Noted -> Settles (foldMap Foldable.toList (Map.lookup oid (GameState.notedMana gs)))
+
+-- CR 106.3: what one AddMana instruction's production comes to on a board --
+-- a settled run of mana, possibly empty (CR 106.5's undefined type adds none),
+-- or CR 105.4's choice among two or more types, one of which is added.
+data Produced
+  = Settles [ManaType]
+  | Offers (NonEmpty.NonEmpty ManaType)
+  deriving (Eq, Show)
 
 -- Every ROUTE by which this object could be activated for mana, as the mana ONE
 -- activation of it adds: its intrinsic subtype mana (CR 305.6), one route per
@@ -516,6 +531,7 @@ manaOptionsOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -
 manaOptionsOfGiven pcs oid gs =
   let tags = productionTagsGiven pcs oid gs
       chosenSubtype = sourceChosenSubtypeOf oid gs
+      lastExiled = lastExiledWith oid gs
       -- CR 106.6, stamped from the instruction that adds the unit: the
       -- restriction is the addition's (CR 106.6a), so every unit one AddMana
       -- produces carries it and a route mixing a restricted addition with an
@@ -542,7 +558,8 @@ manaOptionsOfGiven pcs oid gs =
             ManaUnit.retention = ManaAddition.retention addition,
             ManaUnit.restriction = ManaAddition.restriction addition,
             ManaUnit.rider = ManaAddition.rider addition,
-            ManaUnit.sourceChosenSubtype = chosenSubtype
+            ManaUnit.sourceChosenSubtype = chosenSubtype,
+            ManaUnit.sourceLastExiled = lastExiled
           }
       -- CR 106.3's count, read off the BOARD rather than off the card: Cabal
       -- Coffers' "Add {B} for each Swamp you control" is ONE instruction whose
@@ -595,10 +612,11 @@ manaOptionsOfGiven pcs oid gs =
               (traverse (\(i, addition) -> fmap ((,) i . (,) (ManaAddition.player addition)) (additionUnits addition)) [(i, addition) | (i, (_, additions)) <- indexed, addition <- additions])
       -- CR 106.5: an addition of an undefined type -- CR 607.2d's chosen colour
       -- with none chosen -- adds no mana, and the activation is still one the
-      -- player may make. Resolve.Effect's AddMana arm answers the same.
-      additionUnits addition = case producedTypes oid gs (ManaAddition.production addition) of
-        [] -> [[]]
-        types -> fmap (replicate (howMany addition) . unitFor addition) types
+      -- player may make. Resolve.Effect's AddMana arm answers the same. A
+      -- settled run is repeated whole by the count (CR 607.2e's noted mana).
+      additionUnits addition = case produced oid gs (ManaAddition.production addition) of
+        Settles run -> [concat (replicate (howMany addition) (fmap (unitFor addition) run))]
+        Offers types -> fmap (replicate (howMany addition) . unitFor addition) (NonEmpty.toList types)
    in ListUtils.nubOrd (concatMap expand (manaRoutesOfGiven pcs oid gs))
 
 -- Every unit one option adds, whoever gets it, in printed order within each
@@ -669,6 +687,23 @@ recipientsOf controller chosen gs ref =
 -- made on entering (CR 707.6) rather than with the copied permanent's.
 sourceChosenSubtypeOf :: ObjectId -> GameState -> Maybe Subtype.Subtype
 sourceChosenSubtypeOf oid gs = Game.lookupObject oid gs >>= Object.chosenSubtype
+
+-- CR 607.2a's production-time capture, sourceChosenSubtypeOf's twin: the last
+-- card exiled with this source that is still in exile, baked onto every unit it
+-- adds (Pawl.Types.ManaUnit.sourceLastExiled). "Last" is the latest to enter
+-- exile (CR 613.7d's timestamp), so a second card the source exiles replaces the
+-- first, and a card that left exile is no longer one (CR 400.7).
+--
+-- Asked at PRODUCTION and never at payment, which is the only reading under
+-- which Ice Cauldron's mana can be spent at all: by CR 601.2a the card is on the
+-- stack before CR 601.2h pays for it, so a spend-time read would never find it in
+-- exile. Mana made while that card is already being cast (CR 601.2g) therefore
+-- names whatever was exiled before it.
+lastExiledWith :: ObjectId -> GameState -> Maybe ObjectId
+lastExiledWith oid gs =
+  let linked card = fmap ExileLink.source (Map.lookup card (GameState.exiledWith gs)) == Just oid
+      enteredAt card = fmap (\obj -> (Object.timestamp obj, card)) (Game.lookupObject card gs)
+   in fmap snd (Maybe.listToMaybe (List.sortOn Ord.Down (Maybe.mapMaybe enteredAt (filter linked (Set.toList (GameState.exile gs))))))
 
 -- The production-time tags (Pawl.Types.ProductionTag) every mana this object
 -- adds will carry. THE one place they are decided; manaOptionsOfGiven just above
@@ -1076,12 +1111,9 @@ serves supply demand =
 -- controller is at CR 601.2h and the ability's at CR 602.2b. A restriction that
 -- reads the SOURCE reads it through the values production baked onto the unit
 -- (Pawl.Types.ManaUnit.sourceChosenSubtype), never by looking the source up:
--- Pillar of Origins' "of the chosen type" is the printing that wants one.
---
--- Not implemented: a restriction naming the source's IDENTITY rather than a value
--- it chose -- Ice Cauldron's "only to cast the last card exiled with this
--- artifact". Pawl.Types.ManaUnit carries no source id by construction, so the
--- context has none and such an atom is vacuously False (#1978).
+-- Pillar of Origins' "of the chosen type" is the printing that wants one, and
+-- Ice Cauldron's "the last card exiled with this artifact" the second
+-- (Pawl.Types.ManaUnit.sourceLastExiled).
 spendableFor :: PaymentSubject.PaymentSubject -> PlayerId -> GameState -> ([ManaUnit], [ManaUnit])
 spendableFor subject pid gs = spendableAmong subject pid gs (unitsOf (Game.poolOf pid gs))
 
@@ -1104,9 +1136,10 @@ spendableAmong subject pid gs = List.partition (admitsUnder subject pid gs)
 -- subject for the same reason. That is what the partial application buys, so
 -- keep the unit as the last argument and apply it separately.
 --
--- The one thing the shared context cannot carry is CR 607.2d's chosen subtype,
--- which is the UNIT's: two Pillars of Origins naming two creature types put mana
--- in one pool, so the field is written per unit below.
+-- The things the shared context cannot carry are CR 607.2d's chosen subtype and
+-- CR 607.2a's last exiled card, which are the UNIT's: two Pillars of Origins
+-- naming two creature types put mana in one pool, so both are written per unit
+-- below.
 admitsUnder :: PaymentSubject.PaymentSubject -> PlayerId -> GameState -> ManaUnit -> Bool
 admitsUnder subject pid gs =
   let paidFor = case subject of
@@ -1129,10 +1162,22 @@ admitsUnder subject pid gs =
                   Nothing -> False
                   Just (half, context, view) -> case half restriction of
                     Nothing -> False
-                    Just wanted -> Filter.matches (context {Filter.sourceChosenSubtype = ManaUnit.sourceChosenSubtype unit}) view wanted
+                    Just wanted -> Filter.matches (context {Filter.sourceChosenSubtype = ManaUnit.sourceChosenSubtype unit, Filter.sourceLastExiled = ManaUnit.sourceLastExiled unit}) view wanted
            in -- A prohibition (Hydraulic Helper) admits exactly the payments a
               -- permission would refuse, ForNeither among them.
               if ManaRestriction.prohibits restriction then not named else named
+
+-- CR 601.2a before CR 601.2g: a source activated DURING this payment makes its
+-- mana once the card being cast has already left exile, so the card it last
+-- exiled (Pawl.Types.ManaUnit.sourceLastExiled) cannot be that one. Mana made
+-- beforehand can be (Cast.followIntoPools), so this corrects an untapped
+-- source's yield alone: manaOptionsOfGiven reads the board the gate asks about,
+-- where the card has not moved yet, while the payment it predicts reads the
+-- board after. Ice Cauldron tapped mid-cast pays for none of its card.
+producedDuring :: PaymentSubject.PaymentSubject -> ManaUnit -> ManaUnit
+producedDuring subject unit = case subject of
+  PaymentSubject.Casting oid | ManaUnit.sourceLastExiled unit == Just oid -> unit {ManaUnit.sourceLastExiled = Nothing}
+  _ -> unit
 
 -- A pool unit as a supply. Its type is settled, so the option set is a
 -- singleton, and its tags are the ones production stamped on it
@@ -1250,7 +1295,7 @@ relax spending demand = case spending of
     | otherwise -> demand
 
 -- CR 106.1b: the six types of mana. Written out rather than derived, for the
--- reason producedTypes writes out CR 105.1's five: the enumeration IS the rule.
+-- reason produced writes out CR 105.1's five: the enumeration IS the rule.
 --
 -- This is the whole type side of CR 107.4h's {S}, which narrows nothing about
 -- what the mana is and everything about where it came from.
@@ -2251,7 +2296,7 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed comm
       -- ABILITY, so one payment may activate several of a permanent's. Skyshroud
       -- Elf's {G} pays its own {1} (data/scenarios'
       -- skyshroud-elf-green-buys-red is the proof).
-      options = concat (zipWith (\oid supplies -> fmap (fmap ((,) oid)) (sourceOptions clauses admitting (Claim.contends contested) supplies)) sources suppliesPer)
+      options = concat (zipWith (\oid supplies -> fmap (fmap ((,) oid)) (sourceOptions clauses (admitting . producedDuring subject) (Claim.contends contested) supplies)) sources suppliesPer)
       -- One option taken from each group, appended to the pool: `sequenceA` over
       -- the list applicative is that product, and it is [[]] -- one board, the
       -- pool alone -- when the player controls no source at all. Each board

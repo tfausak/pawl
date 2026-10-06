@@ -120,6 +120,7 @@ withoutAnnouncement before entry closed = do
   outsideCopies <- setOf GameState.outsideCopies
   namedCopyChoices <- mapOf GameState.namedCopyChoices
   notedCards <- mapOf GameState.notedCards
+  notedMana <- mapOf GameState.notedMana
   nextPrintingId <- newest GameState.nextPrintingId
   nextTimestamp <- newest GameState.nextTimestamp
   lastChoice <- newest GameState.lastChoice
@@ -240,6 +241,7 @@ withoutAnnouncement before entry closed = do
         GameState.outsideCopies = outsideCopies,
         GameState.namedCopyChoices = namedCopyChoices,
         GameState.notedCards = notedCards,
+        GameState.notedMana = notedMana,
         GameState.nextPrintingId = nextPrintingId,
         GameState.nextTimestamp = nextTimestamp,
         GameState.lastChoice = lastChoice,

@@ -3452,6 +3452,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.RollDie {} -> False
   Effect.FlipCoin {} -> False
   Effect.ExileHandThenDraw {} -> False
+  Effect.NoteManaSpent {} -> False
   Effect.Proliferate {} -> False
   Effect.Reroll -> False
   Effect.ChooseCardName {} -> False
@@ -3869,7 +3870,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- both printings that write one (Boseiju, Who Shelters All and Delighted
   -- Halfling) are mana abilities and take the inline CR 605.3b road instead, so
   -- neutralising this line leaves the whole suite green. CR 106.6a states it
-  -- anyway, which is why the line is here.
+  -- anyway, which is why the line is here. The CR 607.2a sourceLastExiled stamp
+  -- is a fence for the same reason: Ice Cauldron, its one producer, is a mana
+  -- ability too.
   Effect.AddMana (ManaAddition.MkManaAddition ref production count retention restriction rider) -> do
     gs0 <- State.get
     -- CR 106.3: how many units this ONE instruction adds, read off the board at
@@ -3878,6 +3881,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- for CR 605.3b's inline road, so the offer and the addition measure one
     -- board. A negative count adds nothing, and an undeterminable one reads 0.
     let howMany = max 0 (Integer.toIntSaturating (Maybe.fromMaybe 0 (Quantity.evaluateFor (effectViewOf source legal gs0) (effectContext gs0 controller source legal (slotBindings resolving gs0)) gs0 resolving source count)))
+        unitOf manaType =
+          ManaUnit.MkManaUnit
+            { ManaUnit.manaType = manaType,
+              ManaUnit.tags = Mana.productionTagsGiven Map.empty source gs0,
+              ManaUnit.retention = retention,
+              ManaUnit.restriction = restriction,
+              ManaUnit.rider = rider,
+              ManaUnit.sourceChosenSubtype = Mana.sourceChosenSubtypeOf source gs0,
+              ManaUnit.sourceLastExiled = Mana.lastExiledWith source gs0
+            }
         -- CR 605.1b's event, per recipient. Nothing is recorded where the
         -- instruction added no mana: an addition of none is no addition, and CR
         -- 605.1b's clause is about mana that arrived.
@@ -3895,27 +3908,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       )
                   )
               )
-    case Mana.producedTypes source gs0 production of
-      -- One settled type needs no question; the COUNT is how many units this one
-      -- instruction adds, and a clause adding mana of two DIFFERENT types writes
-      -- two effects, run in printed order (CR 608.2c).
-      [manaType] ->
-        let unit =
-              ManaUnit.MkManaUnit
-                { ManaUnit.manaType = manaType,
-                  ManaUnit.tags = Mana.productionTagsGiven Map.empty source gs0,
-                  ManaUnit.retention = retention,
-                  ManaUnit.restriction = restriction,
-                  ManaUnit.rider = rider,
-                  ManaUnit.sourceChosenSubtype = Mana.sourceChosenSubtypeOf source gs0
-                }
+    case Mana.produced source gs0 production of
+      -- A settled run needs no question; the COUNT is how many times this one
+      -- instruction adds it, and a clause adding mana of two DIFFERENT types
+      -- writes two effects, run in printed order (CR 608.2c) -- except CR
+      -- 607.2e's noted run, which is one instruction of mixed types (Ice
+      -- Cauldron). An empty run is CR 607.2d's "the chosen color" with nothing
+      -- chosen, or nothing noted: adding nothing is the honest answer.
+      Mana.Settles run ->
+        let units = concat (replicate howMany (fmap unitOf run))
             recipients = playerRefPlayers legal controller gs0 ref
-         in do
-              State.modify' (\gs -> foldr (\pid -> Mana.addMana pid (replicate howMany unit)) gs recipients)
-              Monad.mapM_ (\pid -> recordAdded pid (Set.singleton manaType)) recipients
-      -- No type at all is CR 607.2d's "the chosen color" with nothing chosen:
-      -- adding nothing is the honest answer.
-      [] -> pure ()
+         in Monad.unless (null run) $ do
+              State.modify' (\gs -> foldr (\pid -> Mana.addMana pid units) gs recipients)
+              Monad.mapM_ (\pid -> recordAdded pid (Set.fromList run)) recipients
       -- Several types is CR 105.4's choice, and it is the RECIPIENT's: CR 106.3
       -- has the effect instruct a player to add the mana, and CR 106.4 puts it in
       -- that player's pool. CR 101.4: several recipients are asked in APNAP
@@ -3926,9 +3931,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- CR 105.4's choice is made ONCE for the whole instruction, which is what
       -- "two mana of any one color they choose" says (Stadium Vendors): the
       -- count replicates the unit the answer settled rather than asking again.
-      first : second : more ->
-        let offered = first NonEmpty.:| (second : more)
-            named = playerRefPlayers legal controller gs0 ref
+      Mana.Offers offered ->
+        let named = playerRefPlayers legal controller gs0 ref
             ordered = filter (\pid -> List.elem pid named) (Game.apnapOrder gs0)
             recipients = ordered <> filter (\pid -> List.notElem pid ordered) named
          in Monad.forM_ recipients $ \pid -> do
@@ -3937,17 +3941,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- Filtered, not trusted: an answer naming a type never offered
               -- falls back to the first candidate, since the instruction is
               -- mandatory and must put mana in a pool.
-              let manaType = if List.elem answer (NonEmpty.toList offered) then answer else first
-                  unit =
-                    ManaUnit.MkManaUnit
-                      { ManaUnit.manaType = manaType,
-                        ManaUnit.tags = Mana.productionTagsGiven Map.empty source gs0,
-                        ManaUnit.retention = retention,
-                        ManaUnit.restriction = restriction,
-                        ManaUnit.rider = rider,
-                        ManaUnit.sourceChosenSubtype = Mana.sourceChosenSubtypeOf source gs0
-                      }
-              State.modify' (Mana.addMana pid (replicate howMany unit))
+              let manaType = if List.elem answer (NonEmpty.toList offered) then answer else NonEmpty.head offered
+              State.modify' (Mana.addMana pid (replicate howMany (unitOf manaType)))
               recordAdded pid (Set.singleton manaType)
   -- CR 608.2c's instruction, carried out by somebody other than this spell's
   -- controller: Drain Power's first sentence has the TARGETED player activate a
@@ -4377,6 +4372,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     let handIds = Game.zoneMembers Zone.Hand controller gs
     Monad.void (Event.changeZonesTogether (fmap (\oid -> (oid, Zone.Exile)) handIds))
     Monad.replicateM_ (length handIds) (Event.drawCard controller)
+  -- CR 607.2e: the note is the ACTIVATION's CR 602.2b payment -- recorded on
+  -- the ability object as Object.manaSpent -- filed against the SOURCE, whose linked
+  -- mana ability reads it back (ManaProduction.Noted). Ice Cauldron's ruling
+  -- counts the mana spent and not X, so a cost reduction changes nothing.
+  Effect.NoteManaSpent -> do
+    spent <- State.gets (foldMap (Mana.Type.unwrap . Object.manaSpent) . Game.lookupObject resolving)
+    State.modify' (\gs -> gs {GameState.notedMana = Map.insert source (Seq.fromList (fmap ManaUnit.manaType spent)) (GameState.notedMana gs)})
   -- CR 727.1/727.1a: restart the game, with this ability's controller as the new
   -- starting player; the rebuild lives in Setup, reached through a generic opcode
   -- rather than Karn's identity. CR 727.4: this resolves several frames deep, and

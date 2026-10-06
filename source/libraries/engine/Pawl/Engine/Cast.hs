@@ -71,10 +71,12 @@ import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.KickerDecision as KickerDecision
+import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.ManaCost as ManaCost
 import Pawl.Types.ManaSpending (ManaSpending)
 import qualified Pawl.Types.ManaSpending as ManaSpending
+import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Modal as Modal.Type
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
@@ -2407,6 +2409,9 @@ castSpellWith perform timed offered applied widened pid oid name facing = Event.
           -- spell rather than the card. CR 601.2e's rejection puts `before` back,
           -- which puts the old name back with it.
           State.modify' (followIntoSpell (Game.lookupObject oid before >>= Object.playableFromExile) oid sid)
+          -- CR 106.6: mana that may be spent only to cast THIS card names the
+          -- spell it has just become, for the same step's reason.
+          State.modify' (followIntoPools oid sid)
           -- CR 601.2a, carried across the move that forgets it (CR 400.7) and
           -- BEFORE castProposed, which prices the spell at CR 601.2f: the tax
           -- Aven Interrupter puts on a spell cast from a graveyard is read off
@@ -2576,6 +2581,18 @@ followIntoSpell permission old new gs = case permission of
           { GameState.replacements = fmap follow (GameState.replacements gs),
             GameState.delayedTriggers = fmap followDelayed (GameState.delayedTriggers gs)
           }
+
+-- CR 601.2a / 106.6: the pooled units baked with this card as their source's
+-- last exiled card (Pawl.Types.ManaUnit.sourceLastExiled) now name the spell the
+-- card became. Ice Cauldron's "spend this mana only to cast the last card exiled
+-- with this artifact" is about this very cast, while CR 400.7 has already made
+-- the card a new object by CR 601.2h's payment. Every other unit is untouched.
+followIntoPools :: ObjectId -> ObjectId -> GameState -> GameState
+followIntoPools old new gs =
+  let follow unit
+        | ManaUnit.sourceLastExiled unit == Just old = unit {ManaUnit.sourceLastExiled = Just new}
+        | otherwise = unit
+   in gs {GameState.manaPool = fmap (Mana.Type.MkMana . fmap follow . Mana.Type.unwrap) (GameState.manaPool gs)}
 
 -- CR 702.33g/702.113b's own scope: a Quantity naming a CAST-ANNOUNCEMENT fact
 -- rather than a board or resolution one -- Quantity.WasKicked (CR 702.33d's
