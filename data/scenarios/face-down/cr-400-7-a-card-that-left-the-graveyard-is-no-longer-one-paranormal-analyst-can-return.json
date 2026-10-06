@@ -1,5 +1,5 @@
 {
-  "description": "CR 701.40f a refused manifest bins both cards, and Paranormal Analyst asks which returns",
+  "description": "CR 400.7 a card that left the graveyard is no longer one Paranormal Analyst can return",
   "board": {
     "seats": [
       {
@@ -23,6 +23,16 @@
           {
             "card": "Grafdigger's Cage",
             "label": "cage",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp",
+            "ready": true
+          },
+          {
+            "card": "Withered Wretch",
+            "label": "wretch",
             "ready": true
           }
         ],
@@ -74,7 +84,8 @@
           "object": "$manifest-dread",
           "mana": [
             "$forest",
-            "$forest-2"
+            "$forest-2",
+            null
           ]
         }
       }
@@ -84,41 +95,6 @@
       "step": "PrecombatMain",
       "player": "alice",
       "do": "Pass"
-    },
-    {
-      "turn": 1,
-      "step": "PrecombatMain",
-      "player": "alice",
-      "check": {
-        "View": {
-          "of": "Zone",
-          "player": "alice",
-          "zone": "Graveyard",
-          "is": [
-            "Thragtusk",
-            "Ainok Tracker",
-            "Manifest Dread"
-          ]
-        }
-      }
-    },
-    {
-      "turn": 1,
-      "step": "PrecombatMain",
-      "player": "alice",
-      "check": {
-        "View": {
-          "of": "Zone",
-          "player": "alice",
-          "zone": "Battlefield",
-          "is": [
-            "$forest",
-            "$forest-2",
-            "$analyst",
-            "$cage"
-          ]
-        }
-      }
     },
     {
       "turn": 1,
@@ -138,9 +114,33 @@
       "step": "PrecombatMain",
       "player": "alice",
       "do": {
-        "Answer": {
-          "prompt": "ChooseCardFromAmong",
-          "with": "Ainok Tracker"
+        "Activate": {
+          "object": "$wretch",
+          "targets": [
+            "Thragtusk"
+          ],
+          "mana": [
+            "$swamp"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Exile",
+          "card": "Thragtusk",
+          "count": 1
         }
       }
     },
@@ -169,28 +169,8 @@
       "player": "alice",
       "check": {
         "View": {
-          "of": "Zone",
-          "player": "alice",
-          "zone": "Graveyard",
-          "is": [
-            "Thragtusk",
-            "Manifest Dread"
-          ]
-        }
-      }
-    },
-    {
-      "turn": 1,
-      "step": "PrecombatMain",
-      "player": "alice",
-      "check": {
-        "View": {
-          "of": "Zone",
-          "player": "alice",
-          "zone": "Library",
-          "is": [
-            "Goblin Piker"
-          ]
+          "of": "Stack",
+          "is": []
         }
       }
     }

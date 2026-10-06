@@ -47,8 +47,10 @@
                             "type": "ChosenCardFromAmong",
                             "value": {
                               "filter": {
-                                "type": "And",
-                                "value": []
+                                "type": "IsInZone",
+                                "value": {
+                                  "type": "Graveyard"
+                                }
                               },
                               "slot": "became"
                             }
