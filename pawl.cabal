@@ -1174,6 +1174,8 @@ library codec
     Pawl.Codec.SpellWasCopiedSpec
     Pawl.Codec.SpendManaAsThough
     Pawl.Codec.SpendManaAsThoughSpec
+    Pawl.Codec.SpendTrigger
+    Pawl.Codec.SpendTriggerSpec
     Pawl.Codec.Splice
     Pawl.Codec.SpliceSpec
     Pawl.Codec.StackObjectKind
@@ -1305,6 +1307,8 @@ library codec
     Pawl.Codec.WardSpec
     Pawl.Codec.When
     Pawl.Codec.WhenSpec
+    Pawl.Codec.WhenSpent
+    Pawl.Codec.WhenSpentSpec
     Pawl.Codec.WhichCounters
     Pawl.Codec.WhichCountersSpec
     Pawl.Codec.While
@@ -2537,6 +2541,7 @@ library types
     Pawl.Types.SpellWasCast
     Pawl.Types.SpellWasCopied
     Pawl.Types.SpendManaAsThough
+    Pawl.Types.SpendTrigger
     Pawl.Types.Splice
     Pawl.Types.StackObjectKind
     Pawl.Types.Staged
@@ -2612,6 +2617,7 @@ library types
     Pawl.Types.VoteObjects
     Pawl.Types.Ward
     Pawl.Types.When
+    Pawl.Types.WhenSpent
     Pawl.Types.WhichCounters
     Pawl.Types.While
     Pawl.Types.WithCounters

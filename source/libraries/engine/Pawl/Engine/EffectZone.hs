@@ -73,7 +73,7 @@ import Pawl.Types.Zone (Zone)
 -- needs the text an Effect.ArmDelayedTrigger's name stands for, and the opcode
 -- carries only the name (Pawl.Types.Face.delayedAbilities holds the payload,
 -- Effect being first-order). Every caller supplies the map off the same card the
--- ability is read from, which is where Pawl.Engine.Resolve.Effect.declaredDelayedAbility
+-- ability is read from, which is where Pawl.Engine.Game.declaredDelayedAbility
 -- resolves the name at run time.
 --
 -- Not implemented: rule 702's own delayed abilities

@@ -91,8 +91,10 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
+import qualified Pawl.Types.SpendTrigger as SpendTrigger
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.WhenSpent as WhenSpent
 
 -- | Asked of a mana ability's OWN activation cost: HOW MANY TIMES may this
 -- player activate it, for the ability on this object? CR 602.2b is why the
@@ -389,7 +391,8 @@ intrinsicManaAddition manaType =
       ManaAddition.count = Quantity.Type.Literal 1,
       ManaAddition.retention = ManaRetention.Ordinary,
       ManaAddition.restriction = Nothing,
-      ManaAddition.rider = Nothing
+      ManaAddition.rider = Nothing,
+      ManaAddition.whenSpent = Nothing
     }
 
 -- What tapping this object for mana could actually put in a pool: every route
@@ -509,6 +512,21 @@ manaSuppliesGiven capacity pcs pid oid gs =
         (\yield -> List.maximumBy (Ord.comparing rankOf) (filter ((==) yield . yieldOf) available))
         (ListUtils.nubOrd (fmap yieldOf available))
 
+-- CR 603.7a / 106.6a: the delayed ability a Pawl.Types.WhenSpent creates as
+-- one mana is produced, its text read off the source's card now (CR 603.7c).
+-- Nothing for a name the card does not declare, which Pawl.AbilitySlotLintSpec
+-- keeps unreachable.
+spendTriggerOf :: PlayerId -> ObjectId -> GameState -> WhenSpent.WhenSpent -> Maybe SpendTrigger.SpendTrigger
+spendTriggerOf controller source gs whenSpent = do
+  ability <- Game.declaredDelayedAbility source (WhenSpent.ability whenSpent) gs
+  pure
+    SpendTrigger.MkSpendTrigger
+      { SpendTrigger.casts = WhenSpent.casts whenSpent,
+        SpendTrigger.ability = ability,
+        SpendTrigger.source = source,
+        SpendTrigger.controller = controller
+      }
+
 -- Every way this object could be tapped for mana, as the COST CR 602.2b makes
 -- that activation pay paired with the mana it adds -- one entry per (route,
 -- colour choice) pair. `traverse` over the list applicative is that product:
@@ -551,6 +569,10 @@ manaOptionsOfGiven pcs oid gs =
       -- here or resolved off the stack (Resolve's arm). Pawl.ManaSpec's
       -- Synthetic Lasting Spring group is what proves this road, Shizuko,
       -- Caller of Autumn the other.
+      --
+      -- CR 106.6's third shape too, under the source's controller -- CR
+      -- 113.8's activator for every route but CR 602.1b's "any player may
+      -- activate", which Pawl.Engine.Cost.tapForManaWith restamps.
       unitFor addition manaType =
         ManaUnit.MkManaUnit
           { ManaUnit.manaType = manaType,
@@ -558,6 +580,10 @@ manaOptionsOfGiven pcs oid gs =
             ManaUnit.retention = ManaAddition.retention addition,
             ManaUnit.restriction = ManaAddition.restriction addition,
             ManaUnit.rider = ManaAddition.rider addition,
+            ManaUnit.spendTrigger = do
+              controller <- Projection.controllerOf oid gs
+              whenSpent <- ManaAddition.whenSpent addition
+              spendTriggerOf controller oid gs whenSpent,
             ManaUnit.sourceChosenSubtype = chosenSubtype,
             ManaUnit.sourceLastExiled = lastExiled
           }

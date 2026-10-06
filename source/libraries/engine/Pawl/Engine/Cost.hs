@@ -124,6 +124,7 @@ import qualified Pawl.Types.ManaWindow as ManaWindow
 import qualified Pawl.Types.Milled as Milled
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Payment as Payment
 import qualified Pawl.Types.PaymentMoment as PaymentMoment
@@ -148,6 +149,7 @@ import qualified Pawl.Types.Rounding as Rounding
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.SpendTrigger as SpendTrigger
 import qualified Pawl.Types.Subtype as Subtype.Type
 import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 import qualified Pawl.Types.TapPermanents as TapPermanents
@@ -5285,14 +5287,40 @@ payManaWindow perform inFlight record subject spending pid substituting cost = d
 -- CR 106.6a's eagerly created effects go up beside the record and on the same
 -- state, since this is where the units spent are known:
 -- ManaRider.granted mints one continuous effect per unit whose rider the
--- paid-for object matches (Generator Servant). AFTER the record, so that the
+-- paid-for object matches (Generator Servant), and armSpendTriggers arms each
+-- unit's spend trigger (Pyromancer's Goggles). AFTER the record, so that the
 -- condition is matched on the board CR 400.7d has already described -- a rider
 -- clause reading the payment would otherwise see none.
 recordPayment :: ObjectId -> Mana.Type.Mana -> GameState -> GameState
 recordPayment sid spent gs =
   let add o = o {Object.manaSpent = Mana.Type.MkMana (Mana.Type.unwrap (Object.manaSpent o) <> Mana.Type.unwrap spent)}
       recorded = gs {GameState.objects = Map.adjust add sid (GameState.objects gs)}
-   in ManaRider.granted sid spent recorded
+   in armSpendTriggers sid spent (ManaRider.granted sid spent recorded)
+
+-- CR 106.6 / 603.7a: each spent unit's delayed ability triggers when the unit
+-- pays for casting a spell its filter matches -- one per unit (CR 106.6a), with
+-- "that spell" bound as Binding.castSpell. Armed as a reflexive entry, whose
+-- existence is the trigger (Pawl.Engine.Event.Trigger.isReflexive), so it goes
+-- on the stack the next time a player would receive priority (CR 603.3).
+--
+-- The entry's creation moment is minted here rather than at production. Only
+-- CR 701.27f reads it, and no spend trigger in data/cards/ transforms anything.
+--
+-- Game.isSpell is CR 601.2h's "to cast": an activation's payment names an
+-- ability object, and nothing else is paid for with an object at all.
+armSpendTriggers :: ObjectId -> Mana.Type.Mana -> GameState -> GameState
+armSpendTriggers sid spent gs =
+  let fires trigger = Game.isSpell sid gs && ManaRider.spentOnMatches sid gs (SpendTrigger.casts trigger)
+      arm g trigger =
+        Event.armDelayed
+          (SpendTrigger.ability trigger)
+          (SpendTrigger.source trigger)
+          (SpendTrigger.controller trigger)
+          (Map.singleton Binding.castSpell (Binding.toObject sid))
+          Onset.Immediately
+          Nothing
+          g
+   in List.foldl' arm gs (filter fires (Maybe.mapMaybe ManaUnit.spendTrigger (Mana.Type.unwrap spent)))
 
 payMana :: ManaAbilityPerformer.ManaAbilityPerformer -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ManaCost.ManaCost -> Game Bool
 payMana perform = payManaExcept perform Set.empty Nothing
@@ -5654,7 +5682,12 @@ tapForManaWith perform window inFlight refused activator oid = do
                             -- pool it reached: the first recipient's pick, or the
                             -- offered share where it reached nobody.
                             produced = concat (zipWith (\(_, mana) part -> maybe (Mana.unitsOf mana) snd (Maybe.listToMaybe part)) (Map.toList share) parts)
-                        State.modify' (\g -> List.foldl' (\acc (recipient, units) -> Mana.addMana recipient units acc) g shares)
+                        -- CR 603.7e: a spend trigger is the ACTIVATOR's, which
+                        -- Mana.manaOptionsOfGiven could only guess as the
+                        -- permanent's controller. A fence: no "any player may
+                        -- activate" route in data/cards/ prints one.
+                        let activated = fmap (fmap (fmap (\u -> u {ManaUnit.spendTrigger = fmap (\t -> t {SpendTrigger.controller = controller}) (ManaUnit.spendTrigger u)}))) shares
+                        State.modify' (\g -> List.foldl' (\acc (recipient, units) -> Mana.addMana recipient units acc) g activated)
                         bound2 <- ManaAbilityPerformer.effects perform oid controller bound1 (filter (Maybe.isNothing . ManaAbility.manaProduced) trailing)
                         pure (answers2, bound2, filled <> shares, made <> produced)
               (_, _, shares, producedUnits) <- Monad.foldM step (Map.empty, Map.empty, [], []) (zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (zip [0 :: Int ..] (ManaOption.steps chosen)))

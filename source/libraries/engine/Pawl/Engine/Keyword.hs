@@ -6108,7 +6108,8 @@ firebending n =
               ManaAddition.count = keywordCount n,
               ManaAddition.retention = ManaRetention.UntilEndOfCombat,
               ManaAddition.restriction = Nothing,
-              ManaAddition.rider = Nothing
+              ManaAddition.rider = Nothing,
+              ManaAddition.whenSpent = Nothing
             }
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
@@ -7937,7 +7938,8 @@ treasureToken =
           ManaAddition.count = Quantity.Literal 1,
           ManaAddition.retention = ManaRetention.Ordinary,
           ManaAddition.restriction = Nothing,
-          ManaAddition.rider = Nothing
+          ManaAddition.rider = Nothing,
+          ManaAddition.whenSpent = Nothing
         }
 
 -- CR 111.10's shape for the two predefined tokens rule 702.174 promises: a

@@ -20,6 +20,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Duration as Duration
+import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
@@ -116,14 +117,18 @@ granted oid spent gs =
 
 -- Both roads' shared half: does this rider's printed "if that mana is spent on
 -- ..." clause hold of the object the mana paid for?
+matchesCondition :: ObjectId.ObjectId -> GameState.GameState -> ManaRider.ManaRider -> Bool
+matchesCondition oid gs rider = spentOnMatches oid gs (ManaRider.condition rider)
+
+-- | Does a clause about the object mana was spent on hold of it -- a rider's
+-- condition, or the spells a Pawl.Types.SpendTrigger watches?
 --
 -- Matched against the object's own view under its CONTROLLER's perspective --
 -- the context Pawl.Engine.Mana.admitsUnder builds for a restriction's filter,
 -- and honest here for the same reason: the clause names no source and binds no
 -- slot.
-matchesCondition :: ObjectId.ObjectId -> GameState.GameState -> ManaRider.ManaRider -> Bool
-matchesCondition oid gs rider =
+spentOnMatches :: ObjectId.ObjectId -> GameState.GameState -> Filter.Type.Filter Keyword.Keyword -> Bool
+spentOnMatches oid gs =
   Filter.matches
     (Filter.contextFor (Game.teams gs) (Projection.controllerOf oid gs) Nothing)
     (Projection.viewOfObject oid gs)
-    (ManaRider.condition rider)

@@ -361,6 +361,7 @@ import qualified Pawl.Types.Vote as Vote
 import qualified Pawl.Types.VoteChoices as VoteChoices
 import qualified Pawl.Types.VoteObjects as VoteObjects
 import qualified Pawl.Types.Ward as Ward
+import qualified Pawl.Types.WhenSpent as WhenSpent
 import qualified Pawl.Types.WhichCounters as WhichCounters
 import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
@@ -706,8 +707,8 @@ playerRefPositions =
   let one = Quantity.Type.Literal 1
       playerQuantity stem = PlayerQuantity.MkPlayerQuantity (plantedPlayer stem) one
       affecting effect = Effect.AffectPlayers (AffectPlayers.MkAffectPlayers Duration.UntilEndOfTurn (AffectedPlayers.Scoped PlayerScope.You) effect)
-   in [ ("add-mana", Effect.AddMana (ManaAddition.MkManaAddition (plantedPlayer "am") ManaProduction.AnyColor (Quantity.Type.Literal 1) ManaRetention.Ordinary Nothing Nothing), [plantedPlayer "am"]),
-        ("firebend", Effect.Firebend (ManaAddition.MkManaAddition (plantedPlayer "fb") ManaProduction.AnyColor (Quantity.Type.Literal 1) ManaRetention.Ordinary Nothing Nothing), [plantedPlayer "fb"]),
+   in [ ("add-mana", Effect.AddMana (ManaAddition.MkManaAddition (plantedPlayer "am") ManaProduction.AnyColor (Quantity.Type.Literal 1) ManaRetention.Ordinary Nothing Nothing Nothing), [plantedPlayer "am"]),
+        ("firebend", Effect.Firebend (ManaAddition.MkManaAddition (plantedPlayer "fb") ManaProduction.AnyColor (Quantity.Type.Literal 1) ManaRetention.Ordinary Nothing Nothing Nothing), [plantedPlayer "fb"]),
         ("search", Effect.Search (Search.MkSearch (plantedPlayer "se-searcher") (plantedPlayer "se-owner") Set.empty False Nothing (Filter.Type.And []) False SearchDestination.Battlefield Nothing Nothing Set.empty False), [plantedPlayer "se-searcher", plantedPlayer "se-owner"]),
         ("draw", Effect.Draw (Draw.MkDraw (plantedPlayer "dr") one Nothing), [plantedPlayer "dr"]),
         ("mill", Effect.Mill (Mill.MkMill (plantedPlayer "mi") one Nothing Nothing), [plantedPlayer "mi"]),
@@ -5789,11 +5790,13 @@ restrictionFilters restriction =
 manaRiderFilters :: ManaRider.ManaRider -> [Filter.Type.Filter Keyword.Keyword]
 manaRiderFilters rider = [ManaRider.condition rider]
 
--- AddMana's and Firebend's shared payload: CR 106.6's restriction and rider.
+-- AddMana's and Firebend's shared payload: CR 106.6's restriction, rider and
+-- spend trigger.
 manaAdditionFilters :: ManaAddition.ManaAddition -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 manaAdditionFilters addition =
   fmap ((,) ManaRestrictionFramed) (concatMap restrictionFilters (Maybe.maybeToList (ManaAddition.restriction addition)))
     <> unframed (concatMap manaRiderFilters (Maybe.maybeToList (ManaAddition.rider addition)))
+    <> unframed (fmap WhenSpent.casts (Maybe.maybeToList (ManaAddition.whenSpent addition)))
 
 -- Every Filter one effect carries, paired with its Framing. Two arms answer
 -- AttachDestination -- Effect.AttachTarget's destination and

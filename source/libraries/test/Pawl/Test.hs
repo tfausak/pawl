@@ -558,6 +558,7 @@ import qualified Pawl.Codec.SpellCastSpec
 import qualified Pawl.Codec.SpellWasCastSpec
 import qualified Pawl.Codec.SpellWasCopiedSpec
 import qualified Pawl.Codec.SpendManaAsThoughSpec
+import qualified Pawl.Codec.SpendTriggerSpec
 import qualified Pawl.Codec.SpliceSpec
 import qualified Pawl.Codec.StackObjectKindSpec
 import qualified Pawl.Codec.StatedFlipSpec
@@ -622,6 +623,7 @@ import qualified Pawl.Codec.VillainousChoiceRewriteSpec
 import qualified Pawl.Codec.VoteSpec
 import qualified Pawl.Codec.WardSpec
 import qualified Pawl.Codec.WhenSpec
+import qualified Pawl.Codec.WhenSpentSpec
 import qualified Pawl.Codec.WhichCountersSpec
 import qualified Pawl.Codec.WhileSpec
 import qualified Pawl.Codec.WithCountersSpec
@@ -1188,6 +1190,8 @@ spec s registry = do
   Pawl.Codec.ManaRetentionSpec.spec s
   Pawl.Codec.ManaRiderEffectSpec.spec s
   Pawl.Codec.ManaRiderSpec.spec s
+  Pawl.Codec.SpendTriggerSpec.spec s
+  Pawl.Codec.WhenSpentSpec.spec s
   Pawl.Codec.ManaSpec.spec s
   Pawl.Codec.ManaSpecificationSpec.spec s
   Pawl.Codec.ManaSpendingSpec.spec s

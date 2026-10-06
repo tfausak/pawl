@@ -1498,7 +1498,7 @@ faceOfWithLastKnown oid gs = case fmap Object.facing (lookupObject oid gs) of
 --
 -- Through faceOfWithLastKnown, so a departed permanent's ability is read against
 -- the same declarations it carried while it existed (CR 608.2h). The face-up
--- face only, where Pawl.Engine.Resolve.Effect.declaredDelayedAbility falls back to the
+-- face only, where declaredDelayedAbility falls back to the
 -- card's other faces: that fallback is about which face happens to be up as an
 -- opcode RUNS, and a zone-functioning question is asked of the face the ability
 -- was read off.
@@ -1510,6 +1510,40 @@ faceOfWithLastKnown oid gs = case fmap Object.facing (lookupObject oid gs) of
 -- keeps a name local to the face that arms it.
 delayedAbilitiesOf :: ObjectId -> GameState -> Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card))
 delayedAbilitiesOf oid gs = Map.unions (fmap Face.delayedAbilities (facesOfWithLastKnown oid gs))
+
+-- CR 603.7: the text an Effect.ArmDelayedTrigger's or a Pawl.Types.WhenSpent's
+-- name resolves to, off the SOURCE's own card.
+--
+-- The face that is up first, which is what every ordinary arm finds, and then the
+-- card's other faces. That fallback is Ratchet, Field Medic's: "you may convert
+-- Ratchet. When you do, return target artifact card ..." converts the permanent
+-- and arms the reflexive in ONE clause (CR 608.2c's written order), so by the
+-- time the arm runs the face that declared the ability is no longer the one up.
+-- CR 603.7a makes the delayed ability something the RESOLVING ability creates,
+-- and CR 603.7c is the same posture from the other end -- a delayed ability
+-- survives its object changing characteristics -- so which face the permanent
+-- happens to show as the opcode runs is not what says whether the text exists.
+-- Letting a turn earlier in the same resolution blank it would be the wrong
+-- reading of the rule as well as a trigger that could never fire.
+--
+-- Pawl.CardSpec's D4 dataflow lint is per FACE, so a name is declared on the face
+-- that arms it and the fallback cannot pick up somebody else's ability: two faces
+-- reusing one name would have to be two arms as well, and the lint's equality is
+-- what would catch a card writing one.
+--
+-- Both arms quantify over EVERY card representing the source (CR 702.140e), so
+-- an under-component's declaration is found: delayedAbilitiesOf walks the
+-- faces that are up and cardsOfWithLastKnown the cards behind them.
+declaredDelayedAbility :: ObjectId -> AbilityName.AbilityName -> GameState -> Maybe (TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card))
+declaredDelayedAbility source name gs =
+  let onFace = Map.lookup name (delayedAbilitiesOf source gs)
+      onCard =
+        Maybe.listToMaybe
+          ( concatMap
+              (Maybe.mapMaybe (Map.lookup name . Face.delayedAbilities) . NonEmpty.toList . Card.Type.faces)
+              (cardsOfWithLastKnown source gs)
+          )
+   in onFace Applicative.<|> onCard
 
 -- CR 702.140e: the faces of every card representing `oid`, topmost first -- one
 -- face for an ordinary object, and a merged permanent's whole stack. The one
@@ -1530,7 +1564,7 @@ facesOfWithLastKnown oid gs =
 -- CR 702.140e: every card representing `oid`, topmost first -- what
 -- `cardOfWithLastKnown` answers with, widened past CR 730.2a's topmost
 -- component for facesOfWithLastKnown's reason. Its reader is
--- Pawl.Engine.Resolve.Effect.declaredDelayedAbility's fallback, which asks the
+-- declaredDelayedAbility's fallback, which asks the
 -- card rather than the face that is up.
 cardsOfWithLastKnown :: ObjectId -> GameState -> [Card]
 cardsOfWithLastKnown oid gs =

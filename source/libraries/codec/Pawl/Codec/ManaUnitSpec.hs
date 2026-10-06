@@ -1,6 +1,7 @@
 module Pawl.Codec.ManaUnitSpec where
 
 import qualified Data.Set as Set
+import qualified Pawl.Codec.FaceSpec as FaceSpec
 import qualified Pawl.Codec.ManaUnit as ManaUnit
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
@@ -12,7 +13,9 @@ import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.ProductionTag as ProductionTag
+import qualified Pawl.Types.SpendTrigger as SpendTrigger
 import qualified Pawl.Types.Subtype as Subtype
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -29,6 +32,7 @@ spec s = Spec.describe s "Pawl.Codec.ManaUnit" $ do
           ManaUnit.retention = ManaRetention.Ordinary,
           ManaUnit.restriction = Nothing,
           ManaUnit.rider = Nothing,
+          ManaUnit.spendTrigger = Nothing,
           ManaUnit.sourceChosenSubtype = Nothing,
           ManaUnit.sourceLastExiled = Nothing
         }
@@ -47,9 +51,36 @@ spec s = Spec.describe s "Pawl.Codec.ManaUnit" $ do
           ManaUnit.retention = ManaRetention.UntilEndOfTurn,
           ManaUnit.restriction = Just (ManaRestriction.onlyCasts (Filter.HasCardType CardType.Creature)),
           ManaUnit.rider = Nothing,
+          ManaUnit.spendTrigger = Nothing,
           ManaUnit.sourceChosenSubtype = Just Subtype.Goblin,
           ManaUnit.sourceLastExiled = Just (ObjectId.MkObjectId 7)
         }
       " {\"manaType\":{\"type\":\"Colored\",\"value\":{\"type\":\"Red\"}},\"tags\":[{\"type\":\"Snow\"}],\"retention\":{\"type\":\"UntilEndOfTurn\"},\"restriction\":{\"casts\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"rider\":null,\"sourceChosenSubtype\":{\"type\":\"Goblin\"},\"sourceLastExiled\":7} "
+  -- Pyromancer's Goggles' red: CR 106.6's third shape, written only when set.
+  Spec.it s "mana carrying a spend trigger" $
+    Common.assertCodec
+      s
+      ManaUnit.codec
+      ManaUnit.MkManaUnit
+        { ManaUnit.manaType = ManaType.Colored Color.Red,
+          ManaUnit.tags = Set.empty,
+          ManaUnit.retention = ManaRetention.Ordinary,
+          ManaUnit.restriction = Nothing,
+          ManaUnit.rider = Nothing,
+          ManaUnit.spendTrigger =
+            Just
+              SpendTrigger.MkSpendTrigger
+                { SpendTrigger.casts = Filter.HasCardType CardType.Instant,
+                  SpendTrigger.ability = FaceSpec.minimalTriggeredAbility,
+                  SpendTrigger.source = ObjectId.MkObjectId 4,
+                  SpendTrigger.controller = PlayerId.MkPlayerId 0
+                },
+          ManaUnit.sourceChosenSubtype = Nothing,
+          ManaUnit.sourceLastExiled = Nothing
+        }
+      ( " {\"manaType\":{\"type\":\"Colored\",\"value\":{\"type\":\"Red\"}},\"tags\":[],\"retention\":{\"type\":\"Ordinary\"},\"restriction\":null,\"rider\":null,"
+          <> "\"spendTrigger\":{\"casts\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Instant\"}},\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}},\"source\":4,\"controller\":0},"
+          <> "\"sourceChosenSubtype\":null} "
+      )
   Spec.it s "has a schema" $
     Common.assertHasSchema s ManaUnit.codec

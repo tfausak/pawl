@@ -1880,6 +1880,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
               ManaUnit.retention = ManaRetention.Ordinary,
               ManaUnit.restriction = Nothing,
               ManaUnit.rider = Nothing,
+              ManaUnit.spendTrigger = Nothing,
               ManaUnit.sourceChosenSubtype = Nothing,
               ManaUnit.sourceLastExiled = Nothing
             }

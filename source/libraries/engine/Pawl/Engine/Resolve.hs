@@ -56,6 +56,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.IfTaken as IfTaken
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Mode as Mode
 import Pawl.Types.ModeIndex (ModeIndex)
@@ -83,13 +84,17 @@ import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.Result (Result)
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.WhenSpent as WhenSpent
 import qualified Pawl.Types.Zone as Zone
 
--- CR 603.7: the delayed abilities an effect list ARMS, by name.
+-- CR 603.7: the delayed abilities an effect list ARMS, by name -- an AddMana's
+-- spend trigger among them, which its payment arms (CR 106.6).
 armedAbilities :: [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> Set AbilityName
 armedAbilities effects =
   let named effect = case effect of
         Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger name _ _) -> Just name
+        Effect.AddMana addition -> fmap WhenSpent.ability (ManaAddition.whenSpent addition)
+        Effect.Firebend addition -> fmap WhenSpent.ability (ManaAddition.whenSpent addition)
         _ -> Nothing
    in Set.fromList (Maybe.mapMaybe named effects)
 

@@ -10,7 +10,7 @@ module Pawl.Types.ManaRiderEffect where
 -- Pawl.Engine.Event ask it without learning what a card says. Nothing here may
 -- ever mean "run these effects": that shape is CR 603.7a's delayed triggered
 -- ability, the third of rule 106.6's shapes, and it carries a whole ability
--- rather than a word.
+-- rather than a word (Pawl.Types.WhenSpent).
 --
 -- The interpreter is Pawl.Engine.ManaRider, which is where the casing lives so
 -- that Pawl.Engine.Event.counterOne can ask one typed question --
