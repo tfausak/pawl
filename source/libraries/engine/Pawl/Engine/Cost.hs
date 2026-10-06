@@ -680,7 +680,7 @@ candidateCostsGiven permitted pid name oid gs =
               -- face". So it is read off the card rather than off the projection of
               -- the half being proposed, which carries the BACK face's keywords. A
               -- more than meets the eye ability GRANTED to a card in a zone is
-              -- therefore not expanded (gap #1859).
+              -- therefore not expanded (gap #4706).
               converted =
                 if isConvertedFace
                   then
