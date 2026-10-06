@@ -1111,6 +1111,7 @@ handAppend printing pid gs =
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
             Object.designationValues = Map.empty,
+            Object.storedResults = Map.empty,
             Object.paidCosts = Map.empty,
             Object.tributePaid = False,
             Object.bestowed = False,

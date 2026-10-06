@@ -274,6 +274,12 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.DesignationValue Designation.Monstrous)
       " {\"type\":\"DesignationValue\",\"value\":{\"type\":\"Monstrous\"}} "
+  Spec.it s "StoredResultsOfSameValue" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      Quantity.StoredResultsOfSameValue
+      " {\"type\":\"StoredResultsOfSameValue\"} "
   -- CR 716.2b: the object's LEVEL, also with nothing on the wire, and also not a
   -- member of Pawl.Types.Designation -- rule 716.2b's designation is a number.
   Spec.it s "ClassLevel" $

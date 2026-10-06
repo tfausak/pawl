@@ -279,6 +279,7 @@ viewOfCard face =
           -- CR 701.37c's X is set on a PERMANENT -- `designations` above, same
           -- sentence.
           Filter.designationValues = Map.empty,
+          Filter.storedResults = Map.empty,
           -- CR 716.2b gives a level to a PERMANENT, and this builder describes a
           -- printed face.
           Filter.classLevel = Nothing,
@@ -857,6 +858,7 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- CR 701.37c: the number the mark was set with, read live off the object
       -- beside the mark itself -- `designations`' posture above.
       Filter.designationValues = foldMap Object.designationValues (Game.lookupObject oid gs),
+      Filter.storedResults = foldMap Object.storedResults (Game.lookupObject oid gs),
       -- CR 716.2b: a designation too, so `designations`' posture again -- and
       -- Nothing for an id naming no object leaves CR 716.2d to answer level 1 at
       -- the read, which is what a CR 608.2h asker gets for a permanent that is

@@ -76,6 +76,11 @@ import qualified Pawl.Types.SlotName as SlotName
 -- instruction's rollers, ties included, as players for a later clause to name
 -- (Chaos Dragon's "those players"). Nothing where no clause reads it.
 --
+-- `store` is CR 706.8a's "store those results on it": the slot naming the
+-- permanent every result the instruction kept is stored on (Centaur of
+-- Attention). A storing instruction USES no one result, so CR 706.4's reading
+-- is never asked and `slot` binds nothing. Nothing for every other roll.
+--
 -- Construct with BRACE syntax everywhere: positional construction absorbs a new
 -- field in argument order with nothing red (#2009, #2021).
 data RollDie = MkRollDie
@@ -86,7 +91,8 @@ data RollDie = MkRollDie
     slot :: SlotName.SlotName,
     other :: Maybe SlotName.SlotName,
     roller :: PlayerScope.PlayerScope,
-    highest :: Maybe SlotName.SlotName
+    highest :: Maybe SlotName.SlotName,
+    store :: Maybe SlotName.SlotName
   }
   deriving (Eq, Ord, Show)
 

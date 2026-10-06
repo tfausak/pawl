@@ -47,6 +47,7 @@ import qualified Pawl.Types.RollAdjustment as RollAdjustment
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SearchPlace as SearchPlace
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.StoredResult as StoredResult
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TimeTravelChoice as TimeTravelChoice
 
@@ -302,6 +303,8 @@ data Response
     -- replaying as the other would be a silently wrong answer rather than a
     -- desync.
     ChoseDieResult Natural.Natural
+  | -- | CR 706.8b: how many of each stored result a player chose to reroll.
+    ChoseStoredRerolls (Map.Map StoredResult.StoredResult Natural.Natural)
   | -- | CR 122.5: the KIND of counter a player chose to move off the first
     -- object. Its own constructor for ChoseDamageSource's reason -- the answer
     -- is not even an object, so no counter-placing response could stand in for

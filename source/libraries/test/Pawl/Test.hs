@@ -565,6 +565,7 @@ import qualified Pawl.Codec.StaticAbilitySpec
 import qualified Pawl.Codec.StatusSpec
 import qualified Pawl.Codec.StepBeganSpec
 import qualified Pawl.Codec.StepBeginsSpec
+import qualified Pawl.Codec.StoredResultSpec
 import qualified Pawl.Codec.SubtypeFamilySpec
 import qualified Pawl.Codec.SubtypeSpec
 import qualified Pawl.Codec.SubtypesAreSpec
@@ -1394,6 +1395,7 @@ spec s registry = do
   Pawl.Codec.StatusSpec.spec s
   Pawl.Codec.StepBeganSpec.spec s
   Pawl.Codec.StepBeginsSpec.spec s
+  Pawl.Codec.StoredResultSpec.spec s
   Pawl.Codec.SubtypeFamilySpec.spec s
   Pawl.Codec.SubtypeSpec.spec s
   Pawl.Codec.SubtypesAreSpec.spec s

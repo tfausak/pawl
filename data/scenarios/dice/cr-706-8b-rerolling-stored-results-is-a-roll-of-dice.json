@@ -1,0 +1,235 @@
+{
+  "description": "CR 706.8b rerolling stored results is a roll of dice",
+  "note": "Feywild Trickster makes a Faerie Dragon for each instruction that rolls dice: one for the five stored as Centaur of Attention enters, and a second for rerolling its three 4s (one kind of die, so one roll). The control rerolls none and makes no second Dragon.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Feywild Trickster"
+          },
+          {
+            "card": "Forest",
+            "label": "f1"
+          },
+          {
+            "card": "Forest",
+            "label": "f2"
+          },
+          {
+            "card": "Forest",
+            "label": "f3"
+          },
+          {
+            "card": "Forest",
+            "label": "f4"
+          },
+          {
+            "card": "Forest",
+            "label": "f5"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Centaur of Attention",
+            "label": "centaur"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$centaur",
+          "mana": [
+            "$f1",
+            "$f2",
+            "$f3",
+            "$f4",
+            "$f5"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "RollDie",
+          "with": 4
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "RollDie",
+          "with": 2
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "RollDie",
+          "with": 4
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "RollDie",
+          "with": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "RollDie",
+          "with": 4
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Faerie Dragon Token",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseStoredRerolls",
+          "with": [
+            [
+              {
+                "sides": 6,
+                "value": 4
+              },
+              3
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "RollDie",
+          "with": 6
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "RollDie",
+          "with": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "RollDie",
+          "with": 6
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Faerie Dragon Token",
+          "count": 2
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "Centaur of Attention",
+          "power": 5,
+          "toughness": 5
+        }
+      }
+    }
+  ]
+}

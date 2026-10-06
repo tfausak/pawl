@@ -157,6 +157,7 @@ overSlots f quantity =
         Quantity.HasDesignation _ -> pure quantity
         -- CR 701.37c's number, HasDesignation's arm above with the same payload.
         Quantity.DesignationValue _ -> pure quantity
+        Quantity.StoredResultsOfSameValue -> pure quantity
         Quantity.ClassLevel -> pure quantity
         Quantity.WasKicked -> pure quantity
         Quantity.WasForetold -> pure quantity
@@ -342,6 +343,7 @@ nestedRefs quantity = case quantity of
   Quantity.ObjectCountersOfAnyKind -> Set.empty
   Quantity.HasDesignation _ -> Set.empty
   Quantity.DesignationValue _ -> Set.empty
+  Quantity.StoredResultsOfSameValue -> Set.empty
   Quantity.ClassLevel -> Set.empty
   Quantity.WasKicked -> Set.empty
   Quantity.WasForetold -> Set.empty
@@ -457,6 +459,7 @@ nestedCounts quantity = case quantity of
   Quantity.PlayedBy _ -> []
   Quantity.HasDesignation _ -> []
   Quantity.DesignationValue _ -> []
+  Quantity.StoredResultsOfSameValue -> []
   Quantity.ClassLevel -> []
   Quantity.WasKicked -> []
   Quantity.WasForetold -> []
@@ -687,6 +690,7 @@ mapPlayerRefs f intoCount quantity =
         Quantity.ObjectCountersOfAnyKind -> quantity
         Quantity.HasDesignation _ -> quantity
         Quantity.DesignationValue _ -> quantity
+        Quantity.StoredResultsOfSameValue -> quantity
         Quantity.ClassLevel -> quantity
         Quantity.WasKicked -> quantity
         Quantity.WasForetold -> quantity

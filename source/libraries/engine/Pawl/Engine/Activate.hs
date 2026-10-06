@@ -167,6 +167,7 @@ activateAbilityWith runSubgame pid srcId ability = Event.announcing $ do
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
             Object.designationValues = Map.empty,
+            Object.storedResults = Map.empty,
             Object.paidCosts = Map.empty,
             Object.tributePaid = False,
             Object.bestowed = False,

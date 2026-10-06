@@ -1247,6 +1247,7 @@ ownCounts effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.Reroll -> []
+  Effect.RerollStoredResults _ -> []
   Effect.ChooseCardName _ -> []
   Effect.FromOutsideTheGame _ -> []
   Effect.ExileThisSpell -> []
@@ -1782,6 +1783,7 @@ effectNestedEffects effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.Reroll -> []
+  Effect.RerollStoredResults _ -> []
   Effect.ChooseCardName _ -> []
   Effect.FromOutsideTheGame _ -> []
   Effect.ExileThisSpell -> []
@@ -2299,6 +2301,7 @@ effectReplacements effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.Reroll -> []
+  Effect.RerollStoredResults _ -> []
   Effect.ChooseCardName _ -> []
   Effect.FromOutsideTheGame _ -> []
   Effect.ExileThisSpell -> []
@@ -2793,6 +2796,7 @@ effectMintedFaces effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.Reroll -> []
+  Effect.RerollStoredResults _ -> []
   Effect.ChooseCardName _ -> []
   Effect.FromOutsideTheGame _ -> []
   Effect.ExileThisSpell -> []
@@ -4017,6 +4021,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.IsActivePlayer _ -> []
   Quantity.Type.HasDesignation _ -> []
   Quantity.Type.DesignationValue _ -> []
+  Quantity.Type.StoredResultsOfSameValue -> []
   Quantity.Type.ClassLevel -> []
   Quantity.Type.WasKicked -> []
   Quantity.Type.WasForetold -> []
@@ -5836,6 +5841,7 @@ effectFilters effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.Reroll -> []
+  Effect.RerollStoredResults _ -> []
   -- CR 201.4a's restriction, and the WISH's frame: what judges it is
   -- Pawl.Interpreter.legalCardName, on the far side of
   -- Pawl.Engine.Engine.runGameAsked, and it matches a printed FACE
