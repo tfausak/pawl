@@ -23,7 +23,6 @@ import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
-import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Expiry as Expiry
@@ -32,6 +31,7 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.IgnoredAbility as IgnoredAbility
 import Pawl.Types.Keyword (Keyword)
+import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
@@ -147,8 +147,8 @@ ignorable pid gs = do
 -- Pawl.Types.Duration, and CR 116.2d's is not printed as one -- see
 -- Pawl.Types.SpecialAction on why the duration is not carried. CR 514.2 is what
 -- AtCleanup means, and "until end of turn" is what every producer says.
-ignore :: PlayerId -> ObjectId -> AbilityName.AbilityName -> Game ()
-ignore pid oid name = do
+ignore :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> ObjectId -> AbilityName.AbilityName -> Game ()
+ignore perform pid oid name = do
   before <- State.get
   case ignoreCostOf oid name before of
     Nothing -> pure ()
@@ -159,7 +159,7 @@ ignore pid oid name = do
       -- symbol into it, so no prompt is raised today. A printing that did would
       -- be the one to refute that.
       (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure cost
-      payment <- Cost.pay Resolve.performManaAbility before PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
+      payment <- Cost.pay perform before PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
       case payment of
         -- CR 733.1's reversal, Pawl.Engine.Foretell.foretell's reason: this
         -- special action IS the whole of what failed, so `before` goes to

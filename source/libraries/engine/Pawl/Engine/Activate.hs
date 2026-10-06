@@ -40,6 +40,7 @@ import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import Pawl.Types.Result (Result)
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Saddling as Saddling
 import qualified Pawl.Types.Sickness as Sickness
@@ -86,6 +87,12 @@ revealIfHidden pid srcId = do
     Just zone | Game.isHiddenZone zone -> Event.reveal RevealCause.Ordinary pid srcId
     _ -> pure ()
 
+-- The no-subgame activation (every test that activates directly): a triggered
+-- mana ability that plays a subgame while the cost is paid would draw. Engine's
+-- live loop uses activateAbilityWith.
+activateAbility :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> Game ()
+activateAbility = activateAbilityWith Resolve.noSubgame
+
 -- CR 602.2: announce the activation, revealing the card if it is coming from a
 -- hidden zone (602.2a), put the ability on the stack (a fresh OfAbility object),
 -- then walk CR 601.2b-i as CR 602.2b sends it -- choose modes, announce the value
@@ -102,8 +109,11 @@ revealIfHidden pid srcId = do
 -- an activation the engine refused revealed nothing, and must leave no reveal
 -- in the log claiming otherwise. Everything else reads `gs`, the state as of the
 -- announcement.
-activateAbility :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> Game ()
-activateAbility pid srcId ability = Event.announcing $ do
+--
+-- `runSubgame` is the injected nested-game runner, for a subgame a triggered
+-- mana ability starts while the cost is paid (CR 605.4a).
+activateAbilityWith :: Game Result -> PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> Game ()
+activateAbilityWith runSubgame pid srcId ability = Event.announcing $ do
   before <- State.get
   -- CR 602.2a's own order: the reveal is part of announcing, and so precedes
   -- the ability becoming an object on the stack (the rest of that same rule).
@@ -457,7 +467,7 @@ activateAbility pid srcId ability = Event.announcing $ do
               -- (Cost.paySubstituting). The bindings the substitution makes are
               -- dropped -- no printing reads back which permanents a waterbend
               -- cost tapped, where CR 702.51c's convoke does.
-              (payment, _) <- Cost.paySubstituting Resolve.performManaAbility before [] PaymentMoment.OutsideResolution (PaymentSubject.Activating srcId stamp) (Just abilId) ManaSpending.AsProduced pid srcId (Cost.announceSubstitutions Cost.waterbendSubstitutions pid srcId) paidCost
+              (payment, _) <- Cost.paySubstituting (Resolve.performManaAbility runSubgame) before [] PaymentMoment.OutsideResolution (PaymentSubject.Activating srcId stamp) (Just abilId) ManaSpending.AsProduced pid srcId (Cost.announceSubstitutions Cost.waterbendSubstitutions pid srcId) paidCost
               case payment of
                 -- CR 606.3: record that a loyalty ability of THIS PERMANENT was
                 -- activated, which is the whole of the once-per-turn limit's storage

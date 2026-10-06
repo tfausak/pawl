@@ -2864,7 +2864,7 @@ licidSpec s registry = Spec.describe s "Licid" $ do
       Nothing -> Spec.assertFailure s "Gliding Licid should print one activated ability"
       Just (lic, host, after) -> do
         let ready = after {GameState.priority = Just S.alice}
-            paid = S.settleSba (S.runPure S.identityAnswer ready (EndEffect.endEffect S.alice lic))
+            paid = S.settleSba (S.runPure S.identityAnswer ready (EndEffect.endEffect S.manaPerformer S.alice lic))
         -- The OFFER, which no printed permission grants: it rides the stored
         -- effect, so it exists only because the ability resolved.
         Spec.assertBool s (List.elem (Action.Type.EndEffect lic) (Action.legalActions S.alice ready)) "CR 116.2c: alice is offered the pay-to-end while the effect is live"

@@ -343,7 +343,7 @@ resolveSpellWith runSubgame oid = do
                           before <- State.get
                           (admitted, answers2) <-
                             if taken
-                              then payGateAdmits oid oid effectController idx limbIdx (instanceView (Map.mapWithKey legalSlot (Binding.targetsOf (Object.bindings obj)))) (Just facing) Set.empty answers limb
+                              then payGateAdmits runSubgame oid oid effectController idx limbIdx (instanceView (Map.mapWithKey legalSlot (Binding.targetsOf (Object.bindings obj)))) (Just facing) Set.empty answers limb
                               else pure (False, answers)
                           Monad.when admitted (asCostWhenNamed indexedClauses limbIdx (applyClauseEffects oid applyOne (Foldable.toList (Clause.effects limb))))
                           after <- State.get
@@ -409,6 +409,7 @@ resolveSpellWith runSubgame oid = do
                                 then
                                   let chosenAtStart = Binding.targetsOf (Object.bindings obj)
                                    in payGateAdmits
+                                        runSubgame
                                         oid
                                         oid
                                         effectController
@@ -824,7 +825,7 @@ resolveModesWith runSubgame stackId srcId modes = do
                       gated <- gateHolds effectController srcId (instanceView (Binding.targetsOf gateBindings)) gateBindings limb
                       taken <- if gated then exercises stackId srcId effectController idx limbIdx boundHere legalHere (Just facing) Set.empty limb else pure False
                       before <- State.get
-                      (admitted, answers2) <- if taken then payGateAdmits stackId srcId effectController idx limbIdx (instanceView legal) (Just facing) Set.empty answers limb else pure (False, answers)
+                      (admitted, answers2) <- if taken then payGateAdmits runSubgame stackId srcId effectController idx limbIdx (instanceView legal) (Just facing) Set.empty answers limb else pure (False, answers)
                       Monad.when admitted (asCostWhenNamed indexedClauses limbIdx (applyClauseEffects srcId applyOne (Foldable.toList (Clause.effects limb))))
                       after <- State.get
                       pure (answers2, recordTaken limb admitted before after limbIdx ran)
@@ -886,7 +887,7 @@ resolveModesWith runSubgame stackId srcId modes = do
                             -- CR 118.12: then the cost paid on resolution, against the
                             -- START-of-resolution slots.
                             before <- State.get
-                            (admitted, answers2) <- if taken then payGateAdmits stackId srcId effectController idx cIdx (instanceView legal) announced committed answers clause else pure (False, answers)
+                            (admitted, answers2) <- if taken then payGateAdmits runSubgame stackId srcId effectController idx cIdx (instanceView legal) announced committed answers clause else pure (False, answers)
                             Monad.when admitted (asCostWhenNamed indexedClauses cIdx (applyClauseEffects srcId applyOne (Foldable.toList (Clause.effects clause))))
                             after <- State.get
                             pure (answers2, picked2, recordTaken clause admitted before after cIdx ran)
@@ -1392,15 +1393,15 @@ clauseIsInert bound legal clause =
 -- being keyed on the offering clause's ordinal. A clause naming an offer never
 -- made falls through and makes it, the named clause having failed its own CR
 -- 701.46a "if" or CR 603.5 "may".
-payGateAdmits :: ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> Maybe (Set PlayerId) -> Set PlayerId -> Map.Map ClauseIndex (Map.Map PlayerId Bool) -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game (Bool, Map.Map ClauseIndex (Map.Map PlayerId Bool))
-payGateAdmits resolving source controller idx cIdx legal announced committed answers clause = case Clause.payGate clause of
+payGateAdmits :: Game Result -> ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> Maybe (Set PlayerId) -> Set PlayerId -> Map.Map ClauseIndex (Map.Map PlayerId Bool) -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game (Bool, Map.Map ClauseIndex (Map.Map PlayerId Bool))
+payGateAdmits runSubgame resolving source controller idx cIdx legal announced committed answers clause = case Clause.payGate clause of
   Nothing -> pure (True, answers)
   Just gate -> do
     let offerAt = Maybe.fromMaybe cIdx (PayGate.offeredAt gate)
     (asked, answers2) <- case Map.lookup offerAt answers of
       Just recorded -> pure (recorded, answers)
       Nothing -> do
-        recorded <- payGatePaid resolving source controller idx cIdx legal announced committed gate
+        recorded <- payGatePaid runSubgame resolving source controller idx cIdx legal announced committed gate
         pure (recorded, Map.insert offerAt recorded answers)
     let selected = branchSelects (PayGate.branch gate) asked
     State.modify' (bindPlayersSlot resolving Binding.gatePlayers selected)

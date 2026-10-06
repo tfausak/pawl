@@ -20,9 +20,9 @@ import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Expiry as Expiry
-import qualified Pawl.Engine.Resolve.Effect as Resolve
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PaidExpiry as PaidExpiry
@@ -88,8 +88,8 @@ endable pid gs = filter (\oid -> canEnd pid oid gs) (ListUtils.nubOrd (fmap fst 
 --
 -- The payment's bound slots are dropped: a special action puts nothing on the
 -- stack (CR 116.1), so there is no resolving object whose effects could read one.
-endEffect :: PlayerId -> ObjectId -> Game ()
-endEffect pid oid = do
+endEffect :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> ObjectId -> Game ()
+endEffect perform pid oid = do
   before <- State.get
   case offerToEnd oid before of
     Nothing -> pure ()
@@ -100,7 +100,7 @@ endEffect pid oid = do
       -- prompt is raised today. A printing that did would be the one to
       -- refute that.
       (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure (PaidExpiry.cost offer)
-      payment <- Cost.pay Resolve.performManaAbility before PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
+      payment <- Cost.pay perform before PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
       case payment of
         -- CR 733.1's reversal, Pawl.Engine.Foretell.foretell's reason: this
         -- special action IS the whole of what failed, so `before` goes to

@@ -1001,6 +1001,26 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     Spec.assertEqWith s "and his library is whole" (length (Game.zoneMembers Zone.Library S.bob after)) 3
     Spec.assertEqWith s "the drawn subgame did not decide the main game (CR 729.1a)" (GameState.result after) Nothing
 
+  -- CR 605.4a with CR 729.1a: a subgame started by a triggered mana ability,
+  -- which never reaches the stack and runs while alice pays for a spell. CR
+  -- 605.1b has no library clause, so the ability stays a mana ability. Three
+  -- seats and the same dial as the as-enters pair above: bob's library.
+  Spec.it s "CR 605.4a / 729.1b gameplay: a triggered mana ability's subgame winner draws a card" $ do
+    after <- castThroughWellspring s registry 8
+    Spec.assertEqWith s "CR 729.1b: bob won the subgame and drew a card in the main game" (S.handSize S.bob after) 1
+    Spec.assertEqWith s "alice, whose land was tapped, lost and drew nothing" (S.handSize S.alice after) 0
+    Spec.assertEqWith s "nor did carol" (S.handSize S.carol after) 0
+    Spec.assertEqWith s "CR 729.5: bob's draw came from his funnelled-back library" (length (Game.zoneMembers Zone.Library S.bob after)) 7
+    merfolk <- S.printingOf s registry "Merfolk of the Pearl Trident"
+    Spec.assertEqWith s "CR 729.5: the main game resumed, and the spell the mana paid for resolved" (S.countOnBattlefieldByName (S.printingName merfolk) S.alice after) 1
+    Spec.assertEqWith s "the main game did not end" (GameState.result after) Nothing
+
+  Spec.it s "CR 605.4a / 729.1b gameplay: a drawn mana-ability subgame has no winner to draw" $ do
+    after <- castThroughWellspring s registry 3
+    Spec.assertEqWith s "bob's 3 cards cannot fill an opening hand either, so nobody won and he drew nothing" (S.handSize S.bob after) 0
+    Spec.assertEqWith s "and his library is whole" (length (Game.zoneMembers Zone.Library S.bob after)) 3
+    Spec.assertEqWith s "the drawn subgame did not decide the main game (CR 729.1a)" (GameState.result after) Nothing
+
   -- CR 729.1a #137: "the spell or ability that created the subgame" -- the rule
   -- names both kinds of object, and Shahrazad and Sindbad (Unknown Event,
   -- Creature -- Human, type line and Oracle text checked against
@@ -2764,3 +2784,30 @@ castThreshold island mountain threshold bobLibrary =
             GameState.priority = Just S.alice
           }
    in snd (Engine.runGamePure subgameAnswer gStart Engine.priorityLoop)
+
+-- The Synthetic Wellspring of Legends board the two CR 605.4a cases share:
+-- alice's lone Island carries the Aura and pays for a Merfolk of the Pearl
+-- Trident; the libraries are castThreshold's, `bobLibrary` the dial.
+castThroughWellspring :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m GameState.GameState
+castThroughWellspring s registry bobLibrary = do
+  island <- S.printingOf s registry "Island"
+  mountain <- S.printingOf s registry "Mountain"
+  wellspring <- S.printingOf s registry "Synthetic Wellspring of Legends"
+  merfolk <- S.printingOf s registry "Merfolk of the Pearl Trident"
+  let g0 = Setup.emptyGame S.threePlayers
+      g1 = addManyG mountain 3 S.alice (addManyG mountain bobLibrary S.bob (addManyG mountain 4 S.carol g0))
+      g2 = S.landsFor island S.alice 1 (poolToLibraryG S.carol (poolToLibraryG S.bob (poolToLibraryG S.alice g1)))
+  case Game.zoneMembers Zone.Battlefield S.alice g2 of
+    [islandId] -> do
+      let (auraId, g3) = S.addPermanent wellspring S.alice g2
+          -- ToObject, as Pawl.ManaSpec's wildGrowthBoard attaches its Aura.
+          g4 = S.attachTo auraId (Recipient.ToObject islandId) g3
+          (_spellId, g5) = S.addHandCard merfolk S.alice g4
+          gStart =
+            g5
+              { GameState.activePlayer = S.alice,
+                GameState.phase = Phase.PrecombatMain,
+                GameState.priority = Just S.alice
+              }
+      pure (snd (Engine.runGamePure subgameAnswer gStart Engine.priorityLoop))
+    _ -> Spec.assertFailure s "fixture should give alice exactly one Island" >> pure g2
