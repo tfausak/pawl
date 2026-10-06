@@ -363,6 +363,7 @@ import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.SpellWasCopied as SpellWasCopied
+import qualified Pawl.Types.SpendTrigger as SpendTrigger
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.StoredResult as StoredResult
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
@@ -386,40 +387,6 @@ import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 import qualified Pawl.Types.ZonePair as ZonePair
 import qualified Pawl.Types.ZoneScope as ZoneScope
-
--- CR 603.7: the text an Effect.ArmDelayedTrigger's name resolves to, off the
--- SOURCE's own card.
---
--- The face that is up first, which is what every ordinary arm finds, and then the
--- card's other faces. That fallback is Ratchet, Field Medic's: "you may convert
--- Ratchet. When you do, return target artifact card ..." converts the permanent
--- and arms the reflexive in ONE clause (CR 608.2c's written order), so by the
--- time the arm runs the face that declared the ability is no longer the one up.
--- CR 603.7a makes the delayed ability something the RESOLVING ability creates,
--- and CR 603.7c is the same posture from the other end -- a delayed ability
--- survives its object changing characteristics -- so which face the permanent
--- happens to show as the opcode runs is not what says whether the text exists.
--- Letting a turn earlier in the same resolution blank it would be the wrong
--- reading of the rule as well as a trigger that could never fire.
---
--- Pawl.CardSpec's D4 dataflow lint is per FACE, so a name is declared on the face
--- that arms it and the fallback cannot pick up somebody else's ability: two faces
--- reusing one name would have to be two arms as well, and the lint's equality is
--- what would catch a card writing one.
---
--- Both arms quantify over EVERY card representing the source (CR 702.140e), so
--- an under-component's declaration is found: Game.delayedAbilitiesOf walks the
--- faces that are up and Game.cardsOfWithLastKnown the cards behind them.
-declaredDelayedAbility :: ObjectId -> AbilityName -> GameState -> Maybe (TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
-declaredDelayedAbility source name gs =
-  let onFace = Map.lookup name (Game.delayedAbilitiesOf source gs)
-      onCard =
-        Maybe.listToMaybe
-          ( concatMap
-              (Maybe.mapMaybe (Map.lookup name . Face.delayedAbilities) . NonEmpty.toList . Card.Type.faces)
-              (Game.cardsOfWithLastKnown source gs)
-          )
-   in onFace <|> onCard
 
 -- CR 603.7c: bind the tokens a Create or a CreateCopy minted under the slot the
 -- effect names, so a later effect of this resolution or a delayed ability it
@@ -638,7 +605,7 @@ armsReflexive source effect gs = case effect of
     maybe
       False
       ((== TriggerCondition.Reflexive) . TriggeredAbility.condition)
-      (declaredDelayedAbility source name gs <|> Keyword.mintedDelayedAbility name)
+      (Game.declaredDelayedAbility source name gs <|> Keyword.mintedDelayedAbility name)
   _ -> False
 
 -- The players a PlayerRef names, in CR 101.4's APNAP order -- playerRefPlayers
@@ -1981,7 +1948,9 @@ damageSourceCandidates context gs filter_ =
 -- still refers to is offered" (Ghitu Fire-Eater under Auriok Replica), the ROW's
 -- baked ids by the Healing Grace case beside it, the row's captured SLOTS by
 -- Synthetic Communal Bulwark's under Healing Grace, and the DELAYED TRIGGER's
--- bindings by Come Back Wrong's under Auriok Replica.
+-- bindings by Come Back Wrong's under Auriok Replica. A spend trigger's source is
+-- a fence: Pyromancer's Goggles deals no damage, and leaving while its mana
+-- floats is the only way it is not already a candidate.
 --
 -- The two binding-reading carriers -- the stack's and the delayed trigger's -- also
 -- share one EXCLUSION, stated once at referentsOfBindings below rather than at each
@@ -1991,6 +1960,8 @@ referredToSources gs =
   foldMap (\oid -> foldMap referentsOfObject (Game.lookupObject oid gs)) (GameState.stack gs)
     <> foldMap (\row -> ActiveReplacement.source row : (referentsOfReplacement (ActiveReplacement.effect row) <> foldMap Set.toList (ActiveReplacement.slots row))) (GameState.replacements gs)
     <> foldMap (\entry -> DelayedTrigger.source entry : referentsOfBindings (DelayedTrigger.bindings entry)) (GameState.delayedTriggers gs)
+    -- CR 106.6a's spend triggers wait on the unspent units that carry them.
+    <> foldMap (Maybe.mapMaybe (fmap SpendTrigger.source . ManaUnit.spendTrigger) . Mana.Type.unwrap) (GameState.manaPool gs)
 
 -- The objects a waiting row names BY ID: what card data cannot write, so what no
 -- Filter and no captured slot holds, and what CR 609.7a's "any object referred to
@@ -3877,8 +3848,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- neutralising this line leaves the whole suite green. CR 106.6a states it
   -- anyway, which is why the line is here. The CR 607.2a sourceLastExiled stamp
   -- is a fence for the same reason: Ice Cauldron, its one producer, is a mana
-  -- ability too.
-  Effect.AddMana (ManaAddition.MkManaAddition ref production count retention restriction rider) -> do
+  -- ability too. So is the spend trigger's: Pyromancer's Goggles is one.
+  Effect.AddMana (ManaAddition.MkManaAddition ref production count retention restriction rider whenSpent) -> do
     gs0 <- State.get
     -- CR 106.3: how many units this ONE instruction adds, read off the board at
     -- RESOLUTION rather than off the card -- Cabal Coffers' "for each Swamp you
@@ -3893,6 +3864,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               ManaUnit.retention = retention,
               ManaUnit.restriction = restriction,
               ManaUnit.rider = rider,
+              ManaUnit.spendTrigger = Mana.spendTriggerOf controller source gs0 =<< whenSpent,
               ManaUnit.sourceChosenSubtype = Mana.sourceChosenSubtypeOf source gs0,
               ManaUnit.sourceLastExiled = Mana.lastExiledWith source gs0
             }
@@ -7588,7 +7560,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- id `source` names. CR 603.7: a rule 702 keyword has no card text to declare
     -- the far end in, so a name a minted ability arms resolves against rule 702's
     -- own roster instead; the two namespaces are kept disjoint by Pawl.CardSpec.
-    case declaredDelayedAbility source name gs <|> Keyword.mintedDelayedAbility name of
+    case Game.declaredDelayedAbility source name gs <|> Keyword.mintedDelayedAbility name of
       -- For a CARD's name the dataflow lint makes a dangling one a failing test,
       -- and this arm only keeps the executor total. A MINTED name has no such
       -- lint, so a forgotten roster row lands here and does nothing.

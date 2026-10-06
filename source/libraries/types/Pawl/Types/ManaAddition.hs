@@ -6,6 +6,7 @@ import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.ManaRider as ManaRider
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.WhenSpent as WhenSpent
 
 -- | CR 106.3 / 106.4: "this player adds this much mana, decided this way" -- the
 -- whole payload of Pawl.Types.Effect's AddMana arm.
@@ -79,6 +80,10 @@ data ManaAddition = MkManaAddition
     -- on, as opposed to what it may be spent on at all. Boseiju, Who Shelters
     -- All prints this and no restriction, Mishra's Workshop a restriction and no
     -- rider, and Delighted Halfling both.
-    rider :: Maybe ManaRider.ManaRider
+    rider :: Maybe ManaRider.ManaRider,
+    -- | CR 106.6's third shape: a delayed triggered ability that triggers when
+    -- this mana is spent to cast a spell (Pyromancer's Goggles), created once
+    -- for each mana produced (CR 106.6a) as Pawl.Types.ManaUnit.spendTrigger.
+    whenSpent :: Maybe WhenSpent.WhenSpent
   }
   deriving (Eq, Ord, Show)

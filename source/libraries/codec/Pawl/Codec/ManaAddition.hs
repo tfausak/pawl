@@ -8,6 +8,7 @@ import qualified Pawl.Codec.ManaRetention as ManaRetention
 import qualified Pawl.Codec.ManaRider as ManaRider
 import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.Codec.Quantity as Quantity
+import qualified Pawl.Codec.WhenSpent as WhenSpent
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
@@ -45,7 +46,8 @@ defaultPlayer = PlayerRef.Relative PlayerRelation.You
 -- @restriction@ and @rider@ are CR 106.6's two shapes, each DEFAULTED to
 -- Nothing: almost every printing says neither, and the two are independent --
 -- Mishra's Workshop writes only the first key, Boseiju, Who Shelters All only
--- the second, Delighted Halfling both.
+-- the second, Delighted Halfling both. @whenSpent@, the third shape, defaults the
+-- same way; Pyromancer's Goggles writes it.
 codec :: Codec.Codec ManaAddition.ManaAddition
 codec = Fields.object $ do
   player <- Fields.defaulted "player" defaultPlayer PlayerRef.codec ManaAddition.player
@@ -54,6 +56,7 @@ codec = Fields.object $ do
   retention <- Fields.defaulted "retention" ManaRetention.Ordinary ManaRetention.codec ManaAddition.retention
   restriction <- Fields.defaulted "restriction" Nothing (Common.maybe ManaRestriction.codec) ManaAddition.restriction
   rider <- Fields.defaulted "rider" Nothing (Common.maybe ManaRider.codec) ManaAddition.rider
+  whenSpent <- Fields.defaulted "whenSpent" Nothing (Common.maybe WhenSpent.codec) ManaAddition.whenSpent
   pure
     ManaAddition.MkManaAddition
       { ManaAddition.player = player,
@@ -61,5 +64,6 @@ codec = Fields.object $ do
         ManaAddition.count = count,
         ManaAddition.retention = retention,
         ManaAddition.restriction = restriction,
-        ManaAddition.rider = rider
+        ManaAddition.rider = rider,
+        ManaAddition.whenSpent = whenSpent
       }

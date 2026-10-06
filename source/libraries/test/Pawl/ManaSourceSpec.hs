@@ -636,7 +636,7 @@ burningTreeResolved bte pid =
 -- One green mana with no production tags, plainRed's twin: what the Emissary's
 -- trigger adds alongside it.
 plainGreen :: ManaUnit.ManaUnit
-plainGreen = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing, ManaUnit.sourceLastExiled = Nothing}
+plainGreen = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.spendTrigger = Nothing, ManaUnit.sourceChosenSubtype = Nothing, ManaUnit.sourceLastExiled = Nothing}
 
 -- CR 608.2d's OTHER reading of "choose": a scope that admits the CONTROLLER.
 -- Stadium Vendors ({3}{R} 3/3 Creature -- Goblin, "When this creature enters,
@@ -1164,6 +1164,7 @@ hawkerMana manaType =
       ManaUnit.restriction =
         Just ManaRestriction.none {ManaRestriction.activations = Just (Filter.And [])},
       ManaUnit.rider = Nothing,
+      ManaUnit.spendTrigger = Nothing,
       ManaUnit.sourceChosenSubtype = Nothing,
       ManaUnit.sourceLastExiled = Nothing
     }
@@ -1285,6 +1286,56 @@ generatorServantSpec s registry = Spec.describe s "Generator Servant" $ do
     -- (two) and a missing one (zero) both fail. Read before combat, since CR
     -- 514.2 ends the duration at cleanup.
     Spec.assertEqWith s "CR 702.10 exactly one of the two Pikers carries the grant" (length (filter (\oid -> Projection.hasKeyword Keyword.Haste oid hastyCast) (Game.zoneMembers Zone.Battlefield S.alice hastyCast))) 1
+
+-- CR 106.6's THIRD shape: a delayed triggered ability (CR 603.7a) that triggers
+-- when the mana is spent. Pyromancer's Goggles ({5} Legendary Artifact, "{T}: Add
+-- {R}. When that mana is spent to cast a red instant or sorcery spell, copy that
+-- spell and you may choose new targets for the copy.") is the printing. Nothing
+-- is omitted from the card.
+--
+-- Three casts that differ in one thing each: Lightning Bolt off the Goggles,
+-- the same Bolt off a Mountain, and Goblin Piker (a red CREATURE spell) off the
+-- Goggles and the Mountain. Every read is the spell's own effect once the stack
+-- is empty -- bob's life, or how many Pikers alice has -- so a trigger that fired
+-- and copied nothing, or copied the wrong spell, fails the same assertion as one
+-- that never fired.
+pyromancersGogglesSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+pyromancersGogglesSpec s registry = Spec.describe s "Pyromancer's Goggles" $ do
+  Spec.it s "CR 106.6 / 603.7a the Goggles' mana copies the red instant it was spent on" $ do
+    goggles <- S.printingOf s registry "Pyromancer's Goggles"
+    mountain <- S.printingOf s registry "Mountain"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gogglesId, g1) = S.addPermanent goggles S.alice (Setup.emptyGame S.bothPlayers)
+        (mountainId, g2) = S.addPermanent mountain S.alice g1
+        board = g2 {GameState.phase = Phase.PrecombatMain, GameState.remaining = S.phasesAfter Phase.PrecombatMain}
+        castOff printing sources =
+          let (cardId, inHand) = S.addHandCard printing S.alice board
+              cast_ = S.runPure (gogglesAnswer sources) inHand (S.cast S.alice cardId)
+           in drained (gogglesAnswer sources) (S.runPure (gogglesAnswer sources) cast_ Engine.placePendingTriggers)
+        boltedByGoggles = castOff bolt [gogglesId]
+        boltedByMountain = castOff bolt [mountainId]
+        pikerByGoggles = castOff piker [gogglesId, mountainId]
+        pikers gs = length (filter (\oid -> Set.member (CardName.MkCardName (Text.pack "Goblin Piker")) (Projection.namesOf oid gs)) (Set.toList (GameState.battlefield gs)))
+    Spec.assertEqWith s "CR 707.10 the Bolt and its copy both deal 3 to bob" (S.lifeOf S.bob boltedByGoggles) (Just 14)
+    Spec.assertEqWith s "and the same Bolt off a Mountain deals 3 once" (S.lifeOf S.bob boltedByMountain) (Just 17)
+    Spec.assertEqWith s "CR 106.6 the Goggles' mana spent on a red creature spell copies nothing" (pikers pikerByGoggles) 1
+
+-- Resolves until the stack is empty, placing each trigger CR 603.3 puts up on the
+-- way down.
+drained :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+drained answer =
+  let go fuel gs
+        | fuel <= 0 || null (GameState.stack gs) = gs
+        | otherwise = go (fuel - 1 :: Int) (S.runPure answer (S.runPure answer gs Stack.resolveTop) Engine.placePendingTriggers)
+   in go 10
+
+-- `tapsOnly`, with every target slot answered with bob, so a Bolt and its copy
+-- both read off bob's life.
+gogglesAnswer :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+gogglesAnswer wanted p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets
+  _ -> tapsOnly wanted p
 
 -- Takes the first of `wanted` a window offers and declines everywhere else, so
 -- WHICH sources pay each cost is pinned rather than searched: an answerer that
@@ -1473,7 +1524,7 @@ recordingManaTypes manaType p = case p of
 -- One mana of `color` carrying no production tag, plainRed's and plainGreen's
 -- generalisation: CR 107.4h reads the SOURCE, and Quirion Sentinel is not snow.
 plainColor :: Color.Color -> ManaUnit.ManaUnit
-plainColor color = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing, ManaUnit.sourceLastExiled = Nothing}
+plainColor color = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.spendTrigger = Nothing, ManaUnit.sourceChosenSubtype = Nothing, ManaUnit.sourceLastExiled = Nothing}
 
 -- CR 601.2g's window offers one source per interchangeability class rather than
 -- one per permanent (#217): three Llanowar Elves that nothing tells apart are one
@@ -1942,7 +1993,7 @@ freeze oid gs =
 -- One mana of one type carrying no production tag: what a basic land really puts
 -- in a pool, and the unit the Celestial Dawn cases below seat directly.
 plainOf :: ManaType.ManaType -> ManaUnit.ManaUnit
-plainOf manaType = ManaUnit.MkManaUnit {ManaUnit.manaType = manaType, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing, ManaUnit.sourceLastExiled = Nothing}
+plainOf manaType = ManaUnit.MkManaUnit {ManaUnit.manaType = manaType, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.spendTrigger = Nothing, ManaUnit.sourceChosenSubtype = Nothing, ManaUnit.sourceLastExiled = Nothing}
 
 -- A cost of exactly one symbol, so a payability answer is about that symbol and
 -- nothing else.
@@ -1964,7 +2015,7 @@ payable :: PlayerId.PlayerId -> ManaCost.ManaCost -> GameState.GameState -> Bool
 payable = Mana.canPay Cost.manaActivations
 
 plainRed :: ManaUnit.ManaUnit
-plainRed = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing, ManaUnit.sourceLastExiled = Nothing}
+plainRed = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.spendTrigger = Nothing, ManaUnit.sourceChosenSubtype = Nothing, ManaUnit.sourceLastExiled = Nothing}
 
 -- CR 106.6 naming a SPECIAL ACTION rather than a cast or an activation. Overgrown
 -- Zealot ({1}{G} Creature -- Elf Druid 0/4, "{T}: Add one mana of any color." /
@@ -2132,6 +2183,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   omenHawkerSpec s registry
   boseijuSpec s registry
   generatorServantSpec s registry
+  pyromancersGogglesSpec s registry
   delightedHalflingSpec s registry
   quirionSpec s registry
   overgrownZealotSpec s registry

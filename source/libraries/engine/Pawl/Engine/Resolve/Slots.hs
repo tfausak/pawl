@@ -933,8 +933,8 @@ effectPlayerRefs effect = case effect of
   Effect.Fight {} -> []
   Effect.ModifyTarget x -> durationPlayerRefs (ModifyTarget.duration x)
   Effect.ChangeText {} -> []
-  Effect.AddMana (ManaAddition.MkManaAddition ref _ _ _ _ _) -> [ref]
-  Effect.Firebend (ManaAddition.MkManaAddition ref _ _ _ _ _) -> [ref]
+  Effect.AddMana (ManaAddition.MkManaAddition ref _ _ _ _ _ _) -> [ref]
+  Effect.Firebend (ManaAddition.MkManaAddition ref _ _ _ _ _ _) -> [ref]
   Effect.ActivateManaAbilities (ActivateManaAbilities.MkActivateManaAbilities ref _) -> [ref]
   Effect.MoveMana (MoveMana.MkMoveMana from to) -> [from, to]
   Effect.Search (Search.MkSearch searcher owner _ _ _ _ _ _ _ _ _ _) -> [searcher, owner]

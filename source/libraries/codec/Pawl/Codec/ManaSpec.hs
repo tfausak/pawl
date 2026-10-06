@@ -21,6 +21,7 @@ plain manaType =
       ManaUnit.retention = ManaRetention.Ordinary,
       ManaUnit.restriction = Nothing,
       ManaUnit.rider = Nothing,
+      ManaUnit.spendTrigger = Nothing,
       ManaUnit.sourceChosenSubtype = Nothing,
       ManaUnit.sourceLastExiled = Nothing
     }
@@ -51,6 +52,7 @@ spec s = Spec.describe s "Pawl.Codec.Mana" $ do
                 ManaUnit.retention = ManaRetention.Ordinary,
                 ManaUnit.restriction = Nothing,
                 ManaUnit.rider = Nothing,
+                ManaUnit.spendTrigger = Nothing,
                 ManaUnit.sourceChosenSubtype = Nothing,
                 ManaUnit.sourceLastExiled = Nothing
               }

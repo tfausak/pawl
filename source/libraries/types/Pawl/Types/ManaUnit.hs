@@ -7,11 +7,12 @@ import qualified Pawl.Types.ManaRider as ManaRider
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ProductionTag as ProductionTag
+import qualified Pawl.Types.SpendTrigger as SpendTrigger
 import qualified Pawl.Types.Subtype as Subtype
 
 -- | One unit of mana in a pool.
 --
--- SEVEN axes, and three of them are facts about how the mana was made: the tags,
+-- EIGHT axes, and three of them are facts about how the mana was made: the tags,
 -- the subtype its source had chosen (`sourceChosenSubtype` below), and the card
 -- last exiled with its source (`sourceLastExiled`).
 -- Pawl.Types.ProductionTag is the CLOSED half -- snow-ness, "this activation
@@ -35,7 +36,10 @@ import qualified Pawl.Types.Subtype as Subtype
 -- is the only way a CR 106.6 restriction can ask about the thing that made the
 -- mana. Snow cares about a PROPERTY of the source, not
 -- its identity, and a reference would dangle by construction: mana outlives its
--- source, and CR 400.7 mints a fresh id on every zone change. Properties are
+-- source, and CR 400.7 mints a fresh id on every zone change. The id inside
+-- `spendTrigger` is not the exception it looks like: it is the delayed ability's
+-- source (CR 603.7c), read through last-known information as any delayed
+-- ability's is, and nothing asks it about the mana. Properties are
 -- stamped at production time, by whichever of the two producers is adding the
 -- mana: Pawl.Engine.Mana.manaOptionsOfGiven for a mana ability paid inline (CR
 -- 605.3b), and Pawl.Engine.Resolve's Effect.AddMana arm for an ability that
@@ -82,13 +86,17 @@ data ManaUnit = MkManaUnit
     -- one reader. Deliberately NOT read by Pawl.Engine.Mana.admitsUnder: a
     -- rider narrows nothing about what the mana may pay for, so folding it in
     -- there would turn an unconditional rider into an unconditional restriction.
-    --
-    -- Not implemented: CR 106.6's THIRD shape -- a delayed triggered ability
-    -- (CR 603.7a) that triggers when the mana is spent, which Pyromancer's
-    -- Goggles and Path of Ancestry print. It carries a whole ability rather
-    -- than the closed word Pawl.Types.ManaRiderEffect holds, so it is a
-    -- different carrier and not a further arm (#2248).
     rider :: Maybe ManaRider.ManaRider,
+    -- | CR 106.6's third shape: the delayed triggered ability (CR 603.7a) this
+    -- mana's production created, which triggers when the mana is spent to cast
+    -- a spell its filter matches -- Pyromancer's Goggles. Nothing for almost
+    -- every mana. Stamped by both producers off the ADDITION's
+    -- Pawl.Types.WhenSpent, and read off the spent units by
+    -- Pawl.Engine.Cost.recordPayment, which arms it.
+    --
+    -- A carrier of its own rather than a Pawl.Types.ManaRiderEffect arm: it holds
+    -- a whole ability, where that type is a closed word.
+    spendTrigger :: Maybe SpendTrigger.SpendTrigger,
     -- | CR 607.2d: the subtype this mana's SOURCE had chosen as it entered (CR
     -- 614.1c), baked in here at production so that a CR 106.6 restriction can
     -- read it -- Pillar of Origins' "creature spell of the chosen type". Nothing

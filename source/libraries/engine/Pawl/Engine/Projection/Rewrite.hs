@@ -234,6 +234,7 @@ import qualified Pawl.Types.UntapRestriction as UntapRestriction
 import qualified Pawl.Types.Vote as Vote
 import qualified Pawl.Types.VoteChoices as VoteChoices
 import qualified Pawl.Types.VoteObjects as VoteObjects
+import qualified Pawl.Types.WhenSpent as WhenSpent
 import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
@@ -512,7 +513,8 @@ rewriteManaAddition pairs addition =
   addition
     { ManaAddition.count = rewriteQuantity pairs (ManaAddition.count addition),
       ManaAddition.restriction = fmap (rewriteManaRestriction pairs) (ManaAddition.restriction addition),
-      ManaAddition.rider = fmap (rewriteManaRider pairs) (ManaAddition.rider addition)
+      ManaAddition.rider = fmap (rewriteManaRider pairs) (ManaAddition.rider addition),
+      ManaAddition.whenSpent = fmap (\w -> w {WhenSpent.casts = Filter.rewrite pairs (WhenSpent.casts w)}) (ManaAddition.whenSpent addition)
     }
 
 -- CR 612's subtype word swap over an effect's AST. Cases on an effect's

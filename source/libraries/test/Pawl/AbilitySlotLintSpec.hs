@@ -73,6 +73,7 @@ import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
+import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.Modal as Modal
@@ -114,6 +115,7 @@ import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
+import qualified Pawl.Types.WhenSpent as WhenSpent
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneScope as ZoneScope
 
@@ -539,6 +541,22 @@ armingCostSlots card =
         (Face.activatedAbilities card)
     )
 
+-- The fourth half: CR 106.6's spend trigger, armed at payment with "that spell"
+-- bound as Binding.castSpell (Pawl.Engine.Cost.armSpendTriggers) -- Pyromancer's
+-- Goggles' copy. LOOSE about which ability that AddMana names, armingTargetSlots'
+-- caveat.
+armingSpendSlots :: Face.Face Card.Type.Card -> Set.Set SlotName.SlotName
+armingSpendSlots card = if Set.null (spendArmedAbilities card) then Set.empty else Set.singleton Binding.castSpell
+
+-- The delayed abilities a face's AddMana instructions arm as their mana is spent.
+spendArmedAbilities :: Face.Face Card.Type.Card -> Set.Set AbilityName.AbilityName
+spendArmedAbilities card =
+  let named effect = case effect of
+        Effect.AddMana addition -> fmap WhenSpent.ability (ManaAddition.whenSpent addition)
+        Effect.Firebend addition -> fmap WhenSpent.ability (ManaAddition.whenSpent addition)
+        _ -> Nothing
+   in Set.fromList (Maybe.mapMaybe named (cardAuthoredEffects card))
+
 abilitySlotLintSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
   -- The AbilityName half of the D4 dataflow lint (CR 603.7): an
@@ -565,6 +583,15 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
           Resolve.armedAbilities (cardAuthoredEffects card) /= Map.keysSet (Face.delayedAbilities card)
         offenders = filter (anyFace cardOffends . Printing.card) ps
     Spec.assertEqWith s "no dangling or unused delayed abilities" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 106.6 / 603.7a: a spend trigger fires when it is armed, the payment having
+  -- already been the event (Pawl.Engine.Cost.armSpendTriggers), so the ability it
+  -- names has to say so. Any other condition would wait for an event that never
+  -- comes.
+  Spec.it s "CR 603.7a every ability a spend trigger names is reflexive" $ do
+    ps <- S.allPrintings s
+    let cardOffends card = any (\name -> fmap TriggeredAbility.condition (Map.lookup name (Face.delayedAbilities card)) /= Just TriggerCondition.Reflexive) (Set.toList (spendArmedAbilities card))
+        offenders = filter (anyFace cardOffends . Printing.card) ps
+    Spec.assertEqWith s "no spend trigger waiting on another event" (fmap (S.nameOf . Printing.card) offenders) []
   -- The lint above joins names WITHIN a card; this one keeps that namespace clear
   -- of rule 702's. Pawl.Engine.Keyword.mintedDelayedAbilities declares decayed's
   -- "sacrifice it at end of combat" under a name of its own, and
@@ -644,7 +671,7 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
   -- nothing the minting resolution bound is in scope.
   Spec.it s "every slot a delayed ability reads is bound by its card" $ do
     ps <- S.allPrintings s
-    let cardBound card = Set.insert Binding.triggerSource (Set.unions [armingTargetSlots card, armingEventSlots card, armingCostSlots card, Resolve.definedSlots (cardResolutionEffects card)])
+    let cardBound card = Set.insert Binding.triggerSource (Set.unions [armingTargetSlots card, armingEventSlots card, armingCostSlots card, armingSpendSlots card, Resolve.definedSlots (cardResolutionEffects card)])
         abilityOffends card ability =
           modalSlotsOffend
             (Set.unions [cardBound card, Event.eventBindingSlots (TriggeredAbility.condition ability), Event.eventBindingSlotsSometimes (TriggeredAbility.condition ability)])

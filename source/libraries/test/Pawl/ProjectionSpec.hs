@@ -4055,6 +4055,7 @@ shapeshifterBoard shapeshifter sorcerer sentry =
             ManaUnit.retention = ManaRetention.Ordinary,
             ManaUnit.restriction = Nothing,
             ManaUnit.rider = Nothing,
+            ManaUnit.spendTrigger = Nothing,
             ManaUnit.sourceChosenSubtype = Nothing,
             ManaUnit.sourceLastExiled = Nothing
           }

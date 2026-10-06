@@ -845,6 +845,10 @@ airbentObjects = SlotName.MkSlotName (Text.pack "thoseAirbentObjects")
 -- `became`: the spell can leave the stack before the trigger resolves (another
 -- counterspell, or a second Presence of the Master), which is the case CR 608.2h
 -- is about, and CR 701.6a's funnel no-ops on an id that names nothing.
+--
+-- Pawl.Engine.Cost.armSpendTriggers binds it too, for the same object: the
+-- spell CR 106.6's spend-triggering mana was spent to cast (Pyromancer's
+-- Goggles' "copy that spell").
 castSpell :: SlotName
 castSpell = SlotName.MkSlotName (Text.pack "thatSpell")
 

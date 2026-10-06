@@ -4,6 +4,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.ManaAddition as ManaAddition
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Filter as Filter
@@ -16,6 +17,7 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.WhenSpent as WhenSpent
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.ManaAddition" $ do
@@ -31,7 +33,8 @@ spec s = Spec.describe s "Pawl.Codec.ManaAddition" $ do
             ManaAddition.production = ManaProduction.OfType (ManaType.Colored Color.Green),
             ManaAddition.retention = ManaRetention.Ordinary,
             ManaAddition.restriction = Nothing,
-            ManaAddition.rider = Nothing
+            ManaAddition.rider = Nothing,
+            ManaAddition.whenSpent = Nothing
           }
       )
       " {\"production\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}}} "
@@ -48,7 +51,8 @@ spec s = Spec.describe s "Pawl.Codec.ManaAddition" $ do
             ManaAddition.production = ManaProduction.OfType (ManaType.Colored Color.Green),
             ManaAddition.retention = ManaRetention.Ordinary,
             ManaAddition.restriction = Nothing,
-            ManaAddition.rider = Nothing
+            ManaAddition.rider = Nothing,
+            ManaAddition.whenSpent = Nothing
           }
       )
       " {\"player\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"},\"production\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}}} "
@@ -67,7 +71,8 @@ spec s = Spec.describe s "Pawl.Codec.ManaAddition" $ do
             ManaAddition.production = ManaProduction.OfType (ManaType.Colored Color.Green),
             ManaAddition.retention = ManaRetention.UntilEndOfTurn,
             ManaAddition.restriction = Nothing,
-            ManaAddition.rider = Nothing
+            ManaAddition.rider = Nothing,
+            ManaAddition.whenSpent = Nothing
           }
       )
       " {\"player\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"},\"production\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}},\"retention\":{\"type\":\"UntilEndOfTurn\"}} "
@@ -84,7 +89,8 @@ spec s = Spec.describe s "Pawl.Codec.ManaAddition" $ do
             ManaAddition.production = ManaProduction.OfType (ManaType.Colored Color.Red),
             ManaAddition.retention = ManaRetention.Ordinary,
             ManaAddition.restriction = Just (ManaRestriction.onlyCasts (Filter.Or [Filter.HasCardType CardType.Artifact, Filter.HasCardType CardType.Creature])),
-            ManaAddition.rider = Nothing
+            ManaAddition.rider = Nothing,
+            ManaAddition.whenSpent = Nothing
           }
       )
       " {\"production\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Red\"}}},\"restriction\":{\"casts\":{\"type\":\"Or\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}},{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}]}}} "
@@ -102,7 +108,8 @@ spec s = Spec.describe s "Pawl.Codec.ManaAddition" $ do
             ManaAddition.production = ManaProduction.OfType ManaType.Colorless,
             ManaAddition.retention = ManaRetention.Ordinary,
             ManaAddition.restriction = Just (ManaRestriction.none {ManaRestriction.activations = Just (Filter.And [])}),
-            ManaAddition.rider = Nothing
+            ManaAddition.rider = Nothing,
+            ManaAddition.whenSpent = Nothing
           }
       )
       " {\"production\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colorless\"}},\"restriction\":{\"activations\":{\"type\":\"And\",\"value\":[]}}} "
@@ -118,8 +125,25 @@ spec s = Spec.describe s "Pawl.Codec.ManaAddition" $ do
             ManaAddition.production = ManaProduction.AnyColor,
             ManaAddition.retention = ManaRetention.Ordinary,
             ManaAddition.restriction = Nothing,
-            ManaAddition.rider = Nothing
+            ManaAddition.rider = Nothing,
+            ManaAddition.whenSpent = Nothing
           }
       )
       " {\"count\":{\"type\":\"Literal\",\"value\":2},\"player\":{\"type\":\"InSlot\",\"value\":\"chosen\"},\"production\":{\"type\":\"AnyColor\"}} "
+  -- Pyromancer's Goggles: CR 106.6's third shape names a delayed ability.
+  Spec.it s "MkManaAddition, a spend trigger written on the wire" $
+    Common.assertCodec
+      s
+      ManaAddition.codec
+      ( ManaAddition.MkManaAddition
+          { ManaAddition.player = PlayerRef.Relative PlayerRelation.You,
+            ManaAddition.count = Quantity.Literal 1,
+            ManaAddition.production = ManaProduction.OfType ManaType.Colorless,
+            ManaAddition.retention = ManaRetention.Ordinary,
+            ManaAddition.restriction = Nothing,
+            ManaAddition.rider = Nothing,
+            ManaAddition.whenSpent = Just (WhenSpent.MkWhenSpent (Filter.And []) (AbilityName.MkAbilityName (Text.pack "copy")))
+          }
+      )
+      " {\"production\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colorless\"}},\"whenSpent\":{\"casts\":{\"type\":\"And\",\"value\":[]},\"ability\":\"copy\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ManaAddition.codec
