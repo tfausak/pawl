@@ -29,7 +29,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Pawl.CardSpec (anyFace, cardAuthoredEffects, cardCounts, cardResolutionEffects, collectsEvidenceAsCost, declaresVariable, effectCounts, grantedActivatedAbilities, lintMode, modalActivated, modalSlotsOffend, oneEffectActivated, oneEffectTrigger, payGateBound, removesCountersAsCost, sacrificesAsCost, spellCostsOf, triggerConditionSlots, waterbendsAsCost)
+import Pawl.CardSpec (anyFace, anyFaceOrMinted, cardAuthoredEffects, cardCounts, cardResolutionEffects, collectsEvidenceAsCost, createToken, declaresVariable, effectCounts, grantedActivatedAbilities, instantLine, lintMode, mintingSpell, modalActivated, modalSlotsOffend, oneEffectActivated, oneEffectTrigger, payGateBound, removesCountersAsCost, sacrificesAsCost, spellCostsOf, triggerConditionSlots, vanillaFace, waterbendsAsCost, withMinted)
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
@@ -638,6 +638,10 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
   -- abilities' target slots on the DECLARING side, and this is the matching read
   -- side. Since #1043 that comparison is the spell lint's EQUALITY, so a delayed
   -- ability declaring a slot no effect of its reads fails here too.
+  --
+  -- Over withMinted, each face against its OWN cardBound: a token arms from its
+  -- own abilities and is minted with empty bindings (Resolve.Slots), so
+  -- nothing the minting resolution bound is in scope.
   Spec.it s "every slot a delayed ability reads is bound by its card" $ do
     ps <- S.allPrintings s
     let cardBound card = Set.insert Binding.triggerSource (Set.unions [armingTargetSlots card, armingEventSlots card, armingCostSlots card, Resolve.definedSlots (cardResolutionEffects card)])
@@ -654,10 +658,17 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
         -- match rather than available to it.
         conditionOffends bound ability = not (Set.isSubsetOf (Set.fromList (triggerConditionSlots (TriggeredAbility.condition ability))) bound)
         cardOffends card = any (\ability -> abilityOffends card ability || conditionOffends (cardBound card) ability) (Map.elems (Face.delayedAbilities card))
-        offenders = filter (anyFace cardOffends . Printing.card) ps
+        sweeps = anyFaceOrMinted cardOffends
+        offenders = filter (sweeps . Printing.card) ps
         watching slot = modalTrigger (TriggerCondition.LoseControlOfBound slot) [lintMode [] []]
         armingSlot = SlotName.MkSlotName (Text.pack "target")
         strangerSlot = SlotName.MkSlotName (Text.pack "elsewhere")
+        tokenTapping slot =
+          (vanillaFace "Token" instantLine)
+            { Face.delayedAbilities = Map.singleton (AbilityName.MkAbilityName (Text.pack "later")) (modalTrigger TriggerCondition.SelfDies [lintMode [Effect.Tap (ObjectRef.InSlot slot)] []])
+            }
+    Spec.assertBool s (sweeps (mintingSpell createToken (tokenTapping strangerSlot))) "a token's delayed ability reading a slot the token never binds is caught"
+    Spec.assertBool s (not (sweeps (mintingSpell createToken (tokenTapping Binding.triggerSource)))) "and one reading its own source is accepted"
     -- The condition half is vacuous as a corpus sweep: every slot-named
     -- condition in the pool names a slot its own spell declares (Ray of
     -- Command's target), so the sweep would pass under a predicate that always
@@ -763,9 +774,16 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
             [ if any collectsEvidenceAsCost (spellCostsOf face) then Set.singleton Binding.collectedEvidence else Set.empty,
               if any waterbendsAsCost (spellCostsOf face) then Set.singleton Binding.waterbendCost else Set.empty
             ]
+        -- Per face over withMinted, so a minted face inherits only what its OWN
+        -- costs bound.
         cardOffends face = any (triggeredAbilityOffendsGiven (inherited face)) (Face.triggeredAbilities face)
-        offenders = filter (anyFace cardOffends . Printing.card) ps
+        sweeps = anyFaceOrMinted cardOffends
+        offenders = filter (sweeps . Printing.card) ps
+        -- Rule 702.70a's shape, as a targetless read of "that player".
+        tokenDrawing condition = (vanillaFace "Token" instantLine) {Face.triggeredAbilities = [oneEffectTrigger condition (Effect.Draw (Draw.MkDraw (PlayerRef.InSlot Binding.triggerPlayer) (Quantity.Type.Literal 1) Nothing))]}
     Spec.assertEqWith s "no dangling triggered-ability slot" (fmap (S.nameOf . Printing.card) offenders) []
+    Spec.assertBool s (sweeps (mintingSpell createToken (tokenDrawing TriggerCondition.SelfDies))) "a token's dies trigger reading thatPlayer is caught"
+    Spec.assertBool s (not (sweeps (mintingSpell createToken (tokenDrawing (TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer))))) "and its combat-damage trigger reading thatPlayer is accepted"
   -- The sweep above passes VACUOUSLY: no committed card misauthors the
   -- pairing, so the sweep proves nothing about the lint. Both directions are
   -- proven here instead, against a hand-built offender (never a card file --
@@ -1065,9 +1083,17 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
   -- permanent it lands on activates it through the same Activate road.
   Spec.it s "every slot an activated ability reads is bound for its activation, and every slot it declares is read" $ do
     ps <- S.allPrintings s
-    let abilitiesOf p = fmap ((,) (Face.name (S.combinedFace p))) (Face.activatedAbilities (S.combinedFace p) <> grantedActivatedAbilities (S.combinedFace p))
+    let faceAbilities face = Face.activatedAbilities face <> grantedActivatedAbilities face
+        -- Over withMinted, each ability against what its own activation binds:
+        -- the Clue a card creates is activated as the Clue's.
+        cardAbilities card = concatMap faceAbilities (withMinted (Card.combined card))
+        abilitiesOf p = fmap ((,) (Face.name (S.combinedFace p))) (cardAbilities (Printing.card p))
         abilities = concatMap abilitiesOf ps
         readsAnySlot ab = not (all (Map.null . Resolve.slotsOf) (Modal.allEffects (ActivatedAbility.modal ab)))
+        sweeps = any activatedAbilityOffends . cardAbilities
+        tokenDrawing slot = (vanillaFace "Token" instantLine) {Face.activatedAbilities = [oneEffectActivated Nothing (Effect.Draw (Draw.MkDraw (PlayerRef.InSlot slot) (Quantity.Type.Literal 1) Nothing))]}
+    Spec.assertBool s (sweeps (mintingSpell createToken (tokenDrawing Binding.triggerPlayer))) "a token's ability reading thatPlayer is caught"
+    Spec.assertBool s (not (sweeps (mintingSpell createToken (tokenDrawing Binding.you)))) "and one reading you is accepted"
     -- Guards the sweep against passing vacuously, in both directions: an empty
     -- pool of abilities, and a pool in which none reads a slot at all (where
     -- every ability would pass on an empty read side whatever the lint said).

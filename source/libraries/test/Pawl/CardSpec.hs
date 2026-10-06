@@ -117,6 +117,7 @@ import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.ConjureCards as ConjureCards
+import qualified Pawl.Types.ConjureDestination as ConjureDestination
 import qualified Pawl.Types.Connive as Connive
 import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.CopyOriginal as CopyOriginal
@@ -1718,7 +1719,7 @@ perCreatureCounts perCreature = case perCreature of
 -- authored an effect of some shape rather than which field it sat in.
 --
 -- Not the effects a token or emblem this card MINTS prints: those belong to
--- another object, and the sweeps that want them take `card : mintedFaces card`
+-- another object, and the sweeps that want them take `withMinted card`
 -- and ask this question of each face separately.
 cardResolutionEffects :: Face.Face Card.Type.Card -> [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 cardResolutionEffects = concatMap effectWithNested . cardCarrierEffects
@@ -2723,11 +2724,13 @@ powerToughnessSlots card =
 -- so: a minted face's effects belong to ANOTHER object, so the sweeps that want
 -- them ask their question of each face in turn rather than reading one list that
 -- pretends a token's text is the creating card's.
---
--- Not applied to the ability dataflow lints built on modalSlotsOffend, which
--- still stop at the printed face (#1010).
 mintedFaces :: Face.Face Card.Type.Card -> [Face.Face Card.Type.Card]
 mintedFaces = fmap snd . mintedFacesTagged
+
+-- A face and every face it mints: each object whose text the face's card
+-- authored.
+withMinted :: Face.Face Card.Type.Card -> [Face.Face Card.Type.Card]
+withMinted face = face : mintedFaces face
 
 -- mintedFaces keeping WHICH KIND of object each face was minted for, because CR
 -- 205.2c and CR 114.3 disagree about one of them: "tokens have card types even
@@ -2979,7 +2982,7 @@ ownDeclaredTargetSlots card =
 -- the question the lint asks is a property of the ABILITY rather than of how the
 -- card carrying it reached the game.
 declaredTargetSlots :: Face.Face Card.Type.Card -> Set.Set SlotName.SlotName
-declaredTargetSlots card = Set.unions (fmap ownDeclaredTargetSlots (card : mintedFaces card))
+declaredTargetSlots card = Set.unions (fmap ownDeclaredTargetSlots (withMinted card))
 
 -- The reserved names a card declares as target slots -- empty for every card
 -- authored correctly, which is the whole of the sweep's assertion.
@@ -3019,7 +3022,7 @@ ownBoundSlots card = Resolve.definedSlots (cardResolutionEffects card <> concat 
 -- The same, over the card's own face AND every face it mints --
 -- declaredTargetSlots' recursion, for the same reason.
 boundSlots :: Face.Face Card.Type.Card -> Set.Set SlotName.SlotName
-boundSlots card = Set.unions (fmap ownBoundSlots (card : mintedFaces card))
+boundSlots card = Set.unions (fmap ownBoundSlots (withMinted card))
 
 -- The reserved names a card BINDS -- reservedDeclarations' sibling, and empty
 -- for every card authored correctly for the same reason.
@@ -6587,6 +6590,31 @@ oneFaced face = Card.Type.MkCard {Card.Type.layout = Layout.Normal, Card.Type.fa
 anyFace :: (Face.Face Card.Type.Card -> Bool) -> Card.Type.Card -> Bool
 anyFace p = any p . Card.Type.faces
 
+-- anyFace over withMinted, for a lint a minted face owes as much as a printed
+-- one: CR 111.3's token, CR 114.4's emblem and a conjured card each answer for
+-- their own text, against what their own object binds rather than the minter's.
+anyFaceOrMinted :: (Face.Face Card.Type.Card -> Bool) -> Card.Type.Card -> Bool
+anyFaceOrMinted p = anyFace (any p . withMinted)
+
+-- A one-faced spell whose only text mints a face through `mint`, and the
+-- fixture the minted-face self-tests misauthor: whatever the minted face
+-- prints, a lint can find only by descending through mintedFaces.
+mintingSpell :: (Face.Face Card.Type.Card -> Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Face.Face Card.Type.Card -> Card.Type.Card
+mintingSpell mint face =
+  oneFaced
+    ( (vanillaFace "Minter" instantLine)
+        { Face.spell = Modal.MkModal (Seq.singleton (lintMode [mint face] [])) (ModeSelection.ChooseExactly 1)
+        }
+    )
+
+-- CR 111.1: "create a token", the token being `face`.
+createToken :: Face.Face Card.Type.Card -> Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
+createToken face = Effect.Create (Create.MkCreate (Quantity.Type.Literal 1) (oneFaced face) EntryRiders.defaultValue Nothing (PlayerRef.Relative PlayerRelation.You))
+
+-- "Conjure a card named ... into your hand", the card being `face`.
+conjureCard :: Face.Face Card.Type.Card -> Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
+conjureCard face = Effect.Conjure (Conjure.MkConjure Conjure.defaultQuantity (ConjureCards.Written (NonEmpty.singleton (oneFaced face))) Conjure.defaultSelection ConjureDestination.Hand Nothing)
+
 -- The same fanout for a lint that GATHERS rather than decides.
 overFaces :: (Face.Face Card.Type.Card -> [a]) -> Card.Type.Card -> [a]
 overFaces f = concatMap f . NonEmpty.toList . Card.Type.faces
@@ -6604,6 +6632,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   --
   -- The ability carriers get the same equality through the same
   -- modalSlotsOffend, in the three sweeps further down (#1043).
+  --
+  -- Over withMinted: a conjured card is cast like a printed one (CR 601.2), so
+  -- its spell owes the same equality against its own costs.
   Spec.it s "every mode's slot reads equal its declared slots" $ do
     ps <- S.allPrintings s
     let -- What CASTING binds rather than a target slot declaring it, subtracted
@@ -6687,11 +6718,15 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                   then Set.singleton Binding.waterbendCost
                   else Set.empty
            in modalSlotsOffend (Set.unions [Set.fromList [Binding.you, Binding.triggerSource], announcedX, revealed, sacrificed, beheld, collected, waterbent, payGateBound (Face.spell card)]) (Face.spell card)
-        offenders =
-          filter
-            (anyFace cardOffends . Printing.card)
-            ps
+        sweeps = anyFaceOrMinted cardOffends
+        offenders = filter (sweeps . Printing.card) ps
+        slot = SlotName.MkSlotName (Text.pack "creature")
+        conjuredReading declared = (vanillaFace "Conjured" instantLine) {Face.spell = Modal.MkModal (Seq.singleton (lintMode [Effect.Tap (ObjectRef.InSlot slot)] declared)) (ModeSelection.ChooseExactly 1)}
     Spec.assertEqWith s "no dangling or unused slots" (fmap (S.nameOf . Printing.card) offenders) []
+    -- The rejecting direction through the descent, which the corpus never
+    -- exercises: the pair differs in the conjured spell declaring its slot.
+    Spec.assertBool s (sweeps (mintingSpell conjureCard (conjuredReading []))) "a conjured spell reading a slot it never declares is caught"
+    Spec.assertBool s (not (sweeps (mintingSpell conjureCard (conjuredReading [slot])))) "and one declaring it is accepted"
   -- The ENCHANT half, which the sweep above cannot reach: CR 303.4a's slot is
   -- declared on the FACE beside the modes (Card.enchantSlotMap), so it is in no
   -- mode's targetSlots and Resolve.modeSlots never folds it.
@@ -7390,7 +7425,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- Pawl.Engine.Keyword.addsRulesToPrintedAbility is the line.
   --
   -- EVERY face a printing can put an object on the battlefield with, which is
-  -- `card : mintedFaces card` and not the printing's own faces: an activated
+  -- `withMinted card` and not the printing's own faces: an activated
   -- ability printed on a CR 111.1 token's face reaches Keyword.designates by
   -- the same road, and the pool prints several (Thraben Inspector's Clue, The
   -- Underworld Cookbook's Food). mintedFaces reaches an emblem and a
@@ -7402,7 +7437,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let claimed f = filter (not . all KeywordEngine.addsRulesToPrintedAbility . ActivatedAbility.keyword) (Face.activatedAbilities f <> grantedActivatedAbilities f)
         claims f = not (null (claimed f))
         printsAbilities f = not (null (Face.activatedAbilities f))
-        everyFace = overFaces (\f -> f : mintedFaces f)
+        everyFace = overFaces withMinted
         offenders = filter (any claims . everyFace . Printing.card) ps
         stamp ability = ability {ActivatedAbility.keyword = Just Keyword.Station}
         liarAbility = stamp (oneEffectActivated (costOf []) (youDraw 1))
