@@ -16,7 +16,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Count as Count
-import Pawl.Engine.Event.Binding (admittedAttackers, admittedDepartures, postEventView)
+import Pawl.Engine.Event.Binding (admittedAttackers, admittedDepartures, admittedPreventedSources, postEventView)
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
@@ -7637,7 +7637,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
               -- Unreachable: CR 406.4's pile is a candidate at CR 601.2c and
               -- never something damage is dealt to.
               Recipient.ToPile _ -> False
-       in any admits (Map.toList (DamagePrevented.amounts prevented))
+       in any (any admits . Map.toList) (DamagePrevented.amounts prevented)
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
@@ -7733,10 +7733,12 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- already settles -- and one prevention effect of another object covering the
   -- SAME recipient is exactly the case this arm has to answer False for.
   --
-  -- The Filter is over CR 120.1's SOURCE of the damage that did not happen --
-  -- Samite Ministration's "damage from a black or red source" -- and the bearer
-  -- contributes only CR 109.5's "you" and the Filter.Context's source, exactly as
-  -- in the PermanentDealsCombatDamageToPlayer arm above. viewWithLastKnown:
+  -- The Filter is over CR 120.1's SOURCES of the damage that did not happen --
+  -- Samite Ministration's "damage from a black or red source" -- and fires ONCE
+  -- if it admits any of them (Event.Binding.admittedPreventedSources), one
+  -- application being one CR 615.13 trigger however many sources it covered.
+  -- The bearer contributes only CR 109.5's "you" and the Filter.Context's
+  -- source, as in the PermanentDealsCombatDamageToPlayer arm above. viewWithLastKnown:
   -- CR 608.2h's record is what still answers "was it black" for a source that
   -- died to the very batch this prevented. A fence rather than a tested branch:
   -- Samite Ministration's shield covers a PLAYER, so nothing that reaches this
@@ -7748,11 +7750,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   TriggerCondition.SelfPreventsDamage f -> case event of
     GameEvent.DamagePrevented prevented ->
       Replacement.printedBy (DamagePrevented.by prevented) == Just bearer
-        && ( let damager = DamagePrevented.source prevented
-              in case Projection.viewWithLastKnown damager gs damager of
-                   Nothing -> False
-                   Just view -> Filter.matches bearerContext view f
-           )
+        && not (Map.null (admittedPreventedSources bearerContext gs f prevented))
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False

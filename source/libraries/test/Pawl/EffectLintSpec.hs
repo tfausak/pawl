@@ -333,7 +333,7 @@ ownQuantities effect = case effect of
   Effect.Replace (Replace.MkReplace duration _ _ condition _) -> durationQuantities duration <> foldMap conditionQuantities condition
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ _ _ _ _ quantity _) -> quantity : durationQuantities duration
-  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ _ _ _ _ _) -> durationQuantities duration
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ _ _ _ _ _ _) -> durationQuantities duration
   Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance duration _ _ _) -> durationQuantities duration
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ amount _ _ _ _ _) -> Maybe.maybeToList amount <> durationQuantities duration
   Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown _ listed) ->
@@ -940,10 +940,10 @@ shieldNamingNothingOffends effect = case effect of
   -- IS one, but only beside DealtTo: that branch installs the source-only
   -- shield's lone row, where the by-direction branch folds over the ids the ref
   -- named and has nothing to fold.
-  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ ref whatRecipient direction chosenSource _ _) ->
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ ref whatRecipient whoRecipient direction chosenSource _ _) ->
     Maybe.isNothing ref && case direction of
       DamageDirection.DealtBy -> True
-      DamageDirection.DealtTo -> Maybe.isNothing whatRecipient && Maybe.isNothing chosenSource
+      DamageDirection.DealtTo -> Maybe.isNothing whatRecipient && Maybe.isNothing whoRecipient && Maybe.isNothing chosenSource
   -- CR 614.9's redirection covers a side the same two ways -- Carom names it,
   -- Harm's Way describes it -- and one saying neither installs nothing.
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage _ _ _ from whatRecipient whoRecipient _ _) ->
@@ -969,7 +969,7 @@ isPreventionShield effect = case effect of
 -- than isPreventionShield.
 isByDirectionShield :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 isByDirectionShield effect = case effect of
-  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ direction _ _ _) -> direction == DamageDirection.DealtBy
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ direction _ _ _) -> direction == DamageDirection.DealtBy
   _ -> False
 
 -- Every PlayerRef a CLAUSE of this face holds: CR 118.12a's payer and CR 603.5's
@@ -1468,7 +1468,7 @@ effectObjectRefs effect =
         Effect.Replace {} -> []
         Effect.SkipNextPhase {} -> []
         Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ ref _ _ _ _ _) -> read_ (Maybe.maybeToList ref)
-        Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ ref _ _ _ _ _) -> read_ (Maybe.maybeToList ref)
+        Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ ref _ _ _ _ _ _) -> read_ (Maybe.maybeToList ref)
         Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance _ ref _ _) -> read_ [ref]
         Effect.RedirectDamage (RedirectDamage.MkRedirectDamage _ _ _ srcRef _ _ destRef _) -> read_ (Maybe.maybeToList srcRef <> [destRef])
         -- A READ and not an ask: CR 708.2's turning-over takes no choice of its own, and
@@ -3068,7 +3068,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           Effect.PreventNextDamage shield ->
             Effect.PreventNextDamage shield {PreventNextDamage.ref = Nothing, PreventNextDamage.whatRecipient = Nothing, PreventNextDamage.whoRecipient = Nothing}
           Effect.PreventAllDamage shield ->
-            Effect.PreventAllDamage shield {PreventAllDamage.ref = Nothing, PreventAllDamage.whatRecipient = Nothing}
+            Effect.PreventAllDamage shield {PreventAllDamage.ref = Nothing, PreventAllDamage.whatRecipient = Nothing, PreventAllDamage.whoRecipient = Nothing}
           Effect.RedirectDamage redirect ->
             Effect.RedirectDamage redirect {RedirectDamage.from = Nothing, RedirectDamage.whatRecipient = Nothing, RedirectDamage.whoRecipient = Nothing}
           other -> other

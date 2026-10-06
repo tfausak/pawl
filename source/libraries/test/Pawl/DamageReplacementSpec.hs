@@ -19,8 +19,10 @@ import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
@@ -50,12 +52,14 @@ import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
@@ -63,6 +67,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
@@ -107,7 +112,7 @@ divineDeflectionSpec s registry = Spec.describe s "Divine Deflection (CR 615.7)"
     deflection <- S.printingOf s registry "Divine Deflection"
     let base = S.landsInPlay plains 4
         (mine, g1) = S.addPermanent jedit S.alice base
-        (_, g2) = S.addPermanent jedit S.bob g1
+        (striker, g2) = S.addPermanent jedit S.bob g1
         (blocked, g3) = S.addPermanent piker S.bob g2
         (unshielded, spellId) = S.handOne deflection g3
         shielded = castAndResolve (castDeflection 3 S.bob) unshielded spellId
@@ -129,22 +134,21 @@ divineDeflectionSpec s registry = Spec.describe s "Divine Deflection (CR 615.7)"
     Spec.assertEqWith s "spent on the creature instead, its 2 never happens" (S.damageOf mine creatureFirst) (Just 0)
     Spec.assertEqWith s "and only 1 of alice's 5 is prevented" (S.lifeOf S.alice creatureFirst) (Just 16)
     Spec.assertEqWith s "the rider still deals 3 in total" (S.lifeOf S.bob creatureFirst) (Just 17)
-    -- CR 615.13's own unit, and the one thing on this board the life totals
-    -- cannot settle: the shield spanned TWO recipients here, and the rule counts
-    -- one application of one prevention effect however many of the simultaneous
-    -- events it was applied to. So the rider runs ONCE with the total rather than
-    -- once per recipient, which is a difference in the number of damage events
-    -- and not in their sum -- 3 either way, hence the count.
-    Spec.assertEqWith s "CR 615.13 the rider throws its 3 back in ONE event, not a 2 and a 1" (riderHits S.bob creatureFirst) [3]
-    Spec.assertEqWith s "and the allocation that spent the shield on one recipient throws one lot too" (riderHits S.bob aliceFirst) [3]
-    -- The record those triggers read, which the rider count is a consequence of:
-    -- ONE prevention carrying both recipients' shares, rather than one per
+    -- The one thing on this board the life totals cannot settle: the shield
+    -- spanned TWO sources here -- the Piker's 2 at her creature, the Jedit's 1 at
+    -- her -- and the rider runs once per source the application covered, with
+    -- that source's share, which is a difference in the number
+    -- of damage events and not in their sum -- 3 either way, hence the count.
+    Spec.assertEqWith s "CR 615.5 the rider throws back each source's share, a 2 and a 1" (List.sort (riderHits S.bob creatureFirst)) [1, 2]
+    Spec.assertEqWith s "and the allocation that spent the shield on one source throws one lot" (riderHits S.bob aliceFirst) [3]
+    -- The record those runs read: CR 615.13's ONE prevention, carrying each
+    -- source's share of each recipient, rather than one per source or per
     -- recipient. After the behaviour it explains, not before it.
     Spec.assertEqWith
       s
-      "and ONE prevention was recorded, holding each recipient's share"
+      "and ONE prevention was recorded, holding each source's share"
       (fmap DamagePrevented.amounts (preventionsRecorded creatureFirst))
-      [Map.fromList [(Recipient.ToCreature mine, 2), (Recipient.ToPlayer S.alice, 1)]]
+      [Map.fromList [(blocked, Map.singleton (Recipient.ToCreature mine) 2), (striker, Map.singleton (Recipient.ToPlayer S.alice) 1)]]
     -- The fences. The shield covers what is dealt TO alice's side, never what she
     -- deals: her blocker's 5 kills the Piker either way. And the unshielded board
     -- differs in exactly the shield.
@@ -1754,8 +1758,8 @@ selflessSquireSpec s registry = Spec.describe s "Selfless Squire (CR 615.13)" $ 
   -- would be dealt to any player this turn") is the producer: no card in
   -- data/cards/ writes a PreventNextDamage/PreventAllDamage shield whose player
   -- half admits more than one player -- every whoRecipient in the pool is You
-  -- (divine-deflection, synthetic-communal-bulwark, synthetic-parting-ward,
-  -- ajani-steadfast, pariah), and Scryfall o:"prevent" o:"any player"
+  -- (divine-deflection, comeuppance, synthetic-communal-bulwark,
+  -- synthetic-parting-ward, ajani-steadfast, pariah), and Scryfall o:"prevent" o:"any player"
   -- o:"this turn" and o:"damage that would be dealt to an opponent",
   -- 2026-09-03, neither hit a shield of this shape (#3079).
   --
@@ -1782,7 +1786,7 @@ selflessSquireSpec s registry = Spec.describe s "Selfless Squire (CR 615.13)" $ 
       s
       "one prevention was recorded, holding each player's share"
       (fmap DamagePrevented.amounts (preventionsRecorded after))
-      [Map.fromList [(Recipient.ToPlayer S.alice, 2), (Recipient.ToPlayer S.bob, 4)]]
+      [Map.singleton attacker (Map.fromList [(Recipient.ToPlayer S.alice, 2), (Recipient.ToPlayer S.bob, 4)])]
     Spec.assertEqWith s "exactly one trigger was gathered" (length (GameState.stack dealt)) 1
     -- The discriminating assertion: alice's OWN 2, never the application's 6.
     -- An eventBindings that does not re-ask the relation sums the whole record
@@ -2890,6 +2894,160 @@ graveyardNames pid gs = List.sort (Maybe.mapMaybe (\oid -> fmap Face.name (Game.
 tapStateOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe TapState.TapState
 tapStateOf oid = fmap Object.tapped . Game.lookupObject oid
 
+-- ONE prevention effect covering SEVERAL sources in one batch:
+-- CR 615.13 counts one application, the record keeps every source's share, and
+-- CR 615.5's rider runs once per source with that source's share and that source
+-- bound. Comeuppance ({3}{W} Instant, "Prevent all damage that would be dealt to
+-- you and planeswalkers you control this turn by sources you don't control. If
+-- damage from a creature source is prevented this way, Comeuppance deals that
+-- much damage to that creature. If damage from a noncreature source is prevented
+-- this way, Comeuppance deals that much damage to the source's controller" --
+-- Oracle text checked against api.scryfall.com 2026-10-06) is the producer.
+--
+-- REAL COMBAT for the creature half, CR 510.2 being what makes two attackers'
+-- hits simultaneous. Distinct numbers -- Armored Wolf-Rider 4/6, Catacomb
+-- Crocodile 3/7 -- so the summed reading (7 to one creature) kills either, and a
+-- record keeping one source leaves the other undamaged.
+comeuppanceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+comeuppanceSpec s registry = Spec.describe s "Comeuppance (CR 615.5 / 615.13)" $ do
+  Spec.it s "CR 615.5 one shield stopping two attackers deals each the damage prevented from it" $ do
+    plains <- S.printingOf s registry "Plains"
+    wolfPrinting <- S.printingOf s registry "Armored Wolf-Rider"
+    crocPrinting <- S.printingOf s registry "Catacomb Crocodile"
+    comeuppance <- S.printingOf s registry "Comeuppance"
+    let base = S.landsInPlay plains 4
+        (wolf, g1) = S.addPermanent wolfPrinting S.bob base
+        (croc, g2) = S.addPermanent crocPrinting S.bob g1
+        (unshielded, spellId) = S.handOne comeuppance g2
+        shielded = castAndResolve S.identityAnswer unshielded spellId
+        after = S.runCombat attackNoBlock (bobAttacks shielded)
+        control = S.runCombat attackNoBlock (bobAttacks unshielded)
+    Spec.assertEqWith s "the Wolf-Rider is dealt the 4 prevented from it" (S.damageOf wolf after) (Just 4)
+    Spec.assertEqWith s "and the Crocodile the 3 prevented from it" (S.damageOf croc after) (Just 3)
+    Spec.assertEqWith s "alice took none of the 7" (S.lifeOf S.alice after) (Just 20)
+    -- The record the rider runs off: ONE prevention, each source's own share.
+    Spec.assertEqWith
+      s
+      "CR 615.13 ONE prevention was recorded, holding each source's share"
+      (fmap DamagePrevented.amounts (preventionsRecorded after))
+      [Map.fromList [(wolf, Map.singleton (Recipient.ToPlayer S.alice) 4), (croc, Map.singleton (Recipient.ToPlayer S.alice) 3)]]
+    Spec.assertEqWith s "without the shield alice takes all 7" (S.lifeOf S.alice control) (Just 13)
+    Spec.assertEqWith s "and neither attacker is dealt anything" (S.damageOf wolf control, S.damageOf croc control) (Just 0, Just 0)
+  -- The noncreature half, the player half beside the planeswalker half, and the
+  -- source the shield refuses, in ONE hand-built batch over three seats so that
+  -- "the source's controller" is not merely the only opponent. bob's Crocodile
+  -- hits alice for 3 AND her planeswalker for 2 at once; carol's planeswalker (a
+  -- noncreature source) hits alice for 4; alice's own Jedit Ojanen hits her for 1.
+  Spec.it s "CR 615.5 a noncreature source's share goes to its controller, and one source over you and your planeswalker is one run" $ do
+    plains <- S.printingOf s registry "Plains"
+    crocPrinting <- S.printingOf s registry "Catacomb Crocodile"
+    ajani <- S.printingOf s registry "Ajani Steadfast"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    comeuppance <- S.printingOf s registry "Comeuppance"
+    let base = S.landsFor plains S.alice 4 S.threePlayerGame
+        (croc, g1) = S.addPermanent crocPrinting S.bob base
+        (walker, g2) = S.addPermanent ajani S.alice g1
+        (carolWalker, g3) = S.addPermanent ajani S.carol g2
+        (mine, g4) = S.addPermanent jedit S.alice g3
+        (g5, spellId) = S.handOne comeuppance g4
+        shielded = castAndResolve S.identityAnswer g5 spellId
+        hit src target n = DamageEvent.MkDamageEvent src target n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
+        batch = [hit croc (Recipient.ToPlayer S.alice) 3, hit croc (Recipient.ToPlaneswalker walker) 2, hit carolWalker (Recipient.ToPlayer S.alice) 4, hit mine (Recipient.ToPlayer S.alice) 1]
+        (after, _) = strikeAndSettleWith S.identityAnswer shielded batch
+        hitsOn oid = fmap DamageEvent.amount (filter (\de -> DamageEvent.target de == Recipient.ToCreature oid) (S.damageEventsOf after))
+    Spec.assertEqWith s "carol's planeswalker is a noncreature source, so carol is dealt its 4" (S.lifeOf S.carol after) (Just 16)
+    Spec.assertEqWith s "the Crocodile's 3 at alice and 2 at her planeswalker come back as ONE 5" (hitsOn croc) [5]
+    Spec.assertEqWith s "alice is dealt only her own creature's 1, a source she controls" (S.lifeOf S.alice after) (Just 19)
+    Spec.assertEqWith s "her planeswalker loses no loyalty" (countersOn CounterKind.Loyalty walker after) (countersOn CounterKind.Loyalty walker shielded)
+    Spec.assertEqWith s "and bob, who controls a creature source, is dealt nothing" (S.lifeOf S.bob after) (Just 20)
+  -- CR 608.2h: a creature source GONE by the time the rider runs -- a dies
+  -- trigger's damage, whose source is the creature as it last existed -- is
+  -- still a creature source. "That creature" no longer exists, so Comeuppance
+  -- deals nothing; it must not fall through to the noncreature branch and hit
+  -- the controller. The Crocodile is sacrificed first, then its old id deals the
+  -- damage.
+  Spec.it s "CR 608.2h a creature source that has left is still a creature source, so its controller is dealt nothing" $ do
+    plains <- S.printingOf s registry "Plains"
+    crocPrinting <- S.printingOf s registry "Catacomb Crocodile"
+    comeuppance <- S.printingOf s registry "Comeuppance"
+    let base = S.landsInPlay plains 4
+        (croc, g1) = S.addPermanent crocPrinting S.bob base
+        (g2, spellId) = S.handOne comeuppance g1
+        shielded = castAndResolve S.identityAnswer g2 spellId
+        gone = S.runPure S.identityAnswer shielded (Event.sacrifice S.bob croc)
+        (after, _) = strikeAndSettleWith S.identityAnswer gone [DamageEvent.MkDamageEvent croc (Recipient.ToPlayer S.alice) 3 False False False 0 Nothing Nothing mempty False DamageKind.Noncombat]
+    Spec.assertBool s (not (S.onBattlefield croc gone)) "setup: the Crocodile has left the battlefield"
+    Spec.assertEqWith s "bob is not dealt the 3 as if it came from a noncreature source" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "and alice's 3 was still prevented" (S.lifeOf S.alice after) (Just 20)
+
+-- Swans of Bryn Argoll ({2}{W/U}{W/U} Creature -- Bird Spirit 4/3, "Flying / If
+-- a source would deal damage to this creature, prevent that damage. The source's
+-- controller draws cards equal to the damage prevented this way" -- Oracle text
+-- checked against api.scryfall.com 2026-10-06): a PRINTED shield whose CR 615.5
+-- rider reads the source, over two sources with DIFFERENT controllers in one
+-- batch, which is where one rider run over the summed amount would hand the
+-- draws to the wrong player. Hand-built: one player's creatures attack (CR
+-- 506.2) and only the defending player's block (CR 509.1a), so no combat batch
+-- carries two controllers' damage to one creature outside a team game.
+swansOfBrynArgollSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+swansOfBrynArgollSpec s registry = Spec.describe s "Swans of Bryn Argoll (CR 615.5)" $ do
+  Spec.it s "CR 615.5 each source's controller draws for the damage prevented from that source" $ do
+    plains <- S.printingOf s registry "Plains"
+    swansPrinting <- S.printingOf s registry "Swans of Bryn Argoll"
+    crocPrinting <- S.printingOf s registry "Catacomb Crocodile"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    let stock pid n g = List.foldl' (\acc _ -> snd (S.addLibraryCard plains pid acc)) g [1 .. n :: Int]
+        base = stock S.carol 6 (stock S.bob 6 S.threePlayerGame)
+        (swans, g1) = S.addPermanent swansPrinting S.alice base
+        (croc, g2) = S.addPermanent crocPrinting S.bob g1
+        (big, g3) = S.addPermanent jedit S.carol g2
+        hit src n = DamageEvent.MkDamageEvent src (Recipient.ToCreature swans) n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
+        (after, _) = strikeAndSettleWith S.identityAnswer g3 [hit croc 2, hit big 5]
+    Spec.assertEqWith s "bob draws the 2 prevented from his Crocodile" (S.handSize S.bob after) 2
+    Spec.assertEqWith s "carol draws the 5 prevented from her Jedit" (S.handSize S.carol after) 5
+    Spec.assertEqWith s "the Swans are dealt nothing" (S.damageOf swans after) (Just 0)
+    Spec.assertEqWith s "and alice draws nothing" (S.handSize S.alice after) 0
+
+-- Judgment of Alexander ({2}{W} Instant, "Prevent all damage that would be dealt
+-- to you this turn by sources your opponents control. Whenever damage from a
+-- creature is prevented this way, each commander creature you control deals
+-- damage equal to its power to that creature" -- Oracle text checked against
+-- api.scryfall.com 2026-10-06): CR 615.13's trigger over ONE application
+-- covering two creature sources fires ONCE, with both bound as "that creature".
+-- Two triggers each naming one creature would leave the same marked damage, so
+-- the count of resolved triggers is what tells the readings apart; the damage is
+-- what tells "both bound" from "one bound".
+judgmentOfAlexanderSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+judgmentOfAlexanderSpec s registry = Spec.describe s "Judgment of Alexander (CR 615.13)" $ do
+  Spec.it s "CR 615.13 one application over two attackers fires once, naming both" $ do
+    plains <- S.printingOf s registry "Plains"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    wolfPrinting <- S.printingOf s registry "Armored Wolf-Rider"
+    crocPrinting <- S.printingOf s registry "Catacomb Crocodile"
+    judgment <- S.printingOf s registry "Judgment of Alexander"
+    let base = S.landsInPlay plains 3
+        (commander, g1) = S.addPermanent jedit S.alice base
+        (wolf, g2) = S.addPermanent wolfPrinting S.bob (designateCommander commander g1)
+        (croc, g3) = S.addPermanent crocPrinting S.bob g2
+        (g4, spellId) = S.handOne judgment g3
+        shielded = castAndResolve S.identityAnswer g4 spellId
+        after = S.runCombat attackNoBlock (bobAttacks shielded)
+        resolvedTriggers = length [() | GameEvent.TriggeredAbilityResolved _ <- S.eventsOf after]
+    Spec.assertBool s (Commander.isCommander commander g4) "setup: alice's Jedit is her commander"
+    Spec.assertEqWith s "her commander deals its 5 to the Wolf-Rider" (S.damageOf wolf after) (Just 5)
+    Spec.assertEqWith s "and its 5 to the Crocodile" (S.damageOf croc after) (Just 5)
+    Spec.assertEqWith s "from ONE trigger, the one application" resolvedTriggers 1
+    Spec.assertEqWith s "alice took none of the 7" (S.lifeOf S.alice after) (Just 20)
+
+-- CR 903.3: designate `oid`'s card as its owner's commander, by printing --
+-- what Pawl.Scenario does for a placement marked commander.
+designateCommander :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+designateCommander oid gs = case Game.lookupObject oid gs of
+  Just obj
+    | Source.OfCard printing <- Object.source obj ->
+        gs {GameState.players = Map.adjust (\p -> p {Player.commander = Set.insert printing (Player.commander p)}) (Object.owner obj) (GameState.players gs)}
+  _ -> gs
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   divineDeflectionSpec s registry
@@ -2913,6 +3071,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   phyrexianVindicatorSpec s registry
   samiteMinistrationSpec s registry
   deflectingPalmSpec s registry
+  comeuppanceSpec s registry
+  swansOfBrynArgollSpec s registry
+  judgmentOfAlexanderSpec s registry
   reverseDamageSpec s registry
   interventionPactSpec s registry
   newWayForwardSpec s registry

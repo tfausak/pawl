@@ -12,6 +12,7 @@ import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
@@ -36,6 +37,7 @@ spec s = Spec.describe s "Pawl.Codec.PreventAllDamage" $ do
             PreventAllDamage.kind = Nothing,
             PreventAllDamage.ref = Just (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))),
             PreventAllDamage.whatRecipient = Nothing,
+            PreventAllDamage.whoRecipient = Nothing,
             PreventAllDamage.direction = DamageDirection.DealtTo,
             PreventAllDamage.chosenSource = Nothing,
             PreventAllDamage.whatSource = Filter.And [],
@@ -55,6 +57,7 @@ spec s = Spec.describe s "Pawl.Codec.PreventAllDamage" $ do
             PreventAllDamage.kind = Just DamageKind.Combat,
             PreventAllDamage.ref = Just (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
             PreventAllDamage.whatRecipient = Nothing,
+            PreventAllDamage.whoRecipient = Nothing,
             PreventAllDamage.direction = DamageDirection.DealtBy,
             PreventAllDamage.chosenSource = Nothing,
             PreventAllDamage.whatSource = Filter.And [],
@@ -76,6 +79,7 @@ spec s = Spec.describe s "Pawl.Codec.PreventAllDamage" $ do
             PreventAllDamage.kind = Nothing,
             PreventAllDamage.ref = Just (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))),
             PreventAllDamage.whatRecipient = Nothing,
+            PreventAllDamage.whoRecipient = Nothing,
             PreventAllDamage.direction = DamageDirection.DealtTo,
             PreventAllDamage.chosenSource = Just (Filter.And []),
             PreventAllDamage.whatSource = Filter.And [],
@@ -97,6 +101,7 @@ spec s = Spec.describe s "Pawl.Codec.PreventAllDamage" $ do
             PreventAllDamage.kind = Nothing,
             PreventAllDamage.ref = Just (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))),
             PreventAllDamage.whatRecipient = Nothing,
+            PreventAllDamage.whoRecipient = Nothing,
             PreventAllDamage.direction = DamageDirection.DealtTo,
             PreventAllDamage.chosenSource = Nothing,
             PreventAllDamage.whatSource = Filter.HasKeyword Keyword.Flying,
@@ -116,6 +121,7 @@ spec s = Spec.describe s "Pawl.Codec.PreventAllDamage" $ do
             PreventAllDamage.kind = Just DamageKind.Combat,
             PreventAllDamage.ref = Nothing,
             PreventAllDamage.whatRecipient = Just (Filter.HasSubtype Subtype.Dog),
+            PreventAllDamage.whoRecipient = Nothing,
             PreventAllDamage.direction = DamageDirection.DealtTo,
             PreventAllDamage.chosenSource = Nothing,
             PreventAllDamage.whatSource = Filter.And [],
@@ -123,4 +129,24 @@ spec s = Spec.describe s "Pawl.Codec.PreventAllDamage" $ do
           }
       )
       " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"kind\":{\"type\":\"Combat\"},\"whatRecipient\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Dog\"}}} "
+  -- The PLAYER half beside the described objects, Comeuppance's "to you and
+  -- planeswalkers you control": one row, so the key is written beside
+  -- whatRecipient rather than as a second effect.
+  Spec.it s "MkPreventAllDamage, a described player half" $
+    Common.assertCodec
+      s
+      codec
+      ( PreventAllDamage.MkPreventAllDamage
+          { PreventAllDamage.duration = Duration.UntilEndOfTurn,
+            PreventAllDamage.kind = Nothing,
+            PreventAllDamage.ref = Nothing,
+            PreventAllDamage.whatRecipient = Just (Filter.HasSubtype Subtype.Dog),
+            PreventAllDamage.whoRecipient = Just PlayerRelation.You,
+            PreventAllDamage.direction = DamageDirection.DealtTo,
+            PreventAllDamage.chosenSource = Nothing,
+            PreventAllDamage.whatSource = Filter.And [],
+            PreventAllDamage.riders = Seq.empty
+          }
+      )
+      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"whatRecipient\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Dog\"}},\"whoRecipient\":{\"type\":\"You\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

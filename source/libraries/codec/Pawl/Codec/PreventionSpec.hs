@@ -33,12 +33,11 @@ spec s = Spec.describe s "Pawl.Codec.Prevention" $ do
                 { FloatingCandidate.source = ObjectId.MkObjectId 3,
                   FloatingCandidate.timestamp = Timestamp.MkTimestamp 8
                 },
-          Prevention.source = ObjectId.MkObjectId 11,
-          Prevention.amounts = Map.singleton (Recipient.ToPlayer (PlayerId.MkPlayerId 1)) 2,
+          Prevention.amounts = Map.singleton (ObjectId.MkObjectId 11) (Map.singleton (Recipient.ToPlayer (PlayerId.MkPlayerId 1)) 2),
           Prevention.rider = Nothing
         }
-      ( " {\"by\":{\"type\":\"OfFloating\",\"value\":{\"source\":3,\"timestamp\":8}},\"source\":11"
-          <> ",\"amounts\":[{\"key\":{\"type\":\"ToPlayer\",\"value\":1},\"value\":2}],\"rider\":null} "
+      ( " {\"by\":{\"type\":\"OfFloating\",\"value\":{\"source\":3,\"timestamp\":8}}"
+          <> ",\"amounts\":[{\"key\":11,\"value\":[{\"key\":{\"type\":\"ToPlayer\",\"value\":1},\"value\":2}]}],\"rider\":null} "
       )
   -- CR 615.5: the rider rides the prevention rather than the row that fired it,
   -- because a CR 615.7 shield spent to zero is dropped in the same application.
@@ -53,8 +52,7 @@ spec s = Spec.describe s "Pawl.Codec.Prevention" $ do
                 { FloatingCandidate.source = ObjectId.MkObjectId 5,
                   FloatingCandidate.timestamp = Timestamp.MkTimestamp 6
                 },
-          Prevention.source = ObjectId.MkObjectId 12,
-          Prevention.amounts = Map.singleton (Recipient.ToCreature (ObjectId.MkObjectId 7)) 4,
+          Prevention.amounts = Map.singleton (ObjectId.MkObjectId 12) (Map.singleton (Recipient.ToCreature (ObjectId.MkObjectId 7)) 4),
           Prevention.rider =
             Just
               PreventionRider.MkPreventionRider
@@ -68,7 +66,7 @@ spec s = Spec.describe s "Pawl.Codec.Prevention" $ do
                 }
         }
       ( " {\"by\":{\"type\":\"OfFloating\",\"value\":{\"source\":5,\"timestamp\":6}}"
-          <> ",\"source\":12,\"amounts\":[{\"key\":{\"type\":\"ToCreature\",\"value\":7},\"value\":4}]"
+          <> ",\"amounts\":[{\"key\":12,\"value\":[{\"key\":{\"type\":\"ToCreature\",\"value\":7},\"value\":4}]}]"
           <> ",\"rider\":{\"effects\":[{\"type\":\"Proliferate\"}],\"targets\":{\"target\":[{\"type\":\"ToCreature\",\"value\":7}]},\"controller\":1,\"source\":9}} "
       )
   Spec.it s "has a schema" $

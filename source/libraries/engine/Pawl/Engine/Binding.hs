@@ -371,11 +371,12 @@ eventAmount = SlotName.MkSlotName (Text.pack "thatMuch")
 -- CR 615.5 / 615.13 / 120.1: the reserved slot under which a prevention's
 -- SOURCE is bound -- the object that would have dealt the damage, which
 -- Deflecting Palm's and New Way Forward's "that source's controller" reads
--- through PlayerRef.ControllerOfBound. Two writers, one per carrier: a CR 615.13
--- trigger's is Pawl.Engine.Event.Binding.eventBindings, alongside
--- `eventAmount` and off Pawl.Types.DamagePrevented.source, and a CR 615.5
--- rider's is Pawl.Engine.Resolve.Effect.runPreventionRider, off
--- Pawl.Types.Prevention.source.
+-- through PlayerRef.ControllerOfBound. Two writers, one per carrier, both off
+-- the sources keying the prevention's `amounts`: a CR 615.13 trigger's is
+-- Pawl.Engine.Event.Binding.eventBindings, alongside `eventAmount`, binding
+-- every source its Filter admits at once (Judgment of Alexander's "that
+-- creature" over two attackers); a CR 615.5 rider's is
+-- Pawl.Engine.Resolve.Effect.runPreventionRider, binding one source per run.
 --
 -- Distinct from `triggerSource` (CR 113.7a), which names the ability's own
 -- source: the bearer here is the card that shielded, and the object that would
@@ -391,9 +392,8 @@ eventAmount = SlotName.MkSlotName (Text.pack "thatMuch")
 -- Projection.controllerWithLastKnown among them.
 --
 -- A CHARACTERISTIC of it reads its last known information through
--- Pawl.Engine.Resolve.Slots.effectViewOf, like any slot's object. No card in
--- data/cards/ asks for one; Honorable Passage's "if damage from a red source is
--- prevented this way" would.
+-- Pawl.Engine.Resolve.Slots.effectViewOf, like any slot's object -- Comeuppance's
+-- "damage from a creature source", through ObjectRef.EachCardFromAmong.
 --
 -- Not a target (CR 115.10a; nothing was chosen), so the same CR 608.2b posture
 -- and the same "no card's targetSlots may name it" sweep as `became`, and the
@@ -1213,9 +1213,11 @@ setBecame oid = Map.insert became (toObject oid)
 setHandArrival :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setHandArrival oid = Map.insert handArrival (toObject oid)
 
--- Bind an object under the reserved preventedDamageSource slot (CR 615.13).
-setPreventedDamageSource :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
-setPreventedDamageSource oid = Map.insert preventedDamageSource (toObject oid)
+-- Bind objects under the reserved preventedDamageSource slot (CR 615.13): every
+-- source one application covered, as recipients, so ObjectRef.InSlot names them
+-- all.
+setPreventedDamageSources :: Set ObjectId -> Map SlotName Binding -> Map SlotName Binding
+setPreventedDamageSources oids = Map.insert preventedDamageSource (toRecipients (Set.map Recipient.ToObject oids))
 
 -- setBecame for a plural: the SEVERAL cards a melded permanent became as it left
 -- the battlefield (CR 712.21c), or that a manifest dread put into a graveyard (CR

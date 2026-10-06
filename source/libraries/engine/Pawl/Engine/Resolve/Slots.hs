@@ -764,7 +764,7 @@ effectObjectRefs effect = case effect of
   Effect.SkipNextPhase {} -> []
   -- Absent where the shield's recipients are described rather than named.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ ref _ _ _ _ _) -> Maybe.maybeToList ref
-  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ ref _ _ _ _ _) -> Maybe.maybeToList ref
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ ref _ _ _ _ _ _) -> Maybe.maybeToList ref
   -- One ref, and never optional: CR 615.8's shield always names its recipient.
   Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance _ ref _ _) -> [ref]
   -- CR 614.9's two sides, the damage's old recipient -- absent where the card
@@ -1351,7 +1351,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- The same reads, minus the shield size this opcode does not carry and plus CR
   -- 609.7b's printed source properties, the one field only this opcode spells
   -- out; they ride the row and are rechecked at the damage event (CR 615.9).
-  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ whatRecipient _ chosenSource whatSource rider) ->
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ whatRecipient _ _ chosenSource whatSource rider) ->
     joinSlots
       [ durationSlots duration,
         joinSlots (fmap filterSlotsOf (Maybe.maybeToList whatRecipient <> Maybe.maybeToList chosenSource <> [whatSource])),
@@ -2108,7 +2108,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> True
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ _ _ _ _ quantity rider) ->
     durationSlotsAreExhaustive duration && Quantity.slotsAreExhaustive quantity && all slotsAreExhaustive rider
-  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ _ _ _ _ rider) ->
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ _ _ _ _ _ rider) ->
     durationSlotsAreExhaustive duration && all slotsAreExhaustive rider
   Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance duration _ _ rider) ->
     durationSlotsAreExhaustive duration && all slotsAreExhaustive rider
@@ -2380,7 +2380,7 @@ readsX =
         Effect.SkipNextPhase {} -> False
         -- CR 601.2b's X reaches the rider too.
         Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ _ quantity rider) -> Quantity.readsX quantity || readsX (Foldable.toList rider)
-        Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ _ rider) -> readsX (Foldable.toList rider)
+        Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ _ _ rider) -> readsX (Foldable.toList rider)
         Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance _ _ _ rider) -> readsX (Foldable.toList rider)
         Effect.RedirectDamage (RedirectDamage.MkRedirectDamage _ _ amount _ _ _ _ _) -> any Quantity.readsX amount
         Effect.Counter {} -> False
@@ -2636,7 +2636,7 @@ boundSlots effect = case effect of
   -- The shield itself binds nothing; CR 615.5's rider is an effect list, so a
   -- name IT authors is a name this card authors. All three shields.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ _ _ rider) -> foldMap boundSlots rider
-  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ _ rider) -> foldMap boundSlots rider
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ _ _ rider) -> foldMap boundSlots rider
   Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance _ _ _ rider) -> foldMap boundSlots rider
   Effect.RedirectDamage {} -> Set.empty
   -- How many spells this countering ACTUALLY countered, for a "for each spell
@@ -3487,11 +3487,17 @@ effectViewOf source legal gs oid =
 -- ride along -- against the CR 613 projection, so a card a continuous effect
 -- made a creature is a creature card here. The caller's order survives, which
 -- for a group is mint order (CR 608.2f).
+--
+-- Through effectViewOf, so a member that no longer exists answers from CR
+-- 608.2h's last known information and one with none filed matches nothing:
+-- Comeuppance's "damage from a creature source" asks it of a source that may
+-- have left before its CR 615.5 rider runs, and Pawl.DamageReplacementSpec's "a
+-- creature source that has left is still a creature source" proves it.
 matchingFromAmong :: Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId -> ObjectId -> GameState -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId] -> [ObjectId]
 matchingFromAmong legal resolving controller source gs filter_ members =
   let context = effectContext gs controller source legal (slotBindings resolving gs)
-      viewOf = Projection.viewsOf gs
-   in filter (\oid -> Filter.matches context (viewOf oid) filter_) members
+      viewOf = effectViewOf source legal gs
+   in filter (maybe False (\view -> Filter.matches context view filter_) . viewOf) members
 
 -- Every slot ONE target slot reads: its pool's, its filter's, and its CR 202.3
 -- computed bound's. Its own name is not among them -- this is what the slot
