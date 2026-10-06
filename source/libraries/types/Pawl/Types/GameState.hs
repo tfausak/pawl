@@ -354,6 +354,11 @@ data GameState = MkGameState
     -- ordinal onto GameEvent.Drew; cleared for every player at turn handoff,
     -- and after CR 103.3's opening hands.
     drawsThisTurn :: Map.Map PlayerId.PlayerId Natural.Natural,
+    -- | CR 121.8: Nothing unless a spell is being cast or an ability activated
+    -- (Pawl.Engine.Event.announcing); then the cards drawn since it began, each
+    -- kept face down in its hand with no characteristics, keyed to the ordinal
+    -- GameEvent.Drew stamped on its draw.
+    keptFaceDown :: Maybe (Map.Map ObjectId.ObjectId Natural.Natural),
     -- | CR 801.2c: the players who have left the game since this turn began,
     -- whose seats still count toward range of influence until the next turn
     -- begins; cleared at turn handoff.

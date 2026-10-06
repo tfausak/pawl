@@ -168,6 +168,18 @@ beingCast gs candidate = case lookupObject candidate gs of
   Nothing -> False
   Just object -> Object.castFrom object == Just (Object.zone object)
 
+-- CR 121.8: a card drawn while a spell is being cast or an ability activated,
+-- still in the hand it was drawn into, and so kept face down there with no
+-- characteristics. Asked of the zone too, so a card that leaves the hand
+-- leaves the mark behind with its old id (CR 400.7).
+--
+-- Not implemented: CR 708.5's "you can't look at face-down cards in any other
+-- zone" -- a prompt still names the card to its owner (#1412).
+keptFaceDown :: ObjectId -> GameState -> Bool
+keptFaceDown oid gs =
+  maybe False (Map.member oid) (GameState.keptFaceDown gs)
+    && fmap Object.zone (lookupObject oid gs) == Just Zone.Hand
+
 -- CR 601.2a's move, as far as a board condition can see it: the state a cast
 -- gate was handed, with every object `beingCast` taken out of the zone it is
 -- leaving. The same state unchanged wherever nothing is stamped -- CR 605.3a's

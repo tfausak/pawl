@@ -17,6 +17,8 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.CardSpec as CardSpec
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activatable as Activatable
+import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
@@ -34,6 +36,7 @@ import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
@@ -56,9 +59,11 @@ import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KickerDecision as KickerDecision
+import qualified Pawl.Types.Label as Label
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -73,6 +78,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Placement as Placement
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -80,11 +86,15 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Response as Response
+import qualified Pawl.Types.RevealCause as RevealCause
+import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Sacrifice as Sacrifice
+import qualified Pawl.Types.Seat as Seat
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
+import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapPermanents as TapPermanents
 import qualified Pawl.Types.TapState as TapState
@@ -4459,6 +4469,130 @@ humiliationSpec s registry =
       Spec.assertBool s (not (faceDownIn (board True))) "CR 613.1f the humiliated Tracker is offered no face-down cast"
       Spec.assertBool s (faceDownIn (board False)) "the control: with the Piker humiliated instead, it may be cast face down"
 
+-- CR 121.8: a card drawn while a spell is being cast or an ability activated is
+-- kept face down until the spell becomes cast or the ability activated, and a
+-- reveal it is offered "as it's being drawn" waits until then. Synthetic
+-- Wellspring Growth draws mid-payment: its CR 605.1b triggered mana ability
+-- resolves as the enchanted land is tapped in CR 601.2g's window, before CR
+-- 601.2h pays the rest. Magmatic Insight's land half is
+-- data/scenarios/cost's cr-121-8 pair.
+keptFaceDownSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+keptFaceDownSpec s registry = Spec.describe s "KeptFaceDown" $ do
+  let label = Label.MkLabel . Text.pack
+      idOf name built = maybe (Spec.assertFailure s ("no " <> name)) pure (Map.lookup (label name) (Staged.objects built))
+      -- alice's main phase: Synthetic Wellspring Growth on `land`, `mine` beside
+      -- it, `held` in hand, and `top` on three Pikers -- Thunderous Wrath unless
+      -- said otherwise.
+      board = boardTopped "Thunderous Wrath"
+      boardTopped top land mine held =
+        let alice =
+              (S.battlefield S.alice ([S.ready (S.aliased "land" (S.permanent land)), (S.permanent "Synthetic Wellspring Growth") {Placement.attached = Just (label "land")}] <> mine))
+                { Seat.hand = Seq.fromList (fmap (\(alias, name) -> S.aliased alias (S.cardSetup name)) held),
+                  Seat.library = Seq.fromList (S.cardSetup top : replicate 3 (S.cardSetup "Goblin Piker"))
+                }
+         in S.board (alice NonEmpty.:| [S.battlefield S.bob [S.aliased "victim" (S.permanent "Goblin Piker")]]) S.alice S.precombatMain
+      -- Pays with `source` alone, discards a card `pick` names if one is offered,
+      -- aims at the first legal recipient, takes every reveal, and reverses the
+      -- mana abilities of a reversed cast whenever it is asked.
+      answerer :: ObjectId.ObjectId -> (ObjectId.ObjectId -> Bool) -> Prompt.Prompt r -> r
+      answerer source pick p = case p of
+        Prompt.ChooseManaSource _ _ sources -> if source `elem` sources then Just source else Nothing
+        Prompt.ChooseDiscard _ _ cards n -> take (Natural.toIntSaturating n) (filter pick cards <> filter (not . pick) cards)
+        Prompt.ChooseTargets _ _ _ slots -> fmap (Set.take 1 . snd) slots
+        Prompt.OfferedMiracleReveal {} -> OptionalDecision.Exercises
+        Prompt.ReverseManaAbilities {} -> OptionalDecision.Exercises
+        _ -> S.identityAnswer p
+      named name gs oid = Set.member (CardName.MkCardName (Text.pack name)) (Game.namesOf oid gs)
+      wrathIn zone gs = filter (named "Thunderous Wrath" gs) (Game.zoneMembers zone S.alice gs)
+      isMiracleReveal event = case event of
+        GameEvent.Revealed revealed -> case Revealed.cause revealed of
+          RevealCause.ForMiracle _ -> True
+          _ -> False
+        _ -> False
+      isMiracle keyword = case keyword of
+        Keyword.Miracle _ -> True
+        _ -> False
+      isSpellCast event = case event of
+        GameEvent.SpellCast _ -> True
+        _ -> False
+      isDiscard event = case event of
+        GameEvent.Discarded {} -> True
+        _ -> False
+      -- Both indices, the first strictly earlier.
+      loggedBefore label' first second gs = case (List.findIndex first (S.eventsOf gs), List.findIndex second (S.eventsOf gs)) of
+        (Just a, Just b) -> Spec.assertBool s (a < b) label'
+        found -> Spec.assertFailure s (label' <> ": expected both events, got " <> show found)
+  Spec.it s "CR 121.8 Thunderous Wrath drawn while Magmatic Insight is paid for is offered its miracle reveal only once Insight becomes cast" $ do
+    built <- S.buildBoardOrFail s registry (board "Mountain" [] [("insight", "Magmatic Insight"), ("forest", "Forest"), ("plains", "Plains")])
+    land <- idOf "land" built
+    forest <- idOf "forest" built
+    insight <- idOf "insight" built
+    let after = S.runPure (answerer land (== forest)) (Staged.state built) (S.cast S.alice insight)
+    loggedBefore "the miracle reveal is logged after CR 601.2i's cast, not during CR 601.2g's payment" isSpellCast isMiracleReveal after
+    loggedBefore "and after CR 601.2h discarded the Forest" isDiscard isMiracleReveal after
+    Spec.assertEqWith s "the Wrath is face up again: CR 121.8's mark is gone" (GameState.keptFaceDown after) Nothing
+  -- CR 733.1: the {R} is unpaid with only the Forest's {G}{G}, so the cast is
+  -- reversed after the draw. The draw is an action CR 733.1 never reverses, and
+  -- CR 121.8 offers the reveal only "after the spell becomes cast", which never
+  -- comes. The answerer asks for every reversal it is offered.
+  Spec.it s "CR 121.8 / 733.1 a reversed cast keeps the drawn Thunderous Wrath in hand, face up and unrevealed" $ do
+    built <- S.buildBoardOrFail s registry (board "Forest" [S.ready (S.permanent "Mountain")] [("insight", "Magmatic Insight"), ("forest", "Forest")])
+    land <- idOf "land" built
+    insight <- idOf "insight" built
+    let after = S.runPure (answerer land (const False)) (Staged.state built) (S.cast S.alice insight)
+        wrath = wrathIn Zone.Hand after
+    Spec.assertEqWith s "no miracle reveal: the spell never became cast" (filter isMiracleReveal (S.eventsOf after)) []
+    Spec.assertEqWith s "CR 733.1: the draw stands, so the Wrath is in alice's hand" (length wrath) 1
+    Spec.assertBool s (any (named "Magmatic Insight" after) (Game.zoneMembers Zone.Hand S.alice after)) "and Magmatic Insight is back in hand"
+    Spec.assertEqWith s "the Wrath has its characteristics back: its miracle keyword projects" (fmap (any isMiracle . Map.keys . flip Projection.keywordsOf after) wrath) [True]
+  Spec.it s "CR 121.8 Thunderous Wrath drawn while Netter en-Dal's ability is paid for is offered its miracle reveal only once the ability is activated" $ do
+    built <- S.buildBoardOrFail s registry (board "Plains" [S.ready (S.aliased "netter" (S.permanent "Netter en-Dal"))] [("piker", "Goblin Piker")])
+    land <- idOf "land" built
+    piker <- idOf "piker" built
+    netter <- idOf "netter" built
+    let gs = Staged.state built
+    case Activatable.abilitiesFor netter gs of
+      [ability] -> do
+        let after = S.runPure (answerer land (== piker)) gs (Activate.activateAbility S.alice netter ability)
+        loggedBefore "the miracle reveal is logged after CR 601.2h discarded the Piker for the cost" isDiscard isMiracleReveal after
+      abilities -> Spec.assertFailure s ("expected one ability on Netter en-Dal, got " <> show (length abilities))
+  -- CR 121.8 bars the face-down card only from a cost "that would require the
+  -- card to have specific characteristics"; Netter en-Dal's "Discard a card"
+  -- asks none.
+  Spec.it s "CR 121.8 the face-down Thunderous Wrath can still be discarded to Netter en-Dal's discard a card" $ do
+    built <- S.buildBoardOrFail s registry (board "Plains" [S.ready (S.aliased "netter" (S.permanent "Netter en-Dal"))] [("piker", "Goblin Piker")])
+    land <- idOf "land" built
+    piker <- idOf "piker" built
+    netter <- idOf "netter" built
+    let gs = Staged.state built
+    case Activatable.abilitiesFor netter gs of
+      [ability] -> do
+        let after = S.runPure (answerer land (/= piker)) gs (Activate.activateAbility S.alice netter ability)
+        Spec.assertEqWith s "the Wrath was the card discarded" (length (wrathIn Zone.Graveyard after)) 1
+        Spec.assertEqWith s "and the Piker stayed in hand" (Game.zoneMembers Zone.Hand S.alice after) [piker]
+      abilities -> Spec.assertFailure s ("expected one ability on Netter en-Dal, got " <> show (length abilities))
+  -- CR 121.8's "no characteristics" reaches the abilities a card states for a
+  -- hand: Progenitus's "would be put into a graveyard from anywhere" row. Drawn
+  -- face down and discarded to Netter en-Dal's cost, it has no such row, so it
+  -- stays in the graveyard; the control holds it from the start, where the row
+  -- shuffles it into the library.
+  let progenitusIn zone gs = filter (named "Progenitus" gs) (Game.zoneMembers zone S.alice gs)
+      discardProgenitus top held = do
+        built <- S.buildBoardOrFail s registry (boardTopped top "Plains" [S.ready (S.aliased "netter" (S.permanent "Netter en-Dal"))] held)
+        land <- idOf "land" built
+        piker <- idOf "piker" built
+        netter <- idOf "netter" built
+        let gs = Staged.state built
+        case Activatable.abilitiesFor netter gs of
+          [ability] -> pure (S.runPure (answerer land (/= piker)) gs (Activate.activateAbility S.alice netter ability))
+          abilities -> Spec.assertFailure s ("expected one ability on Netter en-Dal, got " <> show (length abilities))
+  Spec.it s "CR 121.8 a face-down Progenitus discarded mid-activation has no graveyard replacement" $ do
+    after <- discardProgenitus "Progenitus" [("piker", "Goblin Piker")]
+    Spec.assertEqWith s "Progenitus stays in alice's graveyard: with no characteristics it had no row to apply" (length (progenitusIn Zone.Graveyard after)) 1
+  Spec.it s "CR 121.8 a face-down Progenitus discarded mid-activation has no graveyard replacement (control)" $ do
+    after <- discardProgenitus "Goblin Piker" [("piker", "Goblin Piker"), ("progenitus", "Progenitus")]
+    Spec.assertEqWith s "held from the start, Progenitus's row shuffles it into the library instead" (length (progenitusIn Zone.Library after), length (progenitusIn Zone.Graveyard after)) (1, 0)
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   castSpec s registry
@@ -4513,6 +4647,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   madnessSpec s registry
   epicSpec s registry
   legendarySpellSpec s registry
+  keptFaceDownSpec s registry
 
 -- Casts the first offered option, then declines (the loop re-offers until empty).
 castFirstOption :: Prompt.Prompt r -> r

@@ -8651,11 +8651,52 @@ performDraw pid = do
             let tally = Map.insertWith (+) pid 1 (GameState.drawsThisTurn g)
              in (Map.findWithDefault 1 pid tally, g {GameState.drawsThisTurn = tally})
           State.modify' (recordEvent (GameEvent.Drew (Drew.MkDrew pid nth)))
-          -- CR 702.94a's "if it's the FIRST card you've drawn this turn", asked
-          -- off the ordinal this draw was just stamped with rather than off a
-          -- second reading of the tally.
-          Monad.when (nth == 1) (offerMiracleReveal pid drawn)
+          -- CR 121.8: drawn while a spell is being cast or an ability
+          -- activated, the card is kept face down and any reveal waits for
+          -- `turnUpKeptDraws`, which is handed the ordinal for the gate below.
+          kept <- State.gets GameState.keptFaceDown
+          case kept of
+            Just held -> State.modify' (\g -> g {GameState.keptFaceDown = Just (Map.insert drawn nth held)})
+            -- CR 702.94a's "if it's the FIRST card you've drawn this turn",
+            -- asked off the ordinal this draw was just stamped with rather than
+            -- off a second reading of the tally.
+            Nothing -> Monad.when (nth == 1) (offerMiracleReveal pid drawn)
           pure (Just drawn)
+
+-- CR 121.8's window: run `body` as the casting of a spell or the activation of
+-- an ability (Pawl.Engine.Cast.castSpellWith, Pawl.Engine.Activate), so a card
+-- drawn during it is kept face down. `turnUpKeptDraws` ends the window when the
+-- spell becomes cast or the ability activated; one still open when `body`
+-- returns was reversed (CR 733.1), and its cards are simply turned up -- the
+-- rule defers a reveal to "after the spell becomes cast", which never came.
+--
+-- A window already open is left to its owner: a card drawn in a nested one is
+-- drawn while the outer spell is still being cast.
+announcing :: Game a -> Game a
+announcing body = do
+  outer <- State.gets GameState.keptFaceDown
+  case outer of
+    Just _ -> body
+    Nothing -> do
+      State.modify' (\g -> g {GameState.keptFaceDown = Just Map.empty})
+      result <- body
+      State.modify' (\g -> g {GameState.keptFaceDown = Nothing})
+      pure result
+
+-- CR 121.8: the spell became cast (CR 601.2i) or the ability activated (CR
+-- 602.2b), so the cards drawn meanwhile turn face up and a reveal they were
+-- offered "as it's being drawn" is offered now, CR 121.9's look included. Only
+-- to a card still in the hand it was drawn into: one paid away as a "discard a
+-- card" has left it, and CR 702.94a reveals from the hand.
+turnUpKeptDraws :: Game ()
+turnUpKeptDraws = do
+  kept <- State.gets GameState.keptFaceDown
+  State.modify' (\g -> g {GameState.keptFaceDown = Nothing})
+  Monad.forM_ (foldMap Map.toAscList kept) $ \(drawn, nth) -> do
+    gs <- State.get
+    case Game.lookupObject drawn gs of
+      Just obj | nth == 1 && Object.zone obj == Zone.Hand -> offerMiracleReveal (Object.owner obj) drawn
+      _ -> pure ()
 
 -- CR 702.94a's static half, and CR 121.9's window: "you may reveal this card from
 -- your hand as you draw it". Asked of the card that just arrived in the hand, and
@@ -8681,10 +8722,12 @@ performDraw pid = do
 -- Molecule Man's "nonland cards in your hand have miracle {0}".
 -- Pawl.EventTriggerSpec's Molecule Man pair proves it.
 --
+-- A card drawn while a spell is being cast or an ability activated is offered
+-- here only once that is done (CR 121.8, `turnUpKeptDraws`).
+--
 -- Not implemented: CR 702.94b's LASTING reveal -- the card stays revealed until it
 -- leaves the hand or the ability leaves the stack -- which needs a per-object
--- revealed flag (#1408). Nor CR 121.8's face-down drawn card
--- (#1409).
+-- revealed flag (#1408).
 offerMiracleReveal :: PlayerId -> ObjectId -> Game ()
 offerMiracleReveal pid drawn = do
   gs <- State.get
