@@ -2986,9 +2986,9 @@ comeuppanceSpec s registry = Spec.describe s "Comeuppance (CR 615.5 / 615.13)" $
 -- checked against api.scryfall.com 2026-10-06): a PRINTED shield whose CR 615.5
 -- rider reads the source, over two sources with DIFFERENT controllers in one
 -- batch, which is where one rider run over the summed amount would hand the
--- draws to the wrong player. Hand-built, since CR 506.2 lets only the defending
--- player's creatures block, so no combat batch carries two controllers' damage
--- to one creature outside a team game.
+-- draws to the wrong player. Hand-built: one player's creatures attack (CR
+-- 506.2) and only the defending player's block (CR 509.1a), so no combat batch
+-- carries two controllers' damage to one creature outside a team game.
 swansOfBrynArgollSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 swansOfBrynArgollSpec s registry = Spec.describe s "Swans of Bryn Argoll (CR 615.5)" $ do
   Spec.it s "CR 615.5 each source's controller draws for the damage prevented from that source" $ do
