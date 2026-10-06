@@ -1415,6 +1415,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
             TriggerCondition.SelfEnters
             (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.ExileAllGraveyards]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             Nothing
+            Nothing
             TriggerLimit.Unlimited
         (abilId, g4) = Game.freshObjectId g3
         (ts, g5) = Game.freshTimestamp g4

@@ -1589,6 +1589,7 @@ unearthExile =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -4217,6 +4218,7 @@ blitzDraw =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -5799,6 +5801,7 @@ poisonous n =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -5849,6 +5852,7 @@ ingest =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -5909,6 +5913,7 @@ myriadExile =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -6001,6 +6006,7 @@ myriad =
               )
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -6071,6 +6077,7 @@ mobilize n =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [spawn, arm]))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -6128,6 +6135,7 @@ firebending n =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton added))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -6157,6 +6165,7 @@ annihilator n =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -6186,6 +6195,7 @@ battleCry =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -6232,6 +6242,7 @@ graft =
               ( Condition.Compares
                   (Compares.MkCompares (Quantity.ObjectCounters CounterKind.PlusOnePlusOne) Comparison.AtLeast (Quantity.Literal 1))
               ),
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -6328,6 +6339,7 @@ soulbondSelfEnters =
                     atLeastOneMatching (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) unpairedOther
                   ]
               ),
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -6383,6 +6395,7 @@ soulbondOtherEnters =
                       (Filter.And [Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.You, Filter.Not Filter.IsPaired])
                   ]
               ),
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -6405,6 +6418,7 @@ evolve =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Just (Condition.Any [entrantExceeds Quantity.Power, entrantExceeds Quantity.Toughness]),
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -6450,6 +6464,7 @@ prowess =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -6499,6 +6514,7 @@ extort =
               (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -6560,6 +6576,7 @@ increment =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton grow))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Just (Condition.All [isCreature, Condition.Any [spentExceeds Quantity.Power, spentExceeds Quantity.Toughness]]),
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -6591,6 +6608,7 @@ melee =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -6622,6 +6640,7 @@ rampage n =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -6648,6 +6667,7 @@ flanking =
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton flankingEffect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.name = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
     }
 
@@ -6693,6 +6713,7 @@ exalted =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -6736,6 +6757,7 @@ bushidoHalf condition n =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -6770,6 +6792,7 @@ enlistReflexive =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -6801,6 +6824,7 @@ frenzy n =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -6828,6 +6852,7 @@ afflict n =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -6853,6 +6878,7 @@ mentor =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton mentorTarget slot)))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -6886,6 +6912,7 @@ training =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -6931,6 +6958,7 @@ ward w =
               (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -6960,6 +6988,7 @@ decayed =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -7072,6 +7101,7 @@ atNextEndStepAll effects =
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing effects)) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.name = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
     }
 
@@ -7147,6 +7177,7 @@ decayedSacrifice =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -7179,6 +7210,7 @@ provoke =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.fromList [requirement, untap]))) (Map.singleton provokeTarget slot)))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -7213,6 +7245,7 @@ renown n =
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening =
             Just (Condition.Compares (Compares.MkCompares (Quantity.HasDesignation Designation.Renowned) Comparison.AtMost (Quantity.Literal 0))),
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -7233,6 +7266,7 @@ dethrone =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton grow))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -7297,6 +7331,7 @@ returns kind =
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening =
             Just (Condition.Compares (Compares.MkCompares (Quantity.ObjectCounters kind) Comparison.AtMost (Quantity.Literal 0))),
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -7320,6 +7355,7 @@ evoke =
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening =
             Just (Condition.Compares (Compares.MkCompares (Quantity.CastUsing KeywordFamily.Evoke) Comparison.AtLeast (Quantity.Literal 1))),
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -7362,6 +7398,7 @@ gift something =
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening =
         Just (Condition.Compares (Compares.MkCompares (Quantity.TimesPaid (Keyword.Gift something)) Comparison.AtLeast (Quantity.Literal 1))),
+      TriggeredAbility.name = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
     }
 
@@ -7461,6 +7498,7 @@ paidTokenCopies keyword quantity exceptions =
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening =
             Just (Condition.Compares (Compares.MkCompares (Quantity.TimesPaid keyword) Comparison.AtLeast (Quantity.Literal 1))),
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -7511,6 +7549,7 @@ afterlife n =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton spawn))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -7611,6 +7650,7 @@ ravenous =
               ( Condition.Compares
                   (Compares.MkCompares (Quantity.InSlot Binding.variableX) Comparison.AtLeast (Quantity.Literal 5))
               ),
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -7681,6 +7721,7 @@ fabricate n =
               (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -7748,6 +7789,7 @@ backup (Backup.MkBackup n above) =
               (Seq.singleton (Mode.MkMode clauses (Map.singleton backupTarget slot)))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -7778,6 +7820,7 @@ exploit =
               (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -7905,6 +7948,7 @@ attachToOwnToken token =
               (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -8140,6 +8184,7 @@ hideaway n =
               (Seq.singleton (Mode.MkMode (Seq.fromList [clause [look], clause [hide, allow], clause [rest]]) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -8201,6 +8246,7 @@ soulshift n =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.singleton back))) (Map.singleton soulshiftTarget slot)))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -8262,6 +8308,7 @@ partnerWith name =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing (Optionality.Optional (PlayerRef.InSlot partnerWithTarget)) Nothing (Seq.singleton effect))) (Map.singleton partnerWithTarget slot)))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -8292,6 +8339,7 @@ haunt =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton exile))) (Map.singleton hauntTarget slot)))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -8318,6 +8366,7 @@ hauntSpell =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton exile))) (Map.singleton hauntTarget slot)))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -8363,6 +8412,7 @@ miracle cost =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton offer))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -8533,6 +8583,7 @@ recover cost =
               (Seq.singleton (Mode.MkMode (Seq.fromList [returned, exiled]) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -8655,6 +8706,7 @@ paidSpellCopies keyword quantity =
       TriggeredAbility.modal = copiesOf quantity,
       TriggeredAbility.intervening =
         Just (Condition.Compares (Compares.MkCompares (Quantity.TimesPaid keyword) Comparison.AtLeast (Quantity.Literal 1))),
+      TriggeredAbility.name = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
     }
 
@@ -8670,6 +8722,7 @@ storm =
     { TriggeredAbility.condition = TriggerCondition.SelfCast,
       TriggeredAbility.modal = copiesOf Quantity.SpellsCastBefore,
       TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.name = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
     }
 
@@ -8687,6 +8740,7 @@ gravestorm =
     { TriggeredAbility.condition = TriggerCondition.SelfCast,
       TriggeredAbility.modal = copiesOf Quantity.PermanentsDiedThisTurn,
       TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.name = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
     }
 
@@ -8758,6 +8812,7 @@ demonstrate =
               (Seq.singleton (Mode.MkMode (Seq.fromList [yours, theirs]) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -8873,6 +8928,7 @@ cascade =
               (Seq.singleton (Mode.MkMode (Seq.fromList [clause exile, clause offer, clause rest]) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -8995,6 +9051,7 @@ ripple n =
               )
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -9030,6 +9087,7 @@ suspendUpkeep =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Just suspendedNow,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -9106,6 +9164,7 @@ suspendLastCounter keyword =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Just stillExiled,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -9186,6 +9245,7 @@ reboundUpkeep =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -9243,6 +9303,7 @@ cipherTrigger card =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -9311,6 +9372,7 @@ epicCopy =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -9364,6 +9426,7 @@ paradigmCopy =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -9454,6 +9517,7 @@ madnessCast manaCost payload =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [offer, toGraveyard]))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -9564,6 +9628,7 @@ vanishingUpkeep =
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening =
             Just (Condition.Compares (Compares.MkCompares (Quantity.ObjectCounters CounterKind.Time) Comparison.AtLeast (Quantity.Literal 1))),
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -9585,6 +9650,7 @@ vanishingLastCounter =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -9602,6 +9668,7 @@ impendingEndStep =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Just impendingHolds,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -9645,6 +9712,7 @@ fading =
               (Seq.singleton (Mode.MkMode (Seq.fromList [sacrificeClause, removeClause]) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -9716,6 +9784,7 @@ cumulativeUpkeep cost =
               (Seq.singleton (Mode.MkMode (Seq.fromList [ageClause, upkeepClause]) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Just onBattlefield,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -9778,6 +9847,7 @@ echo cost =
               (Seq.singleton (Mode.MkMode (Seq.singleton sacrifice) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Just cameUnderYourControl,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -9812,6 +9882,7 @@ modular =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.singleton effect))) (Map.singleton modularTarget slot)))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -9898,6 +9969,7 @@ championEnters quality =
               (Seq.singleton (Mode.MkMode (Seq.fromList [exile, sacrifice]) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -9933,6 +10005,7 @@ championLeaves =
               (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 

@@ -84,6 +84,7 @@ spec s = Spec.describe s "Pawl.Codec.GrantedAbility" $ do
               (TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer)
               emptyModal
               Nothing
+              Nothing
               TriggerLimit.Unlimited
           )
       )

@@ -164,6 +164,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   retractionHelixSpec s registry
   anyPlayerActivationSpec s registry
   instantSpeedEquipSpec s registry
+  silencedSentinelSpec s registry
 
   Spec.it s "CR 602 activating Prodigal Sorcerer's {T} puts an ability on the stack and taps it" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
@@ -4384,6 +4385,38 @@ locusSpec s registry =
     Spec.assertEqWith s "CR 602.5c / 702.167c the Locus pings bob once with EACH exiled Brothers of Fire's ability" (S.lifeOf S.bob fired) (Just 18)
     Spec.assertEqWith s "CR 602.5b and neither is offered a third time this turn, three Mountains still untapped" (fmap fst (offered brothers fired)) []
     Spec.assertEqWith s "CR 607.2a / 702.167c the Ashling the borrowed Wretch exiled gave the Locus nothing" (fmap fst (offered ashling fired)) []
+
+-- CR 613.1f's named removal aimed at a TRIGGERED ability. Synthetic Silenced
+-- Sentinel {2}{W} 2/3: "Whenever this creature attacks, you gain 1 life. {W}:
+-- This creature loses 'Whenever this creature attacks, you gain 1 life.'" No
+-- printed card removes one of its own triggered abilities by name.
+--
+-- The same attack on two boards, one with the {W} resolved first. The trigger
+-- is the gameplay difference; the surviving activated ability is what tells the
+-- named removal from Humility's LoseAllAbilities.
+silencedSentinelSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+silencedSentinelSpec s registry = Spec.describe s "Synthetic Silenced Sentinel (CR 613.1f)" $ do
+  let sentinel = S.aliasRef "sentinel"
+      board =
+        S.board
+          ( S.battlefield S.alice [S.settled "sentinel" "Synthetic Silenced Sentinel", S.settled "mana" "Plains"]
+              NonEmpty.:| [S.playerSetup S.bob]
+          )
+          S.alice
+          S.beginningOfCombat
+      silencing = S.on S.beginningOfCombat S.alice (S.activateAction sentinel Choices.none {Choices.manaSources = Seq.singleton (Just (S.aliasRef "mana"))})
+      attacking = S.on S.declareAttackers S.alice (S.attack [sentinel])
+      sentinelsOf gs = [o | o <- Game.zoneMembers Zone.Battlefield S.alice gs, Set.member (CardName.MkCardName (Text.pack "Synthetic Silenced Sentinel")) (Projection.namesOf o gs)]
+  Spec.it s "CR 603.2 without the {W} the attack gains alice 1 life" $ do
+    built <- S.buildBoardOrFail s registry board
+    (_, after) <- S.runScriptOrFail s (S.turn 1 [attacking]) built S.combatGame
+    Spec.assertEqWith s "the trigger resolved" (S.lifeOf S.alice after) (Just 21)
+  Spec.it s "CR 613.1f after the {W} the attack gains nothing, and the {W} survives" $ do
+    built <- S.buildBoardOrFail s registry board
+    (_, after) <- S.runScriptOrFail s (S.turn 1 [silencing, attacking]) built S.combatGame
+    Spec.assertEqWith s "CR 613.1f the trigger is gone, so alice gains no life" (S.lifeOf S.alice after) (Just 20)
+    Spec.assertEqWith s "and the Plains paid for the removal, the attack tapping the Sentinel" (S.tappedCount S.alice after) 2
+    Spec.assertEqWith s "CR 613.1f the activated ability, named by nothing, stays" (fmap (length . (`Projection.abilitiesOf` after)) (sentinelsOf after)) [1]
 
 -- CR 602.5c / 113.2c: Gliding Licid's "{U}, {T}: This creature loses this
 -- ability and becomes an Aura enchantment with enchant creature. Attach it to

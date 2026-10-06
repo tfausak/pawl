@@ -186,6 +186,7 @@ ability =
           )
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Just hasRadCounters,
+      TriggeredAbility.name = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
     }
 

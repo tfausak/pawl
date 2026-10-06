@@ -474,6 +474,7 @@ modalTrigger condition modes =
     { TriggeredAbility.condition = condition,
       TriggeredAbility.modal = Modal.MkModal (Seq.fromList modes) (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.name = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
     }
 
@@ -1473,8 +1474,9 @@ namedExileReferences face =
    in Set.fromList (concatMap named (concatMap Resolve.effectObjectRefs (cardAuthoredEffects face)))
 
 -- Every AbilityName a face declares FOR A LAYER-6 REMOVAL OR AN EXILE REFERENCE
--- to name -- the other side of the join above. Both carriers of one: an activated ability (Gliding
--- Licid) and a printed replacement (Glittering Lion). A HAND-KEPT union, so a
+-- to name -- the other side of the join above. Every carrier of one: an
+-- activated ability (Gliding Licid), a triggered ability (Synthetic Silenced
+-- Sentinel) and a printed replacement (Glittering Lion). A HAND-KEPT union, so a
 -- third carrier added to Pawl.Types.AbilityName's readers must be added here
 -- too, or its cards' names read as dangling.
 --
@@ -1484,6 +1486,7 @@ declaredAbilityNames :: Face.Face Card.Type.Card -> Set.Set AbilityName.AbilityN
 declaredAbilityNames face =
   Set.fromList
     ( Maybe.mapMaybe ActivatedAbility.name (Face.activatedAbilities face)
+        <> Maybe.mapMaybe TriggeredAbility.name (Face.triggeredAbilities face)
         <> Maybe.mapMaybe PrintedReplacement.name (Face.replacementEffects face)
     )
 

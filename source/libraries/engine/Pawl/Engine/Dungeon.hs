@@ -109,6 +109,7 @@ roomAbility room dungeonRoom =
     { TriggeredAbility.condition = TriggerCondition.RoomEntered room,
       TriggeredAbility.modal = DungeonRoom.ability dungeonRoom,
       TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.name = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
     }
 

@@ -298,6 +298,7 @@ theRingLootsOnAttack =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [draw, discard]))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -352,6 +353,7 @@ theRingSacrificesTheBlocker =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
@@ -387,6 +389,7 @@ theRingBlockerSacrifice =
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.blockingCreature, SacrificeEffect.sacrificer = Sacrificer.PermanentController, SacrificeEffect.sacrificed = Nothing})))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.name = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
     }
 
@@ -431,6 +434,7 @@ theRingDrainsOnCombatDamage =
           -- or does not, and an ability that exists and declines to trigger is a
           -- different thing.
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
