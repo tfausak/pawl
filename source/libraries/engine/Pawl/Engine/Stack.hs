@@ -437,7 +437,7 @@ resolveCardBacked runSubgame oid rest printingId = do
           -- status, the two things those branches differ in.
           entersAs seed facing = do
             Monad.void (Resolve.noteResolved oid (Resolve.spellController obj oid gs1))
-            arrivals <- Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue seed (maybe TapState.Untapped EntryRiders.tapped sneak) Map.empty (Just controller) entering facing False CarryOver.Carried False
+            arrivals <- Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue seed (maybe TapState.Untapped EntryRiders.tapped sneak) Map.empty (Just controller) entering facing False CarryOver.Carried False Seq.empty
             -- AFTER the move, ninjutsu's ordering one opcode over
             -- (Pawl.Engine.Resolve.Effect's MoveToZone arm): the permanent has
             -- to be on the battlefield before CR 508.4 can put it in combat, and

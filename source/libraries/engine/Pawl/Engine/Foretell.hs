@@ -24,6 +24,7 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Event as Event
@@ -211,7 +212,8 @@ riders =
       EntryRiders.exiledFaceDown = True,
       EntryRiders.attachedTo = Nothing,
       EntryRiders.faceDown = Nothing,
-      EntryRiders.noted = False
+      EntryRiders.noted = False,
+      EntryRiders.characteristics = Seq.empty
     }
 
 -- "It becomes a foretold card" -- the stamp and CR 702.143d's granted cost

@@ -134,6 +134,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
@@ -1989,7 +1990,7 @@ manifestedWith s registry land top extra = do
 -- resolved. Nothing if the move did not land.
 putOntoBattlefield :: Maybe (FaceDownState.FaceDownState (GrantedAbility.GrantedAbility Card.Card)) -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, Maybe ObjectId.ObjectId)
 putOntoBattlefield faceDown oid gs =
-  let riders = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = Nothing, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.attachedTo = Nothing, EntryRiders.noted = False, EntryRiders.faceDown = faceDown}
+  let riders = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = Nothing, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.attachedTo = Nothing, EntryRiders.noted = False, EntryRiders.characteristics = Seq.empty, EntryRiders.faceDown = faceDown}
       (entered, moved) = Engine.runGamePure S.identityAnswer gs (Event.changeZoneEntering oid Zone.Battlefield LibraryPosition.defaultValue riders (Just S.alice))
    in -- At most ONE arrival: the funnel answers with several only for a melded
       -- permanent leaving the battlefield (CR 712.21), and this move enters one.
@@ -2255,7 +2256,7 @@ faceUpEffectSpec s registry = Spec.describe s "TurnFaceUp (CR 701.40g)" $ do
 enterFaceDown :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (GameState.GameState, Maybe ObjectId.ObjectId)
 enterFaceDown printing pid gs =
   let (oid, g1) = S.addLibraryCard printing pid gs
-      riders = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = Nothing, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.attachedTo = Nothing, EntryRiders.noted = False, EntryRiders.faceDown = Just (FaceDownState.defaultFor FaceDownReason.Manifested)}
+      riders = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = Nothing, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.attachedTo = Nothing, EntryRiders.noted = False, EntryRiders.characteristics = Seq.empty, EntryRiders.faceDown = Just (FaceDownState.defaultFor FaceDownReason.Manifested)}
       (entered, moved) = Engine.runGamePure S.identityAnswer g1 (Event.changeZoneEntering oid Zone.Battlefield LibraryPosition.defaultValue riders (Just pid))
    in (S.settleSba moved, Maybe.listToMaybe (Foldable.toList entered))
 

@@ -24,72 +24,39 @@
                             "type": "InSlot",
                             "value": "target"
                           },
-                          "slot": "reanimated",
-                          "zone": {
-                            "type": "Battlefield"
-                          }
-                        }
-                      },
-                      {
-                        "type": "ModifyTarget",
-                        "value": {
-                          "duration": {
-                            "type": "Indefinite"
-                          },
-                          "modification": {
-                            "type": "SetColor",
-                            "value": [
+                          "riders": {
+                            "characteristics": [
                               {
-                                "type": "Green"
+                                "type": "SetColor",
+                                "value": [
+                                  {
+                                    "type": "Green"
+                                  }
+                                ]
+                              },
+                              {
+                                "type": "SetCreatureSubtype",
+                                "value": {
+                                  "type": "Mutant"
+                                }
+                              },
+                              {
+                                "type": "SetBasePowerToughness",
+                                "value": {
+                                  "power": {
+                                    "type": "Literal",
+                                    "value": 3
+                                  },
+                                  "toughness": {
+                                    "type": "Literal",
+                                    "value": 3
+                                  }
+                                }
                               }
                             ]
                           },
-                          "ref": {
-                            "type": "InSlot",
-                            "value": "reanimated"
-                          }
-                        }
-                      },
-                      {
-                        "type": "ModifyTarget",
-                        "value": {
-                          "duration": {
-                            "type": "Indefinite"
-                          },
-                          "modification": {
-                            "type": "SetCreatureSubtype",
-                            "value": {
-                              "type": "Mutant"
-                            }
-                          },
-                          "ref": {
-                            "type": "InSlot",
-                            "value": "reanimated"
-                          }
-                        }
-                      },
-                      {
-                        "type": "ModifyTarget",
-                        "value": {
-                          "duration": {
-                            "type": "Indefinite"
-                          },
-                          "modification": {
-                            "type": "SetBasePowerToughness",
-                            "value": {
-                              "power": {
-                                "type": "Literal",
-                                "value": 3
-                              },
-                              "toughness": {
-                                "type": "Literal",
-                                "value": 3
-                              }
-                            }
-                          },
-                          "ref": {
-                            "type": "InSlot",
-                            "value": "reanimated"
+                          "zone": {
+                            "type": "Battlefield"
                           }
                         }
                       }

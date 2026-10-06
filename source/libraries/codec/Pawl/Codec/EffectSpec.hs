@@ -501,7 +501,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
     let slot = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))
         bound = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled"))
         boundSlot = SlotName.MkSlotName (Text.pack "exiled")
-        attacking = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = Just EntryAttack.Chosen, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.attachedTo = Nothing, EntryRiders.faceDown = Nothing, EntryRiders.noted = False}
+        attacking = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = Just EntryAttack.Chosen, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.attachedTo = Nothing, EntryRiders.faceDown = Nothing, EntryRiders.noted = False, EntryRiders.characteristics = Seq.empty}
     Common.assertJsonCodec
       s
       toJson
@@ -812,7 +812,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
   -- were once the middle two of four emitted forms, told apart at decode by JSON
   -- TYPE.
   Spec.it s "Create round-trips every combination of its three elided keys" $ do
-    let attacking = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = Just EntryAttack.Chosen, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.attachedTo = Nothing, EntryRiders.faceDown = Nothing, EntryRiders.noted = False}
+    let attacking = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = Just EntryAttack.Chosen, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.attachedTo = Nothing, EntryRiders.faceDown = Nothing, EntryRiders.noted = False, EntryRiders.characteristics = Seq.empty}
         plain = EntryRiders.defaultValue
         slot = SlotName.MkSlotName (Text.pack "token")
         card = Text.pack "Goblin Piker"
@@ -1072,7 +1072,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Repeat (Repeat.MkRepeat (PlayerRef.Relative PlayerRelation.You) (Seq.singleton (Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1) Nothing)))))
+      (Effect.Repeat (Repeat.MkRepeat (PlayerRef.Relative PlayerRelation.You) (Seq.singleton (Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1) Nothing))) Nothing))
       " {\"type\":\"Repeat\",\"value\":{\"chooser\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"body\":[{\"type\":\"Draw\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"quantity\":{\"type\":\"Literal\",\"value\":1}}}]}} "
   -- Grist, the Hunger Tide's +1: go again only while the process's tally says so.
   Spec.it s "RepeatIf" $

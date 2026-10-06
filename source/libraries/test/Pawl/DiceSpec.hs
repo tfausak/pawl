@@ -32,8 +32,10 @@
 -- CR 706.2b's second step is the EIGHTH, Night Shift of the Living Dead, at the
 -- very bottom -- a modifier from another source that increases or decreases the
 -- result, with a life cost and a once-each-turn budget.
--- Left out: no "Roll again" (#2124), and no CR 706.5 doubles (#3243). CR
--- 706.1's roll does record its event, but the trigger
+-- CR 706.3c's "Roll again" is the NINTH, Delina, Wild Mage, at the end of
+-- the file -- the roll inside Effect.Repeat, asked only on the 15--20 striation.
+-- Left out: no CR 706.5 doubles (#3243). CR 706.1's roll does record its event,
+-- but the trigger
 -- reading it lives in Pawl.EventTriggerSpec beside the other condition cases.
 --
 -- THE ASSERTED QUANTITY on the DRAGON's boards is how many Treasure tokens alice
@@ -83,6 +85,7 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
@@ -96,17 +99,23 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Combat as Combat.Type
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.RollAdjustment as RollAdjustment
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -121,6 +130,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   activatedRerollSpec s registry
   nightShiftSpec s registry
   deckOwnerSpec s registry
+  delinaSpec s registry
 
 knight :: CardName.CardName
 knight = CardName.MkCardName (Text.pack "Knight Token")
@@ -931,3 +941,67 @@ deckOwnerSpec s registry = Spec.describe s "OwnerOfBound" $ do
     -- under alice's control while staying bob's card, and it really did die.
     Spec.assertEqWith s "setup: alice controlled the reanimated creature" (Projection.controllerOf reanimated activated) (Just S.alice)
     Spec.assertEqWith s "setup: the creature really died" (Game.lookupObject reanimated settled) Nothing
+
+-- CR 706.3c on Delina, Wild Mage {3}{R} 3/2, "Whenever Delina attacks, choose
+-- target creature you control, then roll a d20. / 1-14 | Create a tapped and
+-- attacking token that's a copy of that creature, except it's not legendary and
+-- it has "At end of combat, exile this token." / 15-20 | Create one of those
+-- tokens. You may roll again." Delina attacks bob alone, so she is her own
+-- target, and her tokens surviving CR 704.5j beside her is the "not legendary".
+--
+-- `rolls` answers the d20s in order, and `again` every ask while a roll is left
+-- to answer; past the script alice declines, so a missing gate costs one extra
+-- token rather than a loop that never ends. Returns the board at declare
+-- blockers, the board after combat, and how many times alice was asked.
+delinaRun :: [Natural.Natural] -> OptionalDecision.OptionalDecision -> GameState.GameState -> (GameState.GameState, GameState.GameState, Int)
+delinaRun rolls again board =
+  let answer :: Prompt.Prompt r -> State.State ([Natural.Natural], Int) r
+      answer p = case p of
+        Prompt.RollDie _ -> do
+          (left, seen) <- State.get
+          case left of
+            n : rest -> State.put (rest, seen) >> pure n
+            [] -> pure 1
+        Prompt.ChooseRepeat {} -> do
+          (left, seen) <- State.get
+          State.put (left, seen + 1)
+          pure (if null left then OptionalDecision.Declines else again)
+        _ -> pure (S.attackTo S.bob p)
+      go stop n gs =
+        if n <= (0 :: Int) || stop gs || not (S.inCombatPhase (GameState.phase gs))
+          then pure gs
+          else do
+            (_, next) <- Engine.runGame answer gs Engine.runStep
+            go stop (n - 1) next
+      atBlockers = State.evalState (go (\gs -> GameState.phase gs == Phase.Combat CombatStep.DeclareBlockers) 8 board) (rolls, 0)
+      (after, (_, asked)) = State.runState (go (const False) 24 board) (rolls, 0)
+   in (atBlockers, after, asked)
+
+delinaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+delinaSpec s registry = Spec.describe s "Delina" $ do
+  let delinaCase rolls again = do
+        delina <- S.printingOf s registry "Delina, Wild Mage"
+        let (board, _, _) = S.combatBoardOf [delina] []
+        pure (delinaRun rolls again board)
+      attackingBob gs = fmap (\oid -> (fmap Object.tapped (Game.lookupObject oid gs), Map.lookup oid (Combat.Type.attackers (GameState.combat gs)))) (S.tokensOf gs)
+      tappedAtBob n = replicate n (Just TapState.Tapped, Just (AttackTarget.OfPlayer S.bob))
+  -- Each script carries one roll past where the gate should stop the loop, so
+  -- an ungated ask is answered yes and shows up as an extra token.
+  Spec.it s "CR 706.3c a 17 then a 9 makes two tokens and asks once" $ do
+    (atBlockers, after, asked) <- delinaCase [17, 9, 9] OptionalDecision.Exercises
+    Spec.assertEqWith s "CR 508.4 two non-legendary Delinas, tapped and attacking bob" (attackingBob atBlockers) (tappedAtBob 2)
+    Spec.assertEqWith s "alice was asked after the 17 and not after the 9" asked 1
+    Spec.assertEqWith s "CR 510.1b bob takes 3 from Delina and 3 from each token" (S.lifeOf S.bob after) (Just 11)
+    Spec.assertEqWith s "CR 511.2 each token's own end-of-combat trigger exiles it" (S.tokensOf after) []
+  Spec.it s "CR 706.3c a 9 makes one token and asks nothing" $ do
+    (atBlockers, _, asked) <- delinaCase [9, 9] OptionalDecision.Exercises
+    Spec.assertEqWith s "one token" (attackingBob atBlockers) (tappedAtBob 1)
+    Spec.assertEqWith s "alice was never asked" asked 0
+  Spec.it s "CR 706.3c a 20 and a 15 each offer another roll" $ do
+    (atBlockers, _, asked) <- delinaCase [20, 15, 14, 9] OptionalDecision.Exercises
+    Spec.assertEqWith s "three tokens" (attackingBob atBlockers) (tappedAtBob 3)
+    Spec.assertEqWith s "asked after the 20 and the 15" asked 2
+  Spec.it s "CR 608.2d a declined roll again ends the loop" $ do
+    (atBlockers, _, asked) <- delinaCase [17, 9] OptionalDecision.Declines
+    Spec.assertEqWith s "one token" (attackingBob atBlockers) (tappedAtBob 1)
+    Spec.assertEqWith s "asked once" asked 1

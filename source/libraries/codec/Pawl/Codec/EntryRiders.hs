@@ -3,12 +3,14 @@
 module Pawl.Codec.EntryRiders where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.EntryAttack as EntryAttack
 import qualified Pawl.Codec.EntryBlock as EntryBlock
 import qualified Pawl.Codec.FaceDownState as FaceDownState
 import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.Codec.Modification as Modification
 import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Codec.TapState as TapState
@@ -52,6 +54,7 @@ codec abilityCodec = Fields.object $ do
   attachedTo <- Fields.defaulted "attachedTo" Nothing (Common.maybe SlotName.codec) EntryRiders.attachedTo
   faceDown <- Fields.defaulted "faceDown" Nothing (Common.maybe (FaceDownState.codec abilityCodec)) EntryRiders.faceDown
   noted <- Fields.defaulted "noted" False Common.boolean EntryRiders.noted
+  characteristics <- Fields.defaulted "characteristics" Seq.empty (Common.seq (Modification.codec abilityCodec)) EntryRiders.characteristics
   pure
     EntryRiders.MkEntryRiders
       { EntryRiders.tapped = tapped,
@@ -63,7 +66,8 @@ codec abilityCodec = Fields.object $ do
         EntryRiders.exiledFaceDown = exiledFaceDown,
         EntryRiders.attachedTo = attachedTo,
         EntryRiders.faceDown = faceDown,
-        EntryRiders.noted = noted
+        EntryRiders.noted = noted,
+        EntryRiders.characteristics = characteristics
       }
 
 -- | The value every carrier elides: a card file carries riders only when the
@@ -73,7 +77,8 @@ codec abilityCodec = Fields.object $ do
 -- 712.14 for the front face a
 -- double-faced card enters showing by default, CR 122.6 for the counters an
 -- object enters with, CR 110.2a for who it enters under, CR 406.3 for an exiled
--- card being kept face up, CR 110.5b for a permanent entering face up).
+-- card being kept face up, CR 110.5b for a permanent entering face up, CR
+-- 611.2e for a permanent entering under no effect of the instruction's).
 defaultValue :: EntryRiders.EntryRiders count ability
 defaultValue =
   EntryRiders.MkEntryRiders
@@ -86,5 +91,6 @@ defaultValue =
       EntryRiders.exiledFaceDown = False,
       EntryRiders.attachedTo = Nothing,
       EntryRiders.faceDown = Nothing,
-      EntryRiders.noted = False
+      EntryRiders.noted = False,
+      EntryRiders.characteristics = Seq.empty
     }

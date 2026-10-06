@@ -1007,7 +1007,8 @@ craft spec =
                     EntryRiders.exiledFaceDown = False,
                     EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False
+                    EntryRiders.noted = False,
+                    EntryRiders.characteristics = Seq.empty
                   },
               MoveToZone.slot = Nothing,
               MoveToZone.origin = Just Zone.Exile,
@@ -1166,7 +1167,8 @@ ninjutsu cost =
                     EntryRiders.exiledFaceDown = False,
                     EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False
+                    EntryRiders.noted = False,
+                    EntryRiders.characteristics = Seq.empty
                   },
               -- Nothing looks back at the move, so it binds no slot.
               MoveToZone.slot = Nothing,
@@ -1467,7 +1469,8 @@ unearth cost =
                     EntryRiders.exiledFaceDown = False,
                     EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False
+                    EntryRiders.noted = False,
+                    EntryRiders.characteristics = Seq.empty
                   },
               MoveToZone.slot = Just unearthSlot,
               MoveToZone.origin = Just Zone.Graveyard,
@@ -1571,7 +1574,8 @@ unearthExile =
                     EntryRiders.exiledFaceDown = False,
                     EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False
+                    EntryRiders.noted = False,
+                    EntryRiders.characteristics = Seq.empty
                   },
               MoveToZone.slot = Nothing,
               MoveToZone.origin = Nothing,
@@ -1642,7 +1646,8 @@ graveyardTokenCopy exceptions cost =
                     EntryRiders.exiledFaceDown = False,
                     EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False
+                    EntryRiders.noted = False,
+                    EntryRiders.characteristics = Seq.empty
                   },
               -- Nothing looks back at the token, so it binds no slot.
               CreateCopy.slot = Nothing,
@@ -1769,7 +1774,8 @@ encore cost =
                     EntryRiders.exiledFaceDown = False,
                     EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False
+                    EntryRiders.noted = False,
+                    EntryRiders.characteristics = Seq.empty
                   },
               CreateCopy.slot = Just encoreTokenSlot,
               CreateCopy.exceptions = []
@@ -5825,7 +5831,8 @@ ingest =
                   EntryRiders.exiledFaceDown = False,
                   EntryRiders.attachedTo = Nothing,
                   EntryRiders.faceDown = Nothing,
-                  EntryRiders.noted = False
+                  EntryRiders.noted = False,
+                  EntryRiders.characteristics = Seq.empty
                 }
               Nothing
               Nothing
@@ -5887,7 +5894,8 @@ myriadExile =
                     EntryRiders.exiledFaceDown = False,
                     EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False
+                    EntryRiders.noted = False,
+                    EntryRiders.characteristics = Seq.empty
                   },
               MoveToZone.slot = Nothing,
               MoveToZone.origin = Nothing,
@@ -5951,7 +5959,8 @@ myriad =
                     EntryRiders.exiledFaceDown = False,
                     EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False
+                    EntryRiders.noted = False,
+                    EntryRiders.characteristics = Seq.empty
                   },
               CreateCopy.slot = Just myriadTokenSlot,
               CreateCopy.exceptions = []
@@ -6041,7 +6050,8 @@ mobilize n =
                     EntryRiders.exiledFaceDown = False,
                     EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False
+                    EntryRiders.noted = False,
+                    EntryRiders.characteristics = Seq.empty
                   },
               Create.slot = Just mobilizeTokenSlot,
               -- CR 111.2 under CR 109.5: the keyword ability's own controller.
@@ -7026,7 +7036,8 @@ dashReturn =
                     EntryRiders.exiledFaceDown = False,
                     EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False
+                    EntryRiders.noted = False,
+                    EntryRiders.characteristics = Seq.empty
                   },
               MoveToZone.slot = Nothing,
               MoveToZone.origin = Nothing,
@@ -7097,7 +7108,8 @@ warpExile =
                     EntryRiders.exiledFaceDown = False,
                     EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False
+                    EntryRiders.noted = False,
+                    EntryRiders.characteristics = Seq.empty
                   },
               MoveToZone.slot = Just warpedSlot,
               MoveToZone.origin = Nothing,
@@ -7269,7 +7281,8 @@ returns kind =
                   EntryRiders.exiledFaceDown = False,
                   EntryRiders.attachedTo = Nothing,
                   EntryRiders.faceDown = Nothing,
-                  EntryRiders.noted = False
+                  EntryRiders.noted = False,
+                  EntryRiders.characteristics = Seq.empty
                 }
               Nothing
               Nothing
@@ -7387,7 +7400,8 @@ giftToken tapped token =
               EntryRiders.exiledFaceDown = False,
               EntryRiders.attachedTo = Nothing,
               EntryRiders.faceDown = Nothing,
-              EntryRiders.noted = False
+              EntryRiders.noted = False,
+              EntryRiders.characteristics = Seq.empty
             },
         Create.slot = Nothing,
         Create.creator = PlayerRef.ChosenPlayerOfBound Binding.triggerSource
@@ -7433,7 +7447,8 @@ paidTokenCopies keyword quantity exceptions =
                     EntryRiders.exiledFaceDown = False,
                     EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False
+                    EntryRiders.noted = False,
+                    EntryRiders.characteristics = Seq.empty
                   },
               CreateCopy.slot = Nothing,
               CreateCopy.exceptions = exceptions
@@ -7482,7 +7497,8 @@ afterlife n =
                     EntryRiders.exiledFaceDown = False,
                     EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False
+                    EntryRiders.noted = False,
+                    EntryRiders.characteristics = Seq.empty
                   },
               Create.slot = Nothing,
               -- CR 111.2 under CR 109.5: the keyword ability's own controller.
@@ -7651,7 +7667,8 @@ fabricate n =
                     EntryRiders.exiledFaceDown = False,
                     EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False
+                    EntryRiders.noted = False,
+                    EntryRiders.characteristics = Seq.empty
                   },
               Create.slot = Nothing,
               -- CR 111.2 under CR 109.5: the keyword ability's own controller.
@@ -7869,7 +7886,8 @@ attachToOwnToken token =
                     EntryRiders.exiledFaceDown = False,
                     EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False
+                    EntryRiders.noted = False,
+                    EntryRiders.characteristics = Seq.empty
                   },
               -- The slot holds every token minted (Resolve.bindMinted), which
               -- where CR 614.16 doubled the count is two Germs; CR 301.5c then
@@ -8077,7 +8095,8 @@ hideaway n =
             EntryRiders.exiledFaceDown = False,
             EntryRiders.attachedTo = Nothing,
             EntryRiders.faceDown = Nothing,
-            EntryRiders.noted = False
+            EntryRiders.noted = False,
+            EntryRiders.characteristics = Seq.empty
           }
       look =
         Effect.LookAt
@@ -8167,7 +8186,8 @@ soulshift n =
                   EntryRiders.exiledFaceDown = False,
                   EntryRiders.attachedTo = Nothing,
                   EntryRiders.faceDown = Nothing,
-                  EntryRiders.noted = False
+                  EntryRiders.noted = False,
+                  EntryRiders.characteristics = Seq.empty
                 }
               Nothing
               Nothing
@@ -8496,7 +8516,8 @@ recover cost =
                     EntryRiders.exiledFaceDown = False,
                     EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False
+                    EntryRiders.noted = False,
+                    EntryRiders.characteristics = Seq.empty
                   },
               MoveToZone.slot = Nothing,
               MoveToZone.origin = Just Zone.Graveyard,
@@ -8794,7 +8815,8 @@ cascade =
             EntryRiders.exiledFaceDown = False,
             EntryRiders.attachedTo = Nothing,
             EntryRiders.faceDown = Nothing,
-            EntryRiders.noted = False
+            EntryRiders.noted = False,
+            EntryRiders.characteristics = Seq.empty
           }
       match = Filter.And [Filter.Not (Filter.HasCardType CardType.Land), Filter.ManaValueLessThanSource]
       exile =
@@ -8911,7 +8933,8 @@ ripple n =
             EntryRiders.exiledFaceDown = False,
             EntryRiders.attachedTo = Nothing,
             EntryRiders.faceDown = Nothing,
-            EntryRiders.noted = False
+            EntryRiders.noted = False,
+            EntryRiders.characteristics = Seq.empty
           }
       show_ =
         Effect.Reveal
@@ -9416,7 +9439,8 @@ madnessCast manaCost payload =
                     EntryRiders.exiledFaceDown = False,
                     EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False
+                    EntryRiders.noted = False,
+                    EntryRiders.characteristics = Seq.empty
                   },
               MoveToZone.slot = Nothing,
               MoveToZone.origin = Nothing,
@@ -9488,7 +9512,8 @@ castUsingEntry castUsing =
             EntryRiders.exiledFaceDown = False,
             EntryRiders.attachedTo = Nothing,
             EntryRiders.faceDown = Nothing,
-            EntryRiders.noted = False
+            EntryRiders.noted = False,
+            EntryRiders.characteristics = Seq.empty
           }
     else Nothing
 
@@ -9925,5 +9950,6 @@ championRiders =
       EntryRiders.exiledFaceDown = False,
       EntryRiders.attachedTo = Nothing,
       EntryRiders.faceDown = Nothing,
-      EntryRiders.noted = False
+      EntryRiders.noted = False,
+      EntryRiders.characteristics = Seq.empty
     }

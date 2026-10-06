@@ -1024,7 +1024,7 @@ rewriteEffect pairs effect = case effect of
     Effect.ForEach (ForEach.MkForEach (rewriteObjectRef pairs ref) membership slot (fmap (rewriteEffect pairs) body) individually (fmap (rewritePayGate pairs) gate))
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo slot body) ->
     Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo slot (fmap (rewriteEffect pairs) body))
-  Effect.Repeat (Repeat.MkRepeat chooser body) -> Effect.Repeat (Repeat.MkRepeat chooser (fmap (rewriteEffect pairs) body))
+  Effect.Repeat (Repeat.MkRepeat chooser body gate) -> Effect.Repeat (Repeat.MkRepeat chooser (fmap (rewriteEffect pairs) body) (fmap (rewriteCondition pairs) gate))
   Effect.RepeatIf (RepeatIf.MkRepeatIf process condition ifHolds) ->
     Effect.RepeatIf (RepeatIf.MkRepeatIf (fmap (rewriteEffect pairs) process) (rewriteCondition pairs condition) (fmap (rewriteEffect pairs) ifHolds))
   Effect.Heal ref -> Effect.Heal (rewriteObjectRef pairs ref)
@@ -2214,7 +2214,9 @@ rewriteEntryRiders pairs riders =
         Map.mapKeysWith (\greater lesser -> Quantity.Type.Plus (Plus.MkPlus lesser greater)) (Filter.rewriteCounterKind pairs)
           . fmap (rewriteQuantity pairs)
           $ EntryRiders.counters riders,
-      EntryRiders.faceDown = fmap (\state -> state {FaceDownState.listed = rewriteListing pairs (FaceDownState.listed state)}) (EntryRiders.faceDown riders)
+      EntryRiders.faceDown = fmap (\state -> state {FaceDownState.listed = rewriteListing pairs (FaceDownState.listed state)}) (EntryRiders.faceDown riders),
+      -- CR 612.1 over CR 611.2e's effects, ModifyTarget's modification rewrite.
+      EntryRiders.characteristics = fmap (rewriteModification pairs) (EntryRiders.characteristics riders)
     }
 
 -- CR 612.1 over a CR 708.2 listing's quoted abilities, which are printed on the

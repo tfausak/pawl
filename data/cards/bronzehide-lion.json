@@ -1,0 +1,230 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "mana": [
+              {
+                "type": "OfType",
+                "value": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Green"
+                  }
+                }
+              },
+              {
+                "type": "OfType",
+                "value": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "White"
+                  }
+                }
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "ModifyTarget",
+                        "value": {
+                          "duration": {
+                            "type": "UntilEndOfTurn"
+                          },
+                          "modification": {
+                            "type": "GainKeyword",
+                            "value": {
+                              "type": "Indestructible"
+                            }
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "self"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Bronzehide Lion",
+      "oracleText": "{G}{W}: This creature gains indestructible until end of turn.\nWhen this creature dies, return it to the battlefield. It's an Aura enchantment with enchant creature you control and \"{G}{W}: Enchanted creature gains indestructible until end of turn,\" and it loses all other abilities.",
+      "power": {
+        "type": "Literal",
+        "value": 3
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 3
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfDies"
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "MoveToZone",
+                        "value": {
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "became"
+                          },
+                          "riders": {
+                            "characteristics": [
+                              {
+                                "type": "SetCardType",
+                                "value": {
+                                  "type": "Enchantment"
+                                }
+                              },
+                              {
+                                "type": "AddSubtype",
+                                "value": {
+                                  "type": "Aura"
+                                }
+                              },
+                              {
+                                "type": "LoseAllAbilities"
+                              },
+                              {
+                                "type": "GainEnchant",
+                                "value": {
+                                  "filter": {
+                                    "type": "ControlledBy",
+                                    "value": {
+                                      "type": "You"
+                                    }
+                                  },
+                                  "pool": {
+                                    "type": "Creatures"
+                                  }
+                                }
+                              },
+                              {
+                                "type": "GainAbility",
+                                "value": {
+                                  "type": "Activated",
+                                  "value": {
+                                    "cost": {
+                                      "mana": [
+                                        {
+                                          "type": "OfType",
+                                          "value": {
+                                            "type": "Colored",
+                                            "value": {
+                                              "type": "Green"
+                                            }
+                                          }
+                                        },
+                                        {
+                                          "type": "OfType",
+                                          "value": {
+                                            "type": "Colored",
+                                            "value": {
+                                              "type": "White"
+                                            }
+                                          }
+                                        }
+                                      ]
+                                    },
+                                    "modal": {
+                                      "modes": [
+                                        {
+                                          "clauses": [
+                                            {
+                                              "effects": [
+                                                {
+                                                  "type": "ModifyTarget",
+                                                  "value": {
+                                                    "duration": {
+                                                      "type": "UntilEndOfTurn"
+                                                    },
+                                                    "modification": {
+                                                      "type": "GainKeyword",
+                                                      "value": {
+                                                        "type": "Indestructible"
+                                                      }
+                                                    },
+                                                    "ref": {
+                                                      "type": "EachMatching",
+                                                      "value": {
+                                                        "type": "IsHostOfSource"
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          "zone": {
+                            "type": "Battlefield"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Cat"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}
