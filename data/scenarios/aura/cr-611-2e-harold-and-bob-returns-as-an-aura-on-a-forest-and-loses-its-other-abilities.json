@@ -1,0 +1,249 @@
+{
+  "description": "CR 611.2e Harold and Bob, First Numens returns as an Aura on a Forest and loses its other abilities",
+  "note": "Two Forests alice controls make CR 303.4f's prompt a real choice; she names the second. Harold and Bob returns without reach, and the Forest it enchants has the quoted mana ability, whose rad counters show it is the one that was activated.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Harold and Bob, First Numens",
+            "label": "harold",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-2",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-2",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Doom Blade",
+            "label": "blade"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseAttachment",
+          "with": "$forest-2"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$blade",
+          "targets": [
+            "$harold"
+          ],
+          "mana": [
+            "$swamp",
+            "$swamp-2",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "AttachedTo",
+          "object": "Harold and Bob, First Numens",
+          "is": "$forest-2"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Keywords": {
+          "object": "Harold and Bob, First Numens",
+          "keyword": {
+            "type": "Reach"
+          },
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Take": {
+          "action": "ActivateManaAbility $forest-2",
+          "yields": [
+            [
+              {
+                "manaType": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Red"
+                  }
+                },
+                "tags": [],
+                "retention": {
+                  "type": "Ordinary"
+                },
+                "restriction": null,
+                "rider": null,
+                "sourceChosenSubtype": null
+              },
+              {
+                "manaType": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Red"
+                  }
+                },
+                "tags": [],
+                "retention": {
+                  "type": "Ordinary"
+                },
+                "restriction": null,
+                "rider": null,
+                "sourceChosenSubtype": null
+              },
+              {
+                "manaType": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Red"
+                  }
+                },
+                "tags": [],
+                "retention": {
+                  "type": "Ordinary"
+                },
+                "restriction": null,
+                "rider": null,
+                "sourceChosenSubtype": null
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PlayerCounters": {
+          "player": "alice",
+          "kind": {
+            "type": "Rad"
+          },
+          "count": 2
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "ManaPool",
+          "player": "alice",
+          "is": [
+            {
+              "manaType": {
+                "type": "Colored",
+                "value": {
+                  "type": "Red"
+                }
+              },
+              "tags": [],
+              "retention": {
+                "type": "Ordinary"
+              },
+              "restriction": null,
+              "rider": null,
+              "sourceChosenSubtype": null
+            },
+            {
+              "manaType": {
+                "type": "Colored",
+                "value": {
+                  "type": "Red"
+                }
+              },
+              "tags": [],
+              "retention": {
+                "type": "Ordinary"
+              },
+              "restriction": null,
+              "rider": null,
+              "sourceChosenSubtype": null
+            },
+            {
+              "manaType": {
+                "type": "Colored",
+                "value": {
+                  "type": "Red"
+                }
+              },
+              "tags": [],
+              "retention": {
+                "type": "Ordinary"
+              },
+              "restriction": null,
+              "rider": null,
+              "sourceChosenSubtype": null
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

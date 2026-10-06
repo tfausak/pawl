@@ -8,6 +8,7 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Event as Event
@@ -63,5 +64,6 @@ riders =
       EntryRiders.exiledFaceDown = False,
       EntryRiders.attachedTo = Nothing,
       EntryRiders.noted = False,
+      EntryRiders.characteristics = Seq.empty,
       EntryRiders.faceDown = Nothing
     }

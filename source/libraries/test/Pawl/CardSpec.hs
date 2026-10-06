@@ -621,7 +621,7 @@ refCounts = concatMap quantityCounts . Resolve.objectRefQuantities
 -- compile. This list is where that shows up.
 objectRefPositions :: [(String, Effect.Effect () (), [ObjectRef.ObjectRef])]
 objectRefPositions =
-  let plainRiders = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = Nothing, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.attachedTo = Nothing, EntryRiders.faceDown = Nothing, EntryRiders.noted = False}
+  let plainRiders = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = Nothing, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.attachedTo = Nothing, EntryRiders.faceDown = Nothing, EntryRiders.noted = False, EntryRiders.characteristics = Seq.empty}
       handChoice = ChosenCardInHand.MkChosenCardInHand (plantedPlayer "xh") (Filter.Type.And [])
    in [ ("deal-damage", Effect.DealDamage (DealDamage.MkDealDamage (Seq.fromList [DamagePart.MkDamagePart (plantedRef "dd1") (Quantity.Type.Literal 1), DamagePart.MkDamagePart (plantedRef "dd2") (Quantity.Type.Literal 1)]) Nothing Nothing), [plantedRef "dd1", plantedRef "dd2"]),
         ("modify-target", Effect.ModifyTarget (ModifyTarget.MkModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Flying) (plantedRef "mt") Nothing), [plantedRef "mt"]),
@@ -1284,7 +1284,8 @@ ownCounts effect = case effect of
   Effect.ControlPlayerThisResolution _ -> []
   Effect.Destroy {} -> []
   Effect.Sacrifice _ -> []
-  Effect.MoveToZone {} -> []
+  -- CR 611.2e's effects, ModifyTarget's arm above.
+  Effect.MoveToZone move -> foldMap modificationCounts (EntryRiders.characteristics (MoveToZone.riders move))
   Effect.Draw (Draw.MkDraw _ quantity _) -> quantityCounts quantity
   Effect.Mill (Mill.MkMill _ quantity _ _) -> quantityCounts quantity
   Effect.Reveal {} -> []
@@ -3124,15 +3125,17 @@ tokenNameOffends token
 -- silently and drops it -- which is exactly what happened when landwalk's
 -- Subtype became a Filter (#499). A new Filter-bearing keyword needs its arm
 -- added here by hand.
--- Both Filter positions an entry rider has: the counter KINDS it is keyed by (CR
+-- The Filter positions an entry rider has: the counter KINDS it is keyed by (CR
 -- 122.1b's keyword counter carries a whole Keyword) and the COUNTS it holds (CR
 -- 122.6, each a Quantity, which may carry a Count whose Filter is card text).
 -- One function so the three effect arms that carry a rider cannot sweep
 -- different halves of it.
-riderFilters :: EntryRiders.EntryRiders Quantity.Type.Quantity ability -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+riderFilters :: EntryRiders.EntryRiders Quantity.Type.Quantity (GrantedAbility.GrantedAbility Card.Type.Card) -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 riderFilters riders =
   concatMap counterKindFilters (Map.keys (EntryRiders.counters riders))
     <> concatMap quantityFilters (Map.elems (EntryRiders.counters riders))
+    -- CR 611.2e's effects, ModifyTarget's modification read.
+    <> foldMap modificationFilters (EntryRiders.characteristics riders)
 
 -- Both Filter positions a CR 614.1c counter row has: the KINDS it is keyed by
 -- (CR 122.1b's keyword counter carries a whole Keyword) and the COUNTS it holds
@@ -6355,7 +6358,8 @@ grantedModifications card =
               ( \effect -> case effect of
                   Effect.ModifyTarget modify -> [ModifyTarget.modification modify]
                   -- CR 708.2's listed abilities are this card's text too.
-                  Effect.MoveToZone move -> foldMap (listedGrants . FaceDownState.listed) (EntryRiders.faceDown (MoveToZone.riders move))
+                  -- And CR 611.2e's effects, stored as ModifyTarget's are.
+                  Effect.MoveToZone move -> foldMap (listedGrants . FaceDownState.listed) (EntryRiders.faceDown (MoveToZone.riders move)) <> Foldable.toList (EntryRiders.characteristics (MoveToZone.riders move))
                   Effect.Create create -> foldMap (listedGrants . FaceDownState.listed) (EntryRiders.faceDown (Create.riders create))
                   Effect.TurnFaceDown turn -> listedGrants (TurnFaceDown.characteristics turn)
                   Effect.CreateCopy create -> copyQuotedAbilities (CreateCopy.exceptions create) <> foldMap (listedGrants . FaceDownState.listed) (EntryRiders.faceDown (CreateCopy.riders create))

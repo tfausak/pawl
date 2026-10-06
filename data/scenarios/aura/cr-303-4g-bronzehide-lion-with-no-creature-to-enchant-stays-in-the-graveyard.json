@@ -1,0 +1,55 @@
+{
+  "description": "CR 303.4g Bronzehide Lion with no creature of alice's to enchant stays in the graveyard",
+  "note": "The Lion is alice's only creature and bob's Piker is not one she controls, so the returning Aura has no legal host. Historian's Boon makes a Soldier whenever another nontoken enchantment alice controls enters, so an Aura that entered and was then put into the graveyard by CR 704.5m would leave the Boon's trigger on the stack; one that never entered leaves it empty.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Bronzehide Lion", "label": "lion", "ready": true },
+          { "card": "Historian's Boon", "label": "boon", "ready": true },
+          { "card": "Mountain", "label": "mountain", "ready": true }
+        ],
+        "hand": [
+          { "card": "Lightning Bolt", "label": "bolt" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker", "ready": true }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": { "Cast": { "object": "$bolt", "targets": ["$lion"], "mana": ["$mountain"] } }
+    },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": { "View": { "of": "Stack", "is": [] } }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Bronzehide Lion", "count": 1 } }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Bronzehide Lion", "count": 0 } }
+    }
+  ]
+}

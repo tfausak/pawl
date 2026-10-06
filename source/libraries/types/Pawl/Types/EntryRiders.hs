@@ -1,11 +1,13 @@
 module Pawl.Types.EntryRiders where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EntryAttack as EntryAttack
 import qualified Pawl.Types.EntryBlock as EntryBlock
 import qualified Pawl.Types.FaceDownState as FaceDownState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TapState as TapState
 
@@ -225,6 +227,11 @@ data EntryRiders count ability = MkEntryRiders
     faceDown :: Maybe (FaceDownState.FaceDownState ability),
     -- | CR 707.14: note the card being moved, for a later "copy of the card
     -- with the noted name" (GameState.notedCards).
-    noted :: Bool
+    noted :: Bool,
+    -- | CR 611.2e: the continuous effects the instruction says the permanent
+    -- is under as it enters, applied simultaneously with entering (Bronzehide
+    -- Lion's "It's an Aura enchantment"). Battlefield-only, read by MoveToZone
+    -- alone (CR 611.2e's "nontoken permanent"); Pawl.EffectLintSpec fences both.
+    characteristics :: Seq.Seq (Modification.Modification ability)
   }
   deriving (Eq, Ord, Show)

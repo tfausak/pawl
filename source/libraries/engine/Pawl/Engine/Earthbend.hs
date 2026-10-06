@@ -151,7 +151,8 @@ returnAbility =
                     EntryRiders.exiledFaceDown = False,
                     EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False
+                    EntryRiders.noted = False,
+                    EntryRiders.characteristics = Seq.empty
                   },
               MoveToZone.slot = Nothing,
               MoveToZone.origin = Nothing,
