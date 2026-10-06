@@ -976,6 +976,31 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     Spec.assertEqWith s "carol pays her half" (S.lifeOf S.carol after) (Just 4)
     Spec.assertEqWith s "the main game did not end" (GameState.result after) Nothing
 
+  -- CR 614.1c with CR 729.1a: a subgame started by an as-enters effect, which
+  -- never reaches the stack. Three seats and a winner who is not the caster, so
+  -- "the winner draws" cannot pass as "you draw". The two cases are the same
+  -- board with one dial, bob's library: 8 cards survive the subgame's opening
+  -- hand (CR 729.3) and 3 do not, leaving a draw that binds nobody.
+  Spec.it s "CR 614.1c / 729.1b gameplay: an as-enters subgame's winner draws a card" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    threshold <- S.printingOf s registry "Synthetic Threshold of Legends"
+    let after = castThreshold island mountain threshold 8
+    Spec.assertEqWith s "CR 729.1b: bob won the subgame and drew a card in the main game" (S.handSize S.bob after) 1
+    Spec.assertEqWith s "alice, who cast it but lost, drew nothing" (S.handSize S.alice after) 0
+    Spec.assertEqWith s "nor did carol" (S.handSize S.carol after) 0
+    Spec.assertEqWith s "CR 729.5: bob's draw came from his funnelled-back library" (length (Game.zoneMembers Zone.Library S.bob after)) 7
+    Spec.assertEqWith s "the main game did not end" (GameState.result after) Nothing
+
+  Spec.it s "CR 614.1c / 729.1b gameplay: a drawn as-enters subgame has no winner to draw" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    threshold <- S.printingOf s registry "Synthetic Threshold of Legends"
+    let after = castThreshold island mountain threshold 3
+    Spec.assertEqWith s "bob's 3 cards cannot fill an opening hand either, so nobody won and he drew nothing" (S.handSize S.bob after) 0
+    Spec.assertEqWith s "and his library is whole" (length (Game.zoneMembers Zone.Library S.bob after)) 3
+    Spec.assertEqWith s "the drawn subgame did not decide the main game (CR 729.1a)" (GameState.result after) Nothing
+
   -- CR 729.1a #137: "the spell or ability that created the subgame" -- the rule
   -- names both kinds of object, and Shahrazad and Sindbad (Unknown Event,
   -- Creature -- Human, type line and Oracle text checked against
@@ -2716,6 +2741,24 @@ castShahrazad staged mountain plains shahrazad aliceLibrary =
       g5 = atLife S.carol 9 (atLife S.bob 13 (atLife S.alice 20 g4))
       gStart =
         g5
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice
+          }
+   in snd (Engine.runGamePure subgameAnswer gStart Engine.priorityLoop)
+
+-- The Synthetic Threshold of Legends board the two CR 614.1c cases share: alice
+-- casts it off three Islands; alice's library holds 3 cards, carol's 4 and bob's
+-- `bobLibrary`, so only bob can survive the subgame's opening hand (CR 729.3).
+castThreshold :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
+castThreshold island mountain threshold bobLibrary =
+  let g0 = Setup.emptyGame S.threePlayers
+      g1 = addManyG mountain 3 S.alice (addManyG mountain bobLibrary S.bob (addManyG mountain 4 S.carol g0))
+      g2 = poolToLibraryG S.carol (poolToLibraryG S.bob (poolToLibraryG S.alice g1))
+      g3 = S.landsFor island S.alice 3 g2
+      (_spellId, g4) = S.addHandCard threshold S.alice g3
+      gStart =
+        g4
           { GameState.activePlayer = S.alice,
             GameState.phase = Phase.PrecombatMain,
             GameState.priority = Just S.alice

@@ -1827,7 +1827,7 @@ raceShield wantMinted wanted p = case p of
 -- so the first state is the one a player would next be given priority in.
 strikeAndSettleWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> [DamageEvent.DamageEvent] -> (GameState.GameState, GameState.GameState)
 strikeAndSettleWith answer gs batch =
-  let dealt = S.runPure answer gs (Damage.applyDamage batch >> Resolve.runDamageRewriteEffects >> Resolve.runPreventionRiders >> Engine.settleForPriority)
+  let dealt = S.runPure answer gs (Damage.applyDamage batch >> Resolve.runDamageRewriteEffects Resolve.noSubgame >> Resolve.runPreventionRiders Resolve.noSubgame >> Engine.settleForPriority)
    in (dealt, S.runPure answer dealt Stack.resolveTop)
 
 -- CR 615.13 read the OTHER way -- "prevented THIS WAY". Phyrexian Vindicator
