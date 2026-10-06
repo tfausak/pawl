@@ -480,7 +480,7 @@ manaProduced effect = case effect of
   -- (Pawl.Types.ManaAddition).
   Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> Maybe.listToMaybe (Maybe.mapMaybe manaProduced (Foldable.toList body))
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> Maybe.listToMaybe (Maybe.mapMaybe manaProduced (Foldable.toList body))
-  Effect.Repeat (Repeat.MkRepeat _ body) -> Maybe.listToMaybe (Maybe.mapMaybe manaProduced (Foldable.toList body))
+  Effect.Repeat (Repeat.MkRepeat _ body _) -> Maybe.listToMaybe (Maybe.mapMaybe manaProduced (Foldable.toList body))
   Effect.RepeatIf (RepeatIf.MkRepeatIf process _ ifHolds) -> Maybe.listToMaybe (Maybe.mapMaybe manaProduced (Foldable.toList (process <> ifHolds)))
   Effect.Heal _ -> Nothing
   Effect.ChooseNewTargets _ -> Nothing
@@ -937,7 +937,7 @@ movesLibraryCard effect = case effect of
   -- of THIS effect.
   Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> any movesLibraryCard body
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> any movesLibraryCard body
-  Effect.Repeat (Repeat.MkRepeat _ body) -> any movesLibraryCard body
+  Effect.Repeat (Repeat.MkRepeat _ body _) -> any movesLibraryCard body
   Effect.RepeatIf (RepeatIf.MkRepeatIf process _ ifHolds) -> any movesLibraryCard (process <> ifHolds)
   Effect.Heal _ -> False
   Effect.ChooseNewTargets _ -> False

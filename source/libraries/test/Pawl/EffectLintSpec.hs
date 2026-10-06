@@ -179,6 +179,7 @@ import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
+import qualified Pawl.Types.Repeat as Repeat
 import qualified Pawl.Types.RepeatIf as RepeatIf
 import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
@@ -422,7 +423,7 @@ ownQuantities effect = case effect of
   Effect.GrantPlayFromExile grant -> durationQuantities (GrantPlayFromExile.duration grant)
   Effect.ForEach {} -> []
   Effect.ForEachNumber loop -> [ForEachNumber.upTo loop]
-  Effect.Repeat _ -> []
+  Effect.Repeat loop -> foldMap conditionQuantities (Repeat.gate loop)
   Effect.RepeatIf loop -> conditionQuantities (RepeatIf.condition loop)
   Effect.Heal _ -> []
   Effect.ChooseNewTargets _ -> []

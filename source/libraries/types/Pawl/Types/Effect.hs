@@ -666,8 +666,8 @@ data Effect card ability
     -- CR 706.3's results table needs no arm here: a striation is one Clause of
     -- the same mode gated on a Condition.Compares over this slot, which CR
     -- 706.3b's "all part of one ability" is exactly, and Djinni Windseer in
-    -- Pawl.DiceSpec is what proves it. Not implemented: CR 706.3c's "Roll again"
-    -- (#2124).
+    -- Pawl.DiceSpec is what proves it. CR 706.3c's "Roll again" is Repeat with
+    -- the roll in its body and the striation as its gate (Delina, Wild Mage).
     RollDie RollDie.RollDie
   | -- | CR 706.2b: throw again the die whose modification step is open, taking
     -- the new number as its natural result (Goblin Bookie's "reroll any die").

@@ -5934,12 +5934,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- the rescope, and its Trade Secrets group the chooser. The CR 800.4g
   -- reassignment is a fence here: no board lets a player leave the game partway
   -- through a resolution.
-  Effect.Repeat (Repeat.MkRepeat chooser body) -> do
+  --
+  -- The gate (CR 706.3c's "Roll again" on one row of a results table) is read
+  -- live after each run, as RepeatIf's condition is; one that fails ends the
+  -- loop unasked. Pawl.DiceSpec's Delina, Wild Mage group proves it.
+  Effect.Repeat (Repeat.MkRepeat chooser body gate) -> do
     rescope <- State.gets (rescopeRun resolving (foldMap boundSlots body))
     let run runs = do
           State.modify' rescope
           applyLoopBody runSubgame resolving source controller legal chosen (foldMap boundSlots body) body
-          asked <- askedChooser source controller legal chooser
+          gs0 <- State.get
+          let context = effectContext gs0 controller source legal (slotBindings resolving gs0)
+              open = all (Condition.holds (effectViewOf source legal gs0) context gs0 source) gate
+          asked <- if open then askedChooser source controller legal chooser else pure Nothing
           Monad.forM_ asked $ \who -> do
             gs <- State.get
             again <- Game.choose (Prompt.ChooseRepeat (Decide.deciderFor who gs) who resolving runs)

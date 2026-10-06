@@ -1,0 +1,195 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Delina, Wild Mage",
+      "oracleText": "Whenever Delina attacks, choose target creature you control, then roll a d20.\n1—14 | Create a tapped and attacking token that's a copy of that creature, except it's not legendary and it has \"At end of combat, exile this token.\"\n15—20 | Create one of those tokens. You may roll again.",
+      "power": {
+        "type": "Literal",
+        "value": 3
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfAttacks",
+            "value": {
+              "type": "EveryTime"
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Repeat",
+                        "value": {
+                          "body": [
+                            {
+                              "type": "RollDie",
+                              "value": {
+                                "sides": 20,
+                                "slot": "result"
+                              }
+                            },
+                            {
+                              "type": "CreateCopy",
+                              "value": {
+                                "exceptions": [
+                                  {
+                                    "type": "RemoveSupertypes",
+                                    "value": [
+                                      {
+                                        "type": "Legendary"
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "type": "GainAbility",
+                                    "value": {
+                                      "type": "Triggered",
+                                      "value": {
+                                        "condition": {
+                                          "type": "StepBegins",
+                                          "value": {
+                                            "phase": {
+                                              "type": "Combat",
+                                              "value": {
+                                                "type": "EndOfCombat"
+                                              }
+                                            },
+                                            "scope": {
+                                              "type": "EachTurn"
+                                            }
+                                          }
+                                        },
+                                        "modal": {
+                                          "modes": [
+                                            {
+                                              "clauses": [
+                                                {
+                                                  "effects": [
+                                                    {
+                                                      "type": "MoveToZone",
+                                                      "value": {
+                                                        "ref": {
+                                                          "type": "InSlot",
+                                                          "value": "self"
+                                                        },
+                                                        "zone": {
+                                                          "type": "Exile"
+                                                        }
+                                                      }
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      }
+                                    }
+                                  }
+                                ],
+                                "ref": {
+                                  "type": "InSlot",
+                                  "value": "target"
+                                },
+                                "riders": {
+                                  "attacking": {
+                                    "type": "Chosen"
+                                  },
+                                  "tapped": {
+                                    "type": "Tapped"
+                                  }
+                                }
+                              }
+                            }
+                          ],
+                          "chooser": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          "gate": {
+                            "type": "Compares",
+                            "value": {
+                              "comparison": {
+                                "type": "AtLeast"
+                              },
+                              "measured": {
+                                "type": "InSlot",
+                                "value": "result"
+                              },
+                              "threshold": {
+                                "type": "Literal",
+                                "value": 15
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "targetSlots": {
+                  "target": {
+                    "filter": {
+                      "type": "ControlledBy",
+                      "value": {
+                        "type": "You"
+                      }
+                    },
+                    "pool": {
+                      "type": "Creatures"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Elf"
+          },
+          {
+            "type": "Shaman"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}
