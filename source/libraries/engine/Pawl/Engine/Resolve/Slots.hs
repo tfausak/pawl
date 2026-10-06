@@ -855,6 +855,7 @@ effectObjectRefs effect = case effect of
   Effect.RollDie {} -> []
   Effect.FlipCoin {} -> []
   Effect.ExileHandThenDraw -> []
+  Effect.NoteManaSpent -> []
   Effect.Proliferate -> []
   Effect.Reroll -> []
   Effect.RerollStoredResults _ -> []
@@ -1068,6 +1069,7 @@ effectPlayerRefs effect = case effect of
   Effect.RollDie {} -> []
   Effect.FlipCoin {} -> []
   Effect.ExileHandThenDraw -> []
+  Effect.NoteManaSpent -> []
   Effect.Proliferate -> []
   Effect.Reroll -> []
   Effect.RerollStoredResults _ -> []
@@ -1229,6 +1231,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.Cloak {} -> Map.empty
   Effect.Venture {} -> Map.empty
   Effect.ExileHandThenDraw -> Map.empty
+  Effect.NoteManaSpent -> Map.empty
   -- The players are effectPlayerRefs' half, joined at the head above.
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> quantitySlots quantity
   -- The object vote's listed choices are a Filter and nothing else: the starter
@@ -2024,6 +2027,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.Cloak {} -> True
   Effect.Venture {} -> True
   Effect.ExileHandThenDraw -> True
+  Effect.NoteManaSpent -> True
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Vote {} -> True
   Effect.RestartGame _ -> True
@@ -2310,6 +2314,7 @@ readsX =
         Effect.Cloak {} -> False
         Effect.Venture {} -> False
         Effect.ExileHandThenDraw -> False
+        Effect.NoteManaSpent -> False
         Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> Quantity.readsX quantity
         Effect.Vote {} -> False
         Effect.RestartGame _ -> False
@@ -2569,6 +2574,7 @@ boundSlots effect = case effect of
   Effect.Cloak {} -> Set.empty
   Effect.Venture {} -> Set.empty
   Effect.ExileHandThenDraw -> Set.empty
+  Effect.NoteManaSpent -> Set.empty
   Effect.PlayerSacrifices {} -> Set.empty
   -- CR 701.38a: the objects tied for most votes, for the later effect that
   -- acts on them (Council's Judgment's exile). For a word vote it is one slot

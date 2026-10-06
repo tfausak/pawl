@@ -303,7 +303,8 @@ plainUnit manaType =
       ManaUnit.retention = ManaRetention.Ordinary,
       ManaUnit.restriction = Nothing,
       ManaUnit.rider = Nothing,
-      ManaUnit.sourceChosenSubtype = Nothing
+      ManaUnit.sourceChosenSubtype = Nothing,
+      ManaUnit.sourceLastExiled = Nothing
     }
 
 -- | CR 506.2 / CR 507.1: a board past the beginning of combat has its defending

@@ -369,6 +369,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.HasChosenSubtype
       " {\"type\":\"HasChosenSubtype\"} "
+  Spec.it s "IsLastExiledWithSource" $
+    Common.assertCodec
+      s
+      codec
+      Filter.IsLastExiledWithSource
+      " {\"type\":\"IsLastExiledWithSource\"} "
   Spec.it s "OfChosenPlayer" $
     Common.assertCodec
       s

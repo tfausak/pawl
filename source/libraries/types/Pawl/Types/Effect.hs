@@ -685,6 +685,9 @@ data Effect card ability
     -- hand, then draw that many -- "that many" being the hand size before the
     -- exile, which is why it is one opcode.
     ExileHandThenDraw
+  | -- | CR 607.2e: note, for the source, the type and amount of mana spent to
+    -- activate this ability (Ice Cauldron), replacing any earlier note.
+    NoteManaSpent
   | -- | CR 701.34a: choose any number of permanents and/or players that have a
     -- counter, then give each one additional counter of each kind it already
     -- has. Choose, not target, so the set is picked on resolution.

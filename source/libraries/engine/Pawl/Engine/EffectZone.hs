@@ -163,6 +163,7 @@ zoneFunctionedFrom itself delayed effect = case effect of
   Effect.Cloak {} -> Nothing
   Effect.Venture {} -> Nothing
   Effect.ExileHandThenDraw -> Nothing
+  Effect.NoteManaSpent -> Nothing
   Effect.PlayerSacrifices {} -> Nothing
   Effect.Vote {} -> Nothing
   Effect.RestartGame _ -> Nothing
