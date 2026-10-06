@@ -97,6 +97,7 @@ import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LoopTrail as LoopTrail
 import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.Modal as Modal.Type
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
@@ -524,8 +525,8 @@ runTurnBasedActions phase = do
     Phase.Combat CombatStep.BeginningOfCombat -> Combat.designateDefenders
     -- CR 805.10b: the active team declares one combined attack, which its
     -- primary player makes (CR 805.2).
-    Phase.Combat CombatStep.DeclareAttackers -> Monad.unless (null live) (Combat.declareAttackers Resolve.performManaAbility primary)
-    Phase.Combat CombatStep.DeclareBlockers -> Combat.declareBlockers Resolve.performManaAbility
+    Phase.Combat CombatStep.DeclareAttackers -> Monad.unless (null live) (Combat.declareAttackers performManaAbility primary)
+    Phase.Combat CombatStep.DeclareBlockers -> Combat.declareBlockers performManaAbility
     Phase.Combat CombatStep.CombatDamage -> do
       -- CR 510.4: deal this step's damage; if it was the first-strike step,
       -- splice a second combat damage step in after it. CR 510.3's between-steps
@@ -553,7 +554,7 @@ runTurnBasedActions phase = do
       Monad.mapM_ advanceSagas live
       Monad.forM_ live $ \pid -> do
         visits <- State.gets (Attraction.controlsAttraction pid)
-        Monad.when visits (Resolve.rollToVisit pid)
+        Monad.when visits (Resolve.rollToVisit playSubgame pid)
     -- CR 511.1: the end of combat step has no turn-based actions, so no arm here.
     -- CR 511.3's removal from combat is an end-of-STEP action; runStep does it.
     Phase.Ending EndingStep.Cleanup -> do
@@ -1429,7 +1430,7 @@ priorityLoop = do
                                 -- so the two other doors into a cast -- a search's
                                 -- CR 601.3 offer and Pawl.Engine.Resolve's -- spend
                                 -- the same grant this one does.
-                                Cast.castSpell Resolve.performManaAbility p oid name facing
+                                Cast.castSpell performManaAbility p oid name facing
                                 State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
                                 loop trail'
@@ -1439,7 +1440,7 @@ priorityLoop = do
                               -- pass count restarts, CR 117.4's "passing in
                               -- succession" meaning without actions in between.
                               Action.Type.TurnFaceUp oid procedure -> do
-                                FaceDown.turnFaceUp Resolve.performManaAbility p procedure oid
+                                FaceDown.turnFaceUp performManaAbility p procedure oid
                                 State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
                                 loop trail'
@@ -1448,7 +1449,7 @@ priorityLoop = do
                               -- sees is the DESIGNATION, which settleForPriority
                               -- gathers like any other.
                               Action.Type.Unlock oid half -> do
-                                Room.unlock Resolve.performManaAbility p oid half
+                                Room.unlock performManaAbility p oid half
                                 State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
                                 loop trail'
@@ -1466,13 +1467,13 @@ priorityLoop = do
                               -- CR 116.2k / 702.170b: a special action too, the
                               -- TurnFaceUp arm's shape.
                               Action.Type.Plot oid cost -> do
-                                Plot.plot Resolve.performManaAbility p oid cost
+                                Plot.plot performManaAbility p oid cost
                                 State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
                                 loop trail'
                               -- CR 116.2h / 702.143b: a special action too.
                               Action.Type.Foretell oid -> do
-                                Foretell.foretell Resolve.performManaAbility p oid
+                                Foretell.foretell performManaAbility p oid
                                 State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
                                 loop trail'
@@ -1480,7 +1481,7 @@ priorityLoop = do
                               -- the one whose window is the card's own
                               -- castability rather than a phase.
                               Action.Type.Suspend oid -> do
-                                Suspend.suspend Resolve.performManaAbility p oid
+                                Suspend.suspend performManaAbility p oid
                                 State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
                                 loop trail'
@@ -1489,7 +1490,7 @@ priorityLoop = do
                               -- names the card, outside the game having no
                               -- object to name it with (CR 400.11).
                               Action.Type.PutCompanionIntoHand -> do
-                                Companion.take Resolve.performManaAbility p
+                                Companion.take performManaAbility p
                                 State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
                                 loop trail'
@@ -1497,7 +1498,7 @@ priorityLoop = do
                               -- that takes no object; CR 901.9a-c give the roller
                               -- priority afterwards whatever the die shows.
                               Action.Type.RollPlanarDie -> do
-                                Planechase.roll Resolve.performManaAbility p
+                                Planechase.roll performManaAbility p
                                 State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
                                 loop trail'
@@ -1506,13 +1507,13 @@ priorityLoop = do
                               -- from printed text. CR 613.1's next projection is
                               -- what makes the ending visible; nothing is undone.
                               Action.Type.EndEffect oid -> do
-                                EndEffect.endEffect p oid
+                                EndEffect.endEffect performManaAbility p oid
                                 State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
                                 loop trail'
                               -- CR 116.2d: a special action too.
                               Action.Type.Ignore oid name -> do
-                                Ignore.ignore p oid name
+                                Ignore.ignore performManaAbility p oid name
                                 State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
                                 loop trail'
@@ -1525,12 +1526,12 @@ priorityLoop = do
                               -- mana ability whose cost went unpaid having changed
                               -- nothing (CR 601.2h).
                               Action.Type.ActivateManaAbility oid -> do
-                                Monad.void (Cost.tapForMana Resolve.performManaAbility p oid)
+                                Monad.void (Cost.tapForMana performManaAbility p oid)
                                 State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
                                 loop trail'
                               Action.Type.Activate oid ability -> do
-                                Activate.activateAbility p oid ability
+                                Activate.activateAbilityWith playSubgame p oid ability
                                 State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
                                 loop trail'
@@ -2195,6 +2196,11 @@ playSubgame = do
   Monad.forM_ seated Planechase.shufflePlanarDeck
   Monad.forM_ seated Archenemy.shuffleSchemeDeck
   pure result
+
+-- CR 405.6c / 605.4a: the mana-ability performer every payment the live loop
+-- drives takes, with playSubgame as its runner.
+performManaAbility :: ManaAbilityPerformer.ManaAbilityPerformer
+performManaAbility = Resolve.performManaAbility playSubgame
 
 playFrom :: NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> Game Result
 playFrom matchup = do

@@ -1318,17 +1318,17 @@ entryAttack legal resolving entry gs = case EntryRiders.attacking entry of
 --
 -- Answers the spells the offer's casts put on the stack, for CR 400.7h's
 -- OfferCast.slot.
-offerCast :: Filter.Context -> (Quantity.Type.Quantity -> Maybe Integer) -> [ObjectId] -> PlayerId -> CastObligation.CastObligation -> PermissionVerb.PermissionVerb -> Maybe PlayerId -> CastRepetition.CastRepetition -> Bool -> CastOffer.CastOffer -> Game [ObjectId]
-offerCast context evaluate named caster optionality verb retake repetition copied offer = do
+offerCast :: Game Result -> Filter.Context -> (Quantity.Type.Quantity -> Maybe Integer) -> [ObjectId] -> PlayerId -> CastObligation.CastObligation -> PermissionVerb.PermissionVerb -> Maybe PlayerId -> CastRepetition.CastRepetition -> Bool -> CastOffer.CastOffer -> Game [ObjectId]
+offerCast runSubgame context evaluate named caster optionality verb retake repetition copied offer = do
   subjects <- if copied then Maybe.catMaybes <$> traverse (castableCopy caster) named else pure named
   case repetition of
-    CastRepetition.Once -> foldMap (Maybe.maybeToList . snd) <$> offerCastOnce context subjects caster optionality verb retake offer
+    CastRepetition.Once -> foldMap (Maybe.maybeToList . snd) <$> offerCastOnce runSubgame context subjects caster optionality verb retake offer
     CastRepetition.AnyNumber -> again Nothing subjects
     CastRepetition.WithinTotalManaValue quantity -> again (Just (Maybe.fromMaybe 0 (evaluate quantity))) subjects
   where
     again budget remaining = do
       let capped total = offer {CastOffer.restriction = Just (maybe (Filter.Type.ManaValueAtMost total) (\r -> Filter.Type.And [r, Filter.Type.ManaValueAtMost total]) (CastOffer.restriction offer))}
-      taken <- offerCastOnce context remaining caster optionality verb retake (maybe offer capped budget)
+      taken <- offerCastOnce runSubgame context remaining caster optionality verb retake (maybe offer capped budget)
       case taken of
         Nothing -> pure []
         Just (oid, spell) -> do
@@ -1411,10 +1411,10 @@ castableCopy caster original = do
 -- 400.11c leave nothing able to observe it afterwards, and it bounds
 -- Object.zone's placeholder to one resolution, in which no player gets priority
 -- and no SBA is checked.
-offerOutsideCopy :: Filter.Context -> PlayerId -> PrintingId.PrintingId -> CastOffer.CastOffer -> Game ()
-offerOutsideCopy context caster printingId offer = do
+offerOutsideCopy :: Game Result -> Filter.Context -> PlayerId -> PrintingId.PrintingId -> CastOffer.CastOffer -> Game ()
+offerOutsideCopy runSubgame context caster printingId offer = do
   copyId <- State.state (Event.mintOutside caster printingId)
-  Monad.void (offerCast context (const Nothing) [copyId] caster CastObligation.Optional PermissionVerb.Cast Nothing CastRepetition.Once False offer)
+  Monad.void (offerCast runSubgame context (const Nothing) [copyId] caster CastObligation.Optional PermissionVerb.Cast Nothing CastRepetition.Once False offer)
   State.modify' $ \g ->
     if Set.member copyId (GameState.outsideCopies g)
       then g {GameState.objects = Map.delete copyId (GameState.objects g), GameState.outsideCopies = Set.delete copyId (GameState.outsideCopies g)}
@@ -1477,8 +1477,8 @@ ordinaryOffer =
 -- `retake` is CR 723.2's second span: the player who controls the caster while
 -- the spell this cast makes resolves (Word of Command). Keyed to the spell's
 -- own id, which is the one object CR 608.2g puts on top of the stack.
-offerCastOnce :: Filter.Context -> [ObjectId] -> PlayerId -> CastObligation.CastObligation -> PermissionVerb.PermissionVerb -> Maybe PlayerId -> CastOffer.CastOffer -> Game (Maybe (ObjectId, Maybe ObjectId))
-offerCastOnce context named caster optionality verb retake offer = do
+offerCastOnce :: Game Result -> Filter.Context -> [ObjectId] -> PlayerId -> CastObligation.CastObligation -> PermissionVerb.PermissionVerb -> Maybe PlayerId -> CastOffer.CastOffer -> Game (Maybe (ObjectId, Maybe ObjectId))
+offerCastOnce runSubgame context named caster optionality verb retake offer = do
   gs <- State.get
   let -- Whether this offer states CR 118.9's alternative cost, in either of the
       -- two wordings `applied` below reads. NOT `transformed`, which is CR
@@ -1644,7 +1644,7 @@ offerCastOnce context named caster optionality verb retake offer = do
     Just (Right (oid, name, applied, excused)) -> do
       let cast = do
             stackBefore <- State.gets GameState.stack
-            Cast.castSpellWith performManaAbility False True applied (CastOffer.spending offer) caster oid name Facing.FaceUp
+            Cast.castSpellWith (performManaAbility runSubgame) False True applied (CastOffer.spending offer) caster oid name Facing.FaceUp
             -- CR 608.2g: the spell is the new topmost object. A cast that was
             -- reversed put nothing new on top.
             stackAfter <- State.gets GameState.stack
@@ -4000,7 +4000,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- answer that is not a permutation of the offered indices.
           pure (Game.permute batch answer)
         _ -> pure batch
-      Monad.mapM_ (Cost.tapForMana performManaAbility pid) ordered
+      Monad.mapM_ (Cost.tapForMana (performManaAbility runSubgame) pid) ordered
   -- CR 106.13: one player loses all their unspent mana and another adds "the mana
   -- lost this way". WHOLE UNITS cross (Mana.moveMana), which is the rule's second
   -- sentence -- what produced the mana, its CR 106.4 retention and both of CR
@@ -4198,7 +4198,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   -- the graveyard half of an "and/or" alone -- but observing it
                   -- needs a castable library card on the board at the same time,
                   -- which no case builds; removing it reddens nothing.
-                  Monad.when (searcher == owner && Set.member Zone.Library searchedZones) (Cast.castWhileSearching performManaAbility searcher)
+                  Monad.when (searcher == owner && Set.member Zone.Library searchedZones) (Cast.castWhileSearching (performManaAbility runSubgame) searcher)
                   gs <- State.get
                   -- ONE prompt over the union, not one per zone: the card prints
                   -- one instruction with one count, and asking per zone would cap
@@ -4603,7 +4603,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- playing, and in the instruction's scope.
         rollers = filter (\pid -> Game.inRangeOf controller pid before && PlayerEffect.inScope pid controller before (RollDie.roller rollDie)) (Game.apnapOrder before)
     rolled <- Monad.forM rollers $ \roller -> do
-      (results, throwers) <- throwDice roller sides named perDie
+      (results, throwers) <- throwDice runSubgame roller sides named perDie
       used <- case RollDie.reading rollDie of
         -- CR 706.4's total: every result read at once, so there is nothing to
         -- choose, and the total of no dice is zero rather than unbound.
@@ -5623,7 +5623,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         <$> Monad.forM
           (playerRefPlayers legal controller gs caster)
           ( \pid ->
-              offerCast context evaluate named pid optionality verb (if controlWhileResolving then Just controller else Nothing) repetition copied offer
+              offerCast runSubgame context evaluate named pid optionality verb (if controlWhileResolving then Just controller else Nothing) repetition copied offer
           )
     -- CR 400.7h: the rest of the effect names the spells, bindMinted's shape.
     bindMinted resolving slot spells
@@ -5655,7 +5655,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       found <- Game.lookUpCard name
       Monad.forM_ found $ \printingId -> do
         g <- State.get
-        offerOutsideCopy (effectContext g controller source legal (slotBindings resolving g)) controller printingId ordinaryOffer
+        offerOutsideCopy runSubgame (effectContext g controller source legal (slotBindings resolving g)) controller printingId ordinaryOffer
   -- CR 707.14 (Magar of the Magic Strings): the copy is made from the card noted
   -- for the SOURCE as it entered (EntryRiders.noted), so a copy of that permanent,
   -- which has this ability but no note (CR 707.2), creates nothing, and the
@@ -5667,7 +5667,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.OfferNotedCopy offer -> do
     gs <- State.get
     Monad.forM_ (Map.lookup source (GameState.notedCards gs)) $ \printingId ->
-      offerOutsideCopy (effectContext gs controller source legal (slotBindings resolving gs)) controller printingId offer
+      offerOutsideCopy runSubgame (effectContext gs controller source legal (slotBindings resolving gs)) controller printingId offer
   -- CR 601.3: write the standing permission onto every object the ObjectRef names,
   -- for the player the PlayerRef names and the stated duration.
   --
@@ -5795,7 +5795,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             pure (filter (`Set.member` answer) swept)
     ordered <- forEachOrder resolving (const (Just controller)) picked
     -- CR 118.12a per member: every offer is made before the first body runs.
-    members <- maybe (pure ordered) (loopOffers resolving source controller slot legal ordered) gate
+    members <- maybe (pure ordered) (loopOffers runSubgame resolving source controller slot legal ordered) gate
     let -- The slots the BODY defines, computed off the instruction rather than the
         -- board: a body effect binds into the resolving object's live bindings and
         -- the next body effect must see it. Restricted to those names so a target
@@ -10320,7 +10320,7 @@ expandGrant resolving source gs modification = case modification of
           <> fmap (Modification.GainAbility . GrantedAbility.SelfCostReduction) (PC.costReductions pc)
   _ -> [modification]
 
--- The no-subgame executor (the ability path and every direct caller): a
+-- The no-subgame executor, for a test that drives one effect directly: a
 -- PlaySubgame resolves as a draw here (see noSubgame).
 applyEffect :: ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Set Recipient) -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game ()
 applyEffect = applyEffectWith noSubgame
@@ -10511,16 +10511,16 @@ recordRoll controller throwers results = do
 
 -- | CR 701.52a: roll a six-sided die to visit this player's Attractions. A die
 -- roll like any other (CR 706), then the result the Visit triggers read.
-rollToVisit :: PlayerId -> Game ()
-rollToVisit pid = do
-  (results, throwers) <- throwDice pid 6 1 (pure 0)
+rollToVisit :: Game Result -> PlayerId -> Game ()
+rollToVisit runSubgame pid = do
+  (results, throwers) <- throwDice runSubgame pid 6 1 (pure 0)
   recordRoll pid throwers results
   -- CR 706.6 can throw a second die and ignore the lower; one is left.
   Foldable.for_ (Maybe.listToMaybe results) $ \result ->
     State.modify' (Event.recordEvent (GameEvent.RolledToVisit DieResult.MkDieResult {DieResult.roller = pid, DieResult.result = result}))
 
-throwDice :: PlayerId -> Natural -> Natural -> Game Integer -> Game ([Natural], [PlayerId])
-throwDice controller sides named perDie = do
+throwDice :: Game Result -> PlayerId -> Natural -> Natural -> Game Integer -> Game ([Natural], [PlayerId])
+throwDice runSubgame controller sides named perDie = do
   let -- CR 706.1a's outcomes "numbered from 1 to N", BOTH ends included: the
       -- answer filtered back to a face the die could show. Its own binding
       -- because a reroll runs it a second time.
@@ -10601,7 +10601,7 @@ throwDice controller sides named perDie = do
                     rerolling controller (faceOf again)
               (OptionalDecision.Exercises, Right (oid, ability)) -> do
                 rerolled <- duringRoll $ do
-                  activated <- activateWhileRolling payer oid ability
+                  activated <- activateWhileRolling runSubgame payer oid ability
                   after <- State.get
                   pure (if activated then GameState.rerolledTo after else Nothing)
                 case rerolled of
@@ -10701,7 +10701,7 @@ throwDice controller sides named perDie = do
       payForModifier payer oid cost = do
         (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced payer oid pure cost
         began <- State.get
-        outcome <- Cost.pay performManaAbility began PaymentMoment.DuringResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced payer oid announced
+        outcome <- Cost.pay (performManaAbility runSubgame) began PaymentMoment.DuringResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced payer oid announced
         pure (case outcome of Payment.Paid _ -> True; Payment.Unpaid -> False)
       -- Goblin Bookie's "Activate only any time it makes sense", read as a
       -- window inside CR 706.2's modification step, beside the static offers
@@ -10774,14 +10774,17 @@ withRollingDie sides act = do
 -- Pawl.Types.ManaAbilityPerformer parameter: CR 405.6c's other effects of the
 -- activated mana ability being paid, and CR 605.4a's triggered mana ability.
 --
--- Not implemented: both stand on the noSubgame floor, so a mana ability that
--- plays a subgame reports a draw (#1900).
-performManaAbility :: ManaAbilityPerformer.ManaAbilityPerformer
-performManaAbility =
+-- `runSubgame` is CR 729.1a's runner for a subgame either one starts. Only the
+-- triggered half can: CR 605.1a's library clause (ManaAbility.movesLibraryCard)
+-- keeps an activated ability that plays one off the mana-ability road, and CR
+-- 605.1b has no such clause. Pawl.GameSpec's "CR 605.4a / 729.1b gameplay: a
+-- triggered mana ability's subgame winner draws a card" proves the triggered road.
+performManaAbility :: Game Result -> ManaAbilityPerformer.ManaAbilityPerformer
+performManaAbility runSubgame =
   ManaAbilityPerformer.MkManaAbilityPerformer
-    { ManaAbilityPerformer.effects = performManaAbilityEffects,
-      ManaAbilityPerformer.triggered = performTriggeredManaAbility,
-      ManaAbilityPerformer.payGate = performManaPayGate
+    { ManaAbilityPerformer.effects = performManaAbilityEffects runSubgame,
+      ManaAbilityPerformer.triggered = performTriggeredManaAbility runSubgame,
+      ManaAbilityPerformer.payGate = performManaPayGate runSubgame
     }
 
 -- CR 118.12 on a mana ability's clause, which CR 605.3b gives no stack object:
@@ -10792,10 +10795,10 @@ performManaAbility =
 -- Binding.gatePlayers: there is no ability object to bind them on, and no mana
 -- ability prints a "they" (MTGJSON's dump of 2026-08-23: Rhystic Cave is the one
 -- mana ability with a resolution cost).
-performManaPayGate :: ObjectId -> PlayerId -> ClauseIndex.ClauseIndex -> PayGate.PayGate -> Map.Map ClauseIndex.ClauseIndex (Map.Map PlayerId Bool) -> Game (Bool, Map.Map ClauseIndex.ClauseIndex (Map.Map PlayerId Bool))
-performManaPayGate source controller cIdx gate answers = do
+performManaPayGate :: Game Result -> ObjectId -> PlayerId -> ClauseIndex.ClauseIndex -> PayGate.PayGate -> Map.Map ClauseIndex.ClauseIndex (Map.Map PlayerId Bool) -> Game (Bool, Map.Map ClauseIndex.ClauseIndex (Map.Map PlayerId Bool))
+performManaPayGate runSubgame source controller cIdx gate answers = do
   let offerAt = Maybe.fromMaybe cIdx (PayGate.offeredAt gate)
-  asked <- maybe (payGatePaid source source controller (ModeIndex.MkModeIndex 0) cIdx Map.empty Nothing Set.empty gate) pure (Map.lookup offerAt answers)
+  asked <- maybe (payGatePaid runSubgame source source controller (ModeIndex.MkModeIndex 0) cIdx Map.empty Nothing Set.empty gate) pure (Map.lookup offerAt answers)
   pure (not (Set.null (branchSelects (PayGate.branch gate) asked)), Map.insert offerAt asked answers)
 
 -- CR 605.4a: apply one triggered mana ability where it stands. CR 605.1b's
@@ -10809,7 +10812,8 @@ performManaPayGate source controller cIdx gate answers = do
 -- read off an object. CR 605.1b leaves no targets to bind, so what the event
 -- bound (Pawl.Engine.Event.Binding.eventBindings) is the whole environment --
 -- Binding.manaSource, which is how Wild Growth's "its controller" names the
--- land rather than the Aura.
+-- land rather than the Aura. What one effect binds, a later one reads
+-- (runCarrying): Synthetic Wellspring of Legends' subgame winner.
 --
 -- A SOURCELESS pending trigger cannot arrive: no inherent ability the rulebook
 -- states adds mana, and Pawl.Engine.Cost gathers only from an object's
@@ -10818,8 +10822,8 @@ performManaPayGate source controller cIdx gate answers = do
 -- CR 700.2b's mode choice is FORCED or nothing: a modal triggered mana ability
 -- would want the prompt Engine.placeBorne raises, and CR 605.4a leaves no stack
 -- object to raise it against. Not implemented: such an ability (#3724).
-performTriggeredManaAbility :: PendingTrigger.PendingTrigger -> Game ()
-performTriggeredManaAbility pending = case PendingTrigger.source pending of
+performTriggeredManaAbility :: Game Result -> PendingTrigger.PendingTrigger -> Game ()
+performTriggeredManaAbility runSubgame pending = case PendingTrigger.source pending of
   TriggerSource.Sourceless -> pure ()
   TriggerSource.OfObject source -> do
     let controller = PendingTrigger.controller pending
@@ -10840,7 +10844,7 @@ performTriggeredManaAbility pending = case PendingTrigger.source pending of
             )
     case Modal.forcedSelection every (Modal.Type.selection modal) of
       Nothing -> pure ()
-      Just selection -> Monad.mapM_ (applyEffect source source controller bound bound) (Modal.modesEffects selection modal)
+      Just selection -> Monad.void (runCarrying runSubgame source controller bound Map.empty (Modal.modesEffects selection modal))
 
 -- CR 405.6c: run some non-mana effects of a mana ability, as
 -- Pawl.Engine.Cost.tapForManaWith reaches them in printed order.
@@ -10863,14 +10867,14 @@ performTriggeredManaAbility pending = case PendingTrigger.source pending of
 -- Pawl.CardSpec's activatedAbilityOffends admits a read of are ones the payment
 -- binds and Cost.tapForManaWith's Paid branch drops, which no mana ability in
 -- data/cards/ reads (#3124).
-performManaAbilityEffects :: ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> Game (Map.Map SlotName (Set Recipient))
-performManaAbilityEffects source controller =
+performManaAbilityEffects :: Game Result -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> Game (Map.Map SlotName (Set Recipient))
+performManaAbilityEffects runSubgame source controller =
   -- CR 109.5's "you" is the player who activated the ability, and the reserved
   -- self slot is CR 113.7's source. Both are bound here rather than read off an
   -- object, because there is no ability object carrying them:
   -- Pawl.Engine.Activate.activateAbility stamps them for every ability that does
   -- go on the stack.
-  runCarrying noSubgame source controller $
+  runCarrying runSubgame source controller $
     Map.fromList
       [ (Binding.triggerSource, Set.singleton (Recipient.ToObject source)),
         (Binding.you, Set.singleton (Recipient.ToPlayer controller))
@@ -10909,8 +10913,8 @@ runCarrying runSubgame holder controller fixed =
 --
 -- The effects then run as performManaAbilityEffects runs a mana ability's, the
 -- source standing in for the ability object.
-activateWhileRolling :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game Bool
-activateWhileRolling pid oid ability = do
+activateWhileRolling :: Game Result -> PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game Bool
+activateWhileRolling runSubgame pid oid ability = do
   before <- State.get
   let stamp = ActivatedAbility.keyword ability
       loyalty = Cost.loyaltyKindOf (ActivatedAbility.cost ability)
@@ -10918,7 +10922,7 @@ activateWhileRolling pid oid ability = do
       totalled = Cost.plusComponents gathered (ActivatedAbility.cost ability)
   (announced, _) <- Cost.announce (PaymentSubject.Activating oid stamp) ManaSpending.AsProduced pid oid (Cost.substitutedManas (Cost.waterbendSubstitutions (Cost.Type.components totalled) Map.empty pid oid before) (Cost.totalManas gathered)) totalled
   adjustments <- Cost.announceReductions pid oid before announced gathered
-  (payment, _) <- Cost.paySubstituting performManaAbility before [] PaymentMoment.OutsideResolution (PaymentSubject.Activating oid stamp) Nothing ManaSpending.AsProduced pid oid (Cost.announceSubstitutions Cost.waterbendSubstitutions pid oid) (Cost.totalWith adjustments announced)
+  (payment, _) <- Cost.paySubstituting (performManaAbility runSubgame) before [] PaymentMoment.OutsideResolution (PaymentSubject.Activating oid stamp) Nothing ManaSpending.AsProduced pid oid (Cost.announceSubstitutions Cost.waterbendSubstitutions pid oid) (Cost.totalWith adjustments announced)
   case payment of
     -- CR 733.1: the payment reversed the activation back to `before` itself.
     Payment.Unpaid -> pure False
@@ -10933,7 +10937,7 @@ activateWhileRolling pid oid ability = do
                 (Binding.you, Set.singleton (Recipient.ToPlayer pid))
               ]
       Foldable.for_ (Modal.forcedSelection every (Modal.Type.selection modal)) $ \selection ->
-        Monad.mapM_ (applyEffect oid oid pid bound bound) (Modal.modesEffects selection modal)
+        Monad.mapM_ (applyEffectWith runSubgame oid oid pid bound bound) (Modal.modesEffects selection modal)
       pure True
 
 -- CR 603.7c: bind `target` into `slot` of `holder`'s binding environment, so a
@@ -10992,12 +10996,10 @@ isCardInAGraveyard oid gs = case Game.lookupObject oid gs of
 -- the real runner to BOTH halves of CR 729.1a's "spell or ability"
 -- (resolveSpellWith, resolveModesWith), and to the instructions that never reach
 -- the stack: CR 614.1c's as-enters effects, CR 615.5's prevention riders, CR
--- 614.1a's damage-replacement effects and CR 103.5b/103.6's hand actions.
--- Pawl.GameSpec's "CR 614.1c / 729.1b gameplay: an as-enters subgame's winner
--- draws a card" proves the as-enters road.
---
--- Not implemented: a subgame started by a mana ability's effects
--- (performManaAbility), which fold the bare applyEffect and land here (#1900).
+-- 614.1a's damage-replacement effects, CR 103.5b/103.6's hand actions and CR
+-- 605.4a's triggered mana abilities (performManaAbility). Pawl.GameSpec's "CR
+-- 614.1c / 729.1b gameplay: an as-enters subgame's winner draws a card" proves
+-- the as-enters road.
 noSubgame :: Game Result
 noSubgame = pure Result.Drawn
 
@@ -11758,8 +11760,8 @@ branchSelects branch asked = case branch of
 --
 -- A player the reference names who has LEFT the game stays in this list and is
 -- answered unpaid by payGatePaidBy, CR 800.4f.
-payGatePaid :: ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> Maybe (Set PlayerId) -> Set PlayerId -> PayGate.PayGate -> Game (Map.Map PlayerId Bool)
-payGatePaid resolving source controller idx cIdx legal announced committed gate = do
+payGatePaid :: Game Result -> ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> Maybe (Set PlayerId) -> Set PlayerId -> PayGate.PayGate -> Game (Map.Map PlayerId Bool)
+payGatePaid runSubgame resolving source controller idx cIdx legal announced committed gate = do
   gs <- State.get
   -- A COMMITTED payer (Pawl.Engine.Resolve.chosenBranch) already chose to pay
   -- when they announced the branch, so their offer is CR 118.12's mandatory
@@ -11768,7 +11770,7 @@ payGatePaid resolving source controller idx cIdx legal announced committed gate 
   answered <-
     Monad.foldM
       ( \earlier payer -> do
-          paid <- payGatePaidBy resolving source controller (PayOffer.AtClause idx cIdx) (fmap (fmap paymentDecisionOf) earlier) legal payer (offerTo payer)
+          paid <- payGatePaidBy runSubgame resolving source controller (PayOffer.AtClause idx cIdx) (fmap (fmap paymentDecisionOf) earlier) legal payer (offerTo payer)
           pure (earlier Seq.|> (payer, paid))
       )
       Seq.empty
@@ -11799,8 +11801,8 @@ paymentDecisionOf paid = if Maybe.isJust paid then PaymentDecision.Pays else Pay
 -- is made, and what the payments bound is folded on first (foldPaid). Proved
 -- by Pawl.ResolveSpec's "an offer per member" group, whose Exquisite Blood case
 -- counts the life-loss events.
-loopOffers :: ObjectId -> ObjectId -> PlayerId -> SlotName -> Map.Map SlotName (Set Recipient) -> [Recipient] -> PayGate.PayGate -> Game [Recipient]
-loopOffers resolving source controller slot legal members gate = do
+loopOffers :: Game Result -> ObjectId -> ObjectId -> PlayerId -> SlotName -> Map.Map SlotName (Set Recipient) -> [Recipient] -> PayGate.PayGate -> Game [Recipient]
+loopOffers runSubgame resolving source controller slot legal members gate = do
   gs <- State.get
   let legalFor member = Map.insert slot (Set.singleton member) legal
       payersOf member = apnapPlayersOf (PayGate.payer gate) (legalFor member) controller gs
@@ -11823,7 +11825,7 @@ loopOffers resolving source controller slot legal members gate = do
       ( \done payer -> case NonEmpty.nonEmpty (agreedBy payer answered) of
           Nothing -> pure done
           Just taken -> do
-            bound <- payGateCost (fst (NonEmpty.head taken)) payer source (Cost.together (fmap snd taken))
+            bound <- payGateCost runSubgame (fst (NonEmpty.head taken)) payer source (Cost.together (fmap snd taken))
             pure (maybe done (\b -> Map.insert payer b done) bound)
       )
       Map.empty
@@ -11875,11 +11877,11 @@ loopOffers resolving source controller slot legal members gate = do
 -- opposite answer: the controller of the object picks another player to make it,
 -- which Pawl.Engine.Resolve.Effect.askedChooser does. Not here -- a cost is the
 -- whole of what this function asks about.
-payGatePaidBy :: ObjectId -> ObjectId -> PlayerId -> PayOffer.PayOffer -> Seq.Seq (PlayerId, PaymentDecision.PaymentDecision) -> Map.Map SlotName (Set Recipient) -> PlayerId -> PayGate.PayGate -> Game (Maybe (Map.Map SlotName Binding.Type.Binding))
-payGatePaidBy resolving source controller offer earlier legal payer gate = do
+payGatePaidBy :: Game Result -> ObjectId -> ObjectId -> PlayerId -> PayOffer.PayOffer -> Seq.Seq (PlayerId, PaymentDecision.PaymentDecision) -> Map.Map SlotName (Set Recipient) -> PlayerId -> PayGate.PayGate -> Game (Maybe (Map.Map SlotName Binding.Type.Binding))
+payGatePaidBy runSubgame resolving source controller offer earlier legal payer gate = do
   (slots, options) <- State.gets (gateCostOf resolving source controller legal gate)
   agreed <- payGateAgreed resolving source offer earlier payer gate slots Nothing options
-  maybe (pure Nothing) (payGateCost slots payer source) agreed
+  maybe (pure Nothing) (payGateCost runSubgame slots payer source) agreed
 
 -- The costs one offer of this gate may be paid with, one per option in printed
 -- order (PayGate.cost), with the slot map their components read: payGatePaidBy's
@@ -11946,8 +11948,8 @@ payGateAgreed resolving source offer earlier payer gate slots owed options = do
 
 -- The payment of a cost the payer agreed to, against `source` (CR 113.7a): the
 -- slots it bound when it was paid (foldPaid), Nothing when it was not.
-payGateCost :: Map.Map SlotName (Set ObjectId) -> PlayerId -> ObjectId -> Cost.Type.Cost Keyword.Type.Keyword -> Game (Maybe (Map.Map SlotName Binding.Type.Binding))
-payGateCost slots payer source cost = do
+payGateCost :: Game Result -> Map.Map SlotName (Set ObjectId) -> PlayerId -> ObjectId -> Cost.Type.Cost Keyword.Type.Keyword -> Game (Maybe (Map.Map SlotName Binding.Type.Binding))
+payGateCost runSubgame slots payer source cost = do
   gs <- State.get
   -- CR 118.13b: a symbol payable in multiple ways is announced by the
   -- PAYER "immediately before they pay that cost" -- after CR 118.12's
@@ -11979,7 +11981,7 @@ payGateCost slots payer source cost = do
   -- (Cost.pay). Taken after the announcement above, which writes no
   -- state of its own.
   began <- State.get
-  outcome <- Cost.payReading slots performManaAbility began PaymentMoment.DuringResolution PaymentSubject.ForNeither ManaSpending.AsProduced payer source announced
+  outcome <- Cost.payReading slots (performManaAbility runSubgame) began PaymentMoment.DuringResolution PaymentSubject.ForNeither ManaSpending.AsProduced payer source announced
   pure (case outcome of Payment.Paid bound -> Just bound; Payment.Unpaid -> Nothing)
 
 -- CR 608.2c / 608.2h: the slots CR 118.12's payments bound, folded onto the

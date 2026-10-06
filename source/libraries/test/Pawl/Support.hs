@@ -835,11 +835,11 @@ withEffect oid m gs =
 performer :: HandActionPerformer.HandActionPerformer
 performer = Resolve.performHandAction Engine.playSubgame
 
--- The one CR 405.6c performer (Pawl.Engine.Resolve.Effect.performManaAbility), which
--- every payment path takes as a parameter, so a test that pays a cost does not
--- have to reach into Pawl.Engine.Resolve for it.
+-- The one CR 405.6c performer (Pawl.Engine.Resolve.Effect.performManaAbility) with
+-- the live loop's subgame runner (Pawl.Engine.Engine.performManaAbility), which
+-- every payment path takes as a parameter.
 manaPerformer :: ManaAbilityPerformer.ManaAbilityPerformer
-manaPerformer = Resolve.performManaAbility
+manaPerformer = Engine.performManaAbility
 
 -- Cost.tapForMana by the permanent's controller, CR 602.2's default activator.
 -- A mana ability another player activates (CR 602.1b) goes to Cost.tapForMana.
@@ -1618,8 +1618,8 @@ threePlayerCombat mine theirs others =
 fightWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
 fightWith answer gs =
   snd . Engine.runGamePure answer gs $ do
-    Combat.declareAttackers Resolve.performManaAbility alice
-    Combat.declareBlockers Resolve.performManaAbility
+    Combat.declareAttackers manaPerformer alice
+    Combat.declareBlockers manaPerformer
     Damage.dealCombatDamage
 
 -- Build a board, run a script against one engine entry point, and fail the case
@@ -2241,7 +2241,7 @@ soleFaceName oid gs = case Game.castableFacesOfId oid gs of
 cast :: PlayerId.PlayerId -> ObjectId.ObjectId -> Game.Type.Game ()
 cast pid oid = do
   gs <- State.get
-  Cast.castSpell Resolve.performManaAbility pid oid (soleFaceName oid gs) Facing.FaceUp
+  Cast.castSpell manaPerformer pid oid (soleFaceName oid gs) Facing.FaceUp
 
 -- `cast`'s predicate half: Pawl.Engine.Cast.castable asked of that same half.
 castable :: PlayerId.PlayerId -> ObjectId.ObjectId -> GameState.GameState -> Bool

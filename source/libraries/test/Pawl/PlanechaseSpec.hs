@@ -86,7 +86,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Planechase" $ do
     forest <- S.printingOf s registry "Forest"
     board <- planarBoard s registry ["Academy at Tolaria West"]
     let main = inMain S.alice board
-        rolledOnce = S.runPure (rolling 1) main (Planechase.roll Resolve.performManaAbility S.alice)
+        rolledOnce = S.runPure (rolling 1) main (Planechase.roll S.manaPerformer S.alice)
         (_, withForest) = S.addPermanent forest S.alice rolledOnce
     Spec.assertBool s (elem Action.Type.RollPlanarDie (Action.legalActions S.alice main)) "CR 116.2i the active player may roll"
     Spec.assertBool s (notElem Action.Type.RollPlanarDie (Action.legalActions S.bob (main {GameState.priority = Just S.bob}))) "and a player whose turn it isn't may not"
@@ -114,7 +114,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Planechase" $ do
     let (_, b1) = S.addPermanent forest S.bob board
         (_, b2) = S.addPermanent forest S.bob b1
         (_, b3) = S.addPermanent forest S.alice b2
-        chaos = S.runPure (rolling 5) (inMain S.bob b3) (Planechase.roll Resolve.performManaAbility S.bob >> Engine.priorityLoop)
+        chaos = S.runPure (rolling 5) (inMain S.bob b3) (Planechase.roll S.manaPerformer S.bob >> Engine.priorityLoop)
     Spec.assertEqWith s "bob draws one card for each of his two Forests, alice none" (S.handSize S.bob chaos, S.handSize S.alice chaos) (2, 0)
 
   -- CR 901.8 / 701.31b: the Planeswalker symbol triggers the planeswalking
@@ -154,7 +154,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Planechase" $ do
         answer p = case p of
           Prompt.RollDie _ -> 6
           _ -> conceding S.alice p
-        gone = S.runPure answer (inMain S.bob board) (Planechase.roll Resolve.performManaAbility S.bob >> Engine.priorityLoop)
+        gone = S.runPure answer (inMain S.bob board) (Planechase.roll S.manaPerformer S.bob >> Engine.priorityLoop)
         names = fmap (\oid -> fmap Face.name (Game.faceOf oid gone)) (Planechase.faceUp gone)
     Spec.assertEqWith s "CR 901.10a bob's Tazeem is still the face-up plane" names [Just (CardName.MkCardName (Text.pack "Tazeem"))]
     Spec.assertEqWith s "and his Academy is still in his planar deck" (length (Planechase.deckOf S.bob gone)) 1
@@ -212,4 +212,4 @@ rolling n p = case p of
 
 -- alice rolls the planar die showing `n`, and whatever it triggers resolves.
 rollAndResolve :: Natural -> GameState.GameState -> GameState.GameState
-rollAndResolve n gs = S.runPure (rolling n) gs (Planechase.roll Resolve.performManaAbility S.alice >> Engine.priorityLoop)
+rollAndResolve n gs = S.runPure (rolling n) gs (Planechase.roll S.manaPerformer S.alice >> Engine.priorityLoop)

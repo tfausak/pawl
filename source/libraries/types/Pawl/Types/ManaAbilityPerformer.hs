@@ -24,9 +24,10 @@ import qualified Pawl.Types.SlotName as SlotName
 -- Resolve.resolveSpellWith takes its subgame runner and Pawl.Engine.Mulligan its
 -- hand-action performer the same way (Pawl.Types.HandActionPerformer).
 --
--- Taken as a parameter by the modules Pawl.Engine.Resolve imports and cannot
--- take one; the rest -- Pawl.Engine.Activate, Foretell, Ignore, EndEffect,
--- Action, Engine -- import Resolve and read Resolve.performManaAbility off it.
+-- Built by Pawl.Engine.Resolve.Effect.performManaAbility around CR 729.1a's
+-- subgame runner, which a triggered mana ability can need (CR 605.4a);
+-- Pawl.Engine.Engine.performManaAbility is the live loop's, and every module
+-- below the loop takes the record or the runner as a parameter.
 --
 -- Deliberately has NO default: "no performer" is not a real state of the world,
 -- and one would silently drop the damage Ancient Tomb charges for its mana at

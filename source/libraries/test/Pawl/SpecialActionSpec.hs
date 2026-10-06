@@ -1900,7 +1900,7 @@ dampingEngine s registry = Spec.describe s "CR 116.2d Damping Engine" $ do
     changeling <- S.printingOf s registry "Woodland Changeling"
     growth <- S.printingOf s registry "Rampant Growth"
     let (engineId, victimId, forestId, changelingId, _, aliceLeads) = dampingBoard engine forest changeling growth
-        afterIgnore = S.runPure (sacrificing victimId) aliceLeads (Ignore.ignore S.alice engineId theLead)
+        afterIgnore = S.runPure (sacrificing victimId) aliceLeads (Ignore.ignore S.manaPerformer S.alice engineId theLead)
         actions = Action.legalActions S.alice afterIgnore
     Spec.assertEqWith s "the sacrifice was paid: one of alice's three Forests is gone" (S.countOnBattlefieldByName (S.printingName forest) S.alice afterIgnore) 2
     Spec.assertBool s (any (playing forestId) actions) "CR 305.1's half is lifted"
@@ -1946,7 +1946,7 @@ dividedEdicts s registry = Spec.describe s "CR 116.2d Synthetic Warden of Divide
     let (wardenId, victimId, _, bobForestId, changelingId, growthId, gs) = wardenBoard warden forest changeling growth
         (_, _, _, controlForestId, _, _, vanilla) = wardenBoard changeling forest changeling growth
         before = Action.legalActions S.bob gs
-        afterIgnore = S.runPure (sacrificing victimId) gs (Ignore.ignore S.bob wardenId creatureBan)
+        afterIgnore = S.runPure (sacrificing victimId) gs (Ignore.ignore S.manaPerformer S.bob wardenId creatureBan)
         actions = Action.legalActions S.bob afterIgnore
     Spec.assertBool s (not (any (casting changelingId) before)) "before paying, bob's creature spell is stopped"
     Spec.assertBool s (any (casting growthId) before) "while the sorcery of the same cost is not -- the cost control"
@@ -2165,7 +2165,7 @@ volrathsCurse s registry = Spec.describe s "CR 116.2d Volrath's Curse" $ do
     kami <- S.printingOf s registry "Teardrop Kami"
     piker <- S.printingOf s registry "Goblin Piker"
     let (curseId, kamiId, victimId, cursed) = curseCombat curse kami piker
-        afterIgnore = S.runPure (sacrificing victimId) cursed (Ignore.ignore S.alice curseId thisEffect)
+        afterIgnore = S.runPure (sacrificing victimId) cursed (Ignore.ignore S.manaPerformer S.alice curseId thisEffect)
         swept = Expiry.dropAtCleanup afterIgnore
         asked pid board_ = Action.legalActions pid (board_ {GameState.priority = Just pid})
     Spec.assertBool s (Combat.canAttack S.alice kamiId afterIgnore) "CR 508.1c: alice paid, so the enchanted creature may attack"
