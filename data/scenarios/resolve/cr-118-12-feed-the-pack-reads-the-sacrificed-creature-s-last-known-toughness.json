@@ -1,0 +1,29 @@
+{
+  "description": "CR 118.12 Feed the Pack reads the sacrificed creature's last known toughness",
+  "note": "The sacrifice is a cost paid as the trigger resolves, and the Wolves count reads the creature it took (CR 608.2h). Night of Souls' Betrayal makes the Balduvian Barbarians 2/1, so one Wolf; its printed toughness gives two, its power two, and an unbound slot none. One Wolf also raises no CR 613.7m timestamp prompt ahead of the count. The Ancient Crab token is not a candidate, so the Barbarians are the only one and the sacrifice asks nothing.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Feed the Pack", "label": "feed" },
+          { "card": "Night of Souls' Betrayal", "label": "night-of-souls-betrayal" },
+          { "card": "Balduvian Barbarians", "label": "barbarians" },
+          { "card": "Ancient Crab", "label": "crab", "token": true }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PostcombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "PowerToughness": { "object": "$barbarians", "power": 2, "toughness": 1 } } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "do": { "ChooseToPay": { "decision": { "type": "Pays" } } }, "source": "$feed" },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Wolf Token", "count": 1 } } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Balduvian Barbarians", "count": 1 } } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Ancient Crab", "count": 1 } } }
+  ]
+}

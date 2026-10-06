@@ -3475,12 +3475,9 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                           -- the payment because that is when the payment knows
                           -- them, and onto the SPELL because that is the object
                           -- whose effects read it, Pawl.Engine.Activate's route
-                          -- one carrier over.
-                          --
-                          -- Not implemented: the OTHER payers still drop the map
-                          -- -- a CR 118.12 cost paid during a resolution cannot
-                          -- be read by a later clause of the same resolution
-                          -- (#1872).
+                          -- one carrier over. CR 118.12's payment during a
+                          -- resolution is folded the same way
+                          -- (Pawl.Engine.Resolve.Effect.foldPaid).
                           State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setPaid bound (Object.bindings o)}) sid (GameState.objects g)})
                           -- CR 702.51c: the creatures tapped to pay for mana in
                           -- this spell's total cost convoked it, so the relation

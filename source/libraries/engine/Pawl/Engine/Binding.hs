@@ -432,7 +432,9 @@ sacrificedCount = SlotName.MkSlotName (Text.pack "thatMany")
 -- spell the same way, which is how Fling's "the sacrificed creature's power"
 -- reads it off its own additional cost -- proved by Pawl.CostSpec's "CR 601.2h a
 -- creature sacrificed to pay a cast's additional cost is still readable when the
--- spell resolves".
+-- spell resolves". A CR 118.12 cost paid AS a spell or ability resolves is
+-- folded onto the resolving object (Pawl.Engine.Resolve.Effect.foldPaid), which
+-- is Feed the Pack's "the sacrificed creature's toughness".
 --
 -- The permanent is in a graveyard by the time the ability resolves, so every
 -- read of it is CR 608.2h's last known information; Pawl.Engine.Resolve.Slots.effectViewOf

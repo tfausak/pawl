@@ -1,0 +1,35 @@
+{
+  "description": "CR 707.2 Feed the Pack reads the copy's toughness, not the printed Clone's",
+  "note": "A Clone's printed toughness is 0, so a Feed the Pack that read the sacrificed creature through its printed card rather than the copiable values CR 707.2 stamped would create no Wolves. bob owns the Goblin Piker the Clone copies, so the 1 belongs to no permanent alice printed, and its power of 2 tells toughness from power. One Wolf raises no CR 613.7m timestamp prompt ahead of the count. The Clone is alice's only creature, so the sacrifice asks nothing.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Feed the Pack", "label": "feed" },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true }
+        ],
+        "hand": [{ "card": "Clone", "label": "clone" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "piker" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PostcombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "do": { "Cast": { "object": "$clone", "mana": ["Island", "Island#2", "Island#3", "Island#4"] } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "do": { "ChooseCopyTarget": "$piker" } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Clone", "power": 2, "toughness": 1 } } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "do": { "ChooseToPay": { "decision": { "type": "Pays" } } }, "source": "$feed" },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Wolf Token", "count": 1 } } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Clone", "count": 1 } } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "PowerToughness": { "object": "$piker", "power": 2, "toughness": 1 } } }
+  ]
+}
