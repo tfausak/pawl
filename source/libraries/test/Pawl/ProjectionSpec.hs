@@ -4055,7 +4055,8 @@ shapeshifterBoard shapeshifter sorcerer sentry =
             ManaUnit.retention = ManaRetention.Ordinary,
             ManaUnit.restriction = Nothing,
             ManaUnit.rider = Nothing,
-            ManaUnit.sourceChosenSubtype = Nothing
+            ManaUnit.sourceChosenSubtype = Nothing,
+            ManaUnit.sourceLastExiled = Nothing
           }
    in (shifterId, b2 {GameState.manaPool = Map.singleton S.alice (Mana.Type.MkMana [blue, blue]), GameState.priority = Just S.alice})
 

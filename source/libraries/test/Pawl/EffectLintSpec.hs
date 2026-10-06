@@ -279,6 +279,7 @@ ownQuantities effect = case effect of
   Effect.Cloak {} -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
+  Effect.NoteManaSpent -> []
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> [quantity]
   Effect.Vote {} -> []
   Effect.RestartGame _ -> []
@@ -1402,6 +1403,7 @@ effectObjectRefs effect =
         Effect.Cloak {} -> []
         Effect.Venture {} -> []
         Effect.ExileHandThenDraw -> []
+        Effect.NoteManaSpent -> []
         Effect.PlayerSacrifices {} -> []
         Effect.Vote {} -> []
         -- CR 727.5's exemption, optional: a card saying nothing about it exempts

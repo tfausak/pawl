@@ -1051,7 +1051,7 @@ defaultAnswer p = case p of
   Prompt.ChooseEncode {} -> Nothing
   -- CR 105.1: any of the five colours is a legal answer.
   Prompt.ChooseColor _ _ _ colors -> NonEmpty.head colors
-  -- CR 105.4: every candidate is a type Mana.producedTypes offered, so the head
+  -- CR 105.4: every candidate is a type Mana.produced offered, so the head
   -- is legal -- the same filter-not-trust fallback Resolve's arm applies to a
   -- wrong answer.
   Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates

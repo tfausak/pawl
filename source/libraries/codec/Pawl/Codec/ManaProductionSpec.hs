@@ -33,5 +33,11 @@ spec s = Spec.describe s "Pawl.Codec.ManaProduction" $ do
       ManaProduction.codec
       ManaProduction.SnowSymbol
       " {\"type\":\"SnowSymbol\"} "
+  Spec.it s "Noted" $
+    Common.assertCodec
+      s
+      ManaProduction.codec
+      ManaProduction.Noted
+      " {\"type\":\"Noted\"} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s ManaProduction.codec

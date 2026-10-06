@@ -5,13 +5,15 @@ import qualified Pawl.Types.ManaRestriction as ManaRestriction
 import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.ManaRider as ManaRider
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.Subtype as Subtype
 
 -- | One unit of mana in a pool.
 --
--- SIX axes, and two of them are facts about how the mana was made: the tags, and
--- the subtype its source had chosen (`sourceChosenSubtype` below).
+-- SEVEN axes, and three of them are facts about how the mana was made: the tags,
+-- the subtype its source had chosen (`sourceChosenSubtype` below), and the card
+-- last exiled with its source (`sourceLastExiled`).
 -- Pawl.Types.ProductionTag is the CLOSED half -- snow-ness, "this activation
 -- caused you to lose life" -- observable facts about the production event that
 -- the engine determines with no card knowledge.
@@ -104,10 +106,19 @@ data ManaUnit = MkManaUnit
     -- is no source id to look anything up by, the source may have left the
     -- battlefield by the time the mana is spent, and CR 106.6a makes the
     -- restriction the ABILITY's rather than the permanent's.
+    sourceChosenSubtype :: Maybe Subtype.Subtype,
+    -- | CR 607.2a: the last card exiled with this mana's SOURCE when the mana was
+    -- produced, baked in for Filter.IsLastExiledWithSource to ask -- Ice
+    -- Cauldron's "only to cast the last card exiled with this artifact". Nothing
+    -- for almost every mana. Stamped by both producers off
+    -- Pawl.Engine.Mana.lastExiledWith, and read by Pawl.Engine.Mana.admitsUnder.
     --
-    -- Not implemented: a restriction reading the source's IDENTITY rather than a
-    -- value it chose -- Ice Cauldron's "only to cast the last card exiled with
-    -- this artifact", which would want the id this type does not carry (#1978).
-    sourceChosenSubtype :: Maybe Subtype.Subtype
+    -- The CARD's id and not the source's, so the dangling this type's haddock
+    -- warns of is the rule rather than a hazard: once the card leaves exile it is
+    -- a new object (CR 400.7) the mana no longer names. The one move that keeps
+    -- it named is the cast itself -- Pawl.Engine.Cast.followIntoPools renames
+    -- the card to the spell it becomes (CR 601.2a), which is what the
+    -- restriction is about.
+    sourceLastExiled :: Maybe ObjectId.ObjectId
   }
   deriving (Eq, Ord, Show)

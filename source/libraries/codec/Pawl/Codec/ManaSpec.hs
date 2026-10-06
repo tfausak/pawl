@@ -21,7 +21,8 @@ plain manaType =
       ManaUnit.retention = ManaRetention.Ordinary,
       ManaUnit.restriction = Nothing,
       ManaUnit.rider = Nothing,
-      ManaUnit.sourceChosenSubtype = Nothing
+      ManaUnit.sourceChosenSubtype = Nothing,
+      ManaUnit.sourceLastExiled = Nothing
     }
 
 plainJson :: String -> String
@@ -50,7 +51,8 @@ spec s = Spec.describe s "Pawl.Codec.Mana" $ do
                 ManaUnit.retention = ManaRetention.Ordinary,
                 ManaUnit.restriction = Nothing,
                 ManaUnit.rider = Nothing,
-                ManaUnit.sourceChosenSubtype = Nothing
+                ManaUnit.sourceChosenSubtype = Nothing,
+                ManaUnit.sourceLastExiled = Nothing
               }
           ]
       )
