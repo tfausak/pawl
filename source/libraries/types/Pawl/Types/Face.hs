@@ -150,7 +150,7 @@ data Face card = MkFace
     --
     -- The closed half must read this through Pawl.Engine.Projection.keywordsOf, never
     -- directly, since layer 6 grants and removes abilities. The exception is a
-    -- reader off the battlefield that still takes the printed card (#1859) --
+    -- reader off the battlefield that still takes the printed card (#4710) --
     -- the carve-out additionalCosts takes. A GRAVEYARD reader of rule
     -- 702.34a's flashback goes through the projection, so a granted one reaches
     -- the cost (Pawl.Engine.Cost.costsFor). So do the HAND readers of rule
@@ -271,7 +271,7 @@ data Face card = MkFace
     -- must hold for a cast to be legal, where one permission suffices.
     --
     -- Read directly from the card; CR 113.6e is the rule that puts such an
-    -- ability in the hand, where this reader takes the printed card (#1859).
+    -- ability in the hand, where this reader takes the printed card (#4707).
     --
     -- SELF-scoped and printed-only, which is the whole difference between this and
     -- the other producer CR 601.3's "rule or effect" names. A prohibition aimed at
@@ -301,7 +301,7 @@ data Face card = MkFace
     -- | CR 113.6g: a can't-be-countered ability functions on the stack (Rending
     -- Volley). Read straight off the card by Event.counter rather than through the
     -- projection: this reader takes the printed card while the object is on the
-    -- stack (#1859). CR 613 itself does reach the stack, and so does pawl's
+    -- stack (#4707). CR 613 itself does reach the stack, and so does pawl's
     -- projection; this is a fact about ONE reader, not about the rules and not
     -- about the fold.
     --
@@ -313,7 +313,7 @@ data Face card = MkFace
     -- | CR 118.8: this face's printed additional costs, paid at the same time as
     -- the spell's mana cost (Village Rites). Read directly from the card: a cost
     -- is consulted while the object is in hand, where this reader takes the
-    -- printed card (#1859), or the copy stamp's
+    -- printed card (#4710), or the copy stamp's
     -- values where it carries one (Game.castingFaceOf). CR 118.8d: this does not
     -- change the card's mana cost, so 'manaCost' above and every reader of mana
     -- value is unaffected.
@@ -604,7 +604,7 @@ data Face card = MkFace
     -- order, each one a Pawl.Types.HandAction -- its effects in written order,
     -- and the clause gating whether it may be taken (Serum Powder writes none).
     -- Read directly from the card: the ability functions in the HAND (CR 113.6),
-    -- where this reader takes the printed card (#1859).
+    -- where this reader takes the printed card (#4709).
     --
     -- A LIST OF ACTIONS and not one action's effects: nothing in CR 103 caps how
     -- many such actions a face may grant, and two are two separate offers a
@@ -614,7 +614,7 @@ data Face card = MkFace
     mulliganActions :: [HandAction.HandAction card],
     -- | CR 103.6 / 103.6a / 103.6b: this face's opening-hand actions, shaped
     -- exactly like mulliganActions above and read the same way (CR 113.6,
-    -- #1859) -- Leyline of Sanctity's rule 103.6a battlefield action, and
+    -- #4709) -- Leyline of Sanctity's rule 103.6a battlefield action, and
     -- Chancellor of the Forge's rule 103.6b reveal.
     --
     -- The SIBLING of mulliganActions, not a reuse: the two windows are at different
