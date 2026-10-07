@@ -1529,13 +1529,14 @@ bringChosen arrival revealIt pid chosen = fmap concat . Monad.forM chosen $ \car
     showIt oid
     pure [oid]
   OutsideCard.InAnotherGame outerId -> do
+    arrangeOutside arrival pid outerId
     gs1 <- State.get
     case bringInFrom arrival pid outerId gs1 of
       (Nothing, _) -> pure []
-      (Just oid, gs2) -> do
+      (Just oids, gs2) -> do
         State.put gs2
-        showIt oid
-        pure [oid]
+        Monad.forM_ oids showIt
+        pure (NonEmpty.toList oids)
   where
     showIt oid = Monad.when revealIt (reveal RevealCause.Ordinary pid oid)
 
@@ -1593,7 +1594,24 @@ bringIn destination pid printingId gs =
       spent p = p {Player.outsideTheGame = Map.update spend printingId (Player.outsideTheGame p)}
    in (oid, gs1 {GameState.players = Map.adjust spent pid (GameState.players gs1)})
 
--- CR 729.4a: bring in a card from a game that is on hold. The entry is dropped
+-- CR 712.21a / 730.3a: the owner arranges the cards of a melded or merged
+-- permanent a library destination receives, written back onto the entry
+-- `bringInFrom` then spends, since that half is pure. `arrangeComponents` asks
+-- only where there are two cards and the zone is one the rule names. The
+-- Raven's Warning's top of a library is the destination that reaches it.
+arrangeOutside :: OutsideDestination.OutsideDestination -> PlayerId -> ObjectId -> Game ()
+arrangeOutside arrival pid outerId = do
+  gs <- State.get
+  case Map.lookup outerId (GameState.outsideObjects gs) of
+    Nothing -> pure ()
+    Just entry -> do
+      let (zone, _) = arrivalOf arrival
+      arranged <- arrangeComponents pid zone (Seq.fromList (fmap MergeComponent.OfCard (NonEmpty.toList (OutsideObject.cards entry))))
+      case NonEmpty.nonEmpty (fmap Game.printingOfComponent (Foldable.toList arranged)) of
+        Nothing -> pure ()
+        Just cards -> State.modify' (\g -> g {GameState.outsideObjects = Map.insert outerId entry {OutsideObject.cards = cards} (GameState.outsideObjects g)})
+
+-- CR 729.4a: bring in an object from a game that is on hold. The entry is dropped
 -- and the OUTER id is appended to GameState.broughtIn, which is the whole record
 -- the outer frame needs: this game cannot reach that game's state, and must
 -- not (CR 729.1a keeps the two apart while the subgame runs). `Nothing` when
@@ -1606,13 +1624,18 @@ bringIn destination pid printingId gs =
 -- permanent as it leaves the battlefield, and CR 400.7 makes what arrives here a
 -- new object; a wish that reaches a manifested card gets the card, not the 2/2
 -- `eligible` offered it as.
-bringInFrom :: OutsideDestination.OutsideDestination -> PlayerId -> ObjectId -> GameState.GameState -> (Maybe ObjectId, GameState.GameState)
+--
+-- Every card the entry lists arrives, in its order (CR 712.21, CR 730.3): a
+-- melded permanent is two cards in the zone the wish names, and CR 712.21c's
+-- "finds both cards" is the answer naming both new ids.
+bringInFrom :: OutsideDestination.OutsideDestination -> PlayerId -> ObjectId -> GameState.GameState -> (Maybe (NonEmpty.NonEmpty ObjectId), GameState.GameState)
 bringInFrom destination pid outerId gs = case Map.lookup outerId (GameState.outsideObjects gs) of
   Nothing -> (Nothing, gs)
   Just entry ->
     let (zone, position) = arrivalOf destination
-        (oid, gs1) = mintCard pid Nothing (OutsideObject.printing entry) zone position TapState.Untapped gs
-     in ( Just oid,
+        mint printingId (oids, g) = let (oid, g1) = mintCard pid Nothing printingId zone position TapState.Untapped g in (oids <> [oid], g1)
+        (minted, gs1) = Foldable.foldl' (flip mint) ([], gs) (OutsideObject.cards entry)
+     in ( NonEmpty.nonEmpty minted,
           gs1
             { GameState.outsideObjects = Map.delete outerId (GameState.outsideObjects gs1),
               GameState.broughtIn = GameState.broughtIn gs1 Seq.|> outerId
