@@ -306,7 +306,7 @@ combatReplaySpec s =
         -- included, has to survive a transcript; the enlist answer is the foil
         -- of the same Maybe-ObjectId head.
         Spec.it s "ChoosePlayPermission records and replays a permission, and rejects an enlist answer" $ do
-          let grant limit = CastFromZone.MkCastFromZone (InZone.MkInZone Zone.Graveyard (PlayerRef.Relative PlayerRelation.You)) (Filter.Type.HasCardType CardType.Creature) limit PermissionVerb.Play PermissionPool.EveryCard []
+          let grant limit = CastFromZone.MkCastFromZone (InZone.MkInZone Zone.Graveyard (PlayerRef.Relative PlayerRelation.You)) (Filter.Type.HasCardType CardType.Creature) limit PermissionVerb.Play PermissionPool.EveryCard [] 0
               paragon = Just (ObjectId.MkObjectId 8, grant PermissionLimit.OnceEachOfYourTurns)
               will = Just (ObjectId.MkObjectId 9, grant PermissionLimit.Unlimited)
               p = Prompt.ChoosePlayPermission decider S.alice oid (will NonEmpty.:| [paragon, Nothing])

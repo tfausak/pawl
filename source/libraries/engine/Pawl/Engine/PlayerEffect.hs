@@ -2345,8 +2345,8 @@ castPermissionOptions rides offered pid zone oid gs =
 -- them, then each permission, the unlimited ones before the budgeted ones and
 -- each group in timestamp order. Two ways are ONE where they spend the same
 -- budget, give the same rider (`rides` answers whether a source's permission
--- gives one, Pawl.Engine.Event.permissionRiders) and add the same costs (CR
--- 118.8), and the first is kept: a riderless, costless unlimited permission
+-- gives one, Pawl.Engine.Event.permissionRiders), add the same costs (CR
+-- 118.8) and take off the same reduction (CR 601.2f), and the first is kept: a riderless, costless unlimited permission
 -- beside an open zone changes nothing.
 -- So the head spends nothing wherever something admits the play for free.
 --
@@ -2356,13 +2356,25 @@ permissionOptions :: (ObjectId -> Bool) -> Bool -> [(Maybe ObjectId, CastFromZon
 permissionOptions rides open usable =
   let rows = [(sid, grant) | (Just sid, grant) <- usable]
       (unlimited, limited) = List.partition ((== PermissionLimit.Unlimited) . CastFromZone.limit . snd) rows
-      key option = (permissionSpent option, option >>= \(sid, _) -> if rides sid then Just sid else Nothing, permissionCosts option)
+      key option = (permissionSpent option, option >>= \(sid, _) -> if rides sid then Just sid else Nothing, permissionCosts option, permissionReductions option)
    in ListUtils.nubOrdOn key ([Nothing | open] <> fmap Just (unlimited <> limited))
 
 -- CR 118.8: the additional costs a cast made under `option` pays on top of its
 -- other costs -- none for a cast made under no permission.
 permissionCosts :: Maybe (ObjectId, CastFromZone.CastFromZone) -> [CostComponent.CostComponent Keyword]
 permissionCosts = foldMap (CastFromZone.additionalCosts . snd)
+
+-- CR 601.2f: the reduction a spell cast under `option` takes -- Urianger
+-- Augurelt's "spells you cast this way cost {2} less", generic mana, in
+-- Pawl.Types.CandidateCost's `reductions` shape -- and none for a cast made
+-- under no permission.
+permissionReductions :: Maybe (ObjectId, CastFromZone.CastFromZone) -> [ManaCost.ManaCost]
+permissionReductions option =
+  [ ManaCost.MkManaCost [ManaSymbol.Generic n]
+  | Just (_, grant) <- [option],
+    let n = CastFromZone.reduction grant,
+    n > 0
+  ]
 
 -- The budget a play made under `option` spends: a once-each-turn permission's,
 -- and nothing for an unlimited one or for none.

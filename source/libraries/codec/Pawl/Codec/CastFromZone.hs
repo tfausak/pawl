@@ -33,4 +33,5 @@ codec = Fields.object $ do
   verb <- Fields.defaulted "verb" PermissionVerb.Cast PermissionVerb.codec CastFromZone.verb
   pool <- Fields.defaulted "pool" PermissionPool.EveryCard PermissionPool.codec CastFromZone.pool
   additionalCosts <- Fields.defaulted "additionalCosts" [] (Common.list (CostComponent.codec Keyword.codec)) CastFromZone.additionalCosts
-  pure CastFromZone.MkCastFromZone {CastFromZone.from = from, CastFromZone.matching = matching, CastFromZone.limit = limit, CastFromZone.verb = verb, CastFromZone.pool = pool, CastFromZone.additionalCosts = additionalCosts}
+  reduction <- Fields.defaulted "reduction" 0 Common.natural CastFromZone.reduction
+  pure CastFromZone.MkCastFromZone {CastFromZone.from = from, CastFromZone.matching = matching, CastFromZone.limit = limit, CastFromZone.verb = verb, CastFromZone.pool = pool, CastFromZone.additionalCosts = additionalCosts, CastFromZone.reduction = reduction}
