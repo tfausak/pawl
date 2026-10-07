@@ -259,8 +259,13 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- of its own. It cannot: casting writes X to the object it announced on, and CR
         -- 400.7 mints a new object with no bindings on every zone change, so a
         -- permanent never carries the X its spell was cast for.
+        --
+        -- A holder that no longer exists is read off GameState.detachedBindings,
+        -- CR 729.5's resumed resolution: a wish inside the subgame took the
+        -- spell's own card, and what the resolution bound since is filed there.
+        -- Pawl.OutsideTheGameSpec's Synthetic Subgame Tithe case proves it.
         Quantity.InSlot slot ->
-          let boundOn holder = Game.lookupObject holder gs >>= Binding.amountOf slot . Object.bindings
+          let boundOn holder = Binding.amountOf slot (maybe (Map.findWithDefault Map.empty holder (GameState.detachedBindings gs)) Object.bindings (Game.lookupObject holder gs))
            in fmap toInteger ((mOid >>= boundOn) <|> boundOn announcedOn <|> Map.lookup slot (Filter.boundAmounts context) <|> Map.lookup slot (GameState.ambientAmounts gs))
         -- CR 701.4b: was the action taken at all? The BINDING alone answers it,
         -- read out of the announcement's context rather than off the board, which
