@@ -907,13 +907,18 @@ defaultAnswer p = case p of
   -- reasoning above. "Any number" allocates to nobody; "one or more" puts one
   -- counter of the first kind on the first recipient; a batch the card settled
   -- goes whole onto the first recipient, which the engine repairs if that one
-  -- refuses a kind.
+  -- refuses a kind; "n of one kind" puts that many of the first kind there; and
+  -- "up to one" allocates to nobody.
   Prompt.ChooseDistributedMovedCounters _ _ _ spread offered candidates -> case spread of
     MoveSpread.AnyNumber -> Map.empty
     MoveSpread.AtLeastOne -> case Map.lookupMin offered of
       Nothing -> Map.empty
       Just (kind, _) -> Map.singleton (NonEmpty.head candidates) (Map.singleton kind 1)
     MoveSpread.Exactly -> Map.singleton (NonEmpty.head candidates) offered
+    MoveSpread.OneKind n -> case Map.lookupMin offered of
+      Nothing -> Map.empty
+      Just (kind, held) -> Map.singleton (NonEmpty.head candidates) (Map.singleton kind (min n held))
+    MoveSpread.UpToOne -> Map.empty
   -- CR 122.5 once more: "up to one" includes none, and ChooseMovedCounters'
   -- reason for declining is this prompt's too -- a default that took a counter
   -- off the first object would rewrite a board rather than leave it alone.

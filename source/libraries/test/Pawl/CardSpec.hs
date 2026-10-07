@@ -2550,12 +2550,12 @@ cardMovesOntoGroupUnasked =
         MovedKinds.Every -> False
         MovedKinds.Named _ _ -> False
         MovedKinds.EveryOfKind _ -> False
-        MovedKinds.Chosen _ -> True
+        MovedKinds.Chosen _ -> False
         MovedKinds.AnyNumber -> False
         MovedKinds.AtLeastOne -> False
         MovedKinds.AnyNumberOfKind _ -> False
         MovedKinds.EachAbsentKind -> True
-        MovedKinds.UpToOneChosen -> True
+        MovedKinds.UpToOneChosen -> False
       offends effect = case effect of
         Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ to) -> unasked kinds && not (isSlot to)
         _ -> False
@@ -7116,16 +7116,16 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFaceOrMinted cardMovesOntoGroupUnasked . Printing.card) ps
     Spec.assertEqWith s "no unasked group move" (fmap (S.nameOf . Printing.card) offenders) []
-  -- And the rejecting direction: each unasked arm onto a group, against the same
-  -- arm onto a slot and an asked arm onto the same group.
+  -- And the rejecting direction: the unasked arm onto a group, against the same
+  -- arm onto a slot and the asked arms onto the same group.
   Spec.it s "the lint itself catches a move onto a group under an arm the distribution cannot ask" $ do
     let self = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))
         group = ObjectRef.EachMatching (Filter.Type.And [])
         moving kinds to = (vanillaFace "Mover" instantLine) {Face.spell = Modal.MkModal (Seq.singleton (lintMode [Effect.MoveCounters (MoveCounters.MkMoveCounters self kinds Nothing to)] [])) (ModeSelection.ChooseExactly 1)}
-        unasked = [MovedKinds.Chosen (Quantity.Type.Literal 1), MovedKinds.UpToOneChosen, MovedKinds.EachAbsentKind]
-    Spec.assertEqWith s "each unasked arm onto a group is rejected" (fmap (\kinds -> cardMovesOntoGroupUnasked (moving kinds group)) unasked) [True, True, True]
-    Spec.assertEqWith s "and onto a slot is accepted" (fmap (\kinds -> cardMovesOntoGroupUnasked (moving kinds self)) unasked) [False, False, False]
-    Spec.assertBool s (not (cardMovesOntoGroupUnasked (moving (MovedKinds.EveryOfKind CounterKind.PlusOnePlusOne) group))) "and an asked arm onto a group is accepted"
+        asked = [MovedKinds.EveryOfKind CounterKind.PlusOnePlusOne, MovedKinds.Chosen (Quantity.Type.Literal 2), MovedKinds.UpToOneChosen]
+    Spec.assertBool s (cardMovesOntoGroupUnasked (moving MovedKinds.EachAbsentKind group)) "each absent kind onto a group is rejected"
+    Spec.assertBool s (not (cardMovesOntoGroupUnasked (moving MovedKinds.EachAbsentKind self))) "and onto a slot is accepted"
+    Spec.assertEqWith s "and the asked arms onto a group are accepted" (fmap (\kinds -> cardMovesOntoGroupUnasked (moving kinds group)) asked) [False, False, False]
   -- The filing convention, now that no lookup enforces it (#649): a file's stem
   -- must be the slug Registry.filedAs derives from the card inside it.
   --

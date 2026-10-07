@@ -1,5 +1,7 @@
 module Pawl.Types.MoveSpread where
 
+import qualified Numeric.Natural as Natural
+
 -- | How many counters a CR 122.5 move onto a group of permanents carries in
 -- all, as Pawl.Types.Prompt's ChooseDistributedMovedCounters states it: the
 -- answer says where each counter lands, and this says what total it must reach.
@@ -13,4 +15,9 @@ data MoveSpread
   | -- | "All +1\/+1 counters": every counter of the offered tallies, the card
     -- having settled the batch (CR 122.5).
     Exactly
-  deriving (Bounded, Enum, Eq, Ord, Show)
+  | -- | "Two counters of one kind": one offered kind the answer picks, that many
+    -- of it or its whole tally if fewer (CR 122.5, 609.3).
+    OneKind Natural.Natural
+  | -- | "Up to one counter": at most one counter in all (CR 122.5).
+    UpToOne
+  deriving (Eq, Ord, Show)
