@@ -1697,8 +1697,12 @@ setLandSubtypeEffectsGiven functioning gs =
 -- setter's set: CR 613.8a makes the setter depend on it (escapes). Pawl.ProjectionSpec's
 -- Rootpath Purifier and Synthetic Primeval Claim cases prove both limbs.
 --
--- The land test reads layer 1 (see affectsBase). The scenario "CR 613.1 an
--- Island Mirrorweave made a Lord of Atlantis keeps its lord ability" proves it.
+-- The land test reads layer 1 (see affectsBase), plus the setter's own layer-4
+-- parts: a setter that makes the permanent a land as it sets the subtype strips
+-- it too (CR 305.7, 205.3d), even though base saw no land. The scenario "CR 613.1 an
+-- Island Mirrorweave made a Lord of Atlantis keeps its lord ability" proves the
+-- first, and Pawl.ProjectionSpec's "CR 305.7 the Grove makes a Convincing Mirage
+-- a Forest land" pair the second.
 --
 -- Answered per ABILITY, by the index permanentParts gives it. CR 613.6 spares
 -- only the ability whose own setter had started applying by the time a strip
@@ -1706,15 +1710,19 @@ setLandSubtypeEffectsGiven functioning gs =
 -- keeps that one setter and loses the rest. Pawl.ProjectionSpec's "CR
 -- 305.7/613.6 a land inside its own Mountain set" cases prove both halves.
 liveGiven :: (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> [SetEffect] -> ObjectId -> GameState -> Natural -> Bool
-liveGiven functioning setEffs oid gs
-  | hasLandType (copiableCharacteristics oid gs) = \n -> not (any (notElem (oid, Just n)) strippers)
-  | otherwise = const True
+liveGiven functioning setEffs oid gs = \n -> not (any (notElem (oid, Just n)) strippers)
   where
     applied = appliedSetEffects setEffs gs
     -- Each applied setter that strips `oid`, as the setters applied up to and
     -- including it.
-    strippers = [fmap key upTo | upTo@((src, _, aff) : _) <- fmap reverse (drop 1 (List.inits applied)), affectsBase src oid aff gs, not (escapes src aff)]
+    strippers = [fmap key upTo | upTo@((src, _, aff) : _) <- fmap reverse (drop 1 (List.inits applied)), affectsBase src oid aff gs, landWhenSet src aff, not (escapes src aff)]
     key (src, n, _) = (src, n)
+    -- CR 305.7's subject: a land at layer 1, or one the setter itself makes a
+    -- land. Projected only for a permanent the setter reaches that base saw as
+    -- no land, which is rare.
+    landWhenSet src aff =
+      hasLandType (copiableCharacteristics oid gs)
+        || hasLandType (projectWith (<= Layer.Type) (setterPartsOf src aff gs) oid gs)
     -- CR 613.8a/613.8b: the other layer-4 effects that apply before this setter.
     -- One the setter would strip (a rules-text ability of a land it reaches)
     -- depends on it too, and that loop falls back to timestamps; any other the
@@ -1771,9 +1779,9 @@ typeChangersGiven functioning gs =
 -- is what makes that a precondition rather than a description of every board a
 -- setter can reach -- a setter reaching an object with no Land card type sets no
 -- subtype there (setLandSubtypeTo), so it takes no abilities either. The three
--- gates ask it of the characteristics each is judged against: base for liveGiven,
--- the finished projection for liveAfterLayers, through layer 4 for
--- setSubtypeStripped.
+-- gates ask it of the characteristics each is judged against: base and then the
+-- setter's own parts for liveGiven, the finished projection for liveAfterLayers,
+-- through layer 4 for setSubtypeStripped.
 hasLandType :: ProjectedCharacteristics -> Bool
 hasLandType = Set.member CardType.Land . PC.cardTypes
 
@@ -1866,8 +1874,10 @@ appliedSetEffects setEffs gs =
    in go indexed []
 
 -- The layer-4 parts of the setter setLandSubtypeEffectsGiven listed as (`src`,
--- `aff`), for appliedSetEffects' "what it applies to" test. Matched on the
--- affected set, which setLandSubtypeEffectsGiven stores rewritten.
+-- `aff`), for appliedSetEffects' "what it applies to" test and liveGiven's land
+-- test. Matched on the affected set, which setLandSubtypeEffectsGiven stores
+-- rewritten. Every layer-4 part of a setting ability, not only the set: the
+-- Grove's "are Forest lands" makes its Aura a land in the same effect.
 setterPartsOf :: ObjectId -> Affected.Affected -> GameState -> [Gathered]
 setterPartsOf src aff gs =
   let part m =
@@ -1882,9 +1892,11 @@ setterPartsOf src aff gs =
           }
       changes = textChangesAffecting src gs
       stored = [ContinuousEffect.modification eff | eff <- GameState.continuousEffects gs, ContinuousEffect.source eff == src, ContinuousEffect.affected eff == aff]
-      printed = [m | sa <- staticAbilitiesOf src gs, rewriteAffected changes (StaticAbility.affected sa) == aff, m <- NonEmpty.toList (StaticAbility.modifications sa)]
-      granted = [m | (_, sa) <- grantedStaticAbilitiesOf src gs, StaticAbility.affected sa == aff, m <- NonEmpty.toList (StaticAbility.modifications sa)]
-   in fmap part (filter setsLandSubtype (stored <> printed <> granted))
+      setting sa = any setsLandSubtype (StaticAbility.modifications sa)
+      typeParts sa = filter ((== Layer.Type) . layer) (NonEmpty.toList (StaticAbility.modifications sa))
+      printed = [m | sa <- staticAbilitiesOf src gs, setting sa, rewriteAffected changes (StaticAbility.affected sa) == aff, m <- typeParts sa]
+      granted = [m | (_, sa) <- grantedStaticAbilitiesOf src gs, setting sa, StaticAbility.affected sa == aff, m <- typeParts sa]
+   in fmap part (filter setsLandSubtype stored <> printed <> granted)
 
 -- CR 612.1: the subtype-word swaps the rules text `oid` carries has taken, as one
 -- lookup table -- every word paired with the word it ends up as. CR 612.2's
