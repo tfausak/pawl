@@ -30,6 +30,7 @@ import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.MoveSpread as MoveSpread
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
@@ -57,6 +58,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   atLeastOneSpec s registry
   groupSourceSpec s registry
   groupDestinationSpec s registry
+  settledBatchSpec s registry
   upToOneSpec s registry
 
 -- Which counter the answerer takes, and whether it takes the printed "may" at
@@ -782,7 +784,7 @@ forgottenAnswer wanted p = case p of
   -- legal answer; COUNTED, because one case asserts that nothing was asked; and
   -- the offered recipients are RECORDED, so which objects the engine put on the
   -- list is read off the engine rather than off the answer.
-  Prompt.ChooseDistributedMovedCounters _ _ _ _ offered -> do
+  Prompt.ChooseDistributedMovedCounters _ _ _ _ _ offered -> do
     State.modify' (\(asked, seen) -> (asked + 1, Set.union seen (Set.fromList (NonEmpty.toList offered))))
     pure wanted
   _ -> pure (S.identityAnswer p)
@@ -882,3 +884,138 @@ groupDestinationSpec s registry = Spec.describe s "CR 122.5 moving counters onto
         (_, _, _, _, (asked, _), after) = begin Map.empty built
     Spec.assertEqWith s "nothing moved" (fmap (`plussed` after) [ancientId, aliceWall, alicePiker, bobWall]) [0, 0, 0, 0]
     Spec.assertEqWith s "and with nothing to spread the player was not asked" asked 0
+
+-- Synthetic Ancient Redistributor {3}{G} Creature - Elemental 0/4,
+-- data/cards/synthetic-ancient-redistributor.json:
+--
+--   At the beginning of your upkeep, move all +1/+1 counters from this creature
+--   onto other creatures you control.
+--   {2}{G}: Move one or more counters from this creature onto other creatures
+--   you control.
+--   {1}: Move all counters from this creature onto other creatures you control.
+--   {G}: Move two +1/+1 counters from this creature onto other creatures you
+--   control.
+--
+-- Forgotten Ancient's group destination under every `kinds` arm whose count is
+-- not "any number": the card SETTLES the batch (the trigger, {1} and {G}) or
+-- puts a FLOOR under it ({2}{G}), and the player still says where each counter
+-- lands. CR 122.5 forbids neither pairing; Scryfall `o:/move [^.]* onto
+-- other/` with `unique=cards&include_extras=true`, 2026-10-07, finds Forgotten
+-- Ancient alone, so a synthetic is the producer.
+--
+-- "You control" keeps bob's Wall off the list, and the counters go on by hand:
+-- five +1/+1 and two shield counters, so a whole tally, two of it and one
+-- counter are three different boards, and "all counters" differs from "all
+-- +1/+1 counters".
+redistributorAnswer ::
+  Map.Map ObjectId.ObjectId (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural) ->
+  Prompt.Prompt r ->
+  State.State [(MoveSpread.MoveSpread, Set.Set ObjectId.ObjectId)] r
+redistributorAnswer wanted p = case p of
+  -- Answered VERBATIM, so an answerer cannot repair a mutation by re-deriving a
+  -- legal answer; each prompt's spread and offered recipients are RECORDED, so
+  -- what the engine asked is read off the engine rather than off the answer.
+  Prompt.ChooseDistributedMovedCounters _ _ _ spread _ offered -> do
+    State.modify' (<> [(spread, Set.fromList (NonEmpty.toList offered))])
+    pure wanted
+  _ -> pure (S.identityAnswer p)
+
+settledBatchSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+settledBatchSpec s registry = Spec.describe s "CR 122.5 moving a settled batch, or one or more, onto a group of permanents" $ do
+  let -- alice: the Redistributor, three Forests for its costs, and `others` of
+      -- her creatures to receive -- a Wall of Stone and, where `others` is two,
+      -- a Goblin Piker. bob's Wall is a creature the printed "you control" has to
+      -- keep off the list.
+      board others = do
+        forest <- S.printingOf s registry "Forest"
+        wall <- S.printingOf s registry "Wall of Stone"
+        piker <- S.printingOf s registry "Goblin Piker"
+        redistributor <- S.printingOf s registry "Synthetic Ancient Redistributor"
+        let (selfId, g1) = S.addPermanent redistributor S.alice (S.landsInPlay forest 3)
+            (aliceWall, g2) = S.addPermanent wall S.alice g1
+            (alicePiker, g3) = if others > (1 :: Int) then S.addPermanent piker S.alice g2 else (aliceWall, g2)
+            (bobWall, g4) = S.addPermanent wall S.bob g3
+            stocked = S.addCounter CounterKind.Shield 2 selfId (S.addCounter CounterKind.PlusOnePlusOne 5 selfId g4)
+        pure (selfId, aliceWall, alicePiker, bobWall, stocked {GameState.priority = Just S.alice})
+      -- alice's upkeep begins and the printed trigger resolves.
+      upkeep wanted ready =
+        let begun =
+              Event.recordEvent
+                (GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Beginning BeginningStep.Upkeep) S.alice))
+                (ready {GameState.phase = Phase.Beginning BeginningStep.Upkeep, GameState.activePlayer = S.alice})
+         in State.runState (snd <$> Engine.runGame (redistributorAnswer wanted) begun (Engine.settleForPriority >> Engine.priorityLoop)) []
+      -- One printed activated ability, by position, activated and resolved.
+      activate index wanted selfId ready = case drop index (Activatable.abilitiesFor selfId ready) of
+        ability : _ -> Just (State.runState (snd <$> Engine.runGame (redistributorAnswer wanted) ready (Activate.activateAbility S.alice selfId ability >> Stack.resolveTop)) [])
+        [] -> Nothing
+      floorAbility = 0 :: Int
+      everyAbility = 1 :: Int
+      twoAbility = 2 :: Int
+      tallies after = fmap (`pairOn` after)
+  -- "Move all +1/+1 counters": all five cross, THREE and TWO as the player said,
+  -- the shield counters stay, and the batch was asked as one the answer must
+  -- carry whole.
+  Spec.it s "the player spreads every +1/+1 counter over the other creatures alice controls" $ do
+    (selfId, aliceWall, alicePiker, bobWall, ready) <- board 2
+    let wanted = Map.fromList [(aliceWall, Map.singleton CounterKind.PlusOnePlusOne 3), (alicePiker, Map.singleton CounterKind.PlusOnePlusOne 2)]
+        (after, asked) = upkeep wanted ready
+    Spec.assertEqWith s "the Walls and the Piker got three, none and two, and the Redistributor kept its shields" (tallies after [selfId, aliceWall, alicePiker, bobWall]) [(0, 2), (3, 0), (2, 0), (0, 0)]
+    Spec.assertEqWith s "and one settled batch was asked of alice's two other creatures" asked [(MoveSpread.Exactly, Set.fromList [aliceWall, alicePiker])]
+  -- The same board differing only in the answer, which places one counter of
+  -- the five: rule 122.5 forbids removing what has nowhere to land, so the rest
+  -- is placed rather than left behind or lost.
+  Spec.it s "an answer short of the batch is repaired and every counter still crosses" $ do
+    (selfId, aliceWall, alicePiker, bobWall, ready) <- board 2
+    let (after, _) = upkeep (Map.singleton alicePiker (Map.singleton CounterKind.PlusOnePlusOne 1)) ready
+    Spec.assertEqWith
+      s
+      "the Redistributor gave up all five +1/+1 counters, bob's Wall got none, and alice's creatures got five between them"
+      (fst (pairOn selfId after), fst (pairOn bobWall after), sum (fmap (fst . (`pairOn` after)) [aliceWall, alicePiker]))
+      (0, 0, 5)
+  -- A lone other creature makes the group one object, so the move is movePair's
+  -- single-destination road: the batch lands whole and no distribution is asked.
+  Spec.it s "a lone other creature takes the whole batch and nothing is asked" $ do
+    (selfId, aliceWall, _, bobWall, ready) <- board 1
+    let (after, asked) = upkeep Map.empty ready
+    Spec.assertEqWith s "alice's Wall got all five +1/+1 counters" (tallies after [selfId, aliceWall, bobWall]) [(0, 2), (5, 0), (0, 0)]
+    Spec.assertEqWith s "and no distribution was asked" asked []
+  -- "Move one or more counters": the player's own choice of count, kinds and
+  -- recipients, a shield counter included.
+  Spec.it s "the player moves one or more counters of their choosing onto the other creatures" $ do
+    (selfId, aliceWall, alicePiker, bobWall, ready) <- board 2
+    let wanted = Map.fromList [(aliceWall, Map.singleton CounterKind.Shield 1), (alicePiker, Map.singleton CounterKind.PlusOnePlusOne 2)]
+    case activate floorAbility wanted selfId ready of
+      Just (after, asked) -> do
+        Spec.assertEqWith s "two +1/+1 counters went to the Piker and a shield counter to alice's Wall" (tallies after [selfId, aliceWall, alicePiker, bobWall]) [(3, 1), (0, 1), (2, 0), (0, 0)]
+        Spec.assertEqWith s "and one distribution under a floor was asked" asked [(MoveSpread.AtLeastOne, Set.fromList [aliceWall, alicePiker])]
+      Nothing -> Spec.assertFailure s "expected the Redistributor to offer its printed activated abilities"
+  -- The same board differing only in the answer, which moves nothing: the floor
+  -- takes one counter of the first kind offered rather than none.
+  Spec.it s "an answer moving nothing under the floor still moves one counter" $ do
+    (selfId, aliceWall, alicePiker, bobWall, ready) <- board 2
+    case activate floorAbility Map.empty selfId ready of
+      Just (after, _) ->
+        Spec.assertEqWith
+          s
+          "one +1/+1 counter left the Redistributor and landed on one of alice's creatures"
+          (pairOn selfId after, fst (pairOn bobWall after), sum (fmap (fst . (`pairOn` after)) [aliceWall, alicePiker]))
+          ((4, 2), 0, 1)
+      Nothing -> Spec.assertFailure s "expected the Redistributor to offer its printed activated abilities"
+  -- "Move all counters": both kinds' whole tallies, wherever the player sent each.
+  Spec.it s "every counter of every kind crosses, spread as the player says" $ do
+    (selfId, aliceWall, alicePiker, bobWall, ready) <- board 2
+    let wanted = Map.fromList [(aliceWall, Map.fromList [(CounterKind.PlusOnePlusOne, 4), (CounterKind.Shield, 2)]), (alicePiker, Map.singleton CounterKind.PlusOnePlusOne 1)]
+    case activate everyAbility wanted selfId ready of
+      Just (after, asked) -> do
+        Spec.assertEqWith s "the Redistributor is emptied onto alice's Wall and Piker" (tallies after [selfId, aliceWall, alicePiker, bobWall]) [(0, 0), (4, 2), (1, 0), (0, 0)]
+        Spec.assertEqWith s "and one settled batch was asked" (fmap fst asked) [MoveSpread.Exactly]
+      Nothing -> Spec.assertFailure s "expected the Redistributor to offer its printed activated abilities"
+  -- "Move two +1/+1 counters": the batch is the two the card names, so an
+  -- answer placing three is clamped to it and the other three stay.
+  Spec.it s "two +1/+1 counters cross however many the answer places" $ do
+    (selfId, aliceWall, alicePiker, bobWall, ready) <- board 2
+    let wanted = Map.fromList [(aliceWall, Map.singleton CounterKind.PlusOnePlusOne 1), (alicePiker, Map.singleton CounterKind.PlusOnePlusOne 2)]
+    case activate twoAbility wanted selfId ready of
+      Just (after, _) ->
+        Spec.assertEqWith s "one went to alice's Wall, one to the Piker, and three stayed" (tallies after [selfId, aliceWall, alicePiker, bobWall]) [(3, 2), (1, 0), (1, 0), (0, 0)]
+      Nothing -> Spec.assertFailure s "expected the Redistributor to offer its printed activated abilities"

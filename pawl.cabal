@@ -2376,6 +2376,7 @@ library types
     Pawl.Types.MovedKinds
     Pawl.Types.MoveDuration
     Pawl.Types.MoveMana
+    Pawl.Types.MoveSpread
     Pawl.Types.MoveToZone
     Pawl.Types.MulliganDecision
     Pawl.Types.MulliganOffer

@@ -2540,6 +2540,30 @@ modeGateStatesMana mode =
   let offends gate = Maybe.isJust (PayGate.basis gate) && any (Maybe.isJust . Cost.Type.mana) (CostChoice.unwrap (PayGate.cost gate))
    in any (maybe False offends . Clause.payGate) (Mode.clauses mode)
 
+-- CR 122.5 onto a GROUP of permanents under a `kinds` arm that
+-- Pawl.Engine.Resolve.Effect's distributePair does not ask about, which would
+-- move nothing (#4774). A destination other than a slot is taken as a group;
+-- a slot is taken as one object.
+cardMovesOntoGroupUnasked :: Face.Face Card.Type.Card -> Bool
+cardMovesOntoGroupUnasked =
+  let unasked kinds = case kinds of
+        MovedKinds.Every -> False
+        MovedKinds.Named _ _ -> False
+        MovedKinds.EveryOfKind _ -> False
+        MovedKinds.Chosen _ -> True
+        MovedKinds.AnyNumber -> False
+        MovedKinds.AtLeastOne -> False
+        MovedKinds.AnyNumberOfKind _ -> False
+        MovedKinds.EachAbsentKind -> True
+        MovedKinds.UpToOneChosen -> True
+      offends effect = case effect of
+        Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ to) -> unasked kinds && not (isSlot to)
+        _ -> False
+      isSlot to = case to of
+        ObjectRef.InSlot _ -> True
+        _ -> False
+   in any offends . cardResolutionEffects
+
 -- Do these slot-name sets overlap? True when any name appears in more than one
 -- of them, which is exactly what a Map.unions over them would silently collapse.
 slotNamesCollide :: [Set.Set SlotName.SlotName] -> Bool
@@ -7086,6 +7110,22 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (not (cardCostBasisStatesMana face)) "Flash, whose gate states no mana of its own, is accepted"
     Spec.assertBool s (cardCostBasisStatesMana (overGate stated)) "a described cost stating a mana part of its own is rejected"
     Spec.assertBool s (not (cardCostBasisStatesMana (overGate (stated . undescribed)))) "and a gate stating mana and describing nothing is what every other card writes"
+  -- CR 122.5's move onto a group: the corpus half. Synthetic Ancient
+  -- Redistributor's group moves are the arms distributePair does ask about.
+  Spec.it s "no card moves counters onto a group under a kinds arm the distribution cannot ask" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (anyFaceOrMinted cardMovesOntoGroupUnasked . Printing.card) ps
+    Spec.assertEqWith s "no unasked group move" (fmap (S.nameOf . Printing.card) offenders) []
+  -- And the rejecting direction: each unasked arm onto a group, against the same
+  -- arm onto a slot and an asked arm onto the same group.
+  Spec.it s "the lint itself catches a move onto a group under an arm the distribution cannot ask" $ do
+    let self = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))
+        group = ObjectRef.EachMatching (Filter.Type.And [])
+        moving kinds to = (vanillaFace "Mover" instantLine) {Face.spell = Modal.MkModal (Seq.singleton (lintMode [Effect.MoveCounters (MoveCounters.MkMoveCounters self kinds Nothing to)] [])) (ModeSelection.ChooseExactly 1)}
+        unasked = [MovedKinds.Chosen (Quantity.Type.Literal 1), MovedKinds.UpToOneChosen, MovedKinds.EachAbsentKind]
+    Spec.assertEqWith s "each unasked arm onto a group is rejected" (fmap (\kinds -> cardMovesOntoGroupUnasked (moving kinds group)) unasked) [True, True, True]
+    Spec.assertEqWith s "and onto a slot is accepted" (fmap (\kinds -> cardMovesOntoGroupUnasked (moving kinds self)) unasked) [False, False, False]
+    Spec.assertBool s (not (cardMovesOntoGroupUnasked (moving (MovedKinds.EveryOfKind CounterKind.PlusOnePlusOne) group))) "and an asked arm onto a group is accepted"
   -- The filing convention, now that no lookup enforces it (#649): a file's stem
   -- must be the slug Registry.filedAs derives from the card inside it.
   --

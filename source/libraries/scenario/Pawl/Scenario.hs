@@ -897,7 +897,7 @@ withinOffer prompt chosen = case prompt of
   Prompt.Type.AnnounceTargets _ _ _ offered -> all (`Map.member` offered) (Map.keys chosen)
   Prompt.Type.AssignCombatDamage _ _ _ offered _ -> all (`Map.member` offered) (Map.keys chosen)
   Prompt.Type.ChooseRedistribution _ _ totals -> all (`elem` fmap fst totals) (Map.keys chosen <> Map.elems chosen)
-  Prompt.Type.ChooseDistributedMovedCounters _ _ _ _ candidates -> all (`elem` candidates) (Map.keys chosen)
+  Prompt.Type.ChooseDistributedMovedCounters _ _ _ _ _ candidates -> all (`elem` candidates) (Map.keys chosen)
   Prompt.Type.ChooseMovedCounters _ _ _ _ available -> Map.isSubmapOfBy (<=) chosen available
   Prompt.Type.ChooseMovedCountersAtLeastOne _ _ _ _ available -> Map.isSubmapOfBy (<=) chosen available
   Prompt.Type.ChooseStoredRerolls _ _ _ stored -> Map.isSubmapOfBy (<=) chosen stored
