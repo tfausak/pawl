@@ -170,21 +170,37 @@
       "triggeredAbilities": [
         {
           "condition": {
-            "type": "SpellCast",
-            "value": {
-              "filter": {
-                "type": "ControlledBy",
+            "type": "AnyOf",
+            "value": [
+              {
+                "type": "PlayerPlaysLand",
                 "value": {
-                  "type": "You"
+                  "from": {
+                    "type": "Exile"
+                  },
+                  "player": {
+                    "type": "You"
+                  }
                 }
               },
-              "scope": {
-                "type": "EachTurn"
-              },
-              "zone": {
-                "type": "Exile"
+              {
+                "type": "SpellCast",
+                "value": {
+                  "filter": {
+                    "type": "ControlledBy",
+                    "value": {
+                      "type": "You"
+                    }
+                  },
+                  "scope": {
+                    "type": "EachTurn"
+                  },
+                  "zone": {
+                    "type": "Exile"
+                  }
+                }
               }
-            }
+            ]
           },
           "modal": {
             "modes": [

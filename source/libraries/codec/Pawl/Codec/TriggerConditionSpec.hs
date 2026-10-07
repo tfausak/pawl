@@ -40,6 +40,7 @@ import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.PlaysLand as PlaysLand
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SelfCountersReached as SelfCountersReached
@@ -1189,6 +1190,13 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PlayerScries PlayerRelation.Opponent)
       " {\"type\":\"PlayerScries\",\"value\":{\"type\":\"Opponent\"}} "
+  -- CR 305.1: Urianger Augurelt's "whenever you play a land from exile".
+  Spec.it s "PlayerPlaysLand" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerPlaysLand (PlaysLand.MkPlaysLand PlayerRelation.You Zone.Exile))
+      " {\"type\":\"PlayerPlaysLand\",\"value\":{\"player\":{\"type\":\"You\"},\"from\":{\"type\":\"Exile\"}}} "
   -- CR 309.7. Both relations, for PlayerScries' reason above.
   Spec.it s "PlayerCompletesDungeon round-trips both relations" $ do
     Common.assertCodec

@@ -75,6 +75,7 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.Keyword as Keyword.Type
+import qualified Pawl.Types.LandPlayed as LandPlayed
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LeftTheGame as LeftTheGame
 import qualified Pawl.Types.LifeChange as LifeChange
@@ -105,6 +106,7 @@ import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.PlaysLand as PlaysLand
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RevealCause as RevealCause
@@ -274,6 +276,7 @@ countersRemovedFrom bearer wanted event = case event of
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Milled {} -> Nothing
   GameEvent.Scried _ -> Nothing
+  GameEvent.LandPlayed {} -> Nothing
   GameEvent.LostTheGame _ -> Nothing
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
@@ -416,6 +419,7 @@ boundDeparts bindings destinations slot event = case event of
   GameEvent.LeftTheGame _ -> False
   GameEvent.Milled {} -> False
   GameEvent.Scried _ -> False
+  GameEvent.LandPlayed {} -> False
   GameEvent.LostTheGame _ -> False
   GameEvent.DungeonCompleted _ -> False
   GameEvent.Surveiled _ -> False
@@ -517,6 +521,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -625,6 +630,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -716,6 +722,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -819,6 +826,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -912,6 +920,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -1003,6 +1012,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -1102,6 +1112,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -1202,6 +1213,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -1291,6 +1303,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -1389,6 +1402,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -1497,6 +1511,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -1610,6 +1625,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -1720,6 +1736,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -1816,6 +1833,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -1911,6 +1929,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -2015,6 +2034,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -2120,6 +2140,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -2221,6 +2242,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -2321,6 +2343,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -2422,6 +2445,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -2535,6 +2559,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -2646,6 +2671,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -2749,6 +2775,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -2850,6 +2877,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -2947,6 +2975,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -3086,6 +3115,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -3208,6 +3238,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -3291,6 +3322,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -3393,6 +3425,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -3520,6 +3553,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -3626,6 +3660,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -3744,6 +3779,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -3832,6 +3868,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -3924,6 +3961,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -4040,6 +4078,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -4134,6 +4173,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -4245,6 +4285,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -4343,6 +4384,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -4452,6 +4494,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -4556,6 +4599,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -4721,6 +4765,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.LeftTheGame _ -> False
           GameEvent.Milled {} -> False
           GameEvent.Scried _ -> False
+          GameEvent.LandPlayed {} -> False
           GameEvent.LostTheGame _ -> False
           GameEvent.DungeonCompleted _ -> False
           GameEvent.Surveiled _ -> False
@@ -4889,6 +4934,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.LeftTheGame _ -> False
           GameEvent.Milled {} -> False
           GameEvent.Scried _ -> False
+          GameEvent.LandPlayed {} -> False
           GameEvent.LostTheGame _ -> False
           GameEvent.DungeonCompleted _ -> False
           GameEvent.Surveiled _ -> False
@@ -4985,6 +5031,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -5079,6 +5126,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -5176,6 +5224,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -5278,6 +5327,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -5388,6 +5438,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -5526,6 +5577,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.LeftTheGame _ -> False
           GameEvent.Milled {} -> False
           GameEvent.Scried _ -> False
+          GameEvent.LandPlayed {} -> False
           GameEvent.LostTheGame _ -> False
           GameEvent.DungeonCompleted _ -> False
           GameEvent.Surveiled _ -> False
@@ -5624,6 +5676,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -5736,6 +5789,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -5899,6 +5953,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -6016,6 +6071,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -6107,6 +6163,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -6182,6 +6239,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -6300,6 +6358,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -6416,6 +6475,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -6511,6 +6571,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -6609,6 +6670,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -6670,6 +6732,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame l -> LeftTheGame.object l == bearer && LeftTheGame.from l == Zone.Battlefield
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -6767,6 +6830,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -6870,6 +6934,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.LeftTheGame l -> LeftTheGame.from l == Zone.Battlefield && admits (LeftTheGame.object l)
           GameEvent.Milled {} -> False
           GameEvent.Scried _ -> False
+          GameEvent.LandPlayed {} -> False
           GameEvent.LostTheGame _ -> False
           GameEvent.DungeonCompleted _ -> False
           GameEvent.Surveiled _ -> False
@@ -6983,6 +7048,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.LeftTheGame _ -> False
           GameEvent.Milled {} -> False
           GameEvent.Scried _ -> False
+          GameEvent.LandPlayed {} -> False
           GameEvent.LostTheGame _ -> False
           GameEvent.DungeonCompleted _ -> False
           GameEvent.Surveiled _ -> False
@@ -7128,6 +7194,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -7206,6 +7273,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.LeftTheGame _ -> False
           GameEvent.Milled {} -> False
           GameEvent.Scried _ -> False
+          GameEvent.LandPlayed {} -> False
           GameEvent.LostTheGame _ -> False
           GameEvent.DungeonCompleted _ -> False
           GameEvent.Surveiled _ -> False
@@ -7371,6 +7439,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.LeftTheGame _ -> False
           GameEvent.Milled {} -> False
           GameEvent.Scried _ -> False
+          GameEvent.LandPlayed {} -> False
           GameEvent.LostTheGame _ -> False
           GameEvent.DungeonCompleted _ -> False
           GameEvent.Surveiled _ -> False
@@ -7471,6 +7540,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -7570,6 +7640,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -7691,6 +7762,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -7804,6 +7876,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -7913,6 +7986,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -8022,6 +8096,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -8098,6 +8173,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -8205,6 +8281,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -8344,6 +8421,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -8509,6 +8587,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.LeftTheGame _ -> False
           GameEvent.Milled {} -> False
           GameEvent.Scried _ -> False
+          GameEvent.LandPlayed {} -> False
           GameEvent.LostTheGame _ -> False
           GameEvent.DungeonCompleted _ -> False
           GameEvent.Surveiled _ -> False
@@ -8627,6 +8706,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -8686,6 +8766,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -8792,6 +8873,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -8908,6 +8990,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -9026,6 +9109,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -9125,6 +9209,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -9226,6 +9311,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -9361,6 +9447,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -9478,6 +9565,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -9569,6 +9657,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -9657,6 +9746,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -9752,6 +9842,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -9842,6 +9933,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -9943,6 +10035,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -10032,6 +10125,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -10127,6 +10221,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -10230,6 +10325,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -10328,6 +10424,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -10422,6 +10519,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -10514,6 +10612,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -10620,6 +10719,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -10733,6 +10833,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -10871,6 +10972,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -10960,6 +11062,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -11054,6 +11157,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -11188,6 +11292,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried scryer -> PlayerRelation.holds (Game.teams gs) relation you scryer
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -11282,6 +11387,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -11375,6 +11481,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted completer -> PlayerRelation.holds (Game.teams gs) relation you completer
     GameEvent.Surveiled _ -> False
@@ -11465,6 +11572,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame loser -> PlayerRelation.holds (Game.teams gs) relation you loser
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -11554,9 +11662,102 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled surveiller -> PlayerRelation.holds (Game.teams gs) relation you surveiller
+    GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
+    GameEvent.RolledToVisit _ -> False
+    GameEvent.PlanarDieRolled _ -> False
+    GameEvent.SchemeSetInMotion _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+    GameEvent.BecameUntapped _ -> False
+    GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
+    GameEvent.ManaAbilityResolved _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.RingTempted _ -> False
+    GameEvent.Blighted _ -> False
+    GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
+    GameEvent.CollectedEvidence _ -> False
+    GameEvent.GaveGift _ -> False
+    GameEvent.AttractionOpened _ -> False
+    GameEvent.PrizeClaimed _ -> False
+    GameEvent.Earthbent _ -> False
+    GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
+    GameEvent.ActivatedAbilityResolved _ -> False
+    GameEvent.TriggeredAbilityResolved _ -> False
+    GameEvent.CardArrived _ -> False
+  -- CR 305.1: "whenever you play a land from exile" (Urianger Augurelt). The
+  -- player is the one who played it, which CR 305.1 makes the special
+  -- action's taker; the zone is the one it was played from.
+  TriggerCondition.PlayerPlaysLand p -> case event of
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.TookInitiative _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mutated _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Exploited {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.BecameCrewed _ -> False
+    GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
+    GameEvent.Crewed _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.LandPlayed played ->
+      PlayerRelation.holds (Game.teams gs) (PlaysLand.player p) you (LandPlayed.player played)
+        && LandPlayed.from played == PlaysLand.from p
+    GameEvent.LostTheGame _ -> False
+    GameEvent.DungeonCompleted _ -> False
+    GameEvent.Surveiled _ -> False
     GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
     GameEvent.DiceRolled _ -> False
@@ -11642,6 +11843,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -11731,6 +11933,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -11832,6 +12035,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -11921,6 +12125,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -12013,6 +12218,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -12104,6 +12310,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -12192,6 +12399,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -12286,6 +12494,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -12380,6 +12589,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -12474,6 +12684,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -12572,6 +12783,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -12668,6 +12880,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -12761,6 +12974,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -12868,6 +13082,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -12974,6 +13189,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -13075,6 +13291,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -13170,6 +13387,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -13264,6 +13482,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -13353,6 +13572,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -13441,6 +13661,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -13529,6 +13750,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -13617,6 +13839,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -13705,6 +13928,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -13800,6 +14024,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -13893,6 +14118,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -13980,6 +14206,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
@@ -14068,6 +14295,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False

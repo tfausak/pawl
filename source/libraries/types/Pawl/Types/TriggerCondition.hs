@@ -26,6 +26,7 @@ import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.PlaysLand as PlaysLand
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SelfCountersReached as SelfCountersReached
 import qualified Pawl.Types.SelfCountersRemoved as SelfCountersRemoved
@@ -569,6 +570,9 @@ data TriggerCondition
   | -- | CR 701.25d, PlayerScries' twin: a surveil that put nothing into a
     -- graveyard fires it just the same, and CR 701.25c's surveil 0 fires nothing.
     PlayerSurveils PlayerRelation.PlayerRelation
+  | -- | CR 305.1: "whenever you play a land from exile" (Urianger Augurelt),
+    -- against GameEvent.LandPlayed.
+    PlayerPlaysLand PlaysLand.PlaysLand
   | -- | CR 701.34a: "whenever you proliferate" (Scheming Aspirant), against
     -- GameEvent.Proliferated.
     PlayerProliferates PlayerRelation.PlayerRelation

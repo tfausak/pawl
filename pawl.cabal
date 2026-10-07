@@ -716,6 +716,8 @@ library codec
     Pawl.Codec.KeywordTally
     Pawl.Codec.Label
     Pawl.Codec.LabelSpec
+    Pawl.Codec.LandPlayed
+    Pawl.Codec.LandPlayedSpec
     Pawl.Codec.LastKnown
     Pawl.Codec.LastKnownSpec
     Pawl.Codec.Layout
@@ -991,6 +993,8 @@ library codec
     Pawl.Codec.PlayerStaticAbilitySpec
     Pawl.Codec.PlayPermissionOrigin
     Pawl.Codec.PlayPermissionOriginSpec
+    Pawl.Codec.PlaysLand
+    Pawl.Codec.PlaysLandSpec
     Pawl.Codec.PlotFromZone
     Pawl.Codec.PlotFromZoneSpec
     Pawl.Codec.Plus
@@ -2286,6 +2290,7 @@ library types
     Pawl.Types.KeywordTally
     Pawl.Types.KickerDecision
     Pawl.Types.Label
+    Pawl.Types.LandPlayed
     Pawl.Types.LastKnown
     Pawl.Types.Layer
     Pawl.Types.Layout
@@ -2440,6 +2445,7 @@ library types
     Pawl.Types.PlayerScope
     Pawl.Types.PlayerStaticAbility
     Pawl.Types.PlayPermissionOrigin
+    Pawl.Types.PlaysLand
     Pawl.Types.PlotFromZone
     Pawl.Types.Plus
     Pawl.Types.Pool

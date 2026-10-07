@@ -7,6 +7,7 @@
 -- out of Pawl.PlayerEffectSpec, which keeps the machinery.
 module Pawl.CastPermissionSpec where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
@@ -66,6 +67,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.VariableChoice as VariableChoice
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
@@ -1803,6 +1805,57 @@ uriangerSpec s registry =
       -- Proxies, AFTER the behaviour: the permission is bob's, and control moved.
       Spec.assertBool s (offered shown) "though the face-up Memnite exiled with Urianger is"
       Spec.assertEqWith s "CR 613.1b Act of Treason gave bob Urianger" (View.controllerOf urianger gs) (Just S.bob)
+    -- CR 305.1: "whenever you play a land from exile". alice exiles an Island
+    -- face down with Draw Arcanum, activates Play Arcanum, and plays it. A PAIR
+    -- differing in the zone the land is played from: the Island in her hand on
+    -- the same board gains nothing.
+    Spec.it s "CR 305.1 playing a land from exile with Urianger gains 2 life, and playing one from hand does not" $ do
+      (exiledIsland, handIsland, gs) <- uriangerLandBoard s registry
+      let landPlayFrom oid =
+            let played = S.runPure exilingAnswer gs (Cast.playLand False S.alice oid Nothing)
+             in S.runPure exilingAnswer played (Engine.settleForPriority >> Monad.void Stack.resolveTop)
+          offered oid = any (isPlayOf oid) (Action.legalActions S.alice gs)
+      -- The gameplay-level claims, first.
+      Spec.assertEqWith s "CR 305.1: the Island played from exile gains alice 2 life" (S.lifeOf S.alice (landPlayFrom exiledIsland)) (Just 22)
+      Spec.assertEqWith s "and the Island played from her hand gains nothing" (S.lifeOf S.alice (landPlayFrom handIsland)) (Just 20)
+      -- The fixture: both plays were legal, and both landed.
+      Spec.assertBool s (offered exiledIsland && offered handIsland) "alice is offered both land plays"
+      Spec.assertEqWith s "each Island reached the battlefield" (fmap (length . Game.zoneMembers Zone.Battlefield S.alice . landPlayFrom) [exiledIsland, handIsland]) [2, 2]
+
+-- Urianger's land-play board: alice's Urianger with an Island on top of her
+-- library and another in her hand, Draw Arcanum run (exiling the top Island face
+-- down) and Play Arcanum active. Answers the exiled Island, the hand Island and
+-- the board, alice holding priority in her main phase on an empty stack.
+uriangerLandBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+uriangerLandBoard s registry = do
+  urianger <- S.printingOf s registry "Urianger Augurelt"
+  island <- S.printingOf s registry "Island"
+  let (uriangerId, g1) = S.addPermanent urianger S.alice (Setup.emptyGame S.bothPlayers)
+      (_, g2) = S.addLibraryCard island S.alice g1
+      (handIsland, g3) = S.addHandCard island S.alice g2
+      ready =
+        g3
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+  case Face.activatedAbilities (S.combinedFace urianger) of
+    [draw, play] -> do
+      let drawn = S.runPure exilingAnswer ready (Activate.activateAbility S.alice uriangerId draw >> Stack.resolveTop)
+          -- Both abilities cost {T}: untapped between them, as an untap step
+          -- would, so one turn's board carries both.
+          untapped = drawn {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Untapped}) uriangerId (GameState.objects drawn)}
+          permitted = S.runPure exilingAnswer untapped (Activate.activateAbility S.alice uriangerId play >> Stack.resolveTop)
+      case Set.toList (GameState.exile permitted) of
+        [card] -> pure (card, handIsland, permitted)
+        _ -> Spec.assertFailure s "Draw Arcanum should exile exactly one card"
+    _ -> Spec.assertFailure s "Urianger Augurelt should print two activated abilities"
+
+-- A land play of this card, among the legal actions.
+isPlayOf :: ObjectId.ObjectId -> Action.Type.Action -> Bool
+isPlayOf oid action = case action of
+  Action.Type.Play o _ -> o == oid
+  _ -> False
 
 -- The board uriangerSpec's cases share, described above it: alice activates Draw
 -- Arcanum on her own turn and exiles the Ornithopter, then `caster` casts Act of

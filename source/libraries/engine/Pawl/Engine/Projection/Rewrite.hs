@@ -2025,6 +2025,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PlayerFirebends _ -> condition
   TriggerCondition.PlayerCompletesDungeon _ -> condition
   TriggerCondition.PlayerSurveils _ -> condition
+  TriggerCondition.PlayerPlaysLand _ -> condition
   TriggerCondition.PlayerProliferates _ -> condition
   TriggerCondition.PlayerManifestsDread _ -> condition
   TriggerCondition.PlayerRollsDice _ -> condition
