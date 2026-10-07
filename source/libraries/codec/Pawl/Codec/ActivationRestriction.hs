@@ -2,6 +2,7 @@ module Pawl.Codec.ActivationRestriction where
 
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.DuringPhase as DuringPhase
+import qualified Pawl.Codec.ManaSpecification as ManaSpecification
 import qualified Pawl.Codec.TurnScope as TurnScope
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -28,7 +29,8 @@ codec =
       Arm.nullary "OnlyOnce" ActivationRestriction.OnlyOnce,
       Arm.nullary "OnlyOnceEachTurn" ActivationRestriction.OnlyOnceEachTurn,
       Arm.nullary "DuringDieRoll" ActivationRestriction.DuringDieRoll,
-      Arm.nullary "InstantSpeed" ActivationRestriction.InstantSpeed
+      Arm.nullary "InstantSpeed" ActivationRestriction.InstantSpeed,
+      Arm.payload "SpendOnly" ManaSpecification.codec ActivationRestriction.SpendOnly (\x -> case x of ActivationRestriction.SpendOnly y -> Just y; _ -> Nothing)
     ]
 
 tagOf :: ActivationRestriction.ActivationRestriction -> String
@@ -45,3 +47,4 @@ tagOf x = case x of
   ActivationRestriction.OnlyOnceEachTurn {} -> "OnlyOnceEachTurn"
   ActivationRestriction.DuringDieRoll {} -> "DuringDieRoll"
   ActivationRestriction.InstantSpeed {} -> "InstantSpeed"
+  ActivationRestriction.SpendOnly {} -> "SpendOnly"

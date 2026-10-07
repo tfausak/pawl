@@ -412,6 +412,7 @@ filterNames asking criterion = case criterion of
   Filter.HasCardType _cardType -> False
   Filter.HasSupertype _supertype -> False
   Filter.HasColor _color -> False
+  Filter.IsMonocolored -> False
   Filter.SharesColorWithSource -> False
   Filter.HasSubtype _subtype -> False
   Filter.HasName _name -> False
@@ -549,6 +550,7 @@ activationRestrictionNames asking x = case x of
   ActivationRestriction.OnlyOnceEachTurn -> False
   ActivationRestriction.DuringDieRoll -> False
   ActivationRestriction.InstantSpeed -> False
+  ActivationRestriction.SpendOnly _ -> False
 
 activeReplacementNames :: Asking -> ActiveReplacement.ActiveReplacement -> Bool
 activeReplacementNames asking x = case x of

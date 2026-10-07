@@ -44,6 +44,7 @@ import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.LoyaltyKind as LoyaltyKind
 import qualified Pawl.Types.ManaSpending as ManaSpending
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Modal as Modal.Type
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.Object as Object
@@ -465,7 +466,7 @@ loyaltyActivatedThisTurn srcId gs = elem (GameEvent.LoyaltyAbilityActivated srcI
 -- demands nothing at all (Mana.waysOf), so leaving it in place would answer the
 -- same as X=0 by accident rather than by rule -- the accident that made the {X}
 -- free (#544).
-payableCost :: [Map.Map SlotName (Set.Set ObjectId)] -> Maybe Keyword -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
+payableCost :: [Map.Map SlotName (Set.Set ObjectId)] -> Maybe Keyword -> Maybe (Set.Set ManaType.ManaType) -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCost aimable = payableCostAt aimable 0
 
 -- The same question asked at some OTHER value of X -- `activatable` asks it at
@@ -489,15 +490,15 @@ payableCost aimable = payableCostAt aimable 0
 -- offers: CR 601.2b's completion comes before CR 601.2f's totalling, so a {2/R}
 -- totalled while still spelled {2/R} would hide the generic reduction the
 -- announcement exposes.
-payableCostAt :: [Map.Map SlotName (Set.Set ObjectId)] -> Natural -> Maybe Keyword -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payableCostAt aimable x stamp pid srcId gs cost =
-  aimingSomewhere (Cost.readsBoundSlot (Cost.substituteX x cost)) aimable stamp (Cost.loyaltyKindOf cost) pid srcId gs (\slots adjustments -> let totalled = Cost.plusComponents adjustments (Cost.substituteX x cost) in Cost.canPaySomeCompletion slots (PaymentSubject.Activating srcId stamp) ManaSpending.AsProduced pid srcId (Cost.totalManas adjustments) (Cost.waterbendSubstitutions (Cost.Type.components totalled) slots pid srcId gs) totalled gs)
+payableCostAt :: [Map.Map SlotName (Set.Set ObjectId)] -> Natural -> Maybe Keyword -> Maybe (Set.Set ManaType.ManaType) -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
+payableCostAt aimable x stamp spendable pid srcId gs cost =
+  aimingSomewhere (Cost.readsBoundSlot (Cost.substituteX x cost)) aimable stamp (Cost.loyaltyKindOf cost) pid srcId gs (\slots adjustments -> let totalled = Cost.plusComponents adjustments (Cost.substituteX x cost) in Cost.canPaySomeCompletion slots (PaymentSubject.Activating srcId stamp spendable) ManaSpending.AsProduced pid srcId (Cost.totalManas adjustments) (Cost.waterbendSubstitutions (Cost.Type.components totalled) slots pid srcId gs) totalled gs)
 
 -- The same predicate on a board the caller already walked -- see
 -- Cost.canPaySomeCompletionGiven.
-payableCostAtGiven :: [Map.Map SlotName (Set.Set ObjectId)] -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Natural -> Maybe Keyword -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payableCostAtGiven aimable sources pcs x stamp pid srcId gs cost =
-  aimingSomewhere (Cost.readsBoundSlot (Cost.substituteX x cost)) aimable stamp (Cost.loyaltyKindOf cost) pid srcId gs (\slots adjustments -> let totalled = Cost.plusComponents adjustments (Cost.substituteX x cost) in Cost.canPaySomeCompletionGiven slots (PaymentSubject.Activating srcId stamp) ManaSpending.AsProduced sources pcs pid srcId (Cost.totalManas adjustments) (Cost.waterbendSubstitutions (Cost.Type.components totalled) slots pid srcId gs) totalled gs)
+payableCostAtGiven :: [Map.Map SlotName (Set.Set ObjectId)] -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Natural -> Maybe Keyword -> Maybe (Set.Set ManaType.ManaType) -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
+payableCostAtGiven aimable sources pcs x stamp spendable pid srcId gs cost =
+  aimingSomewhere (Cost.readsBoundSlot (Cost.substituteX x cost)) aimable stamp (Cost.loyaltyKindOf cost) pid srcId gs (\slots adjustments -> let totalled = Cost.plusComponents adjustments (Cost.substituteX x cost) in Cost.canPaySomeCompletionGiven slots (PaymentSubject.Activating srcId stamp spendable) ManaSpending.AsProduced sources pcs pid srcId (Cost.totalManas adjustments) (Cost.waterbendSubstitutions (Cost.Type.components totalled) slots pid srcId gs) totalled gs)
 
 -- CR 601.2f's totalling asked where CR 601.2c's targets do not exist yet: the
 -- predicate holds if SOME aiming this activation could still take leaves the
@@ -617,8 +618,8 @@ candidateSlotsGiven pcs grants pools pid srcId modal fillable gs =
 -- Blighted Nightmare's blight route terminate -- CostComponent.BlightX's demand
 -- never grows (Cost.demandGrowsWithX), so the climb has no other ground to stop
 -- on. Cast.affordableX takes the same argument off Face.maximumX.
-affordableX :: Maybe Natural -> [Map.Map SlotName (Set.Set ObjectId)] -> Maybe Keyword -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Natural
-affordableX mCeiling aimable stamp pid srcId gs cost = Cost.greatestPayableX mCeiling (\x -> payableCostAt aimable x stamp pid srcId gs cost) cost
+affordableX :: Maybe Natural -> [Map.Map SlotName (Set.Set ObjectId)] -> Maybe Keyword -> Maybe (Set.Set ManaType.ManaType) -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Natural
+affordableX mCeiling aimable stamp spendable pid srcId gs cost = Cost.greatestPayableX mCeiling (\x -> payableCostAt aimable x stamp spendable pid srcId gs cost) cost
 
 -- CR 601.2b / 118.9 through CR 602.2b: the costs a player may announce for this
 -- activation -- its printed activation cost, then each alternative an effect
@@ -733,4 +734,4 @@ activatableGiven grants pcs pools sources pid srcId ability gs =
         && riderOk pid srcId ability gs
         && loyaltyOk pid srcId ability gs
         && Modal.selectionPossible fillable (Modal.Type.selection modal)
-        && any (payableCostAtGiven aimable sources pcs (ActivatedAbility.minimumX ability) (ActivatedAbility.keyword ability) pid srcId gs) (costsFor pid ability gs)
+        && any (payableCostAtGiven aimable sources pcs (ActivatedAbility.minimumX ability) (ActivatedAbility.keyword ability) (ActivationRestriction.spendableTypes srcId (ActivatedAbility.restrictions ability) gs) pid srcId gs) (costsFor pid ability gs)

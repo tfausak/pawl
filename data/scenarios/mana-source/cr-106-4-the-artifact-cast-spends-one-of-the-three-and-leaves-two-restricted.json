@@ -103,7 +103,7 @@
                 }
               },
               "rider": null,
-              "sourceChosenSubtype": null
+              "sourceChoices": null
             },
             {
               "manaType": {
@@ -122,7 +122,7 @@
                 }
               },
               "rider": null,
-              "sourceChosenSubtype": null
+              "sourceChoices": null
             }
           ]
         }

@@ -19,7 +19,7 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$second", "mana": ["$elf", null, "$elf", "$forest"], "yields": [[{ "manaType": { "type": "Colored", "value": { "type": "Red" } }, "tags": [], "retention": { "type": "Ordinary" }, "restriction": null, "rider": null, "sourceChosenSubtype": null }]] } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$second", "mana": ["$elf", null, "$elf", "$forest"], "yields": [[{ "manaType": { "type": "Colored", "value": { "type": "Red" } }, "tags": [], "retention": { "type": "Ordinary" }, "restriction": null, "rider": null, "sourceChoices": null }]] } } }
   ],
   "final": [
     { "Count": { "player": "alice", "zone": "Battlefield", "card": "Skyshroud Elf", "count": 2 } },

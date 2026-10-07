@@ -842,6 +842,7 @@ restrictionConditions restriction = case restriction of
   ActivationRestriction.OnlyOnceEachTurn -> []
   ActivationRestriction.DuringDieRoll -> []
   ActivationRestriction.InstantSpeed -> []
+  ActivationRestriction.SpendOnly _ -> []
 
 -- CR 701.46a's per-clause gate. Mode.allEffects and Modal.allEffects drop clause
 -- boundaries by design, so every lint that reaches a card through them needs
@@ -4769,6 +4770,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.HasCardType _ -> []
   Filter.Type.HasSupertype _ -> []
   Filter.Type.HasColor _ -> []
+  Filter.Type.IsMonocolored -> []
   Filter.Type.SharesColorWithSource -> []
   Filter.Type.HasSubtype _ -> []
   Filter.Type.HasName _ -> []
@@ -5457,9 +5459,9 @@ blockPermissionFilters permission =
 --     Pawl.Engine.Cost and Pawl.Engine.Replacement.matchesPermanent fill the
 --     same two fields off the source (SourceContext.withChoicesOf, Doom Cannon).
 --   * ManaRestrictionFramed -- CR 106.6's restriction on the mana an ability
---     adds, matched by Pawl.Engine.Mana.admitsUnder, which fills
---     sourceChosenSubtype off the mana unit and not the colour (Pillar of
---     Origins).
+--     adds, matched by Pawl.Engine.Mana.admitsUnder, which fills the source's
+--     CR 607.2d choices off the mana unit (Pillar of Origins, Throne of
+--     Eldraine).
 --   * TriggerConditionFramed -- a triggered ability's own CR 603.2 trigger
 --     condition, matched by Pawl.Engine.Event.Match against the bearer through
 --     Pawl.Engine.SourceContext, which fills the bearer's CR 607.2d choices

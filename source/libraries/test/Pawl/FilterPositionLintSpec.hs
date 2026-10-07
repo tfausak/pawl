@@ -223,6 +223,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.HasCardType _ -> 0
   Filter.Type.HasSupertype _ -> 0
   Filter.Type.HasColor _ -> 0
+  Filter.Type.IsMonocolored -> 0
   Filter.Type.SharesColorWithSource -> 0
   Filter.Type.HasSubtype _ -> 0
   Filter.Type.HasName _ -> 0
@@ -718,14 +719,16 @@ chosenValueCounts admitted tag card =
 -- Pawl.Engine.Replacement.matchesPermanent), a trigger condition
 -- (Pawl.Engine.Event.Match) and every position of a resolution
 -- (Pawl.Engine.Resolve.Slots.effectContext) -- plus a static grant's bare
--- protection quality (grantedChosenColors). Everywhere else -- a CR 604.2
+-- protection quality (grantedChosenColors) and CR 106.6's mana restriction,
+-- which Pawl.Engine.Mana.admitsUnder fills off the mana unit (Throne of
+-- Eldraine). Everywhere else -- a CR 604.2
 -- clause, an attach destination -- it is a silent False. A CR 603.4 clause is
 -- filled (Tablet of the Guilds reads its colours there through
 -- Quantity.ChosenColorsItIs) but shares StandingHostFramed with CR 604.2's, so
 -- the atom is refused there too.
 hasChosenColorCounts :: Face.Face Card.Type.Card -> (Int, Int)
 hasChosenColorCounts card =
-  let (framed, elsewhere) = chosenValueCounts chosenValuePositions hasChosenColorTag card
+  let (framed, elsewhere) = chosenValueCounts (ManaRestrictionFramed : chosenValuePositions) hasChosenColorTag card
       granted = grantedChosenColors card
    in (framed + granted, elsewhere - granted)
 
@@ -3291,6 +3294,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         ("Kindred Boon", hasChosenSubtypeCounts, "an activated ability's target slot", (1, 0)),
         ("Etchings of the Chosen", hasChosenSubtypeCounts, "an affected set and an activated ability's cost", (2, 0)),
         ("Pillar of Origins", hasChosenSubtypeCounts, "a mana restriction", (1, 0)),
+        ("Throne of Eldraine", hasChosenColorCounts, "a mana restriction", (1, 0)),
         ("Kindred Discovery", hasChosenSubtypeCounts, "two trigger conditions", (2, 0)),
         ("Brass Herald", hasChosenSubtypeCounts, "an affected set and a resolution's own filter", (2, 0))
       ]

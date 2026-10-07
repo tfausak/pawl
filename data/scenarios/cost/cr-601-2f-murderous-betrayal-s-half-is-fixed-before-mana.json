@@ -21,7 +21,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "$murderous-betrayal", "targets": ["$goblin-piker"], "mana": ["$swamp", "$mana-confluence"], "yields": [[{ "manaType": { "type": "Colored", "value": { "type": "Black" } }, "tags": [], "retention": { "type": "Ordinary" }, "restriction": null, "rider": null, "sourceChosenSubtype": null }]] } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "$murderous-betrayal", "targets": ["$goblin-piker"], "mana": ["$swamp", "$mana-confluence"], "yields": [[{ "manaType": { "type": "Colored", "value": { "type": "Black" } }, "tags": [], "retention": { "type": "Ordinary" }, "restriction": null, "rider": null, "sourceChoices": null }]] } } }
   ],
   "final": [
     { "Life": { "player": "alice", "life": 4 } },

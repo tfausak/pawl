@@ -28,6 +28,7 @@ import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
+import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Subtype as Subtype.Engine
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
@@ -90,6 +91,7 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.SourceChoices as SourceChoices
 import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
 import qualified Pawl.Types.SpendTrigger as SpendTrigger
 import qualified Pawl.Types.Subtype as Subtype
@@ -548,7 +550,7 @@ manaOptionsOf = manaOptionsOfGiven Map.empty
 manaOptionsOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [ManaOption]
 manaOptionsOfGiven pcs oid gs =
   let tags = productionTagsGiven pcs oid gs
-      chosenSubtype = sourceChosenSubtypeOf oid gs
+      choices = sourceChoicesOf oid gs
       lastExiled = lastExiledWith oid gs
       -- CR 106.6, stamped from the instruction that adds the unit: the
       -- restriction is the addition's (CR 106.6a), so every unit one AddMana
@@ -584,7 +586,7 @@ manaOptionsOfGiven pcs oid gs =
               controller <- Projection.controllerOf oid gs
               whenSpent <- ManaAddition.whenSpent addition
               spendTriggerOf controller oid gs whenSpent,
-            ManaUnit.sourceChosenSubtype = chosenSubtype,
+            ManaUnit.sourceChoices = choices,
             ManaUnit.sourceLastExiled = lastExiled
           }
       -- CR 106.3's count, read off the BOARD rather than off the card: Cabal
@@ -701,20 +703,27 @@ recipientsOf controller chosen gs ref =
     []
     (Count.playersFor (const Nothing) ((Filter.contextFor (Game.teams gs) (Just controller) Nothing) {Filter.slotPlayers = chosen}) gs ref)
 
--- CR 607.2d's production-time capture, and THE one place it is decided: the
--- subtype the source had chosen as it entered (CR 614.1c), baked onto every unit
--- it adds so that a CR 106.6 restriction can still ask about it once the source is
--- out of reach (Pawl.Types.ManaUnit.sourceChosenSubtype). Read by both producers
--- exactly as the tags below are.
+-- CR 607.2d's production-time capture, and THE one place it is decided: what
+-- the source had chosen as it entered (CR 614.1c), baked onto every unit it adds
+-- so that a CR 106.6 restriction can still ask about it once the source is out
+-- of reach (Pawl.Types.ManaUnit.sourceChoices). Read by both producers exactly
+-- as the tags below are.
 --
 -- Read off the OBJECT and not off the projection: CR 614.1c's choice is base
--- state no CR 613 layer writes, and Pawl.Types.Object.chosenSubtype is
--- per-incarnation, so a Clone of Pillar of Origins answers with the choice IT
--- made on entering (CR 707.6) rather than with the copied permanent's.
-sourceChosenSubtypeOf :: ObjectId -> GameState -> Maybe Subtype.Subtype
-sourceChosenSubtypeOf oid gs = Game.lookupObject oid gs >>= Object.chosenSubtype
+-- state no CR 613 layer writes, and the object's choices are per-incarnation,
+-- so a Clone of Pillar of Origins answers with the choice IT made on entering
+-- (CR 707.6) rather than with the copied permanent's.
+--
+-- Nothing where the source chose nothing, which is almost every source, so a
+-- plain unit stays equal to every other plain unit of its type.
+sourceChoicesOf :: ObjectId -> GameState -> Maybe SourceChoices.SourceChoices
+sourceChoicesOf oid gs = case Game.lookupObject oid gs of
+  Nothing -> Nothing
+  Just _ ->
+    let choices = SourceContext.choicesOf oid gs
+     in if Set.null (SourceChoices.names choices) && Set.null (SourceChoices.colors choices) && Maybe.isNothing (SourceChoices.subtype choices) then Nothing else Just choices
 
--- CR 607.2a's production-time capture, sourceChosenSubtypeOf's twin: the last
+-- CR 607.2a's production-time capture, sourceChoicesOf's twin: the last
 -- card exiled with this source that is still in exile, baked onto every unit it
 -- adds (Pawl.Types.ManaUnit.sourceLastExiled). "Last" is the latest to enter
 -- exile (CR 613.7d's timestamp), so a second card the source exiles replaces the
@@ -1136,7 +1145,7 @@ serves supply demand =
 -- The perspective is the PAYER (CR 109.5's "you"), which is who the spell's
 -- controller is at CR 601.2h and the ability's at CR 602.2b. A restriction that
 -- reads the SOURCE reads it through the values production baked onto the unit
--- (Pawl.Types.ManaUnit.sourceChosenSubtype), never by looking the source up:
+-- (Pawl.Types.ManaUnit.sourceChoices), never by looking the source up:
 -- Pillar of Origins' "of the chosen type" is the printing that wants one, and
 -- Ice Cauldron's "the last card exiled with this artifact" the second
 -- (Pawl.Types.ManaUnit.sourceLastExiled).
@@ -1162,36 +1171,46 @@ spendableAmong subject pid gs = List.partition (admitsUnder subject pid gs)
 -- subject for the same reason. That is what the partial application buys, so
 -- keep the unit as the last argument and apply it separately.
 --
--- The things the shared context cannot carry are CR 607.2d's chosen subtype and
--- CR 607.2a's last exiled card, which are the UNIT's: two Pillars of Origins
+-- The things the shared context cannot carry are CR 607.2d's choices and CR
+-- 607.2a's last exiled card, which are the UNIT's: two Pillars of Origins
 -- naming two creature types put mana in one pool, so both are written per unit
 -- below.
+--
+-- An activation's SUBJECT can narrow the units too, ahead of any of that:
+-- PaymentSubject.Activating's mana types (ActivationRestriction.SpendOnly).
 admitsUnder :: PaymentSubject.PaymentSubject -> PlayerId -> GameState -> ManaUnit -> Bool
 admitsUnder subject pid gs =
   let paidFor = case subject of
         PaymentSubject.ForNeither -> Nothing
         PaymentSubject.Casting oid -> Just (ManaRestriction.casts, oid)
-        PaymentSubject.Activating oid _ -> Just (ManaRestriction.activations, oid)
+        PaymentSubject.Activating oid _ _ -> Just (ManaRestriction.activations, oid)
         PaymentSubject.Unlocking oid -> Just (ManaRestriction.unlocks, oid)
         PaymentSubject.TurningFaceUp oid -> Just (ManaRestriction.turnsFaceUp, oid)
       -- CR 716.2c: the one half asked of the ABILITY rather than of an object --
       -- its keyword stamp against the designator, no view needed.
       byKeyword restriction = case subject of
-        PaymentSubject.Activating _ stamp -> any (\designator -> any (Keyword.Engine.designates designator) stamp) (ManaRestriction.keywordActivations restriction)
+        PaymentSubject.Activating _ stamp _ -> any (\designator -> any (Keyword.Engine.designates designator) stamp) (ManaRestriction.keywordActivations restriction)
         _ -> False
       asked = fmap (\(half, oid) -> (half, Filter.contextFor (Game.teams gs) (Just pid) Nothing, Projection.viewOfObject oid gs)) paidFor
-   in \unit -> case ManaUnit.restriction unit of
-        Nothing -> True
-        Just restriction ->
-          let named =
-                byKeyword restriction || case asked of
-                  Nothing -> False
-                  Just (half, context, view) -> case half restriction of
+      -- The ability's own narrowing of what may pay for it (Throne of
+      -- Eldraine's "Spend only mana of the chosen color"), asked of every unit
+      -- before CR 106.6's question about the unit's own restriction.
+      typeAllowed unit = case subject of
+        PaymentSubject.Activating _ _ (Just types) -> Set.member (ManaUnit.manaType unit) types
+        _ -> True
+   in \unit ->
+        typeAllowed unit && case ManaUnit.restriction unit of
+          Nothing -> True
+          Just restriction ->
+            let named =
+                  byKeyword restriction || case asked of
                     Nothing -> False
-                    Just wanted -> Filter.matches (context {Filter.sourceChosenSubtype = ManaUnit.sourceChosenSubtype unit, Filter.sourceLastExiled = ManaUnit.sourceLastExiled unit}) view wanted
-           in -- A prohibition (Hydraulic Helper) admits exactly the payments a
-              -- permission would refuse, ForNeither among them.
-              if ManaRestriction.prohibits restriction then not named else named
+                    Just (half, context, view) -> case half restriction of
+                      Nothing -> False
+                      Just wanted -> Filter.matches ((maybe id SourceContext.withChoices (ManaUnit.sourceChoices unit) context) {Filter.sourceLastExiled = ManaUnit.sourceLastExiled unit}) view wanted
+             in -- A prohibition (Hydraulic Helper) admits exactly the payments a
+                -- permission would refuse, ForNeither among them.
+                if ManaRestriction.prohibits restriction then not named else named
 
 -- CR 601.2a before CR 601.2g: a source activated DURING this payment makes its
 -- mana once the card being cast has already left exile, so the card it last
@@ -2296,7 +2315,7 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed comm
       -- A nested source's subject carries no keyword stamp: Sorcerer Class's
       -- CR 716.2c clause names a class level bar, whose ability sets a level and
       -- so is no mana ability (CR 605.1a).
-      subjects = Set.toList (Set.fromList (subject : fmap (\oid -> PaymentSubject.Activating oid Nothing) sources))
+      subjects = Set.toList (Set.fromList (subject : fmap (\oid -> PaymentSubject.Activating oid Nothing Nothing) sources))
       admittedBy = fmap (\each -> (each, admitsUnder each pid gs)) subjects
       admitting unit = Set.fromList (fmap fst (filter (\(_, ok) -> ok unit) admittedBy))
       -- CR 609.4b, resolved ONCE for this whole question and applied to both
@@ -2373,7 +2392,7 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed comm
               <> concatMap (\(k, (_, option)) -> fmap ((,) k) (optionSupplies option)) ranked,
             concatMap (\(k, (_, option)) -> fmap ((,) k) (optionDemands option)) ranked,
             costPosition,
-            Map.fromList ((costPosition, subject) : fmap (\(k, (oid, _)) -> (k, PaymentSubject.Activating oid Nothing)) ranked),
+            Map.fromList ((costPosition, subject) : fmap (\(k, (oid, _)) -> (k, PaymentSubject.Activating oid Nothing Nothing)) ranked),
             sum (fmap (optionLife . snd) taken)
           )
       -- Whether there is a walk for the relaxation below to save: one option per

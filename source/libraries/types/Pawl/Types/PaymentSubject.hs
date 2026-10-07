@@ -1,6 +1,8 @@
 module Pawl.Types.PaymentSubject where
 
+import qualified Data.Set as Set
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ObjectId as ObjectId
 
 -- | WHAT a cost is being paid for, at the one grain CR 106.6's restrictions ask
@@ -41,7 +43,11 @@ data PaymentSubject
     --
     -- The keyword is the ability's own Pawl.Types.ActivatedAbility.keyword, which
     -- CR 716.2c's "to gain a Class level" asks about rather than the source.
-    Activating ObjectId.ObjectId (Maybe Keyword.Keyword)
+    --
+    -- The set is the mana types the payment may spend, Nothing for any: Throne
+    -- of Eldraine's "Spend only mana of the chosen color to activate this
+    -- ability" (Pawl.Types.ActivationRestriction.SpendOnly).
+    Activating ObjectId.ObjectId (Maybe Keyword.Keyword) (Maybe (Set.Set ManaType.ManaType))
   | -- | CR 116.2m \/ 709.5e: the PERMANENT whose locked half's unlock cost is
     -- being paid.
     Unlocking ObjectId.ObjectId
