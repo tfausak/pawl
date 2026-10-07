@@ -45,18 +45,24 @@ import qualified Pawl.Types.ActiveCopy as ActiveCopy
 import qualified Pawl.Types.ActiveEvasion as ActiveEvasion
 import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
 import qualified Pawl.Types.ActiveUntapProhibition as ActiveUntapProhibition
+import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Compares as Compares
+import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.Count as Count
+import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Face as Face
@@ -66,6 +72,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.IgnoredAbility as IgnoredAbility
+import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -82,6 +89,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.Prompt as Prompt
@@ -89,6 +97,7 @@ import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import qualified Pawl.Types.RoomHalf as RoomHalf
+import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
@@ -1688,20 +1697,107 @@ interchangeableSourcesSpec s registry = Spec.describe s "Interchangeable mana so
     Spec.assertBool s paid "the {G} was paid"
     Spec.assertEqWith s "off exactly one Elf" (tappedCount elves after) 1
 
-  -- CR 611.2b: "for as long as" carries a Condition, which the search does not
-  -- read, so a row lasting that long might name anything -- every Elf is a
-  -- candidate of its own though the row is about bob's Bears.
-  Spec.it s "CR 611.2b a stored row with a conditional duration retires the elision" $ do
+  -- CR 611.2b: "for as long as" carries a Condition, which the search reads
+  -- through. One counting bob's Bears says nothing about the Elves; the same
+  -- count baked down to one Elf (Filter.IsObject) parts that Elf from the two.
+  Spec.it s "CR 611.2b a conditional duration that names no Elf leaves the elision standing" $ do
     elf <- S.printingOf s registry "Llanowar Elves"
     bears <- S.printingOf s registry "Grizzly Bears"
     let (elves, plain) = elfBoard elf 3
         (bear, withBears) = S.addPermanent bears S.bob plain
         board = S.withEffect bear nothingMore withBears
-        conditional = board {GameState.continuousEffects = fmap (\row -> row {ContinuousEffect.expiry = Expiry.While (While.MkWhile S.alice (Condition.All []))}) (GameState.continuousEffects board)}
-        (offers, paid, after) = greenWindow conditional
-        (plainOffers, _, _) = greenWindow board
-    Spec.assertEqWith s "asked once, with all three Elves on offer" (fmap length offers) [3]
-    Spec.assertEqWith s "and the same row until end of turn leaves them one candidate" (fmap length plainOffers) [1]
+        lasting criterion = board {GameState.continuousEffects = fmap (\row -> row {ContinuousEffect.expiry = Expiry.While (While.MkWhile S.alice (onBattlefield criterion))}) (GameState.continuousEffects board)}
+        (offers, paid, after) = greenWindow (lasting (Filter.ControlledByPlayer S.bob))
+        (named, _, _) = greenWindow (lasting (Filter.IsObject (NonEmpty.head elves)))
+    Spec.assertEqWith s "asked once, and the three Elves are one candidate" (fmap length offers) [1]
+    Spec.assertEqWith s "and lasting while one Elf is on the battlefield, that Elf is a candidate of its own" (fmap length named) [2]
+    Spec.assertBool s paid "the {G} was paid"
+    Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
+
+  -- CR 615.7: Mending Hands ({W} Instant, "Prevent the next 4 damage that would
+  -- be dealt to any target this turn") stores a floating replacement, searched
+  -- rather than required absent. Shielding bob's Bears says nothing about the
+  -- Elves.
+  Spec.it s "CR 615.7 Mending Hands shielding another creature leaves the elision standing" $ do
+    (elves, shielded) <- mendingHandsBoard s registry (\_ bear -> bear)
+    let (offers, paid, after) = greenWindow shielded
+    Spec.assertBool s (not (null (GameState.replacements shielded))) "the shield is stored"
+    Spec.assertEqWith s "asked once, and the three Elves are one candidate" (fmap length offers) [1]
+    Spec.assertBool s paid "the {G} was paid"
+    Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
+
+  -- The control: the shield on one Elf, which damage would tell apart and no
+  -- projection shows.
+  Spec.it s "CR 615.7 an Elf Mending Hands shields is a candidate of its own" $ do
+    (elves, shielded) <- mendingHandsBoard s registry (\elves _ -> NonEmpty.head elves)
+    let (offers, paid, after) = greenWindow shielded
+    Spec.assertEqWith s "asked once, with the shielded Elf beside the two that are alike" (fmap length offers) [2]
+    Spec.assertBool s paid "the {G} was paid"
+    Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
+
+  -- CR 603.7c: Salt Road Skirmish ({3}{B} Sorcery, "Destroy target creature.
+  -- Create two 1/1 red Warrior creature tokens. They gain haste until end of
+  -- turn. Sacrifice them at the beginning of the next end step.") arms a delayed
+  -- trigger whose bindings name the two tokens. A delayed trigger is searched
+  -- rather than required absent, so the Elves are still alike.
+  Spec.it s "CR 603.7c Salt Road Skirmish's delayed sacrifice leaves the elision standing" $ do
+    (elves, armed) <- saltRoadBoard s registry
+    let (offers, paid, after) = greenWindow armed
+    Spec.assertEqWith s "the sacrifice is armed" (Seq.length (GameState.delayedTriggers armed)) 1
+    Spec.assertEqWith s "asked once, and the three Elves are one candidate" (fmap length offers) [1]
+    Spec.assertBool s paid "the {G} was paid"
+    Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
+
+  -- The control: the same board with the delayed trigger's binding moved to one
+  -- Elf, which its firing would sacrifice.
+  Spec.it s "CR 603.7c an Elf a delayed trigger will sacrifice is a candidate of its own" $ do
+    (elves, armed) <- saltRoadBoard s registry
+    let aimed binding = binding {Binding.objects = Just (Seq.singleton (NonEmpty.head elves))}
+        moved = armed {GameState.delayedTriggers = fmap (\entry -> entry {DelayedTrigger.bindings = fmap aimed (DelayedTrigger.bindings entry)}) (GameState.delayedTriggers armed)}
+        (offers, paid, after) = greenWindow moved
+    Spec.assertEqWith s "asked once, with the doomed Elf beside the two that are alike" (fmap length offers) [2]
+    Spec.assertBool s paid "the {G} was paid"
+    Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
+
+  -- CR 611.2c: Can't Stay Away ({W}{B} Sorcery, "Return target creature card
+  -- with mana value 3 or less from your graveyard to the battlefield. It gains
+  -- 'If this creature would die, exile it instead.'") stores a granted ability,
+  -- which the search reads through. Granted to the returned Bears, it says
+  -- nothing about the Elves.
+  Spec.it s "CR 611.2c a stored granted ability on another creature leaves the elision standing" $ do
+    elf <- S.printingOf s registry "Llanowar Elves"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    plains <- S.printingOf s registry "Plains"
+    swamp <- S.printingOf s registry "Swamp"
+    spell <- S.printingOf s registry "Can't Stay Away"
+    let (elves, plain) = elfBoard elf 3
+        (dead, buried) = S.addGraveyardCard bears S.alice plain
+        (white, one) = S.addPermanent plains S.alice buried
+        (black, board) = S.addPermanent swamp S.alice one
+        returned = castResolving (Set.fromList [white, black]) spell dead board
+        (offers, paid, after) = greenWindow returned
+    Spec.assertBool s (any (granted . ContinuousEffect.modification) (GameState.continuousEffects returned)) "the ability is granted"
+    Spec.assertEqWith s "asked once, and the three Elves are one candidate" (fmap length offers) [1]
+    Spec.assertBool s paid "the {G} was paid"
+    Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
+
+  -- A granted ability's own target slot is read against the bindings of the
+  -- stack object it becomes, not the row's: Retraction Helix ({U} Instant,
+  -- "Until end of turn, target creature gains '{T}: Return target nonland
+  -- permanent to its owner's hand.'") on bob's Bears says nothing about the
+  -- Elves.
+  Spec.it s "CR 611.2c a granted ability with a target slot of its own leaves the elision standing" $ do
+    elf <- S.printingOf s registry "Llanowar Elves"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    island <- S.printingOf s registry "Island"
+    helix <- S.printingOf s registry "Retraction Helix"
+    let (elves, plain) = elfBoard elf 3
+        (bear, withBears) = S.addPermanent bears S.bob plain
+        (blue, board) = S.addPermanent island S.alice withBears
+        granting = castResolving (Set.singleton blue) helix bear board
+        (offers, paid, after) = greenWindow granting
+    Spec.assertBool s (any (granted . ContinuousEffect.modification) (GameState.continuousEffects granting)) "the ability is granted"
+    Spec.assertEqWith s "asked once, and the three Elves are one candidate" (fmap length offers) [1]
     Spec.assertBool s paid "the {G} was paid"
     Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
 
@@ -1927,6 +2023,61 @@ haunts hauntingCard haunted gs =
   gs
     { GameState.haunting = Map.insert hauntingCard haunted (GameState.haunting gs)
     }
+
+-- Alice casts this card from her hand at `aimed`, paying from `lands` alone,
+-- and it resolves: the board CR 601.2g's window then opens on.
+castResolving :: Set.Set ObjectId.ObjectId -> Printing.Printing -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+castResolving lands spell aimed board =
+  let (inHand, card) = S.handOne spell board
+      answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ChooseTargets _ _ _ offer -> S.preferring ((==) (Just aimed) . Recipient.objectOf) offer
+        Prompt.ChooseManaSource _ _ candidates -> Just (Maybe.fromMaybe (NonEmpty.head candidates) (List.find (`Set.member` lands) (NonEmpty.toList candidates)))
+        _ -> S.identityAnswer p
+   in S.runPure answer (S.runPure answer inHand (S.cast S.alice card)) Stack.resolveTop
+
+-- Three Elves, bob's Bears and Mending Hands resolved at the creature `aim`
+-- picks from the Elves and the Bears.
+mendingHandsBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> (NonEmpty.NonEmpty ObjectId.ObjectId -> ObjectId.ObjectId -> ObjectId.ObjectId) -> m (NonEmpty.NonEmpty ObjectId.ObjectId, GameState.GameState)
+mendingHandsBoard s registry aim = do
+  elf <- S.printingOf s registry "Llanowar Elves"
+  bears <- S.printingOf s registry "Grizzly Bears"
+  plains <- S.printingOf s registry "Plains"
+  hands <- S.printingOf s registry "Mending Hands"
+  let (elves, plain) = elfBoard elf 3
+      (bear, withBears) = S.addPermanent bears S.bob plain
+      (white, board) = S.addPermanent plains S.alice withBears
+  pure (elves, castResolving (Set.singleton white) hands (aim elves bear) board)
+
+-- Three Elves, and Salt Road Skirmish resolved at bob's Bears, paid from four
+-- Swamps.
+saltRoadBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (NonEmpty.NonEmpty ObjectId.ObjectId, GameState.GameState)
+saltRoadBoard s registry = do
+  elf <- S.printingOf s registry "Llanowar Elves"
+  bears <- S.printingOf s registry "Grizzly Bears"
+  swamp <- S.printingOf s registry "Swamp"
+  skirmish <- S.printingOf s registry "Salt Road Skirmish"
+  let (elves, plain) = elfBoard elf 3
+      (bear, withBears) = S.addPermanent bears S.bob plain
+      (swamps, board) = List.foldl' (\(oids, gs) _ -> let (oid, next) = S.addPermanent swamp S.alice gs in (Set.insert oid oids, next)) (Set.empty, withBears) (replicate 4 ())
+  pure (elves, castResolving swamps skirmish bear board)
+
+-- Whether a stored continuous effect grants an ability.
+granted :: Modification.Modification ability -> Bool
+granted modification = case modification of
+  Modification.GainAbility _ -> True
+  _ -> False
+
+-- CR 611.2b's condition "while a permanent matching this is on the
+-- battlefield".
+onBattlefield :: Filter.Filter Keyword.Keyword -> Condition.Condition
+onBattlefield criterion =
+  Condition.Compares
+    ( Compares.MkCompares
+        (Quantity.Count (Count.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) criterion Aggregation.Members))
+        Comparison.AtLeast
+        (Quantity.Literal 1)
+    )
 
 -- The lengths of what CR 601.2g's window offered on three Elves and bob's
 -- Bears once `write` has stored a row about the Bears and the first Elf.

@@ -267,6 +267,11 @@ to agents as written. What it doesn't say:
     Grep the sibling constructor, read every hit, and record in the PR which
     ones you read and why each is right as it stands.
 
+    A TYPE THAT GAINS an ObjectId, a slot name or a Filter where it held none
+    is the inverse: `Pawl.Engine.Interchangeable.Mentions` matches every field
+    of that type as a named discard, which compiles on. Give the type a
+    function there and turn each discard of it into a read.
+
     A CONSTRUCTOR GREP has to allow for the module ALIAS. The same constructor is
     spelled `Keyword.Flying` in most of the tree and `Keyword.Type.Flying` where a
     module imports the type module under a second name, so a grep for the usual

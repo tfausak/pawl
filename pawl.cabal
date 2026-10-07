@@ -1431,6 +1431,7 @@ library engine
     Pawl.Engine.IgnoredAbility
     Pawl.Engine.Initiative
     Pawl.Engine.Interchangeable
+    Pawl.Engine.Interchangeable.Mentions
     Pawl.Engine.Keyword
     Pawl.Engine.Learn
     Pawl.Engine.Mana

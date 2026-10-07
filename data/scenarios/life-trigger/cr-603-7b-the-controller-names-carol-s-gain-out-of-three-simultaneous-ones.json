@@ -95,8 +95,8 @@
         "Cast": {
           "object": "$peacemaker",
           "mana": [
-            "$f2",
             "$f",
+            "$f2",
             "$p"
           ]
         }
