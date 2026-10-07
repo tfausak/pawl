@@ -462,6 +462,7 @@ grantsItself keyword =
     Nothing
     Set.empty
     Nothing
+    Nothing
     (NonEmpty.singleton (Modification.GainKeyword keyword))
 
 -- CR 709.4's fixture: two halves that DIFFER on every axis Pawl.Engine.Card.merge2

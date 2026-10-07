@@ -1476,9 +1476,10 @@ namedExileReferences face =
 -- Every AbilityName a face declares FOR A LAYER-6 REMOVAL OR AN EXILE REFERENCE
 -- to name -- the other side of the join above. Every carrier of one: an
 -- activated ability (Gliding Licid), a triggered ability (Synthetic Silenced
--- Sentinel) and a printed replacement (Glittering Lion). A HAND-KEPT union, so a
--- third carrier added to Pawl.Types.AbilityName's readers must be added here
--- too, or its cards' names read as dangling.
+-- Sentinel), a printed replacement (Glittering Lion) and a static ability
+-- (Synthetic Muted Captain). A HAND-KEPT union, so a new carrier added to
+-- Pawl.Types.AbilityName's readers must be added here too, or its cards' names
+-- read as dangling.
 --
 -- PlayerStaticAbility.name is deliberately NOT here: it belongs to CR 116.2d's
 -- join below, which has its own pair of sides.
@@ -1488,6 +1489,7 @@ declaredAbilityNames face =
     ( Maybe.mapMaybe ActivatedAbility.name (Face.activatedAbilities face)
         <> Maybe.mapMaybe TriggeredAbility.name (Face.triggeredAbilities face)
         <> Maybe.mapMaybe PrintedReplacement.name (Face.replacementEffects face)
+        <> Maybe.mapMaybe StaticAbility.name (Face.staticAbilities face)
     )
 
 -- CR 116.2d: every ability name a face's ignore grants refer to. One grant per

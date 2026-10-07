@@ -461,6 +461,7 @@ theRingIsLegendary =
       -- its effect outlives the emblem, and CR 114.4 keeps the emblem in the
       -- command zone anyway.
       StaticAbility.lingers = Nothing,
+      StaticAbility.name = Nothing,
       StaticAbility.modifications = NonEmpty.singleton (Modification.AddSupertype Supertype.Legendary)
     }
 
