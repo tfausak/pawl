@@ -1,5 +1,6 @@
 module Pawl.Types.Quantity where
 
+import qualified Pawl.Types.AgainstLastCardExiledWith as AgainstLastCardExiledWith
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.CastFrom as CastFrom
 import qualified Pawl.Types.CompletedDungeon as CompletedDungeon
@@ -324,6 +325,10 @@ data Quantity
   | -- | CR 607.2a / 614.14: the inner quantity read against each card this
     -- quantity's source exiled, summed (CR 607.3); an empty pile reads 0.
     AgainstCardsExiledWith Quantity
+  | -- | CR 607.2a / 613.7d: the inner quantity read against the card this
+    -- quantity's source exiled LAST among those the filter matches (Duplicant);
+    -- Nothing when none does.
+    AgainstLastCardExiledWith (AgainstLastCardExiledWith.AgainstLastCardExiledWith Quantity)
   | -- | CR 702.167c: the inner quantity read against each exiled card used to
     -- craft this quantity's source, summed; AgainstCardsExiledWith narrowed to
     -- the craft link (Mastercraft Raptor).

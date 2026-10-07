@@ -67,6 +67,18 @@ order oids = do
         _ -> pure group
   fmap concat (traverse ask groups)
 
+-- | CR 712.21b / 730.3b: the exception to `order` -- ONE player, the one who
+-- exiled a melded or merged permanent, orders the cards it became, which have
+-- just been put into exile with stamps from `start` on. Permutes those stamps in
+-- place (`reassign`); asked at two or more, filtered by Game.permute.
+orderFor :: PlayerId -> Timestamp -> [ObjectId] -> Game ()
+orderFor pid start arrivals = case arrivals of
+  _ : _ : _ -> do
+    gs <- State.get
+    answer <- Game.choose (Prompt.OrderTimestamps (Decide.deciderFor pid gs) pid arrivals)
+    State.modify' (reassign start (Game.permute arrivals answer))
+  _ -> pure ()
+
 -- | CR 613.7m over a batch that has ALREADY entered the battlefield (CR 613.7d)
 -- at one moment: `arrivals` in the order they arrived, `start` the first stamp
 -- the batch could have minted. Asked AFTER the arrivals rather than before them,
@@ -81,8 +93,10 @@ order oids = do
 -- The canonical answer is the arrival order itself, which leaves every stamp
 -- where it was.
 --
--- Battlefield arrivals only. Elsewhere an object's stamp is read by nothing but
--- its own static abilities functioning there (CR 113.6, CR 613.7a), and no
+-- Battlefield arrivals only. Elsewhere an object's stamp is read by
+-- Quantity.lastCardExiledWith, whose reader (Duplicant) links one target per
+-- exile, so its only simultaneous batch is CR 712.21b's, which `orderFor` asks;
+-- and by its own static abilities functioning there (CR 113.6, CR 613.7a), and no
 -- printing's such ability writes a characteristic an order could change (MTGJSON
 -- 2026-08-23, text "As long as/While ... is in a graveyard/in exile/in your
 -- hand/in the command zone" beside a set base power, lost abilities, a set type

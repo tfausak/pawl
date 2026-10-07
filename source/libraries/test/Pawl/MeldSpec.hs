@@ -40,6 +40,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Engine.Subtype as Subtype.Engine
 import qualified Pawl.Interpreter as Interpreter
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
@@ -82,6 +83,7 @@ import qualified Pawl.Types.MovedBetween as MovedBetween
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -1296,6 +1298,58 @@ spec s registry = Spec.describe s "Meld" $ do
         Spec.assertEqWith s "setup: alice's hand was empty once the Griptide had been cast" (handNames (bounced [0, 1])) []
         Spec.assertEqWith s "setup: the melded permanent left the battlefield" (Game.lookupObject meldedId (bounced [0, 1])) Nothing
         Spec.assertEqWith s "setup: alice's library was empty before it went there" (libraryNames board) []
+
+  -- CR 712.21b's own Example: Duplicant's imprint exiles Chittering Host, and
+  -- Duplicant's controller chooses which of Graf Rats (2/1 Rat) and Midnight
+  -- Scavengers (3/3 Human Rogue) is the last creature card exiled with it.
+  --
+  -- bob exiles alice's Host, so the exiler and the owner differ, and only bob's
+  -- OrderTimestamps is answered with the swap: a road that asked alice would
+  -- leave both boards on the melded order. The two boards differ in that one
+  -- answer.
+  Spec.it s "CR 712.21b the player exiling a melded permanent picks which card Duplicant copies" $ do
+    rats <- S.printingOf s registry "Graf Rats"
+    scavengers <- S.printingOf s registry "Midnight Scavengers"
+    duplicant <- S.printingOf s registry "Duplicant"
+    let (_, g1) = S.addPermanent rats S.alice (Setup.emptyGame S.bothPlayers)
+        (_, g2) = S.addPermanent scavengers S.alice g1
+        atCombat = g2 {GameState.phase = Phase.Combat CombatStep.BeginningOfCombat, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+        meldedBoard = S.runPure S.identityAnswer atCombat (Engine.runStep >> Engine.priorityLoop)
+        hostName = CardName.MkCardName (Text.pack "Chittering Host")
+        hosts = filter (\oid -> fmap S.nameOf (Game.cardOf oid meldedBoard) == Just hostName) (Game.zoneMembers Zone.Battlefield S.alice meldedBoard)
+    case hosts of
+      [hostId] -> do
+        let (duplicantId, board) = S.entersWithTrigger duplicant S.bob meldedBoard
+            imprinted order =
+              let onStack = S.runPure (duplicating hostId order) board Engine.settleForPriority
+               in (onStack, S.runPure (duplicating hostId order) onStack Stack.resolveTop)
+            (staged, melded_) = imprinted [0, 1]
+            swapped = snd (imprinted [1, 0])
+            creatureTypes gs = Set.filter Subtype.Engine.isCreatureType (Projection.subtypesOf duplicantId gs)
+        Spec.assertEqWith s "CR 712.21b in the melded order the Rats is exiled last: Duplicant is 2/1" (S.powerToughnessOf duplicantId melded_) (Just (2, 1))
+        Spec.assertEqWith s "and a Rat, still a Shapeshifter" (creatureTypes melded_) (Set.fromList [Subtype.Rat, Subtype.Shapeshifter])
+        Spec.assertEqWith s "CR 712.21b bob's swap makes the Scavengers the last: Duplicant is 3/3" (S.powerToughnessOf duplicantId swapped) (Just (3, 3))
+        Spec.assertEqWith s "and a Human Rogue, still a Shapeshifter" (creatureTypes swapped) (Set.fromList [Subtype.Human, Subtype.Rogue, Subtype.Shapeshifter])
+        -- The proxies behind those, kept AFTER them: both cards really are in
+        -- exile under either answer, and before the trigger resolved Duplicant
+        -- was its printed 2/4 Shapeshifter, so the values above are the static
+        -- ability's reading of the link and not a printed box.
+        Spec.assertEqWith s "CR 712.21 both cards were exiled" (List.sort (exileNames melded_)) (List.sort [S.printingName rats, S.printingName scavengers])
+        Spec.assertEqWith s "under either order" (List.sort (exileNames swapped)) (List.sort [S.printingName rats, S.printingName scavengers])
+        Spec.assertEqWith s "setup: printed 2/4 while the trigger waits" (S.powerToughnessOf duplicantId staged) (Just (2, 4))
+        Spec.assertEqWith s "setup: a Shapeshifter alone" (creatureTypes staged) (Set.singleton Subtype.Shapeshifter)
+      other -> Spec.assertFailure s ("expected exactly one Chittering Host, got " <> show (length other))
+
+-- Duplicant's imprint aimed at the melded permanent by FILTERING the offered set,
+-- its "you may" exercised, and bob's CR 712.21b order pinned by index. Every
+-- other prompt -- alice's included -- gets the identity answer, so the order is
+-- the one thing a caller varies.
+duplicating :: ObjectId.ObjectId -> [Natural.Natural] -> Prompt.Prompt r -> r
+duplicating victim order p = case p of
+  Prompt.ChooseTargets _ _ _ offered -> S.preferring (== Recipient.ToCreature victim) offered
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  Prompt.OrderTimestamps _ pid _ | pid == S.bob -> order
+  _ -> S.identityAnswer p
 
 -- The melded permanent destroyed under a given CR 712.21a arrangement: the board
 -- on which its two cards have arrived in alice's graveyard.

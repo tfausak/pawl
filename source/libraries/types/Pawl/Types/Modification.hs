@@ -281,6 +281,10 @@ data Modification ability
     -- artifact. Pawl.ProjectionSpec's "CR 205.1a Nameless Inversion strips the
     -- Wall type, and the Wall blocks what no Wall may block" proves that.
     LoseEveryCreatureSubtype
+  | -- | layer 4, CR 613.1d / 205.1a set: this object's creature types become
+    -- those of the card its source exiled LAST among those the filter matches
+    -- (CR 607.2a, 613.7d) -- Duplicant. No such card leaves them alone.
+    SetCreatureSubtypesOfLastCardExiledWith (Filter.Filter Keyword.Keyword)
   | -- | layer 4, CR 613.1d / CR 205.1b add, over the subtype families the two
     -- family-tagged adds above cannot reach: CR 205.3g's artifact types (Ygra,
     -- Eater of All's "other creatures are Food artifacts in addition to their

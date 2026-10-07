@@ -183,6 +183,13 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       codec
       Modification.LoseEveryCreatureSubtype
       " {\"type\":\"LoseEveryCreatureSubtype\"} "
+  -- layer 4, CR 205.1a set to a linked card's creature types (Duplicant).
+  Spec.it s "SetCreatureSubtypesOfLastCardExiledWith carries its filter" $
+    Common.assertCodec
+      s
+      codec
+      (Modification.SetCreatureSubtypesOfLastCardExiledWith (Filter.HasCardType CardType.Creature))
+      " {\"type\":\"SetCreatureSubtypesOfLastCardExiledWith\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
   -- layer 4, CR 205.1b add outside the land and creature families (Ygra, Eater
   -- of All). A different subtype from every arm above, so a codec that crossed
   -- this arm with one of them cannot pass both.

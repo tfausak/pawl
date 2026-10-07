@@ -5,9 +5,11 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.AgainstLastCardExiledWith as AgainstLastCardExiledWith
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastFrom as CastFrom
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CompletedDungeon as CompletedDungeon
@@ -757,6 +759,14 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.Plus (Plus.MkPlus (Quantity.Literal 1) (Quantity.AgainstCardsExiledWith Quantity.Toughness)))
       " {\"type\":\"Plus\",\"value\":{\"left\":{\"type\":\"Literal\",\"value\":1},\"right\":{\"type\":\"AgainstCardsExiledWith\",\"value\":{\"type\":\"Toughness\"}}}} "
+  -- CR 607.2a / 613.7d (Duplicant): the filter picking the card, then what to
+  -- read off it.
+  Spec.it s "AgainstLastCardExiledWith" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.AgainstLastCardExiledWith (AgainstLastCardExiledWith.MkAgainstLastCardExiledWith (Filter.HasCardType CardType.Creature) Quantity.Toughness))
+      " {\"type\":\"AgainstLastCardExiledWith\",\"value\":{\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"quantity\":{\"type\":\"Toughness\"}}} "
   -- CR 702.167c: the arm above's shape, over the craft materials alone.
   Spec.it s "AgainstCraftMaterials" $
     Common.assertCodec
