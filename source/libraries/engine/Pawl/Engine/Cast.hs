@@ -1762,13 +1762,14 @@ castableGiven shared pid oid name facing gs =
       -- on the object. Off `proposed` rather than the candidate's board, since
       -- nothing rule 702.103b writes is a thing rule 118.14's rider reads.
       --
-      -- CR 118.8: payable together with the additional costs of SOME
-      -- permission the cast could be made under (Dawnhand Dissident's).
-      extras = maybe [[]] (\face -> permissionCostChoices pid oid face proposed) (proposedFace oid name proposed)
+      -- CR 118.8 / 601.2f: payable together with the additional costs and the
+      -- reduction of SOME permission the cast could be made under (Dawnhand
+      -- Dissident's costs, Urianger Augurelt's reduction).
+      extras = maybe [([], [])] (\face -> permissionCostChoices pid oid face proposed) (proposedFace oid name proposed)
       candidateOk candidate =
         candidateAllowed pid oid proposed candidate
           && candidateFillable pid oid name proposed candidate
-          && any (\extra -> payable (CandidateCost.reductions candidate) (spendingFor pid oid proposed) (proposedFor oid (CandidateCost.keyword candidate) proposed) (withPermissionCosts extra (CandidateCost.cost candidate))) extras
+          && any (\(extra, less) -> payable (CandidateCost.reductions candidate <> less) (spendingFor pid oid proposed) (proposedFor oid (CandidateCost.keyword candidate) proposed) (withPermissionCosts extra (CandidateCost.cost candidate))) extras
    in cardGatesOk pid oid name proposed
         && lookGateOk pid oid name gs proposed
         -- Gated HERE, upstream of Action.legalActions, because the engine never
@@ -2568,12 +2569,13 @@ castWays :: (ObjectId -> Bool) -> Bool -> PlayerId -> ObjectId -> Zone.Zone -> F
 castWays rides offered pid oid zone face gs =
   PlayerEffect.castPermissionOptions rides (offered || (zone == Zone.Exile && exileOpen pid oid face gs)) pid zone oid gs
 
--- CR 118.8: the additional costs each way castWays offers would add, [[]] where
--- there is no permission to choose among.
-permissionCostChoices :: PlayerId -> ObjectId -> Face.Face Card.Type.Card -> GameState -> [[CostComponent.CostComponent Keyword]]
+-- CR 118.8 / 601.2f: the additional costs and the reductions each way castWays
+-- offers would bring, one empty pair where there is no permission to choose
+-- among.
+permissionCostChoices :: PlayerId -> ObjectId -> Face.Face Card.Type.Card -> GameState -> [([CostComponent.CostComponent Keyword], [ManaCost.ManaCost])]
 permissionCostChoices pid oid face gs = case foldMap (\zone -> castWays (const False) False pid oid zone face gs) (Game.zoneOf oid gs) of
-  [] -> [[]]
-  ways -> fmap PlayerEffect.permissionCosts ways
+  [] -> [([], [])]
+  ways -> fmap (\way -> (PlayerEffect.permissionCosts way, PlayerEffect.permissionReductions way)) ways
 
 -- CR 601.2f: `cost` with a permission's additional costs added to it.
 withPermissionCosts :: [CostComponent.CostComponent Keyword] -> Cost Keyword -> Cost Keyword
@@ -3119,9 +3121,17 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
           -- adjustments read the Aura a bestow announcement would make of the
           -- spell rather than the creature it prints. Thalia's "noncreature
           -- spells cost {1} more" is what tells the two apart.
+          --
+          -- CR 601.2f: payable under the reduction of SOME permission the cast
+          -- could be made under (Urianger Augurelt's {2} less). Which one it is
+          -- made under is asked below, and payableCost re-asks the cost with
+          -- that permission's own reduction once it is.
+          permissionReductionChoices = case permissions of
+            [] -> [[]]
+            ways -> fmap PlayerEffect.permissionReductions ways
           payableCandidates =
             filter
-              (\candidate -> payableCost (Just chosenModes) (CandidateCost.reductions candidate) spending pid sid (proposedFor sid (CandidateCost.keyword candidate) gs) (CandidateCost.cost candidate))
+              (\candidate -> any (\less -> payableCost (Just chosenModes) (CandidateCost.reductions candidate <> less) spending pid sid (proposedFor sid (CandidateCost.keyword candidate) gs) (CandidateCost.cost candidate)) permissionReductionChoices)
               (fmap (\candidate -> candidate {CandidateCost.cost = withSplice (withBuyback (withKicker (withModeCost (withEscalate (withEntwine (CandidateCost.cost candidate))))))}) candidateCosts)
           payable = fmap CandidateCost.cost payableCandidates
       if null payable || overKickerLimit || not spliceValid
@@ -3167,7 +3177,7 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                   -- cannot come from different candidates. Two emerge candidates
                   -- differ in the object their sacrifice component names (CR
                   -- 702.119c), so they are never the tie the note above describes.
-                  chosenReductions = foldMap CandidateCost.reductions chosenCandidate
+                  candidateReductions = foldMap CandidateCost.reductions chosenCandidate
               -- CR 601.3: otherwise, which of the permissions admitting the cast
               -- it is made under -- the budget it spends and the rider it gets.
               permissionUsed <- if ownPermission then pure Nothing else choosePlayPermission pid sid permissions
@@ -3175,6 +3185,8 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                   -- CR 118.8 / 601.2f: the permission's additional costs join
                   -- the chosen candidate's.
                   chargedCost = withPermissionCosts (PlayerEffect.permissionCosts permissionUsed) chosenCost
+                  -- CR 601.2f: and its reduction joins the candidate's.
+                  chosenReductions = candidateReductions <> PlayerEffect.permissionReductions permissionUsed
               -- CR 702.103b: the announcement has settled on the bestow
               -- candidate, so the spell becomes an Aura enchantment with enchant
               -- creature -- BEFORE CR 601.2c's targets below, which that rule's

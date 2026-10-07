@@ -1810,7 +1810,7 @@ uriangerSpec s registry =
     -- differing in the zone the land is played from: the Island in her hand on
     -- the same board gains nothing.
     Spec.it s "CR 305.1 playing a land from exile with Urianger gains 2 life, and playing one from hand does not" $ do
-      (exiledIsland, handIsland, gs) <- uriangerLandBoard s registry
+      (exiledIsland, handIsland, gs) <- uriangerPlayBoard s registry "Island" 0
       let landPlayFrom oid =
             let played = S.runPure exilingAnswer gs (Cast.playLand False S.alice oid Nothing)
              in S.runPure exilingAnswer played (Engine.settleForPriority >> Monad.void Stack.resolveTop)
@@ -1822,17 +1822,38 @@ uriangerSpec s registry =
       Spec.assertBool s (offered exiledIsland && offered handIsland) "alice is offered both land plays"
       Spec.assertEqWith s "each Island reached the battlefield" (fmap (length . Game.zoneMembers Zone.Battlefield S.alice . landPlayFrom) [exiledIsland, handIsland]) [2, 2]
 
--- Urianger's land-play board: alice's Urianger with an Island on top of her
--- library and another in her hand, Draw Arcanum run (exiling the top Island face
--- down) and Play Arcanum active. Answers the exiled Island, the hand Island and
--- the board, alice holding priority in her main phase on an empty stack.
-uriangerLandBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-uriangerLandBoard s registry = do
+    -- CR 601.2f: "spells you cast this way cost {2} less to cast". Two
+    -- Mountains pay a Hill Giant ({3}{R}) cast from among the cards exiled with
+    -- Urianger, and the PAIR's other copy, in her hand on the same board, is
+    -- not castable off them.
+    Spec.it s "CR 601.2f a spell cast with Play Arcanum costs {2} less, and the same spell from hand does not" $ do
+      (exiledGiant, handGiant, gs) <- uriangerPlayBoard s registry "Hill Giant" 2
+      let offered oid = any (S.isCastOf oid) (Action.legalActions S.alice gs)
+          -- Cast as the offered action names it: Draw Arcanum exiled the card
+          -- face down, and CR 708.2a leaves it no name of its own until then.
+          casting = case [(name, facing) | Action.Type.Cast o name facing <- Action.legalActions S.alice gs, o == exiledGiant] of
+            (name, facing) : _ -> Cast.castSpell S.manaPerformer S.alice exiledGiant name facing >> Monad.void Stack.resolveTop
+            [] -> pure ()
+          cast = S.runPure exilingAnswer gs casting
+          giants = filter (\oid -> fmap S.nameOf (Game.cardOf oid cast) == Just (CardName.MkCardName (Text.pack "Hill Giant"))) (Game.zoneMembers Zone.Battlefield S.alice cast)
+      -- The gameplay-level claims, first.
+      Spec.assertEqWith s "CR 601.2f: the exiled Hill Giant resolves off two Mountains" (length giants) 1
+      Spec.assertBool s (not (offered handGiant)) "and the one in her hand, which no permission reduces, is not castable off them"
+      Spec.assertBool s (offered exiledGiant) "the exiled Hill Giant is offered"
+
+-- Urianger's play board: alice's Urianger and `mountains` Mountains, one copy
+-- of `name` on top of her library and another in her hand, Draw Arcanum run
+-- (exiling the top copy face down) and Play Arcanum active. Answers the exiled
+-- copy, the hand copy and the board, alice holding priority in her main phase
+-- on an empty stack.
+uriangerPlayBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> Int -> m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+uriangerPlayBoard s registry name mountains = do
   urianger <- S.printingOf s registry "Urianger Augurelt"
-  island <- S.printingOf s registry "Island"
-  let (uriangerId, g1) = S.addPermanent urianger S.alice (Setup.emptyGame S.bothPlayers)
-      (_, g2) = S.addLibraryCard island S.alice g1
-      (handIsland, g3) = S.addHandCard island S.alice g2
+  card <- S.printingOf s registry name
+  mountain <- S.printingOf s registry "Mountain"
+  let (uriangerId, g1) = S.addPermanent urianger S.alice (S.landsFor mountain S.alice mountains (Setup.emptyGame S.bothPlayers))
+      (_, g2) = S.addLibraryCard card S.alice g1
+      (handCopy, g3) = S.addHandCard card S.alice g2
       ready =
         g3
           { GameState.phase = Phase.PrecombatMain,
@@ -1847,7 +1868,7 @@ uriangerLandBoard s registry = do
           untapped = drawn {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Untapped}) uriangerId (GameState.objects drawn)}
           permitted = S.runPure exilingAnswer untapped (Activate.activateAbility S.alice uriangerId play >> Stack.resolveTop)
       case Set.toList (GameState.exile permitted) of
-        [card] -> pure (card, handIsland, permitted)
+        [exiled] -> pure (exiled, handCopy, permitted)
         _ -> Spec.assertFailure s "Draw Arcanum should exile exactly one card"
     _ -> Spec.assertFailure s "Urianger Augurelt should print two activated abilities"
 
