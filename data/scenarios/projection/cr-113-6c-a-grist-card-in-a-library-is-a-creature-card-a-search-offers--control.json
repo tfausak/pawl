@@ -105,7 +105,8 @@
           "prompt": "Search",
           "with": [
             "$subject"
-          ]
+          ],
+          "unoffered": true
         }
       }
     },
@@ -187,7 +188,8 @@
           "prompt": "Search",
           "with": [
             "$mountain"
-          ]
+          ],
+          "unoffered": true
         }
       }
     },

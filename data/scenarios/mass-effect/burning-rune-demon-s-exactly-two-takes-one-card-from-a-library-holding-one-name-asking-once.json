@@ -101,9 +101,9 @@
         "Answer": {
           "prompt": "Shuffle",
           "with": [
-            "Burning-Rune Demon",
-            "Murder",
-            "Murder"
+            "$demon-2",
+            "$murder",
+            "$murder-2"
           ]
         }
       }

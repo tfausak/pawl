@@ -86,7 +86,8 @@
               "$giant",
               3
             ]
-          ]
+          ],
+          "unoffered": true
         }
       }
     },

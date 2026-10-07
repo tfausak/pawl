@@ -127,10 +127,13 @@
         "Answer": {
           "prompt": "Shuffle",
           "with": [
-            "Ornithopter",
-            "Subterranean Schooner",
-            "Day of Judgment",
-            "Forest"
+            "$giant-spider",
+            "$murder",
+            "$ornithopter",
+            "$schooner",
+            "$day-of-judgment",
+            "$pacifism",
+            "$forest"
           ]
         }
       }
