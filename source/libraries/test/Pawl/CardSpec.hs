@@ -277,6 +277,7 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
+import qualified Pawl.Types.PlaysLand as PlaysLand
 import qualified Pawl.Types.PlotFromZone as PlotFromZone
 import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.Pool as Pool
@@ -4446,7 +4447,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PlayerScries _ -> []
   TriggerCondition.RingTemptsPlayer _ -> []
   TriggerCondition.PlayerSurveils _ -> []
-  TriggerCondition.PlayerPlaysLand _ -> []
+  TriggerCondition.PlayerPlaysLand payload -> unframed [PlaysLand.filter payload]
   TriggerCondition.PlayerProliferates _ -> []
   TriggerCondition.PlayerManifestsDread _ -> []
   TriggerCondition.PlayerRollsDice _ -> []
