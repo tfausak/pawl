@@ -81,6 +81,7 @@ import qualified Pawl.Engine.Room as Room
 import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Soulbond as Soulbond
+import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Star as Star
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.TimeTravel as TimeTravel
@@ -7992,9 +7993,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   ActivePlayerEffect.MkActivePlayerEffect
                     { ActivePlayerEffect.source = source,
                       ActivePlayerEffect.controller = controller,
-                      -- CR 608.2h: the names chosen so far, determined once as
+                      -- CR 608.2h: the choices made so far, determined once as
                       -- the effect begins (Pawl.Types.ActivePlayerEffect).
-                      ActivePlayerEffect.chosenNames = Game.chosenNamesWithLastKnown source gs,
+                      ActivePlayerEffect.choices = SourceContext.choicesOf source gs,
                       ActivePlayerEffect.timestamp = ts,
                       ActivePlayerEffect.expiry = expiry,
                       ActivePlayerEffect.scope = scope,

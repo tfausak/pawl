@@ -1367,11 +1367,17 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
       "Cheering Fanatic's one atom is framed by its stored player effect"
       (hasChosenNameCounts (S.combinedFace fanatic))
       (1, 0)
+    ward <- S.printingOf s registry "Synthetic Name Ward"
     Spec.assertEqWith
       s
-      "and the seven cards' atoms are the pool's only ones"
+      "Synthetic Name Ward's one atom is framed by its stored player effect"
+      (hasChosenNameCounts (S.combinedFace ward))
+      (1, 0)
+    Spec.assertEqWith
+      s
+      "and the eight cards' atoms are the pool's only ones"
       (sum (fmap (uncurry (+) . hasChosenNameCounts . S.combinedFace) ps))
-      9
+      10
   -- CR 702.16k's chosen player in the same frame one atom over: answerable only
   -- where a protection quality is read, and every one of those four positions
   -- takes its filter off a keyword. See ofChosenPlayerOffends for the two

@@ -312,7 +312,7 @@ copyNames oid row = case row of
 
 playerEffectRowNames :: ObjectId -> ActivePlayerEffect.ActivePlayerEffect -> Bool
 playerEffectRowNames oid row = case row of
-  ActivePlayerEffect.MkActivePlayerEffect source _controller _chosenNames _timestamp expiry _scope effect ->
+  ActivePlayerEffect.MkActivePlayerEffect source _controller _choices _timestamp expiry _scope effect ->
     source == oid || Mentions.expiryNames (unread oid) expiry || Mentions.playerEffectNames (unread oid) effect
 
 blockRequirementNames :: ObjectId -> ActiveBlockRequirement.ActiveBlockRequirement -> Bool

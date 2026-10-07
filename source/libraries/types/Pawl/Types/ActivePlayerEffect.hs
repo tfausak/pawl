@@ -1,12 +1,11 @@
 module Pawl.Types.ActivePlayerEffect where
 
-import qualified Data.Set as Set
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
-import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.SourceChoices as SourceChoices
 import qualified Pawl.Types.Timestamp as Timestamp
 
 -- | CR 611.1 / 613.11: a stored, resolution-generated player or rules-modifying
@@ -63,9 +62,9 @@ data ActivePlayerEffect = MkActivePlayerEffect
     -- answers False for one.
     source :: ObjectId.ObjectId,
     controller :: PlayerId.PlayerId,
-    -- | CR 608.2h / 611.2a: the names `source` had chosen as the effect began,
-    -- baked so a later choice by the same permanent leaves this row's alone.
-    chosenNames :: Set.Set CardName.CardName,
+    -- | CR 608.2h / 611.2a: what `source` had chosen as the effect began, baked
+    -- so a later choice by the same permanent leaves this row's alone.
+    choices :: SourceChoices.SourceChoices,
     timestamp :: Timestamp.Timestamp,
     expiry :: Expiry.Expiry,
     scope :: AffectedPlayers.AffectedPlayers PlayerId.PlayerId,
