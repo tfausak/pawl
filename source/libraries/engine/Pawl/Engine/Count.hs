@@ -39,6 +39,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
+import qualified Pawl.Types.LeftTheGame as LeftTheGame
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.MovedBetween as MovedBetween
@@ -907,16 +908,16 @@ snapshotView viewOf gs shape event = case event of
   GameEvent.BecameUnattached {} -> Nothing
   -- CR 701.17a names its cards by id and snapshots no characteristics.
   GameEvent.Milled {} -> Nothing
-  -- CR 603.6c's other road off the battlefield: this event is recorded only for a
-  -- phased-in permanent leaving the game, so it answers MovedFrom Battlefield
-  -- and nothing else, read off the CR 608.2h record filed under its id.
-  GameEvent.LeftTheGame oid -> case shape of
-    EventShape.MovedFrom Zone.Battlefield -> fmap leftView (Map.lookup oid (GameState.lastKnown gs))
+  -- CR 603.6c's other road off the battlefield, and CR 729.4a's out of any
+  -- main-game zone: this event answers MovedFrom the zone it records and nothing
+  -- else, read off the CR 608.2h record filed under its id.
+  GameEvent.LeftTheGame (LeftTheGame.MkLeftTheGame oid from) -> case shape of
+    EventShape.MovedFrom zone | zone == from -> fmap leftView (Map.lookup oid (GameState.lastKnown gs))
     _ -> Nothing
     where
       leftView lastKnown =
         viewOfSnapshot
-          (deployIn gs Zone.Battlefield)
+          (deployIn gs from)
           (Just (LastKnown.controller lastKnown))
           (Just (LastKnown.owner lastKnown))
           (Game.sourceIsToken (LastKnown.source lastKnown))
