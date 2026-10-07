@@ -57,7 +57,8 @@
             "$enchanted",
             "$other",
             "$giant"
-          ]
+          ],
+          "unoffered": true
         }
       }
     },

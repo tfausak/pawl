@@ -169,7 +169,11 @@ data Modification ability
     -- and a STATIC ability (StaticAbility.name) are the carriers of a name, so
     -- those are what this reaches: Gliding Licid removes the first, Synthetic
     -- Silenced Sentinel the second, Glittering Lion the third, Synthetic Muted
-    -- Captain the fourth.
+    -- Captain the fourth. So are the rule and player abilities CR 116.2d's
+    -- ignore names (AffectedUnless.name, PlayerStaticAbility.name,
+    -- ActivationProhibition.name), read per row by
+    -- Projection.namedAbilityRemoval: Synthetic Grounded Sentry removes a
+    -- "can't block", Synthetic Hushed Warden a "can't gain life".
     --
     -- Distinct from LoseAllAbilities above, and observably so: a Licid keeps its
     -- other printed ability ("Enchanted creature has flying") while losing the

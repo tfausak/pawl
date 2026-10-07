@@ -123,11 +123,11 @@
         "Answer": {
           "prompt": "Shuffle",
           "with": [
-            "Burning-Rune Demon",
-            "Murder",
-            "Murder",
-            "Hill Giant",
-            "Forest"
+            "$demon-2",
+            "$murder",
+            "$murder-2",
+            "$hill-giant",
+            "$forest"
           ]
         }
       }

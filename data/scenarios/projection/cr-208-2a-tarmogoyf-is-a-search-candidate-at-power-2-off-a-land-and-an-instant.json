@@ -145,7 +145,8 @@
           "prompt": "Search",
           "with": [
             "$giant"
-          ]
+          ],
+          "unoffered": true
         }
       }
     },
@@ -228,7 +229,8 @@
           "prompt": "Search",
           "with": [
             "$mountain"
-          ]
+          ],
+          "unoffered": true
         }
       }
     },

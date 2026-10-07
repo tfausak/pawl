@@ -2019,7 +2019,7 @@ wordSwapOf m = case m of
 -- effect or counter is a single part and carries none.
 --
 -- Three ability losses: CR 305.7's land-subtype strip (liveGiven) drops the
--- permanent outright, CR 613.1f's layer-6 removal (abilitiesRemoved) drops only
+-- permanent outright, CR 613.1f's layer-6 removal (abilitiesRemovedBy) drops only
 -- an ability whose every part lands after layer 6, and CR 604.2's "as long as"
 -- gate drops one whose clause is currently false. Neither of the first two
 -- touches a stored effect or a counter (CR 611.2a; CR 122.1a/613.4c). The last
@@ -2104,7 +2104,7 @@ carriesCondition sa =
 -- CR 604.2: is this static ability's "as long as" clause true right now?
 --
 -- The VIEW is bounded at the ability's own lowest layer -- CR 613.6's decision
--- point, and where abilitiesRemoved judges a remover's affected set. So Kird
+-- point, and where abilitiesRemovedBy judges a remover's affected set. So Kird
 -- Ape's layer-7c clause reads a Forest through layers 1-6. Bounded rather than
 -- full because a condition read against a projection including its OWN layer
 -- would be circular, and the descending bound is what makes the nesting
@@ -2670,13 +2670,25 @@ candidatesFor a gs = case a of
 -- outside the fold, so it answers the gate against the seed list the way
 -- setLandSubtypeEffects does rather than wiring it open.
 abilityRemoval :: GameState -> ObjectId -> Bool
-abilityRemoval gs =
+abilityRemoval gs = namedAbilityRemoval gs Nothing
+
+-- abilityRemoval asked of ONE ability carrying `name`: a wipe removes it, and so
+-- does a CR 613.1f removal of that name. For the rule and player abilities that
+-- carry a name (Pawl.Engine.CombatRestriction.nameOf,
+-- PlayerStaticAbility.name, ActivationProhibition.name); Nothing answers as
+-- abilityRemoval does. Pawl.ActivateSpec's Synthetic Grounded Sentry and
+-- Synthetic Hushed Warden groups prove it.
+namedAbilityRemoval :: GameState -> Maybe AbilityName.AbilityName -> ObjectId -> Bool
+namedAbilityRemoval gs =
   let gated = gatedGather gs
+      wiped = any (wipesAbilities . gModification) gated
+      named = Set.fromList [n | c <- gated, Modification.LoseNamedAbility n <- [gModification c]]
    in -- Almost every board has no ability-removing effect, and then no projection
       -- is spent on the question.
-      if any (wipesAbilities . gModification) gated
-        then abilitiesRemoved gated gs
-        else const False
+      \name ->
+        if wiped || maybe False (`Set.member` named) name
+          then abilitiesRemovedBy name (const True) gated gs
+          else const False
 
 -- gather's candidate list with CR 604.2's gate asked and CR 613.1f's layer-6 gate
 -- left open -- what the two outside-the-fold removal readers below share. The
@@ -2845,14 +2857,10 @@ removesNamed name m = case m of
   _ -> False
 
 -- CR 613.1f / 613.1g: were `oid`'s abilities removed by the time layer 6
--- finished, by any remover on the board?
-abilitiesRemoved :: [Gathered] -> GameState -> ObjectId -> Bool
-abilitiesRemoved = abilitiesRemovedBy Nothing (const True)
-
--- CR 613.1f / 613.1g: abilitiesRemoved, counting only the removers `keep`
--- admits. `keep` narrows the REMOVERS alone, never `cands`: that list is also
--- what the object is projected THROUGH, so filtering it would answer the
--- question against a board the game does not have.
+-- finished, counting only the removers `keep` admits? `keep` narrows the
+-- REMOVERS alone, never `cands`: that list is also what the object is projected
+-- THROUGH, so filtering it would answer the question against a board the game
+-- does not have.
 --
 -- CR 613.6's rescue falls out of reading the removers off the same candidate
 -- list: an ability-removing effect is itself a layer-6 part, so an ability

@@ -91,7 +91,8 @@
       "do": {
         "Answer": {
           "prompt": "RollDie",
-          "with": 7
+          "with": 7,
+          "unoffered": true
         }
       }
     },

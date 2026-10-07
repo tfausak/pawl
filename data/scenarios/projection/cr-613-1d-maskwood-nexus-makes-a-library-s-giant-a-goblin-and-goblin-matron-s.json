@@ -132,7 +132,8 @@
           "prompt": "Search",
           "with": [
             "$mountain"
-          ]
+          ],
+          "unoffered": true
         }
       }
     },

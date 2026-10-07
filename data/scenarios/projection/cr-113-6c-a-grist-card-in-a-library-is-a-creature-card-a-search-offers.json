@@ -105,7 +105,8 @@
           "prompt": "Search",
           "with": [
             "$giant"
-          ]
+          ],
+          "unoffered": true
         }
       }
     },

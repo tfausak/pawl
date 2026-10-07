@@ -58,7 +58,8 @@
       "do": {
         "Answer": {
           "prompt": "ChooseBolster",
-          "with": "$wall-of-stone"
+          "with": "$wall-of-stone",
+          "unoffered": true
         }
       }
     },

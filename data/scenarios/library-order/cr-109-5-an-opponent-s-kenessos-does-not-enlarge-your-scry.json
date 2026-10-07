@@ -80,7 +80,8 @@
               "$mountain"
             ],
             []
-          ]
+          ],
+          "unoffered": true
         }
       }
     },

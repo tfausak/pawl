@@ -106,7 +106,8 @@
           "prompt": "Search",
           "with": [
             "$chromatic-star"
-          ]
+          ],
+          "unoffered": true
         }
       }
     },
