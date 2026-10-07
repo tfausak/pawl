@@ -22,6 +22,8 @@ spec s = Spec.describe s "Pawl.Codec.Reference" $ do
     Common.assertCodec s Reference.codec (Reference.Type.TriggerOf (Reference.Type.Labelled (Label.Type.MkLabel (Text.pack "bear")))) " \"trigger of $bear\" "
   Spec.it s "an activated one names a printed source too" $
     Common.assertCodec s Reference.codec (Reference.Type.AbilityOf (Reference.Type.Printed (CardName.Type.MkCardName (Text.pack "Grizzly Bears")) 2)) " \"ability of Grizzly Bears#2\" "
+  Spec.it s "a cast spell is named by the card it was cast from" $
+    Common.assertCodec s Reference.codec (Reference.Type.SpellOf (Reference.Type.Labelled (Label.Type.MkLabel (Text.pack "will")))) " \"spell of $will\" "
   Spec.it s "an explicit first occurrence reads as the bare name" $
     Common.assertFromJson s (Codec.decode Reference.codec) " \"Grizzly Bears#1\" " (Reference.Type.Printed (CardName.Type.MkCardName (Text.pack "Grizzly Bears")) 1)
   Spec.it s "rejects a bare @, an empty string and a non-number occurrence" $

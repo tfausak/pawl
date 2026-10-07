@@ -16,4 +16,7 @@ data Reference
     TriggerOf Reference
   | -- | CR 602.2: the topmost activated ability on the stack from this source.
     AbilityOf Reference
+  | -- | CR 601.2a: the spell this card became when it was last cast this turn,
+    -- whether or not it is still on the stack.
+    SpellOf Reference
   deriving (Eq, Ord, Show)

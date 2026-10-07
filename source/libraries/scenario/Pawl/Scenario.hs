@@ -35,6 +35,7 @@ import qualified Pawl.Engine.Attach as Attach
 import qualified Pawl.Engine.Card as Engine.Card
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event.Trigger as Event.Trigger
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mana as Mana
@@ -89,6 +90,7 @@ import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.KeywordsAre as KeywordsAre
 import qualified Pawl.Types.Label as Label
 import qualified Pawl.Types.LifeIs as LifeIs
+import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.ManaType as ManaType
@@ -136,6 +138,7 @@ import qualified Pawl.Types.View as View
 import qualified Pawl.Types.ViewIs as ViewIs
 import qualified Pawl.Types.When as When
 import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneChange as ZoneChange
 
 -- | What a run carries between prompts: the entries not yet taken, keyed by
 -- their moment, the board's labels, and the cast or activation whose own
@@ -1428,17 +1431,38 @@ resolveObject ref gs = case ref of
   Reference.AbilityOf source -> onStack source $ \obj -> case Object.source obj of
     Source.OfAbility ability -> Just (ActivatedAbilitySource.source ability)
     _ -> Nothing
+  -- Read off the turn's log rather than the stack, so the spell is still named
+  -- once it has resolved or been countered: an effect it left behind keeps it as
+  -- its source (CR 113.7a).
+  Reference.SpellOf source -> do
+    card <- sourceObject source
+    case List.reverse (castsOf card gs) of
+      oid : _ -> pure oid
+      [] -> failWith (Failure.MkUnknownObject ref False)
   where
-    -- The source may have left the game since (CR 113.7a), so a label is read
-    -- off the board without asking that its object still exist.
     onStack source sourceOf = do
-      labels <- State.gets (Staged.objects . staged)
-      wanted <- case source of
-        Reference.Labelled label | Just oid <- Map.lookup label labels -> pure oid
-        _ -> resolveObject source gs
+      wanted <- sourceObject source
       case [oid | oid <- GameState.stack gs, Just from <- [Game.lookupObject oid gs >>= sourceOf], from == wanted] of
         oid : _ -> pure oid
         [] -> failWith (Failure.MkUnknownObject ref False)
+    -- The source may have left the game since (CR 113.7a), so a label is read
+    -- off the board without asking that its object still exist.
+    sourceObject source = do
+      labels <- State.gets (Staged.objects . staged)
+      case source of
+        Reference.Labelled label | Just oid <- Map.lookup label labels -> pure oid
+        _ -> resolveObject source gs
+
+-- | The spells this card became on the stack this turn (CR 601.2a), oldest
+-- first: each move onto the stack that the card departed for.
+castsOf :: ObjectId.ObjectId -> GameState.GameState -> [ObjectId.ObjectId]
+castsOf card gs =
+  [ ZoneChange.object moved
+  | logged <- Foldable.toList (GameState.events gs),
+    Just moved <- [Event.Trigger.movedOf (LoggedEvent.event logged)],
+    ZoneChange.departed moved == card,
+    ZoneChange.to moved == Zone.Stack
+  ]
 
 -- | A seat (Left) or an object (Right), for a reference that may name either.
 resolveEither :: Reference.Reference -> GameState.GameState -> Run (Either PlayerId.PlayerId ObjectId.ObjectId)
@@ -1575,7 +1599,9 @@ describeObject gs oid = do
       Nothing -> case fmap Object.source (Game.lookupObject oid gs) of
         Just (Source.OfTrigger trigger) -> Text.pack "trigger of " <> describeSource (TriggeredAbilitySource.source trigger)
         Just (Source.OfAbility ability) -> Text.pack "ability of " <> describeSource (ActivatedAbilitySource.source ability)
-        _ -> Text.pack ("object " <> show (ObjectId.unwrap oid))
+        _ -> case [label | (label, card) <- Map.toAscList labels, elem oid (castsOf card gs)] of
+          label : _ -> Codec.Reference.toText (Reference.SpellOf (Reference.Labelled label))
+          [] -> Text.pack ("object " <> show (ObjectId.unwrap oid))
       Just card ->
         let name = Face.name (NonEmpty.head (Card.faces card))
             occurrence = Natural.length (takeWhile (/= oid) (namedObjects name gs)) + 1
