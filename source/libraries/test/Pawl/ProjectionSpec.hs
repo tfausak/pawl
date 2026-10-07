@@ -380,6 +380,22 @@ entwinedGrove forest wildGrowth grove bloodMoon groveFirst =
           else snd (S.addPermanent grove S.alice (snd (S.addPermanent bloodMoon S.alice g)))
    in (growthId, forestId, place attached)
 
+-- A Plains with a Convincing Mirage on it (Island chosen), and Synthetic Entwined
+-- Grove, all alice's; the Grove enters first when the flag is set. Returns the
+-- Plains' and the Mirage's ids, and the board with and without the Grove.
+mutedMirage :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, GameState.GameState)
+mutedMirage plains mirage grove groveFirst =
+  let (plainsId, g1) = S.addPermanent plains S.alice (Setup.emptyGame S.bothPlayers)
+      withMirage g =
+        let (oid, g') = S.addPermanent mirage S.alice g
+         in (oid, S.withChosenSubtype Subtype.Type.Island oid (S.attach oid plainsId g'))
+      (_, without) = withMirage g1
+      (mirageId, with) =
+        if groveFirst
+          then withMirage (snd (S.addPermanent grove S.alice g1))
+          else fmap (snd . S.addPermanent grove S.alice) (withMirage g1)
+   in (plainsId, mirageId, with, without)
+
 -- A Goblin Piker carrying a Bonesplitter, and Synthetic Gilded Trellis, all
 -- alice's, built twice: with a Pacifism on the Piker as well, and without.
 -- Returns the Bonesplitter's id and the two boards.
@@ -2199,6 +2215,27 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     let (growthId, _, gs) = entwinedGrove forest wildGrowth grove bloodMoon False
     Spec.assertEqWith s "still a Mountain land, order-independent" (Projection.cardTypesOf growthId gs, Projection.subtypesOf growthId gs) (Set.fromList [CardType.Enchantment, CardType.Land], Set.fromList [Subtype.Type.Aura, Subtype.Type.Mountain])
     Spec.assertBool s (null (Projection.triggeredAbilitiesOf growthId gs)) "still no mana trigger"
+
+  -- CR 305.7 / 613.8a: the Grove makes the Mirage a land and sets its subtype, so
+  -- the Mirage's own layer-4 ability depends on the Grove for its existence and
+  -- never applies; CR 613.6 rescues nothing, since it had not started applying.
+  -- The Mirage changes nothing the Grove's set reads, so the Grove goes first in
+  -- either timestamp order.
+  Spec.it s "CR 305.7 the Grove makes a Convincing Mirage a Forest land, so its Plains stays a Plains (Grove older)" $ do
+    plains <- S.printingOf s registry "Plains"
+    mirage <- S.printingOf s registry "Convincing Mirage"
+    grove <- S.printingOf s registry "Synthetic Entwined Grove"
+    let (plainsId, mirageId, gs, without) = mutedMirage plains mirage grove True
+    Spec.assertEqWith s "CR 305.7 the Mirage's ability is gone, so the Plains is a Plains" (Projection.subtypesOf plainsId gs) (Set.singleton Subtype.Type.Plains)
+    Spec.assertEqWith s "the Mirage is a Forest land" (Projection.cardTypesOf mirageId gs, Projection.subtypesOf mirageId gs) (Set.fromList [CardType.Enchantment, CardType.Land], Set.fromList [Subtype.Type.Aura, Subtype.Type.Forest])
+    Spec.assertEqWith s "and without the Grove the Plains is an Island" (Projection.subtypesOf plainsId without) (Set.singleton Subtype.Type.Island)
+
+  Spec.it s "CR 613.8b the Mirage still waits for the Grove with the timestamps swapped (Mirage older)" $ do
+    plains <- S.printingOf s registry "Plains"
+    mirage <- S.printingOf s registry "Convincing Mirage"
+    grove <- S.printingOf s registry "Synthetic Entwined Grove"
+    let (plainsId, _, gs, _) = mutedMirage plains mirage grove False
+    Spec.assertEqWith s "the Plains is still a Plains, order-independent" (Projection.subtypesOf plainsId gs) (Set.singleton Subtype.Type.Plains)
 
   -- The proving case for `resolve` reading a peer's attachments off its running
   -- board: read through a full projection, the Bonesplitter is re-projected from
