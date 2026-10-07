@@ -372,17 +372,17 @@ default.
   of a controller reference, the second face of a keyword pair) is folded, not
   filed, for the same reason.
 - **File it** only when it clears the bar above, and cite it inline where the
-  code elides it. **A filed gap names the real card that needs it**, found the
-  way `CLAUDE.md` says a producer is found, in the issue body. If you cannot
-  name one, the gap is not filed: fold it in, or record it in the PR body
-  under "deferred" and let it go. An elision still gets its issue, since the
-  comment at the code site must cite one; the card rule applies to the gap it
-  elides.
+  code elides it. **A filed gap names the card that exercises it**, found the
+  way `CLAUDE.md` says a producer is found, in the issue body: a printing, or
+  a synthetic draft when no printing reaches the rule. "No card in the pool"
+  is the work the issue describes, not a reason to skip filing it. Only a
+  rules reason --- the CR forbids the card, or the behaviour is correct ---
+  lets a known problem go unfiled. An elision still gets its issue, since the
+  comment at the code site must cite one.
 
 Each filed leaf costs a whole unit's fixed overhead later, and a merged PR
 filing about one issue is why the backlog holds its size. A follow-up that
-takes ten minutes now and forty as its own dispatch is folded in; one no card
-reaches is a capability the design forbids building anyway.
+takes ten minutes now and forty as its own dispatch is folded in.
 
 ## Git and the PR
 
