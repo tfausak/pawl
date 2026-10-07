@@ -165,6 +165,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   anyPlayerActivationSpec s registry
   instantSpeedEquipSpec s registry
   silencedSentinelSpec s registry
+  mutedCaptainSpec s registry
 
   Spec.it s "CR 602 activating Prodigal Sorcerer's {T} puts an ability on the stack and taps it" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
@@ -4417,6 +4418,36 @@ silencedSentinelSpec s registry = Spec.describe s "Synthetic Silenced Sentinel (
     Spec.assertEqWith s "CR 613.1f the trigger is gone, so alice gains no life" (S.lifeOf S.alice after) (Just 20)
     Spec.assertEqWith s "and the Plains paid for the removal, the attack tapping the Sentinel" (S.tappedCount S.alice after) 2
     Spec.assertEqWith s "CR 613.1f the activated ability, named by nothing, stays" (fmap (length . (`Projection.abilitiesOf` after)) (sentinelsOf after)) [1]
+
+-- CR 613.1f / 604.2: Synthetic Muted Captain's "{W}: Until end of turn, this
+-- creature loses "Other creatures you control get +1/+0."" names its own STATIC
+-- ability, so the Goblin Piker beside it loses the bonus while the Captain keeps
+-- the {W} ability a wipe would take too. The bonus is a pure layer-7c effect, so
+-- CR 613.6 has nothing already applying to keep.
+mutedCaptainSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+mutedCaptainSpec s registry = Spec.describe s "Synthetic Muted Captain (CR 613.1f)" $ do
+  let captain = S.aliasRef "captain"
+      board =
+        S.board
+          ( S.battlefield S.alice [S.settled "captain" "Synthetic Muted Captain", S.settled "piker" "Goblin Piker", S.settled "mana" "Plains"]
+              NonEmpty.:| [S.playerSetup S.bob]
+          )
+          S.alice
+          S.beginningOfCombat
+      muting = S.on S.beginningOfCombat S.alice (S.activateAction captain Choices.none {Choices.manaSources = Seq.singleton (Just (S.aliasRef "mana"))})
+      noAttack = S.on S.declareAttackers S.alice (S.attack [])
+      named name gs = [o | o <- Game.zoneMembers Zone.Battlefield S.alice gs, Set.member (CardName.MkCardName (Text.pack name)) (Projection.namesOf o gs)]
+      powers name gs = fmap (`Projection.powerOf` gs) (named name gs)
+  Spec.it s "CR 604.2 without the {W} the Piker gets +1/+0" $ do
+    built <- S.buildBoardOrFail s registry board
+    (_, after) <- S.runScriptOrFail s (S.turn 1 [noAttack]) built S.combatGame
+    Spec.assertEqWith s "the bonus applies" (powers "Goblin Piker" after) [Just 3]
+  Spec.it s "CR 613.1f after the {W} the Piker is back to 2, and the {W} survives" $ do
+    built <- S.buildBoardOrFail s registry board
+    (_, after) <- S.runScriptOrFail s (S.turn 1 [muting, noAttack]) built S.combatGame
+    Spec.assertEqWith s "CR 613.1f the named static ability is gone, so the Piker loses +1/+0" (powers "Goblin Piker" after) [Just 2]
+    Spec.assertEqWith s "and the Plains paid for the removal" (S.tappedCount S.alice after) 1
+    Spec.assertEqWith s "CR 613.1f the activated ability, named by nothing, stays" (fmap (length . (`Projection.abilitiesOf` after)) (named "Synthetic Muted Captain" after)) [1]
 
 -- CR 602.5c / 113.2c: Gliding Licid's "{U}, {T}: This creature loses this
 -- ability and becomes an Aura enchantment with enchant creature. Attach it to

@@ -58,6 +58,12 @@ progress noise and still prints GHC's errors in full. One build at a time; no
 `cabal clean`; keep the optimizer on for the suite (`-O0` saves under a minute
 cold and then blows the suite's timeouts). Mutations are the exception, below.
 
+`--test-options` splits on spaces, so a `-p` pattern holding one (`'/CR
+729/'`) arrives mangled and tasty refuses it. Run the built binary instead ---
+`find dist-newstyle -name pawl-test-suite -type f -perm -u+x` --- with
+`pawl_datadir=$PWD/data` in its environment, or it cannot find the corpus and
+throws `MissingRoot`.
+
 The timeout catches infinite loops; it is not an assertion about speed. The
 machine is shared, so a lone TIMEOUT is background noise --- re-run it unloaded
 first; a real hang fails at any budget. ONE budget covers the whole suite and
@@ -179,6 +185,18 @@ perfectly good-looking line of output. Read the label, then decide.
   after another.
 - **Build a negative as a pair of boards differing in exactly one thing.** A
   negative assembled on its own board passes for reasons you did not choose.
+- **Point the pattern at the spec that reads the line.** A pattern reaching
+  the wrong subtree reports NOTHING RED, which looks exactly like a line with
+  no observer. `Pawl.Engine.Event.Binding`'s slots, for one, are pinned by
+  `Pawl.LeavesTriggerSpec`'s "eventBindingSlots names exactly", not by
+  `Pawl.ZoneTriggerSpec`, which only supplies its events. Grep for the test
+  before choosing the pattern.
+- **Address a sed mutation whose text recurs.** A bare `s/.../.../` rewrites
+  every line it matches, and the first failure it reports can come from the
+  other one: `Binding.setEventAmount 1 Map.empty` appears twice in
+  `Pawl.Engine.Event.Binding`. Anchor it (`/a comment above it/{n;s/.../.../}`
+  in an `@FILE` script) and read the failure's condition name before believing
+  it.
 - **Keep the mutated binding referenced.** Deleting a use trips
   `-Wunused-local-binds` under `-Werror`, so a real red comes back as a build
   failure. Neutralize the value instead --- `const Map.empty . f`, `filter

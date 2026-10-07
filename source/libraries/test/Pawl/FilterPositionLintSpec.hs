@@ -1640,6 +1640,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                     Nothing
                     Set.empty
                     Nothing
+                    Nothing
                     (NonEmpty.singleton Modification.LoseAllAbilities)
                 ]
             }
@@ -2120,6 +2121,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
               (Affected.Matching creatures)
               Nothing
               Set.empty
+              Nothing
               Nothing
               (NonEmpty.singleton (Modification.GainKeyword keyword))
           ]
@@ -2731,6 +2733,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
             Nothing
             Set.empty
             Nothing
+            Nothing
             (NonEmpty.singleton (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness quantity (Quantity.Type.Literal 0))))
         planted =
           [ ( "a target slot",
@@ -2746,6 +2749,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                         (Affected.Matching buried)
                         Nothing
                         Set.empty
+                        Nothing
                         Nothing
                         (NonEmpty.singleton (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1))))
                     ]
@@ -2872,7 +2876,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                       [ Effect.Create
                           Create.MkCreate
                             { Create.quantity = Quantity.Type.Literal 1,
-                              Create.card = oneFaced (base {Face.staticAbilities = [StaticAbility.MkStaticAbility (Affected.Matching buried) Nothing Set.empty Nothing (NonEmpty.singleton Modification.LoseAllAbilities)]}),
+                              Create.card = oneFaced (base {Face.staticAbilities = [StaticAbility.MkStaticAbility (Affected.Matching buried) Nothing Set.empty Nothing Nothing (NonEmpty.singleton Modification.LoseAllAbilities)]}),
                               Create.riders = EntryRiders.defaultValue,
                               Create.slot = Nothing,
                               Create.creator = PlayerRef.Relative PlayerRelation.You
@@ -2965,6 +2969,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
             Nothing
             Set.empty
             Nothing
+            Nothing
             (NonEmpty.singleton (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness quantity (Quantity.Type.Literal 0))))
         planted =
           [ -- THE one that separates this lint from a copy of the sibling: an
@@ -2982,6 +2987,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                         (Affected.Matching buried)
                         Nothing
                         Set.empty
+                        Nothing
                         Nothing
                         (NonEmpty.singleton (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1))))
                     ]
@@ -3027,7 +3033,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                       [ Effect.Create
                           Create.MkCreate
                             { Create.quantity = Quantity.Type.Literal 1,
-                              Create.card = oneFaced (base {Face.staticAbilities = [StaticAbility.MkStaticAbility (Affected.Matching buried) Nothing Set.empty Nothing (NonEmpty.singleton Modification.LoseAllAbilities)]}),
+                              Create.card = oneFaced (base {Face.staticAbilities = [StaticAbility.MkStaticAbility (Affected.Matching buried) Nothing Set.empty Nothing Nothing (NonEmpty.singleton Modification.LoseAllAbilities)]}),
                               Create.riders = EntryRiders.defaultValue,
                               Create.slot = Nothing,
                               Create.creator = PlayerRef.Relative PlayerRelation.You
@@ -3144,6 +3150,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                         Nothing
                         Set.empty
                         Nothing
+                        Nothing
                         (NonEmpty.singleton (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1))))
                     ]
                 }
@@ -3174,6 +3181,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                             )
                         )
                         Set.empty
+                        Nothing
                         Nothing
                         (NonEmpty.singleton (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1))))
                     ]
@@ -3298,6 +3306,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                     (Affected.Matching f)
                     Nothing
                     Set.empty
+                    Nothing
                     Nothing
                     (NonEmpty.singleton (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1))))
                 ]

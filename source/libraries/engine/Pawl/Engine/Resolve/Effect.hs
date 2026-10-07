@@ -11077,12 +11077,9 @@ noSubgame = pure Result.Drawn
 -- (CR 400.7) and leaves the old id naming nothing too -- and the read side treats
 -- both the same.
 --
--- The sibling writers below are NOT given the same fallback. bindPlayersSlot's
--- one caller is CR 118.12a's per-player gate, which cannot lose its holder.
--- bindAmountSlot writes onto `source`, which for a SPELL is the same id a subgame
--- can take, but an amount is read back by Pawl.Engine.Quantity's own lookup
--- rather than through liveBindings, so a fallback here would not reach it
--- (#2493).
+-- bindPlayersSlot is NOT given the same fallback: its one caller is CR
+-- 118.12a's per-player gate, which cannot lose its holder. bindAmountSlot is,
+-- for a SPELL's source is the same id a subgame can take.
 bindPlayerSlot :: ObjectId -> SlotName -> Set PlayerId -> GameState -> GameState
 bindPlayerSlot holder slot players gs =
   let binding = Binding.toPlayers players
@@ -11153,11 +11150,20 @@ rescopeRun resolving bodyDefined gs0 =
 -- trigger on the stack -- the amount goes on `resolving`, the object
 -- Quantity.InSlot falls back to, since CR 113.7a resolves the ability anyway.
 -- Pawl.RemoveCounterSpec's bounced Spider-Man proves it.
+--
+-- Where neither exists -- CR 729.5's resumed resolution, a wish inside the
+-- subgame having taken the spell's own card -- the amount goes to
+-- GameState.detachedBindings under `resolving`, bindPlayerSlot's fallback, which
+-- Quantity.InSlot reads back. Pawl.OutsideTheGameSpec's Synthetic Subgame Tithe
+-- case proves it.
 bindAmountSlot :: ObjectId -> ObjectId -> SlotName -> Natural -> GameState -> GameState
 bindAmountSlot resolving source slot n gs =
-  let put obj = obj {Object.bindings = Map.insert slot (Binding.toAmount n) (Object.bindings obj)}
+  let binding = Binding.toAmount n
+      put obj = obj {Object.bindings = Map.insert slot binding (Object.bindings obj)}
       holder = if Map.member source (GameState.objects gs) then source else resolving
-   in gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
+   in if Map.member holder (GameState.objects gs)
+        then gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
+        else gs {GameState.detachedBindings = Map.insertWith Map.union resolving (Map.singleton slot binding) (GameState.detachedBindings gs)}
 
 -- CR 119.5 / 701.12c: move a player's life total by a delta. A DOWNWARD delta is
 -- a life loss and goes through Event.resolveLifeLoss first, CR 614.1's funnel for

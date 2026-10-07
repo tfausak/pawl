@@ -216,7 +216,7 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- Gond); emptied by LoseAllAbilities (Humility) and by CR 305.7's strip at
     -- layer 4 (Blood Moon), as are the two fields below. A NAMED removal reaches
     -- it too (Modification.LoseNamedAbility, Gliding Licid), as it does the
-    -- replacementEffects below; those two are the ability kinds carrying a name.
+    -- replacementEffects and triggeredAbilities below.
     activatedAbilities :: [ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)],
     -- | CR 614 layer 6: the object's replacement effects after the layer system,
     -- the same projection posture as activatedAbilities, emptied by the same two

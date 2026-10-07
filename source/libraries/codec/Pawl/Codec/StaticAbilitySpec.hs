@@ -9,6 +9,7 @@ import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Compares as Compares
@@ -42,7 +43,7 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
     Common.assertCodec
       s
       codec
-      (StaticAbility.MkStaticAbility Affected.Attached Nothing Set.empty Nothing (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying)))
+      (StaticAbility.MkStaticAbility Affected.Attached Nothing Set.empty Nothing Nothing (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying)))
       " {\"affected\":{\"type\":\"Attached\"},\"modifications\":[{\"type\":\"GainKeyword\",\"value\":{\"type\":\"Flying\"}}]} "
   -- Humility's shape: several parts under one affected set (CR 613.6).
   Spec.it s "several parts" $
@@ -53,6 +54,7 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
           Affected.Attached
           Nothing
           Set.empty
+          Nothing
           Nothing
           (Modification.LoseAllAbilities NonEmpty.:| [Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness (Just (Quantity.Literal 1)) (Just (Quantity.Literal 1)))])
       )
@@ -78,6 +80,7 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
           )
           Set.empty
           Nothing
+          Nothing
           (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying))
       )
       " {\"affected\":{\"type\":\"Attached\"},\"condition\":{\"type\":\"Compares\",\"value\":{\"measured\":{\"type\":\"Count\",\"value\":{\"scope\":{\"type\":\"InZone\",\"value\":{\"zone\":{\"type\":\"Battlefield\"},\"player\":{\"type\":\"EachPlayer\"}}},\"filter\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Forest\"}},\"aggregation\":{\"type\":\"Members\"}}},\"comparison\":{\"type\":\"AtLeast\"},\"threshold\":{\"type\":\"Literal\",\"value\":1}}},\"modifications\":[{\"type\":\"GainKeyword\",\"value\":{\"type\":\"Flying\"}}]} "
@@ -93,6 +96,7 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
           Nothing
           Set.empty
           (Just Duration.UntilEndOfTurn)
+          Nothing
           (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying))
       )
       " {\"affected\":{\"type\":\"Attached\"},\"lingers\":{\"type\":\"UntilEndOfTurn\"},\"modifications\":[{\"type\":\"GainKeyword\",\"value\":{\"type\":\"Flying\"}}]} "
@@ -108,9 +112,25 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
           Nothing
           (Set.fromList [Zone.Graveyard, Zone.Stack])
           Nothing
+          Nothing
           (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying))
       )
       " {\"affected\":{\"type\":\"Attached\"},\"functionsFrom\":[{\"type\":\"Graveyard\"},{\"type\":\"Stack\"}],\"modifications\":[{\"type\":\"GainKeyword\",\"value\":{\"type\":\"Flying\"}}]} "
+  -- CR 613.1f: the name a LoseNamedAbility removal joins to. Optional for the
+  -- condition's reason.
+  Spec.it s "a name" $
+    Common.assertCodec
+      s
+      codec
+      ( StaticAbility.MkStaticAbility
+          Affected.Attached
+          Nothing
+          Set.empty
+          Nothing
+          (Just (AbilityName.MkAbilityName (Text.pack "rally")))
+          (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying))
+      )
+      " {\"affected\":{\"type\":\"Attached\"},\"modifications\":[{\"type\":\"GainKeyword\",\"value\":{\"type\":\"Flying\"}}],\"name\":\"rally\"} "
   -- CR 613.6 is why a static ability is one affected set and one or more parts, so
   -- the wire format is an array -- and an array can be empty. An ability with
   -- no parts does nothing, which no card means, so it is a decode FAILURE
