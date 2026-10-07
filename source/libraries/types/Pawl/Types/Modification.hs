@@ -165,11 +165,11 @@ data Modification ability
     -- reordered.
     --
     -- An ACTIVATED ability (ActivatedAbility.name), a TRIGGERED ability
-    -- (TriggeredAbility.name) and a PRINTED REPLACEMENT (PrintedReplacement.name)
-    -- are the three carriers of a name, so those are what this reaches: Gliding
-    -- Licid removes the first, Synthetic Silenced Sentinel the second, Glittering
-    -- Lion the third. Not implemented: naming a static ability whose continuous
-    -- effect is not a replacement, for removal (gap #2212).
+    -- (TriggeredAbility.name), a PRINTED REPLACEMENT (PrintedReplacement.name)
+    -- and a STATIC ability (StaticAbility.name) are the carriers of a name, so
+    -- those are what this reaches: Gliding Licid removes the first, Synthetic
+    -- Silenced Sentinel the second, Glittering Lion the third, Synthetic Muted
+    -- Captain the fourth.
     --
     -- Distinct from LoseAllAbilities above, and observably so: a Licid keeps its
     -- other printed ability ("Enchanted creature has flying") while losing the

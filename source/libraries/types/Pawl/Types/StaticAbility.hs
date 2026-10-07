@@ -2,6 +2,7 @@ module Pawl.Types.StaticAbility where
 
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Set as Set
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Duration as Duration
@@ -96,6 +97,10 @@ data StaticAbility ability = MkStaticAbility
     -- Duration.UntilEndOfTurn, the same value a spell would print. A card
     -- naming a different one needs no new field.
     lingers :: Maybe Duration.Duration,
+    -- | The name another clause of the same card uses to refer to this ability,
+    -- or Nothing; the same reference Pawl.Types.ActivatedAbility.name is, read
+    -- by CR 613.1f's Modification.LoseNamedAbility.
+    name :: Maybe AbilityName.AbilityName,
     modifications :: NonEmpty.NonEmpty (Modification.Modification ability)
   }
   deriving (Eq, Ord, Show)

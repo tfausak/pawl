@@ -4203,6 +4203,7 @@ whilePaid family modifications =
       StaticAbility.condition = Just (Condition.Compares (Compares.MkCompares (Quantity.CastUsing family) Comparison.AtLeast (Quantity.Literal 1))),
       StaticAbility.functionsFrom = Set.empty,
       StaticAbility.lingers = Nothing,
+      StaticAbility.name = Nothing,
       StaticAbility.modifications = modifications
     }
 
@@ -4255,6 +4256,7 @@ livingMetal =
           ),
       StaticAbility.functionsFrom = Set.empty,
       StaticAbility.lingers = Nothing,
+      StaticAbility.name = Nothing,
       StaticAbility.modifications =
         Modification.AddCardType CardType.Artifact
           NonEmpty.:| [Modification.AddCardType CardType.Creature]
@@ -4290,6 +4292,7 @@ reconfigured =
       StaticAbility.condition = Nothing,
       StaticAbility.functionsFrom = Set.empty,
       StaticAbility.lingers = Nothing,
+      StaticAbility.name = Nothing,
       StaticAbility.modifications = NonEmpty.singleton (Modification.LoseCardType CardType.Creature)
     }
 
@@ -4306,6 +4309,7 @@ impendingNotCreature =
       StaticAbility.condition = Just impendingHolds,
       StaticAbility.functionsFrom = Set.empty,
       StaticAbility.lingers = Nothing,
+      StaticAbility.name = Nothing,
       StaticAbility.modifications = NonEmpty.singleton (Modification.LoseCardType CardType.Creature)
     }
 

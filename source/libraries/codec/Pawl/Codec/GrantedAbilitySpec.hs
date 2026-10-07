@@ -101,6 +101,7 @@ spec s = Spec.describe s "Pawl.Codec.GrantedAbility" $ do
               Nothing
               Set.empty
               Nothing
+              Nothing
               (NonEmpty.singleton Modification.AssignCombatDamageWithToughness)
           )
       )

@@ -4,6 +4,7 @@ module Pawl.Codec.StaticAbility where
 
 import qualified Data.Set as Set
 import qualified Data.Typeable as Typeable
+import qualified Pawl.Codec.AbilityName as AbilityNameCodec
 import qualified Pawl.Codec.Affected as Affected
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.Duration as Duration
@@ -26,7 +27,7 @@ import qualified Pawl.Types.StaticAbility as StaticAbility
 --
 -- CR 113.6b's zone clause is optional and defaults to EMPTY, which is the
 -- ability stating no zone at all: every card written before the field existed
--- encodes byte-for-byte as it did.
+-- encodes byte-for-byte as it did. CR 613.1f's name is optional too.
 --
 -- The wire format is unchanged by the conversion to a bundle; what it adds is
 -- the schema.
@@ -39,6 +40,7 @@ codec abilityCodec = Fields.object $ do
   condition <- Fields.defaulted "condition" Nothing (Common.maybe Condition.codec) StaticAbility.condition
   functionsFrom <- Fields.defaulted "functionsFrom" Set.empty (Common.set Zone.codec) StaticAbility.functionsFrom
   lingers <- Fields.defaulted "lingers" Nothing (Common.maybe Duration.codec) StaticAbility.lingers
+  name <- Fields.defaulted "name" Nothing (Common.maybe AbilityNameCodec.codec) StaticAbility.name
   modifications <- Fields.required "modifications" (Common.nonEmpty (Modification.codec abilityCodec)) StaticAbility.modifications
   pure
     StaticAbility.MkStaticAbility
@@ -46,5 +48,6 @@ codec abilityCodec = Fields.object $ do
         StaticAbility.condition = condition,
         StaticAbility.functionsFrom = functionsFrom,
         StaticAbility.lingers = lingers,
+        StaticAbility.name = name,
         StaticAbility.modifications = modifications
       }
