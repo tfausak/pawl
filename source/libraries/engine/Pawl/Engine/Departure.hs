@@ -39,6 +39,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LastKnown as LastKnown
+import qualified Pawl.Types.LeftTheGame as LeftTheGame
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Player as Player
@@ -391,7 +392,7 @@ objectsLeaveWith pid gs =
       revealed = Maybe.mapMaybe (\oid -> Event.revealedOn RevealCause.LeavingFaceDown pid oid gs) (filter faceDown permanents)
       faceDown oid = maybe False (Facing.isFaceDown . Object.facing) (Map.lookup oid (GameState.objects gs))
    in Event.simultaneouslyPure
-        (\g -> List.foldl' (\g1 oid -> Event.recordEvent (GameEvent.LeftTheGame oid) g1) (List.foldl' (flip Event.recordEvent) g revealed) permanents)
+        (\g -> List.foldl' (\g1 oid -> Event.recordEvent (GameEvent.LeftTheGame (LeftTheGame.MkLeftTheGame oid Zone.Battlefield)) g1) (List.foldl' (flip Event.recordEvent) g revealed) permanents)
         recorded
 
 -- CR 800.4a, second clause: any effects which give that player control of

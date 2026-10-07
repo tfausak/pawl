@@ -47,6 +47,7 @@ import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.MovedBetween as MovedBetween
 import qualified Pawl.Types.Object as Object
+import qualified Pawl.Types.OutsideDestination as OutsideDestination
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -1104,3 +1105,18 @@ leftBattlefieldSpec s registry =
             "CR 603.6c bob's Hill Giant under alice's control gets her an experience counter as it leaves; under bob's it does not"
             (experience (bounce theirGiant stolen), experience (bounce theirGiant ready))
             (1, 0)
+        -- CR 729.4a's crossing records the zone the card left, and only a
+        -- battlefield one is a permanent leaving the battlefield. The pair differs
+        -- in where bob's Hill Giant sits as a subgame bob plays takes it.
+        Spec.it s "CR 603.6c/729.4a Insatiable Skittermaw counts a Hill Giant a subgame takes from the battlefield, and not one it takes from a graveyard" $ do
+          (skittermawId, theirGiant, _, ready) <- board "Insatiable Skittermaw"
+          hillGiant <- S.printingOf s registry "Hill Giant"
+          let (buriedGiant, withBuried) = S.addGraveyardCard hillGiant S.bob ready
+              cross oid gs = Setup.applyCrossings (snd (Event.bringInFrom OutsideDestination.Hand S.bob oid (Setup.subgameStateFrom S.bob gs))) gs
+              counters = S.counterOf CounterKind.PlusOnePlusOne skittermawId . endStepOf
+          Spec.assertEqWith
+            s
+            "CR 603.6c the battlefield Hill Giant leaving makes the counter; the graveyard one does not"
+            (counters (cross theirGiant withBuried), counters (cross buriedGiant withBuried))
+            (1, 0)
+          Spec.assertEqWith s "setup: each crossing took its card out of the main game" (Map.member theirGiant (GameState.objects (cross theirGiant withBuried)), Map.member buriedGiant (GameState.objects (cross buriedGiant withBuried))) (False, False)
