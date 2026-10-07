@@ -396,6 +396,20 @@ mutedMirage plains mirage grove groveFirst =
           else fmap (snd . S.addPermanent grove S.alice) (withMirage g1)
    in (plainsId, mirageId, with, without)
 
+-- Slivdrazi Monstrosity, a Culling Drone TOKEN (an Eldrazi Ashaya never makes a
+-- land), Ashaya and Blood Moon, all alice's; Blood Moon enters before Slivdrazi
+-- when the flag is set. Returns the token's and Slivdrazi's ids and the board,
+-- with Blood Moon and without it; the ids differ between the two.
+moonedSlivdrazi :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> ((ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState), (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState))
+moonedSlivdrazi slivdrazi drone ashaya bloodMoon moonFirst =
+  let build withMoon =
+        let moon g = if withMoon then snd (S.addPermanent bloodMoon S.alice g) else g
+            (sliv, g1) = S.addPermanent slivdrazi S.alice ((if moonFirst then moon else id) (Setup.emptyGame S.bothPlayers))
+            (token, g2) = S.addToken (Printing.card drone) S.alice g1
+            (_, g3) = S.addPermanent ashaya S.alice g2
+         in (token, sliv, (if moonFirst then id else moon) g3)
+   in (build True, build False)
+
 -- A Goblin Piker carrying a Bonesplitter, and Synthetic Gilded Trellis, all
 -- alice's, built twice: with a Pacifism on the Piker as well, and without.
 -- Returns the Bonesplitter's id and the two boards.
@@ -2257,6 +2271,31 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     let (_, _, _, ashayaId, gs) = ashayaBloodMoon forest piker ashaya bloodMoon True
     Spec.assertBool s (Set.member CardType.Land (Projection.cardTypesOf ashayaId gs)) "Ashaya is a land"
     Spec.assertBool s (Set.member Subtype.Type.Mountain (Projection.subtypesOf ashayaId gs)) "Ashaya is a Mountain"
+
+  -- CR 305.7 / 613.8a: Ashaya makes Slivdrazi a Forest land, so Blood Moon --
+  -- which depends on Ashaya for what it applies to -- reaches it and strips its
+  -- rules text. Slivdrazi's "Eldrazi you control are Slivers" depends on Blood
+  -- Moon for its existence, and Blood Moon on nothing of Slivdrazi's, so it never
+  -- starts applying and CR 613.6 rescues nothing. The token is no land, so only
+  -- Slivdrazi's ability could have made it a Sliver.
+  Spec.it s "CR 305.7 Blood Moon strips an Ashaya-animated Slivdrazi, so the Eldrazi token is no Sliver (Slivdrazi older)" $ do
+    slivdrazi <- S.printingOf s registry "Slivdrazi Monstrosity"
+    drone <- S.printingOf s registry "Culling Drone"
+    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+    bloodMoon <- S.printingOf s registry "Blood Moon"
+    let ((tokenId, slivId, gs), (bareToken, _, without)) = moonedSlivdrazi slivdrazi drone ashaya bloodMoon False
+    Spec.assertBool s (not (Set.member Subtype.Type.Sliver (Projection.subtypesOf tokenId gs))) "CR 305.7 Slivdrazi's ability is gone, so the token is no Sliver"
+    Spec.assertBool s (Set.member Subtype.Type.Mountain (Projection.subtypesOf slivId gs)) "Slivdrazi is a Mountain"
+    Spec.assertBool s (Set.member Subtype.Type.Sliver (Projection.subtypesOf bareToken without)) "and without Blood Moon the token is a Sliver"
+
+  Spec.it s "CR 613.8b Slivdrazi's ability still waits for Blood Moon with the timestamps swapped (Blood Moon older)" $ do
+    slivdrazi <- S.printingOf s registry "Slivdrazi Monstrosity"
+    drone <- S.printingOf s registry "Culling Drone"
+    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+    bloodMoon <- S.printingOf s registry "Blood Moon"
+    let ((tokenId, _, gs), (bareToken, _, without)) = moonedSlivdrazi slivdrazi drone ashaya bloodMoon True
+    Spec.assertBool s (not (Set.member Subtype.Type.Sliver (Projection.subtypesOf tokenId gs))) "the token is still no Sliver, order-independent"
+    Spec.assertBool s (Set.member Subtype.Type.Sliver (Projection.subtypesOf bareToken without)) "and without Blood Moon it is a Sliver"
 
   -- CR 305.7's strip reaching an ability whose lowest layer is AFTER layer 4, on
   -- a permanent that is a land only because a layer-4 effect made it one.
