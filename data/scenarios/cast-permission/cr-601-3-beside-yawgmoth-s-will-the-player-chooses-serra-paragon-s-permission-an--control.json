@@ -124,7 +124,7 @@
         "Answer": {
           "prompt": "ChoosePlayPermission",
           "with": [
-            "Yawgmoth's Will",
+            "spell of $will",
             {
               "from": {
                 "player": {
@@ -142,8 +142,7 @@
                 "value": []
               }
             }
-          ],
-          "unoffered": true
+          ]
         }
       }
     },
@@ -238,6 +237,5 @@
         }
       }
     }
-  ],
-  "note": "The permission's source is the resolved Yawgmoth's Will, which no reference can name once it has left the stack, so the answer is unoffered and falls back to the head of the offer: Yawgmoth's Will's own permission."
+  ]
 }
