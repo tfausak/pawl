@@ -18,6 +18,7 @@ import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Exile as Exile
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -1408,15 +1409,10 @@ permitsCastPlotted pid oid gs = Maybe.fromMaybe False $ do
 -- foretold card is cast whenever its own card type could be, so nothing here
 -- narrows Cast.timingOk.
 --
--- CR 601.3f -- "a player may begin to cast such a spell only if they can look at
--- the face-down card in exile" -- is satisfied by construction rather than
--- checked here: rule 702.143a grants the permission to the card's owner, which
--- is exactly what Pawl.Engine.Exile.mayLookAt reads off the same stamp, and the
--- owner conjunct above is the same player.
---
--- Not implemented: the gate itself, for the effect side rule 601.3f actually
--- scopes itself to -- "a spell with certain qualities from among face-down cards
--- in exile" -- which no permission pawl can express states (#2504).
+-- CR 601.3f does not reach this permission, which names ONE card rather than
+-- rule 601.3f's qualities; `lookGateOk` is where that rule is asked. It would
+-- pass here regardless: rule 702.143a grants the permission to the card's owner,
+-- which is exactly what Pawl.Engine.Exile.mayLookAt reads off the same stamp.
 permitsCastForetold :: PlayerId -> ObjectId -> GameState -> Bool
 permitsCastForetold pid oid gs = Maybe.fromMaybe False $ do
   obj <- Game.lookupObject oid gs
@@ -1478,10 +1474,8 @@ permitsCastWarped pid oid gs = Maybe.fromMaybe False $ do
 -- Pawl.Engine.Commander.canCastFromCommandZone tests, so that zone keeps the
 -- owner-filed list.
 --
--- Not implemented: CR 601.3f's gate on a card exiled FACE DOWN -- "a player may
--- begin to cast such a spell only if they can look at the face-down card in
--- exile". Unreachable today, since every permission this list is then filtered
--- by names ONE exiled object rather than rule 601.3f's qualities (#2504).
+-- A card exiled FACE DOWN is a candidate like any other: CR 601.3f's gate on it
+-- is `lookGateOk`'s, asked of the board before the card is turned up.
 zoneCandidates :: Zone.Zone -> PlayerId -> GameState -> [ObjectId]
 zoneCandidates zone pid gs = case zone of
   Zone.Exile -> Set.toList (GameState.exile gs)
@@ -1775,6 +1769,7 @@ castableGiven shared pid oid name facing gs =
           && candidateFillable pid oid name proposed candidate
           && any (\extra -> payable (CandidateCost.reductions candidate) (spendingFor pid oid proposed) (proposedFor oid (CandidateCost.keyword candidate) proposed) (withPermissionCosts extra (CandidateCost.cost candidate))) extras
    in cardGatesOk pid oid name proposed
+        && lookGateOk pid oid name gs proposed
         -- Gated HERE, upstream of Action.legalActions, because the engine never
         -- offers an illegal action and then rejects it.
         && any candidateOk (windowedCandidates True pid oid name proposed (Cost.candidateCostsFor pid name oid proposed))
@@ -1824,7 +1819,28 @@ couldBeginToCast pid oid name gs =
   let proposed = asProposed oid name Facing.FaceUp gs
       allowed = candidateAllowed pid oid proposed
       candidates = windowedCandidates True pid oid name proposed (Cost.candidateCostsFor pid name oid proposed)
-   in cardGatesOk pid oid name proposed && any allowed candidates
+   in cardGatesOk pid oid name proposed && lookGateOk pid oid name gs proposed && any allowed candidates
+
+-- CR 601.3f / 406.3b: "a player may begin to cast such a spell only if they can
+-- look at the face-down card in exile". Asked of the board BEFORE `asProposed`
+-- turns the card face up (CR 406.3a), since that turn is what the proposal
+-- reads and it leaves nothing face down to ask about.
+--
+-- Rule 601.3f's "such a spell" is one cast from AMONG face-down cards by quality,
+-- which is every Pawl.Types.PlayerEffect.CastFrom grant -- a Filter over a zone
+-- -- and none of the permissions an exiled card carries for itself: each of
+-- `exileOpen`'s names ONE object, so CR 406.3a alone governs it. A card this
+-- player may not look at therefore stays castable under those and no other.
+lookGateOk :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> GameState -> Bool
+lookGateOk pid oid name before proposed =
+  Exile.mayLookAt pid oid before
+    || maybe False (\face -> exileOpen pid oid face proposed) (proposedFace oid name proposed)
+
+-- `castWays`' options a cast may still be made under once CR 601.3f has been
+-- asked (`lookGateOk`): every one where the caster may look at the card, and
+-- otherwise only those made under no CastFrom grant.
+lookedWays :: Bool -> [Maybe (ObjectId, CastFromZone.CastFromZone)] -> [Maybe (ObjectId, CastFromZone.CastFromZone)]
+lookedWays looks ways = if looks then ways else filter Maybe.isNothing ways
 
 -- The facings a face may be cast in (CR 702.37d, 702.168c): face up always,
 -- and face down once per ability that allows it. castableSpells and
@@ -2263,6 +2279,9 @@ castSpell perform = castSpellWith perform True False [] ManaSpending.AsProduced
 -- `spendingFor`'s reason.
 castSpellWith :: ManaAbilityPerformer.ManaAbilityPerformer -> Bool -> Bool -> [CandidateCost.CandidateCost] -> ManaSpending -> PlayerId -> ObjectId -> CardName.CardName -> Facing.Facing -> Game ()
 castSpellWith perform timed offered applied widened pid oid name facing = Event.announcing $ do
+  -- CR 601.3f, asked of the card while it is still face down, `lookGateOk`'s
+  -- reason; `permissions` below is what reads it.
+  looks <- State.gets (Exile.mayLookAt pid oid)
   -- CR 406.3a, run BEFORE `before` is read and so before CR 601.2e's rewind
   -- captures it: the turn happens just before the announcement rather than
   -- inside it, so a cast the player backs out of leaves the card face up.
@@ -2373,7 +2392,7 @@ castSpellWith perform timed offered applied widened pid oid name facing = Event.
           -- same PROPOSED state and for `spent`'s reason -- the ones the gate
           -- offered the cast under are the ones castProposed chooses among, and
           -- a rejected announcement spends none.
-          permissions = foldMap (\zone -> castWays (\src -> not (null (Event.permissionRiders src proposed oid))) offered pid oid zone face proposed) castFrom
+          permissions = lookedWays looks (foldMap (\zone -> castWays (\src -> not (null (Event.permissionRiders src proposed oid))) offered pid oid zone face proposed) castFrom)
           -- CR 400.7h / 611.3d: what the permission a cast is made under gives
           -- the spell it becomes, asked of the same PROPOSED state -- the board
           -- that source was offering it on.

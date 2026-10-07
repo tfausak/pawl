@@ -27,6 +27,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as View
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
@@ -55,6 +56,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerEffect as PlayerEffect.Type
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -1672,6 +1674,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   oppressiveRaysSpec s registry
   scoutsWarningSpec s registry
   dawnhandSpec s registry
+  uriangerSpec s registry
 
 -- Dawnhand Dissident {B} Creature -- Elf Warlock 1/2 (Oracle text checked against
 -- Scryfall 2026-09-29): "During your turn, you may cast creature spells from among
@@ -1768,3 +1771,79 @@ castLinkedAnswering :: ObjectId.ObjectId -> Map.Map ObjectId.ObjectId (Map.Map (
 castLinkedAnswering wanted answer p = case p of
   Prompt.ChooseMixedCounterRemoval {} -> answer
   _ -> castOnly wanted p
+
+-- Urianger Augurelt {W}{U} Legendary Creature -- Elf Advisor 1/3 (Oracle text
+-- checked against Scryfall 2026-10-07): "Draw Arcanum -- {T}: Look at the top card
+-- of your library. You may exile it face down. / Play Arcanum -- {T}: Until end of
+-- turn, you may play cards exiled with Urianger Augurelt."
+--
+-- The producer for CR 601.3f: the look Draw Arcanum gives stays with the player
+-- who looked (CR 406.3), while Play Arcanum's permission goes to whoever controls
+-- Urianger when it is activated. Act of Treason {2}{R} -- "Gain control of target
+-- creature until end of turn. Untap that creature. It gains haste until end of
+-- turn." -- is both the steal and the untap, so the PAIR differs only in who
+-- casts it.
+--
+-- THE BOARD: alice's Urianger, an Ornithopter on top of her library, and her
+-- Memnite exiled FACE UP and linked to Urianger, which is the control: it shows
+-- the permission reached the caster, so a refusal of the hidden card is the look.
+uriangerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+uriangerSpec s registry =
+  Spec.describe s "UriangerAugurelt" $ do
+    Spec.it s "CR 601.3f the player who looked may cast the face-down card she exiled" $ do
+      (hidden, shown, urianger, gs) <- uriangerBoard s registry S.alice
+      let offered oid = any (S.isCastOf oid) (Action.legalActions S.alice gs)
+      Spec.assertBool s (offered hidden) "alice is offered the Ornithopter she exiled face down"
+      Spec.assertBool s (offered shown) "and the face-up Memnite"
+      Spec.assertEqWith s "she controls Urianger" (View.controllerOf urianger gs) (Just S.alice)
+    Spec.it s "CR 601.3f a new controller may not begin to cast a face-down card they cannot look at" $ do
+      (hidden, shown, urianger, gs) <- uriangerBoard s registry S.bob
+      let offered oid = any (S.isCastOf oid) (Action.legalActions S.bob gs)
+      Spec.assertBool s (not (offered hidden)) "bob is not offered the Ornithopter alice exiled face down"
+      -- Proxies, AFTER the behaviour: the permission is bob's, and control moved.
+      Spec.assertBool s (offered shown) "though the face-up Memnite exiled with Urianger is"
+      Spec.assertEqWith s "CR 613.1b Act of Treason gave bob Urianger" (View.controllerOf urianger gs) (Just S.bob)
+
+-- The board uriangerSpec's cases share, described above it: alice activates Draw
+-- Arcanum on her own turn and exiles the Ornithopter, then `caster` casts Act of
+-- Treason on Urianger on their own turn and activates Play Arcanum. Answers the
+-- face-down Ornithopter, the face-up Memnite, Urianger, and the board with
+-- `caster` holding priority on an empty stack.
+uriangerBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> PlayerId.PlayerId -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+uriangerBoard s registry caster = do
+  urianger <- S.printingOf s registry "Urianger Augurelt"
+  ornithopter <- S.printingOf s registry "Ornithopter"
+  memnite <- S.printingOf s registry "Memnite"
+  treason <- S.printingOf s registry "Act of Treason"
+  mountain <- S.printingOf s registry "Mountain"
+  let lands = S.landsFor mountain caster 3 (Setup.emptyGame S.bothPlayers)
+      (uriangerId, g1) = S.addPermanent urianger S.alice lands
+      (_, g2) = S.addLibraryCard ornithopter S.alice g1
+      (shown, g3) = S.addExiledCard memnite S.alice g2
+      (treasonId, g4) = S.addHandCard treason caster g3
+      link = ExileLink.MkExileLink {ExileLink.source = uriangerId, ExileLink.ability = Nothing}
+      ready =
+        g4
+          { GameState.exiledWith = Map.singleton shown link,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+  case Face.activatedAbilities (S.combinedFace urianger) of
+    [draw, play] -> do
+      let drawn = S.runPure exilingAnswer ready (Activate.activateAbility S.alice uriangerId draw >> Stack.resolveTop)
+          hidden = filter (\oid -> maybe False Object.exiledFaceDown (Game.lookupObject oid drawn)) (Set.toList (GameState.exile drawn))
+          casterTurn = drawn {GameState.activePlayer = caster, GameState.priority = Just caster}
+          stolen = S.runPure exilingAnswer casterTurn (S.cast caster treasonId >> Stack.resolveTop)
+          permitted = S.runPure exilingAnswer stolen (Activate.activateAbility caster uriangerId play >> Stack.resolveTop)
+      case hidden of
+        [card] -> pure (card, shown, uriangerId, permitted)
+        _ -> Spec.assertFailure s "Draw Arcanum should exile exactly one card face down"
+    _ -> Spec.assertFailure s "Urianger Augurelt should print two activated abilities"
+
+-- Takes Draw Arcanum's "you may exile it face down"; everything else as
+-- S.identityAnswer.
+exilingAnswer :: Prompt.Prompt r -> r
+exilingAnswer p = case p of
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  _ -> S.identityAnswer p
