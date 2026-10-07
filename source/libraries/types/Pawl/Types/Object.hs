@@ -216,7 +216,7 @@ data Object = MkObject
     -- ONE field because no printing makes both choices. Read by
     -- Modification.SetLandSubtypeToChosen and by Filter.HasChosenSubtype off the
     -- effect's SOURCE -- in a CR 106.6 restriction through the value
-    -- Pawl.Engine.Mana.sourceChosenSubtypeOf bakes onto a mana unit at production.
+    -- Pawl.Engine.Mana.sourceChoicesOf bakes onto a mana unit at production.
     -- A sibling of chosenColors rather than one generalized
     -- choice map, whose sum-typed value every reader would have to re-narrow. Not
     -- a copiable value and per-incarnation, for that field's reasons.
