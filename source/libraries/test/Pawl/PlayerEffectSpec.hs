@@ -1043,7 +1043,7 @@ patricianGeistSpec s registry =
 -- is active only "as long as the permanent with the ability remains on the
 -- battlefield AND HAS THE ABILITY", so a CR 613.1f layer-6 removal takes the
 -- player-affecting half of a card's text with it -- the axis Pawl.Engine.Projection
--- already gates for the projected characteristics (abilitiesRemoved).
+-- already gates for the projected characteristics (abilitiesRemovedBy).
 --
 -- CR 613.6's rescue ("if an effect starts to apply in one layer ... it will
 -- continue to be applied ... even if the ability generating the effect is
@@ -1096,7 +1096,7 @@ humilitySpec s registry =
 
     -- The animated case: Rule of Law is an enchantment, so Humility alone
     -- leaves it alone. Opalescence's CR 613.1d layer-4 AddCardType is what
-    -- brings it inside "each creature" -- and abilitiesRemoved judges the
+    -- brings it inside "each creature" -- and abilitiesRemovedBy judges the
     -- affected set at CR 613.6's decision point, which for Humility is layer 6,
     -- so the partial it reads already has that animation. Opalescence itself is
     -- spared by its own "each other enchantment", so it keeps animating.

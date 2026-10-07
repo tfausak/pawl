@@ -73,7 +73,8 @@ data ActivationProhibition = MkActivationProhibition
     --
     -- Nothing for Arrest and Realmbreaker's Grasp, which grant no such
     -- permission. Volrath's Curse names this row and its two combat
-    -- restrictions alike, one sentence declaring all three.
+    -- restrictions alike, one sentence declaring all three. A CR 613.1f
+    -- Modification.LoseNamedAbility reads it too.
     name :: Maybe AbilityName.AbilityName
   }
   deriving (Eq, Ord, Show)
