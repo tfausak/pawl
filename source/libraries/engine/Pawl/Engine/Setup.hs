@@ -42,6 +42,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GraveyardOrder as GraveyardOrder
 import Pawl.Types.HandActionPerformer (HandActionPerformer)
 import qualified Pawl.Types.LastKnown as LastKnown
+import qualified Pawl.Types.LeftTheGame as LeftTheGame
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Object as Object
@@ -1397,12 +1398,6 @@ subgameStateFrom starter parent =
 -- So no Event.simultaneouslyPure: each crossing takes its own event group and CR
 -- 603.10a's look-back triggers read them as a sequence rather than as one event.
 --
--- Not implemented: the event is recorded for a permanent on the battlefield and
--- for nothing else, so a card that crossed out of a hand, a graveyard, a library
--- or exile files its last known information and records nothing -- narrower than
--- CR 729.4a's "abilities in the main game that trigger on objects leaving a
--- main-game zone" (#2463).
---
 -- An id that is not one of this game's own objects came from further out: CR
 -- 729.6 makes a subgame's own parent the main game of a subgame below it, so
 -- subgameStateFrom hands a subgame its parent's outsideObjects along with the
@@ -1492,9 +1487,11 @@ applyCrossings finalSub parent =
       -- Event.recordEvent's CR 603.10 sample is of the board immediately after
       -- this card left and before the next one does.
       --
-      -- The event -- and CR 604.2's handover below it -- only for a permanent on
-      -- the battlefield, which is the set Pawl.Types.GameEvent.LeftTheGame
-      -- documents at its own constructor.
+      -- The event names the zone the card left, since CR 729.4a's main-game
+      -- abilities "trigger on objects leaving a main-game zone" -- a card a wish
+      -- took out of a graveyard is Spirit Mascot's trigger event. CR 604.2's
+      -- handover below is for a permanent on the battlefield alone.
+      --
       -- Battlefield MEMBERSHIP rather than Object.zone, the way
       -- Departure.objectsLeaveWith reads the same question, since
       -- Pawl.Engine.Phasing takes a phased-out permanent out of that set and
@@ -1517,12 +1514,18 @@ applyCrossings finalSub parent =
               Nothing -> g
               Just (key, value) -> g {GameState.lastKnown = Map.insert key value (GameState.lastKnown g)}
             gone = leave noted oid
+            left zone = GameEvent.LeftTheGame (LeftTheGame.MkLeftTheGame oid zone)
          in if Set.member oid (GameState.battlefield g)
               then
                 Event.recordEvent
-                  (GameEvent.LeftTheGame oid)
+                  (left Zone.Battlefield)
                   gone {GameState.continuousEffects = handover g oid <> GameState.continuousEffects gone}
-              else gone
+              else case fmap Object.zone (Map.lookup oid (GameState.objects g)) of
+                -- Phased out, CR 702.26b above.
+                Just Zone.Battlefield -> gone
+                Just zone -> Event.recordEvent (left zone) gone
+                -- Unreachable, for `leave`'s reason.
+                Nothing -> gone
       -- CR 604.2's override, the same one Departure.objectsLeaveWith performs on
       -- the other road out of the game: a permanent that leaves the GAME has left
       -- the battlefield, so a card whose text says its effect continues anyway --
@@ -1533,9 +1536,9 @@ applyCrossings finalSub parent =
       -- reason: what continues is what was applying at THIS instant, with every
       -- earlier crossing already gone. CR 611.2c then freezes the set.
       --
-      -- Gated by the caller on GameState.battlefield membership, exactly as the
-      -- event above is and for CR 702.26b's reason: a phased-out permanent was
-      -- generating no effect there is anything to continue.
+      -- Gated by the caller on GameState.battlefield membership, for CR
+      -- 702.26b's reason: a phased-out permanent was generating no effect there
+      -- is anything to continue.
       --
       -- The controller is read the way `filed` reads it (CR 109.5 / CR 613.1b),
       -- and the Object.owner fallback is unreachable for `filed`'s reason.

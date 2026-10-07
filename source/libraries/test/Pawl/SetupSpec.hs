@@ -53,6 +53,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LastKnown as LastKnown
+import qualified Pawl.Types.LeftTheGame as LeftTheGame
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Modal as Modal
@@ -865,7 +866,7 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
         sub0 = Setup.subgameStateFrom S.alice parent
         (broughtInId, crossedSub) = Event.bringInFrom OutsideDestination.Hand S.alice elfId sub0
         after = Setup.applyCrossings crossedSub parent
-        leftEvents = Maybe.mapMaybe (\logged -> case LoggedEvent.event logged of GameEvent.LeftTheGame oid -> Just oid; _ -> Nothing) (Foldable.toList (GameState.events after))
+        leftEvents = Maybe.mapMaybe (\logged -> case LoggedEvent.event logged of GameEvent.LeftTheGame l -> Just (LeftTheGame.object l); _ -> Nothing) (Foldable.toList (GameState.events after))
     -- The fixture's own preconditions, so the assertions below cannot pass for
     -- want of a board: the elf really was in the main game, and the subgame
     -- really did take it.
@@ -941,6 +942,49 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
     Spec.assertEqWith s "CR 729.4a: it left the main game just the same" (Game.lookupObject tusk after) Nothing
     Spec.assertEqWith s "and is no longer recorded as phased out either" (Map.member tusk (GameState.phasedOut after)) False
     Spec.assertEqWith s "CR 608.2h: its last known information is still filed" (Map.member tusk (GameState.lastKnown after)) True
+  -- CR 729.4a's wider half: "abilities in the main game that trigger on objects
+  -- leaving a main-game ZONE will trigger". A card the subgame takes out of a
+  -- main-game graveyard has left that graveyard, and it has NOT left the
+  -- battlefield (CR 603.6c), so only the first kind of ability may see it.
+  --
+  -- One board, four watchers, each answering a different question about the
+  -- one crossing. alice's Kishla Skimmer ("whenever a card leaves your graveyard
+  -- during your turn, draw a card") must draw. The crossing card is a Thragtusk,
+  -- whose own leaves-the-battlefield ability must not make a Beast, and bob's
+  -- Super Shredder ("whenever another permanent leaves the battlefield") must
+  -- get no counter. alice's Rakshasa Vizier ("whenever one or more cards are put
+  -- into exile from your graveyard") must get none either: the card left her
+  -- graveyard for no zone at all. Pawl.OutsideTheGameSpec's Spirit Mascot case is the same
+  -- reading at gameplay level; the battlefield legs above are the pairs for the
+  -- two negatives.
+  Spec.it s "CR 729.4a a card a subgame takes from a main-game graveyard triggers leaves-your-graveyard and not leaves-the-battlefield" $ do
+    skimmer <- S.printingOf s registry "Kishla Skimmer"
+    shredder <- S.printingOf s registry "Super Shredder"
+    thragtusk <- S.printingOf s registry "Thragtusk"
+    vizier <- S.printingOf s registry "Rakshasa Vizier"
+    mountain <- S.printingOf s registry "Mountain"
+    let (_skimmerId, g0) = S.addPermanent skimmer S.alice S.threePlayerGame
+        (vizierId, g1) = S.addPermanent vizier S.alice g0
+        (shredderId, g2) = S.addPermanent shredder S.bob g1
+        (tusk, g3) = S.addGraveyardCard thragtusk S.alice g2
+        -- Something for the Skimmer to draw.
+        parent = snd (S.addLibraryCard mountain S.alice (snd (S.addLibraryCard mountain S.alice g3)))
+        sub0 = Setup.subgameStateFrom S.alice parent
+        (broughtInId, crossedSub) = Event.bringInFrom OutsideDestination.Hand S.alice tusk sub0
+        after = resolveTriggers (Setup.applyCrossings crossedSub parent)
+        plusOnes oid = maybe 0 (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid after)
+    -- The gameplay-level claims, ahead of the proxies.
+    Spec.assertEqWith s "CR 729.4a: Kishla Skimmer saw the card leave alice's graveyard, and she drew" (S.handSize S.alice after) 1
+    Spec.assertEqWith s "CR 603.6c: the Thragtusk left no battlefield, so it made no Beast" (fmap (\pid -> S.countOnBattlefieldByName beastToken pid after) [S.alice, S.bob, S.carol]) [0, 0, 0]
+    Spec.assertEqWith s "CR 603.6c: and Super Shredder saw no permanent leave" (plusOnes shredderId) 0
+    Spec.assertEqWith s "CR 729.4a: Rakshasa Vizier saw no card put into exile" (plusOnes vizierId) 0
+    -- The fixture's preconditions.
+    Spec.assertEqWith s "it is alice's turn, which the Skimmer's scope asks" (GameState.activePlayer parent) S.alice
+    Spec.assertEqWith s "the Thragtusk started in alice's main-game graveyard" (Game.zoneMembers Zone.Graveyard S.alice parent) [tusk]
+    Spec.assertEqWith s "and her hand started empty" (S.handSize S.alice parent) 0
+    Spec.assertEqWith s "the subgame's wish reached it (CR 729.4)" (Maybe.isJust broughtInId) True
+    Spec.assertEqWith s "CR 729.4a: it left the main game" (Game.lookupObject tusk after) Nothing
+
   -- CR 702.26b again, this time against CR 604.2's handover rather than the
   -- event: a phased-out permanent "is treated as though it does not exist", so
   -- its static ability was generating no effect there is anything to continue.
@@ -986,7 +1030,7 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
         (_, crossed1) = Event.bringInFrom OutsideDestination.Hand S.alice earlyCrosser sub0
         (_, crossedSub) = Event.bringInFrom OutsideDestination.Hand S.alice lateCrosser crossed1
         after = Setup.applyCrossings crossedSub parent
-        left = Maybe.mapMaybe (\logged -> case LoggedEvent.event logged of GameEvent.LeftTheGame oid -> Just (LoggedEvent.group logged, oid); _ -> Nothing) (Foldable.toList (GameState.events after))
+        left = Maybe.mapMaybe (\logged -> case LoggedEvent.event logged of GameEvent.LeftTheGame l -> Just (LoggedEvent.group logged, LeftTheGame.object l); _ -> Nothing) (Foldable.toList (GameState.events after))
         -- CR 603.10's "objects that exist immediately after an event", as
         -- Event.recordEvent sampled it for each of the two groups.
         sampledAt eventGroup = Map.keysSet (Map.findWithDefault Map.empty eventGroup (GameState.battlefieldWhenTriggered after))
@@ -1047,7 +1091,7 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
         sub0 = Setup.subgameStateFrom S.alice parent
         (_, crossedSub) = Event.bringInFrom OutsideDestination.Hand S.alice outerId sub0
         after = Setup.applyCrossings crossedSub parent
-        leftEvents = Maybe.mapMaybe (\logged -> case LoggedEvent.event logged of GameEvent.LeftTheGame oid -> Just oid; _ -> Nothing) (Foldable.toList (GameState.events after))
+        leftEvents = Maybe.mapMaybe (\logged -> case LoggedEvent.event logged of GameEvent.LeftTheGame l -> Just (LeftTheGame.object l); _ -> Nothing) (Foldable.toList (GameState.events after))
     Spec.assertEqWith s "the subgame really did inherit the outer entry (CR 729.6)" (Map.member outerId (GameState.outsideObjects sub0)) True
     Spec.assertEqWith s "CR 729.6: this game hands the crossing to the frame above it" (Foldable.toList (GameState.broughtIn after)) [outerId]
     Spec.assertEqWith s "CR 729.4a: and stops offering the card it can no longer supply" (Map.member outerId (GameState.outsideObjects after)) False

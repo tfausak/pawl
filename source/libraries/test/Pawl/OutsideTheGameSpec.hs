@@ -22,11 +22,11 @@
 -- Exile Burning Wish.")
 -- for the pool, with Cunning Wish for the cycle's instant speed, Death Wish
 -- for a card that prints no reveal, The Raven's Warning for a destination that
--- is not the hand, Research for a count other than one, and, in three cases, a Shahrazad
+-- is not the hand, Research for a count other than one, and, in four cases, a Shahrazad
 -- subgame for CR 729.4's main game -- Living Wish reaching two main-game
 -- creatures, then Death Wish reaching a main-game Titania's Song (CR 604.2's
 -- handover), then Burning Wish reaching the resolving Shahrazad itself (CR
--- 729.5).
+-- 729.5), then Burning Wish reaching a main-game graveyard (CR 729.4a).
 --
 -- The last group takes the OTHER road in: Ring of Ma'rûf's CR 614.6 draw
 -- replacement, whose rewrite reaches the same `bringInto` the resolution arm
@@ -707,6 +707,66 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
     Spec.assertEqWith s "CR 729.4/729.5: the wish really took the resolving Shahrazad, which came back to alice's main-game library" (length (filter (== shahrazad) (printingsIn Zone.Library S.alice after))) 1
     Spec.assertEqWith s "CR 400.7/608.2n: and so it is in no main-game graveyard" (printingsIn Zone.Graveyard S.alice after) []
     Spec.assertEqWith s "CR 729.1a: the subgame did not decide the main game" (GameState.result after) Nothing
+
+  -- CR 729.4a's wider half: main-game abilities "trigger on objects leaving a
+  -- main-game ZONE", not only the battlefield. alice's Spirit Mascot ({R}{W}
+  -- creature, "Whenever one or more cards leave your graveyard, put a +1/+1
+  -- counter on this creature.") watches her main-game graveyard, which holds a
+  -- Sign in Blood. Inside the subgame Burning Wish takes a sorcery she owns from
+  -- outside the game, and CR 729.4 offers it two: the Sign in Blood, and the
+  -- resolving Shahrazad on the main game's stack.
+  --
+  -- A PAIR differing in the answer alone. Taking the graveyard card is a card
+  -- leaving her graveyard, and the Mascot gets its counter once the main game
+  -- resumes; taking Shahrazad is a card leaving the STACK, and it gets none.
+  --
+  -- The sizing is the Shahrazad-taking case above's, which this board's
+  -- second leg repeats.
+  Spec.it s "CR 729.4a gameplay: Burning Wish takes a card out of a main-game graveyard and Spirit Mascot sees it leave" $ do
+    plains <- S.printingOf s registry "Plains"
+    mountain <- S.printingOf s registry "Mountain"
+    shahrazad <- S.printingOf s registry "Shahrazad"
+    burningWish <- S.printingOf s registry "Burning Wish"
+    mascot <- S.printingOf s registry "Spirit Mascot"
+    signInBlood <- S.printingOf s registry "Sign in Blood"
+    let g0 = Setup.emptyGame S.bothPlayers
+        (mascotId, g1) = S.addPermanent mascot S.alice g0
+        (signId, g2) = S.addGraveyardCard signInBlood S.alice g1
+        g3 = S.landsFor plains S.alice 2 g2
+        g4 = stockLibrary mountain 9 S.bob (stockLibrary mountain 8 S.alice (stockLibrary burningWish 1 S.alice g3))
+        (_shahrazadId, g5) = S.addHandCard shahrazad S.alice g4
+        before =
+          g5
+            { GameState.activePlayer = S.alice,
+              GameState.phase = Phase.PrecombatMain,
+              GameState.priority = Just S.alice
+            }
+        -- Pinned by id: the graveyard card, or the one other main-game sorcery
+        -- offered, which is the resolving Shahrazad.
+        playWith takeGraveyardCard =
+          let wanted candidate = case candidate of
+                OutsideCard.InAnotherGame oid -> (oid == signId) == takeGraveyardCard
+                OutsideCard.InPool _ -> False
+              answer :: Prompt.Prompt r -> r
+              answer p = case p of
+                -- Burning Wish's printed "may" (CR 608.2d), taken.
+                Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+                Prompt.ChooseFromOutsideTheGame _ _ offered _ _ ->
+                  [Maybe.fromMaybe (NonEmpty.head offered) (List.find wanted (NonEmpty.toList offered))]
+                -- CR 729.2's roll, answered so the turn count above is the one played.
+                Prompt.RandomFirstPlayer _ -> S.alice
+                _ -> S.castAnswer p
+           in snd (Engine.runGamePure answer before Engine.priorityLoop)
+        tookGraveyardCard = playWith True
+        tookShahrazad = playWith False
+    -- The gameplay-level claims, first.
+    Spec.assertEqWith s "CR 729.4a: a card left alice's main-game graveyard, so the Mascot got its counter" (plusOneCounters mascotId tookGraveyardCard) 1
+    Spec.assertEqWith s "CR 729.4a: a card left the main game's stack instead, so it got none" (plusOneCounters mascotId tookShahrazad) 0
+    -- What each leg took, which is the pair's one difference.
+    Spec.assertEqWith s "the first leg's wish took the Sign in Blood out of her graveyard" (Map.member signId (GameState.objects tookGraveyardCard), printingsIn Zone.Graveyard S.alice tookGraveyardCard) (False, [shahrazad])
+    Spec.assertEqWith s "the second leg's wish took Shahrazad, leaving the Sign in Blood where it was" (Map.member signId (GameState.objects tookShahrazad), length (filter (== shahrazad) (printingsIn Zone.Library S.alice tookShahrazad))) (True, 1)
+    Spec.assertEqWith s "the Mascot starts with no counters" (plusOneCounters mascotId before) 0
+    Spec.assertEqWith s "CR 729.1b: alice won the subgame on both legs, so only bob paid" (fmap (\gs -> (S.lifeOf S.alice gs, S.lifeOf S.bob gs)) [tookGraveyardCard, tookShahrazad]) [(Just 20, Just 10), (Just 20, Just 10)]
 
   -- CR 614.6 / 400.11c: Ring of Ma'rûf ({5} Artifact, "{5}, {T}, Exile this
   -- artifact: The next time you would draw a card this turn, instead put a card

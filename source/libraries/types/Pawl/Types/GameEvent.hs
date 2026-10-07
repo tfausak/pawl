@@ -25,6 +25,7 @@ import qualified Pawl.Types.Discarded as Discarded
 import qualified Pawl.Types.Drew as Drew
 import qualified Pawl.Types.Exploited as Exploited
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
+import qualified Pawl.Types.LeftTheGame as LeftTheGame
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.ManaAbilityResolved as ManaAbilityResolved
 import qualified Pawl.Types.ManaAdded as ManaAdded
@@ -417,21 +418,18 @@ data GameEvent
     -- Not emitted by Pawl.Engine.Phasing, which is CR 702.26j, the same fence
     -- BecameAttached carries.
     BecameUnattached BecameUnattached.BecameUnattached
-  | -- | A permanent left the GAME rather than the battlefield, by CR 800.4a's
+  | -- | An object left the GAME rather than moving between zones, by CR 800.4a's
     -- road (its owner having left) or CR 729.4a's (a subgame having brought the
-    -- card in). The ObjectId is the id it had while it existed, which is the key
-    -- its CR 608.2h last known information is filed under. Not a Moved event:
-    -- there is no destination zone to name, and an invented one would answer CR
-    -- 700.4's "dies" with a fiction.
+    -- card in). Not a Moved event: there is no destination zone to name, and an
+    -- invented one would answer CR 700.4's "dies" with a fiction.
     --
-    -- Emitted for a PHASED-IN BATTLEFIELD permanent and nothing else, by both
-    -- roads -- CR 603.6c's second trigger event for the first, and CR 702.26b for
-    -- the second, to which rule 729.4a states no exception.
-    --
-    -- Not implemented: CR 729.4a's wider ask, abilities that trigger on objects
-    -- leaving a main-game ZONE, so a card a subgame took out of a hand,
-    -- graveyard, library or exile does not enter this log (#2463).
-    LeftTheGame ObjectId.ObjectId
+    -- Emitted for a PHASED-IN BATTLEFIELD permanent by both roads -- CR 603.6c's
+    -- second trigger event for the first, and CR 702.26b for the second, to which
+    -- rule 729.4a states no exception -- and by CR 729.4a's road for a card in
+    -- any other main-game zone too, since rule 729.4a's main-game abilities
+    -- trigger on objects leaving a main-game ZONE. Pawl.OutsideTheGameSpec's
+    -- Spirit Mascot case proves the graveyard leg.
+    LeftTheGame LeftTheGame.LeftTheGame
   | -- | CR 104.3 / 603.9: a player lost the game, or left it other than by a
     -- draw. Recorded by Pawl.Engine.Departure.leaveTogether.
     LostTheGame PlayerId.PlayerId

@@ -50,6 +50,7 @@ import qualified Pawl.Types.Exploited as Exploited
 import qualified Pawl.Types.FloatingCandidate as FloatingCandidate
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
+import qualified Pawl.Types.LeftTheGame as LeftTheGame
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.ManaAbilityResolved as ManaAbilityResolved
 import qualified Pawl.Types.ManaAdded as ManaAdded
@@ -506,14 +507,14 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.BecameTarget (BecameTarget.MkBecameTarget (Recipient.ToPlayer (PlayerId.MkPlayerId 3)) (ObjectId.MkObjectId 11) StackObjectKind.Spell (PlayerId.MkPlayerId 2)))
       " {\"type\":\"BecameTarget\",\"value\":{\"targeted\":{\"type\":\"ToPlayer\",\"value\":3},\"source\":11,\"kind\":{\"type\":\"Spell\"},\"controller\":2}} "
-  -- CR 800.4a. One id, TurnedFaceDown's payload again: the object left the game, so
-  -- there is no destination zone to carry and no new incarnation to name.
+  -- CR 800.4a / 729.4a. The id and the zone it left: the object left the game,
+  -- so there is no destination zone to carry and no new incarnation to name.
   Spec.it s "LeftTheGame" $
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.LeftTheGame (ObjectId.MkObjectId 7))
-      " {\"type\":\"LeftTheGame\",\"value\":7} "
+      (GameEvent.LeftTheGame (LeftTheGame.MkLeftTheGame (ObjectId.MkObjectId 7) Zone.Battlefield))
+      " {\"type\":\"LeftTheGame\",\"value\":{\"object\":7,\"from\":{\"type\":\"Battlefield\"}}} "
   -- CR 603.9. One player id, Scried's payload: the player who lost.
   Spec.it s "LostTheGame" $
     Common.assertCodec
