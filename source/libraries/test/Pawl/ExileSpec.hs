@@ -489,9 +489,6 @@ foretoldBoard s registry = do
 -- cards are offered and cast with their characteristics back; the Augury Raven
 -- group above is what proves the turn. CR 110.5d keeps that apart from
 -- Object.facing, which `proposedFace` branches on and no exile rider writes.
---
--- Not implemented: CR 406.3b's gate on a quality-scoped permission to cast from
--- among face-down cards in exile (#2504).
 extractPower :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 extractPower s registry = Spec.describe s "Extract Power" $ do
   Spec.it s "CR 406.3 the player the exiling instruction let look names both cards, and the owner who was shown nothing gets their pile" $ do
