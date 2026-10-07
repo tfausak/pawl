@@ -6,6 +6,7 @@ import qualified Pawl.Codec.Layout as Layout
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Layout as Layout
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -77,8 +78,15 @@ spec s = Spec.describe s "Pawl.Codec.Layout" $ do
     Common.assertCodec
       s
       Layout.codec
-      Layout.Meld
-      " {\"type\":\"Meld\"} "
+      (Layout.Meld (CardName.MkCardName (Text.pack "Graf Rats")))
+      " {\"type\":\"Meld\",\"value\":\"Graf Rats\"} "
+  -- CR 701.42b: the counterpart is what makes two meld cards a pair, so a meld
+  -- card naming none must not load.
+  Spec.it s "a Meld layout without its counterpart is rejected" $
+    Spec.assertBool
+      s
+      (Either.isLeft (Common.parse (Text.pack " {\"type\":\"Meld\"} ") >>= Codec.decode Layout.codec))
+      "expected a bare Meld tag to fail to decode"
   -- Card layouts name more frames than have landed. A file naming one must
   -- fail loudly rather than fall back to Normal. A plane card needs no layout:
   -- Deck.planes is what puts it in the planar deck (CR 901.3).
@@ -87,9 +95,5 @@ spec s = Spec.describe s "Pawl.Codec.Layout" $ do
       s
       (Either.isLeft (Common.parse (Text.pack " {\"type\":\"Planar\"} ") >>= Codec.decode Layout.codec))
       "expected an unknown layout tag to fail to decode"
-  -- Exhaustive where the literals above are representative: Arm.enum derives
-  -- the arm list from the type, so this is what would catch a constructor the
-  -- derivation missed or two that encode alike.
-  Spec.it s "round trips every constructor" $ Common.assertEnumCodec s Layout.codec
   Spec.it s "has a schema" $
     Common.assertHasSchema s Layout.codec
