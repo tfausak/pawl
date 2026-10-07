@@ -33,7 +33,6 @@ import Pawl.CardSpec (anyFace, anyFaceOrMinted, cardAuthoredEffects, cardCounts,
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
-import qualified Pawl.Engine.CombatRestriction as CombatRestriction.Engine
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Event.Binding as Event
@@ -41,6 +40,7 @@ import qualified Pawl.Engine.Keyword as Keyword.Engine
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Resolve.Slots as Resolve
+import qualified Pawl.Engine.RuleAbilities as RuleAbilities.Engine
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -99,6 +99,7 @@ import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.RuleAbilities as RuleAbilities
 import qualified Pawl.Types.SacrificeEffect as SacrificeEffect
 import qualified Pawl.Types.Sacrificer as Sacrificer
 import qualified Pawl.Types.Scope as Scope
@@ -1493,7 +1494,17 @@ declaredAbilityNames face =
         <> Maybe.mapMaybe TriggeredAbility.name (Face.triggeredAbilities face)
         <> Maybe.mapMaybe PrintedReplacement.name (Face.replacementEffects face)
         <> Maybe.mapMaybe StaticAbility.name (Face.staticAbilities face)
+        <> concatMap grantedNames (concatMap (NonEmpty.toList . StaticAbility.modifications) (Face.staticAbilities face))
     )
+  where
+    -- A rule or player ability the face's static ability GRANTS carries its own
+    -- name, which the same face's removal reads (Synthetic Tethering Charm).
+    grantedNames m = case m of
+      Modification.GainAbility (GrantedAbility.Rules rules) ->
+        Maybe.mapMaybe RuleAbilities.Engine.nameOf (RuleAbilities.combatRestrictions rules)
+          <> Maybe.mapMaybe ActivationProhibition.name (RuleAbilities.activationProhibitions rules)
+      Modification.GainAbility (GrantedAbility.Player ability) -> Maybe.maybeToList (PlayerStaticAbility.name ability)
+      _ -> []
 
 -- CR 116.2d: every ability name a face's ignore grants refer to. One grant per
 -- name, and every printed producer prints exactly one grant.
@@ -1509,12 +1520,12 @@ ignoredAbilityNames face =
 -- A HAND-KEPT union over the carriers CR 116.2d can reach, declaredAbilityNames'
 -- posture: a fourth carrier given a name field must be added here too, or its
 -- cards' names read as dangling. The two BOUNDING combat restrictions have no
--- name field to read (Pawl.Engine.CombatRestriction.nameOf says why).
+-- name field to read (Pawl.Engine.RuleAbilities.nameOf says why).
 declaredIgnorableAbilityNames :: Face.Face Card.Type.Card -> Set.Set AbilityName.AbilityName
 declaredIgnorableAbilityNames face =
   Set.fromList
     ( Maybe.mapMaybe PlayerStaticAbility.name (Face.playerAbilities face)
-        <> Maybe.mapMaybe CombatRestriction.Engine.nameOf (Face.combatRestrictions face)
+        <> Maybe.mapMaybe RuleAbilities.Engine.nameOf (Face.combatRestrictions face)
         <> Maybe.mapMaybe ActivationProhibition.name (Face.activationProhibitions face)
     )
 
