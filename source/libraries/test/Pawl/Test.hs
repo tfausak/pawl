@@ -55,6 +55,7 @@ import qualified Pawl.Codec.AffectedPlayersSpec
 import qualified Pawl.Codec.AffectedSpec
 import qualified Pawl.Codec.AffectedUnlessSpec
 import qualified Pawl.Codec.AfterTurnSpec
+import qualified Pawl.Codec.AgainstLastCardExiledWithSpec
 import qualified Pawl.Codec.AgainstSlotSpec
 import qualified Pawl.Codec.AggregationSpec
 import qualified Pawl.Codec.AimedAtSpec
@@ -886,6 +887,7 @@ spec s registry = do
   Pawl.Codec.AimedPlayersSpec.spec s
   Pawl.Codec.AffectedUnlessSpec.spec s
   Pawl.Codec.AfterTurnSpec.spec s
+  Pawl.Codec.AgainstLastCardExiledWithSpec.spec s
   Pawl.Codec.AgainstSlotSpec.spec s
   Pawl.Codec.AggregationSpec.spec s
   Pawl.Codec.AlternativeCostSpec.spec s

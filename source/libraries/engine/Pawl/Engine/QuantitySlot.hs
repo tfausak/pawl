@@ -19,6 +19,7 @@ import qualified Data.Functor.Identity as Identity
 import qualified Data.Monoid as Monoid
 import Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Pawl.Types.AgainstLastCardExiledWith as AgainstLastCardExiledWith
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AttackingPlayers as AttackingPlayers
@@ -240,6 +241,8 @@ overSlots f quantity =
         -- GameState.exiledWith rather than from a binding, so the arm names nothing
         -- here and only the payload can.
         Quantity.AgainstCardsExiledWith inner -> fmap Quantity.AgainstCardsExiledWith (recur inner)
+        -- The same descent: the card comes off GameState.exiledWith too.
+        Quantity.AgainstLastCardExiledWith (AgainstLastCardExiledWith.MkAgainstLastCardExiledWith criterion inner) -> fmap (Quantity.AgainstLastCardExiledWith . AgainstLastCardExiledWith.MkAgainstLastCardExiledWith criterion) (recur inner)
         -- CR 702.167c: AgainstCardsExiledWith's answer, over the craft link alone.
         Quantity.AgainstCraftMaterials inner -> fmap Quantity.AgainstCraftMaterials (recur inner)
 
@@ -399,6 +402,7 @@ nestedRefs quantity = case quantity of
   -- named by no reference and no slot -- and the payload is walked like any
   -- other.
   Quantity.AgainstCardsExiledWith inner -> nestedRefs inner
+  Quantity.AgainstLastCardExiledWith l -> nestedRefs (AgainstLastCardExiledWith.quantity l)
   -- CR 702.167c: AgainstCardsExiledWith's answer, over the craft link alone.
   Quantity.AgainstCraftMaterials inner -> nestedRefs inner
 
@@ -523,6 +527,7 @@ nestedCounts quantity = case quantity of
   -- AgainstSlot's answer: re-aiming the evaluation at CR 607.2a's linked cards
   -- does not stop the payload from being a Count.
   Quantity.AgainstCardsExiledWith inner -> nestedCounts inner
+  Quantity.AgainstLastCardExiledWith l -> nestedCounts (AgainstLastCardExiledWith.quantity l)
   -- CR 702.167c: AgainstCardsExiledWith's answer, over the craft link alone.
   Quantity.AgainstCraftMaterials inner -> nestedCounts inner
 
@@ -672,6 +677,7 @@ mapPlayerRefs f intoCount quantity =
         Quantity.Negate a -> Quantity.Negate (recur a)
         Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot inner) -> Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot (recur inner))
         Quantity.AgainstCardsExiledWith inner -> Quantity.AgainstCardsExiledWith (recur inner)
+        Quantity.AgainstLastCardExiledWith l -> Quantity.AgainstLastCardExiledWith l {AgainstLastCardExiledWith.quantity = recur (AgainstLastCardExiledWith.quantity l)}
         -- CR 702.167c: AgainstCardsExiledWith's answer, over the craft link alone.
         Quantity.AgainstCraftMaterials inner -> Quantity.AgainstCraftMaterials (recur inner)
         -- Every arm below holds no PlayerRef and no Quantity. InSlot names an AMOUNT

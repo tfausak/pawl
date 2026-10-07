@@ -1,5 +1,6 @@
 module Pawl.Codec.Quantity where
 
+import qualified Pawl.Codec.AgainstLastCardExiledWith as AgainstLastCardExiledWith
 import qualified Pawl.Codec.AgainstSlot as AgainstSlot
 import qualified Pawl.Codec.CastFrom as CastFrom
 import qualified Pawl.Codec.CompletedDungeon as CompletedDungeon
@@ -215,6 +216,8 @@ codec =
       -- CR 607.2a: no slot to name, so the payload IS the whole arm -- what to
       -- read off each card the source exiled.
       Arm.payload "AgainstCardsExiledWith" codec Quantity.AgainstCardsExiledWith (\x -> case x of Quantity.AgainstCardsExiledWith y -> Just y; _ -> Nothing),
+      -- CR 607.2a / 613.7d: which linked card to aim at, then what to read off it.
+      Arm.payload "AgainstLastCardExiledWith" (AgainstLastCardExiledWith.codec codec) Quantity.AgainstLastCardExiledWith (\x -> case x of Quantity.AgainstLastCardExiledWith y -> Just y; _ -> Nothing),
       -- CR 702.167c: the arm above's shape, over the craft materials alone.
       Arm.payload "AgainstCraftMaterials" codec Quantity.AgainstCraftMaterials (\x -> case x of Quantity.AgainstCraftMaterials y -> Just y; _ -> Nothing),
       -- CR 702.184c, engine-only: Power's shape, nothing on the wire.
@@ -296,6 +299,7 @@ tagOf x = case x of
   Quantity.BlockersBeyondFirst {} -> "BlockersBeyondFirst"
   Quantity.AgainstSlot {} -> "AgainstSlot"
   Quantity.AgainstCardsExiledWith {} -> "AgainstCardsExiledWith"
+  Quantity.AgainstLastCardExiledWith {} -> "AgainstLastCardExiledWith"
   -- CR 702.167c: AgainstCardsExiledWith's answer, over the craft link alone.
   Quantity.AgainstCraftMaterials {} -> "AgainstCraftMaterials"
   Quantity.StationMeasure {} -> "StationMeasure"

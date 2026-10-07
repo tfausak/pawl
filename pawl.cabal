@@ -143,6 +143,8 @@ library codec
     Pawl.Codec.AffectPlayersSpec
     Pawl.Codec.AfterTurn
     Pawl.Codec.AfterTurnSpec
+    Pawl.Codec.AgainstLastCardExiledWith
+    Pawl.Codec.AgainstLastCardExiledWithSpec
     Pawl.Codec.AgainstSlot
     Pawl.Codec.AgainstSlotSpec
     Pawl.Codec.Aggregation
@@ -1964,6 +1966,7 @@ library types
     Pawl.Types.AffectedUnless
     Pawl.Types.AffectPlayers
     Pawl.Types.AfterTurn
+    Pawl.Types.AgainstLastCardExiledWith
     Pawl.Types.AgainstSlot
     Pawl.Types.Aggregation
     Pawl.Types.AimedAt

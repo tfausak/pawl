@@ -34,6 +34,7 @@ import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.AgainstLastCardExiledWith as AgainstLastCardExiledWith
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.BattlefieldCandidate as BattlefieldCandidate
@@ -151,6 +152,7 @@ layer m = case m of
   -- in the pool orders Nameless Inversion's removal against an effect in
   -- another layer, so answering any other layer here leaves the suite green.
   Modification.LoseEveryCreatureSubtype -> Layer.Type
+  Modification.SetCreatureSubtypesOfLastCardExiledWith _ -> Layer.Type
   -- CR 613.1d, and a regression fence rather than a proved behaviour: no board
   -- in the pool orders the one AddSubtype (Ygra, Eater of All's Food) against an
   -- effect in another layer, so answering any other layer here leaves the suite
@@ -452,6 +454,20 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
         -- artifact creature is still an artifact and still a creature.
         Modification.LoseEveryCreatureSubtype ->
           pc {PC.subtypes = Set.filter (not . Subtype.isCreatureType) (PC.subtypes pc)}
+        -- CR 205.1a's set again, over the creature types the linked card has
+        -- (Quantity.lastCardExiledWith's pick), read off its projected view. With
+        -- no such card the arm is the identity, the "as long as" Duplicant's
+        -- static ability states as its condition.
+        Modification.SetCreatureSubtypesOfLastCardExiledWith criterion ->
+          case Quantity.lastCardExiledWith viewOf context gs criterion >>= viewOf of
+            Nothing -> pc
+            Just view ->
+              pc
+                { PC.subtypes =
+                    Set.union
+                      (gainableSubtypes unitTypes (Set.filter Subtype.isCreatureType (Filter.subtypes view)))
+                      (Set.filter (not . Subtype.isCreatureType) (PC.subtypes pc))
+                }
         -- CR 205.1b's add again, over CR 205.3g's and CR 205.3h's families: the
         -- object keeps every subtype it had. Literally the two adds above, and
         -- deliberately so -- what differs is CR 612.2's gate, which lives on the
@@ -710,6 +726,7 @@ cardTypesAfter m types = case m of
   Modification.AddCreatureSubtype _ -> types
   Modification.AddEveryCreatureSubtype -> types
   Modification.LoseEveryCreatureSubtype -> types
+  Modification.SetCreatureSubtypesOfLastCardExiledWith _ -> types
   Modification.AddSubtype _ -> types
   Modification.ChangeSubtypeWord {} -> types
   -- CR 612.1 / 612.5: the text box moves and the type line does not.
@@ -1408,6 +1425,9 @@ freezeQuantities gs announcedOn source context m =
         Modification.AddCreatureSubtype _ -> Just m
         Modification.AddEveryCreatureSubtype -> Just m
         Modification.LoseEveryCreatureSubtype -> Just m
+        -- Nothing frozen: no resolution stores this arm, and the card it reads is
+        -- re-picked at every projection (CR 604.2).
+        Modification.SetCreatureSubtypesOfLastCardExiledWith _ -> Just m
         Modification.AddSubtype _ -> Just m
         Modification.AddCardType _ -> Just m
         Modification.SetCardType _ -> Just m
@@ -1462,6 +1482,7 @@ quantitiesOf m = case m of
   Modification.AddCreatureSubtype _ -> []
   Modification.AddEveryCreatureSubtype -> []
   Modification.LoseEveryCreatureSubtype -> []
+  Modification.SetCreatureSubtypesOfLastCardExiledWith _ -> []
   Modification.AddSubtype _ -> []
   Modification.AddCardType _ -> []
   Modification.SetCardType _ -> []
@@ -1511,6 +1532,7 @@ referenceQuery m = case m of
   Modification.AddCreatureSubtype _ -> Nothing
   Modification.AddEveryCreatureSubtype -> Nothing
   Modification.LoseEveryCreatureSubtype -> Nothing
+  Modification.SetCreatureSubtypesOfLastCardExiledWith _ -> Nothing
   Modification.AddSubtype _ -> Nothing
   Modification.AddCardType _ -> Nothing
   Modification.SetCardType _ -> Nothing
@@ -1564,6 +1586,7 @@ setsLandSubtype m = case m of
   Modification.AddCreatureSubtype _ -> False
   Modification.AddEveryCreatureSubtype -> False
   Modification.LoseEveryCreatureSubtype -> False
+  Modification.SetCreatureSubtypesOfLastCardExiledWith _ -> False
   -- Not a SET, so CR 305.7 does not fire whatever family the subtype belongs to
   -- -- the same answer AddLandSubtype gives above, and Pawl.CardSpec keeps CR
   -- 205.3i's land types off this arm anyway.
@@ -2719,6 +2742,7 @@ removesAbilities m = case m of
   Modification.AddCreatureSubtype _ -> False
   Modification.AddEveryCreatureSubtype -> False
   Modification.LoseEveryCreatureSubtype -> False
+  Modification.SetCreatureSubtypesOfLastCardExiledWith _ -> False
   Modification.AddSubtype _ -> False
   Modification.SetBasePowerToughness {} -> False
   Modification.ModifyPowerToughness {} -> False
@@ -3832,6 +3856,7 @@ modificationWrites m = case m of
   -- effect's affected set depend on a creature type this arm took away, so
   -- Set.empty here leaves the suite green too.
   Modification.LoseEveryCreatureSubtype -> Set.singleton Subtypes
+  Modification.SetCreatureSubtypesOfLastCardExiledWith _ -> Set.singleton Subtypes
   -- The honest answer -- the arm writes PC.subtypes and nothing else -- but a
   -- regression fence rather than a proved behaviour: no board in the pool makes
   -- another effect depend on the one AddSubtype, so Set.empty here leaves the
@@ -3935,6 +3960,9 @@ modificationReads m = case m of
   Modification.AddCreatureSubtype _ -> Set.empty
   Modification.AddEveryCreatureSubtype -> Set.empty
   Modification.LoseEveryCreatureSubtype -> Set.empty
+  -- Reads the subtypes of a card in EXILE, and no modification this screen
+  -- guards writes one there.
+  Modification.SetCreatureSubtypesOfLastCardExiledWith _ -> Set.empty
   Modification.AddSubtype _ -> Set.empty
   -- Carries no Quantity, but CR 612.1's rewrite reads the object's own text:
   -- the words it replaces are in the very aspects it writes, so an earlier
@@ -3980,6 +4008,7 @@ quantityReads q = case q of
   -- here, so the payload's reads are reported even though the cards it reads
   -- them off are in exile and no modification this screen guards writes there.
   Quantity.Type.AgainstCardsExiledWith a -> quantityReads a
+  Quantity.Type.AgainstLastCardExiledWith l -> quantityReads (AgainstLastCardExiledWith.quantity l)
   -- CR 702.167c: AgainstCardsExiledWith's answer, over the craft link alone.
   Quantity.Type.AgainstCraftMaterials a -> quantityReads a
   Quantity.Type.Literal _ -> Set.empty
@@ -5669,6 +5698,7 @@ grantsKeywordWhere p m = case m of
   Modification.AddCreatureSubtype _ -> False
   Modification.AddEveryCreatureSubtype -> False
   Modification.LoseEveryCreatureSubtype -> False
+  Modification.SetCreatureSubtypesOfLastCardExiledWith _ -> False
   Modification.AddSubtype _ -> False
   Modification.AddCardType _ -> False
   Modification.SetCardType _ -> False
@@ -5751,6 +5781,7 @@ grantsMintingType m = case m of
   Modification.AddCreatureSubtype _ -> False
   Modification.AddEveryCreatureSubtype -> False
   Modification.LoseEveryCreatureSubtype -> False
+  Modification.SetCreatureSubtypesOfLastCardExiledWith _ -> False
   Modification.AddSupertype _ -> False
   Modification.RemoveSupertype _ -> False
   Modification.SetController _ -> False
@@ -5845,6 +5876,7 @@ grantsAbilityWhere p m = case m of
   Modification.AddCreatureSubtype _ -> False
   Modification.AddEveryCreatureSubtype -> False
   Modification.LoseEveryCreatureSubtype -> False
+  Modification.SetCreatureSubtypesOfLastCardExiledWith _ -> False
   Modification.AddSupertype _ -> False
   Modification.RemoveSupertype _ -> False
   Modification.SetController _ -> False

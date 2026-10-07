@@ -523,6 +523,7 @@ printedBoxQuantity quantity = case quantity of
   -- AgainstSlot's answer: CR 607.2a's linked pile is read off the board, which
   -- a printed box (CR 208.2) cannot name.
   Quantity.Type.AgainstCardsExiledWith {} -> False
+  Quantity.Type.AgainstLastCardExiledWith {} -> False
   -- CR 702.167c: AgainstCardsExiledWith's answer, over the craft link alone.
   Quantity.Type.AgainstCraftMaterials {} -> False
 

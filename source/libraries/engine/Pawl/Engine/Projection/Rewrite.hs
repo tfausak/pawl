@@ -23,6 +23,7 @@ import qualified Pawl.Types.AddSpellCost as AddSpellCost
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
+import qualified Pawl.Types.AgainstLastCardExiledWith as AgainstLastCardExiledWith
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
@@ -271,6 +272,8 @@ rewriteModification pairs m =
         Modification.AddEveryCreatureSubtype -> acc
         -- The removal over that same list, and no word to swap for the same reason.
         Modification.LoseEveryCreatureSubtype -> acc
+        -- CR 612.1 through its Filter, printed on the granter (CR 612.3).
+        Modification.SetCreatureSubtypesOfLastCardExiledWith f -> Modification.SetCreatureSubtypesOfLastCardExiledWith (Filter.rewrite [(from, to)] f)
         -- Deliberately unrewritten. CR 612.2 changes only a word used in the
         -- correct way, and this arm carries no family to check the word against;
         -- the two family-tagged adds above are where a land-type or creature-type
@@ -2244,6 +2247,8 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot slot inner) -> Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot slot (rewriteQuantity pairs inner))
   -- AgainstSlot's answer: not a leaf, and the payload may hide a Count.
   Quantity.Type.AgainstCardsExiledWith inner -> Quantity.Type.AgainstCardsExiledWith (rewriteQuantity pairs inner)
+  -- And its filter, which may carry a creature type ("the last Goblin card").
+  Quantity.Type.AgainstLastCardExiledWith (AgainstLastCardExiledWith.MkAgainstLastCardExiledWith criterion inner) -> Quantity.Type.AgainstLastCardExiledWith (AgainstLastCardExiledWith.MkAgainstLastCardExiledWith (Filter.rewrite pairs criterion) (rewriteQuantity pairs inner))
   -- CR 702.167c: AgainstCardsExiledWith's answer, over the craft link alone.
   Quantity.Type.AgainstCraftMaterials inner -> Quantity.Type.AgainstCraftMaterials (rewriteQuantity pairs inner)
 

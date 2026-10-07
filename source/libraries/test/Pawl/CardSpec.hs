@@ -64,6 +64,7 @@ import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
+import qualified Pawl.Types.AgainstLastCardExiledWith as AgainstLastCardExiledWith
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
@@ -945,6 +946,7 @@ modificationCounts modification = case modification of
   Modification.AddCreatureSubtype _ -> []
   Modification.AddEveryCreatureSubtype -> []
   Modification.LoseEveryCreatureSubtype -> []
+  Modification.SetCreatureSubtypesOfLastCardExiledWith _ -> []
   Modification.AddSubtype _ -> []
   Modification.AddCardType _ -> []
   Modification.SetCardType _ -> []
@@ -4099,6 +4101,8 @@ quantityKindFilters quantity = case quantity of
   -- AgainstSlot's answer: aiming the evaluation at CR 607.2a's linked cards
   -- does not stop the payload from naming a kind.
   Quantity.Type.AgainstCardsExiledWith inner -> quantityKindFilters inner
+  -- And its own Filter, which no Count holds and countFilters cannot see.
+  Quantity.Type.AgainstLastCardExiledWith (AgainstLastCardExiledWith.MkAgainstLastCardExiledWith criterion inner) -> (Unframed, criterion) : quantityKindFilters inner
   -- CR 702.167c: AgainstCardsExiledWith's answer, over the craft link alone.
   Quantity.Type.AgainstCraftMaterials inner -> quantityKindFilters inner
 
@@ -4162,9 +4166,10 @@ modificationFilters modification = case modification of
   Modification.GainKeywordAtManaCost _ -> []
   -- CR 702.5a again: the granted slot's own Filter, which is card text like any
   -- other and has to be swept. NOT [] -- this, LoseEnchant beside it,
-  -- GainKeyword above, LoseKeyword and AddNamesMatching below are the arms that
-  -- answer with something, and every other one carries no Filter at all,
-  -- LoseKeywordFamily's payload-free family included.
+  -- GainKeyword above, LoseKeyword, SetCreatureSubtypesOfLastCardExiledWith and
+  -- AddNamesMatching below are the arms that answer with something, and every
+  -- other one carries no Filter at all, LoseKeywordFamily's payload-free family
+  -- included.
   Modification.GainEnchant slot -> targetSlotFilters slot
   Modification.LoseEnchant slot -> targetSlotFilters slot
   Modification.GainCastingPermission _ -> []
@@ -4197,6 +4202,8 @@ modificationFilters modification = case modification of
   Modification.AddCreatureSubtype _ -> []
   Modification.AddEveryCreatureSubtype -> []
   Modification.LoseEveryCreatureSubtype -> []
+  -- Its Filter picks the card it reads, which is card text like any other.
+  Modification.SetCreatureSubtypesOfLastCardExiledWith f -> unframed [f]
   Modification.AddSubtype _ -> []
   Modification.AddCardType _ -> []
   Modification.SetCardType _ -> []
