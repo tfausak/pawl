@@ -17,17 +17,9 @@ import qualified Pawl.Types.SlotName as SlotName
 -- HOW MANY land on each is the player's answer
 -- (Pawl.Types.Prompt's ChooseDistributedMovedCounters) rather than the card's.
 --
--- Not implemented: a group destination under any `kinds` arm but
--- MovedKinds.AnyNumber and MovedKinds.AnyNumberOfKind, whose count is the
--- player's and whose whole answer the distribution prompt can therefore carry.
--- An arm the CARD settles a count on would have to ask where a fixed batch goes
--- rather than what crosses, and MovedKinds.AtLeastOne -- whose count IS the
--- player's -- would have to repair an answer moving nothing by choosing a
--- recipient as well as a kind, which under one destination it never has to do.
--- No printing writes either pairing: the sweep on Pawl.Types.MovedKinds names
--- Forgotten Ancient as the only group destination there is, and Goldberry,
--- River-Daughter's floor as the only "one or more", whose destination is one
--- targeted permanent (#2784).
+-- Not implemented: a group destination under MovedKinds.Chosen,
+-- MovedKinds.UpToOneChosen or MovedKinds.EachAbsentKind, which moves nothing
+-- (#4774).
 --
 -- `kinds` is WHICH counters cross and how many of each; Pawl.Types.MovedKinds is
 -- where every spelling the printed text uses for that is set out.

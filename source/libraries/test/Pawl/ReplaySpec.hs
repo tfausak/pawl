@@ -64,6 +64,7 @@ import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeSelection as ModeSelection
+import qualified Pawl.Types.MoveSpread as MoveSpread
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.MulliganOffer as MulliganOffer
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -1588,20 +1589,23 @@ combatReplaySpec s =
               offered = Map.singleton CounterKind.PlusOnePlusOne (5 :: Natural.Natural)
               spread = Map.fromList [(one, Map.singleton CounterKind.PlusOnePlusOne (3 :: Natural.Natural)), (two, Map.singleton CounterKind.PlusOnePlusOne 1)]
               onlyOne = Map.singleton two (Map.singleton CounterKind.PlusOnePlusOne (2 :: Natural.Natural))
-              p = Prompt.ChooseDistributedMovedCounters decider S.alice oid offered (one NonEmpty.:| [two])
+              p = Prompt.ChooseDistributedMovedCounters decider S.alice oid MoveSpread.AnyNumber offered (one NonEmpty.:| [two])
           Spec.assertEqWith s "a distribution across both recipients round trips" (Replay.decode p (Replay.encode p spread)) (Just spread)
           -- Discriminating: a decode that ignored the response would answer the
           -- case above whatever was encoded.
           Spec.assertEqWith s "and one naming a single recipient round trips as itself" (Replay.decode p (Replay.encode p onlyOne)) (Just onlyOne)
-        Spec.it s "a short distributed transcript moves nothing" $
+          -- An answer to "any number" is not one to a settled batch.
+          Spec.assertEqWith s "and one recorded under another spread does not decode" (Replay.decode (Prompt.ChooseDistributedMovedCounters decider S.alice oid MoveSpread.Exactly offered (one NonEmpty.:| [two])) (Replay.encode p spread)) Nothing
+        Spec.it s "a short distributed transcript moves the least its spread allows" $ do
           -- CR 122.5: "any number" includes none here too, so the quiet answer
-          -- allocates to nobody and leaves the board where a short transcript
-          -- found it.
-          Spec.assertEqWith
-            s
-            "the empty distribution"
-            (Replay.defaultAnswer (Prompt.ChooseDistributedMovedCounters decider S.alice oid (Map.singleton CounterKind.PlusOnePlusOne (3 :: Natural.Natural)) (ObjectId.MkObjectId 9 NonEmpty.:| [])))
-            Map.empty
+          -- allocates to nobody; "one or more" puts one counter of the first kind
+          -- on the first recipient; a settled batch goes whole onto it.
+          let offered = Map.fromList [(CounterKind.PlusOnePlusOne, 3), (CounterKind.Shield, 2)] :: Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural
+              first = ObjectId.MkObjectId 9
+              quiet spread = Replay.defaultAnswer (Prompt.ChooseDistributedMovedCounters decider S.alice oid spread offered (first NonEmpty.:| [ObjectId.MkObjectId 11]))
+          Spec.assertEqWith s "the empty distribution under any number" (quiet MoveSpread.AnyNumber) Map.empty
+          Spec.assertEqWith s "one counter of the first kind under one or more" (quiet MoveSpread.AtLeastOne) (Map.singleton first (Map.singleton CounterKind.PlusOnePlusOne 1))
+          Spec.assertEqWith s "and the whole batch under a settled one" (quiet MoveSpread.Exactly) (Map.singleton first offered)
         -- CR 122.5 once more, for "up to one": the answer is a kind OR none, so a
         -- transcript has to carry the declining half that ChooseMovedCounter's
         -- cannot say.

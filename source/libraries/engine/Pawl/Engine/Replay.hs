@@ -32,6 +32,7 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GraveyardArrangement as GraveyardArrangement
 import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
+import qualified Pawl.Types.MoveSpread as MoveSpread
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.MutateSide as MutateSide
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -104,7 +105,7 @@ encode p answer = case p of
   Prompt.ChooseMovedCounters {} -> Response.ChoseMovedCounters answer
   Prompt.ChooseStoredRerolls {} -> Response.ChoseStoredRerolls answer
   Prompt.ChooseMovedCountersAtLeastOne {} -> Response.ChoseMovedCountersAtLeastOne answer
-  Prompt.ChooseDistributedMovedCounters {} -> Response.ChoseDistributedMovedCounters answer
+  Prompt.ChooseDistributedMovedCounters _ _ _ spread _ _ -> Response.ChoseDistributedMovedCounters spread answer
   Prompt.ChooseMovedCounterOrNone {} -> Response.ChoseMovedCounterOrNone answer
   Prompt.ChooseCardInGraveyard {} -> Response.ChoseCardInGraveyard answer
   Prompt.ChooseCardInHand {} -> Response.ChoseCardInHand answer
@@ -384,8 +385,8 @@ decode p response = case p of
   Prompt.ChooseMovedCountersAtLeastOne {} -> case response of
     Response.ChoseMovedCountersAtLeastOne counters -> Just counters
     _ -> Nothing
-  Prompt.ChooseDistributedMovedCounters {} -> case response of
-    Response.ChoseDistributedMovedCounters counters -> Just counters
+  Prompt.ChooseDistributedMovedCounters _ _ _ spread _ _ -> case response of
+    Response.ChoseDistributedMovedCounters recorded counters | recorded == spread -> Just counters
     _ -> Nothing
   Prompt.ChooseMovedCounterOrNone {} -> case response of
     Response.ChoseMovedCounterOrNone kind -> Just kind
@@ -901,10 +902,18 @@ defaultAnswer p = case p of
   Prompt.ChooseMovedCountersAtLeastOne _ _ _ _ offered -> case Map.lookupMin offered of
     Nothing -> Map.empty
     Just (kind, _) -> Map.singleton kind 1
-  -- CR 122.5 once more: a group destination under "any number" includes none, so
-  -- ChooseMovedCounters' default is this prompt's too -- allocate to nobody and
-  -- the board is left alone.
-  Prompt.ChooseDistributedMovedCounters {} -> Map.empty
+  -- CR 122.5 once more, over a group destination: the least-eventful answer the
+  -- spread allows, ChooseMovedCounters' and ChooseMovedCountersAtLeastOne's
+  -- reasoning above. "Any number" allocates to nobody; "one or more" puts one
+  -- counter of the first kind on the first recipient; a batch the card settled
+  -- goes whole onto the first recipient, which the engine repairs if that one
+  -- refuses a kind.
+  Prompt.ChooseDistributedMovedCounters _ _ _ spread offered candidates -> case spread of
+    MoveSpread.AnyNumber -> Map.empty
+    MoveSpread.AtLeastOne -> case Map.lookupMin offered of
+      Nothing -> Map.empty
+      Just (kind, _) -> Map.singleton (NonEmpty.head candidates) (Map.singleton kind 1)
+    MoveSpread.Exactly -> Map.singleton (NonEmpty.head candidates) offered
   -- CR 122.5 once more: "up to one" includes none, and ChooseMovedCounters'
   -- reason for declining is this prompt's too -- a default that took a counter
   -- off the first object would rewrite a board rather than leave it alone.

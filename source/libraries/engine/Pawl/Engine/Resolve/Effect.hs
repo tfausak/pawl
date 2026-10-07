@@ -279,6 +279,7 @@ import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.MoveCounters as MoveCounters
 import qualified Pawl.Types.MoveDuration as MoveDuration.Type
 import qualified Pawl.Types.MoveMana as MoveMana
+import qualified Pawl.Types.MoveSpread as MoveSpread
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.MovedKinds as MovedKinds
 import qualified Pawl.Types.Object as Object
@@ -9376,83 +9377,126 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- rather than once for the sentence.
         --
         -- WHERE each counter goes is the player's, which is what makes this a
-        -- prompt rather than a fold: the card leaves both the count and the
-        -- recipient open, and one question answers both (Prompt's
-        -- ChooseDistributedMovedCounters).
+        -- prompt rather than a fold (Prompt's ChooseDistributedMovedCounters),
+        -- and the prompt's MoveSpread states the total the answer must reach.
+        -- Where the card leaves the count open ("any number") that is anything
+        -- up to the offered tallies; under a floor ("one or more") at least one
+        -- counter; and where the card settles the batch ("all +1/+1 counters",
+        -- "two +1/+1 counters") every counter of it, since rule 122.5's
+        -- all-or-nothing forbids removing a counter that has nowhere to land.
         --
-        -- Only MovedKinds.AnyNumber and MovedKinds.AnyNumberOfKind are asked, and
-        -- they are two of the THREE arms whose count is the player's rather than
-        -- all of them: MovedKinds.AtLeastOne's count is the player's too and it
-        -- is not asked here. An arm the card settles a count on would be a
-        -- different question -- where does a fixed batch go -- which this prompt
-        -- cannot state, since an answer allocating less than the batch would
-        -- leave counters removed with nowhere to land and rule 122.5 forbids the
-        -- half-move. The floor is a different question again: an answer moving
-        -- nothing is repaired below by taking one counter of the first kind
-        -- offered, and over a group that repair would have to choose the
-        -- RECIPIENT as well, which the card leaves to the player and no board
-        -- forces. Neither pairing is printed; see Pawl.Types.MoveCounters
-        -- (#2784).
+        -- Not implemented: a group destination under MovedKinds.Chosen,
+        -- MovedKinds.UpToOneChosen or MovedKinds.EachAbsentKind, each of which
+        -- asks a question per kind or reads the one destination, and moves
+        -- nothing here (#4774).
         distributePair candidates fromOne =
           -- Rule 122.5's first and fourth impossibilities, per recipient: the
           -- first object is not its own destination, and both ends are on the
           -- battlefield. A recipient failing either is not a pair this move can
           -- make and is simply not offered.
           let others = NonEmpty.filter (\to -> to /= fromOne && Set.member to (GameState.battlefield gs)) candidates
+              -- Rule 122.5's third impossibility, asked of one pair at a time.
+              takes kind to = not (CounterRestriction.prohibited to kind gs)
            in if not (Set.member fromOne (GameState.battlefield gs))
                 then pure Map.empty
                 else case others of
                   [] -> pure Map.empty
                   firstTo : moreTo ->
                     -- movePair's `onFrom` read across the whole group: a kind is
-                    -- appropriate here if SOME recipient can take it, rule 122.5's
-                    -- third impossibility being asked of one pair at a time.
-                    -- Which recipient may take which kind is then asked again as
-                    -- the answer is filtered below.
+                    -- appropriate here if SOME recipient can take it. Which
+                    -- recipient may take which kind is then asked again as the
+                    -- answer is filtered below.
                     let onFrom =
                           Map.filterWithKey
-                            (\kind n -> n > 0 && any (\to -> not (CounterRestriction.prohibited to kind gs)) others)
+                            (\kind n -> n > 0 && any (takes kind) others)
                             (maybe Map.empty Object.counters (Game.lookupObject fromOne gs))
-                        offered = case kinds of
-                          MovedKinds.AnyNumber -> onFrom
-                          MovedKinds.AnyNumberOfKind wanted -> Map.restrictKeys onFrom (Set.singleton wanted)
-                          -- Not implemented: a floor over a group, whose repair
-                          -- would have to name a recipient (#2784). Written out
-                          -- rather than left to the fallthrough below, since it
-                          -- is the arm a reader of this file would expect here.
-                          MovedKinds.AtLeastOne -> Map.empty
-                          _ -> Map.empty
-                     in if Map.null offered
-                          then pure Map.empty
-                          else do
-                            answer <- Game.choose (Prompt.ChooseDistributedMovedCounters (Decide.deciderFor controller gs) controller fromOne offered (firstTo NonEmpty.:| moreTo))
-                            -- FILTERED, NOT TRUSTED: an object that was not
-                            -- offered is dropped (the fold is over `others`), a
-                            -- kind that was not offered is dropped, a kind the
-                            -- recipient itself refuses is dropped, and the
-                            -- tallies are clamped in offered order to what the
-                            -- first object actually holds (CR 609.3's "only as
-                            -- much as possible"). Clamping in an order rather
-                            -- than proportionally is what keeps a transcript
-                            -- deterministic; an honest answer never reaches it.
-                            let step (remaining, acc) to =
-                                  let wanted = Map.restrictKeys (Map.findWithDefault Map.empty to answer) (Map.keysSet offered)
-                                      granted =
-                                        Map.filter (> 0) $
-                                          Map.mapMaybeWithKey
-                                            (\kind n -> if CounterRestriction.prohibited to kind gs then Nothing else Just (min n (Map.findWithDefault 0 kind remaining)))
-                                            wanted
-                                   in (Map.differenceWith (\held n -> Just (held - n)) remaining granted, if Map.null granted then acc else Map.insert to granted acc)
-                                allocated = snd (List.foldl' step (offered, Map.empty) others)
-                            -- The REMOVAL half, once per kind for this first
-                            -- object however many recipients share it: movePair's
-                            -- batching, CR 608.2f's first branch. The placements
-                            -- are below the sweep with the single-destination
-                            -- ones, and cannot batch across recipients, an
-                            -- arrival being on one object.
-                            Monad.forM_ (Map.toList (Map.unionsWith (+) (Map.elems allocated))) $ \(kind, n) ->
-                              Monad.when (n > 0) (Event.removeCounters fromOne kind n)
-                            pure allocated
+                        ofKind wanted = Map.restrictKeys onFrom (Set.singleton wanted)
+                        question = case kinds of
+                          MovedKinds.AnyNumber -> Just (MoveSpread.AnyNumber, onFrom)
+                          MovedKinds.AnyNumberOfKind wanted -> Just (MoveSpread.AnyNumber, ofKind wanted)
+                          MovedKinds.AtLeastOne -> Just (MoveSpread.AtLeastOne, onFrom)
+                          -- The batch the card settles, movePair's arms of the
+                          -- same names read across the group: every kind's whole
+                          -- tally, one kind's whole tally, and the named kind
+                          -- clamped to what is there (CR 609.3).
+                          MovedKinds.Every -> Just (MoveSpread.Exactly, onFrom)
+                          MovedKinds.EveryOfKind wanted -> Just (MoveSpread.Exactly, ofKind wanted)
+                          MovedKinds.Named wanted quantity -> Just (MoveSpread.Exactly, Map.filter (> 0) (fmap (min (askedFor quantity)) (ofKind wanted)))
+                          MovedKinds.Chosen _ -> Nothing
+                          MovedKinds.UpToOneChosen -> Nothing
+                          MovedKinds.EachAbsentKind -> Nothing
+                        -- Places `owed` counters of each kind on the first
+                        -- recipient, in offered order, that takes that kind --
+                        -- one exists for every kind `onFrom` kept.
+                        topUp owed acc =
+                          Map.foldrWithKey
+                            ( \kind n placed -> case filter (takes kind) others of
+                                to : _ | n > 0 -> Map.insertWith (Map.unionWith (+)) to (Map.singleton kind n) placed
+                                _ -> placed
+                            )
+                            acc
+                            owed
+                        -- Every offered kind that one recipient alone can take:
+                        -- a settled batch then has one legal distribution.
+                        --
+                        -- The `takes` reads here and in `topUp` are a
+                        -- regression fence: every group in the pool leaves
+                        -- `others` two or more recipients, and the pool's
+                        -- prohibitions (Solemnity; Melira, Sylvok Outcast)
+                        -- refuse a kind on every creature one player controls
+                        -- alike, so no board refuses it on one recipient of
+                        -- "other creatures you control" alone.
+                        forced offered = all (\kind -> length (filter (takes kind) others) == 1) (Map.keys offered)
+                     in case question of
+                          Nothing -> pure Map.empty
+                          Just (spread, offered)
+                            | Map.null offered -> pure Map.empty
+                            | otherwise -> do
+                                -- Nothing is asked of a settled batch whose
+                                -- every counter has one place to land.
+                                allocated <-
+                                  if spread == MoveSpread.Exactly && forced offered
+                                    then pure (topUp offered Map.empty)
+                                    else do
+                                      answer <- Game.choose (Prompt.ChooseDistributedMovedCounters (Decide.deciderFor controller gs) controller fromOne spread offered (firstTo NonEmpty.:| moreTo))
+                                      -- FILTERED, NOT TRUSTED: an object that was
+                                      -- not offered is dropped (the fold is over
+                                      -- `others`), a kind that was not offered is
+                                      -- dropped, a kind the recipient itself
+                                      -- refuses is dropped, and the tallies are
+                                      -- clamped in offered order to what the
+                                      -- first object actually holds (CR 609.3's
+                                      -- "only as much as possible"). Clamping in
+                                      -- an order rather than proportionally is
+                                      -- what keeps a transcript deterministic; an
+                                      -- honest answer never reaches it.
+                                      let step (remaining, acc) to =
+                                            let wanted = Map.restrictKeys (Map.findWithDefault Map.empty to answer) (Map.keysSet offered)
+                                                granted = Map.filter (> 0) (Map.mapMaybeWithKey (\kind n -> if takes kind to then Just (min n (Map.findWithDefault 0 kind remaining)) else Nothing) wanted)
+                                             in (Map.differenceWith (\held n -> Just (held - n)) remaining granted, if Map.null granted then acc else Map.insert to granted acc)
+                                          (unplaced, filtered) = List.foldl' step (offered, Map.empty) others
+                                      -- An answer short of the spread is then
+                                      -- REPAIRED, Chosen's fallback posture: a
+                                      -- floor answered with nothing takes one
+                                      -- counter of the first kind offered
+                                      -- (Map.lookupMin), and a settled batch
+                                      -- places what the answer left over, each
+                                      -- onto the first recipient taking it.
+                                      pure $ case spread of
+                                        MoveSpread.AnyNumber -> filtered
+                                        MoveSpread.AtLeastOne
+                                          | Map.null filtered -> topUp (foldMap (\(kind, _) -> Map.singleton kind 1) (Map.lookupMin offered)) Map.empty
+                                          | otherwise -> filtered
+                                        MoveSpread.Exactly -> topUp (Map.filter (> 0) unplaced) filtered
+                                -- The REMOVAL half, once per kind for this first
+                                -- object however many recipients share it:
+                                -- movePair's batching, CR 608.2f's first branch.
+                                -- The placements are below the sweep with the
+                                -- single-destination ones, and cannot batch across
+                                -- recipients, an arrival being on one object.
+                                Monad.forM_ (Map.toList (Map.unionsWith (+) (Map.elems allocated))) $ \(kind, n) ->
+                                  Monad.when (n > 0) (Event.removeCounters fromOne kind n)
+                                pure allocated
     -- The FIRST side is swept as this instruction is reached (CR 608.2c), and the
     -- removals run in the order the sweep hands back -- battlefieldMatching's
     -- APNAP sort for the EachMatching arm, one object for every other arm the

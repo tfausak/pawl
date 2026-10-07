@@ -1,0 +1,318 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "mana": [
+              {
+                "type": "Generic",
+                "value": 2
+              },
+              {
+                "type": "OfType",
+                "value": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Green"
+                  }
+                }
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "MoveCounters",
+                        "value": {
+                          "from": {
+                            "type": "InSlot",
+                            "value": "self"
+                          },
+                          "kinds": {
+                            "type": "AtLeastOne"
+                          },
+                          "to": {
+                            "type": "EachMatching",
+                            "value": {
+                              "type": "And",
+                              "value": [
+                                {
+                                  "type": "HasCardType",
+                                  "value": {
+                                    "type": "Creature"
+                                  }
+                                },
+                                {
+                                  "type": "ControlledBy",
+                                  "value": {
+                                    "type": "You"
+                                  }
+                                },
+                                {
+                                  "type": "Not",
+                                  "value": {
+                                    "type": "IsSource"
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "cost": {
+            "mana": [
+              {
+                "type": "Generic",
+                "value": 1
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "MoveCounters",
+                        "value": {
+                          "from": {
+                            "type": "InSlot",
+                            "value": "self"
+                          },
+                          "kinds": {
+                            "type": "Every"
+                          },
+                          "to": {
+                            "type": "EachMatching",
+                            "value": {
+                              "type": "And",
+                              "value": [
+                                {
+                                  "type": "HasCardType",
+                                  "value": {
+                                    "type": "Creature"
+                                  }
+                                },
+                                {
+                                  "type": "ControlledBy",
+                                  "value": {
+                                    "type": "You"
+                                  }
+                                },
+                                {
+                                  "type": "Not",
+                                  "value": {
+                                    "type": "IsSource"
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "cost": {
+            "mana": [
+              {
+                "type": "OfType",
+                "value": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Green"
+                  }
+                }
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "MoveCounters",
+                        "value": {
+                          "from": {
+                            "type": "InSlot",
+                            "value": "self"
+                          },
+                          "kinds": {
+                            "type": "Named",
+                            "value": {
+                              "count": {
+                                "type": "Literal",
+                                "value": 2
+                              },
+                              "kind": {
+                                "type": "PlusOnePlusOne"
+                              }
+                            }
+                          },
+                          "to": {
+                            "type": "EachMatching",
+                            "value": {
+                              "type": "And",
+                              "value": [
+                                {
+                                  "type": "HasCardType",
+                                  "value": {
+                                    "type": "Creature"
+                                  }
+                                },
+                                {
+                                  "type": "ControlledBy",
+                                  "value": {
+                                    "type": "You"
+                                  }
+                                },
+                                {
+                                  "type": "Not",
+                                  "value": {
+                                    "type": "IsSource"
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Synthetic Ancient Redistributor",
+      "power": {
+        "type": "Literal",
+        "value": 0
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 4
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "StepBegins",
+            "value": {
+              "phase": {
+                "type": "Beginning",
+                "value": {
+                  "type": "Upkeep"
+                }
+              },
+              "scope": {
+                "type": "ControllersTurn"
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "MoveCounters",
+                        "value": {
+                          "from": {
+                            "type": "InSlot",
+                            "value": "self"
+                          },
+                          "kinds": {
+                            "type": "EveryOfKind",
+                            "value": {
+                              "type": "PlusOnePlusOne"
+                            }
+                          },
+                          "to": {
+                            "type": "EachMatching",
+                            "value": {
+                              "type": "And",
+                              "value": [
+                                {
+                                  "type": "HasCardType",
+                                  "value": {
+                                    "type": "Creature"
+                                  }
+                                },
+                                {
+                                  "type": "ControlledBy",
+                                  "value": {
+                                    "type": "You"
+                                  }
+                                },
+                                {
+                                  "type": "Not",
+                                  "value": {
+                                    "type": "IsSource"
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Elemental"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

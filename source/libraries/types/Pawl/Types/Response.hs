@@ -33,6 +33,7 @@ import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.ModeIndex as ModeIndex
+import qualified Pawl.Types.MoveSpread as MoveSpread
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.MutateSide as MutateSide
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -328,8 +329,9 @@ data Response
     -- "onto other creatures"). Its own constructor and not ChoseMovedCounters
     -- above: that answer is one tally per kind for one destination, where this
     -- one is a tally per kind PER OBJECT, so neither could stand in for the
-    -- other.
-    ChoseDistributedMovedCounters (Map.Map ObjectId.ObjectId (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural))
+    -- other. It carries the prompt's spread, ChoseMovedCountersAtLeastOne's
+    -- reason: an answer legal under one spread may be illegal under another.
+    ChoseDistributedMovedCounters MoveSpread.MoveSpread (Map.Map ObjectId.ObjectId (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural))
   | -- | CR 122.5: the KIND of counter a player chose to move off the first
     -- object, or none at all. Its own constructor and not ChoseMovedCounter
     -- above for that same reason: declining is an answer only one of the two

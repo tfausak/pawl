@@ -71,7 +71,7 @@ deciderOf prompt = case prompt of
   Prompt.ChooseMovedCounters decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseStoredRerolls decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseMovedCountersAtLeastOne decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseDistributedMovedCounters decider _ _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseDistributedMovedCounters decider _ _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseMovedCounterOrNone decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChoosePaidEnergy decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseNumber decider _ _ _ -> Just (Decider.unwrap decider)
