@@ -15,6 +15,7 @@ import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.ProductionTag as ProductionTag
+import qualified Pawl.Types.SourceChoices as SourceChoices
 import qualified Pawl.Types.SpendTrigger as SpendTrigger
 import qualified Pawl.Types.Subtype as Subtype
 
@@ -33,10 +34,10 @@ spec s = Spec.describe s "Pawl.Codec.ManaUnit" $ do
           ManaUnit.restriction = Nothing,
           ManaUnit.rider = Nothing,
           ManaUnit.spendTrigger = Nothing,
-          ManaUnit.sourceChosenSubtype = Nothing,
+          ManaUnit.sourceChoices = Nothing,
           ManaUnit.sourceLastExiled = Nothing
         }
-      " {\"manaType\":{\"type\":\"Colorless\"},\"tags\":[],\"retention\":{\"type\":\"Ordinary\"},\"restriction\":null,\"rider\":null,\"sourceChosenSubtype\":null} "
+      " {\"manaType\":{\"type\":\"Colorless\"},\"tags\":[],\"retention\":{\"type\":\"Ordinary\"},\"restriction\":null,\"rider\":null,\"sourceChoices\":null} "
   -- Every axis but the rider at once, each away from its default: CR 107.4h's
   -- snow tag, CR 514.2's retention, Geosurge's "spend this mana only to cast"
   -- restriction, CR 607.2d's subtype baked off the source (Pillar of Origins)
@@ -52,10 +53,10 @@ spec s = Spec.describe s "Pawl.Codec.ManaUnit" $ do
           ManaUnit.restriction = Just (ManaRestriction.onlyCasts (Filter.HasCardType CardType.Creature)),
           ManaUnit.rider = Nothing,
           ManaUnit.spendTrigger = Nothing,
-          ManaUnit.sourceChosenSubtype = Just Subtype.Goblin,
+          ManaUnit.sourceChoices = Just SourceChoices.MkSourceChoices {SourceChoices.names = Set.empty, SourceChoices.colors = Set.singleton Color.Red, SourceChoices.subtype = Just Subtype.Goblin},
           ManaUnit.sourceLastExiled = Just (ObjectId.MkObjectId 7)
         }
-      " {\"manaType\":{\"type\":\"Colored\",\"value\":{\"type\":\"Red\"}},\"tags\":[{\"type\":\"Snow\"}],\"retention\":{\"type\":\"UntilEndOfTurn\"},\"restriction\":{\"casts\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"rider\":null,\"sourceChosenSubtype\":{\"type\":\"Goblin\"},\"sourceLastExiled\":7} "
+      " {\"manaType\":{\"type\":\"Colored\",\"value\":{\"type\":\"Red\"}},\"tags\":[{\"type\":\"Snow\"}],\"retention\":{\"type\":\"UntilEndOfTurn\"},\"restriction\":{\"casts\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"rider\":null,\"sourceChoices\":{\"colors\":[{\"type\":\"Red\"}],\"subtype\":{\"type\":\"Goblin\"}},\"sourceLastExiled\":7} "
   -- Pyromancer's Goggles' red: CR 106.6's third shape, written only when set.
   Spec.it s "mana carrying a spend trigger" $
     Common.assertCodec
@@ -75,12 +76,12 @@ spec s = Spec.describe s "Pawl.Codec.ManaUnit" $ do
                   SpendTrigger.source = ObjectId.MkObjectId 4,
                   SpendTrigger.controller = PlayerId.MkPlayerId 0
                 },
-          ManaUnit.sourceChosenSubtype = Nothing,
+          ManaUnit.sourceChoices = Nothing,
           ManaUnit.sourceLastExiled = Nothing
         }
       ( " {\"manaType\":{\"type\":\"Colored\",\"value\":{\"type\":\"Red\"}},\"tags\":[],\"retention\":{\"type\":\"Ordinary\"},\"restriction\":null,\"rider\":null,"
           <> "\"spendTrigger\":{\"casts\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Instant\"}},\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}},\"source\":4,\"controller\":0},"
-          <> "\"sourceChosenSubtype\":null} "
+          <> "\"sourceChoices\":null} "
       )
   Spec.it s "has a schema" $
     Common.assertHasSchema s ManaUnit.codec

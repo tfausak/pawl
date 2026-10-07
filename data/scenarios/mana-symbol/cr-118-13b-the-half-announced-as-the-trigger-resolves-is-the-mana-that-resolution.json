@@ -226,7 +226,7 @@
               },
               "restriction": null,
               "rider": null,
-              "sourceChosenSubtype": null
+              "sourceChoices": null
             },
             {
               "manaType": {
@@ -241,7 +241,7 @@
               },
               "restriction": null,
               "rider": null,
-              "sourceChosenSubtype": null
+              "sourceChoices": null
             }
           ]
         }

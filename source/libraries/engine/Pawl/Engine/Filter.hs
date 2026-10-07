@@ -1534,7 +1534,9 @@ data Context = MkContext
     -- (Pawl.Engine.Resolve.Slots.effectContext, Brass Herald) and the cost pools
     -- of Pawl.Engine.Cost and Pawl.Engine.Replacement.matchesPermanent. The other
     -- is Pawl.Engine.Target.slotContext's target slot (Pentarch Paladin), which
-    -- builds its record by hand. A static grant's bare protection quality
+    -- builds its record by hand. CR 106.6's mana restriction reads it off the
+    -- MANA UNIT instead (Pawl.Engine.Mana.admitsUnder, Throne of Eldraine), for
+    -- sourceChosenSubtype's reason below. A static grant's bare protection quality
     -- (Cho-Manno's Blessing) never reaches it: Pawl.Engine.Keyword.grantedBy
     -- bakes the granter's choice out.
     --
@@ -1559,7 +1561,7 @@ data Context = MkContext
     -- reads it off the MANA UNIT, because a CR 106.6 restriction is asked when the
     -- source may be gone: CR 106.6a makes the restriction the ability's, so the
     -- answer is the one baked in when the mana was produced
-    -- (Pawl.Types.ManaUnit.sourceChosenSubtype, Pillar of Origins). That caller
+    -- (Pawl.Types.ManaUnit.sourceChoices, Pillar of Origins). That caller
     -- overrides whatever this field holds.
     --
     -- Vacuously False everywhere else, sourceChosenColors's posture, and fenced by
@@ -1673,6 +1675,7 @@ matches context view predicate = case predicate of
   Filter.HasCardType t -> Set.member t (cardTypes view)
   Filter.HasSupertype s -> Set.member s (supertypes view)
   Filter.HasColor c -> Set.member c (colors view)
+  Filter.IsMonocolored -> Set.size (colors view) == 1
   -- CR 702.78a's "share a color with it", the arm above asked of two objects:
   -- CR 105.2 makes colour a SET, so sharing is a non-empty intersection. False
   -- where either side is colourless, which is that reading rather than an
@@ -2350,6 +2353,7 @@ rewrite pairs predicate = case predicate of
   Filter.HasCardType _ -> predicate
   Filter.HasSupertype _ -> predicate
   Filter.HasColor _ -> predicate
+  Filter.IsMonocolored -> predicate
   Filter.SharesColorWithSource -> predicate
   -- Untouched, and CR 612.2 says so outright: "an effect that changes a color
   -- word or a subtype can't change a card name, even if that name contains a
@@ -3134,6 +3138,7 @@ bakeBound players predicate = case predicate of
   Filter.HasCardType _ -> predicate
   Filter.HasSupertype _ -> predicate
   Filter.HasColor _ -> predicate
+  Filter.IsMonocolored -> predicate
   Filter.SharesColorWithSource -> predicate
   Filter.HasSubtype _ -> predicate
   Filter.HasName _ -> predicate
@@ -3329,6 +3334,7 @@ manaValueThresholds predicate = case predicate of
   Filter.HasCardType _ -> []
   Filter.HasSupertype _ -> []
   Filter.HasColor _ -> []
+  Filter.IsMonocolored -> []
   Filter.SharesColorWithSource -> []
   Filter.HasSubtype _ -> []
   Filter.HasName _ -> []
@@ -3495,6 +3501,7 @@ statesAQuality predicate = case predicate of
   Filter.HasCardType _ -> True
   Filter.HasSupertype _ -> True
   Filter.HasColor _ -> True
+  Filter.IsMonocolored -> True
   Filter.SharesColorWithSource -> True
   Filter.HasSubtype _ -> True
   -- CR 701.23b's "stated quality" at its sharpest -- a named card is the most

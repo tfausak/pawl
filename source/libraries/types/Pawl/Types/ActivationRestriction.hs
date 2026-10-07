@@ -2,6 +2,7 @@ module Pawl.Types.ActivationRestriction where
 
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.DuringPhase as DuringPhase
+import qualified Pawl.Types.ManaSpecification as ManaSpecification
 import qualified Pawl.Types.TurnScope as TurnScope
 
 -- | CR 602.5: ONE clause of the "activate only ..." rider an activated ability
@@ -186,4 +187,7 @@ data ActivationRestriction
   | -- | CR 602.5e's "Activate only as an instant": the player must have priority
     -- (CR 304.5), so never inside a payment -- Rhystic Cave.
     InstantSpeed
+  | -- | CR 602.2b: the activation may be paid only with mana this names -- Throne
+    -- of Eldraine's "Spend only mana of the chosen color to activate this ability".
+    SpendOnly ManaSpecification.ManaSpecification
   deriving (Eq, Ord, Show)

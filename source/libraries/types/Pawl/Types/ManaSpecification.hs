@@ -2,7 +2,8 @@ module Pawl.Types.ManaSpecification where
 
 -- | CR 106.12a's "or is tapped for mana of a specified type": which mana a tap
 -- has to have produced for the ability to trigger. The narrowing half of
--- Pawl.Types.PermanentTappedForMana, beside its subject and its filter.
+-- Pawl.Types.PermanentTappedForMana, beside its subject and its filter. Also
+-- which mana may pay for an activation (Pawl.Types.ActivationRestriction.SpendOnly).
 --
 -- A SPECIFICATION and not a Pawl.Types.ManaProduction, which the AddMana opcode
 -- carries: that type says how an effect DECIDES the mana it adds, and two of its

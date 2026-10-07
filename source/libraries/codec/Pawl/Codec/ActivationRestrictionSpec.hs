@@ -14,6 +14,7 @@ import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.DuringPhase as DuringPhase
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.InZone as InZone
+import qualified Pawl.Types.ManaSpecification as ManaSpecification
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -162,4 +163,10 @@ spec s = Spec.describe s "Pawl.Codec.ActivationRestriction" $ do
       ActivationRestriction.codec
       ActivationRestriction.InstantSpeed
       " {\"type\":\"InstantSpeed\"} "
+  Spec.it s "SpendOnly" $
+    Common.assertCodec
+      s
+      ActivationRestriction.codec
+      (ActivationRestriction.SpendOnly ManaSpecification.ChosenColor)
+      " {\"type\":\"SpendOnly\",\"value\":{\"type\":\"ChosenColor\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ActivationRestriction.codec

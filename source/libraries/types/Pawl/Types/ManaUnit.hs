@@ -7,13 +7,13 @@ import qualified Pawl.Types.ManaRider as ManaRider
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ProductionTag as ProductionTag
+import qualified Pawl.Types.SourceChoices as SourceChoices
 import qualified Pawl.Types.SpendTrigger as SpendTrigger
-import qualified Pawl.Types.Subtype as Subtype
 
 -- | One unit of mana in a pool.
 --
 -- EIGHT axes, and three of them are facts about how the mana was made: the tags,
--- the subtype its source had chosen (`sourceChosenSubtype` below), and the card
+-- what its source had chosen (`sourceChoices` below), and the card
 -- last exiled with its source (`sourceLastExiled`).
 -- Pawl.Types.ProductionTag is the CLOSED half -- snow-ness, "this activation
 -- caused you to lose life" -- observable facts about the production event that
@@ -31,7 +31,7 @@ import qualified Pawl.Types.Subtype as Subtype
 -- payment evaluates it through the one generic matcher
 -- (Pawl.Engine.Filter.matches) and never cases on what it says.
 --
--- Deliberately no source ObjectId, and `sourceChosenSubtype` below is that rule
+-- Deliberately no source ObjectId, and `sourceChoices` below is that rule
 -- kept rather than broken: it is a VALUE read off the source at production, which
 -- is the only way a CR 106.6 restriction can ask about the thing that made the
 -- mana. Snow cares about a PROPERTY of the source, not
@@ -97,24 +97,23 @@ data ManaUnit = MkManaUnit
     -- A carrier of its own rather than a Pawl.Types.ManaRiderEffect arm: it holds
     -- a whole ability, where that type is a closed word.
     spendTrigger :: Maybe SpendTrigger.SpendTrigger,
-    -- | CR 607.2d: the subtype this mana's SOURCE had chosen as it entered (CR
+    -- | CR 607.2d: what this mana's SOURCE had chosen as it entered (CR
     -- 614.1c), baked in here at production so that a CR 106.6 restriction can
-    -- read it -- Pillar of Origins' "creature spell of the chosen type". Nothing
-    -- for mana from a source that chose none, which is almost every mana.
+    -- read it -- Pillar of Origins' "creature spell of the chosen type", Throne
+    -- of Eldraine's "monocolored spells of that color". Nothing for mana from a
+    -- source that is gone, which reads as nothing chosen.
     --
-    -- Read by Pawl.Engine.Mana.admitsUnder, which hands it to
-    -- Pawl.Engine.Filter's sourceChosenSubtype for Filter.HasChosenSubtype to
-    -- ask. The atom's other position, a static ability's affected set (Obelisk of
-    -- Urd), fills that field off the board instead and never reaches this one.
-    -- BOTH producers stamp it -- Pawl.Engine.Mana.manaOptionsOfGiven for a
-    -- mana ability paid inline (Pillar of Origins) and Pawl.Engine.Resolve's
-    -- Effect.AddMana arm for one that resolves off the stack.
+    -- Read by Pawl.Engine.Mana.admitsUnder through
+    -- Pawl.Engine.SourceContext.withChoices. BOTH producers stamp it --
+    -- Pawl.Engine.Mana.manaOptionsOfGiven for a mana ability paid inline and
+    -- Pawl.Engine.Resolve's Effect.AddMana arm for one that resolves off the
+    -- stack.
     --
     -- BAKED and not looked up, which is what this type's own haddock requires: there
     -- is no source id to look anything up by, the source may have left the
     -- battlefield by the time the mana is spent, and CR 106.6a makes the
     -- restriction the ABILITY's rather than the permanent's.
-    sourceChosenSubtype :: Maybe Subtype.Subtype,
+    sourceChoices :: Maybe SourceChoices.SourceChoices,
     -- | CR 607.2a: the last card exiled with this mana's SOURCE when the mana was
     -- produced, baked in for Filter.IsLastExiledWithSource to ask -- Ice
     -- Cauldron's "only to cast the last card exiled with this artifact". Nothing

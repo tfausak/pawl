@@ -16,7 +16,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$typhoid-rats", "mana": ["$mana-confluence"], "yields": [[{ "manaType": { "type": "Colored", "value": { "type": "Black" } }, "tags": [], "retention": { "type": "Ordinary" }, "restriction": null, "rider": null, "sourceChosenSubtype": null }]] } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$typhoid-rats", "mana": ["$mana-confluence"], "yields": [[{ "manaType": { "type": "Colored", "value": { "type": "Black" } }, "tags": [], "retention": { "type": "Ordinary" }, "restriction": null, "rider": null, "sourceChoices": null }]] } } }
   ],
   "final": [
     { "Count": { "player": "alice", "zone": "Battlefield", "card": "Typhoid Rats", "count": 1 } },

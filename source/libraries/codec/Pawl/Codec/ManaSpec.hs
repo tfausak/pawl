@@ -22,13 +22,13 @@ plain manaType =
       ManaUnit.restriction = Nothing,
       ManaUnit.rider = Nothing,
       ManaUnit.spendTrigger = Nothing,
-      ManaUnit.sourceChosenSubtype = Nothing,
+      ManaUnit.sourceChoices = Nothing,
       ManaUnit.sourceLastExiled = Nothing
     }
 
 plainJson :: String -> String
 plainJson manaType =
-  "{\"manaType\":" <> manaType <> ",\"tags\":[],\"retention\":{\"type\":\"Ordinary\"},\"restriction\":null,\"rider\":null,\"sourceChosenSubtype\":null}"
+  "{\"manaType\":" <> manaType <> ",\"tags\":[],\"retention\":{\"type\":\"Ordinary\"},\"restriction\":null,\"rider\":null,\"sourceChoices\":null}"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Mana" $ do
@@ -53,7 +53,7 @@ spec s = Spec.describe s "Pawl.Codec.Mana" $ do
                 ManaUnit.restriction = Nothing,
                 ManaUnit.rider = Nothing,
                 ManaUnit.spendTrigger = Nothing,
-                ManaUnit.sourceChosenSubtype = Nothing,
+                ManaUnit.sourceChoices = Nothing,
                 ManaUnit.sourceLastExiled = Nothing
               }
           ]
@@ -62,7 +62,7 @@ spec s = Spec.describe s "Pawl.Codec.Mana" $ do
           <> plainJson "{\"type\":\"Colored\",\"value\":{\"type\":\"Red\"}}"
           <> ","
           <> plainJson "{\"type\":\"Colored\",\"value\":{\"type\":\"Red\"}}"
-          <> ",{\"manaType\":{\"type\":\"Colored\",\"value\":{\"type\":\"Red\"}},\"tags\":[{\"type\":\"Snow\"}],\"retention\":{\"type\":\"Ordinary\"},\"restriction\":null,\"rider\":null,\"sourceChosenSubtype\":null}] "
+          <> ",{\"manaType\":{\"type\":\"Colored\",\"value\":{\"type\":\"Red\"}},\"tags\":[{\"type\":\"Snow\"}],\"retention\":{\"type\":\"Ordinary\"},\"restriction\":null,\"rider\":null,\"sourceChoices\":null}] "
       )
   Spec.it s "has a schema" $
     Common.assertHasSchema s Mana.codec
