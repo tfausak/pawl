@@ -1,5 +1,6 @@
 module Pawl.Codec.OutsideObjectSpec where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Pawl.Codec.OutsideObject as OutsideObject
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -24,10 +25,11 @@ spec s = Spec.describe s "Pawl.Codec.OutsideObject" $ do
       ( OutsideObject.MkOutsideObject
           { OutsideObject.owner = PlayerId.MkPlayerId 0,
             OutsideObject.printing = PrintingId.MkPrintingId 1,
-            OutsideObject.facing = Facing.FaceUp
+            OutsideObject.facing = Facing.FaceUp,
+            OutsideObject.cards = PrintingId.MkPrintingId 1 NonEmpty.:| []
           }
       )
-      " {\"owner\":0,\"printing\":1} "
+      " {\"owner\":0,\"printing\":1,\"cards\":[1]} "
   -- CR 708.2's status, the one thing carried besides the printing.
   Spec.it s "MkOutsideObject face down" $
     Common.assertCodec
@@ -36,8 +38,23 @@ spec s = Spec.describe s "Pawl.Codec.OutsideObject" $ do
       ( OutsideObject.MkOutsideObject
           { OutsideObject.owner = PlayerId.MkPlayerId 0,
             OutsideObject.printing = PrintingId.MkPrintingId 1,
-            OutsideObject.facing = Facing.faceDown FaceDownReason.Manifested
+            OutsideObject.facing = Facing.faceDown FaceDownReason.Manifested,
+            OutsideObject.cards = PrintingId.MkPrintingId 1 NonEmpty.:| []
           }
       )
-      " {\"owner\":0,\"printing\":1,\"facing\":{\"type\":\"FaceDown\",\"value\":{\"reason\":{\"type\":\"Manifested\"},\"listed\":{}}}} "
+      " {\"owner\":0,\"printing\":1,\"facing\":{\"type\":\"FaceDown\",\"value\":{\"reason\":{\"type\":\"Manifested\"},\"listed\":{}}},\"cards\":[1]} "
+  -- CR 712.21 / 712.8g: a melded permanent, offered by its combined face and
+  -- bringing both cards.
+  Spec.it s "MkOutsideObject melded" $
+    Common.assertCodec
+      s
+      codec
+      ( OutsideObject.MkOutsideObject
+          { OutsideObject.owner = PlayerId.MkPlayerId 0,
+            OutsideObject.printing = PrintingId.MkPrintingId 3,
+            OutsideObject.facing = Facing.FaceUp,
+            OutsideObject.cards = PrintingId.MkPrintingId 1 NonEmpty.:| [PrintingId.MkPrintingId 2]
+          }
+      )
+      " {\"owner\":0,\"printing\":3,\"cards\":[1,2]} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec
