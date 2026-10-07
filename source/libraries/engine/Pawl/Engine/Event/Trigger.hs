@@ -78,6 +78,7 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
+import qualified Pawl.Types.LandPlayed as LandPlayed
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LeftTheGame as LeftTheGame
 import qualified Pawl.Types.LifeChange as LifeChange
@@ -251,6 +252,7 @@ movedOf event = case event of
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Milled {} -> Nothing
   GameEvent.Scried _ -> Nothing
+  GameEvent.LandPlayed {} -> Nothing
   GameEvent.LostTheGame _ -> Nothing
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
@@ -399,6 +401,7 @@ participants event =
         GameEvent.BecameUnattached a -> ([BecameUnattached.attachment a], []) <> recipient (BecameUnattached.host a)
         GameEvent.LeftTheGame l -> one (LeftTheGame.object l)
         GameEvent.Scried pid -> player pid
+        GameEvent.LandPlayed l -> ([LandPlayed.land l], [LandPlayed.player l])
         GameEvent.LostTheGame pid -> player pid
         GameEvent.DungeonCompleted pid -> player pid
         GameEvent.Surveiled pid -> player pid
@@ -474,6 +477,7 @@ looksBack condition = case condition of
   TriggerCondition.PlayerScries _ -> False
   TriggerCondition.RingTemptsPlayer _ -> False
   TriggerCondition.PlayerSurveils _ -> False
+  TriggerCondition.PlayerPlaysLand _ -> False
   TriggerCondition.PlayerProliferates _ -> False
   TriggerCondition.PlayerManifestsDread _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
@@ -810,6 +814,7 @@ batchScoped condition = case condition of
   TriggerCondition.PlayerFirebends _ -> False
   TriggerCondition.PlayerCompletesDungeon _ -> False
   TriggerCondition.PlayerSurveils _ -> False
+  TriggerCondition.PlayerPlaysLand _ -> False
   TriggerCondition.PlayerProliferates _ -> False
   TriggerCondition.PlayerManifestsDread _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
@@ -1341,6 +1346,7 @@ eventTriggers events gs =
           | otherwise -> Map.empty
         GameEvent.Milled {} -> Map.empty
         GameEvent.Scried _ -> Map.empty
+        GameEvent.LandPlayed {} -> Map.empty
         GameEvent.LostTheGame _ -> Map.empty
         GameEvent.DungeonCompleted _ -> Map.empty
         GameEvent.Surveiled _ -> Map.empty
@@ -1714,6 +1720,7 @@ eventTriggers events gs =
         GameEvent.LeftTheGame _ -> Map.empty
         GameEvent.Milled {} -> Map.empty
         GameEvent.Scried _ -> Map.empty
+        GameEvent.LandPlayed {} -> Map.empty
         GameEvent.LostTheGame _ -> Map.empty
         GameEvent.DungeonCompleted _ -> Map.empty
         GameEvent.Surveiled _ -> Map.empty
@@ -2043,6 +2050,7 @@ eventTriggers events gs =
         GameEvent.LeftTheGame _ -> Map.empty
         GameEvent.Milled {} -> Map.empty
         GameEvent.Scried _ -> Map.empty
+        GameEvent.LandPlayed {} -> Map.empty
         GameEvent.LostTheGame _ -> Map.empty
         GameEvent.DungeonCompleted _ -> Map.empty
         GameEvent.Surveiled _ -> Map.empty
@@ -2218,6 +2226,7 @@ eventTriggers events gs =
         GameEvent.LeftTheGame _ -> Map.empty
         GameEvent.Milled {} -> Map.empty
         GameEvent.Scried _ -> Map.empty
+        GameEvent.LandPlayed {} -> Map.empty
         GameEvent.LostTheGame _ -> Map.empty
         GameEvent.DungeonCompleted _ -> Map.empty
         GameEvent.Surveiled _ -> Map.empty
@@ -2652,6 +2661,7 @@ zonesTriggeredFrom cond =
         TriggerCondition.PlayerScries _ -> battlefield
         TriggerCondition.RingTemptsPlayer _ -> battlefield
         TriggerCondition.PlayerSurveils _ -> battlefield
+        TriggerCondition.PlayerPlaysLand _ -> battlefield
         TriggerCondition.PlayerProliferates _ -> battlefield
         TriggerCondition.PlayerManifestsDread _ -> battlefield
         -- CR 113.6's default: Withengar Unbound is a creature.
@@ -3155,6 +3165,7 @@ stateTriggers gs
             TriggerCondition.PlayerScries _ -> False
             TriggerCondition.RingTemptsPlayer _ -> False
             TriggerCondition.PlayerSurveils _ -> False
+            TriggerCondition.PlayerPlaysLand _ -> False
             TriggerCondition.PlayerProliferates _ -> False
             TriggerCondition.PlayerManifestsDread _ -> False
             TriggerCondition.SelfBecomesPlotted -> False
@@ -3966,6 +3977,7 @@ resnapshot gs without event =
         GameEvent.BecameUnattached {} -> Just event
         GameEvent.LeftTheGame {} -> Just event
         GameEvent.Scried {} -> Just event
+        GameEvent.LandPlayed {} -> Just event
         GameEvent.LostTheGame {} -> Just event
         GameEvent.DungeonCompleted {} -> Just event
         GameEvent.Surveiled {} -> Just event

@@ -72,6 +72,7 @@ import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.KickerDecision as KickerDecision
+import qualified Pawl.Types.LandPlayed as LandPlayed
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -2530,6 +2531,10 @@ playLand offered pid oid mName = do
     -- CR 305.1 / 400.7i: the card was played, under its pre-move id and the
     -- permanent's.
     State.modify' (\g -> g {GameState.cardsPlayed = foldr (`Map.insert` pid) (GameState.cardsPlayed g) (oid Seq.<| moved)})
+    -- CR 305.1: the play itself, for a condition watching land plays
+    -- (TriggerCondition.PlayerPlaysLand), naming the zone it was played from.
+    Monad.forM_ (Game.zoneOf oid before) $ \from ->
+      State.modify' (Event.recordEvent (GameEvent.LandPlayed (LandPlayed.MkLandPlayed pid (Maybe.fromMaybe oid (Seq.lookup 0 moved)) from)))
   -- CR 305.2a counts the lands played this turn, so this TALLIES rather than
   -- flagging. CR 305.4: the only tally, an effect that PUTS a land onto the
   -- battlefield not being one.

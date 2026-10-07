@@ -334,6 +334,7 @@ import qualified Pawl.Codec.KeywordFamilySpec
 import qualified Pawl.Codec.KeywordSpec
 import qualified Pawl.Codec.KeywordsAreSpec
 import qualified Pawl.Codec.LabelSpec
+import qualified Pawl.Codec.LandPlayedSpec
 import qualified Pawl.Codec.LastKnownSpec
 import qualified Pawl.Codec.LayoutSpec
 import qualified Pawl.Codec.LeftTheGameSpec
@@ -471,6 +472,7 @@ import qualified Pawl.Codec.PlayerSacrificesSpec
 import qualified Pawl.Codec.PlayerScopeSpec
 import qualified Pawl.Codec.PlayerSpec
 import qualified Pawl.Codec.PlayerStaticAbilitySpec
+import qualified Pawl.Codec.PlaysLandSpec
 import qualified Pawl.Codec.PlotFromZoneSpec
 import qualified Pawl.Codec.PlusSpec
 import qualified Pawl.Codec.PoolSpec
@@ -1161,6 +1163,7 @@ spec s registry = do
   Pawl.Codec.KeywordSpec.spec s
   Pawl.Codec.KeywordsAreSpec.spec s
   Pawl.Codec.LastKnownSpec.spec s
+  Pawl.Codec.LandPlayedSpec.spec s
   Pawl.Codec.LayoutSpec.spec s
   Pawl.Codec.LeftTheGameSpec.spec s
   Pawl.Codec.ArrivalSpec.spec s
@@ -1319,6 +1322,7 @@ spec s registry = do
   Pawl.Codec.PlotFromZoneSpec.spec s
   Pawl.Codec.PlayerSpec.spec s
   Pawl.Codec.PlayerStaticAbilitySpec.spec s
+  Pawl.Codec.PlaysLandSpec.spec s
   Pawl.Codec.PlusSpec.spec s
   Pawl.Codec.PoolSpec.spec s
   Pawl.Codec.PowerSpec.spec s

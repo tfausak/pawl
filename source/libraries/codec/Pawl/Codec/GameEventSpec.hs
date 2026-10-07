@@ -50,6 +50,7 @@ import qualified Pawl.Types.Exploited as Exploited
 import qualified Pawl.Types.FloatingCandidate as FloatingCandidate
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
+import qualified Pawl.Types.LandPlayed as LandPlayed
 import qualified Pawl.Types.LeftTheGame as LeftTheGame
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.ManaAbilityResolved as ManaAbilityResolved
@@ -537,6 +538,14 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.Scried (PlayerId.MkPlayerId 1))
       " {\"type\":\"Scried\",\"value\":1} "
+  -- CR 305.1. The player, the land as it arrived, and the zone it was played
+  -- from, which is what Urianger Augurelt's condition reads.
+  Spec.it s "LandPlayed" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.LandPlayed (LandPlayed.MkLandPlayed (PlayerId.MkPlayerId 1) (ObjectId.MkObjectId 7) Zone.Exile))
+      " {\"type\":\"LandPlayed\",\"value\":{\"player\":1,\"land\":7,\"from\":{\"type\":\"Exile\"}}} "
   -- CR 309.7. One player id, Scried's payload: the rule names the completion
   -- and not the dungeon.
   Spec.it s "DungeonCompleted" $
