@@ -40,6 +40,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Engine.Subtype as Subtype.Engine
 import qualified Pawl.Interpreter as Interpreter
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
@@ -1320,15 +1321,15 @@ spec s registry = Spec.describe s "Meld" $ do
       [hostId] -> do
         let (duplicantId, board) = S.entersWithTrigger duplicant S.bob meldedBoard
             imprinted order =
-              let staged = S.runPure (duplicating hostId order) board Engine.settleForPriority
-               in (staged, S.runPure (duplicating hostId order) staged Stack.resolveTop)
+              let onStack = S.runPure (duplicating hostId order) board Engine.settleForPriority
+               in (onStack, S.runPure (duplicating hostId order) onStack Stack.resolveTop)
             (staged, melded_) = imprinted [0, 1]
             swapped = snd (imprinted [1, 0])
-            creatureTypes gs = Set.filter Subtype.isCreatureType (Projection.subtypesOf duplicantId gs)
-        Spec.assertEqWith s "CR 712.21b in the melded order the Scavengers is exiled last: Duplicant is 3/3" (S.powerToughnessOf duplicantId melded_) (Just (3, 3))
-        Spec.assertEqWith s "and a Human Rogue, still a Shapeshifter" (creatureTypes melded_) (Set.fromList [Subtype.Human, Subtype.Rogue, Subtype.Shapeshifter])
-        Spec.assertEqWith s "CR 712.21b bob's swap makes the Rats the last: Duplicant is 2/1" (S.powerToughnessOf duplicantId swapped) (Just (2, 1))
-        Spec.assertEqWith s "and a Rat, still a Shapeshifter" (creatureTypes swapped) (Set.fromList [Subtype.Rat, Subtype.Shapeshifter])
+            creatureTypes gs = Set.filter Subtype.Engine.isCreatureType (Projection.subtypesOf duplicantId gs)
+        Spec.assertEqWith s "CR 712.21b in the melded order the Rats is exiled last: Duplicant is 2/1" (S.powerToughnessOf duplicantId melded_) (Just (2, 1))
+        Spec.assertEqWith s "and a Rat, still a Shapeshifter" (creatureTypes melded_) (Set.fromList [Subtype.Rat, Subtype.Shapeshifter])
+        Spec.assertEqWith s "CR 712.21b bob's swap makes the Scavengers the last: Duplicant is 3/3" (S.powerToughnessOf duplicantId swapped) (Just (3, 3))
+        Spec.assertEqWith s "and a Human Rogue, still a Shapeshifter" (creatureTypes swapped) (Set.fromList [Subtype.Human, Subtype.Rogue, Subtype.Shapeshifter])
         -- The proxies behind those, kept AFTER them: both cards really are in
         -- exile under either answer, and before the trigger resolved Duplicant
         -- was its printed 2/4 Shapeshifter, so the values above are the static
