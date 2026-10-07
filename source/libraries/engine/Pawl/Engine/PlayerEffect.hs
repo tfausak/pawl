@@ -262,7 +262,7 @@ printedRows gs =
       -- Hoisted for the same reason, and a thunk until a permanent that actually
       -- has a player ability forces it -- so the ordinary board pays nothing for
       -- the CR 604.2 question below.
-      removed = Projection.abilityRemoval gs
+      removed = Projection.namedAbilityRemoval gs
       -- One permanent's rows, each ability stamped and read through `changes`,
       -- CR 612.1's word swap over the text it is printed in -- none for a
       -- granted one (CR 612.3).
@@ -336,25 +336,28 @@ printedRows gs =
             -- already STARTED to apply cannot reach it: CR 613.10/613.11 apply
             -- a player effect AFTER the seven layers have run, so it never
             -- started to apply before layer 6 and the cut is unconditional.
+            -- Asked per ability, by its name, so a removal naming one
+            -- leaves the others (Pawl.ActivateSpec's Synthetic Hushed
+            -- Warden group).
             --
             -- That same "after the layers" placement is why the CR 305.7 gate
             -- is liveAfterLayers: the projection is finished here, so the
             -- setter's affected set is read against it rather than against base
             -- characteristics, and a permanent animated into a land at layer 4
             -- is reached (Ashaya on Thalia, under Blood Moon).
-            if (null setEffs || Projection.liveAfterLayers setEffs oid gs)
-              && not (removed oid)
-              then
-                -- CR 612.1's word swap over the permanent's own text, computed
-                -- HERE rather than hoisted beside setEffs above, exactly as
-                -- Pawl.Engine.CombatRestriction.restricted computes it:
-                -- readerTextChanges folds the whole continuous-effect list,
-                -- and the empty case above has already turned away every
-                -- permanent that prints no player ability, so the fold runs
-                -- once per ability-bearing permanent instead of once per
-                -- permanent on the battlefield.
-                rowsOf (Projection.readerTextChanges oid gs) oid controller (fmap ((,) (Projection.staticTimestampOf oid object gs)) abilities)
-              else []
+            let kept = filter (\ability -> not (removed (PlayerStaticAbility.name ability) oid)) abilities
+             in if (null setEffs || Projection.liveAfterLayers setEffs oid gs) && not (null kept)
+                  then
+                    -- CR 612.1's word swap over the permanent's own text, computed
+                    -- HERE rather than hoisted beside setEffs above, exactly as
+                    -- Pawl.Engine.CombatRestriction.restricted computes it:
+                    -- readerTextChanges folds the whole continuous-effect list,
+                    -- and the empty case above has already turned away every
+                    -- permanent that prints no player ability, so the fold runs
+                    -- once per ability-bearing permanent instead of once per
+                    -- permanent on the battlefield.
+                    rowsOf (Projection.readerTextChanges oid gs) oid controller (fmap ((,) (Projection.staticTimestampOf oid object gs)) kept)
+                  else []
       -- CR 613.1f / 613.10: the player abilities layer 6 GRANTED a permanent
       -- (Nerd Rage's "You have no maximum hand size"), read off the finished
       -- projection because only the fold knows who a static ability's grant

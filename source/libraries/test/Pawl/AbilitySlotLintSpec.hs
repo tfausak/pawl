@@ -616,31 +616,34 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
   -- and joins the same namespace: a reference naming no exiling ability of its
   -- face would read an empty pile. It must name an ACTIVATED ability, the one
   -- carrier Pawl.Engine.Resolve.Effect.exilingAbility files a name for.
+  --
+  -- A removal may name any carrier, the rule and player abilities CR 116.2d's
+  -- ignore names included (Synthetic Grounded Sentry, Synthetic Hushed Warden),
+  -- so the "unused" half reads every reader: a named ability is used when a
+  -- removal, an exile reference or an ignore reads it.
   Spec.it s "CR 613.1f/607.2a every named removal or exile reference names an ability its face declares, and every named ability is read" $ do
     ps <- S.allPrintings s
     let faceOffends face =
-          Set.union (namedRemovals face) (namedExileReferences face) /= declaredAbilityNames face
-            || not (Set.isSubsetOf (namedExileReferences face) (Set.fromList (Maybe.mapMaybe ActivatedAbility.name (Face.activatedAbilities face))))
+          let declared = Set.union (declaredAbilityNames face) (declaredIgnorableAbilityNames face)
+              readNames = Set.unions [namedRemovals face, namedExileReferences face, ignoredAbilityNames face]
+           in not (Set.isSubsetOf (Set.union (namedRemovals face) (namedExileReferences face)) declared)
+                || declared /= readNames
+                || not (Set.isSubsetOf (namedExileReferences face) (Set.fromList (Maybe.mapMaybe ActivatedAbility.name (Face.activatedAbilities face))))
         offenders = filter (anyFace faceOffends . Printing.card) ps
     Spec.assertEqWith s "no dangling or unused ability names" (fmap (S.nameOf . Printing.card) offenders) []
   -- CR 116.2d's join, the same shape one rule over: an ignore naming an ability
-  -- its face does not declare is a payment that suppresses nothing, and a named
-  -- ignorable ability no ignore grants is a name for nobody -- each carrier's
-  -- name field exists only so that grant can refer to it. Equality for both
-  -- directions at once.
+  -- its face does not declare as ignorable is a payment that suppresses
+  -- nothing. Whether every named ability is read is the case above's question,
+  -- since a removal may read an ignorable carrier's name too.
   --
   -- BOTH AXES in one namespace, because CR 116.2d's grant does not know which:
   -- Damping Engine names two player abilities, and Volrath's Curse names two
   -- combat restrictions and an activation prohibition, one sentence each.
-  --
-  -- Its own namespace rather than declaredAbilityNames' above, because the two
-  -- joins never meet: no card both names an ignorable ability and removes one by
-  -- name, and folding them together would make each card's unused half dangle.
-  Spec.it s "CR 116.2d every ignore names an ability its face declares, and every named ignorable ability is ignorable" $ do
+  Spec.it s "CR 116.2d every ignore names an ignorable ability its face declares" $ do
     ps <- S.allPrintings s
-    let faceOffends face = ignoredAbilityNames face /= declaredIgnorableAbilityNames face
+    let faceOffends face = not (Set.isSubsetOf (ignoredAbilityNames face) (declaredIgnorableAbilityNames face))
         offenders = filter (anyFace faceOffends . Printing.card) ps
-    Spec.assertEqWith s "no dangling or unused ignore names" (fmap (S.nameOf . Printing.card) offenders) []
+    Spec.assertEqWith s "no dangling ignore names" (fmap (S.nameOf . Printing.card) offenders) []
   -- Every slot a delayed ability READS must be one the arming card DEFINES:
   -- the reserved trigger-source slot, a token bound by a Create, the
   -- incarnation a MoveToZone bound at its destination (Meandering Towershell's

@@ -43,7 +43,8 @@ data PlayerStaticAbility = MkPlayerStaticAbility
     -- Nothing for the overwhelming majority, which grant no such permission and
     -- so have nothing to be referred to by. Damping Engine's one sentence
     -- declares two of these rows and both carry the SAME name, which is what
-    -- makes one payment cover both.
+    -- makes one payment cover both. A CR 613.1f Modification.LoseNamedAbility
+    -- reads it too (Synthetic Hushed Warden).
     name :: Maybe AbilityName.AbilityName,
     effect :: PlayerEffect.PlayerEffect
   }

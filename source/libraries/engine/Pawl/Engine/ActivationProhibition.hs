@@ -58,7 +58,7 @@ gathered gs =
       -- them, and both unforced until some permanent actually declares a
       -- prohibition.
       setEffs = Projection.setLandSubtypeEffects gs
-      removed = Projection.abilityRemoval gs
+      removed = Projection.namedAbilityRemoval gs
       -- CR 613.1f: what a stored grant gave the permanent, whose gates
       -- Projection.grantedRuleAbilities has asked already, with no CR 612.1
       -- word swap (CR 612.3) -- CombatRestriction.gathered's reading.
@@ -74,17 +74,21 @@ gathered gs =
           -- prohibition that has started to apply is argued in
           -- Pawl.Engine.BlockRequirement.instances, as is why CR 613.11 also
           -- lets the CR 305.7 gate be liveAfterLayers rather than liveGiven.
-          if (null setEffs || Projection.liveAfterLayers setEffs source gs)
-            && not (removed source)
-            then
-              -- CR 612.1's word swap over the SOURCE's own text, computed here
-              -- rather than hoisted beside setEffs, the placement
-              -- CombatRestriction.restricted argues for: readerTextChanges
-              -- folds the whole continuous-effect list, and the empty case
-              -- above already turned away every permanent that prints no
-              -- prohibition.
-              fmap (\prohibition -> (source, Projection.readerTextChanges source gs, prohibition)) prohibitions
-            else []
+          --
+          -- The CR 613.1f half is asked per row, by its name, as
+          -- CombatRestriction.gathered asks it. A regression fence here: no
+          -- card names a prohibition for removal.
+          let kept = filter (\prohibition -> not (removed (ActivationProhibition.name prohibition) source)) prohibitions
+           in if (null setEffs || Projection.liveAfterLayers setEffs source gs) && not (null kept)
+                then
+                  -- CR 612.1's word swap over the SOURCE's own text, computed here
+                  -- rather than hoisted beside setEffs, the placement
+                  -- CombatRestriction.restricted argues for: readerTextChanges
+                  -- folds the whole continuous-effect list, and the empty case
+                  -- above already turned away every permanent that prints no
+                  -- prohibition.
+                  fmap (\prohibition -> (source, Projection.readerTextChanges source gs, prohibition)) kept
+                else []
    in concatMap (\source -> fromPermanent source <> fromGrant source) (Set.toList (GameState.battlefield gs))
 
 -- CR 602.2 with CR 101.2: which of `candidates` an effect in force right now

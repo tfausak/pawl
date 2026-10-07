@@ -468,7 +468,8 @@ gate cr = case cr of
   CombatRestriction.CantBlockMoreThan (LimitUnless.MkLimitUnless _ c) -> c
 
 -- CR 116.2d: the name the source's face gives the ability stating this
--- restriction, so a payment can say WHICH effect it ignores. Read off any arm
+-- restriction, so a payment can say WHICH effect it ignores, and a CR 613.1f
+-- removal which one it removes (gathered). Read off any arm
 -- that names a SUBJECT, because the clause is the same one on all of them --
 -- Volrath's Curse's single sentence names both halves of "can't attack or block"
 -- alike, and one payment covers both.
@@ -510,7 +511,7 @@ gathered gs =
   let -- Hoisted out of the walk as AttackRequirement.instances hoists them, and
       -- both unforced until some permanent actually declares a restriction.
       setEffs = Projection.setLandSubtypeEffects gs
-      removed = Projection.abilityRemoval gs
+      removed = Projection.namedAbilityRemoval gs
       removedAfter = Projection.abilityRemovalAfter gs
       -- CR 702: the restrictions rule 702 gives a permanent for HOLDING A
       -- KEYWORD, which until unleash (CR 702.98a) nothing produced -- every row
@@ -636,7 +637,11 @@ gathered gs =
       -- RULES-granted ability is a timestamp question that only the printed rows
       -- can settle with a bare bit.
       keepsRulesText source = null setEffs || Projection.liveAfterLayers setEffs source gs
-      keepsAbilities source = keepsRulesText source && not (removed source)
+      --
+      -- The CR 613.1f half is asked per ROW, by the row's name (nameOf): a
+      -- removal naming one restriction leaves the source's others standing.
+      -- Pawl.ActivateSpec's Synthetic Grounded Sentry group proves it.
+      keepsAbilities source restriction = keepsRulesText source && not (removed (nameOf restriction) source)
       -- CR 613.1f: the restrictions a stored grant gave the permanent (Chomping
       -- Kavu's backup), whose gates Projection.grantedRuleAbilities has asked
       -- already, so no `keepsAbilities` and no CR 612.1 word swap (CR 612.3).
@@ -654,8 +659,9 @@ gathered gs =
             -- restriction that has started to apply is argued in
             -- BlockRequirement.instances, as is why CR 613.11 also lets the CR
             -- 305.7 gate be liveAfterLayers rather than liveGiven.
-            if keepsAbilities source
-              then
+            case filter (keepsAbilities source) restrictions of
+              [] -> []
+              kept ->
                 -- CR 612.1's word swap over the source's own text, computed HERE
                 -- rather than hoisted beside setEffs: readerTextChanges folds
                 -- the whole continuous-effect list, and the empty case above
@@ -667,8 +673,7 @@ gathered gs =
                 -- 612.1 changes the words printed on THAT object, and the gate
                 -- is printed on the card stating the restriction.
                 let changes = Projection.readerTextChanges source gs
-                 in fmap (\restriction -> (source, changes, restriction)) restrictions
-              else []
+                 in fmap (\restriction -> (source, changes, restriction)) kept
       -- CR 114.4: "abilities of emblems function in the command zone", which is
       -- what makes CR 701.54c's restriction on the emblem named The Ring do
       -- anything at all. Pawl.Engine.Projection.gatherGiven walks the same zone
