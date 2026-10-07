@@ -8,6 +8,7 @@
 module Pawl.ActivateSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Either as Either
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -166,6 +167,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   instantSpeedEquipSpec s registry
   silencedSentinelSpec s registry
   mutedCaptainSpec s registry
+  groundedSentrySpec s registry
+  hushedWardenSpec s registry
 
   Spec.it s "CR 602 activating Prodigal Sorcerer's {T} puts an ability on the stack and taps it" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
@@ -4448,6 +4451,62 @@ mutedCaptainSpec s registry = Spec.describe s "Synthetic Muted Captain (CR 613.1
     Spec.assertEqWith s "CR 613.1f the named static ability is gone, so the Piker loses +1/+0" (powers "Goblin Piker" after) [Just 2]
     Spec.assertEqWith s "and the Plains paid for the removal" (S.tappedCount S.alice after) 1
     Spec.assertEqWith s "CR 613.1f the activated ability, named by nothing, stays" (fmap (length . (`Projection.abilitiesOf` after)) (named "Synthetic Muted Captain" after)) [1]
+
+-- CR 613.1f / 509.1b: Synthetic Grounded Sentry's "{W}: Until end of turn, this
+-- creature loses 'This creature can't block.'" names its own RULE ability, so
+-- the paid Sentry blocks alice's Grizzly Bears and keeps the {W} ability a wipe
+-- would take too. The negative is the same script without the {W}, where the
+-- harness refuses the scheduled block because it was never offered.
+groundedSentrySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+groundedSentrySpec s registry = Spec.describe s "Synthetic Grounded Sentry (CR 613.1f)" $ do
+  let sentry = S.aliasRef "sentry"
+      board =
+        S.board
+          ( S.battlefield S.alice [S.settled "bears" "Grizzly Bears"]
+              NonEmpty.:| [S.battlefield S.bob [S.settled "sentry" "Synthetic Grounded Sentry", S.settled "mana" "Plains"]]
+          )
+          S.alice
+          S.beginningOfCombat
+      freeing = S.on S.beginningOfCombat S.bob (S.activateAction sentry Choices.none {Choices.manaSources = Seq.singleton (Just (S.aliasRef "mana"))})
+      attacking = S.on S.declareAttackers S.alice (S.attack [S.aliasRef "bears"])
+      blocking = S.on S.declareBlockers S.bob (S.block [(sentry, S.aliasRef "bears")])
+      sentriesOf gs = [o | o <- Game.zoneMembers Zone.Battlefield S.bob gs, Set.member (CardName.MkCardName (Text.pack "Synthetic Grounded Sentry")) (Projection.namesOf o gs)]
+  Spec.it s "CR 509.1b without the {W} the Sentry can't block" $ do
+    built <- S.buildBoardOrFail s registry board
+    Spec.assertBool s (Either.isLeft (Scenario.rehearse (S.turn 1 [attacking, blocking]) built S.combatGame)) "the block is never offered"
+  Spec.it s "CR 613.1f after the {W} the Sentry blocks, and the {W} survives" $ do
+    built <- S.buildBoardOrFail s registry board
+    (_, after) <- S.runScriptOrFail s (S.turn 1 [freeing, attacking, blocking]) built S.combatGame
+    Spec.assertEqWith s "CR 613.1f the Sentry blocked, so bob took no damage" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "CR 613.1f the activated ability, named by nothing, stays" (fmap (length . (`Projection.abilitiesOf` after)) (sentriesOf after)) [1]
+
+-- CR 613.1f / 604.2: Synthetic Hushed Warden's "{W}: Until end of turn, this
+-- creature loses 'Your opponents can't gain life.'" names its own PLAYER ability.
+-- bob's Synthetic Silenced Sentinel gains him 1 life when it attacks, which the
+-- Warden stops until alice pays the {W}.
+hushedWardenSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+hushedWardenSpec s registry = Spec.describe s "Synthetic Hushed Warden (CR 613.1f)" $ do
+  let warden = S.aliasRef "warden"
+      board =
+        S.board
+          ( S.battlefield S.alice [S.settled "warden" "Synthetic Hushed Warden", S.settled "mana" "Plains"]
+              NonEmpty.:| [S.battlefield S.bob [S.settled "sentinel" "Synthetic Silenced Sentinel"]]
+          )
+          S.bob
+          S.beginningOfCombat
+      unhushing = S.on S.beginningOfCombat S.alice (S.activateAction warden Choices.none {Choices.manaSources = Seq.singleton (Just (S.aliasRef "mana"))})
+      attacking = S.on S.declareAttackers S.bob (S.attack [S.aliasRef "sentinel"])
+      noBlock = S.on S.declareBlockers S.alice (S.block [])
+      wardensOf gs = [o | o <- Game.zoneMembers Zone.Battlefield S.alice gs, Set.member (CardName.MkCardName (Text.pack "Synthetic Hushed Warden")) (Projection.namesOf o gs)]
+  Spec.it s "CR 604.2 without the {W} bob gains no life" $ do
+    built <- S.buildBoardOrFail s registry board
+    (_, after) <- S.runScriptOrFail s (S.turn 1 [attacking, noBlock]) built S.combatGame
+    Spec.assertEqWith s "the Warden stops the gain" (S.lifeOf S.bob after) (Just 20)
+  Spec.it s "CR 613.1f after the {W} bob gains 1 life, and the {W} survives" $ do
+    built <- S.buildBoardOrFail s registry board
+    (_, after) <- S.runScriptOrFail s (S.turn 1 [unhushing, attacking, noBlock]) built S.combatGame
+    Spec.assertEqWith s "CR 613.1f the named player ability is gone, so bob gains 1 life" (S.lifeOf S.bob after) (Just 21)
+    Spec.assertEqWith s "CR 613.1f the activated ability, named by nothing, stays" (fmap (length . (`Projection.abilitiesOf` after)) (wardensOf after)) [1]
 
 -- CR 602.5c / 113.2c: Gliding Licid's "{U}, {T}: This creature loses this
 -- ability and becomes an Aura enchantment with enchant creature. Attach it to
