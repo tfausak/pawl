@@ -54,6 +54,7 @@ import qualified Pawl.Types.Protection as Protection
 import Pawl.Types.Quantity (Quantity)
 import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
+import Pawl.Types.RowSource (RowSource)
 import qualified Pawl.Types.SlotCount as SlotCount
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.SlotPerPlayer as SlotPerPlayer
@@ -684,7 +685,7 @@ poolHeldLastKnown pool view =
 -- the player arm split out, an objectOf-shaped match would leave a Nothing branch
 -- no input reaches and would silently swallow a new constructor -- a new one must
 -- break this build rather than default to targetable.
-targetable :: Map ObjectId PC.ProjectedCharacteristics -> (PlayerId -> [(Maybe ObjectId, PlayerEffect)]) -> Maybe PlayerId -> ObjectId -> Filter.View -> GameState -> Recipient -> Bool
+targetable :: Map ObjectId PC.ProjectedCharacteristics -> (PlayerId -> [(RowSource, PlayerEffect)]) -> Maybe PlayerId -> ObjectId -> Filter.View -> GameState -> Recipient -> Bool
 targetable pcs rowsOf perspective source sourceView gs recipient =
   let restrictedObject oid =
         let keywords = Projection.keywordsGiven pcs oid gs
@@ -853,7 +854,7 @@ data Pools = MkPools
     -- enumeration rather than once per player candidate per slot. A list of
     -- lazy pairs rather than a strict Map, so a slot that admits no player
     -- gathers nothing.
-    playerRowsPool :: [(PlayerId, [(Maybe ObjectId, PlayerEffect)])]
+    playerRowsPool :: [(PlayerId, [(RowSource, PlayerEffect)])]
   }
 
 -- The pools of one board. `pcs` is the caller's whole-board projection, as

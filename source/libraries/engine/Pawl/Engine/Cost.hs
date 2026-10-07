@@ -146,6 +146,7 @@ import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Rounding as Rounding
+import Pawl.Types.RowSource (RowSource)
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
@@ -3079,7 +3080,7 @@ manaActivations measure pcs pid oid cost restrictions ability gs = manaActivatio
 --
 -- Each row carries the SOURCE that printed it, which the gather under this needs
 -- and no reader here reads: see Pawl.Engine.PlayerEffect.matchesObjectFrom.
-manaActivationsGiven :: [(Maybe ObjectId, PlayerEffect.Type.PlayerEffect)] -> Mana.Capacity
+manaActivationsGiven :: [(RowSource, PlayerEffect.Type.PlayerEffect)] -> Mana.Capacity
 manaActivationsGiven effects measure pcs pid oid printedCost restrictions ability gs =
   let adjustments = manaActivationAdjustmentsGiven effects pid (ActivatedAbility.keyword =<< ability) oid gs
       -- The COMPONENT half of CR 601.2f, applied here so every conjunct below
@@ -3181,7 +3182,7 @@ manaActivationAdjustments :: Maybe Keyword.Type.Keyword -> PlayerId -> ObjectId 
 manaActivationAdjustments stamp pid oid gs = manaActivationAdjustmentsGiven (PlayerEffect.applying pid gs) pid stamp oid gs
 
 -- The same gather off a hoisted effect list; see manaActivationsGiven.
-manaActivationAdjustmentsGiven :: [(Maybe ObjectId, PlayerEffect.Type.PlayerEffect)] -> PlayerId -> Maybe Keyword.Type.Keyword -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
+manaActivationAdjustmentsGiven :: [(RowSource, PlayerEffect.Type.PlayerEffect)] -> PlayerId -> Maybe Keyword.Type.Keyword -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
 manaActivationAdjustmentsGiven effects pid stamp = PlayerEffect.activationCostAdjustmentsGiven effects pid Set.empty stamp AbilityKind.ManaAbility LoyaltyKind.NonLoyaltyAbility
 
 -- CR 118.3 asked of a mana ability's own MANA part, and the one read
@@ -3197,7 +3198,7 @@ manaActivationAdjustmentsGiven effects pid stamp = PlayerEffect.activationCostAd
 -- reduction's hybrid halves (CR 118.7e) and the order of several reductions are
 -- the payer's, unmade at this moment, so a cost this refuses has to be one NO
 -- resolution could have paid.
-manaPartPayable :: [(Maybe ObjectId, PlayerEffect.Type.PlayerEffect)] -> CostAdjustments.CostAdjustments -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Bool
+manaPartPayable :: [(RowSource, PlayerEffect.Type.PlayerEffect)] -> CostAdjustments.CostAdjustments -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Bool
 manaPartPayable effects adjustments pid oid cost gs = case Cost.mana cost of
   Nothing -> False
   Just (ManaCost.MkManaCost []) -> True
@@ -3556,7 +3557,7 @@ supplyManaSourcesGiven grants pcs pid gs = Mana.manaSourcesGiven Set.empty (Mana
 -- run with the object already on the stack, so ActivationRestriction.restrictionsOk
 -- reads the real stack there and refuses the same routes. The gate and the
 -- payment agree because this function states exactly the move between them.
-stackedManaActivations :: [(Maybe ObjectId, PlayerEffect.Type.PlayerEffect)] -> Mana.Capacity
+stackedManaActivations :: [(RowSource, PlayerEffect.Type.PlayerEffect)] -> Mana.Capacity
 stackedManaActivations effects = midPayment (stackedAt effects)
   where
     stackedAt given measure pcs pid oid cost restrictions ability gs =

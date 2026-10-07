@@ -7992,6 +7992,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   ActivePlayerEffect.MkActivePlayerEffect
                     { ActivePlayerEffect.source = source,
                       ActivePlayerEffect.controller = controller,
+                      -- CR 608.2h: the names chosen so far, determined once as
+                      -- the effect begins (Pawl.Types.ActivePlayerEffect).
+                      ActivePlayerEffect.chosenNames = Game.chosenNamesWithLastKnown source gs,
                       ActivePlayerEffect.timestamp = ts,
                       ActivePlayerEffect.expiry = expiry,
                       ActivePlayerEffect.scope = scope,

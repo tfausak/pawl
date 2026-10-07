@@ -35,9 +35,10 @@
 -- EntryRewrite.ChooseCardNames arm and Pawl.Engine.Action.playableLands as well.
 -- Conjurer's Ban is the same two prohibitions on the STORED carrier, which is
 -- what makes the pair worth having: its name is chosen by CR 608.2c during the
--- resolution rather than by CR 614.1c as a permanent enters, and its source is in
--- a graveyard before the rows it stored are read, so it is the only card that
--- reaches CR 608.2h's last-known road into Pawl.Engine.SourceContext.withChoicesOf.
+-- resolution rather than by CR 614.1c as a permanent enters, so the rows it
+-- stores carry the name baked (Pawl.Types.ActivePlayerEffect.chosenNames).
+-- Cheering Fanatic is the stored carrier's other producer, whose source stays on
+-- the battlefield and names again (data/scenarios/cost).
 --
 -- Runed Halo is the card-name choice's other shape -- CR 614.1c with ONE chooser
 -- rather than Null Chamber's two -- and the pool's one card that gives a PLAYER
@@ -2378,6 +2379,7 @@ addPlayerEffectAt source expiry scope effect controller gs =
         ActivePlayerEffect.MkActivePlayerEffect
           { ActivePlayerEffect.source = source,
             ActivePlayerEffect.controller = controller,
+            ActivePlayerEffect.chosenNames = Game.chosenNamesWithLastKnown source gs,
             ActivePlayerEffect.timestamp = ts,
             ActivePlayerEffect.expiry = expiry,
             ActivePlayerEffect.scope = scope,

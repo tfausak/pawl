@@ -2518,6 +2518,7 @@ library types
     Pawl.Types.RoomHalf
     Pawl.Types.RoomIndex
     Pawl.Types.Rounding
+    Pawl.Types.RowSource
     Pawl.Types.RuleAbilities
     Pawl.Types.Sacrifice
     Pawl.Types.SacrificeAnyNumber

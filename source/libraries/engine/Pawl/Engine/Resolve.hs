@@ -526,6 +526,7 @@ applyEpic oid controller = do
             ActivePlayerEffect.MkActivePlayerEffect
               { ActivePlayerEffect.source = oid,
                 ActivePlayerEffect.controller = controller,
+                ActivePlayerEffect.chosenNames = Game.chosenNamesWithLastKnown oid g,
                 ActivePlayerEffect.timestamp = ts,
                 ActivePlayerEffect.expiry = Expiry.Type.Never,
                 ActivePlayerEffect.scope = AffectedPlayers.Scoped PlayerScope.You,

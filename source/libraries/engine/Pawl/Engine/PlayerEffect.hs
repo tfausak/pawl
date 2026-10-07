@@ -103,6 +103,8 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
+import Pawl.Types.RowSource (RowSource)
+import qualified Pawl.Types.RowSource as RowSource
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
 import qualified Pawl.Types.StatedFlip as StatedFlip
@@ -442,11 +444,10 @@ affectedBy pid oid name gs =
 -- direction Modification.AddChosenColor reads a colour. A stored CR 611.2c effect
 -- carries one too -- ActivePlayerEffect.source is the object that resolved -- and
 -- it is what makes Filter.IsSource answerable for Lava Burst's self-naming
--- clause, which was vacuously False while this walk hardcoded Nothing. It is also
--- what carries Conjurer's Ban's own chosen name, through CR 608.2h rather than
--- off the board, since that source is in a graveyard by then (contextFor
--- below).
-applying :: PlayerId -> GameState -> [(Maybe ObjectId, PlayerEffect)]
+-- clause, which was vacuously False while this walk hardcoded Nothing. A stored
+-- row's source also carries the names baked as it began (storedSource), which
+-- contextFor below reads in place of the object's.
+applying :: PlayerId -> GameState -> [(RowSource, PlayerEffect)]
 applying pid gs =
   let printed = printedRows gs
       -- CR 611.2c: the stored carrier. Its controller is read off the record and
@@ -469,7 +470,7 @@ applying pid gs =
       -- Nothing here made vacuously False.
       storedOne active =
         ( ActivePlayerEffect.timestamp active,
-          Just (ActivePlayerEffect.source active),
+          storedSource active,
           -- CR 611.2a: a resolved spell's continuous effect is not an ability, so
           -- there is no printed name for CR 116.2d's ignore to have named -- which
           -- is the same reason `notIgnored` below is applied to the printed
@@ -499,11 +500,20 @@ applying pid gs =
       -- load-bearing now that a stored row names its source: an activated
       -- ability of a permanent stores rows under that permanent's own id, which
       -- a shared filter would suppress on a rule the ability is not subject to.
-      notIgnored (_, source, name, _, _) = not (any (\s -> IgnoredAbility.ignoredBy pid s name gs) source)
+      notIgnored (_, source, name, _, _) = not (any (\s -> IgnoredAbility.ignoredBy pid s name gs) (RowSource.object source))
       applyingScope (_, _, _, reaches, _) = reaches pid
       effectOf (_, source, _, _, effect) = (source, effect)
       stampOf (timestamp, _, _, _, _) = timestamp
-   in fmap effectOf (List.sortOn stampOf (filter applyingScope (filter notIgnored printed <> stored)))
+      printedOne (timestamp, source, name, reaches, effect) = (timestamp, liveSource source, name, reaches, effect)
+   in fmap effectOf (List.sortOn stampOf (filter applyingScope (filter notIgnored (fmap printedOne printed) <> stored)))
+
+-- A printed row's source: its choices are read off the object live (CR 604.2).
+liveSource :: Maybe ObjectId -> RowSource
+liveSource source = RowSource.MkRowSource source Nothing
+
+-- A stored row's source, carrying the names baked as it began (CR 608.2h).
+storedSource :: ActivePlayerEffect.ActivePlayerEffect -> RowSource
+storedSource active = RowSource.MkRowSource (Just (ActivePlayerEffect.source active)) (Just (ActivePlayerEffect.chosenNames active))
 
 -- CR 601.2i: how many spells this player has cast this turn. A fold over the
 -- whole event log, which is exactly "this turn" because Engine.handoffTurn clears
@@ -690,7 +700,7 @@ prohibitsCasting pid oid variable gs =
 -- Given the rows the caller has already gathered, which is what lets
 -- Pawl.Engine.Cost.manaActivationsGiven ask it inside its own hoisted sweep
 -- (#1073); `prohibitsActivating` is the wrapper for a caller holding no list.
-prohibitsActivatingGiven :: Maybe Keyword -> [(Maybe ObjectId, PlayerEffect)] -> Bool
+prohibitsActivatingGiven :: Maybe Keyword -> [(RowSource, PlayerEffect)] -> Bool
 prohibitsActivatingGiven stamp effects =
   let bars effect = case effect of
         PlayerEffect.CantActivateAbilities designator -> maybe True (\d -> any (Keyword.designates d) stamp) designator
@@ -1172,7 +1182,7 @@ prohibitsAttackingWithCreatures pid gs =
 -- (Pawl.Engine.Filter.sourceAttachedTo says so) and reading it live is what CR
 -- 611.2c asks for: an Aura moved to another creature taxes the new one from that
 -- moment.
-matchesObjectFrom :: Maybe ObjectId -> Filter Keyword -> ObjectId -> GameState -> Bool
+matchesObjectFrom :: RowSource -> Filter Keyword -> ObjectId -> GameState -> Bool
 matchesObjectFrom src filter_ oid gs =
   Filter.matches (contextFrom src oid gs) (Projection.viewOfObject oid gs) filter_
 
@@ -1187,31 +1197,34 @@ matchesObjectFrom src filter_ oid gs =
 -- Magistrate's "from anywhere other than their hand" is Filter.OwnedBy You, and
 -- read at the OWNER's perspective that conjunct is vacuously true of every card
 -- in every hand.
-matchesObjectFor :: PlayerId -> Maybe ObjectId -> Filter Keyword -> ObjectId -> GameState -> Bool
+matchesObjectFor :: PlayerId -> RowSource -> Filter Keyword -> ObjectId -> GameState -> Bool
 matchesObjectFor you src filter_ oid gs =
   Filter.matches (contextFor (Just you) src gs) (Projection.viewOfObject oid gs) filter_
 
 -- The Context every match in this module is made against: CR 109.5's "you" is
 -- the AFFECTED object's own controller, and the source is the row's.
-contextFrom :: Maybe ObjectId -> ObjectId -> GameState -> Filter.Context
+contextFrom :: RowSource -> ObjectId -> GameState -> Filter.Context
 contextFrom src oid gs = contextFor (Projection.controllerOf oid gs) src gs
 
 -- contextFrom with the perspective supplied, which matchesObjectFor above is the
 -- one caller of.
 --
 -- The source's CR 607.2d choices come from SourceContext.withChoicesOf, read
--- through CR 608.2h's last known information: Conjurer's Ban is in a graveyard
--- by CR 608.2n before the rows it stored are read (Pawl.PlayerEffectSpec's
--- ConjurersBan group).
+-- through CR 608.2h's last known information. A stored row's NAMES are its own
+-- instead, baked as it began (RowSource.chosenNames): CR 608.2h determines them
+-- once, so Cheering Fanatic naming a second card leaves the first row's alone
+-- (the Cheering Fanatic scenario under data/scenarios/cost proves it).
 --
--- Not implemented: a stored row whose source is still on the battlefield and
--- chooses a SECOND name afterwards reads that later name instead, where CR 608.2c
--- made the choice once and the effect should hold the one it was made with
--- (#2531).
-contextFor :: Maybe PlayerId -> Maybe ObjectId -> GameState -> Filter.Context
-contextFor you src gs =
-  let framed = maybe id (`SourceContext.withChoicesOf` gs) src (Filter.contextFor (Game.teams gs) you src)
-   in framed {Filter.sourceAttachedTo = src >>= \s -> Projection.hostOf s gs}
+-- Not implemented: a stored row's chosen colour and subtype are not baked, and
+-- still read the source live (#4760).
+contextFor :: Maybe PlayerId -> RowSource -> GameState -> Filter.Context
+contextFor you row gs =
+  let src = RowSource.object row
+      framed = maybe id (`SourceContext.withChoicesOf` gs) src (Filter.contextFor (Game.teams gs) you src)
+   in framed
+        { Filter.sourceAttachedTo = src >>= \s -> Projection.hostOf s gs,
+          Filter.sourceChosenNames = Maybe.fromMaybe (Filter.sourceChosenNames framed) (RowSource.chosenNames row)
+        }
 
 -- CR 601.3a's LOOKAHEAD, asked of a prohibition that matches the spell as it
 -- stands: could a choice still to be made during this spell's proposal cause the
@@ -1251,7 +1264,7 @@ contextFor you src gs =
 --
 -- Sampled by reachableManaValues below. Lenience to BEGIN only: CR 601.2e
 -- judges the announced X, which prohibitsAtManaValue below asks.
-choiceCouldEscape :: PlayerId -> Maybe ObjectId -> Filter Keyword -> ObjectId -> VariableChoice.VariableChoice -> GameState -> Bool
+choiceCouldEscape :: PlayerId -> RowSource -> Filter Keyword -> ObjectId -> VariableChoice.VariableChoice -> GameState -> Bool
 choiceCouldEscape you src criterion oid variable gs =
   let variables = case variable of
         VariableChoice.Announced -> variablesIn oid gs
@@ -1314,12 +1327,15 @@ prohibitsAtManaValue pid oid manaValue gs =
 -- Nothing, a cast needing no permission, always does. Pawl.CastPermissionSpec's
 -- "CR 601.2e Serra Paragon admits Protean Hydra at X = 2 and not at X = 3" is
 -- the proof.
+--
+-- Not implemented: a stored permission is re-matched with its source's names
+-- read live, not the ones baked onto the row (#4760).
 admitsAtManaValue :: Maybe (ObjectId, CastFromZone.CastFromZone) -> ObjectId -> Integer -> GameState -> Bool
 admitsAtManaValue permission oid manaValue gs = case permission of
   Nothing -> True
   Just (source, grant) ->
     let view = (Projection.viewOfObject oid gs) {Filter.manaValue = Just manaValue}
-     in Filter.matches (contextFrom (Just source) oid gs) view (CastFromZone.matching grant)
+     in Filter.matches (contextFrom (liveSource (Just source)) oid gs) view (CastFromZone.matching grant)
 
 -- CR 613.11 / 601.2f: the cost increases, the cost reductions and the additional
 -- non-mana components that apply to `pid` CASTING `oid`.
@@ -1341,7 +1357,7 @@ admitsAtManaValue permission oid manaValue gs = case permission of
 -- (perTargetCount); empty for a caller standing before CR 601.2c.
 spellCostAdjustments :: Set.Set Recipient.Recipient -> PlayerId -> ObjectId -> GameState -> CostAdjustments
 spellCostAdjustments targets pid oid gs =
-  let matching :: Maybe ObjectId -> Filter Keyword -> a -> Maybe a
+  let matching :: RowSource -> Filter Keyword -> a -> Maybe a
       matching source criterion amount = if matchesObjectFrom source criterion oid gs then Just amount else Nothing
       times source = maybe 1 (perTargetCount targets pid source gs)
       increaseOf (source, effect) = case effect of
@@ -1541,7 +1557,7 @@ spellCostReadsTargets pid oid gs =
 -- Filter.View's `targetCount`, which counts instances, is not this. Merging by
 -- referent is a fence: the announcement's union already merges a recipient named
 -- twice, and no test names one object under two of CR 115.4's tags.
-perTargetCount :: Set.Set Recipient.Recipient -> PlayerId -> Maybe ObjectId -> GameState -> Filter Keyword -> Natural
+perTargetCount :: Set.Set Recipient.Recipient -> PlayerId -> RowSource -> GameState -> Filter Keyword -> Natural
 perTargetCount targets pid source gs wanted =
   let context = contextFor (Just pid) source gs
       referent r = (Recipient.objectOf r, Recipient.playerOf r)
@@ -1556,7 +1572,7 @@ perTargetCount targets pid source gs wanted =
 -- GameState.activationsThisTurn's snapshots rather than the live board, with the
 -- same four criteria Pawl.Types.ReduceActivationCost carries; `source` is the
 -- asking effect's own permanent, which Filter.IsSource reads.
-firstActivation :: PlayerId -> Maybe ObjectId -> Filter Keyword -> Maybe KeywordDesignator.KeywordDesignator -> Maybe AbilityKind.AbilityKind -> Maybe (Filter Keyword) -> GameState -> TurnScope.TurnScope -> Bool
+firstActivation :: PlayerId -> RowSource -> Filter Keyword -> Maybe KeywordDesignator.KeywordDesignator -> Maybe AbilityKind.AbilityKind -> Maybe (Filter Keyword) -> GameState -> TurnScope.TurnScope -> Bool
 firstActivation pid source criterion granted wantedKind aimedAt gs scope =
   let snapshotView snapshot =
         (Count.viewOfSnapshot False (ObjectSnapshot.controller snapshot) (Just (ObjectSnapshot.owner snapshot)) False Map.empty (ObjectSnapshot.characteristics snapshot))
@@ -1658,7 +1674,7 @@ activationCostAdjustments targets stamp kind loyalty pid srcId gs = activationCo
 -- The rows arrive PAIRED WITH THEIR SOURCE and not stripped to bare effects,
 -- because CR 303.4b's "enchanted" is a fact about the row's own permanent: the
 -- criterion is matched through matchesObjectFrom, which needs it.
-activationCostAdjustmentsGiven :: [(Maybe ObjectId, PlayerEffect)] -> PlayerId -> Set.Set ObjectId -> Maybe Keyword -> AbilityKind.AbilityKind -> LoyaltyKind.LoyaltyKind -> ObjectId -> GameState -> CostAdjustments
+activationCostAdjustmentsGiven :: [(RowSource, PlayerEffect)] -> PlayerId -> Set.Set ObjectId -> Maybe Keyword -> AbilityKind.AbilityKind -> LoyaltyKind.LoyaltyKind -> ObjectId -> GameState -> CostAdjustments
 activationCostAdjustmentsGiven effects pid targets stamp kind loyalty srcId gs =
   let -- CR 601.2c's chosen targets, asked of ReduceActivationCost's third
       -- criterion: Dwarven Mauler's "equip abilities you activate THAT TARGET
@@ -1867,7 +1883,7 @@ activationCostAdjustmentsGiven effects pid targets stamp kind loyalty srcId gs =
       -- reduces by the mana cost it copied (CR 707.2); CR 107.3g's {X} is 0.
       -- Pawl.ActivateSpec's "Power-up (CR 702.193)" group proves it.
       ruleReduction
-        | any Keyword.reducesByManaCostOnEntry stamp && matchesObjectFrom (Just srcId) Filter.Type.EnteredThisTurn srcId gs =
+        | any Keyword.reducesByManaCostOnEntry stamp && matchesObjectFrom (liveSource (Just srcId)) Filter.Type.EnteredThisTurn srcId gs =
             [ AppliedReduction.MkAppliedReduction (ManaCost.MkManaCost (filter (/= ManaSymbol.Variable) (ManaCost.unwrap manaCost))) 0 False
             | manaCost <- Maybe.maybeToList (PC.manaCost (Projection.project srcId gs))
             ]
@@ -1955,7 +1971,7 @@ activatesLoyaltyAtInstantSpeed pid srcId gs =
 -- `oid`: CR 601.3b's first sentence through matchesObjectFrom, and its second --
 -- what a choice still to be made during the proposal could make of the card --
 -- through choiceCouldApply.
-grantReaches :: (PlayerEffect -> Maybe (Filter Keyword)) -> ObjectId -> GameState -> (Maybe ObjectId, PlayerEffect) -> Bool
+grantReaches :: (PlayerEffect -> Maybe (Filter Keyword)) -> ObjectId -> GameState -> (RowSource, PlayerEffect) -> Bool
 grantReaches grantOf oid gs (source, effect) =
   maybe False (\criterion -> matchesObjectFrom source criterion oid gs || choiceCouldApply source criterion oid gs) (grantOf effect)
 
@@ -2071,7 +2087,7 @@ castFlashGrant effect = case effect of
 -- Read off the PROJECTION's keywords, which is where Cost.costsFor reads the same
 -- ability from and for its CR 613.1 reason: a bestow granted where the card lies
 -- offers rule 702.103a's choice as much as a printed one does.
-choiceCouldApply :: Maybe ObjectId -> Filter Keyword -> ObjectId -> GameState -> Bool
+choiceCouldApply :: RowSource -> Filter Keyword -> ObjectId -> GameState -> Bool
 choiceCouldApply src criterion oid gs =
   let bestowable = not (null (Keyword.bestowCosts (Map.keysSet (Projection.keywordsOf oid gs))))
       prototyped = gs {GameState.objects = Map.adjust (\o -> o {Object.prototyped = True}) oid (GameState.objects gs)}
@@ -2081,7 +2097,7 @@ choiceCouldApply src criterion oid gs =
 
 -- choiceCouldApply's X half: could some X the candidate lets its caster announce
 -- (CR 107.3b fixes it at 0 under FixedAtZero) make `criterion` name `oid`?
-xCouldApply :: Maybe ObjectId -> Filter Keyword -> ObjectId -> VariableChoice.VariableChoice -> GameState -> Bool
+xCouldApply :: RowSource -> Filter Keyword -> ObjectId -> VariableChoice.VariableChoice -> GameState -> Bool
 xCouldApply src criterion oid variable gs =
   let context = contextFrom src oid gs
       view = Projection.viewOfObject oid gs
@@ -2211,9 +2227,9 @@ castPermissionsFrom pid zone oid gs =
   let allows (source, effect) = case effect of
         PlayerEffect.CastFrom grant ->
           opensZoneOf pid zone oid (CastFromZone.from grant) gs
-            && inPool source (CastFromZone.pool grant)
-            && matchesObjectFor (holder source) source (CastFromZone.matching grant) oid gs
-            && unspentPermission pid source grant gs
+            && inPool (RowSource.object source) (CastFromZone.pool grant)
+            && matchesObjectFor (holder (RowSource.object source)) source (CastFromZone.matching grant) oid gs
+            && unspentPermission pid (RowSource.object source) grant gs
         -- The other CR 601.3 permission on this axis names a TIME, and this
         -- question is about a ZONE.
         PlayerEffect.CastAsThoughItHadFlash _ -> False
@@ -2271,7 +2287,7 @@ castPermissionsFrom pid zone oid gs =
         PlayerEffect.CantGainLife -> False
         PlayerEffect.CantLoseLife -> False
       grantOf (source, effect) = case effect of
-        PlayerEffect.CastFrom grant -> Just (source, grant)
+        PlayerEffect.CastFrom grant -> Just (RowSource.object source, grant)
         _ -> Nothing
       -- CR 109.5: the Filter's "you" is the granting ability's controller, not
       -- the card's -- an exiled card's is its owner (CR 108.4a), which would
@@ -2654,7 +2670,7 @@ playLandPiles pid gs =
 -- forces Projection.abilityRemoval, a whole-board gather, the moment any
 -- permanent carries a player ability. One walk for two questions is why there is
 -- no PlayerId-taking wrapper beside this -- nothing would call it.
-protectedFromTargeting :: [(Maybe ObjectId, PlayerEffect)] -> Maybe PlayerId -> PlayerId -> GameState -> Bool
+protectedFromTargeting :: [(RowSource, PlayerEffect)] -> Maybe PlayerId -> PlayerId -> GameState -> Bool
 protectedFromTargeting rows caster pid gs =
   let stops effect = case effect of
         PlayerEffect.CantBeTargetedBy scope -> case caster of
@@ -2739,7 +2755,7 @@ protectedFrom oid pid gs = protectedFromGiven (applying pid gs) oid gs
 
 -- protectedFrom against an already-gathered row list, for
 -- protectedFromTargetingGiven's reason above.
-protectedFromGiven :: [(Maybe ObjectId, PlayerEffect)] -> ObjectId -> GameState -> Bool
+protectedFromGiven :: [(RowSource, PlayerEffect)] -> ObjectId -> GameState -> Bool
 protectedFromGiven rows oid gs =
   let stops (source, effect) = case effect of
         -- CR 702.16a's quality, matched through the identity-blind
@@ -2832,13 +2848,16 @@ protectedFromGiven rows oid gs =
 -- A walk per SEAT, which is what `applying` is, rather than one gather over the
 -- axis: CR 116.2d's ignore and every scope in Pawl.Types.PlayerScope are asked
 -- about a particular player, so a single-pass version would restate both.
+--
+-- Not implemented: a stored row's shield reads its source's chosen names live
+-- through Replacement.candidateContext, not the ones baked onto the row (#4760).
 protectionCarriers :: GameState -> [(PlayerId, ObjectId, Filter Keyword)]
 protectionCarriers gs =
   let carrier pid (source, effect) = case effect of
         -- The quality the CARD states, handed on as written: the shield's source
         -- side is this Filter, so the three consequences of rule 702.16 read one
         -- quality (protectedFromGiven above is the other two).
-        PlayerEffect.HasProtectionFrom quality -> fmap (\oid -> (pid, oid, quality)) source
+        PlayerEffect.HasProtectionFrom quality -> fmap (\oid -> (pid, oid, quality)) (RowSource.object source)
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
@@ -3672,7 +3691,7 @@ cantBeCountered pid oid gs =
 unpreventable :: GameState -> [(Maybe ObjectId, DamagePattern.DamagePattern)]
 unpreventable gs =
   let says (src, effect) = case effect of
-        PlayerEffect.DamageCantBePrevented pattern_ -> Just (src, pattern_)
+        PlayerEffect.DamageCantBePrevented pattern_ -> Just (RowSource.object src, pattern_)
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.HasProtectionFrom _ -> Nothing
@@ -3746,7 +3765,7 @@ unpreventable gs =
 unredirectable :: GameState -> [(Maybe ObjectId, DamagePattern.DamagePattern)]
 unredirectable gs =
   let says (src, effect) = case effect of
-        PlayerEffect.DamageCantBeRedirected pattern_ -> Just (src, pattern_)
+        PlayerEffect.DamageCantBeRedirected pattern_ -> Just (RowSource.object src, pattern_)
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.HasProtectionFrom _ -> Nothing
@@ -3932,7 +3951,7 @@ rollModifiers pid gs =
         PlayerEffect.PlotFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
-   in Maybe.mapMaybe (\(source, effect) -> fmap ((,) source) (modifies effect)) (applying pid gs)
+   in Maybe.mapMaybe (\(source, effect) -> fmap ((,) (RowSource.object source)) (modifies effect)) (applying pid gs)
 
 -- CR 611.2a / Quicken: the one-shot (Expiry.WhenUsed) stored rows `pid` would
 -- SPEND by casting `oid` -- every row on castUse's axes that applies to them
@@ -3978,7 +3997,7 @@ spentGrants useOf pid oid gs =
   let spent active =
         applies pid (ActivePlayerEffect.controller active) gs (ActivePlayerEffect.scope active)
           && Expiry.expiresWhenUsed (ActivePlayerEffect.expiry active)
-          && maybe False (\criterion -> matchesObjectFrom (Just (ActivePlayerEffect.source active)) criterion oid gs) (useOf (ActivePlayerEffect.effect active))
+          && maybe False (\criterion -> matchesObjectFrom (storedSource active) criterion oid gs) (useOf (ActivePlayerEffect.effect active))
    in filter spent (GameState.playerEffects gs)
 
 -- Drop the rows spentByCast / spentByLandPlay named, once the play they were

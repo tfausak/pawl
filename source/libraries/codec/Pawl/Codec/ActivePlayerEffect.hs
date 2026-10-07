@@ -2,13 +2,16 @@
 
 module Pawl.Codec.ActivePlayerEffect where
 
+import qualified Data.Set as Set
 import qualified Pawl.Codec.AffectedPlayers as AffectedPlayers
+import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.Expiry as Expiry
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PlayerEffect as PlayerEffect
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.Timestamp as Timestamp
 import qualified Pawl.JsonCodec.Codec as Codec
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 
@@ -20,6 +23,7 @@ codec :: Codec.Codec ActivePlayerEffect.ActivePlayerEffect
 codec = Fields.object $ do
   source <- Fields.required "source" ObjectId.codec ActivePlayerEffect.source
   controller <- Fields.required "controller" PlayerId.codec ActivePlayerEffect.controller
+  chosenNames <- Fields.defaulted "chosenNames" Set.empty (Common.set CardName.codec) ActivePlayerEffect.chosenNames
   timestamp <- Fields.required "timestamp" Timestamp.codec ActivePlayerEffect.timestamp
   expiry <- Fields.required "expiry" Expiry.codec ActivePlayerEffect.expiry
   scope <- Fields.required "scope" (AffectedPlayers.codec PlayerId.codec) ActivePlayerEffect.scope
@@ -28,6 +32,7 @@ codec = Fields.object $ do
     ActivePlayerEffect.MkActivePlayerEffect
       { ActivePlayerEffect.source = source,
         ActivePlayerEffect.controller = controller,
+        ActivePlayerEffect.chosenNames = chosenNames,
         ActivePlayerEffect.timestamp = timestamp,
         ActivePlayerEffect.expiry = expiry,
         ActivePlayerEffect.scope = scope,

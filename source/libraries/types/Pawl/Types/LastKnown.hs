@@ -113,11 +113,9 @@ data LastKnown = MkLastKnown
     -- Empty for everything nothing was attached to, which is most objects.
     attached :: !(Set.Set ObjectId.ObjectId),
     -- | CR 201.4: the card names that had been chosen for it -- the same
-    -- Object.chosenNames the live object carried. What CR 608.2h answers for a
-    -- CR 611.2c effect whose source chose a name and then left the zone it was
-    -- expected to be in: Conjurer's Ban chooses during its own resolution and is
-    -- in a graveyard by the time the prohibition it stored is first read
-    -- (Pawl.Engine.SourceContext.withChoicesOf).
+    -- Object.chosenNames the live object carried. What CR 608.2h answers for an
+    -- ability whose source chose a name and then left the zone it was expected
+    -- to be in (Pawl.Engine.SourceContext.withChoicesOf).
     --
     -- Not a characteristic either -- CR 109.3's list has no chosen name -- and
     -- not recoverable from `characteristics` or `copiable`, since choosing a name

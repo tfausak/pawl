@@ -857,7 +857,7 @@ stampSpliced cards sid gs =
 spliceOffer :: PlayerId -> ObjectId -> GameState -> ObjectId -> Maybe (ObjectId, Cost Keyword)
 spliceOffer pid sid gs cid = do
   face <- Game.faceOf cid gs
-  splicing <- List.find (\splicing -> PlayerEffect.matchesObjectFrom (Just cid) (Splice.onto splicing) sid gs) (Keyword.splices (Map.keysSet (Projection.keywordsOf cid gs)))
+  splicing <- List.find (\splicing -> PlayerEffect.matchesObjectFrom (PlayerEffect.liveSource (Just cid)) (Splice.onto splicing) sid gs) (Keyword.splices (Map.keysSet (Projection.keywordsOf cid gs)))
   let modal = Face.spell face
       fillable = Target.fillableModes (Just pid) Map.empty sid Map.empty modal gs
       every = List.genericTake (Modal.modeCount modal) (fmap ModeIndex.MkModeIndex [0 ..])

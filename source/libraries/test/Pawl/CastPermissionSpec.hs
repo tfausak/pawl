@@ -1187,8 +1187,8 @@ voidWinnowerSpec s registry =
       disaster <- S.printingOf s registry "Molten Disaster"
       winnower <- S.printingOf s registry "Void Winnower"
       let (_, bobsPiker, _, bobsDisaster, board) = voidWinnowerBoard mountain piker bolt disaster [winnower]
-      Spec.assertBool s (PlayerEffect.matchesObjectFrom Nothing Filter.Type.ManaValueIsEven bobsPiker board) "the fixed spell's mana value is even"
-      Spec.assertBool s (PlayerEffect.matchesObjectFrom Nothing Filter.Type.ManaValueIsEven bobsDisaster board) "and so is the {X} spell's, while it sits in hand"
+      Spec.assertBool s (PlayerEffect.matchesObjectFrom (PlayerEffect.liveSource Nothing) Filter.Type.ManaValueIsEven bobsPiker board) "the fixed spell's mana value is even"
+      Spec.assertBool s (PlayerEffect.matchesObjectFrom (PlayerEffect.liveSource Nothing) Filter.Type.ManaValueIsEven bobsDisaster board) "and so is the {X} spell's, while it sits in hand"
       Spec.assertBool s (not (any (S.isCastOf bobsPiker) (askedOf S.bob board))) "the fixed one is refused"
       Spec.assertBool s (any (S.isCastOf bobsDisaster) (askedOf S.bob board)) "and the {X} one is offered"
 
@@ -1206,9 +1206,9 @@ voidWinnowerSpec s registry =
       disaster <- S.printingOf s registry "Molten Disaster"
       let (_, bobsPiker, _, bobsDisaster, board) = voidWinnowerBoard mountain piker bolt disaster []
           cheap = Filter.Type.ManaValueAtMost 5
-      Spec.assertBool s (PlayerEffect.matchesObjectFrom Nothing cheap bobsDisaster board) "the {X} spell is inside the class as it sits in hand"
-      Spec.assertBool s (PlayerEffect.choiceCouldEscape S.bob Nothing cheap bobsDisaster VariableChoice.Announced board) "and a large enough X takes it out"
-      Spec.assertBool s (not (PlayerEffect.choiceCouldEscape S.bob Nothing cheap bobsPiker VariableChoice.Announced board)) "while the fixed spell beside it has no choice to make"
+      Spec.assertBool s (PlayerEffect.matchesObjectFrom (PlayerEffect.liveSource Nothing) cheap bobsDisaster board) "the {X} spell is inside the class as it sits in hand"
+      Spec.assertBool s (PlayerEffect.choiceCouldEscape S.bob (PlayerEffect.liveSource Nothing) cheap bobsDisaster VariableChoice.Announced board) "and a large enough X takes it out"
+      Spec.assertBool s (not (PlayerEffect.choiceCouldEscape S.bob (PlayerEffect.liveSource Nothing) cheap bobsPiker VariableChoice.Announced board)) "while the fixed spell beside it has no choice to make"
 
     -- CR 601.2e with CR 202.3e's second half: CR 601.3a let bob BEGIN, and the X
     -- he announces is then judged. X = 2 leaves {X}{R}{R} at mana value 4, even,
