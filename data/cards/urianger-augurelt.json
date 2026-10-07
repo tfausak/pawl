@@ -116,6 +116,7 @@
                               "pool": {
                                 "type": "CardsExiledWithSource"
                               },
+                              "reduction": 2,
                               "verb": {
                                 "type": "Play"
                               }
