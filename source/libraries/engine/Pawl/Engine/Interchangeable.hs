@@ -15,6 +15,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Filter as Filter.Engine
+import qualified Pawl.Engine.Interchangeable.Mentions as Mentions
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection.View
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
@@ -34,30 +35,23 @@ import qualified Pawl.Types.AimedPlayers as AimedPlayers
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.Binding as Binding
+import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.ExileLink as ExileLink
-import qualified Pawl.Types.Expiry as Expiry
-import qualified Pawl.Types.Filter as Filter
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.IgnoredAbility as IgnoredAbility
-import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.Modification as Modification
-import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectSnapshot as ObjectSnapshot
 import qualified Pawl.Types.PastActivation as PastActivation
 import qualified Pawl.Types.PhasedOut as PhasedOut
-import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.ProjectedCharacteristics as PC
-import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import qualified Pawl.Types.ReturnWatch as ReturnWatch
-import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TriggerSource as TriggerSource
 
@@ -84,17 +78,8 @@ import qualified Pawl.Types.TriggerSource as TriggerSource
 --     no id-keyed relation (namedByRelation), and no stored row or combat
 --     assignment (namedByStored). Each of those SEARCHES for the two ids, so a
 --     row about some third object leaves the pair alike.
---   * The board must be QUIET: the containers whose rows carry a whole effect
---     or ability -- a replacement, a delayed trigger, a pending effect -- are
---     required EMPTY instead, so one such row anywhere retires the elision for
---     the whole board.
---
--- Not implemented: searching a replacement, a delayed trigger, a prevention
--- rider or a pending damage or entry effect for the two ids, or a granted
--- ability, a full text, a non-literal quantity or a conditional or paid
--- duration on a searched row. Each holds an effect or ability tree no traversal
--- here reads, so quiet requires the first set empty and namedByStored answers
--- "might name" for the second (#1969).
+--   * The board must be QUIET: the entry bookkeeping, which no traversal here
+--     reads, is required EMPTY instead.
 objects :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> ObjectId -> Bool
 objects pcs gs a b =
   let sameObject = case (Map.lookup a (GameState.objects gs), Map.lookup b (GameState.objects gs)) of
@@ -145,8 +130,8 @@ representatives pcs gs candidates =
         [] -> candidates
         first : rest -> first NonEmpty.:| rest
 
--- Whether the board stores nothing this module cannot search -- a row holding
--- a whole effect or ability, or entry bookkeeping.
+-- Whether the board stores no entry bookkeeping, the one thing this module
+-- does not search.
 --
 -- The lists here, in namedByRelation and in namedByStored are HAND-KEPT, and
 -- nothing forces a new GameState field into any of them, so the account below
@@ -168,7 +153,8 @@ representatives pcs gs candidates =
 --     and CR 500.2 ends no step while the stack holds one.
 --     GameState.stackArchive is keyed by stack objects that have left too, and
 --     its bindings are read only on behalf of a stack object or a delayed
---     trigger (CR 608.2h), which namedByAnother and quiet already cover.
+--     trigger (CR 608.2h), which namedByAnother and namedByStored already
+--     cover.
 --   * GameState.events is read here through the two Filter views objects
 --     compares, which is where a Filter's look-back atoms read it; an event
 --     the choice itself writes names whichever object was chosen, alike.
@@ -202,12 +188,7 @@ representatives pcs gs candidates =
 -- is the cheap side to be wrong on.
 quiet :: GameState -> Bool
 quiet gs =
-  null (GameState.replacements gs)
-    && Seq.null (GameState.delayedTriggers gs)
-    && Seq.null (GameState.pendingPreventionRiders gs)
-    && Seq.null (GameState.pendingDamageEffects gs)
-    && Seq.null (GameState.pendingEntryEffects gs)
-    && Seq.null (GameState.broughtIn gs)
+  Seq.null (GameState.broughtIn gs)
     && Set.null (GameState.enteringBeside gs)
     && Set.null (GameState.enteringSubjects gs)
     && Map.null (GameState.enteringPending gs)
@@ -219,8 +200,8 @@ quiet gs =
     && Maybe.isNothing (GameState.arrivals gs)
 
 -- Whether a stored row, or the combat in progress, MIGHT name this object.
--- "Might", because the answer is True wherever a row holds something this
--- module does not read through -- the side that cannot make a player's choice.
+-- "Might", because a slot read with no environment to search answers True --
+-- the side that cannot make a player's choice.
 --
 -- Every row type is matched POSITIONALLY, so a field added to one is an arity
 -- error here rather than an ObjectId this silently stops reading.
@@ -228,6 +209,19 @@ quiet gs =
 -- A row's SOURCE is read alongside its subject, since the source frames the
 -- row's Filters (IsSource, the source comparisons) and a row whose source is
 -- one of the two treats the pair differently through it.
+--
+-- The trees a row holds -- an effect, an ability, a condition, a cost -- are
+-- read through Pawl.Engine.Interchangeable.Mentions. A replacement, a delayed
+-- trigger and the three pending queues store the environment their slots read
+-- (a pending entry effect reads none), which the same traversal searches, so
+-- they are asked as Mentions.Searched;
+-- every other row stores none, so a slot it reads might name anything
+-- (Mentions.Unread).
+--
+-- Pawl.ManaSourceSpec proves the replacement arm (Mending Hands, through
+-- DamagePattern's recipient) and the delayed-trigger arm (Salt Road Skirmish,
+-- through its bindings). The pending queues are regression fences: no board
+-- in the suite reaches a mana-source window with one non-empty.
 namedByStored :: ObjectId -> GameState -> Bool
 namedByStored oid gs =
   combatNames oid (GameState.combat gs)
@@ -243,6 +237,21 @@ namedByStored oid gs =
     || any (untapProhibitionNames oid) (GameState.untapProhibitions gs)
     || any (evasionNames oid) (GameState.evasions gs)
     || any (ignoredNames oid) (GameState.ignoredAbilities gs)
+    || any (Mentions.activeReplacementNames (searched oid)) (GameState.replacements gs)
+    || any (Mentions.delayedTriggerNames (searched oid)) (GameState.delayedTriggers gs)
+    || any (Mentions.preventionNames (searched oid)) (GameState.pendingPreventionRiders gs)
+    || any (Mentions.pendingDamageEffectNames (searched oid)) (GameState.pendingDamageEffects gs)
+    || any (Mentions.pendingEntryEffectNames (searched oid)) (GameState.pendingEntryEffects gs)
+
+-- The question asked of a row that stores the environment its slots read --
+-- searched alongside the row's trees, so a slot read is answered there.
+searched :: ObjectId -> Mentions.Asking
+searched oid = Mentions.MkAsking oid Mentions.Searched
+
+-- The question asked of a row that stores no environment, so every slot read
+-- might name the object.
+unread :: ObjectId -> Mentions.Asking
+unread oid = Mentions.MkAsking oid Mentions.Unread
 
 -- CR 613.7a: an object's static abilities apply at its own timestamp, so a
 -- stored layered row stamped strictly BETWEEN the two can apply after one's
@@ -289,48 +298,48 @@ attackTargetNames oid target = case target of
   AttackTarget.OfPlaneswalker walker -> walker == oid
   AttackTarget.OfBattle battle -> battle == oid
 
-continuousNames :: ObjectId -> GameState -> ContinuousEffect.ContinuousEffect card -> Bool
+continuousNames :: ObjectId -> GameState -> ContinuousEffect.ContinuousEffect Card.Card -> Bool
 continuousNames oid gs row = case row of
   ContinuousEffect.MkContinuousEffect source _timestamp expiry modification affected ->
-    source == oid || expiryNames expiry || modificationNames oid modification || affectedNames oid source gs affected
+    source == oid || Mentions.expiryNames (unread oid) expiry || Mentions.modificationNames (unread oid) (Mentions.grantedAbilityNames (unread oid) (const False)) modification || affectedNames oid source gs affected
 
 -- CR 707.2: the snapshot is copiable values, which hold printed text and no
 -- runtime id, exactly as a printed card does.
 copyNames :: ObjectId -> ActiveCopy.ActiveCopy -> Bool
 copyNames oid row = case row of
   ActiveCopy.MkActiveCopy source _timestamp expiry copied _snapshot ->
-    source == oid || expiryNames expiry || Set.member oid copied
+    source == oid || Mentions.expiryNames (unread oid) expiry || Set.member oid copied
 
 playerEffectRowNames :: ObjectId -> ActivePlayerEffect.ActivePlayerEffect -> Bool
 playerEffectRowNames oid row = case row of
   ActivePlayerEffect.MkActivePlayerEffect source _controller _choices _timestamp expiry _scope effect ->
-    source == oid || expiryNames expiry || playerEffectNames oid effect
+    source == oid || Mentions.expiryNames (unread oid) expiry || Mentions.playerEffectNames (unread oid) effect
 
 blockRequirementNames :: ObjectId -> ActiveBlockRequirement.ActiveBlockRequirement -> Bool
 blockRequirementNames oid row = case row of
   ActiveBlockRequirement.MkActiveBlockRequirement source _timestamp expiry blocker attacker ->
-    source == oid || expiryNames expiry || blocker == oid || attacker == oid
+    source == oid || Mentions.expiryNames (unread oid) expiry || blocker == oid || attacker == oid
 
 attackRequirementNames :: ObjectId -> ActiveAttackRequirement.ActiveAttackRequirement -> Bool
 attackRequirementNames oid row = case row of
   ActiveAttackRequirement.MkActiveAttackRequirement source _controller _timestamp expiry attacker defender ->
-    source == oid || expiryNames expiry || restrictedNames oid attacker || attackTargetNames oid defender
+    source == oid || Mentions.expiryNames (unread oid) expiry || restrictedNames oid attacker || attackTargetNames oid defender
 
 unregeneratableNames :: ObjectId -> ActiveUnregeneratable.ActiveUnregeneratable -> Bool
 unregeneratableNames oid row = case row of
   ActiveUnregeneratable.MkActiveUnregeneratable source _timestamp expiry object ->
-    source == oid || expiryNames expiry || object == oid
+    source == oid || Mentions.expiryNames (unread oid) expiry || object == oid
 
 blockProhibitionNames :: ObjectId -> ActiveBlockProhibition.ActiveBlockProhibition -> Bool
 blockProhibitionNames oid row = case row of
   ActiveBlockProhibition.MkActiveBlockProhibition source _timestamp expiry object ->
-    source == oid || expiryNames expiry || object == oid
+    source == oid || Mentions.expiryNames (unread oid) expiry || object == oid
 
 -- AimedAt names players and target kinds, never an object.
 attackProhibitionNames :: ObjectId -> ActiveAttackProhibition.ActiveAttackProhibition -> Bool
 attackProhibitionNames oid row = case row of
   ActiveAttackProhibition.MkActiveAttackProhibition source _controller _timestamp expiry affected aimedAt ->
-    source == oid || expiryNames expiry || restrictedNames oid affected || maybe False aimedAtNames aimedAt
+    source == oid || Mentions.expiryNames (unread oid) expiry || restrictedNames oid affected || maybe False aimedAtNames aimedAt
 
 aimedAtNames :: AimedAt.AimedAt -> Bool
 aimedAtNames aimed = case aimed of
@@ -342,48 +351,28 @@ aimedAtNames aimed = case aimed of
 activationProhibitionNames :: ObjectId -> ActiveActivationProhibition.ActiveActivationProhibition -> Bool
 activationProhibitionNames oid row = case row of
   ActiveActivationProhibition.MkActiveActivationProhibition source _timestamp expiry object ->
-    source == oid || expiryNames expiry || object == oid
+    source == oid || Mentions.expiryNames (unread oid) expiry || object == oid
 
 untapProhibitionNames :: ObjectId -> ActiveUntapProhibition.ActiveUntapProhibition -> Bool
 untapProhibitionNames oid row = case row of
   ActiveUntapProhibition.MkActiveUntapProhibition source _timestamp expiry object ->
-    source == oid || expiryNames expiry || object == oid
+    source == oid || Mentions.expiryNames (unread oid) expiry || object == oid
 
 evasionNames :: ObjectId -> ActiveEvasion.ActiveEvasion -> Bool
 evasionNames oid row = case row of
   ActiveEvasion.MkActiveEvasion source _controller _timestamp expiry affected ->
-    source == oid || expiryNames expiry || filterNames oid affected
+    source == oid || Mentions.expiryNames (unread oid) expiry || Mentions.filterNames (unread oid) affected
 
 -- CR 116.2d: the ignored ability is its source's, so the source is the subject.
 ignoredNames :: ObjectId -> IgnoredAbility.IgnoredAbility -> Bool
 ignoredNames oid row = case row of
   IgnoredAbility.MkIgnoredAbility _player source _ability expiry ->
-    source == oid || expiryNames expiry
+    source == oid || Mentions.expiryNames (unread oid) expiry
 
 restrictedNames :: ObjectId -> RestrictedCreatures.RestrictedCreatures ObjectId -> Bool
 restrictedNames oid restricted = case restricted of
   RestrictedCreatures.Named named -> named == oid
-  RestrictedCreatures.Matching criterion -> filterNames oid criterion
-
--- Whether a row's lifetime might name an object. CR 611.2b's "for as long as"
--- carries a Condition and CR 611.2a's "until a player pays" a Cost, and this
--- reads neither, so both answer "might name"; every other arm is a player, a
--- turn, a step or a stamp.
-expiryNames :: Expiry.Expiry -> Bool
-expiryNames expiry = case expiry of
-  Expiry.AtCleanup -> False
-  Expiry.Never -> False
-  Expiry.Perpetual -> False
-  Expiry.While _while -> True
-  Expiry.AtTurnOf _player -> False
-  Expiry.AtUpkeepOf _player -> False
-  Expiry.AtEndOfTurnOf _after -> False
-  Expiry.DuringTurnOf _after -> False
-  Expiry.DuringExtraTurn _stamp -> False
-  Expiry.AtEndOf _selector -> False
-  Expiry.AtEndOfCombatOn _after -> False
-  Expiry.WhenPaid _paid -> True
-  Expiry.WhenUsed -> False
+  RestrictedCreatures.Matching criterion -> Mentions.filterNames (unread oid) criterion
 
 -- CR 611.2c: who a stored continuous effect applies to. A fixed set is
 -- searched; a predicate is filterNames' question; CR 303.4m's "enchanted"
@@ -391,291 +380,14 @@ expiryNames expiry = case expiry of
 affectedNames :: ObjectId -> ObjectId -> GameState -> Affected.Affected -> Bool
 affectedNames oid source gs affected = case affected of
   Affected.TheseObjects held -> Set.member oid held
-  Affected.Matching criterion -> filterNames oid criterion
-  Affected.MatchingAnywhere criterion -> filterNames oid criterion
-  Affected.MatchingOffBattlefield criterion -> filterNames oid criterion
+  Affected.Matching criterion -> Mentions.filterNames (unread oid) criterion
+  Affected.MatchingAnywhere criterion -> Mentions.filterNames (unread oid) criterion
+  Affected.MatchingOffBattlefield criterion -> Mentions.filterNames (unread oid) criterion
   Affected.Attached -> (Map.lookup source (GameState.objects gs) >>= Object.attachedTo >>= Recipient.objectOf) == Just oid
-  Affected.AttachedPlayerControls criterion -> filterNames oid criterion
-  -- CR 611.3d: the card a permission was used for is read off a record this
-  -- does not search.
-  Affected.PlayedThisWay _duration -> True
-
--- Whether what a stored effect DOES might name an object. An atom carrying a
--- type, a colour, a player, a literal or a keyword without a payload names
--- none. A granted ability, a full text, a cast permission, an enchant ability
--- and a computed quantity each hold a tree this does not read, so each answers
--- "might name".
-modificationNames :: ObjectId -> Modification.Modification ability -> Bool
-modificationNames oid modification = case modification of
-  Modification.GainKeyword keyword -> keywordNames keyword
-  Modification.GainKeywordAtManaCost _keyword -> False
-  Modification.GainEnchant _slot -> True
-  Modification.LoseEnchant _slot -> True
-  Modification.GainCastingPermission _permission -> True
-  Modification.GainAbility _ability -> True
-  -- CR 702.165a: the source's own abilities, which are printed text.
-  Modification.GainAbilitiesOfSource _except -> False
-  Modification.GainCraftMaterialAbilities _restrictions -> True
-  Modification.LoseAllAbilities -> False
-  Modification.LoseNamedAbility _name -> False
-  -- Removal matches the keyword by equality and never evaluates a payload.
-  Modification.LoseKeyword _keyword -> False
-  Modification.LoseKeywordFamily _family -> False
-  Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness power toughness) -> any quantityNames power || any quantityNames toughness
-  Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness power toughness) -> quantityNames power || quantityNames toughness
-  Modification.SetLandSubtype _subtype -> False
-  Modification.SetLandSubtypeToChosen -> False
-  Modification.AddLandSubtype _subtype -> False
-  Modification.SetCreatureSubtype _subtype -> False
-  Modification.AddCreatureSubtype _subtype -> False
-  Modification.AddEveryCreatureSubtype -> False
-  Modification.LoseEveryCreatureSubtype -> False
-  -- Reads a card off GameState.exiledWith, which this does not search.
-  Modification.SetCreatureSubtypesOfLastCardExiledWith _criterion -> True
-  Modification.AddSubtype _subtype -> False
-  Modification.AddCardType _cardType -> False
-  Modification.SetCardType _cardType -> False
-  Modification.LoseCardType _cardType -> False
-  Modification.AddSupertype _supertype -> False
-  Modification.RemoveSupertype _supertype -> False
-  Modification.ChangeSubtypeWord _change -> False
-  -- CR 612.5: the pair exchanging is the row's affected set.
-  Modification.ExchangeTextBoxes -> False
-  Modification.AddNamesMatching criterion -> filterNames oid criterion
-  Modification.HasFullText _text -> True
-  Modification.SetController _player -> False
-  Modification.SetControllerToSource -> False
-  Modification.SetColor _colors -> False
-  Modification.AddColor _colors -> False
-  Modification.AddChosenColor -> False
-  Modification.SwitchPowerToughness -> False
-  Modification.AssignCombatDamageWithToughness -> False
-  Modification.GrantsStationToughness -> False
-  Modification.Intensify amount -> quantityNames amount
-
--- A literal names nothing; every other Quantity arm reads a slot, a count or
--- an object this does not search.
-quantityNames :: Quantity.Quantity -> Bool
-quantityNames quantity = case quantity of
-  Quantity.Literal _n -> False
-  _ -> True
-
--- CR 702: a keyword without a payload names nothing. One with a payload may
--- carry a Filter, a cost or a quantity, so it answers "might name". The list is
--- the payload-free keywords a resolution grants; any other keyword lands on
--- the conservative side.
-keywordNames :: Keyword.Keyword -> Bool
-keywordNames keyword = case keyword of
-  Keyword.Changeling -> False
-  Keyword.Deathtouch -> False
-  Keyword.Defender -> False
-  Keyword.DoubleStrike -> False
-  Keyword.Fear -> False
-  Keyword.FirstStrike -> False
-  Keyword.Flash -> False
-  Keyword.Flying -> False
-  Keyword.Haste -> False
-  Keyword.Indestructible -> False
-  Keyword.Infect -> False
-  Keyword.Intimidate -> False
-  Keyword.Lifelink -> False
-  Keyword.Menace -> False
-  Keyword.Prowess -> False
-  Keyword.Reach -> False
-  Keyword.Shadow -> False
-  Keyword.Shroud -> False
-  Keyword.Skulk -> False
-  Keyword.Trample -> False
-  Keyword.Vigilance -> False
-  Keyword.Wither -> False
-  _ -> True
-
--- Whether a player effect might name an object. The atoms that carry a Filter
--- defer to filterNames; the cost, permission, damage-pattern and zone records
--- answer "might name" unread.
-playerEffectNames :: ObjectId -> PlayerEffect.PlayerEffect -> Bool
-playerEffectNames oid effect = case effect of
-  PlayerEffect.CantCastSpells -> False
-  PlayerEffect.CantActivateAbilities _designator -> False
-  PlayerEffect.CantCastMoreThan _n -> False
-  PlayerEffect.IncreaseSpellCost _increase -> True
-  PlayerEffect.IncreaseActivationCost _increase -> True
-  PlayerEffect.ReduceSpellCost _reduce -> True
-  PlayerEffect.ReduceActivationCost _reduce -> True
-  PlayerEffect.AddActivationCost _add -> True
-  PlayerEffect.AlternativeActivationCost _alternative -> True
-  PlayerEffect.AddSpellCost _add -> True
-  PlayerEffect.PlayAdditionalLands _n -> False
-  PlayerEffect.NoMaximumHandSize -> False
-  PlayerEffect.SetMaximumHandSize _n -> False
-  PlayerEffect.IncreaseMaximumHandSize _n -> False
-  PlayerEffect.ReduceMaximumHandSize _n -> False
-  PlayerEffect.DontLoseUnspentMana _mana -> False
-  PlayerEffect.LoseLifeForUnspentMana -> False
-  PlayerEffect.SpendManaAsThough _spend -> True
-  PlayerEffect.CantBeTargetedBy _scope -> False
-  PlayerEffect.HasProtectionFrom criterion -> filterNames oid criterion
-  PlayerEffect.CastAsThoughItHadFlash criterion -> filterNames oid criterion
-  PlayerEffect.MayPlayAsThoughItHadFlash criterion -> filterNames oid criterion
-  PlayerEffect.ActivateKeywordAtInstantSpeed _designator -> False
-  PlayerEffect.ActivateLoyaltyAtInstantSpeed criterion -> filterNames oid criterion
-  PlayerEffect.CantBeCountered criterion -> filterNames oid criterion
-  PlayerEffect.DamageCantBePrevented _pattern -> True
-  PlayerEffect.DamageCantBeRedirected _pattern -> True
-  PlayerEffect.CantSearchLibraries _searching -> False
-  PlayerEffect.CantBecomeMonarch -> False
-  PlayerEffect.CantSetSchemesInMotion -> False
-  PlayerEffect.CantAttackWithCreatures -> False
-  PlayerEffect.CantCastMatching criterion -> filterNames oid criterion
-  PlayerEffect.CastOnlyAtSorcerySpeed -> False
-  PlayerEffect.CantPlayLands criterion -> filterNames oid criterion
-  PlayerEffect.CastFrom _permission -> True
-  PlayerEffect.PlayLandsFrom _zone -> True
-  PlayerEffect.PlotFrom _permission -> True
-  PlayerEffect.CastFromHandWithoutPayingManaCost criterion -> filterNames oid criterion
-  PlayerEffect.CantGetCounters _kind -> False
-  PlayerEffect.StateCoinFlip _flip -> False
-  PlayerEffect.ModifyDieRoll _roll -> True
-  PlayerEffect.AdditionalVotes _n -> False
-  PlayerEffect.AdditionalSurveilCards _n -> False
-  PlayerEffect.CantGainLife -> False
-  PlayerEffect.CantLoseLife -> False
-
--- Whether a Filter might single this object out from one alike in every other
--- respect.
---
--- Two objects equal whole bar the timestamp, projecting alike, named by no
--- other object, relation, stored row or combat assignment, present every atom
--- the same Pawl.Engine.Filter.View in all but three respects, so an atom reading
--- none of them answers the same of both, now and after either is chosen:
---
---   * IDENTITY: IsObject names an id outright.
---   * The turn's EVENT LOG: the look-back atoms (AttackedThisTurn,
---     MilledThisTurn, DealtDamageThisTurn, EnteredThisTurn, the
---     crewed/convoked/saddled-the-source atoms) and EnteredWithSource
---     (GameState.enteredWith) read a record kept per object id.
---   * A RESOLUTION CONTEXT a stored row does not fix: the slot atoms, the
---     target-slot amount atoms, the attach and search subject atoms,
---     CantCrewVehicles and AttachedNoLaterThanSource's baked set.
---
--- No atom reads a timestamp. The source comparisons read the row's source,
--- which namedByStored checks is neither object; the combat atoms read the
--- combat combatNames searches; the attachment atoms read the candidate's own
--- attachedTo, which whole-object Eq compares, or another object's, which
--- namedByAnother searches. A nested Filter is asked of some OTHER object --
--- a host, a target, a source, a represented card, an attacher, a permanent a
--- player counts -- which may be one of the two, so it is recursed into.
-filterNames :: ObjectId -> Filter.Filter keyword -> Bool
-filterNames oid criterion = case criterion of
-  Filter.HasCardType _cardType -> False
-  Filter.HasSupertype _supertype -> False
-  Filter.HasColor _color -> False
-  Filter.SharesColorWithSource -> False
-  Filter.HasSubtype _subtype -> False
-  Filter.HasName _name -> False
-  Filter.HasNameOriginallyPrintedIn _expansion -> False
-  Filter.HasKeyword _keyword -> False
-  Filter.HasKeywordFamily _family -> False
-  Filter.PowerAtLeast _n -> False
-  Filter.PowerAtMost _n -> False
-  Filter.ToughnessGreaterThanPower -> False
-  Filter.PowerLessThanSource -> False
-  Filter.PowerGreaterThanSource -> False
-  Filter.PowerAtLeastSourceToughness -> False
-  Filter.PowerIsAmountInSlot _slot -> True
-  Filter.PowerAtLeastAmountInSlot _slot -> True
-  Filter.ManaValueAtMost _n -> False
-  Filter.ManaValueLessThanSource -> False
-  Filter.ManaValueEqualToSource -> False
-  Filter.ManaValueIsEven -> False
-  Filter.ManaValueAtMostAmount -> True
-  Filter.ManaValueEqualToAmount -> True
-  Filter.ControlledBy _relation -> False
-  Filter.ControlledByDefendingPlayer -> False
-  Filter.ControlledByBound _slot -> True
-  Filter.ControlledByPlayer _player -> False
-  Filter.ControlledByRecipient -> False
-  Filter.OwnedBy _relation -> False
-  Filter.OwnedByRecipient -> False
-  Filter.IsSource -> False
-  Filter.IsObject named -> named == oid
-  Filter.TargetsSource -> False
-  Filter.TargetsOnlySource -> False
-  Filter.TargetsOnlyOne nested -> filterNames oid nested
-  Filter.HasSingleTarget -> False
-  Filter.TargetsMatching nested -> filterNames oid nested
-  Filter.TargetsPlayer _relation -> False
-  Filter.IsBound _slot -> True
-  Filter.SameNameAsBound _slot -> True
-  Filter.SameNameAsSource -> False
-  Filter.SameOwnerAsSource -> False
-  Filter.SameControllerAsBound _slot -> True
-  Filter.SameControllerAsHostOfBound _slot -> True
-  Filter.SharesCreatureTypeWithBound _slot -> True
-  Filter.ToughnessLessThanBound _slot -> True
-  Filter.HasChosenName -> False
-  Filter.HasChosenColor -> False
-  Filter.HasChosenSubtype -> False
-  Filter.IsLastExiledWithSource -> False
-  Filter.OfChosenPlayer -> False
-  Filter.IsPlayer _relation -> False
-  Filter.IsControllerOfBound _slot -> True
-  Filter.ControlsMoreThanYou _margin nested -> filterNames oid nested
-  Filter.CardsInGraveyardAtLeast _n -> False
-  Filter.IsAttacking -> False
-  Filter.IsAttackingPlayer _relation -> False
-  Filter.IsAttackingPlaneswalker _relation -> False
-  Filter.IsAttackingBattle _relation -> False
-  Filter.DeclaredAttackedThisCombat -> False
-  Filter.IsBlocking -> False
-  Filter.IsBlocked -> False
-  Filter.DeclaredAttackerThisCombat -> False
-  Filter.DeclaredBlockerThisCombat -> False
-  Filter.AttackedThisTurn -> True
-  Filter.MilledThisTurn -> True
-  Filter.CantCrewVehicles -> True
-  Filter.CrewedSourceThisTurn -> True
-  Filter.ConvokedSourceThisTurn -> True
-  Filter.SaddledSourceThisTurn -> True
-  Filter.DealtDamageThisTurn -> True
-  Filter.EnteredThisTurn -> True
-  Filter.ControlledSinceTurnBegan -> False
-  Filter.AttachedTo nested -> filterNames oid nested
-  Filter.HasAttached nested -> filterNames oid nested
-  Filter.IsAttachedToSource -> False
-  Filter.IsAttachedToEvaluated -> False
-  Filter.IsHostOfSource -> False
-  Filter.EnteredWithSource -> True
-  Filter.AttachedNoLaterThanSource -> True
-  Filter.CanHostSubject -> True
-  Filter.CanAttachToSubject -> True
-  Filter.HostOfSubjectHasCardType _cardType -> True
-  Filter.IsToken -> False
-  Filter.IsCommander -> False
-  Filter.IsActivatedAbility -> False
-  Filter.IsAbility -> False
-  Filter.IsEmblem -> False
-  Filter.FromSource nested -> filterNames oid nested
-  Filter.IsTapped -> False
-  Filter.IsFaceDown -> False
-  Filter.RepresentedByCard nested -> filterNames oid nested
-  Filter.IsExiledFaceDown -> False
-  Filter.Transformed -> False
-  Filter.IsRingBearer -> False
-  Filter.IsPaired -> False
-  Filter.IsPairedWithSource -> False
-  Filter.IsBlockedBySource -> False
-  Filter.HasDesignation _designation -> False
-  Filter.HasCounters _kind -> False
-  Filter.HasCountersOfAnyKind -> False
-  Filter.HasNonManaActivatedAbility -> False
-  Filter.HasActivatedAbility -> False
-  Filter.IsInZone _zone -> False
-  Filter.WasCastFrom _zone -> False
-  Filter.TagWasSpent _tag -> False
-  Filter.And nested -> any (filterNames oid) nested
-  Filter.Or nested -> any (filterNames oid) nested
-  Filter.Not nested -> filterNames oid nested
+  Affected.AttachedPlayerControls criterion -> Mentions.filterNames (unread oid) criterion
+  -- CR 611.3d: applied by storing a TheseObjects row (Event.permissionRiders),
+  -- and Pawl.Engine.Projection applies this template to nothing.
+  Affected.PlayedThisWay _duration -> False
 
 -- Whether one of the board's ID-KEYED RELATIONS names this object. Each is
 -- a Map from an object to what the game remembers about it, so the ids a row
