@@ -2531,6 +2531,11 @@ playLand offered pid oid mName = do
     -- CR 305.1 / 400.7i: the card was played, under its pre-move id and the
     -- permanent's.
     State.modify' (\g -> g {GameState.cardsPlayed = foldr (`Map.insert` pid) (GameState.cardsPlayed g) (oid Seq.<| moved)})
+    -- CR 400.7i, followIntoSpell's land half: the rest of the effect that
+    -- allowed this play names the permanent rather than the card, so Fires of
+    -- Mount Doom's "when you play a card this way" finds it.
+    Monad.forM_ (Seq.lookup 0 moved) $ \land ->
+      State.modify' (followIntoSpell (Game.lookupObject oid before >>= Object.playableFromExile) oid land)
     -- CR 305.1: the play itself, for a condition watching land plays
     -- (TriggerCondition.PlayerPlaysLand), naming the zone it was played from.
     Monad.forM_ (Game.zoneOf oid before) $ \from ->
@@ -2595,7 +2600,9 @@ choosePlayPermission pid oid options = case options of
 -- is the CR 400.7 incarnation on the stack, so every reference the granting effect
 -- captured is moved from one to the other. Dire Fleet Daredevil's "if that spell
 -- would be put into a graveyard, exile it instead" is what needs it: the ability
--- installed the redirect while the spell it names did not yet exist.
+-- installed the redirect while the spell it names did not yet exist. CR 400.7i
+-- says the same of a land card played, and `playLand` calls this with the
+-- permanent as `new`.
 --
 -- Scoped by the PERMISSION's source, which is rule 400.7h's "that effect" at the
 -- granularity pawl records: a row some other object installed keeps naming the
