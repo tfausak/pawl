@@ -367,6 +367,7 @@ import qualified Pawl.Types.SpellWasCopied as SpellWasCopied
 import qualified Pawl.Types.SpendTrigger as SpendTrigger
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.StoredResult as StoredResult
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TapState as TapState
@@ -3793,6 +3794,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             question = case family of
               SubtypeFamily.BasicLandType -> Prompt.ChooseLandTypeSwap decider controller resolving slot forbidden
               SubtypeFamily.CreatureType -> Prompt.ChooseCreatureTypeSwap decider controller resolving slot forbidden
+              SubtypeFamily.EnchantmentType -> Prompt.ChooseEnchantmentTypeSwap decider controller resolving slot forbidden
         (from, to) <- Game.choose question
         State.modify' $ \gs ->
           -- CR 611.2a: no stated duration, so Duration.Indefinite, armed through
@@ -5554,10 +5556,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- and the projection). Then one CR 608.2f event: the source goes to its
   -- owner's hand, and the card enters attached to the source's former host (CR
   -- 701.12e), so CR 303.4f asks nobody, under the resolving controller (CR
-  -- 110.2a). An unattached source exchanges nothing: unreachable, CR 704.3 and
-  -- 704.5m putting an unattached Aura into its graveyard before anyone has
-  -- priority.
-  -- Pawl.AuraSpec's AuraSwap group is the proof.
+  -- 110.2a). Pawl.AuraSpec's AuraSwap group is the proof.
+  --
+  -- An UNATTACHED source is one a text change made a non-Aura (CR 612.1 reaches
+  -- the type line, and CR 704.5p then detaches it), and CR 701.12e has no host to
+  -- hand on. A non-Aura card simply enters. An Aura card is CR 303.4f's, its
+  -- host chosen here rather than by the funnel so that CR 303.4g's "remains in
+  -- its current zone" stops the source's half too (CR 701.12a), and never the
+  -- leaving source itself. Pawl.AuraSpec's "CR 612.1" AuraSwap cases are the
+  -- proof; the no-host and self-host halves are fences, every Aura card those
+  -- boards offer having a host other than the source.
   Effect.ExchangeWithCardInHand inHand -> do
     gs <- State.get
     Monad.when (Set.member source (GameState.battlefield gs)) $ do
@@ -5565,13 +5573,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       before <- State.get
       let ownerOf oid = fmap Object.owner (Game.lookupObject oid before)
           host = Game.lookupObject source before >>= Object.attachedTo
+          exchange card seed =
+            Event.simultaneously $ do
+              Event.changeZoneInBatch before source Zone.Hand
+              Monad.void (Event.changeZoneAttaching (Just before) Set.empty card Zone.Battlefield LibraryPosition.defaultValue seed TapState.Untapped Map.empty (Just controller) Nothing Facing.FaceUp False CarryOver.NotCarried False Seq.empty)
       case picked of
-        [card]
-          | ownerOf card == ownerOf source,
-            Just seed <- host >>= \h -> Attach.attachmentFor card h before ->
-              Event.simultaneously $ do
-                Event.changeZoneInBatch before source Zone.Hand
-                Monad.void (Event.changeZoneAttaching (Just before) Set.empty card Zone.Battlefield LibraryPosition.defaultValue (Just seed) TapState.Untapped Map.empty (Just controller) Nothing Facing.FaceUp False CarryOver.NotCarried False Seq.empty)
+        [card] | ownerOf card == ownerOf source -> case host of
+          Just h -> maybe (pure ()) (exchange card . Just) (Attach.attachmentFor card h before)
+          Nothing
+            | Set.member Subtype.Aura (Projection.subtypesOf card before) -> do
+                let hosts = filter ((/= Just source) . Recipient.objectOf) (Attach.entryHostsFor (Filter.contextFor (Game.teams before) (Just controller) (Just card)) card before)
+                entryHost <- Attach.chooseEntryHost controller card hosts
+                maybe (pure ()) (exchange card . Just) (entryHost >>= \h -> Attach.attachmentFor card h before)
+            | otherwise -> exchange card Nothing
         _ -> pure ()
   -- CR 701.24: shuffle the objects the refs name into their OWNERS' libraries. Two
   -- steps: CR 400.7's move through the same changeZone funnel every destination

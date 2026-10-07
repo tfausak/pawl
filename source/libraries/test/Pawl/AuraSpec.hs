@@ -3878,6 +3878,97 @@ auraSwapSpec s registry =
               Spec.assertEqWith s "Pacifism and Wild Growth are both still in alice's hand" (List.sort (handNames S.alice after)) (sorted ["Pacifism", "Wild Growth"])
               Spec.assertEqWith s "and the Wings still enchant the Piker" (hostOf wingsId after) (Just pikerId)
             Nothing -> Spec.assertFailure s "Arcanum Wings has not exactly one ability"
+        -- CR 612.1 through the MINT: rule 702.65a's own "an Aura card", changed
+        -- by Synthetic Enchanted Evolution. Aura -> Background reaches the Wings'
+        -- type line too, so CR 704.5p detaches them, and the swap must offer the
+        -- two Backgrounds and neither Aura.
+        Spec.it s "CR 612.1 an Aura swap changed to Background offers the Backgrounds" $ do
+          (wingsId, evolved, textChanged) <- textChangedSwap s registry ("Raised by Giants", "Master Chef") (Subtype.Aura, Subtype.Background)
+          Spec.assertEqWith s "CR 704.5p the changed Wings stay on the battlefield, attached to nothing" (Set.member wingsId (GameState.battlefield evolved), hostOf wingsId evolved) (True, Nothing)
+          case textChanged of
+            Just (pikerId, auras, (giantsId, chefId), offers, after) -> do
+              Spec.assertEqWith s "CR 612.1 the swap offered the two Backgrounds" (fmap List.sort offers) [[giantsId, chefId]]
+              Spec.assertEqWith s "Raised by Giants is on the battlefield, attached to nothing" (fmap (`hostOf` after) (namedOnBattlefield "Raised by Giants" after)) [Nothing]
+              Spec.assertEqWith s "the Wings are in alice's hand beside the Auras and Master Chef" (List.sort (handNames S.alice after)) (sorted ["Arcanum Wings", "Master Chef", "Pacifism", "Wild Growth"])
+              Spec.assertBool s (Set.notMember wingsId (GameState.battlefield after) && all (\aura -> Set.notMember aura (GameState.battlefield after)) [fst auras, snd auras]) "and no Aura entered"
+              Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying pikerId after)) "and the Piker, unenchanted since CR 704.5p, has no flying"
+            Nothing -> Spec.assertFailure s "the changed Wings have not exactly one ability"
+        -- THE PAIR: the same board and the same Evolution, naming a swap the
+        -- Wings' text holds no word of, so rule 702.65a's Aura stands.
+        Spec.it s "CR 612.1 an Aura swap the change does not touch offers the Auras" $ do
+          (_, _, textChanged) <- textChangedSwap s registry ("Raised by Giants", "Master Chef") (Subtype.Curse, Subtype.Background)
+          case textChanged of
+            Just (pikerId, (pacifismId, growthId), _, offers, after) -> do
+              Spec.assertEqWith s "the swap offered the two Auras" (fmap List.sort offers) [[pacifismId, growthId]]
+              Spec.assertEqWith s "Pacifism enchants the Piker" (fmap (`hostOf` after) (namedOnBattlefield "Pacifism" after)) [Just pikerId]
+            Nothing -> Spec.assertFailure s "the Wings have not exactly one ability"
+        -- CR 303.4f through the same unattached source: Aura -> Curse, and Curse
+        -- of Death's Hold is an Aura Curse with enchant player, so alice chooses
+        -- the player it enters on. The answerer names bob, not the first offer.
+        Spec.it s "CR 612.1 an Aura swap changed to Curse enters the Curse on the player alice chooses" $ do
+          (_, _, textChanged) <- textChangedSwap s registry ("Curse of Death's Hold", "Curse of Chaos") (Subtype.Aura, Subtype.Curse)
+          case textChanged of
+            Just (_, _, (holdId, chaosId), offers, after) -> do
+              Spec.assertEqWith s "CR 612.1 the swap offered the two Curses" (fmap List.sort offers) [[holdId, chaosId]]
+              Spec.assertEqWith s "CR 303.4f Curse of Death's Hold enchants bob" (fmap (\oid -> Game.lookupObject oid after >>= Object.attachedTo >>= Recipient.playerOf) (namedOnBattlefield "Curse of Death's Hold" after)) [Just S.bob]
+              Spec.assertEqWith s "the Wings are in alice's hand beside the Auras and Curse of Chaos" (List.sort (handNames S.alice after)) (sorted ["Arcanum Wings", "Curse of Chaos", "Pacifism", "Wild Growth"])
+            Nothing -> Spec.assertFailure s "the changed Wings have not exactly one ability"
+
+-- auraSwapSpec's text-change board. Synthetic Enchanted Evolution ({U}
+-- Instant, "Change the text of target spell or permanent by replacing all
+-- instances of one enchantment type with another. (This effect lasts
+-- indefinitely.)") is Artificial Evolution's shape over CR 205.3h's enchantment
+-- types: no printing changes one (Scryfall `o:"change the text"
+-- include:extras`, 2026-10-06), and CR 612.2's word classes are examples. Four
+-- Islands, the Piker wearing alice's Arcanum Wings, the Wolves, and Pacifism,
+-- Wild Growth, the two named cards and the Evolution in her hand -- two of each
+-- kind, so the hand choice is a real prompt either way. The Evolution resolves
+-- onto the Wings with `swap`, state-based actions run, and the Wings' ability is
+-- activated and resolved. Returns the Wings, the board the Evolution left, and,
+-- when the Wings still have their one ability there, the Piker, the two Auras,
+-- the two named cards, every ChooseCardInHand offer in order, and the board.
+textChangedSwap :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> (String, String) -> (Subtype.Subtype, Subtype.Subtype) -> m (ObjectId.ObjectId, GameState.GameState, Maybe (ObjectId.ObjectId, (ObjectId.ObjectId, ObjectId.ObjectId), (ObjectId.ObjectId, ObjectId.ObjectId), [[ObjectId.ObjectId]], GameState.GameState))
+textChangedSwap s registry (firstName, secondName) swap = do
+  wings <- S.printingOf s registry "Arcanum Wings"
+  island <- S.printingOf s registry "Island"
+  piker <- S.printingOf s registry "Goblin Piker"
+  wolves <- S.printingOf s registry "Russet Wolves"
+  pacifism <- S.printingOf s registry "Pacifism"
+  growth <- S.printingOf s registry "Wild Growth"
+  first <- S.printingOf s registry firstName
+  second <- S.printingOf s registry secondName
+  evolution <- S.printingOf s registry "Synthetic Enchanted Evolution"
+  let mana = S.landsFor island S.alice 4 S.threePlayerGame
+      (pikerId, g1) = S.addPermanent piker S.alice mana
+      (_, g2) = S.addPermanent wolves S.alice g1
+      (wingsId, g3) = S.addPermanent wings S.alice g2
+      (pacifismId, g4) = S.addHandCard pacifism S.alice (S.attach wingsId pikerId g3)
+      (growthId, g5) = S.addHandCard growth S.alice g4
+      (firstId, g6) = S.addHandCard first S.alice g5
+      (secondId, g7) = S.addHandCard second S.alice g6
+      (evolutionId, g8) = S.addHandCard evolution S.alice g7
+      evolving :: Prompt.Prompt r -> r
+      evolving p = case p of
+        Prompt.ChooseTargets _ _ _ offers -> S.preferring ((== Just wingsId) . Recipient.objectOf) offers
+        Prompt.ChooseEnchantmentTypeSwap {} -> swap
+        _ -> S.identityAnswer p
+      evolved = S.runPure evolving g8 {GameState.priority = Just S.alice} (S.cast S.alice evolutionId >> Stack.resolveTop >> Engine.settleForPriority)
+      -- Records each hand offer and takes its least id, the first named card
+      -- whenever the offer assertions hold; bob is the CR 303.4f answer, never
+      -- the first offered.
+      recording :: Prompt.Prompt r -> State.State [[ObjectId.ObjectId]] r
+      recording p = case p of
+        Prompt.ChooseOptional {} -> pure OptionalDecision.Exercises
+        Prompt.ChooseCardInHand _ _ _ offered -> do
+          State.modify' (<> [NonEmpty.toList offered])
+          pure (minimum offered)
+        Prompt.ChoosePlayer _ _ _ offered -> pure (if List.elem S.bob (NonEmpty.toList offered) then S.bob else NonEmpty.head offered)
+        _ -> pure (S.identityAnswer p)
+  pure . (,,) wingsId evolved $ case Projection.abilitiesOf wingsId evolved of
+    [ability] ->
+      let ((_, after), offers) = State.runState (Engine.runGame recording evolved (Activate.activateAbility S.alice wingsId ability >> Stack.resolveTop >> Engine.settleForPriority)) []
+       in Just (pikerId, (pacifismId, growthId), (firstId, secondId), offers, after)
+    _ -> Nothing
 
 -- auraSwapSpec's board: three Islands, the Piker wearing Arcanum Wings (owned by
 -- `owner`, controlled by alice), the Wolves, and Pacifism and Wild Growth in

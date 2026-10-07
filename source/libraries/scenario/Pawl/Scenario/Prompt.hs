@@ -97,6 +97,7 @@ deciderOf prompt = case prompt of
   Prompt.AnnounceTargets decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseLandTypeSwap decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseCreatureTypeSwap decider _ _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseEnchantmentTypeSwap decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseBasicLandType decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseCreatureType decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseSearchZones decider _ _ -> Just (Decider.unwrap decider)
@@ -263,6 +264,7 @@ kindOf prompt = Text.pack $ case prompt of
   Prompt.AnnounceTargets {} -> "AnnounceTargets"
   Prompt.ChooseLandTypeSwap {} -> "ChooseLandTypeSwap"
   Prompt.ChooseCreatureTypeSwap {} -> "ChooseCreatureTypeSwap"
+  Prompt.ChooseEnchantmentTypeSwap {} -> "ChooseEnchantmentTypeSwap"
   Prompt.ChooseBasicLandType {} -> "ChooseBasicLandType"
   Prompt.ChooseCreatureType {} -> "ChooseCreatureType"
   Prompt.ChooseSearchZones {} -> "ChooseSearchZones"

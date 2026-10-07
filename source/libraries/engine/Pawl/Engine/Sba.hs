@@ -356,6 +356,11 @@ isBestowed gs oid = maybe False Object.bestowed (Game.lookupObject oid gs)
 -- and consults neither indestructible (CR 702.12b) nor a regeneration shield (CR
 -- 701.19a).
 --
+-- An AURA only, read off the projected subtypes: a permanent that keeps an
+-- enchant ability after a text change took its Aura subtype (CR 612.1) is CR
+-- 704.5p's, detached by cannotBeAttached and left on the battlefield.
+-- Pawl.AuraSpec's "CR 612.1 an Aura swap changed to Background" is the proof.
+--
 -- CR 702.103f is the one EXCEPTION the rule itself names, and
 -- performStateBasedActions subtracts it rather than this predicate: a bestowed
 -- Aura matching here becomes unattached and ceases to be bestowed instead of
@@ -363,6 +368,7 @@ isBestowed gs oid = maybe False Object.bestowed (Game.lookupObject oid gs)
 fallsOff :: Map.Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Target.Pools -> GameState -> ObjectId -> Bool
 fallsOff pcs grants pools gs oid = case Map.lookup oid pcs of
   Nothing -> False
+  Just pc | Set.notMember Subtype.Aura (PC.subtypes pc) -> False
   Just pc -> case Card.foldEnchant (PC.enchant pc) of
     Nothing -> False
     Just slot -> case Game.lookupObject oid gs of

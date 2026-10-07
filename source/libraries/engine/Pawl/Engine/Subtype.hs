@@ -29,6 +29,10 @@ inFamily :: SubtypeFamily.SubtypeFamily -> Subtype.Subtype -> Bool
 inFamily family = case family of
   SubtypeFamily.BasicLandType -> isLandType
   SubtypeFamily.CreatureType -> isCreatureType
+  -- CR 205.3h, read off correlatedCardTypes' list rather than restated. A
+  -- regression fence: its one reader is Rewrite.swapWordIn over a ChangeText's
+  -- forbidden set, and Synthetic Enchanted Evolution forbids nothing.
+  SubtypeFamily.EnchantmentType -> Set.member CardType.Enchantment . correlatedCardTypes
 
 -- | CR 305.6: the mana an object with the land card type and this basic land
 -- type has an intrinsic "{T}: Add [mana symbol]" ability for, or Nothing for

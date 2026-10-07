@@ -481,21 +481,26 @@ combatReplaySpec s =
           let p = Prompt.ChooseOpponent decider S.alice oid (S.bob NonEmpty.:| [])
           Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p S.bob)) (Just S.bob)
           Spec.assertEqWith s "a defender is not an answer to it" (Replay.decode p (Response.ChoseDefender S.bob)) Nothing
-        -- CR 612.2's two word families are asked for by two prompts whose
-        -- answers have the SAME shape, so the transcript has to tell them apart:
-        -- a shared Response constructor would replay Magical Hack's basic land
-        -- types into Artificial Evolution's creature-type ask. Each decodes its
-        -- own and rejects the other.
-        Spec.it s "the two CR 612 swap prompts do not answer each other" $ do
+        -- CR 612.2's word families are asked for by prompts whose answers have
+        -- the SAME shape, so the transcript has to tell them apart: a shared
+        -- Response constructor would replay Magical Hack's basic land types into
+        -- Artificial Evolution's creature-type ask. Each decodes its own and
+        -- rejects the others.
+        Spec.it s "the CR 612 swap prompts do not answer each other" $ do
           let slot = SlotName.MkSlotName (Text.pack "target")
               landPrompt = Prompt.ChooseLandTypeSwap decider S.alice oid slot Set.empty
               creaturePrompt = Prompt.ChooseCreatureTypeSwap decider S.alice oid slot (Set.singleton Subtype.Wall)
+              enchantmentPrompt = Prompt.ChooseEnchantmentTypeSwap decider S.alice oid slot Set.empty
               lands = (Subtype.Mountain, Subtype.Island)
               creatures = (Subtype.Frog, Subtype.Elf)
+              enchantments = (Subtype.Aura, Subtype.Curse)
           Spec.assertEqWith s "land round trip" (Replay.decode landPrompt (Replay.encode landPrompt lands)) (Just lands)
           Spec.assertEqWith s "creature round trip" (Replay.decode creaturePrompt (Replay.encode creaturePrompt creatures)) (Just creatures)
+          Spec.assertEqWith s "enchantment round trip" (Replay.decode enchantmentPrompt (Replay.encode enchantmentPrompt enchantments)) (Just enchantments)
           Spec.assertEqWith s "a land answer does not fill a creature ask" (Replay.decode creaturePrompt (Replay.encode landPrompt lands)) Nothing
           Spec.assertEqWith s "nor the other way round" (Replay.decode landPrompt (Replay.encode creaturePrompt creatures)) Nothing
+          Spec.assertEqWith s "a creature answer does not fill an enchantment ask" (Replay.decode enchantmentPrompt (Replay.encode creaturePrompt creatures)) Nothing
+          Spec.assertEqWith s "nor an enchantment answer a land ask" (Replay.decode landPrompt (Replay.encode enchantmentPrompt enchantments)) Nothing
         Spec.it s "DeclareMulligan records and replays a MulliganDecision" $ do
           let offer = MulliganOffer.MkMulliganOffer {MulliganOffer.taken = 0, MulliganOffer.bottomCount = 1}
               p = Prompt.DeclareMulligan decider S.alice offer

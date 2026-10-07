@@ -125,6 +125,7 @@ encode p answer = case p of
   Prompt.AnnounceTargets {} -> Response.AnnouncedTargets answer
   Prompt.ChooseLandTypeSwap {} -> Response.ChoseLandTypeSwap answer
   Prompt.ChooseCreatureTypeSwap {} -> Response.ChoseCreatureTypeSwap answer
+  Prompt.ChooseEnchantmentTypeSwap {} -> Response.ChoseEnchantmentTypeSwap answer
   Prompt.ChooseSearchZones {} -> Response.ChoseSearchZones answer
   Prompt.Search {} -> Response.Searched answer
   Prompt.CastWhileSearching {} -> Response.CastWhileSearched answer
@@ -445,6 +446,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseCreatureTypeSwap {} -> case response of
     Response.ChoseCreatureTypeSwap pair -> Just pair
+    _ -> Nothing
+  Prompt.ChooseEnchantmentTypeSwap {} -> case response of
+    Response.ChoseEnchantmentTypeSwap pair -> Just pair
     _ -> Nothing
   Prompt.ChooseSearchZones {} -> case response of
     Response.ChoseSearchZones zones -> Just zones
@@ -982,9 +986,11 @@ defaultAnswer p = case p of
   -- The same identity for CR 612.2's creature-type half. Frog is a creature
   -- type (CR 205.3m) and nothing in the pool forbids it.
   --
-  -- Not implemented: neither swap prompt's stated restrictions are checked
-  -- against the answer that comes back (#641).
+  -- Not implemented: no swap prompt's stated restrictions are checked against
+  -- the answer that comes back (#641).
   Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Frog, Subtype.Frog)
+  -- The same identity for CR 205.3h's half, Aura being an enchantment type.
+  Prompt.ChooseEnchantmentTypeSwap {} -> (Subtype.Aura, Subtype.Aura)
   -- Every zone the card named. Always legal -- "and/or" permits all of them --
   -- and deliberately the MAXIMAL answer rather than a least-eventful one: it is
   -- what pawl did before the searcher was asked at all, so a board that does not
