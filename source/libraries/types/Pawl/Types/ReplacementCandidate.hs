@@ -13,6 +13,7 @@ import qualified Pawl.Types.PreventionRider as PreventionRider
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.SourceChoices as SourceChoices
 import qualified Pawl.Types.Uses as Uses
 
 -- | One replacement effect instance as the CR 616.1 loop sees it: what it does,
@@ -67,6 +68,9 @@ data ReplacementCandidate = MkReplacementCandidate
     -- Pawl.Types.ActiveReplacement) so this instance's own Filters can be read in
     -- a context that knows them. Empty for a permanent's static replacement
     -- ability, which has no resolution behind it to have bound anything.
-    slots :: Map.Map SlotName.SlotName (Set.Set ObjectId.ObjectId)
+    slots :: Map.Map SlotName.SlotName (Set.Set ObjectId.ObjectId),
+    -- | CR 608.2h: a stored effect's baked source choices, read in place of
+    -- `source`'s own; Nothing reads them live.
+    choices :: Maybe SourceChoices.SourceChoices
   }
   deriving (Eq, Ord, Show)

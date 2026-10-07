@@ -40,7 +40,11 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   source, which may have left the game (CR 113.7a).
 - **Timeline.** Each entry is keyed by `turn`, `step` and the `player` who
   decides, and carries `do` (a move) or `check`. Entries sharing a key are
-  taken in order. An unscheduled priority prompt passes; any other
+  taken in order; order across keys is not kept, so an entry is taken the first
+  time its key comes up once the entries before it at that key are spent. A
+  step that occurs twice in a turn (an extra combat or main phase) is one key,
+  so a move that must follow the second occurrence sits at a step that occurs
+  once after it. An unscheduled priority prompt passes; any other
   unscheduled prompt fails the scenario, as does an entry whose moment never
   comes. A check runs when its player is next offered priority at its key, so
   put a `"Pass"` between a check with a spell on the stack and one after it
