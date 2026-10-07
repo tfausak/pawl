@@ -2621,7 +2621,7 @@ everyTriggerCondition =
     TriggerCondition.PlayerScries PlayerRelation.Opponent,
     TriggerCondition.PlayerSurveils PlayerRelation.You,
     TriggerCondition.PlayerSurveils PlayerRelation.Opponent,
-    TriggerCondition.PlayerPlaysLand (PlaysLand.MkPlaysLand PlayerRelation.You Zone.Exile),
+    TriggerCondition.PlayerPlaysLand (PlaysLand.MkPlaysLand PlayerRelation.You Zone.Exile (Filter.Type.And [])),
     TriggerCondition.PlayerProliferates PlayerRelation.You,
     TriggerCondition.PlayerProliferates PlayerRelation.Opponent,
     TriggerCondition.PlayerManifestsDread PlayerRelation.You,

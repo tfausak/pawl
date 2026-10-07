@@ -175,6 +175,10 @@
               {
                 "type": "PlayerPlaysLand",
                 "value": {
+                  "filter": {
+                    "type": "And",
+                    "value": []
+                  },
                   "from": {
                     "type": "Exile"
                   },
