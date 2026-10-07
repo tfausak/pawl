@@ -37,8 +37,8 @@
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$bounty", "mana": ["$island-1", "$island-2", null]}}},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Life": {"player": "alice", "life": 20}}},
-    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"View": {"of": "Offered", "player": "alice", "is": ["Pass", "EndEffect object 4", "ActivateManaAbility $island-3"]}}},
-    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Take": {"action": "EndEffect object 4", "mana": ["$island-3"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"View": {"of": "Offered", "player": "alice", "is": ["Pass", "EndEffect spell of $bounty", "ActivateManaAbility $island-3"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Take": {"action": "EndEffect spell of $bounty", "mana": ["$island-3"]}}},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"View": {"of": "Offered", "player": "alice", "is": ["Pass"]}}},
     {"turn": 1, "step": "EndStep", "player": "alice", "check": {"View": {"of": "Stack", "is": []}}},
     {"turn": 1, "step": "EndStep", "player": "alice", "check": {"Life": {"player": "alice", "life": 20}}}
