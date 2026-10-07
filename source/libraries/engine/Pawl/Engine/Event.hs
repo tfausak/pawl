@@ -1529,13 +1529,14 @@ bringChosen arrival revealIt pid chosen = fmap concat . Monad.forM chosen $ \car
     showIt oid
     pure [oid]
   OutsideCard.InAnotherGame outerId -> do
+    arrangeOutside arrival pid outerId
     gs1 <- State.get
     case bringInFrom arrival pid outerId gs1 of
       (Nothing, _) -> pure []
-      (Just oid, gs2) -> do
+      (Just oids, gs2) -> do
         State.put gs2
-        showIt oid
-        pure [oid]
+        Monad.forM_ oids showIt
+        pure (NonEmpty.toList oids)
   where
     showIt oid = Monad.when revealIt (reveal RevealCause.Ordinary pid oid)
 
@@ -1593,7 +1594,24 @@ bringIn destination pid printingId gs =
       spent p = p {Player.outsideTheGame = Map.update spend printingId (Player.outsideTheGame p)}
    in (oid, gs1 {GameState.players = Map.adjust spent pid (GameState.players gs1)})
 
--- CR 729.4a: bring in a card from a game that is on hold. The entry is dropped
+-- CR 712.21a / 730.3a: the owner arranges the cards of a melded or merged
+-- permanent a library destination receives, written back onto the entry
+-- `bringInFrom` then spends, since that half is pure. `arrangeComponents` asks
+-- only where there are two cards and the zone is one the rule names. The
+-- Raven's Warning's top of a library is the destination that reaches it.
+arrangeOutside :: OutsideDestination.OutsideDestination -> PlayerId -> ObjectId -> Game ()
+arrangeOutside arrival pid outerId = do
+  gs <- State.get
+  case Map.lookup outerId (GameState.outsideObjects gs) of
+    Nothing -> pure ()
+    Just entry -> do
+      let (zone, _) = arrivalOf arrival
+      arranged <- arrangeComponents pid zone (Seq.fromList (fmap MergeComponent.OfCard (NonEmpty.toList (OutsideObject.cards entry))))
+      case NonEmpty.nonEmpty (fmap Game.printingOfComponent (Foldable.toList arranged)) of
+        Nothing -> pure ()
+        Just cards -> State.modify' (\g -> g {GameState.outsideObjects = Map.insert outerId entry {OutsideObject.cards = cards} (GameState.outsideObjects g)})
+
+-- CR 729.4a: bring in an object from a game that is on hold. The entry is dropped
 -- and the OUTER id is appended to GameState.broughtIn, which is the whole record
 -- the outer frame needs: this game cannot reach that game's state, and must
 -- not (CR 729.1a keeps the two apart while the subgame runs). `Nothing` when
@@ -1606,13 +1624,18 @@ bringIn destination pid printingId gs =
 -- permanent as it leaves the battlefield, and CR 400.7 makes what arrives here a
 -- new object; a wish that reaches a manifested card gets the card, not the 2/2
 -- `eligible` offered it as.
-bringInFrom :: OutsideDestination.OutsideDestination -> PlayerId -> ObjectId -> GameState.GameState -> (Maybe ObjectId, GameState.GameState)
+--
+-- Every card the entry lists arrives, in its order (CR 712.21, CR 730.3): a
+-- melded permanent is two cards in the zone the wish names, and CR 712.21c's
+-- "finds both cards" is the answer naming both new ids.
+bringInFrom :: OutsideDestination.OutsideDestination -> PlayerId -> ObjectId -> GameState.GameState -> (Maybe (NonEmpty.NonEmpty ObjectId), GameState.GameState)
 bringInFrom destination pid outerId gs = case Map.lookup outerId (GameState.outsideObjects gs) of
   Nothing -> (Nothing, gs)
   Just entry ->
     let (zone, position) = arrivalOf destination
-        (oid, gs1) = mintCard pid Nothing (OutsideObject.printing entry) zone position TapState.Untapped gs
-     in ( Just oid,
+        mint printingId (oids, g) = let (oid, g1) = mintCard pid Nothing printingId zone position TapState.Untapped g in (oids <> [oid], g1)
+        (minted, gs1) = Foldable.foldl' (flip mint) ([], gs) (OutsideObject.cards entry)
+     in ( NonEmpty.nonEmpty minted,
           gs1
             { GameState.outsideObjects = Map.delete outerId (GameState.outsideObjects gs1),
               GameState.broughtIn = GameState.broughtIn gs1 Seq.|> outerId
@@ -8195,8 +8218,8 @@ meld controller victims resultCard = do
                 -- onto the battlefield, that object enters the battlefield under
                 -- that player's control", so the resolving controller is stamped
                 -- rather than the owner defaulted to. The two coincide for the
-                -- pool's only meld pair, whose ability requires the activating
-                -- player to own and control both halves.
+                -- pool's meld pairs, whose abilities require their controller
+                -- to own and control both halves.
                 Object.enteredUnder = Just controller,
                 Object.source = Source.OfMeld (MeldSource.MkMeldSource {MeldSource.result = resultId, MeldSource.components = fmap snd melding}),
                 Object.zone = Zone.Battlefield,
@@ -8312,7 +8335,8 @@ meld controller victims resultCard = do
 -- can't be melded." What can be read off the board is: every named object is a
 -- CARD (CR 108.2, so Source.OfCard and not a token, a copy or an ability), each
 -- such card's layout is Meld (CR 712.4), each is somewhere a card can be PUT ONTO
--- the battlefield from, and they share an owner. Answers that owner, the zone the
+-- the battlefield from, they share an owner, and each card's counterpart is
+-- another of them (CR 712.5's pairs). Answers that owner, the zone the
 -- cards are in, and each card's id paired with its printing, in the order the
 -- objects were named -- the ids so that the caller's CR 608.2h records and its
 -- CR 400.7 event name real departing incarnations rather than re-deriving them,
@@ -8326,11 +8350,11 @@ meld controller victims resultCard = do
 -- current zone". CR 712.4a's ability exiles both halves first, so no card in the
 -- pool reaches this arm.
 --
--- Not implemented: rule 701.42b's PAIR membership. Nothing in a card file says
--- which meld card is whose counterpart -- the melding ability names its
--- counterpart by name and carries the combined face, so the pairing is the
--- ability's rather than the engine's, and an ability naming a meld card that is
--- not its counterpart would be melded here (gap #2497).
+-- The PAIR is read off each card's printing rather than off the ability: its
+-- melding ability finds its counterpart by name, which a copy effect fools until
+-- the exile ends it (CR 400.7), so a card of another pair can reach here.
+-- Pawl.MeldSpec's "CR 701.42b/701.42c a meld card of another pair melds nothing"
+-- is the proof.
 --
 -- Two or more, from rule 701.42a's "the two cards in a meld pair": one object is
 -- not a meld, and a melding ability whose counterpart is gone by resolution
@@ -8352,9 +8376,14 @@ meldable victims gs = do
         case Object.source obj of
           Source.OfCard pid | Object.owner obj == owner && Object.zone obj /= Zone.Battlefield -> do
             card <- Game.cardOfPrinting pid gs
-            if Card.Type.layout card == Layout.Meld then Just (oid, pid) else Nothing
+            case Card.Type.layout card of
+              Layout.Meld counterpart -> Just ((oid, pid), (Face.name (NonEmpty.head (Card.Type.faces card)), counterpart))
+              _ -> Nothing
           _ -> Nothing
-  traverse printingOf (first NonEmpty.:| rest) >>= \melding -> Just (owner, origin, melding)
+  cards <- traverse printingOf (first NonEmpty.:| rest)
+  let names = fmap (fst . snd) cards
+  Monad.guard (all ((`elem` names) . snd . snd) cards)
+  Just (owner, origin, fmap fst cards)
 
 -- CR 730.2 / 702.140c: merge this spell with this permanent -- "place that
 -- object on top of or under that permanent. That permanent becomes a merged

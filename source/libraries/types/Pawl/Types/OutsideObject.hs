@@ -1,10 +1,11 @@
 module Pawl.Types.OutsideObject where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PrintingId as PrintingId
 
--- | CR 729.4: one card in a game that is on hold, as the game being played sees
+-- | CR 729.4: one object in a game that is on hold, as the game being played sees
 -- it -- "all objects in the main game ... are considered outside the subgame".
 -- Keyed in GameState.outsideObjects by the id the card has OUT THERE, which is
 -- the only handle the outer frame needs to apply the departure when this game
@@ -28,6 +29,11 @@ data OutsideObject = MkOutsideObject
     -- Only `eligible` reads it. What CROSSES is the card, face up: CR 708.9 has
     -- the owner reveal a face-down permanent as it leaves the battlefield, and
     -- CR 400.7 makes the card that arrives in the other game a new object.
-    facing :: Facing.Facing
+    facing :: Facing.Facing,
+    -- | CR 712.21 / 730.3: the cards that arrive if it is brought in -- one for
+    -- a card, every card component of a melded or merged permanent, in the
+    -- order its source lists them. `printing` above is the face `eligible`
+    -- reads, CR 712.8g's combined face for a melded one.
+    cards :: NonEmpty.NonEmpty PrintingId.PrintingId
   }
   deriving (Eq, Ord, Show)

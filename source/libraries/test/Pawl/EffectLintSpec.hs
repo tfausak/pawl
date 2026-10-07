@@ -59,6 +59,7 @@ import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.Blight as Blight
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.ChoosePermanents as ChoosePermanents
@@ -1639,7 +1640,7 @@ sharedTypeLineOffends card =
 -- layout answers off NonEmpty.head, so the extra face would be silently dropped
 -- rather than rejected. This is where that is made loud.
 --
--- A `== Layout.Meld` rather than an engine classifier, unlike
+-- A match on Layout.Meld rather than an engine classifier, unlike
 -- sharedTypeLineOffends above: nothing in Pawl.Engine.Card asks "is this a meld
 -- card?" -- CR 701.42b's and CR 712.4c's readers case on the layout directly --
 -- so there is no shared answer for the lint to range over.
@@ -1648,7 +1649,22 @@ sharedTypeLineOffends card =
 -- reason: this is a claim about the faces as a set.
 meldFaceCountOffends :: Card.Type.Card -> Bool
 meldFaceCountOffends card =
-  Card.Type.layout card == Layout.Meld && length (Card.Type.faces card) /= 1
+  isMeld card && length (Card.Type.faces card) /= 1
+
+isMeld :: Card.Type.Card -> Bool
+isMeld card = case Card.Type.layout card of
+  Layout.Meld {} -> True
+  _ -> False
+
+-- CR 712.5's pairs, as the files spell them: each meld card's counterpart is a
+-- meld card in the pool naming it back. A one-sided or misspelt counterpart
+-- would leave Pawl.Engine.Event.meldable refusing the real pair (CR 701.42b).
+-- Answers each meld card's name whose counterpart does not name it back.
+unpairedMelds :: [Card.Type.Card] -> [CardName.CardName]
+unpairedMelds cards =
+  let counterparts = Map.fromList [(S.nameOf card, c) | card <- cards, Layout.Meld c <- [Card.Type.layout card]]
+      paired name c = Map.lookup c counterparts == Just name
+   in [name | (name, c) <- Map.toList counterparts, not (paired name c)]
 
 -- A MINTED face's own SourceHostFramed filters, for the effect that mints it.
 -- They come through effectFilters -- Effect.Create's arm ends
@@ -3447,12 +3463,24 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
   -- asks and why the check is a face count.
   Spec.it s "CR 712.4b a meld card carries its front face alone" $ do
     ps <- S.allPrintings s
-    let melds = filter ((== Layout.Meld) . Card.Type.layout . Printing.card) ps
+    let melds = filter (isMeld . Printing.card) ps
         offenders = filter (meldFaceCountOffends . Printing.card) ps
     -- The guard the sibling lints carry: over a pool with no meld card this
     -- sweep counts nothing.
     Spec.assertBool s (not (null melds)) "the pool has a meld card to lint"
     Spec.assertEqWith s "no meld card prints a second face" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 712.5, swept over the pool. See unpairedMelds.
+  Spec.it s "CR 712.5 every meld card's counterpart names it back" $ do
+    ps <- S.allPrintings s
+    let cards = fmap Printing.card ps
+    Spec.assertBool s (length (filter isMeld cards) >= 4) "the pool has two meld pairs to lint"
+    Spec.assertEqWith s "no meld card is unpaired" (unpairedMelds cards) []
+    -- The rejecting direction: the real pair with one half's counterpart
+    -- pointed across at the other pair.
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    let crossed = (Printing.card battlements) {Card.Type.layout = Layout.Meld (CardName.MkCardName (Text.pack "Graf Rats"))}
+        others = filter ((/= S.nameOf crossed) . S.nameOf) cards
+    Spec.assertBool s (not (null (unpairedMelds (crossed : others)))) "a counterpart that does not name it back is caught"
   -- The REJECTING direction, against the real pair restated rather than a card
   -- file, as the Room lint above does it: the two halves of a meld pair stitched
   -- into one card must not be loadable.

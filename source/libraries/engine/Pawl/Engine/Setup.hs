@@ -1185,7 +1185,7 @@ subgameStateFrom starter parent =
       -- brought into the subgame)". The exception is `movedObjects` -- CR
       -- 729.2's libraries, CR 729.2a's supplementary decks, CR 729.2b's vanguards and CR 729.2c's commanders --
       -- which are IN the
-      -- subgame and so are excluded here. Only Source.OfCard objects: CR
+      -- subgame and so are excluded here. Only objects cards represent: CR
       -- 400.11c's "spells and abilities that allow those cards to be brought
       -- into the game" is what a road into a subgame is, and a token or an
       -- emblem is not a card and cannot be brought in.
@@ -1220,14 +1220,26 @@ subgameStateFrom starter parent =
       -- is offered to a subgame's wish as a creature and not as a sorcery" is
       -- the proof.
       --
-      -- Not implemented: a melded permanent, which this answers Nothing for. One
-      -- OutsideObject names one printing and GameState.outsideObjects is keyed
-      -- by the outer object's id, so recording it would have to drop a component
-      -- (#2489). The other two funnels that sorted objects into cards split it
-      -- instead; this is the site that still does not.
-      asOutside obj = case Object.source obj of
-        Source.OfCard printingId -> Just (OutsideObject.MkOutsideObject (Object.owner obj) printingId (Object.facing obj))
-        _ -> Nothing
+      -- A melded or merged permanent is ONE entry: CR 701.42a and CR 730.2 make
+      -- it a single object, which is all CR 729.4 lists, so a wish names the
+      -- permanent and never one of its cards. It is offered by the face every
+      -- characteristic read resolves through (CR 712.8g's combined face, CR
+      -- 730.2a's topmost component), and brings every card component with it
+      -- (CR 712.21, CR 730.3) -- read through Game.componentsOf, as
+      -- `splitComponents` reads it. A merged permanent whose topmost component
+      -- is a token is a token (CR 730.2d), and no token is a card.
+      -- Pawl.OutsideTheGameSpec's melded Hanweir cases prove it.
+      asOutside obj =
+        let source = Object.source obj
+            components = Game.componentsOf source
+            arriving
+              | Seq.null components = case source of
+                  Source.OfCard printingId -> [printingId]
+                  _ -> []
+              | otherwise = fmap Game.printingOfComponent (filter Game.componentIsCard (Foldable.toList components))
+         in case (Game.sourceIsToken source, Game.printingIdOfSource source, NonEmpty.nonEmpty arriving) of
+              (False, Just printingId, Just cards) -> Just (OutsideObject.MkOutsideObject (Object.owner obj) printingId (Object.facing obj) cards)
+              _ -> Nothing
    in parent
         { GameState.objects = movedObjects,
           GameState.turnOrder = order,

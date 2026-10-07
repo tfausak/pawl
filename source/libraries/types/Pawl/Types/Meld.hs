@@ -19,11 +19,11 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- be melded. Tokens, cards that aren't meld cards, or meld cards that don't form
 -- a meld pair can't be melded." Pawl.Engine.Resolve reads it off each named
 -- object -- a CARD (CR 108.2, so not a token and not a copy) whose layout is
--- 'Pawl.Types.Layout.Meld', all sharing one owner.
+-- 'Pawl.Types.Layout.Meld', all sharing one owner, each naming another as its
+-- counterpart.
 data Meld card = MkMeld
   { -- | The cards to meld, which the melding ability has already named -- a slot
-    -- an earlier 'Pawl.Types.Effect.MoveToZone' bound (CR 400.7j), for the pool's
-    -- only pair.
+    -- an earlier 'Pawl.Types.Effect.MoveToZone' bound (CR 400.7j).
     objects :: ObjectRef.ObjectRef,
     -- | The combined back face, INLINE, and interned at resolution.
     --

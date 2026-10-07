@@ -65,14 +65,17 @@ import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.LeftTheGame as LeftTheGame
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
+import qualified Pawl.Types.MergeComponent as MergeComponent
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.OutsideCard as OutsideCard
 import qualified Pawl.Types.OutsideDestination as OutsideDestination
+import qualified Pawl.Types.OutsideObject as OutsideObject
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -81,6 +84,7 @@ import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.SearchPlace as SearchPlace
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
@@ -145,6 +149,36 @@ plusOneCounters oid gs =
 -- WHEN two things were recorded and not merely that both were.
 eventIndex :: (GameEvent.GameEvent -> Bool) -> GameState.GameState -> Maybe Int
 eventIndex predicate gs = List.findIndex (predicate . LoggedEvent.event) (Foldable.toList (GameState.events gs))
+
+-- alice's Hanweir Battlements and Hanweir Garrison put onto `base` and melded
+-- into Hanweir, the Writhing Township (CR 701.42a), answering the township's id
+-- -- Nothing if the meld did not happen. Duplicated from Pawl.SetupSpec's
+-- `meldedBoard` rather than hoisted into Pawl.Support, which rebuilds every
+-- spec in the tree; the five Mountains pay the melding ability.
+meldedBoard :: GameState.GameState -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (Maybe ObjectId.ObjectId, GameState.GameState)
+meldedBoard base battlements garrison mountain =
+  let (battlementsId, g1) = S.addPermanent battlements S.alice base
+      (_, g2) = S.addPermanent garrison S.alice g1
+      board =
+        (S.landsFor mountain S.alice 5 g2)
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      townshipName = CardName.MkCardName (Text.pack "Hanweir, the Writhing Township")
+   in case Projection.abilitiesOf battlementsId board of
+        [_, _, melding] ->
+          let after = S.runPure (sparing battlementsId) board (do Activate.activateAbility S.alice battlementsId melding; Stack.resolveTop)
+              township = filter (\oid -> fmap S.nameOf (Game.cardOf oid after) == Just townshipName) (Game.zoneMembers Zone.Battlefield S.alice after)
+           in (Maybe.listToMaybe township, after)
+        _ -> (Nothing, board)
+
+-- Pays the melding ability without tapping Hanweir Battlements for mana, whose
+-- {T} the ability still needs (CR 107.5). Duplicated from Pawl.SetupSpec.
+sparing :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+sparing oid p = case p of
+  Prompt.ChooseManaSource _ _ candidates -> List.find (/= oid) (NonEmpty.toList candidates)
+  _ -> S.identityAnswer p
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
@@ -463,6 +497,169 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
     Spec.assertEqWith s "and the card under it is Sign in Blood" (Game.printingOfObject manifestedId parent) (Just signInBlood)
     Spec.assertEqWith s "the creature-or-land wish was offered the manifest beside alice's two main-game Plains" (length (offeredOuter creatureOrLand), elem manifestedId (offeredOuter creatureOrLand)) (3, True)
     Spec.assertEqWith s "and the sorcery wish was offered the graveyard card alone" (elem manifestedId (offeredOuter (Filter.HasCardType CardType.Sorcery)), length (offeredOuter (Filter.HasCardType CardType.Sorcery))) (False, 1)
+  -- CR 712.8g over CR 729.4: a melded main-game permanent is ONE object outside
+  -- the subgame (CR 701.42a), offered by its combined face. Granted (Fae of
+  -- Wishes' Adventure, "You may reveal a noncreature card you own from outside
+  -- the game and put it into your hand.") is the one printed wish whose filter
+  -- tells the combined face from the two front faces: Hanweir, the Writhing
+  -- Township is a creature, while Hanweir Battlements is a land.
+  --
+  -- A PAIR differing in the meld alone, cast and resolved inside the subgame.
+  -- Unmelded, Granted takes the Battlements; melded, the township is not on
+  -- offer and no Hanweir card arrives. The answerer pins the Hanweir object by
+  -- id and falls back to the head of the offer, which holds alice's main-game
+  -- Mountains on both legs.
+  Spec.it s "CR 712.8g/729.4 Granted cannot see a melded Hanweir, whose combined face is a creature, and takes an unmelded Battlements" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    fae <- S.printingOf s registry "Fae of Wishes"
+    let (townshipId, melded) = meldedBoard (Setup.emptyGame S.bothPlayers) battlements garrison mountain
+        (battlementsId, u1) = S.addPermanent battlements S.alice (Setup.emptyGame S.bothPlayers)
+        (_, u2) = S.addPermanent garrison S.alice u1
+        unmelded = S.landsFor mountain S.alice 5 u2
+        hanweir = Maybe.catMaybes [townshipId, Just battlementsId]
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          -- Granted's printed "may" (CR 608.2d), taken.
+          Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+          Prompt.ChooseFromOutsideTheGame _ _ offered _ _ ->
+            [Maybe.fromMaybe (NonEmpty.head offered) (List.find (\card -> any (\oid -> card == OutsideCard.InAnotherGame oid) hanweir) (NonEmpty.toList offered))]
+          _ -> S.identityAnswer p
+        granting parent =
+          let (faeId, sub1) = S.addHandCard fae S.alice (S.landsFor island S.alice 4 (Setup.subgameStateFrom S.alice parent))
+              sub2 = sub1 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+              granted = CardName.MkCardName (Text.pack "Granted")
+           in (faeId, S.runPure answer sub2 (Cast.castSpell S.manaPerformer S.alice faeId granted Facing.FaceUp >> Stack.resolveTop))
+        hanweirIn gs = filter (`elem` [battlements, garrison]) (printingsIn Zone.Hand S.alice gs)
+        (_, afterMelded) = granting melded
+        (_, afterUnmelded) = granting unmelded
+    -- The gameplay-level claims, first.
+    Spec.assertEqWith s "CR 712.8g: the melded township is a creature, so Granted brings no Hanweir card in" (hanweirIn afterMelded) []
+    Spec.assertEqWith s "CR 729.4: the unmelded Battlements is a noncreature card, and Granted takes it" (hanweirIn afterUnmelded) [battlements]
+    -- What each leg rests on.
+    Spec.assertBool s (Maybe.isJust townshipId) "the meld happened"
+    Spec.assertEqWith s "Granted resolved on the melded leg, taking a Mountain instead" (printingsIn Zone.Hand S.alice afterMelded) [mountain]
+    Spec.assertEqWith s "CR 729.4: the township stays outside the subgame" (fmap (`Map.member` GameState.outsideObjects afterMelded) townshipId) (Just True)
+  -- CR 712.21 over CR 729.4: what a wish takes of a melded permanent is the
+  -- permanent, and the permanent leaving the battlefield is "two cards into
+  -- the appropriate zone" -- here her subgame hand. Living Wish's creature
+  -- filter admits the township's combined face.
+  Spec.it s "CR 712.21/729.4 a wish cast in a subgame takes a melded main-game permanent, and both its cards arrive" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    let (townshipId, melded) = meldedBoard (Setup.emptyGame S.bothPlayers) battlements garrison mountain
+        sub = Setup.subgameStateFrom S.alice melded
+        township = Maybe.fromMaybe (ObjectId.MkObjectId 0) townshipId
+        creature = Filter.HasCardType CardType.Creature
+        after = snd (Engine.runGamePure exercising sub (Event.bringInto (FromOutsideTheGame.MkFromOutsideTheGame 1 False OutsideDestination.Hand creature True) township S.alice))
+    Spec.assertEqWith s "CR 712.21: both of Hanweir's cards arrive in her subgame hand" (List.sort (fmap S.nameOf (Maybe.mapMaybe (`Game.cardOf` after) (Game.zoneMembers Zone.Hand S.alice after)))) (List.sort [S.nameOf (Printing.card battlements), S.nameOf (Printing.card garrison)])
+    Spec.assertEqWith s "CR 712.21e: one permanent crossed, under the township's id" (Foldable.toList (GameState.broughtIn after)) [township]
+    Spec.assertBool s (Maybe.isJust townshipId) "the meld happened"
+    Spec.assertEqWith s "CR 729.4: it was the one creature outside the subgame" (fmap (\oid -> [OutsideCard.InAnotherGame oid]) townshipId) (Just (Event.eligible creature township S.alice sub))
+  -- CR 712.21a: "if a melded permanent is put into its owner's graveyard or
+  -- library, that player may arrange the two cards in any order" -- and a wish
+  -- naming the top of her library (The Raven's Warning's chapter III) is that.
+  -- A PAIR of answers to Prompt.OrderComponentCards over the same board, which
+  -- must leave different cards on top.
+  Spec.it s "CR 712.21a a melded permanent a subgame puts on top of her library is arranged by her, and the answer decides the top card" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    let (townshipId, melded) = meldedBoard (Setup.emptyGame S.bothPlayers) battlements garrison mountain
+        sub = Setup.subgameStateFrom S.alice melded
+        township = Maybe.fromMaybe (ObjectId.MkObjectId 0) townshipId
+        creature = Filter.HasCardType CardType.Creature
+        arranging :: ([Natural.Natural] -> [Natural.Natural]) -> Prompt.Prompt r -> r
+        arranging order p = case p of
+          Prompt.OrderComponentCards _ _ _ offered -> order (List.genericTake (length offered) [0 ..])
+          _ -> exercising p
+        topWith order =
+          let after = snd (Engine.runGamePure (arranging order) sub (Event.bringInto (FromOutsideTheGame.MkFromOutsideTheGame 1 False OutsideDestination.LibraryTop creature False) township S.alice))
+              library = Game.zoneMembers Zone.Library S.alice after
+           in (fmap S.nameOf (Maybe.listToMaybe library >>= (`Game.cardOf` after)), length library)
+        (asOffered, offeredCount) = topWith id
+        (reversedOrder, reversedCount) = topWith reverse
+    Spec.assertBool s (asOffered /= reversedOrder) "CR 712.21a: the two arrangements leave different cards on top"
+    Spec.assertEqWith s "and each top card is one of Hanweir's" (all (`elem` [Just (S.nameOf (Printing.card battlements)), Just (S.nameOf (Printing.card garrison))]) [asOffered, reversedOrder]) True
+    Spec.assertEqWith s "CR 712.21: both cards arrive on each leg" (offeredCount, reversedCount) (2, 2)
+    Spec.assertBool s (Maybe.isJust townshipId) "the meld happened"
+  -- CR 730.3 over CR 729.4: a merged permanent rides the same door. Cubwarden
+  -- merged over alice's Goblin Piker is one object outside the subgame, offered
+  -- by its topmost component (CR 730.2a), and both cards arrive. Hand-built
+  -- through Object.source rather than cast, since the merge itself is
+  -- Pawl.MutateSpec's subject. Two more boards put a token on top, which CR
+  -- 730.2d makes a token and so no card a wish can bring in, and a token
+  -- underneath, which is no card to bring.
+  Spec.it s "CR 730.3/729.4 a wish cast in a subgame takes a merged main-game permanent, and both its cards arrive" $ do
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (mergedId, g1) = S.addPermanent cubwarden S.alice (Setup.emptyGame S.bothPlayers)
+        (pikerPrinting, g2) = Game.intern piker g1
+        cubwardenPrinting = case fmap Object.source (Game.lookupObject mergedId g2) of
+          Just (Source.OfCard printingId) -> printingId
+          _ -> pikerPrinting
+        withSource source gs = gs {GameState.objects = Map.adjust (\o -> o {Object.source = source}) mergedId (GameState.objects gs)}
+        merged = withSource (Source.OfMerge (MergeComponent.OfCard cubwardenPrinting NonEmpty.:| [MergeComponent.OfCard pikerPrinting])) g2
+        tokenTopped = withSource (Source.OfMerge (MergeComponent.OfToken pikerPrinting NonEmpty.:| [MergeComponent.OfCard cubwardenPrinting])) g2
+        overToken = withSource (Source.OfMerge (MergeComponent.OfCard cubwardenPrinting NonEmpty.:| [MergeComponent.OfToken pikerPrinting])) g2
+        creature = Filter.HasCardType CardType.Creature
+        wishing parent = snd (Engine.runGamePure exercising (Setup.subgameStateFrom S.alice parent) (Event.bringInto (FromOutsideTheGame.MkFromOutsideTheGame 1 False OutsideDestination.Hand creature True) mergedId S.alice))
+    Spec.assertEqWith s "CR 730.3: both of the merged permanent's cards arrive in her subgame hand" (List.sort (printingsIn Zone.Hand S.alice (wishing merged))) (List.sort [cubwarden, piker])
+    Spec.assertEqWith s "CR 730.2d: a token on top makes it a token, and no card is brought in" (printingsIn Zone.Hand S.alice (wishing tokenTopped)) []
+    Spec.assertEqWith s "CR 730.3/111.7: Cubwarden over a token brings the one card, the token being none" (printingsIn Zone.Hand S.alice (wishing overToken)) [cubwarden]
+    Spec.assertEqWith s "the merged board's entry is offered by its topmost component" (fmap OutsideObject.printing (Map.lookup mergedId (GameState.outsideObjects (Setup.subgameStateFrom S.alice merged)))) (Just cubwardenPrinting)
+  -- CR 712.21 / 729.4a / 729.5 at gameplay level: alice casts Shahrazad over a
+  -- melded Hanweir, the Writhing Township, and inside the subgame Living Wish
+  -- takes the township. One permanent leaves the main game (CR 712.21e), and
+  -- its two cards are what the subgame hands back to her main-game library.
+  --
+  -- The sizing is the Death Wish case's: one wish and eight Forests, so she
+  -- holds the wish by turn 5 with three lands down, and bob decks on turn 6.
+  -- Her main-game Plains and Mountains are lands outside the subgame too, so
+  -- the offer has a choice in it; the answerer pins the township by id.
+  Spec.it s "CR 712.21/729.4a gameplay: Living Wish takes a melded Hanweir out of the main game, and both its cards come back to her library" $ do
+    plains <- S.printingOf s registry "Plains"
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    shahrazad <- S.printingOf s registry "Shahrazad"
+    livingWish <- S.printingOf s registry "Living Wish"
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    let (townshipId, melded) = meldedBoard (Setup.emptyGame S.bothPlayers) battlements garrison mountain
+        township = Maybe.fromMaybe (ObjectId.MkObjectId 0) townshipId
+        g1 = S.landsFor plains S.alice 2 melded
+        g2 = stockLibrary mountain 9 S.bob (stockLibrary forest 8 S.alice (stockLibrary livingWish 1 S.alice g1))
+        (_shahrazadId, g3) = S.addHandCard shahrazad S.alice g2
+        before =
+          g3
+            { GameState.activePlayer = S.alice,
+              GameState.phase = Phase.PrecombatMain,
+              GameState.priority = Just S.alice
+            }
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          -- Living Wish's printed "may" (CR 608.2d), taken.
+          Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+          Prompt.ChooseFromOutsideTheGame _ _ offered _ _ ->
+            [Maybe.fromMaybe (NonEmpty.head offered) (List.find (== OutsideCard.InAnotherGame township) (NonEmpty.toList offered))]
+          -- CR 729.2's roll, answered so the turn count above is the one played.
+          Prompt.RandomFirstPlayer _ -> S.alice
+          _ -> S.castAnswer p
+        after = snd (Engine.runGamePure answer before Engine.priorityLoop)
+        leftTheGame = [LeftTheGame.object l | GameEvent.LeftTheGame l <- fmap LoggedEvent.event (Foldable.toList (GameState.events after))]
+        hanweirIn zone = filter (`elem` [battlements, garrison]) (printingsIn zone S.alice after)
+    -- The gameplay-level claims, first.
+    Spec.assertEqWith s "CR 712.21/729.5: both of Hanweir's cards come back to her main-game library" (List.sort (hanweirIn Zone.Library)) (List.sort [battlements, garrison])
+    Spec.assertEqWith s "CR 712.21e/729.4a: one permanent left the main game, the township" leftTheGame [township]
+    -- What the claims rest on.
+    Spec.assertBool s (Maybe.isJust townshipId) "the meld happened"
+    Spec.assertEqWith s "the township started on the main-game battlefield" (Set.member township (GameState.battlefield before)) True
+    Spec.assertEqWith s "CR 729.4a: it is gone from the main game" (Map.member township (GameState.objects after)) False
+    Spec.assertEqWith s "and neither card is on her battlefield" (hanweirIn Zone.Battlefield) []
+    Spec.assertEqWith s "CR 729.1b: alice won the subgame, so only bob paid" (S.lifeOf S.alice after, S.lifeOf S.bob after) (Just 20, Just 10)
   -- CR 729.4 / 729.4a / 729.5, the whole road at gameplay level and the case #152
   -- is about. alice casts Shahrazad in the main game; inside the subgame she casts
   -- Living Wish ({1}{G} sorcery, "You may reveal a creature or land card you own
@@ -767,6 +964,54 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
     Spec.assertEqWith s "the second leg's wish took Shahrazad, leaving the Sign in Blood where it was" (Map.member signId (GameState.objects tookShahrazad), length (filter (== shahrazad) (printingsIn Zone.Library S.alice tookShahrazad))) (True, 1)
     Spec.assertEqWith s "the Mascot starts with no counters" (plusOneCounters mascotId before) 0
     Spec.assertEqWith s "CR 729.1b: alice won the subgame on both legs, so only bob paid" (fmap (\gs -> (S.lifeOf S.alice gs, S.lifeOf S.bob gs)) [tookGraveyardCard, tookShahrazad]) [(Just 20, Just 10), (Just 20, Just 10)]
+
+  -- CR 729.5 again, against the two readers that looked the resolving spell up
+  -- by id: Synthetic Subgame Tithe ({W}{W} sorcery: players play a subgame,
+  -- then roll a six-sided die, you gain life equal to the result, then 1 life
+  -- for each player who didn't win). A synthetic because no printed subgame
+  -- card reads an amount it bound or counts "each player except the winner";
+  -- issue 2493 records the Scryfall query. Burning Wish inside the subgame takes
+  -- the resolving Tithe, so both gains are read off a spell whose object is
+  -- gone: the die's 4 through Quantity.InSlot, and bob's 1 through
+  -- Count.playersFor's EachPlayerExcept arm.
+  --
+  -- A PAIR differing in the wish's "may" alone: declined, the Tithe stays on
+  -- the stack and the same gains are read off a live object. The sizing is the
+  -- Shahrazad-taking case above's.
+  Spec.it s "CR 729.5 gameplay: a subgame spell whose card a wish took still reads the die it rolled and counts who didn't win" $ do
+    plains <- S.printingOf s registry "Plains"
+    mountain <- S.printingOf s registry "Mountain"
+    tithe <- S.printingOf s registry "Synthetic Subgame Tithe"
+    burningWish <- S.printingOf s registry "Burning Wish"
+    let g1 = S.landsFor plains S.alice 2 (Setup.emptyGame S.bothPlayers)
+        g2 = stockLibrary mountain 9 S.bob (stockLibrary mountain 8 S.alice (stockLibrary burningWish 1 S.alice g1))
+        (_titheId, g3) = S.addHandCard tithe S.alice g2
+        before =
+          g3
+            { GameState.activePlayer = S.alice,
+              GameState.phase = Phase.PrecombatMain,
+              GameState.priority = Just S.alice
+            }
+        playWith decision =
+          let answer :: Prompt.Prompt r -> r
+              answer p = case p of
+                -- Burning Wish's printed "may" (CR 608.2d): the pair's one difference.
+                Prompt.ChooseOptional {} -> decision
+                -- CR 706.2's result, distinct from every other number here.
+                Prompt.RollDie _ -> 4
+                -- CR 729.2's roll, answered so the turn count above is the one played.
+                Prompt.RandomFirstPlayer _ -> S.alice
+                _ -> S.castAnswer p
+           in snd (Engine.runGamePure answer before Engine.priorityLoop)
+        taken = playWith OptionalDecision.Exercises
+        left = playWith OptionalDecision.Declines
+    -- The gameplay-level claims, first: 20 + 4 for the die + 1 for bob.
+    Spec.assertEqWith s "CR 729.5: with the Tithe's card taken, alice still gains the die's 4 and 1 for bob" (S.lifeOf S.alice taken) (Just 25)
+    Spec.assertEqWith s "the same gains off a Tithe nothing took" (S.lifeOf S.alice left) (Just 25)
+    -- What the pair rests on.
+    Spec.assertEqWith s "CR 729.4/729.5: the wish took the Tithe, which came back to alice's main-game library" (length (filter (== tithe) (printingsIn Zone.Library S.alice taken)), length (filter (== tithe) (printingsIn Zone.Graveyard S.alice taken))) (1, 0)
+    Spec.assertEqWith s "the declined wish left it to finish into her graveyard" (length (filter (== tithe) (printingsIn Zone.Graveyard S.alice left))) 1
+    Spec.assertEqWith s "bob lost nothing either way" (S.lifeOf S.bob taken, S.lifeOf S.bob left) (Just 20, Just 20)
 
   -- CR 614.6 / 400.11c: Ring of Ma'rûf ({5} Artifact, "{5}, {T}, Exile this
   -- artifact: The next time you would draw a card this turn, instead put a card
