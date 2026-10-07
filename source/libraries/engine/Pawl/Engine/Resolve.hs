@@ -1498,12 +1498,8 @@ resolveAbility = resolveAbilityWith noSubgame
 -- subgame -- and Pawl.Engine.Setup.applyCrossings then deletes that object before
 -- the resolution resumes. What it bound meanwhile is in
 -- GameState.detachedBindings, and takes precedence over the announced bindings
--- the snapshot carries.
---
--- Not implemented: the readers that look the resolving object up by id rather
--- than coming through here -- Pawl.Engine.Count.playersFor's EachPlayerExcept
--- arm and Pawl.Engine.Quantity's InSlot arm -- stay unanswered on that path
--- (#2493).
+-- the snapshot carries. Pawl.Engine.Quantity's InSlot arm, which looks the
+-- holder up by id rather than coming through here, falls back to the same map.
 liveBindings :: Object.Object -> ObjectId -> GameState -> Map SlotName Binding.Type.Binding
 liveBindings obj oid gs = case Game.lookupObject oid gs of
   Just live -> Object.bindings live

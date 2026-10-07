@@ -599,14 +599,13 @@ playersFor viewOf context gs ref =
         -- that read comes up empty -- a slot naming nobody excludes nobody, which
         -- is the type's stated reading and the opposite of InSlot's collapse. A
         -- reference with no source at all is still unanswerable, since without one
-        -- there are no bindings to have excluded anybody.
-        --
-        -- Not implemented: a source object that EXISTED and then ceased, which CR
-        -- 729.5 leaves a resumed resolution holding -- this answers Nothing where
-        -- Pawl.Engine.Resolve.Slots.playerRefPlayers' arm answers "excludes nobody", and
-        -- neither consults GameState.detachedBindings (#2493).
+        -- there are no bindings to have excluded anybody. A source that EXISTED and
+        -- then ceased, which CR 729.5 leaves a resumed resolution holding, is not
+        -- looked up: the resolution's context carries the slot, read through
+        -- Pawl.Engine.Resolve.liveBindings. Pawl.OutsideTheGameSpec's Synthetic
+        -- Subgame Tithe case proves it.
         PlayerRef.EachPlayerExcept name ->
-          case Filter.source context >>= \src -> Game.lookupObject src gs of
+          case Filter.source context of
             Nothing -> Nothing
             Just _ ->
               let excluded = Maybe.fromMaybe [] (slotPlayers context gs name)
@@ -615,7 +614,7 @@ playersFor viewOf context gs ref =
         -- above narrowed by CR 102.2 / 102.3, which needs the perspective, so an
         -- unframed evaluation is unanswerable here as it is under Relative.
         PlayerRef.EachOpponentExcept name ->
-          case Filter.source context >>= \src -> Game.lookupObject src gs of
+          case Filter.source context of
             Nothing -> Nothing
             Just _ -> do
               you <- Filter.perspective context

@@ -965,6 +965,54 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
     Spec.assertEqWith s "the Mascot starts with no counters" (plusOneCounters mascotId before) 0
     Spec.assertEqWith s "CR 729.1b: alice won the subgame on both legs, so only bob paid" (fmap (\gs -> (S.lifeOf S.alice gs, S.lifeOf S.bob gs)) [tookGraveyardCard, tookShahrazad]) [(Just 20, Just 10), (Just 20, Just 10)]
 
+  -- CR 729.5 again, against the two readers that looked the resolving spell up
+  -- by id: Synthetic Subgame Tithe ({W}{W} sorcery: players play a subgame,
+  -- then roll a six-sided die, you gain life equal to the result, then 1 life
+  -- for each player who didn't win). A synthetic because no printed subgame
+  -- card reads an amount it bound or counts "each player except the winner";
+  -- issue 2493 records the Scryfall query. Burning Wish inside the subgame takes
+  -- the resolving Tithe, so both gains are read off a spell whose object is
+  -- gone: the die's 4 through Quantity.InSlot, and bob's 1 through
+  -- Count.playersFor's EachPlayerExcept arm.
+  --
+  -- A PAIR differing in the wish's "may" alone: declined, the Tithe stays on
+  -- the stack and the same gains are read off a live object. The sizing is the
+  -- Shahrazad-taking case above's.
+  Spec.it s "CR 729.5 gameplay: a subgame spell whose card a wish took still reads the die it rolled and counts who didn't win" $ do
+    plains <- S.printingOf s registry "Plains"
+    mountain <- S.printingOf s registry "Mountain"
+    tithe <- S.printingOf s registry "Synthetic Subgame Tithe"
+    burningWish <- S.printingOf s registry "Burning Wish"
+    let g1 = S.landsFor plains S.alice 2 (Setup.emptyGame S.bothPlayers)
+        g2 = stockLibrary mountain 9 S.bob (stockLibrary mountain 8 S.alice (stockLibrary burningWish 1 S.alice g1))
+        (_titheId, g3) = S.addHandCard tithe S.alice g2
+        before =
+          g3
+            { GameState.activePlayer = S.alice,
+              GameState.phase = Phase.PrecombatMain,
+              GameState.priority = Just S.alice
+            }
+        playWith decision =
+          let answer :: Prompt.Prompt r -> r
+              answer p = case p of
+                -- Burning Wish's printed "may" (CR 608.2d): the pair's one difference.
+                Prompt.ChooseOptional {} -> decision
+                -- CR 706.2's result, distinct from every other number here.
+                Prompt.RollDie _ -> 4
+                -- CR 729.2's roll, answered so the turn count above is the one played.
+                Prompt.RandomFirstPlayer _ -> S.alice
+                _ -> S.castAnswer p
+           in snd (Engine.runGamePure answer before Engine.priorityLoop)
+        taken = playWith OptionalDecision.Exercises
+        left = playWith OptionalDecision.Declines
+    -- The gameplay-level claims, first: 20 + 4 for the die + 1 for bob.
+    Spec.assertEqWith s "CR 729.5: with the Tithe's card taken, alice still gains the die's 4 and 1 for bob" (S.lifeOf S.alice taken) (Just 25)
+    Spec.assertEqWith s "the same gains off a Tithe nothing took" (S.lifeOf S.alice left) (Just 25)
+    -- What the pair rests on.
+    Spec.assertEqWith s "CR 729.4/729.5: the wish took the Tithe, which came back to alice's main-game library" (length (filter (== tithe) (printingsIn Zone.Library S.alice taken)), length (filter (== tithe) (printingsIn Zone.Graveyard S.alice taken))) (1, 0)
+    Spec.assertEqWith s "the declined wish left it to finish into her graveyard" (length (filter (== tithe) (printingsIn Zone.Graveyard S.alice left))) 1
+    Spec.assertEqWith s "bob lost nothing either way" (S.lifeOf S.bob taken, S.lifeOf S.bob left) (Just 20, Just 20)
+
   -- CR 614.6 / 400.11c: Ring of Ma'rûf ({5} Artifact, "{5}, {T}, Exile this
   -- artifact: The next time you would draw a card this turn, instead put a card
   -- you own from outside the game into your hand." -- name, cost, type line and
