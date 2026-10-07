@@ -103,7 +103,8 @@
       "do": {
         "Answer": {
           "prompt": "ChooseOpponent",
-          "with": "alice"
+          "with": "alice",
+          "unoffered": true
         }
       }
     },

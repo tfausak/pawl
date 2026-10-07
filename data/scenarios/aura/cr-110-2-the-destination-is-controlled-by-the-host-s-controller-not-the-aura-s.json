@@ -98,7 +98,8 @@
       "do": {
         "Answer": {
           "prompt": "ChooseAttachment",
-          "with": "$mage"
+          "with": "$mage",
+          "unoffered": true
         }
       }
     },

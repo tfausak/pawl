@@ -104,7 +104,8 @@
       "do": {
         "Answer": {
           "prompt": "ChooseDamageSource",
-          "with": "ability of $eater"
+          "with": "ability of $eater",
+          "unoffered": true
         }
       }
     },

@@ -148,7 +148,8 @@
           "prompt": "Search",
           "with": [
             "$giant"
-          ]
+          ],
+          "unoffered": true
         }
       }
     },
@@ -231,7 +232,8 @@
           "prompt": "Search",
           "with": [
             "$mountain"
-          ]
+          ],
+          "unoffered": true
         }
       }
     },
@@ -314,7 +316,8 @@
           "prompt": "Search",
           "with": [
             "$goyf"
-          ]
+          ],
+          "unoffered": true
         }
       }
     },

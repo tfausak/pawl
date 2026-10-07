@@ -99,7 +99,8 @@
       "do": {
         "Answer": {
           "prompt": "RandomObject",
-          "with": "Whipstitched Zombie"
+          "with": "Whipstitched Zombie",
+          "unoffered": true
         }
       }
     },

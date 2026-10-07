@@ -12,4 +12,5 @@ codec :: Codec.Codec Answer.Answer
 codec = Fields.object $ do
   prompt <- Fields.required "prompt" Common.text Answer.prompt
   with <- Fields.required "with" Reply.codec Answer.with
-  pure Answer.MkAnswer {Answer.prompt = prompt, Answer.with = with}
+  unoffered <- Fields.defaulted "unoffered" False Common.boolean Answer.unoffered
+  pure Answer.MkAnswer {Answer.prompt = prompt, Answer.with = with, Answer.unoffered = unoffered}
