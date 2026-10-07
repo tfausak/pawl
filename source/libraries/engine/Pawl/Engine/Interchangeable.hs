@@ -430,6 +430,8 @@ modificationNames oid modification = case modification of
   Modification.AddCreatureSubtype _subtype -> False
   Modification.AddEveryCreatureSubtype -> False
   Modification.LoseEveryCreatureSubtype -> False
+  -- Reads a card off GameState.exiledWith, which this does not search.
+  Modification.SetCreatureSubtypesOfLastCardExiledWith _criterion -> True
   Modification.AddSubtype _subtype -> False
   Modification.AddCardType _cardType -> False
   Modification.SetCardType _cardType -> False

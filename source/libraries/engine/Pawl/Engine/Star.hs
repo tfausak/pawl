@@ -112,6 +112,7 @@ substituteStar star quantity = case quantity of
   -- No descent, the Count arm's reason again: the payload is read against the
   -- exiled card, where a star would be THAT card's box and not this one's.
   Quantity.AgainstCardsExiledWith {} -> quantity
+  Quantity.AgainstLastCardExiledWith {} -> quantity
   -- CR 702.167c: AgainstCardsExiledWith's answer, over the craft link alone.
   Quantity.AgainstCraftMaterials {} -> quantity
 

@@ -21,6 +21,7 @@
 -- an import cycle.
 module Pawl.Engine.Event where
 
+import Control.Applicative ((<|>))
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Containers.ListUtils as ListUtils
@@ -6629,11 +6630,6 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
               -- Example, is the pool's producer, and its ZoneChangeR names a
               -- destination and an owner rather than card-ness, so it applies to
               -- the melded permanent and both cards follow it to exile.
-              --
-              -- Not implemented: CR 712.21b's relative timestamp order on exile,
-              -- which is the EXILING player's and not the owner's -- the two
-              -- cards are stamped in the order arrangeComponents leaves them,
-              -- which on that path is the order they melded in (#2508).
               let components = if fromZone /= Zone.Battlefield || dest == Zone.Battlefield then Seq.empty else Game.componentsOf (Object.source obj)
                   -- CR 903.9c, the split offerCommandZone above settled: "that
                   -- permanent and each component representing it that isn't a
@@ -6677,8 +6673,28 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
               let (leading, trailing) = case Seq.viewl arranged of
                     Seq.EmptyL -> (Nothing, Seq.empty)
                     c Seq.:< cs -> (Just c, cs)
+              start <- State.gets GameState.nextTimestamp
               newId <- placeObject pid (asComponent dest leading) dest position
               trailingIds0 <- Monad.forM trailing (\component -> placeObject pid (asComponent dest (Just component)) dest position)
+              -- CR 712.21b / 730.3b: "if a player exiles a melded permanent, that
+              -- player determines the relative timestamp order of the two cards",
+              -- an exception to CR 613.7m. Asked AFTER the placements, which minted
+              -- the stamps Restamp.reassign permutes, and before anything reads them.
+              --
+              -- THE EXILER: the controller of the replacement that sent the
+              -- permanent here (CR 614.1, `exiledBy`), else `under`, the resolving
+              -- controller Pawl.Engine.Resolve's MoveToZone passes, else the
+              -- departing permanent's controller, who pays every cost that exiles a
+              -- permanent. Pawl.MeldSpec's Duplicant boards prove the second; the
+              -- first and third are regression fences.
+              --
+              -- CARDS only, which is the rule's word: a token component (CR 730.2d)
+              -- ceases by CR 111.7 and holds no timestamp anyone reads.
+              Monad.when (dest == Zone.Exile) $ do
+                placed <- State.get
+                let exiler = Maybe.fromMaybe lastController ((exiledBy >>= \replacer -> Projection.controllerOf replacer placed) <|> under)
+                    cards = [arrival | (arrival, Just component) <- zip (newId : Foldable.toList trailingIds0) (leading : fmap Just (Foldable.toList trailing)), Game.componentIsCard component]
+                Restamp.orderFor exiler start cards
               -- CR 408.1's command zone is one shared area rather than one per
               -- player, so placeObject's `pid` decides nothing about where the
               -- card lands here; it is Object.owner all the same, which is rule
@@ -7007,7 +7023,8 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
 --
 -- Exile is NOT here. CR 712.21b gives that case to the EXILING player and asks
 -- about relative timestamps rather than an arrangement, so it is a different
--- question of a different player (#2508).
+-- question of a different player, asked after the placements in
+-- changeZoneAttaching (Restamp.orderFor).
 --
 -- Not asked for fewer than two cards, which is not an elision: with one card
 -- there is one arrangement, and with none there is nothing to arrange.

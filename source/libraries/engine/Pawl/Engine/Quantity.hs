@@ -3,8 +3,10 @@ module Pawl.Engine.Quantity where
 import Control.Applicative ((<|>))
 import qualified Control.Monad as Monad
 import qualified Data.Foldable as Foldable
+import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Ord as Ord
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
@@ -16,6 +18,7 @@ import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.ManaCount as ManaCount
 import qualified Pawl.Engine.QuantitySlot as QuantitySlot
 import qualified Pawl.Engine.Turn as Turn
+import qualified Pawl.Types.AgainstLastCardExiledWith as AgainstLastCardExiledWith
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Card as Card
@@ -30,12 +33,14 @@ import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.Devotion as Devotion
 import qualified Pawl.Types.ExileLink as ExileLink
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.HybridPhyrexian as HybridPhyrexian
 import qualified Pawl.Types.InZone as InZone
+import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
@@ -355,6 +360,13 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
             Just src ->
               let linked = filter (\o -> fmap ExileLink.source (Map.lookup o (GameState.exiledWith gs)) == Just src) (Set.toList (GameState.exile gs))
                in fmap sum (traverse (\o -> evaluateAgainst viewOf context gs announcedOn (Just o) (viewOf o) inner) linked)
+        -- The arm above narrowed to ONE card, lastCardExiledWith's, so there is
+        -- nothing to sum. Nothing when no linked card matches: "the last creature
+        -- card exiled with it" is then no card at all.
+        --
+        -- Terminating: the payload is a strictly smaller subterm.
+        Quantity.AgainstLastCardExiledWith (AgainstLastCardExiledWith.MkAgainstLastCardExiledWith criterion inner) ->
+          lastCardExiledWith viewOf context gs criterion >>= \o -> evaluateAgainst viewOf context gs announcedOn (Just o) (viewOf o) inner
         -- CR 702.167c: the arm above narrowed to the craft link
         -- (Binding.craftLink), so a card the permanent's own abilities exile is
         -- not "used to craft it". A REGRESSION FENCE: no board in the suite
@@ -1354,6 +1366,7 @@ objectSlots quantity = case quantity of
   -- rather than from a binding, so this arm names none, and the payload it aims
   -- at them may still name one.
   Quantity.AgainstCardsExiledWith inner -> objectSlots inner
+  Quantity.AgainstLastCardExiledWith l -> objectSlots (AgainstLastCardExiledWith.quantity l)
   -- CR 702.167c: AgainstCardsExiledWith's answer, over the craft link alone.
   Quantity.AgainstCraftMaterials inner -> objectSlots inner
 
@@ -1634,6 +1647,7 @@ readsX quantity = case quantity of
   -- AgainstSlot's answer: not a leaf, and its payload may read X. It names no
   -- slot at all, so the target/amount distinction above does not arise.
   Quantity.AgainstCardsExiledWith inner -> readsX inner
+  Quantity.AgainstLastCardExiledWith l -> readsX (AgainstLastCardExiledWith.quantity l)
   -- CR 702.167c: AgainstCardsExiledWith's answer, over the craft link alone.
   Quantity.AgainstCraftMaterials inner -> readsX inner
 
@@ -1781,3 +1795,20 @@ controlClockOf gs oid = case Game.lookupObject oid gs of
 greatestOfOneValue :: Map.Map StoredResult.StoredResult Natural -> Natural
 greatestOfOneValue stored =
   Foldable.foldl' max 0 (Map.fromListWith (+) [(StoredResult.value result, n) | (result, n) <- Map.toList stored])
+
+-- | CR 607.2a / 613.7d: of the cards in exile that an ability of the context's
+-- source exiled, the one `criterion` matches with the LATEST timestamp --
+-- Duplicant's "the last creature card exiled with it". CR 712.21b and 730.3b
+-- let the exiler order two cards exiled at once, and
+-- Pawl.Engine.Event.changeZoneAttaching asks for that order and stamps the cards
+-- by it, so the latest stamp is "last" there too.
+--
+-- The membership test is Quantity.AgainstCardsExiledWith's relation, not a zone
+-- sweep. Nothing when the context names no source or nothing matches.
+lastCardExiledWith :: Count.ViewOf -> Filter.Context -> GameState -> Filter.Type.Filter Keyword.Type.Keyword -> Maybe ObjectId
+lastCardExiledWith viewOf context gs criterion = do
+  src <- Filter.source context
+  let linked o = fmap ExileLink.source (Map.lookup o (GameState.exiledWith gs)) == Just src
+      matching o = maybe False (\view -> Filter.matches context view criterion) (viewOf o)
+      stamped = [(Object.timestamp obj, o) | o <- Set.toList (GameState.exile gs), linked o, matching o, Just obj <- [Game.lookupObject o gs]]
+  fmap snd (Maybe.listToMaybe (List.sortOn (Ord.Down . fst) stamped))
