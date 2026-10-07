@@ -24,7 +24,7 @@ import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
-import Pawl.Engine.Projection.Rewrite (Modification, rewriteActivatedAbility, rewriteAffected, rewriteCharacteristicPT, rewriteCondition, rewriteModification, rewritePlayerStaticAbility, rewritePrintedReplacement, rewriteRuleAbilities, rewriteStaticAbility, rewriteTriggeredAbility)
+import Pawl.Engine.Projection.Rewrite (Modification, composeWordChanges, rewriteActivatedAbility, rewriteAffected, rewriteCharacteristicPT, rewriteCondition, rewriteMinted, rewriteModification, rewritePlayerStaticAbility, rewritePrintedReplacement, rewriteRuleAbilities, rewriteStaticAbility, rewriteTriggeredAbility)
 import Pawl.Engine.Projection.View (ControlGrant, abilitiesFromCharacteristics, abilityFaceOf, abilityFaceOfId, abilitySources, controlGrants, controllerOf, controllerOfGiven, copiableCharacteristics, copiableRuleAbilitiesOf, copiableSnapshotOf, copiableSpecialActionsOf, countersOf, definesColorless, definesEveryCreatureType, enchantedPlayerOf, functionsFromZone, grantedStaticAbilitiesOf, hostOf, inSourceRangeGiven, lastKnownView, staticAbilitiesOf, staticTimestampOf, viewOfCard, viewOfCharacteristics, withAnnouncedX)
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Saga as Saga
@@ -1927,13 +1927,6 @@ wordSwapOf :: Modification -> Maybe (Subtype.Type.Subtype, Subtype.Type.Subtype)
 wordSwapOf m = case m of
   Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord from to) -> Just (from, to)
   _ -> Nothing
-
--- Swaps applied in order, as one table: each word any swap names, paired with
--- the word the whole sequence leaves it as, and dropped where that is itself.
-composeWordChanges :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)]
-composeWordChanges pairs =
-  let image s = List.foldl' (\x (from, to) -> if x == from then to else x) s pairs
-   in Map.toList (Map.filterWithKey (/=) (Map.fromSet image (Set.fromList (fmap fst pairs))))
 
 -- Every continuous effect in the game: stored resolution effects, plus every
 -- battlefield permanent's static abilities (CR 613.7a, with the permanent's own
@@ -5198,8 +5191,16 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid castUsing pc =
                (Maybe.maybeToList (PC.defense pc))
            else []
        )
-    -- No CR 612.2a rewrite here either, for abilitiesFromCharacteristics' reason
-    -- (gap #2495).
+    -- No CR 612.1 rewrite through Rewrite.rewriteMinted, which its sibling mints
+    -- take, because there is nothing for one to change: every subtype word in
+    -- Keyword.mintedReplacementsFor's rows is a keyword PAYLOAD (protection's
+    -- quality, devour's), which layer 3 already rewrote through
+    -- Filter.rewriteKeyword, and rule 702 writes none of its own there. Bestow's
+    -- "becomes an Aura" is not one either: it is CR 702.103b's rule, not the
+    -- ability CR 702.103a defines, and it reaches the fold as
+    -- Keyword.bestowModifications rather than as a row here. rewriteMinted's
+    -- per-instance split would also mint protection's one row per key twice
+    -- once a granted instance joins a printed one.
     <> Keyword.mintedReplacementsOf (PC.keywords pc)
     <> Keyword.castForReplacementsOf castUsing (PC.keywords pc)
     -- CR 714.3a's intrinsic lore counter -- or CR 714.3b's chosen number, which
@@ -5855,45 +5856,10 @@ triggeredAbilitiesOf oid gs = PC.triggeredAbilities (project oid gs)
 
 -- The other half of that list: the triggered abilities rule 702 MINTS from a
 -- finished projection's keyword counts, with the object's CR 612 text changes
--- applied. The rewrite happens here rather than at layer 3 because a keyword's
--- rules text is the rule's, not the card's, so the words a text change reaches
--- do not exist until the mint runs (CR 612.1, CR 612.2a).
---
--- CR 612.3 stops the rewrite at the instances layer 3 actually reached: an ability
--- GRANTED at CR 613.1f layer 6 arrives after the swap and keeps rule 702's printed
--- word. PC.textChangedKeywords is the layer-3 count and PC.keywords the live one,
--- so the split is per INSTANCE (CR 702.135b) rather than per object -- a permanent
--- printing afterlife and granted afterlife again mints its printed instance with
--- the swapped word and its granted one with rule 702.135a's own.
---
--- The pairs are composed (textChangesAffecting's composeWordChanges), since the
--- rewrite looks each word up once. A keyword's payload word (Champion's
--- quality) was already rewritten at layer 3 and meets the table a second time
--- here; outside a dependency loop that is the identity, because CR 613.8b puts
--- every swap after any swap that makes its word, so no word the table produces
--- is one it maps again.
--- Pawl.KeywordTriggerSpec's "CR 613.7 two Evolutions on Wanderwine Prophets
--- champion a Merfolk" proves it.
---
--- `min` keeps `live - changed` total. It cannot bite today, and the mutation that
--- removes it leaves the suite green: every layer-6 write to PC.keywords either
--- adds one instance, DELETES whole keys (Modification.LoseKeyword and
--- Modification.LoseKeywordFamily, which the CR gives no way to spend one
--- instance of) or empties the map, so a live count strictly between zero and the
--- layer-3 count is unreachable, and a deleted key is not walked at all. It is arithmetic insurance, not a rule -- which surviving
--- instance counts as the printed one is a question CR 702.135b leaves moot, the
--- instances being interchangeable.
+-- applied by rewriteMinted, which says why the rewrite is at the mint and why it
+-- covers the whole ability.
 mintedTriggeredAbilitiesOf :: ProjectedCharacteristics -> [TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
-mintedTriggeredAbilitiesOf pc =
-  let pairs = composeWordChanges (fmap (\c -> (ChangeSubtypeWord.from c, ChangeSubtypeWord.to c)) (PC.subtypeWordChanges pc))
-      mint keyword count = Keyword.triggeredAbilitiesOf (Map.singleton keyword count)
-      instances (keyword, live) =
-        let changed = min live (Map.findWithDefault 0 keyword (PC.textChangedKeywords pc))
-         in fmap (rewriteTriggeredAbility pairs) (mint keyword changed) <> mint keyword (live - changed)
-   in -- Keyword.triggeredAbilitiesOf's own order, one keyword at a time: it walks
-      -- Map.toAscList, so keeping that walk here leaves the CR 603.3b ordering
-      -- prompt indexing into the same canonical order it did before the split.
-      concatMap instances (Map.toAscList (PC.keywords pc))
+mintedTriggeredAbilitiesOf = rewriteMinted rewriteTriggeredAbility Keyword.triggeredAbilitiesOf
 
 -- CR 702.5a / 613 layer 6: the object's enchant abilities after the fold --
 -- printed and granted together, which is what Modification.GainEnchant exists to

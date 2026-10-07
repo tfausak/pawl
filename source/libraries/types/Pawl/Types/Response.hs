@@ -427,6 +427,8 @@ data Response
   | -- | CR 612 again, for the creature-type half: the (from, to) creature types
     -- Artificial Evolution's caster chose.
     ChoseCreatureTypeSwap (Subtype.Subtype, Subtype.Subtype)
+  | -- | CR 612 for the enchantment-type half (CR 205.3h).
+    ChoseEnchantmentTypeSwap (Subtype.Subtype, Subtype.Subtype)
   | -- | CR 614.1c: the basic land type a player chose as an object entered.
     -- Singular, and distinct from ChoseLandTypeSwap above for
     -- Prompt.ChooseBasicLandType's reason.

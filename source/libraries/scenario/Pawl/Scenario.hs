@@ -682,6 +682,12 @@ answerDedicated decider asked =
           onEntry unscheduled key kind [] (takeForSource gs key named) $ \verb -> case verb of
             Move.ChooseTypeSwap swap -> Just (pure (TypeSwap.from swap, TypeSwap.to swap))
             _ -> Nothing
+        Prompt.Type.ChooseEnchantmentTypeSwap who _ applying _ _ -> do
+          key <- whenOf gs (Decider.unwrap who)
+          let named = Maybe.fromMaybe applying (Game.abilitySourceOf applying gs)
+          onEntry unscheduled key kind [] (takeForSource gs key named) $ \verb -> case verb of
+            Move.ChooseTypeSwap swap -> Just (pure (TypeSwap.from swap, TypeSwap.to swap))
+            _ -> Nothing
         -- CR 707.5 / 614.12a: keyed by the object entering as the copy; an
         -- unoffered permanent fails rather than reaching the engine.
         Prompt.Type.ChooseCopyTarget who _ entering candidates -> do
@@ -793,6 +799,7 @@ withinOffer prompt chosen = case prompt of
   Prompt.Type.ChooseMixedCounterRemoval _ _ _ _ _ bearers -> Map.isSubmapOfBy (Map.isSubmapOfBy (<=)) chosen bearers
   Prompt.Type.ChooseLandTypeSwap _ _ _ _ forbidden -> Set.notMember (snd chosen) forbidden
   Prompt.Type.ChooseCreatureTypeSwap _ _ _ _ forbidden -> Set.notMember (snd chosen) forbidden
+  Prompt.Type.ChooseEnchantmentTypeSwap _ _ _ _ forbidden -> Set.notMember (snd chosen) forbidden
   Prompt.Type.RandomFirstPlayer players -> chosen `elem` players
   Prompt.Type.RandomObject objects -> chosen `elem` objects
   Prompt.Type.ChooseDieResult _ _ _ results -> toInteger chosen < toInteger (length results)

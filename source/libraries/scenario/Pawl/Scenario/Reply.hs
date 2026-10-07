@@ -351,6 +351,7 @@ shapeOf prompt = case prompt of
   Prompt.AnnounceTargets {} -> mapOf (viaCodec Codec.SlotName.codec) natural
   Prompt.ChooseLandTypeSwap {} -> pairOf subtype subtype
   Prompt.ChooseCreatureTypeSwap {} -> pairOf subtype subtype
+  Prompt.ChooseEnchantmentTypeSwap {} -> pairOf subtype subtype
   Prompt.ChooseBasicLandType {} -> subtype
   Prompt.ChooseCreatureType {} -> subtype
   Prompt.ChooseSearchZones {} -> setOf searchPlace

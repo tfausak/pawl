@@ -29,6 +29,7 @@ import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Plane as Plane
+import qualified Pawl.Engine.Projection.Rewrite as Rewrite
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Star as Star
 import qualified Pawl.Engine.Subtype as Subtype
@@ -2146,21 +2147,22 @@ abilitiesFromCharacteristics peers pc oid gs =
    in -- Rule 702's own activated abilities are appended here, minted from the
       -- POST-LAYER keyword map, so Humility takes crew away with the rest.
       --
-      -- Unlike mintedTriggeredAbilitiesOf, no CR 612.2a rewrite is applied here,
-      -- and that is right in both directions. A word from a keyword PAYLOAD --
-      -- CR 702.6c's equip quality is the one the pool writes -- has already
-      -- taken the swap once, because layer 3 rewrites the keyword MAP through
-      -- Pawl.Engine.Filter.rewriteKeyword and this reads that map; rewriting
-      -- again here would double-apply it under two chained changes.
+      -- The battlefield mint takes the object's CR 612 text changes through
+      -- Rewrite.rewriteMinted, mintedTriggeredAbilitiesOf's road: aura swap's
+      -- "an Aura card" is rule 702.65a's own word, and Pawl.AuraSpec's "CR 612.1
+      -- an Aura swap changed to Background" pair proves it.
       --
-      -- Not implemented: a rewrite of the words rule 702's OWN TEXT writes into
-      -- an activated ability it mints, which is the half a second pass would be
-      -- for. No rule-702 keyword whose ability functions on the battlefield
-      -- writes a creature-type word today (gap #2495).
+      -- The hand and graveyard mints take none, since no text change can reach
+      -- them where they function: CR 400.7 ends one when its object changes
+      -- zones, and every "change the text" printing names a spell or a
+      -- permanent, or a card type word rather than a subtype (Scryfall
+      -- `o:"change the text" include:extras`, 2026-10-06, Deceptive Divination
+      -- the one card-type hit). A card in a hand or graveyard changed by a
+      -- subtype swap would refute it.
       filter
         granted
         ( PC.activatedAbilities pc
-            <> Keyword.battlefieldAbilitiesOf (PC.keywords pc)
+            <> Rewrite.rewriteMinted Rewrite.rewriteActivatedAbility Keyword.battlefieldAbilitiesOf pc
             <> Keyword.handAbilitiesOf (Map.keysSet (PC.keywords pc))
             <> Keyword.graveyardAbilitiesOf (Map.keysSet (PC.keywords pc))
             -- CR 804.2's, minted off the POST-LAYER types for the same reason, and

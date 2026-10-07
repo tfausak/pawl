@@ -10,6 +10,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Types.AbilityAddsMana as AbilityAddsMana
@@ -54,6 +55,7 @@ import qualified Pawl.Types.CardsPutIntoZone as CardsPutIntoZone
 import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.CastRepetition as CastRepetition
+import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.ChooseCardName as ChooseCardName
@@ -136,6 +138,7 @@ import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
+import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LimitUnless as LimitUnless
@@ -177,6 +180,8 @@ import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Types.PreventNextDamageInstance as PreventNextDamageInstance
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
+import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity.Type
@@ -600,9 +605,9 @@ rewriteEffect pairs effect = case effect of
   -- CR 612.2's gate, and this arm is where it bites rather than where it is
   -- restated: the payload IS a subtype word (CR 701.49d's quality), but a pair
   -- reaching it would have to come from a Pawl.Types.SubtypeFamily, and that type
-  -- has only CR 205.3m's creature types and the basic land types -- the two
-  -- families CR 612.2 names. CR 205.3p's dungeon type is in neither, so no swap
-  -- this function can be given names it.
+  -- has CR 205.3m's creature types, the land types and CR 205.3h's enchantment
+  -- types. CR 205.3p's dungeon type is in none of them, so no swap this function
+  -- can be given names it.
   Effect.Venture {} -> effect
   Effect.ExileHandThenDraw -> effect
   Effect.NoteManaSpent -> effect
@@ -621,7 +626,7 @@ rewriteEffect pairs effect = case effect of
   -- reaches it exactly as Destroy's above. A REGRESSION FENCE rather than a
   -- proven behaviour: Golgothian Sylex and City in a Bottle are the only cards
   -- whose sacrifice carries a Filter at all, and CR 206.3a/b's names are not
-  -- words CR 612.2's two families can swap, so mutating this line reddens
+  -- words any Pawl.Types.SubtypeFamily can swap, so mutating this line reddens
   -- nothing.
   Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect ref sacrificer mSacrificed) -> Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect (rewriteObjectRef pairs ref) sacrificer mSacrificed)
   -- CR 612.1: the ref carries a Filter of printed card text, so a text-changer
@@ -1031,6 +1036,60 @@ rewriteEffect pairs effect = case effect of
   Effect.Heal ref -> Effect.Heal (rewriteObjectRef pairs ref)
   Effect.ChooseNewTargets ref -> Effect.ChooseNewTargets (rewriteObjectRef pairs ref)
   Effect.ChangeTargets ref -> Effect.ChangeTargets (rewriteObjectRef pairs ref)
+
+-- Swaps applied in order, as one table: each word any swap names, paired with
+-- the word the whole sequence leaves it as, and dropped where that is itself.
+composeWordChanges :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)]
+composeWordChanges pairs =
+  let image s = List.foldl' (\x (from, to) -> if x == from then to else x) s pairs
+   in Map.toList (Map.filterWithKey (/=) (Map.fromSet image (Set.fromList (fmap fst pairs))))
+
+-- CR 612.1 / 612.2a over what rule 702 MINTS from a finished projection's
+-- keyword counts, with the object's text changes applied. The rewrite happens at
+-- the mint rather than at layer 3 because a keyword's rules text is the rule's,
+-- not the card's, so the words a text change reaches do not exist until the mint
+-- runs.
+--
+-- The WHOLE minted ability is rewritten, payload words included. A payload word
+-- (Champion's quality, equip's) was already rewritten at layer 3 through
+-- Filter.rewriteKeyword and meets the composed table a second time here; outside
+-- a dependency loop that is the identity, because CR 613.8b puts every swap
+-- after any swap that makes its word, so no word the table produces is one it
+-- maps again. Rewriting only the words rule 702's own text writes would need the
+-- mint to say which those are, and would answer the same. Pawl.KeywordTriggerSpec's
+-- "CR 613.7 two Evolutions on Wanderwine Prophets champion a Merfolk" proves it.
+--
+-- CR 612.3 stops the rewrite at the instances layer 3 actually reached: an
+-- ability GRANTED at CR 613.1f layer 6 arrives after the swap and keeps rule
+-- 702's printed word. PC.textChangedKeywords is the layer-3 count and
+-- PC.keywords the live one, so the split is per INSTANCE (CR 702.135b) rather
+-- than per object -- a permanent printing afterlife and granted afterlife again
+-- mints its printed instance with the swapped word and its granted one with rule
+-- 702.135a's own. That needs `mint` to answer one result per instance it is
+-- handed, and nothing for none.
+--
+-- `min` keeps `live - changed` total. It cannot bite today, and the mutation that
+-- removes it leaves the suite green: every layer-6 write to PC.keywords either
+-- adds one instance, DELETES whole keys (Modification.LoseKeyword and
+-- Modification.LoseKeywordFamily, which the CR gives no way to spend one
+-- instance of) or empties the map, so a live count strictly between zero and the
+-- layer-3 count is unreachable, and a deleted key is not walked at all. It is
+-- arithmetic insurance, not a rule -- which surviving instance counts as the
+-- printed one is a question CR 702.135b leaves moot, the instances being
+-- interchangeable.
+--
+-- One keyword at a time, in Map.toAscList order, which is the walk every mint
+-- in Pawl.Engine.Keyword takes, so a reader indexing into the result (CR
+-- 603.3b's ordering prompt, an activation's ability index) sees the order it did
+-- before the split.
+rewriteMinted :: ([(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> a -> a) -> (Map.Map Keyword Natural -> [a]) -> ProjectedCharacteristics -> [a]
+rewriteMinted rewriteOne mint pc =
+  let pairs = composeWordChanges (fmap (\c -> (ChangeSubtypeWord.from c, ChangeSubtypeWord.to c)) (PC.subtypeWordChanges pc))
+      mintOne keyword count = mint (Map.singleton keyword count)
+      instances (keyword, live) =
+        let changed = min live (Map.findWithDefault 0 keyword (PC.textChangedKeywords pc))
+         in fmap (rewriteOne pairs) (mintOne keyword changed) <> mintOne keyword (live - changed)
+   in concatMap instances (Map.toAscList (PC.keywords pc))
 
 -- CR 612.2 over one word whose family a card's text names rather than a
 -- constructor -- a ChangeText's forbidden-word set.

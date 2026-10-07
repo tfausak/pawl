@@ -424,6 +424,8 @@ data Prompt r where
   -- | CR 612: ChooseLandTypeSwap's sibling for CR 612.2's creature types, the
   -- family named rather than enumerated.
   ChooseCreatureTypeSwap :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> SlotName.SlotName -> Set.Set Subtype.Subtype -> Prompt (Subtype.Subtype, Subtype.Subtype)
+  -- | CR 612: the same for CR 205.3h's enchantment types.
+  ChooseEnchantmentTypeSwap :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> SlotName.SlotName -> Set.Set Subtype.Subtype -> Prompt (Subtype.Subtype, Subtype.Subtype)
   -- | CR 614.1c: the one basic land type an entering object's controller
   -- chooses, written to Object.chosenSubtype; no candidate list (CR 305.6).
   ChooseBasicLandType :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt Subtype.Subtype
