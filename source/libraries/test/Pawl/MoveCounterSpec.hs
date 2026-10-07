@@ -59,6 +59,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   groupSourceSpec s registry
   groupDestinationSpec s registry
   settledBatchSpec s registry
+  scattererSpec s registry
   upToOneSpec s registry
 
 -- Which counter the answerer takes, and whether it takes the printed "may" at
@@ -1019,3 +1020,108 @@ settledBatchSpec s registry = Spec.describe s "CR 122.5 moving a settled batch, 
       Just (after, _) ->
         Spec.assertEqWith s "one went to alice's Wall, one to the Piker, and three stayed" (tallies after [selfId, aliceWall, alicePiker, bobWall]) [(3, 2), (1, 0), (1, 0), (0, 0)]
       Nothing -> Spec.assertFailure s "expected the Redistributor to offer its printed activated abilities"
+
+-- Synthetic Counter Scatterer {2}{G} Creature - Elemental 0/3,
+-- data/cards/synthetic-counter-scatterer.json:
+--
+--   {1}: Move two counters of one kind from this creature onto other creatures
+--   you control.
+--   {G}: Move up to one counter from this creature onto other creatures you
+--   control.
+--
+-- The group destination under the two kindless arms whose kind the PLAYER
+-- picks: Agent's Toolkit's "a counter" with a count of two, and Takesies' "up
+-- to one counter". CR 122.5 forbids neither; Scryfall `o:/move [^.]* onto
+-- other/` with `unique=cards&include_extras=true`, 2026-10-07, finds Forgotten
+-- Ancient alone, so a synthetic is the producer.
+--
+-- Three +1/+1 counters and one shield counter by hand, so "two of one kind" can
+-- be met by one kind and not the other, and Redistributor's answerer records
+-- what was asked.
+scattererSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+scattererSpec s registry = Spec.describe s "CR 122.5 moving counters of a kind the player picks onto a group of permanents" $ do
+  let -- alice: the Scatterer, two Forests, a Wall of Stone and a Goblin Piker;
+      -- bob's Wall is a creature the printed "you control" keeps off the list.
+      -- `stock` is what a case puts on the Scatterer.
+      board stock = do
+        forest <- S.printingOf s registry "Forest"
+        wall <- S.printingOf s registry "Wall of Stone"
+        piker <- S.printingOf s registry "Goblin Piker"
+        scatterer <- S.printingOf s registry "Synthetic Counter Scatterer"
+        let (selfId, g1) = S.addPermanent scatterer S.alice (S.landsInPlay forest 2)
+            (aliceWall, g2) = S.addPermanent wall S.alice g1
+            (alicePiker, g3) = S.addPermanent piker S.alice g2
+            (bobWall, g4) = S.addPermanent wall S.bob g3
+        pure (selfId, aliceWall, alicePiker, bobWall, (stock selfId g4) {GameState.priority = Just S.alice})
+      bothKinds selfId = S.addCounter CounterKind.Shield 1 selfId . S.addCounter CounterKind.PlusOnePlusOne 3 selfId
+      -- One printed activated ability, by position, activated and resolved.
+      activate index wanted selfId ready = case drop index (Activatable.abilitiesFor selfId ready) of
+        ability : _ -> Just (State.runState (snd <$> Engine.runGame (redistributorAnswer wanted) ready (Activate.activateAbility S.alice selfId ability >> Stack.resolveTop)) [])
+        [] -> Nothing
+      twoOfOneKind = 0 :: Int
+      upToOne = 1 :: Int
+      tallies after = fmap (`pairOn` after)
+      missing = Spec.assertFailure s "expected the Scatterer to offer its printed activated abilities"
+  -- "Two counters of one kind": the player picks +1/+1 and spreads the two.
+  Spec.it s "the player picks one kind and spreads two of it over the other creatures" $ do
+    (selfId, aliceWall, alicePiker, bobWall, ready) <- board bothKinds
+    let wanted = Map.fromList [(aliceWall, Map.singleton CounterKind.PlusOnePlusOne 1), (alicePiker, Map.singleton CounterKind.PlusOnePlusOne 1)]
+    case activate twoOfOneKind wanted selfId ready of
+      Just (after, asked) -> do
+        Spec.assertEqWith s "one +1/+1 counter each went to alice's Wall and Piker" (tallies after [selfId, aliceWall, alicePiker, bobWall]) [(1, 1), (1, 0), (1, 0), (0, 0)]
+        Spec.assertEqWith s "and two of one kind were asked of alice's two other creatures" asked [(MoveSpread.OneKind 2, Set.fromList [aliceWall, alicePiker])]
+      Nothing -> missing
+  -- The same board differing only in the answer, which mixes kinds: the lowest
+  -- kind answered is kept and topped up to two, and no shield counter moves.
+  Spec.it s "an answer mixing kinds keeps one kind and still moves two of it" $ do
+    (selfId, aliceWall, alicePiker, bobWall, ready) <- board bothKinds
+    let wanted = Map.fromList [(aliceWall, Map.singleton CounterKind.PlusOnePlusOne 1), (alicePiker, Map.singleton CounterKind.Shield 1)]
+    case activate twoOfOneKind wanted selfId ready of
+      Just (after, _) ->
+        Spec.assertEqWith
+          s
+          "two +1/+1 counters left the Scatterer for alice's creatures, and its shield counter stayed"
+          (pairOn selfId after, sum (fmap (fst . (`pairOn` after)) [aliceWall, alicePiker]), sum (fmap (snd . (`pairOn` after)) [aliceWall, alicePiker, bobWall]))
+          ((1, 1), 2, 0)
+      Nothing -> missing
+  -- CR 609.3: the one shield counter is all of that kind there is, so picking it
+  -- moves one, not two.
+  Spec.it s "picking a kind with fewer counters than the count moves all it has" $ do
+    (selfId, aliceWall, alicePiker, bobWall, ready) <- board bothKinds
+    case activate twoOfOneKind (Map.singleton alicePiker (Map.singleton CounterKind.Shield 2)) selfId ready of
+      Just (after, _) ->
+        Spec.assertEqWith s "the Piker got the one shield counter and nothing else moved" (tallies after [selfId, aliceWall, alicePiker, bobWall]) [(3, 0), (0, 0), (0, 1), (0, 0)]
+      Nothing -> missing
+  -- A Scatterer bearing one kind leaves no kind to pick, so only where the two
+  -- counters land is asked: a settled batch.
+  Spec.it s "a lone kind on the Scatterer is not asked about, only where it goes" $ do
+    (selfId, aliceWall, alicePiker, bobWall, ready) <- board (S.addCounter CounterKind.PlusOnePlusOne 3)
+    case activate twoOfOneKind (Map.singleton aliceWall (Map.singleton CounterKind.PlusOnePlusOne 2)) selfId ready of
+      Just (after, asked) -> do
+        Spec.assertEqWith s "two +1/+1 counters went to alice's Wall" (tallies after [selfId, aliceWall, alicePiker, bobWall]) [(1, 0), (2, 0), (0, 0), (0, 0)]
+        Spec.assertEqWith s "and a settled batch was asked" (fmap fst asked) [MoveSpread.Exactly]
+      Nothing -> missing
+  -- "Up to one counter": the player's one counter, of the kind and onto the
+  -- creature they name.
+  Spec.it s "the player moves up to one counter of their choosing onto one creature" $ do
+    (selfId, aliceWall, alicePiker, bobWall, ready) <- board bothKinds
+    case activate upToOne (Map.singleton alicePiker (Map.singleton CounterKind.Shield 1)) selfId ready of
+      Just (after, asked) -> do
+        Spec.assertEqWith s "the shield counter went to the Piker" (tallies after [selfId, aliceWall, alicePiker, bobWall]) [(3, 0), (0, 0), (0, 1), (0, 0)]
+        Spec.assertEqWith s "and up to one counter was asked" (fmap fst asked) [MoveSpread.UpToOne]
+      Nothing -> missing
+  -- "Up to one" includes none.
+  Spec.it s "declining moves nothing" $ do
+    (selfId, aliceWall, alicePiker, bobWall, ready) <- board bothKinds
+    case activate upToOne Map.empty selfId ready of
+      Just (after, _) -> Spec.assertEqWith s "every counter stayed on the Scatterer" (tallies after [selfId, aliceWall, alicePiker, bobWall]) [(3, 1), (0, 0), (0, 0), (0, 0)]
+      Nothing -> missing
+  -- An answer of more than one is cut to its first counter, recipients in
+  -- offered order and kinds ascending.
+  Spec.it s "an answer moving more than one counter moves only the first" $ do
+    (selfId, aliceWall, alicePiker, bobWall, ready) <- board bothKinds
+    let wanted = Map.fromList [(aliceWall, Map.singleton CounterKind.PlusOnePlusOne 2), (alicePiker, Map.singleton CounterKind.Shield 1)]
+    case activate upToOne wanted selfId ready of
+      Just (after, _) ->
+        Spec.assertEqWith s "one +1/+1 counter went to alice's Wall and nothing else moved" (tallies after [selfId, aliceWall, alicePiker, bobWall]) [(2, 1), (1, 0), (0, 0), (0, 0)]
+      Nothing -> missing

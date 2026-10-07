@@ -1606,6 +1606,8 @@ combatReplaySpec s =
           Spec.assertEqWith s "the empty distribution under any number" (quiet MoveSpread.AnyNumber) Map.empty
           Spec.assertEqWith s "one counter of the first kind under one or more" (quiet MoveSpread.AtLeastOne) (Map.singleton first (Map.singleton CounterKind.PlusOnePlusOne 1))
           Spec.assertEqWith s "and the whole batch under a settled one" (quiet MoveSpread.Exactly) (Map.singleton first offered)
+          Spec.assertEqWith s "and that many of the first kind under one kind" (quiet (MoveSpread.OneKind 2)) (Map.singleton first (Map.singleton CounterKind.PlusOnePlusOne 2))
+          Spec.assertEqWith s "and the empty distribution under up to one" (quiet MoveSpread.UpToOne) Map.empty
         -- CR 122.5 once more, for "up to one": the answer is a kind OR none, so a
         -- transcript has to carry the declining half that ChooseMovedCounter's
         -- cannot say.
