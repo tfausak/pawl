@@ -1693,9 +1693,11 @@ setLandSubtypeEffectsGiven functioning gs =
 -- outside the fold use liveAfterLayers. The layer-2 control fold asks NEITHER
 -- gate -- see controlGrants.
 --
--- The one exception is a layer-4 effect that takes the permanent OUT of the
--- setter's set: CR 613.8a makes the setter depend on it (escapes). Pawl.ProjectionSpec's
--- Rootpath Purifier and Synthetic Primeval Claim cases prove both limbs.
+-- The exception is a layer-4 effect the setter applies after (CR 613.8a): one
+-- that takes the permanent OUT of the setter's set or puts it IN, so membership
+-- is judged once those effects have applied. Pawl.ProjectionSpec's Rootpath
+-- Purifier and Synthetic Primeval Claim cases prove the first, and its
+-- Ashaya-animated Slivdrazi Monstrosity pair the second.
 --
 -- The land test reads layer 1 (see affectsBase), plus the setter's own layer-4
 -- parts: a setter that makes the permanent a land as it sets the subtype strips
@@ -1705,42 +1707,64 @@ setLandSubtypeEffectsGiven functioning gs =
 -- a Forest land" pair the second.
 --
 -- Answered per ABILITY, by the index permanentParts gives it. CR 613.6 spares
--- only the ability whose own setter had started applying by the time a strip
--- landed -- the strip itself included, so a land inside its own setter's set
--- keeps that one setter and loses the rest. Pawl.ProjectionSpec's "CR
--- 305.7/613.6 a land inside its own Mountain set" cases prove both halves.
+-- only an ability that had started applying by the time a strip landed: the
+-- permanent's own setter, the strip itself included, so a land inside its own
+-- setter's set keeps that one setter and loses the rest; and its own layer-4
+-- ability the setter depends on, Ashaya's. Pawl.ProjectionSpec's "CR
+-- 305.7/613.6 a land inside its own Mountain set" cases prove the first, and
+-- Ashaya's Blood Moon cases the second.
 liveGiven :: (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> [SetEffect] -> ObjectId -> GameState -> Natural -> Bool
 liveGiven functioning setEffs oid gs = \n -> not (any (notElem (oid, Just n)) strippers)
   where
     applied = appliedSetEffects setEffs gs
+    changers = typeChangersGiven functioning gs
     -- Each applied setter that strips `oid`, as the setters applied up to and
-    -- including it.
-    strippers = [fmap key upTo | upTo@((src, _, aff) : _) <- fmap reverse (drop 1 (List.inits applied)), affectsBase src oid aff gs, landWhenSet src aff, not (escapes src aff)]
+    -- including it, and the abilities of `oid`'s own it spares.
+    strippers =
+      [ fmap key upTo <> spared first src aff
+      | upTo@((src, _, aff) : _) <- fmap reverse (drop 1 (List.inits applied)),
+        let first = firstOf src aff,
+        reaches (fmap fst first) src aff
+      ]
     key (src, n, _) = (src, n)
-    -- CR 305.7's subject: a land at layer 1, or one the setter itself makes a
-    -- land. Projected only for a permanent the setter reaches that base saw as
-    -- no land, which is rare.
-    landWhenSet src aff =
-      hasLandType (copiableCharacteristics oid gs)
-        || hasLandType (projectWith (<= Layer.Type) (setterPartsOf src aff gs) oid gs)
     -- CR 613.8a/613.8b: the other layer-4 effects that apply before this setter.
     -- One the setter would strip (a rules-text ability of a land it reaches)
     -- depends on it too, and that loop falls back to timestamps; any other the
-    -- setter merely waits for. Applied to `oid`, do they move it out of reach?
-    escapes src aff =
+    -- setter merely waits for.
+    firstOf src aff =
       let stamp = fmap Object.timestamp (Game.lookupObject src gs)
           strippedBy c = affectsBase src (gSource c) aff gs && hasLandType (copiableCharacteristics (gSource c) gs)
-          before (c, printed) = not (printed && strippedBy c) || maybe True (gTimestamp c <) stamp
-       in case fmap fst (filter before (typeChangersGiven functioning gs)) of
+          before (c, printed) = not (Maybe.isJust printed && strippedBy c) || maybe True (gTimestamp c <) stamp
+       in filter before changers
+    -- Does the setter reach `oid`, a land, once those effects have applied? They
+    -- can move it out of reach (Rootpath Purifier) or into it (Ashaya making a
+    -- creature a land, Pawl.ProjectionSpec's Slivdrazi pair). CR 305.7's subject
+    -- is a land at layer 1, or one those effects or the setter itself make a land
+    -- (Pawl.ProjectionSpec's Convincing Mirage pair). With nothing applying
+    -- first, layer 1 answers and no projection is spent.
+    reaches parts src aff =
+      let landWith ps = hasLandType (copiableCharacteristics oid gs) || hasLandType (projectWith (<= Layer.Type) ps oid gs)
+       in if null parts
+            then affectsBase src oid aff gs && landWith (setterPartsOf src aff gs)
+            else affectsGiven (baseView gs) src oid aff (projectWith (<= Layer.Type) parts oid gs) gs && landWith (parts <> setterPartsOf src aff gs)
+    -- CR 613.6: an ability of `oid`'s own that applied first because the setter
+    -- depends on it for what it applies to (CR 613.8a) had started applying, so
+    -- the strip does not stop it. Ashaya's own ability is the one, which is what
+    -- keeps her animation standing under Blood Moon.
+    spared first src aff =
+      let own = Set.toList (Set.fromList [k | (c, Just k) <- first, gSource c == oid])
+          partsOf k = [c | (c, Just k') <- first, gSource c == oid, k' == k]
+          dependedOn k = case partsOf k of
             [] -> False
-            first -> not (affectsGiven (baseView gs) src oid aff (projectWith (<= Layer.Type) first oid gs) gs)
+            ps@(c : _) -> movesSetBy ps (gSource c) (gAffected c) src aff gs
+       in [(oid, Just k) | k <- own, dependedOn k]
 
 -- Every layer-4 part of an effect that sets no land's subtype, for liveGiven's CR
 -- 613.8a question. Walked as setLandSubtypeEffectsGiven walks the setters: stored
 -- effects, then each permanent's printed and granted static abilities, under the
--- same CR 604.2 and CR 612 reads. The flag marks a PRINTED ability, the one kind
--- CR 305.7 can strip.
-typeChangersGiven :: (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> GameState -> [(Gathered, Bool)]
+-- same CR 604.2 and CR 612 reads. The index marks a PRINTED ability, the one kind
+-- CR 305.7 can strip, numbered as permanentParts numbers it.
+typeChangersGiven :: (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> GameState -> [(Gathered, Maybe Natural)]
 typeChangersGiven functioning gs =
   let part src ts aff m =
         MkGathered
@@ -1756,32 +1780,33 @@ typeChangersGiven functioning gs =
       keeps sa = not (any setsLandSubtype (StaticAbility.modifications sa)) && functionsFromZone Zone.Battlefield sa
       fromStored eff =
         let m = ContinuousEffect.modification eff
-         in [(part (ContinuousEffect.source eff) (ContinuousEffect.timestamp eff) (ContinuousEffect.affected eff) m, False) | layer m == Layer.Type, not (setsLandSubtype m)]
+         in [(part (ContinuousEffect.source eff) (ContinuousEffect.timestamp eff) (ContinuousEffect.affected eff) m, Nothing) | layer m == Layer.Type, not (setsLandSubtype m)]
       fromPerm permId = case Game.lookupObject permId gs of
         Nothing -> []
         Just obj ->
           let changes = textChangesAffecting permId gs
               ts = staticTimestampOf permId obj gs
-              printedOf sa =
+              printedOf n sa =
                 let parts = staticParts changes sa
                  in if keeps sa && staticLives (functioning permId) changes (minimum (fmap layer parts)) sa
-                      then [(part permId ts (rewriteAffected changes (StaticAbility.affected sa)) m, True) | m <- typeParts parts]
+                      then [(part permId ts (rewriteAffected changes (StaticAbility.affected sa)) m, Just n) | m <- typeParts parts]
                       else []
               grantedOf (grantTs, sa) =
                 let parts = staticParts [] sa
                  in if keeps sa && staticLives (functioning permId) [] (minimum (fmap layer parts)) sa
-                      then [(part permId (max (Object.timestamp obj) grantTs) (StaticAbility.affected sa) m, False) | m <- typeParts parts]
+                      then [(part permId (max (Object.timestamp obj) grantTs) (StaticAbility.affected sa) m, Nothing) | m <- typeParts parts]
                       else []
-           in concatMap printedOf (staticAbilitiesOf permId gs) <> concatMap grantedOf (grantedStaticAbilitiesOf permId gs)
+           in concat (zipWith printedOf [0 ..] (staticAbilitiesOf permId gs)) <> concatMap grantedOf (grantedStaticAbilitiesOf permId gs)
    in concatMap fromStored (GameState.continuousEffects gs) <> concatMap fromPerm (abilitySources gs)
 
 -- CR 305.7's subject: only a LAND loses its rules text to a subtype set. CR 205.3d
 -- is what makes that a precondition rather than a description of every board a
 -- setter can reach -- a setter reaching an object with no Land card type sets no
 -- subtype there (setLandSubtypeTo), so it takes no abilities either. The three
--- gates ask it of the characteristics each is judged against: base and then the
--- setter's own parts for liveGiven, the finished projection for liveAfterLayers,
--- through layer 4 for setSubtypeStripped.
+-- gates ask it of the characteristics each is judged against: base, then
+-- through the effects applying first and the setter's own parts, for liveGiven;
+-- the finished projection for liveAfterLayers; through layer 4 for
+-- setSubtypeStripped.
 hasLandType :: ProjectedCharacteristics -> Bool
 hasLandType = Set.member CardType.Land . PC.cardTypes
 
@@ -1853,12 +1878,7 @@ appliedSetEffects setEffs gs =
       -- CR 613.8a, for these effects: does `other` strip `e`'s source, or move
       -- what `e` applies to?
       dependsOn (_, (src, _, aff)) (_, (osrc, _, oaff)) = affectsBase osrc src oaff gs || movesSet osrc oaff src aff
-      movesSet osrc oaff src aff =
-        let parts = setterPartsOf osrc oaff gs
-            reached = filter (\x -> affectsBase osrc x oaff gs) (Set.toList (candidatesFor oaff gs))
-            before x = affectsGiven (baseView gs) src x aff (projectWith (<= Layer.Type) [] x gs) gs
-            after x = affectsGiven (baseView gs) src x aff (projectWith (<= Layer.Type) parts x gs) gs
-         in not (null parts) && any (\x -> before x /= after x) reached
+      movesSet osrc oaff src aff = movesSetBy (setterPartsOf osrc oaff gs) osrc oaff src aff gs
       earliest :: [(Int, SetEffect)] -> (Int, SetEffect)
       earliest = List.minimumBy (Ord.comparing (\e -> (stampOf e, fst e)))
       go remaining applied = case remaining of
@@ -1872,6 +1892,17 @@ appliedSetEffects setEffs gs =
               stripped = any (\(src, _, aff) -> affectsBase src nsrc aff gs) applied
            in go (filter (\o -> fst o /= fst next) remaining) (if stripped then applied else snd next : applied)
    in go indexed []
+
+-- CR 613.8a's "what it applies to", for two layer-4 effects: does applying
+-- `parts`, one effect's layer-4 parts from `osrc` over `oaff`, move an object it
+-- reaches into or out of (`src`, `aff`)'s set? Judged from layer 1, one pair at
+-- a time.
+movesSetBy :: [Gathered] -> ObjectId -> Affected.Affected -> ObjectId -> Affected.Affected -> GameState -> Bool
+movesSetBy parts osrc oaff src aff gs =
+  let reached = filter (\x -> affectsBase osrc x oaff gs) (Set.toList (candidatesFor oaff gs))
+      before x = affectsGiven (baseView gs) src x aff (projectWith (<= Layer.Type) [] x gs) gs
+      after x = affectsGiven (baseView gs) src x aff (projectWith (<= Layer.Type) parts x gs) gs
+   in not (null parts) && any (\x -> before x /= after x) reached
 
 -- The layer-4 parts of the setter setLandSubtypeEffectsGiven listed as (`src`,
 -- `aff`), for appliedSetEffects' "what it applies to" test and liveGiven's land
