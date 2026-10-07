@@ -210,8 +210,10 @@ to agents as written. What it doesn't say:
   issue means grepping its bare number and rewriting every elision that cited
   it, in the same PR.
 
-  A filed follow-up names the real card that needs it. A gap no card needs is
-  folded in or dropped, not filed; `docs/agents/implementing.md` has the rule.
+  A filed follow-up names the card that exercises it: a printing, or a
+  synthetic draft when no printing reaches the rule (below). A known problem is
+  folded in or filed, never dropped for want of a card in the pool; only a rules
+  reason closes it unfiled. `docs/agents/implementing.md` has the rule.
 
   A BLOCKED issue records its blocker as a GitHub dependency, not as prose:
 
