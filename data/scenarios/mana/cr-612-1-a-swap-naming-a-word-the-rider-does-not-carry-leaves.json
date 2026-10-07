@@ -25,7 +25,7 @@
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$hack", "targets": ["$maze"], "mana": ["$island", null] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTypeSwap": { "from": { "type": "Plains" }, "to": { "type": "Swamp" } } }, "source": "Magical Hack" },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$luminesce", "mana": ["$maze"], "yields": [[{ "manaType": { "type": "Colored", "value": { "type": "White" } }, "tags": [], "retention": { "type": "Ordinary" }, "restriction": null, "rider": null, "sourceChosenSubtype": null }]] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$luminesce", "mana": ["$maze"], "yields": [[{ "manaType": { "type": "Colored", "value": { "type": "White" } }, "tags": [], "retention": { "type": "Ordinary" }, "restriction": null, "rider": null, "sourceChoices": null }]] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Luminesce", "count": 0 } } }
   ]
 }

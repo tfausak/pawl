@@ -3870,7 +3870,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               ManaUnit.restriction = restriction,
               ManaUnit.rider = rider,
               ManaUnit.spendTrigger = Mana.spendTriggerOf controller source gs0 =<< whenSpent,
-              ManaUnit.sourceChosenSubtype = Mana.sourceChosenSubtypeOf source gs0,
+              ManaUnit.sourceChoices = Mana.sourceChoicesOf source gs0,
               ManaUnit.sourceLastExiled = Mana.lastExiledWith source gs0
             }
         -- CR 605.1b's event, per recipient. Nothing is recorded where the
@@ -10977,9 +10977,10 @@ activateWhileRolling runSubgame pid oid ability = do
       loyalty = Cost.loyaltyKindOf (ActivatedAbility.cost ability)
       gathered = Cost.activationAdjustments Set.empty stamp AbilityKind.NonManaAbility loyalty pid oid before
       totalled = Cost.plusComponents gathered (ActivatedAbility.cost ability)
-  (announced, _) <- Cost.announce (PaymentSubject.Activating oid stamp) ManaSpending.AsProduced pid oid (Cost.substitutedManas (Cost.waterbendSubstitutions (Cost.Type.components totalled) Map.empty pid oid before) (Cost.totalManas gathered)) totalled
+      spendable = ActivationRestriction.spendableTypes oid (ActivatedAbility.restrictions ability) before
+  (announced, _) <- Cost.announce (PaymentSubject.Activating oid stamp spendable) ManaSpending.AsProduced pid oid (Cost.substitutedManas (Cost.waterbendSubstitutions (Cost.Type.components totalled) Map.empty pid oid before) (Cost.totalManas gathered)) totalled
   adjustments <- Cost.announceReductions pid oid before announced gathered
-  (payment, _) <- Cost.paySubstituting (performManaAbility runSubgame) before [] PaymentMoment.OutsideResolution (PaymentSubject.Activating oid stamp) Nothing ManaSpending.AsProduced pid oid (Cost.announceSubstitutions Cost.waterbendSubstitutions pid oid) (Cost.totalWith adjustments announced)
+  (payment, _) <- Cost.paySubstituting (performManaAbility runSubgame) before [] PaymentMoment.OutsideResolution (PaymentSubject.Activating oid stamp spendable) Nothing ManaSpending.AsProduced pid oid (Cost.announceSubstitutions Cost.waterbendSubstitutions pid oid) (Cost.totalWith adjustments announced)
   case payment of
     -- CR 733.1: the payment reversed the activation back to `before` itself.
     Payment.Unpaid -> pure False

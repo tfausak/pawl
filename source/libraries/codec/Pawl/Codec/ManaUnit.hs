@@ -8,8 +8,8 @@ import qualified Pawl.Codec.ManaRider as ManaRider
 import qualified Pawl.Codec.ManaType as ManaType
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.ProductionTag as ProductionTag
+import qualified Pawl.Codec.SourceChoices as SourceChoices
 import qualified Pawl.Codec.SpendTrigger as SpendTrigger
-import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
@@ -33,7 +33,7 @@ codec = Fields.object $ do
   retention <- Fields.required "retention" ManaRetention.codec ManaUnit.retention
   restriction <- Fields.required "restriction" (Common.maybe ManaRestriction.codec) ManaUnit.restriction
   rider <- Fields.required "rider" (Common.maybe ManaRider.codec) ManaUnit.rider
-  sourceChosenSubtype <- Fields.required "sourceChosenSubtype" (Common.maybe Subtype.codec) ManaUnit.sourceChosenSubtype
+  sourceChoices <- Fields.required "sourceChoices" (Common.maybe SourceChoices.codec) ManaUnit.sourceChoices
   spendTrigger <- Fields.defaulted "spendTrigger" Nothing (Common.maybe SpendTrigger.codec) ManaUnit.spendTrigger
   sourceLastExiled <- Fields.defaulted "sourceLastExiled" Nothing (Common.maybe ObjectId.codec) ManaUnit.sourceLastExiled
   pure
@@ -44,6 +44,6 @@ codec = Fields.object $ do
         ManaUnit.restriction = restriction,
         ManaUnit.rider = rider,
         ManaUnit.spendTrigger = spendTrigger,
-        ManaUnit.sourceChosenSubtype = sourceChosenSubtype,
+        ManaUnit.sourceChoices = sourceChoices,
         ManaUnit.sourceLastExiled = sourceLastExiled
       }

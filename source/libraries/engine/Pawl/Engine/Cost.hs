@@ -3206,7 +3206,7 @@ manaPartPayable effects adjustments pid oid cost gs = case Cost.mana cost of
     any
       ( \totalled ->
           Mana.canPayCommitting
-            (PaymentSubject.Activating oid Nothing)
+            (PaymentSubject.Activating oid Nothing Nothing)
             (manaActivationsGiven effects)
             ManaSpending.AsProduced
             pid
@@ -5619,7 +5619,7 @@ tapForManaWith perform window inFlight refused activator oid = do
           --
           -- The Phyrexian life record is DISCARDED, Activate's reason: rule
           -- 702.150a reads what the player who CAST a spell announced.
-          (announcedCost, _) <- announce (PaymentSubject.Activating oid Nothing) ManaSpending.AsProduced controller oid (totalManas gathered) withComponents
+          (announcedCost, _) <- announce (PaymentSubject.Activating oid Nothing Nothing) ManaSpending.AsProduced controller oid (totalManas gathered) withComponents
           -- CR 118.7e's half of each hybrid symbol in a reduction, and CR
           -- 601.2f's order of several reductions -- both the payer's, and both
           -- elided by announceReductions wherever the answers cannot differ,
@@ -5854,7 +5854,7 @@ payActivation perform inFlight pid oid cost = do
     -- Chromatic Star's {1} -- and mana restricted to casts may not. `oid` is the
     -- ability's SOURCE, which is what "abilities of artifacts" reads.
     Just manaCost -> do
-      (windowPaid, _, window) <- payManaWindow perform inFlight Nothing (PaymentSubject.Activating oid Nothing) ManaSpending.AsProduced pid (\mc -> pure (mc, [])) manaCost
+      (windowPaid, _, window) <- payManaWindow perform inFlight Nothing (PaymentSubject.Activating oid Nothing Nothing) ManaSpending.AsProduced pid (\mc -> pure (mc, [])) manaCost
       pure (windowPaid, [window])
     -- CR 118.6: attempting to pay an unpayable cost is an illegal action.
     Nothing -> pure (False, [])

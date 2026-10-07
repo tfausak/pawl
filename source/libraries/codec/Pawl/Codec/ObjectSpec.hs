@@ -234,7 +234,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
                     ManaUnit.restriction = Nothing,
                     ManaUnit.rider = Nothing,
                     ManaUnit.spendTrigger = Nothing,
-                    ManaUnit.sourceChosenSubtype = Nothing,
+                    ManaUnit.sourceChoices = Nothing,
                     ManaUnit.sourceLastExiled = Nothing
                   }
               ],
@@ -286,7 +286,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"spliced\":[31,30]"
           <> ",\"phyrexianLifePaid\":19"
           <> ",\"manaSpent\":[{\"manaType\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}"
-          <> ",\"tags\":[],\"retention\":{\"type\":\"Ordinary\"},\"restriction\":null,\"rider\":null,\"sourceChosenSubtype\":null}]"
+          <> ",\"tags\":[],\"retention\":{\"type\":\"Ordinary\"},\"restriction\":null,\"rider\":null,\"sourceChoices\":null}]"
           <> ",\"announcedX\":20,\"castFrom\":{\"type\":\"Graveyard\"}"
           <> ",\"castUsing\":{\"type\":\"JumpStart\"}"
           <> ",\"castGrant\":{\"type\":\"Retrace\"}"

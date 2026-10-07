@@ -177,7 +177,7 @@
                 }
               },
               "rider": null,
-              "sourceChosenSubtype": null,
+              "sourceChoices": null,
               "sourceLastExiled": 9
             },
             {
@@ -198,7 +198,7 @@
                 }
               },
               "rider": null,
-              "sourceChosenSubtype": null,
+              "sourceChoices": null,
               "sourceLastExiled": 9
             }
           ],

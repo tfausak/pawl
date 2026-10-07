@@ -43,6 +43,8 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword.Type
+import qualified Pawl.Types.ManaSpecification as ManaSpecification
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectSnapshot as ObjectSnapshot
@@ -209,6 +211,9 @@ restrictionMet pid srcId ability gs restriction = case restriction of
   -- step: open only while Pawl.Engine.Resolve.Effect.throwDice is asking
   -- about a die, so never at priority (CR 117.1b).
   ActivationRestriction.DuringDieRoll -> Maybe.isJust (GameState.rollingDie gs)
+  -- A payment rule, not a gate: Pawl.Engine.Mana.admitsUnder spends only the
+  -- mana it names (PaymentSubject.Activating's colours).
+  ActivationRestriction.SpendOnly _ -> True
   -- CR 602.5e: the timing of an instant, which CR 304.5 reduces to holding
   -- priority. Every road that asks this board-reading gate is one where the
   -- activator holds it -- Engine.priorityLoop's offer, Activate.activateAbility
@@ -235,6 +240,7 @@ atInstantSpeed restriction = case restriction of
   ActivationRestriction.OnlyOnce -> restriction
   ActivationRestriction.OnlyOnceEachTurn -> restriction
   ActivationRestriction.DuringDieRoll -> restriction
+  ActivationRestriction.SpendOnly _ -> restriction
   ActivationRestriction.InstantSpeed -> restriction
 
 -- CR 602.5b / 602.5c: does `srcId` bear a copy of `this` not yet spent? Each
@@ -357,6 +363,7 @@ needsEmptyStack restriction = case restriction of
   -- A die roll's modification step opens inside a resolution, never at a
   -- payment's gate, so no move between the two can close it.
   ActivationRestriction.DuringDieRoll -> False
+  ActivationRestriction.SpendOnly _ -> False
   -- Not a stack question: `refusedMidPayment` is how the payment windows ask.
   ActivationRestriction.InstantSpeed -> False
 
@@ -383,3 +390,18 @@ refusedMidPayment restriction = case restriction of
   ActivationRestriction.OnlyOnce -> False
   ActivationRestriction.OnlyOnceEachTurn -> False
   ActivationRestriction.DuringDieRoll -> False
+  ActivationRestriction.SpendOnly _ -> False
+
+-- The mana types an activation under these restrictions may spend, Nothing for
+-- any (PaymentSubject.Activating): SpendOnly's chosen colours are the source's
+-- (CR 607.2d), read through CR 608.2h's last known information.
+spendableTypes :: ObjectId -> [ActivationRestriction.ActivationRestriction] -> GameState -> Maybe (Set.Set ManaType.ManaType)
+spendableTypes srcId restrictions gs =
+  let named restriction = case restriction of
+        ActivationRestriction.SpendOnly ManaSpecification.ChosenColor -> Just (Set.map ManaType.Colored (Game.chosenColorsWithLastKnown srcId gs))
+        ActivationRestriction.SpendOnly ManaSpecification.AnyMana -> Nothing
+        -- The rest time or count an activation and say nothing of its mana.
+        _ -> Nothing
+   in case Maybe.mapMaybe named restrictions of
+        [] -> Nothing
+        first : rest -> Just (List.foldl' Set.intersection first rest)

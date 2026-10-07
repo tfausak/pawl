@@ -45,6 +45,7 @@ codec keywordCodec =
     [ Arm.payload "HasCardType" CardType.codec Filter.HasCardType (\x -> case x of Filter.HasCardType y -> Just y; _ -> Nothing),
       Arm.payload "HasSupertype" Supertype.codec Filter.HasSupertype (\x -> case x of Filter.HasSupertype y -> Just y; _ -> Nothing),
       Arm.payload "HasColor" Color.codec Filter.HasColor (\x -> case x of Filter.HasColor y -> Just y; _ -> Nothing),
+      Arm.nullary "IsMonocolored" Filter.IsMonocolored,
       Arm.payload "HasSubtype" Subtype.codec Filter.HasSubtype (\x -> case x of Filter.HasSubtype y -> Just y; _ -> Nothing),
       Arm.payload "HasName" CardName.codec Filter.HasName (\x -> case x of Filter.HasName y -> Just y; _ -> Nothing),
       Arm.payload "HasNameOriginallyPrintedIn" Expansion.codec Filter.HasNameOriginallyPrintedIn (\x -> case x of Filter.HasNameOriginallyPrintedIn y -> Just y; _ -> Nothing),
@@ -184,6 +185,7 @@ tagOf x = case x of
   Filter.HasCardType {} -> "HasCardType"
   Filter.HasSupertype {} -> "HasSupertype"
   Filter.HasColor {} -> "HasColor"
+  Filter.IsMonocolored {} -> "IsMonocolored"
   Filter.HasSubtype {} -> "HasSubtype"
   Filter.HasName {} -> "HasName"
   Filter.HasNameOriginallyPrintedIn {} -> "HasNameOriginallyPrintedIn"

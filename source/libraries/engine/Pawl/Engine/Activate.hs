@@ -207,6 +207,9 @@ activateAbilityWith runSubgame pid srcId ability = Event.announcing $ do
       -- paid. Read off the ability's own stamp, so the answer does not depend on
       -- the zone its source is in when this is asked.
       stamp = ActivatedAbility.keyword ability
+      -- The mana this activation may be paid with, asked by both gates and the
+      -- payment alike (ActivationRestriction.SpendOnly).
+      spendable = ActivationRestriction.spendableTypes srcId (ActivatedAbility.restrictions ability) gs
   State.put onStack
   -- Sorted on the way in, for the reason Cast.castProposed gives: printed order
   -- (CR 608.2c), with a repeated mode's instances adjacent (CR 700.2d).
@@ -277,14 +280,14 @@ activateAbilityWith runSubgame pid srcId ability = Event.announcing $ do
       -- alternative cost. Only the payable ones are offered, as the gate
       -- measured them, and a question with one answer is not asked. The
       -- printed cost is FIRST, so a default answer pays it.
-      let offeredCosts = filter (Activatable.payableCostAt aimableUnannounced floorX stamp pid srcId gs) (Activatable.costsFor pid ability gs)
+      let offeredCosts = filter (Activatable.payableCostAt aimableUnannounced floorX stamp spendable pid srcId gs) (Activatable.costsFor pid ability gs)
       printedCost <- case offeredCosts of
         _ : _ : _ -> Game.choose (Prompt.ChooseCost decider pid abilId offeredCosts)
         [only] -> pure only
         [] -> pure (ActivatedAbility.cost ability)
       mAmount <-
         if Cost.hasVariable printedCost
-          then fmap Just (Game.choose (Prompt.ChooseX decider pid abilId floorX (Activatable.affordableX mCeiling aimableUnannounced stamp pid srcId gs printedCost)))
+          then fmap Just (Game.choose (Prompt.ChooseX decider pid abilId floorX (Activatable.affordableX mCeiling aimableUnannounced stamp spendable pid srcId gs printedCost)))
           else pure Nothing
       let announcedAtX = maybe printedCost (\x -> Cost.substituteX x printedCost) mAmount
           -- CR 101.1, and CR 101.2 for its direction, exactly as Cast.castProposed
@@ -343,7 +346,7 @@ activateAbilityWith runSubgame pid srcId ability = Event.announcing $ do
       -- one predicate over one cost instead of two spellings of when the gate
       -- applies.
       -- An answer outside the offered costs is rejected, ChooseCost's contract.
-      if overCeiling || underFloor || (length offeredCosts > 1 && notElem printedCost offeredCosts) || not (Activatable.payableCost aimable stamp pid srcId gs announcedAtX)
+      if overCeiling || underFloor || (length offeredCosts > 1 && notElem printedCost offeredCosts) || not (Activatable.payableCost aimable stamp spendable pid srcId gs announcedAtX)
         then State.put before -- reject: the whole activation is a no-op
         else do
           -- CR 118.13a's announcement, which names an activated ability's
@@ -387,7 +390,7 @@ activateAbilityWith runSubgame pid srcId ability = Event.announcing $ do
           -- (Cost.substitutedManas): a half this offer makes payable is a half
           -- CR 601.2b leaves to the payer rather than to the fallback.
           let totalledCost = Cost.plusComponents gathered announcedAtX
-          (announcedCost, _) <- Cost.announce (PaymentSubject.Activating srcId stamp) ManaSpending.AsProduced pid srcId (Cost.substitutedManas (Cost.waterbendSubstitutions (Cost.Type.components totalledCost) Map.empty pid srcId gs) (Cost.totalManas gathered)) totalledCost
+          (announcedCost, _) <- Cost.announce (PaymentSubject.Activating srcId stamp spendable) ManaSpending.AsProduced pid srcId (Cost.substitutedManas (Cost.waterbendSubstitutions (Cost.Type.components totalledCost) Map.empty pid srcId gs) (Cost.totalManas gathered)) totalledCost
           chosen <- Target.chooseTargets pid abilId srcId seed (Maybe.fromMaybe 0 mAmount) slots sets
           if not (Target.selectionLegal (Just pid) seed srcId (Maybe.fromMaybe 0 mAmount) slots sets chosen gs)
             then State.put before -- reject: the whole activation is a no-op
@@ -468,7 +471,7 @@ activateAbilityWith runSubgame pid srcId ability = Event.announcing $ do
               -- (Cost.paySubstituting). The bindings the substitution makes are
               -- dropped -- no printing reads back which permanents a waterbend
               -- cost tapped, where CR 702.51c's convoke does.
-              (payment, _) <- Cost.paySubstituting (Resolve.performManaAbility runSubgame) before [] PaymentMoment.OutsideResolution (PaymentSubject.Activating srcId stamp) (Just abilId) ManaSpending.AsProduced pid srcId (Cost.announceSubstitutions Cost.waterbendSubstitutions pid srcId) paidCost
+              (payment, _) <- Cost.paySubstituting (Resolve.performManaAbility runSubgame) before [] PaymentMoment.OutsideResolution (PaymentSubject.Activating srcId stamp spendable) (Just abilId) ManaSpending.AsProduced pid srcId (Cost.announceSubstitutions Cost.waterbendSubstitutions pid srcId) paidCost
               case payment of
                 -- CR 606.3: record that a loyalty ability of THIS PERMANENT was
                 -- activated, which is the whole of the once-per-turn limit's storage

@@ -3365,6 +3365,7 @@ filterReads f = case f of
   Filter.Type.HasCardType _ -> Set.singleton Types
   Filter.Type.HasSupertype _ -> Set.singleton Supertypes
   Filter.Type.HasColor _ -> Set.singleton Colors
+  Filter.Type.IsMonocolored -> Set.singleton Colors
   Filter.Type.SharesColorWithSource -> Set.singleton Colors
   Filter.Type.HasSubtype _ -> Set.singleton Subtypes
   -- Reads no aspect: no Modification writes CR 201.1's names.
@@ -3718,6 +3719,7 @@ filterReadsPeers f = case f of
   Filter.Type.HasCardType _ -> False
   Filter.Type.HasSupertype _ -> False
   Filter.Type.HasColor _ -> False
+  Filter.Type.IsMonocolored -> False
   Filter.Type.SharesColorWithSource -> False
   Filter.Type.HasSubtype _ -> False
   Filter.Type.HasName _ -> False

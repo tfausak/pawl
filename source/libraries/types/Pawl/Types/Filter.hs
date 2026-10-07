@@ -34,6 +34,7 @@ data Filter keyword
   = HasCardType CardType.CardType -- CR 205 / 300: the object's card types include this one.
   | HasSupertype Supertype.Supertype -- CR 205.4: the object's supertypes include this one.
   | HasColor Color.Color -- CR 105.2: the object's colours include this one.
+  | IsMonocolored -- CR 105.2a: the object is exactly one of the five colours.
   | -- | CR 105.2 asked of TWO objects: the candidate's colours intersect the
     -- colours of the object the evaluation comes from (CR 702.78a's conspire).
     -- PowerLessThanSource's shape one characteristic over -- read off

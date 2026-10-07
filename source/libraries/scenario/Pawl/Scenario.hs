@@ -307,7 +307,7 @@ plainUnit manaType =
       ManaUnit.restriction = Nothing,
       ManaUnit.rider = Nothing,
       ManaUnit.spendTrigger = Nothing,
-      ManaUnit.sourceChosenSubtype = Nothing,
+      ManaUnit.sourceChoices = Nothing,
       ManaUnit.sourceLastExiled = Nothing
     }
 

@@ -27,7 +27,7 @@
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "$paladin", "ability": 0, "mana": ["$swamp-1", "$swamp-2", null] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Treasure Token", "count": 1 } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "$paladin", "ability": 1, "targets": ["$victim"], "mana": ["Treasure Token", "$swamp-3", "$swamp-4", null], "costOrder": [0, 1], "yields": [[{ "manaType": { "type": "Colored", "value": { "type": "Black" } }, "tags": [{ "type": "Artifact" }, { "type": "Treasure" }], "retention": { "type": "Ordinary" }, "restriction": null, "rider": null, "sourceChosenSubtype": null }]] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "$paladin", "ability": 1, "targets": ["$victim"], "mana": ["Treasure Token", "$swamp-3", "$swamp-4", null], "costOrder": [0, 1], "yields": [[{ "manaType": { "type": "Colored", "value": { "type": "Black" } }, "tags": [{ "type": "Artifact" }, { "type": "Treasure" }], "retention": { "type": "Ordinary" }, "restriction": null, "rider": null, "sourceChoices": null }]] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "$victim", "keyword": { "type": "Deathtouch" }, "count": 1 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "$victim", "power": 4, "toughness": 1 } } },

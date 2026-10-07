@@ -16,7 +16,7 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$ape", "mana": ["$elf", "$elf", null], "yields": [[{ "manaType": { "type": "Colored", "value": { "type": "Red" } }, "tags": [], "retention": { "type": "Ordinary" }, "restriction": null, "rider": null, "sourceChosenSubtype": null }]] } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$ape", "mana": ["$elf", "$elf", null], "yields": [[{ "manaType": { "type": "Colored", "value": { "type": "Red" } }, "tags": [], "retention": { "type": "Ordinary" }, "restriction": null, "rider": null, "sourceChoices": null }]] } } }
   ],
   "final": [
     { "Count": { "player": "alice", "zone": "Battlefield", "card": "Kird Ape", "count": 1 } },
