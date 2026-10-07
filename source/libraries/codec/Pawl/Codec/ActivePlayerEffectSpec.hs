@@ -1,10 +1,13 @@
 module Pawl.Codec.ActivePlayerEffectSpec where
 
+import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Pawl.Codec.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
@@ -25,6 +28,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivePlayerEffect" $ do
       ActivePlayerEffect.MkActivePlayerEffect
         { ActivePlayerEffect.source = ObjectId.MkObjectId 1,
           ActivePlayerEffect.controller = PlayerId.MkPlayerId 2,
+          ActivePlayerEffect.chosenNames = Set.empty,
           ActivePlayerEffect.timestamp = Timestamp.MkTimestamp 3,
           ActivePlayerEffect.expiry = Expiry.AtCleanup,
           ActivePlayerEffect.scope = AffectedPlayers.Scoped PlayerScope.Opponents,
@@ -41,11 +45,27 @@ spec s = Spec.describe s "Pawl.Codec.ActivePlayerEffect" $ do
       ActivePlayerEffect.MkActivePlayerEffect
         { ActivePlayerEffect.source = ObjectId.MkObjectId 5,
           ActivePlayerEffect.controller = PlayerId.MkPlayerId 6,
+          ActivePlayerEffect.chosenNames = Set.empty,
           ActivePlayerEffect.timestamp = Timestamp.MkTimestamp 7,
           ActivePlayerEffect.expiry = Expiry.Never,
           ActivePlayerEffect.scope = AffectedPlayers.Named (PlayerId.MkPlayerId 8),
           ActivePlayerEffect.effect = PlayerEffect.NoMaximumHandSize
         }
       " {\"source\":5,\"controller\":6,\"timestamp\":7,\"expiry\":{\"type\":\"Never\"},\"scope\":{\"type\":\"Named\",\"value\":8},\"effect\":{\"type\":\"NoMaximumHandSize\"}} "
+  -- CR 608.2h: the names baked as the effect began, Cheering Fanatic's row.
+  Spec.it s "an effect carrying the names its source had chosen" $
+    Common.assertCodec
+      s
+      ActivePlayerEffect.codec
+      ActivePlayerEffect.MkActivePlayerEffect
+        { ActivePlayerEffect.source = ObjectId.MkObjectId 9,
+          ActivePlayerEffect.controller = PlayerId.MkPlayerId 10,
+          ActivePlayerEffect.chosenNames = Set.singleton (CardName.MkCardName (Text.pack "Shock")),
+          ActivePlayerEffect.timestamp = Timestamp.MkTimestamp 11,
+          ActivePlayerEffect.expiry = Expiry.AtCleanup,
+          ActivePlayerEffect.scope = AffectedPlayers.Scoped PlayerScope.EachPlayer,
+          ActivePlayerEffect.effect = PlayerEffect.CantCastSpells
+        }
+      " {\"source\":9,\"controller\":10,\"chosenNames\":[\"Shock\"],\"timestamp\":11,\"expiry\":{\"type\":\"AtCleanup\"},\"scope\":{\"type\":\"Scoped\",\"value\":{\"type\":\"EachPlayer\"}},\"effect\":{\"type\":\"CantCastSpells\"}} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s ActivePlayerEffect.codec

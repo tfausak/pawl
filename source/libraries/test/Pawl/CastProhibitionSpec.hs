@@ -753,25 +753,25 @@ matchesObjectSpec s registry =
       lightningBolt <- S.printingOf s registry "Lightning Bolt"
       piker <- S.printingOf s registry "Goblin Piker"
       let (bolt, _, gs) = matchesObjectBoard lightningBolt piker
-      Spec.assertBool s (PlayerEffect.matchesObjectFrom Nothing noncreature bolt gs) "Lightning Bolt is a noncreature spell"
+      Spec.assertBool s (PlayerEffect.matchesObjectFrom (PlayerEffect.liveSource Nothing) noncreature bolt gs) "Lightning Bolt is a noncreature spell"
 
     Spec.it s "CR 613.1d a creature spell fails the noncreature criterion" $ do
       lightningBolt <- S.printingOf s registry "Lightning Bolt"
       piker <- S.printingOf s registry "Goblin Piker"
       let (_, pikerId, gs) = matchesObjectBoard lightningBolt piker
-      Spec.assertBool s (not (PlayerEffect.matchesObjectFrom Nothing noncreature pikerId gs)) "Goblin Piker is a creature spell"
+      Spec.assertBool s (not (PlayerEffect.matchesObjectFrom (PlayerEffect.liveSource Nothing) noncreature pikerId gs)) "Goblin Piker is a creature spell"
 
     Spec.it s "CR 613.1e a colour criterion admits a matching-colour spell" $ do
       lightningBolt <- S.printingOf s registry "Lightning Bolt"
       piker <- S.printingOf s registry "Goblin Piker"
       let (bolt, _, gs) = matchesObjectBoard lightningBolt piker
-      Spec.assertBool s (PlayerEffect.matchesObjectFrom Nothing (Filter.Type.HasColor Color.Red) bolt gs) "Lightning Bolt is red"
+      Spec.assertBool s (PlayerEffect.matchesObjectFrom (PlayerEffect.liveSource Nothing) (Filter.Type.HasColor Color.Red) bolt gs) "Lightning Bolt is red"
 
     Spec.it s "CR 613.1e a colour criterion rejects a non-matching colour" $ do
       lightningBolt <- S.printingOf s registry "Lightning Bolt"
       piker <- S.printingOf s registry "Goblin Piker"
       let (bolt, _, gs) = matchesObjectBoard lightningBolt piker
-      Spec.assertBool s (not (PlayerEffect.matchesObjectFrom Nothing (Filter.Type.HasColor Color.Blue) bolt gs)) "Lightning Bolt is not blue"
+      Spec.assertBool s (not (PlayerEffect.matchesObjectFrom (PlayerEffect.liveSource Nothing) (Filter.Type.HasColor Color.Blue) bolt gs)) "Lightning Bolt is not blue"
 
 -- Null Chamber {3}{W} World Enchantment: "As this enchantment enters, you and an
 -- opponent each choose a card name other than a basic land card name. Spells

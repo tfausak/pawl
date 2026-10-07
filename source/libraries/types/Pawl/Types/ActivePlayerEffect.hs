@@ -1,6 +1,8 @@
 module Pawl.Types.ActivePlayerEffect where
 
+import qualified Data.Set as Set
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
@@ -56,10 +58,14 @@ data ActivePlayerEffect = MkActivePlayerEffect
     -- own effect is ever read. That is not a reason to drop it:
     -- Pawl.Engine.PlayerEffect.applying hands it to every consumer, and CR
     -- 608.2h's last-known record is filed under exactly this id, which is what
-    -- lets Pawl.Engine.SourceContext.withChoicesOf still answer Conjurer's Ban's chosen name. A dead id
-    -- equals no live candidate, so Filter.IsSource simply answers False for one.
+    -- lets Pawl.Engine.SourceContext.withChoicesOf still answer its chosen colour
+    -- and subtype. A dead id equals no live candidate, so Filter.IsSource simply
+    -- answers False for one.
     source :: ObjectId.ObjectId,
     controller :: PlayerId.PlayerId,
+    -- | CR 608.2h / 611.2a: the names `source` had chosen as the effect began,
+    -- baked so a later choice by the same permanent leaves this row's alone.
+    chosenNames :: Set.Set CardName.CardName,
     timestamp :: Timestamp.Timestamp,
     expiry :: Expiry.Expiry,
     scope :: AffectedPlayers.AffectedPlayers PlayerId.PlayerId,
