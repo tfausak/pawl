@@ -1950,11 +1950,22 @@ castProposals pid gs =
       -- graveyard or exile offers its halves and nothing more.
       fusedProposals zone oid = do
         Monad.guard (zone == Zone.Hand)
-        card <- Maybe.maybeToList (Game.cardOf oid gs)
-        face <- Maybe.maybeToList (Card.fusedFace card)
+        face <- Maybe.maybeToList (fusedFaceOf oid gs)
         pure (oid, Face.name face, Facing.FaceUp)
       inZone zone = concatMap (\oid -> proposals oid <> fusedProposals zone oid) (zoneCandidates zone pid gs)
    in concatMap inZone castZones
+
+-- CR 702.102a: the fused spell this card in a hand may be cast as, or Nothing
+-- when it has no fuse there. The caller owns the zone; this asks the ABILITY,
+-- through the projection (CR 613.1f names no zone), so a fuse an effect grants
+-- to a card in a hand counts as a printed one does, and a printed one an effect
+-- removes does not. Pawl.CastRestrictionSpec's "CR 702.102a a fuse granted to a
+-- card in a hand offers the fused cast" proves the grant.
+fusedFaceOf :: ObjectId -> GameState -> Maybe (Face.Face Card.Type.Card)
+fusedFaceOf oid gs = do
+  card <- Game.cardOf oid gs
+  Monad.guard (Keyword.hasFuse (projectedKeywords oid gs))
+  Card.fusedFace card
 
 -- CR 601.3 (Panglacial): may this card be cast from the library while its
 -- controller searches their own library? A membership test on the card's casting

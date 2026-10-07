@@ -21,7 +21,6 @@ import Pawl.CastSpec (aliceOnTurn, rallyBoard, tapStateOf)
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
-import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
@@ -702,9 +701,74 @@ wearTearSpec s registry = Spec.describe s "WearTear" $ do
     waxWane <- S.printingOf s registry "Wax"
     let targets g = snd (S.addPermanent ghostlyPrison S.alice (snd (S.addPermanent piker S.alice g)))
         namesOffered board = Maybe.mapMaybe (\a -> case a of A.Cast _ n _ -> Just n; _ -> Nothing) (Action.legalActions S.alice board)
-        (unfused, _) = S.handOne waxWane (targets (S.landsFor plains S.alice 1 (S.landsInPlay forest 1)))
+        (unfused, waxId) = S.handOne waxWane (targets (S.landsFor plains S.alice 1 (S.landsInPlay forest 1)))
     Spec.assertEqWith s "both halves payable, and still two offers" (namesOffered unfused) [waxName, waneName]
-    Spec.assertEqWith s "and no fused face to offer" (fmap Face.name (Card.fusedFace (Printing.card waxWane))) Nothing
+    Spec.assertEqWith s "and no fused face to offer" (fmap Face.name (Cast.fusedFaceOf waxId unfused)) Nothing
+  -- The same card with fuse GRANTED: Synthetic Fusing Lens {2} Artifact,
+  -- "Instant cards in your hand have fuse." CR 702.102a's permission is the
+  -- ability's, and CR 613.1f grants it to a card in a hand as readily as it
+  -- prints it there. The two boards differ only in the Lens, which is no
+  -- enchantment, so Wane's one target is bob's Ghostly Prison on both.
+  --
+  -- The fused spell resolves BOTH halves although the grant is gone once the card
+  -- leaves the hand: the Prison assertion comes first because it is the right
+  -- half's, which a spell resolving the combined view's left-half payload skips.
+  Spec.it s "CR 702.102a a fuse granted to a card in a hand offers the fused cast" $ do
+    forest <- S.printingOf s registry "Forest"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    ghostlyPrison <- S.printingOf s registry "Ghostly Prison"
+    lens <- S.printingOf s registry "Synthetic Fusing Lens"
+    waxWane <- S.printingOf s registry "Wax"
+    let (pikerId, withPiker) = S.addPermanent piker S.alice (S.landsFor plains S.alice 1 (S.landsInPlay forest 1))
+        (_, withPrison) = S.addPermanent ghostlyPrison S.bob withPiker
+        namesOffered board = Maybe.mapMaybe (\a -> case a of A.Cast _ n _ -> Just n; _ -> Nothing) (Action.legalActions S.alice board)
+        (bare, _) = S.handOne waxWane withPrison
+        (granted, oid) = S.handOne waxWane (snd (S.addPermanent lens S.alice withPrison))
+        fusedWax = CardName.MkCardName (Text.pack "Wax//Wane")
+        cast = snd (Engine.runGamePure S.identityAnswer granted (Cast.castSpell S.manaPerformer S.alice oid fusedWax Facing.FaceUp))
+        resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+    Spec.assertEqWith s "the Lens offers the fused cast, and without it there are two offers" (namesOffered granted, namesOffered bare) ([waxName, waneName, fusedWax], [waxName, waneName])
+    Spec.assertEqWith s "CR 702.102d Wane, the RIGHT half, destroys the Prison" (S.countOnBattlefieldByName prisonName S.bob resolved) 0
+    Spec.assertEqWith s "and Wax, the left half, gives the Piker +2/+2" (S.powerToughnessOf pikerId resolved) (Just (4, 3))
+  -- CR 702.102a's fuse on a split card with a MODAL half: Synthetic Fork Choice
+  -- {1}{R} Instant, "Choose one -- Destroy target artifact; or destroy target
+  -- creature. Fuse", and Synthetic Fork Chance {W} Instant, "Destroy target
+  -- enchantment. Fuse". CR 700.2's choice is made for the fused spell as CR
+  -- 601.2b makes it for any modal spell, and CR 702.102d then runs the chosen
+  -- mode and the right half.
+  --
+  -- One board, cast twice with the mode pinned by index: alice's Chromatic Sphere
+  -- is the only artifact, bob's Goblin Piker the only creature and alice's
+  -- Ghostly Prison the only enchantment, so the targets are forced and the mode
+  -- alone decides which of the Sphere and the Piker dies.
+  Spec.it s "CR 702.102d a fused cast with a modal half runs the chosen mode and then the right half" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    sphere <- S.printingOf s registry "Chromatic Sphere"
+    piker <- S.printingOf s registry "Goblin Piker"
+    ghostlyPrison <- S.printingOf s registry "Ghostly Prison"
+    fork <- S.printingOf s registry "Synthetic Fork Choice"
+    let board = S.landsFor mountain S.alice 2 (S.landsInPlay plains 1)
+        (_, withSphere) = S.addPermanent sphere S.alice board
+        (_, withPiker) = S.addPermanent piker S.bob withSphere
+        (_, withPrison) = S.addPermanent ghostlyPrison S.alice withPiker
+        (gs, oid) = S.handOne fork withPrison
+        fusedFork = CardName.MkCardName (Text.pack "Synthetic Fork Choice//Synthetic Fork Chance")
+        pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
+        choosing :: Natural -> Prompt.Prompt r -> r
+        choosing mode p = case p of
+          Prompt.ChooseModes {} -> Seq.singleton (ModeIndex.MkModeIndex mode)
+          _ -> S.identityAnswer p
+        castWith mode =
+          let cast = snd (Engine.runGamePure (choosing mode) gs (Cast.castSpell S.manaPerformer S.alice oid fusedFork Facing.FaceUp))
+           in snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+        survivors resolved = (S.countOnBattlefieldByName pikerName S.bob resolved, S.countOnBattlefieldByName sphereName S.alice resolved)
+        namesOffered = Maybe.mapMaybe (\a -> case a of A.Cast _ n _ -> Just n; _ -> Nothing) (Action.legalActions S.alice gs)
+    Spec.assertEqWith s "the creature mode destroys the Piker and spares the Sphere" (survivors (castWith 1)) (0, 1)
+    Spec.assertEqWith s "the artifact mode destroys the Sphere and spares the Piker" (survivors (castWith 0)) (1, 0)
+    Spec.assertEqWith s "and the right half destroys the Prison either way" (fmap (S.countOnBattlefieldByName prisonName S.alice . castWith) [0, 1]) [0, 0]
+    Spec.assertBool s (elem fusedFork namesOffered) "the fused cast is offered beside both halves"
   -- CR 601.2c, asked of a spell with TWO halves' target slots: "the player
   -- announces their choice of an appropriate . . . object for each target the
   -- spell requires", and CR 601.2e rewinds the cast where they cannot. So a board

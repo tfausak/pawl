@@ -1491,13 +1491,13 @@ offerCastOnce runSubgame context named caster optionality verb retake offer = do
       --
       -- FACE UP alone, that road's other narrowing, needs no arm here: an
       -- OfferCast opcode carries no morph rider at all (see `proposed` below).
-      fusedFaces oid card
-        | elem oid (Game.zoneMembers Zone.Hand caster gs) = Maybe.maybeToList (Card.fusedFace card)
+      fusedFaces oid
+        | elem oid (Game.zoneMembers Zone.Hand caster gs) = Maybe.maybeToList (Cast.fusedFaceOf oid gs)
         | otherwise = []
       faces oid card
         | CastOffer.transformed offer = fmap pure (Card.backFace card)
-        | alternative = Just (filter (\face -> fmap Face.name (Card.convertedFace card) /= Just (Face.name face)) (Game.castableFacesOfId oid gs) <> fusedFaces oid card)
-        | otherwise = Just (Game.castableFacesOfId oid gs <> fusedFaces oid card)
+        | alternative = Just (filter (\face -> fmap Face.name (Card.convertedFace card) /= Just (Face.name face)) (Game.castableFacesOfId oid gs) <> fusedFaces oid)
+        | otherwise = Just (Game.castableFacesOfId oid gs <> fusedFaces oid)
       -- One proposal per half, gated on its own (CR 709.3a, CR 712.11c), which
       -- is why the whole tuple is built per face rather than once per card.
       --

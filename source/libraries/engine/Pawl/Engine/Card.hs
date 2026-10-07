@@ -9,6 +9,7 @@
 module Pawl.Engine.Card where
 
 import Control.Applicative ((<|>))
+import qualified Control.Monad as Monad
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -492,8 +493,8 @@ merge2 l r =
           Face.additionalCostChoices = Face.additionalCostChoices l <> Face.additionalCostChoices r,
           -- Left-biased, with Face.spell, which merge2 also leaves as the left
           -- half's: CR 700.2h's costs index THAT half's modes, so the right
-          -- half's keys would name modes this view does not have. Both sides are
-          -- empty today: fuseSpells builds no fused face from a modal half.
+          -- half's keys would name modes this view does not have. Never a fused
+          -- spell's: fusedFace refuses a half with mode costs.
           Face.modeCosts = Face.modeCosts l,
           Face.alternativeCosts = Face.alternativeCosts l <> Face.alternativeCosts r,
           -- CR 709.4c again: a cost reduction a half prints about itself is an
@@ -858,60 +859,88 @@ castableFaces card = case Card.layout card of
 -- job: merge2 leaves Face.spell as the left half's because CR 709.3b puts one half
 -- on the stack, and fuse is the printing that puts BOTH there. CR 702.102d fixes
 -- the order -- "the controller of the spell follows the instructions of the left
--- half and then follows the instructions of the right half" -- which is the
--- clauses of the halves concatenated in printed order, one mode.
+-- half and then follows the instructions of the right half" -- which is
+-- fuseSpells below.
 --
--- Read off the card's PRINTED keywords, through `combined` (CR 709.4c), which is
--- rule 702.102a's own scope: a static ability of the card, functioning in the
--- hand. Not implemented: a fuse ability GRANTED to a card lying in a hand, the
--- posture Pawl.Engine.Cast.castableSpells takes for rule 702.37a's morph (gap
--- #2787).
+-- The view of ANY split card, asking nothing of its keywords: whether the card has
+-- fuse is a question about where it lies (rule 702.102a's hand), asked through the
+-- CR 613 projection by the two callers that offer the cast, so a fuse an effect
+-- GRANTS to a card in a hand is seen there (Pawl.CastRestrictionSpec's "CR
+-- 702.102a a fuse granted to a card in a hand offers the fused cast"). Once cast,
+-- the spell is fused whatever it has on the stack, which is why
+-- Pawl.Engine.Game.resolveFace reads this view by NAME alone.
 --
 -- SPLIT alone. A Room is a split card too (CR 709.5) and no printing gives one
 -- fuse; the other layouts that are not split cards (Adventure, Omen,
 -- ModalDoubleFaced, Transforming, Meld) are not what rule 702.102a's "found on
 -- some split cards" reaches.
+--
+-- Not implemented: fusing a card where either half prints CR 700.2h's per-mode
+-- costs, or a half is modal and the card prints CR 702.42a's entwine (gap
+-- #4777). fuseSpells' modes are PAIRS of selections, so a pair's cost is a sum
+-- of mode costs, and entwine's "all modes" would pick every pair and run the
+-- right half once per left mode.
 fusedFace :: Card.Card -> Maybe (Face.Face Card.Card)
 fusedFace card = case Card.layout card of
-  Layout.Split | Keyword.hasFuse (Face.keywordSet (combined card)) -> do
-    spell <- fuseSpells (fmap Face.spell (Card.faces card))
-    pure ((combined card) {Face.spell = spell})
+  Layout.Split -> do
+    let halves = Card.faces card
+        whole = combined card
+    spell <- fuseSpells (fmap Face.spell halves)
+    Monad.guard (all (Map.null . Face.modeCosts) halves)
+    Monad.guard (Modal.modeCount spell == 1 || null (Keyword.entwineCosts (Face.keywordSet whole)))
+    pure whole {Face.spell = spell}
   _ -> Nothing
 
--- CR 702.102d's ordering, one pair of halves at a time: the left half's clauses
--- and then the right half's, in ONE mode, with the two halves' target namespaces
--- unioned.
+-- CR 702.102d's ordering over CR 700.2's choice: one mode of the fused spell per
+-- way of answering EACH half's instruction -- every selection of the left half
+-- paired with every selection of the right, left-major -- each the left half's
+-- chosen modes' clauses and then the right half's, under the union of their
+-- target slots, with "choose one" over the lot.
 --
--- NOTHING for a half that is modal, which is what keeps that union honest: CR
--- 601.2c fills the CHOSEN mode's slots, and two halves offering two mode lists
--- each would be a cross product this does not build. Every printed fuse card is a
--- pair of non-modal halves. Not implemented: fusing a modal half (gap #2787).
+-- That is CR 601.2b's announcement made once rather than twice: the player picks a
+-- pair, and CR 700.2a's "a mode that would be illegal can't be chosen" lands on
+-- the pair through its slots, since a pair holding an untargetable mode has an
+-- unfillable slot. A pair of non-modal halves -- every printed fuse card -- is one
+-- selection each and so one mode.
+-- Pawl.CastRestrictionSpec's "CR 702.102d a fused cast with a modal half runs the
+-- chosen mode and then the right half" proves a modal half.
 --
--- NOTHING as well for two halves whose slot names collide, since Map.union would
--- silently drop one half's slot and leave that half's effects pointing at the
--- other half's target. Slot names are card DATA and never printed, so a card can
--- always name them apart; Pawl.CardSpec's fuse lint is what holds every corpus
--- card to it, loudly, rather than leaving a colliding card quietly unfusable.
+-- NOTHING where two halves' slot names collide, since Map.union would silently
+-- drop one half's slot and leave that half's effects pointing at the other half's
+-- target. Slot names are card DATA and never printed, so a card can always name
+-- them apart; Pawl.CardSpec's fuse lint is what holds every corpus card to it,
+-- loudly, rather than leaving a colliding card quietly unfusable. The same refusal
+-- covers a TARGETED mode chosen twice under CR 700.2d's exception: its two
+-- instances name one slot, and Pawl.Engine.Modal.instanceSlot's renaming is a
+-- resolution-time projection a merged mode cannot carry (gap #4777). An
+-- untargeted repeat merges as its clauses twice, which is what the rule's "as if
+-- that mode appeared that many times in sequence" asks.
 fuseSpells ::
   NonEmpty.NonEmpty (Modal.Type.Modal Card.Card (GrantedAbility.GrantedAbility Card.Card)) ->
   Maybe (Modal.Type.Modal Card.Card (GrantedAbility.GrantedAbility Card.Card))
 fuseSpells spells = do
-  modes <- traverse soleMode spells
-  merged <- Foldable.foldlM mergeDisjointModes (NonEmpty.head modes) (NonEmpty.tail modes)
-  pure (Modal.Type.MkModal (Seq.singleton merged) (ModeSelection.ChooseExactly 1))
+  halves <- traverse selectionModes (NonEmpty.toList spells)
+  merged <- traverse (Foldable.foldlM mergeDisjointModes emptyMode) (sequence halves)
+  pure (Modal.Type.MkModal (Seq.fromList merged) (ModeSelection.ChooseExactly 1))
 
--- The one mode a NON-MODAL payload is (Pawl.Types.Modal's own header: "a
--- non-modal payload is one Mode with ChooseExactly 1"), and Nothing for a modal
--- one.
-soleMode ::
+-- One half's every legal answer to its own CR 700.2 instruction, each as its
+-- chosen modes merged in printed order (Pawl.Engine.Modal.selections), or Nothing
+-- when a selection's modes collide (fuseSpells' refusal). A non-modal half is
+-- the one selection of its one mode.
+selectionModes ::
   Modal.Type.Modal Card.Card (GrantedAbility.GrantedAbility Card.Card) ->
-  Maybe (Mode.Mode Card.Card (GrantedAbility.GrantedAbility Card.Card))
-soleMode modal = case (Foldable.toList (Modal.Type.modes modal), Modal.Type.selection modal) of
-  ([mode], ModeSelection.ChooseExactly 1) -> Just mode
-  _ -> Nothing
+  Maybe [Mode.Mode Card.Card (GrantedAbility.GrantedAbility Card.Card)]
+selectionModes modal =
+  let every = Set.fromList (fmap ModeIndex.MkModeIndex (List.genericTake (Modal.modeCount modal) [0 ..]))
+      modesOf chosen = fmap snd (Modal.chosenModes chosen modal)
+   in traverse (Foldable.foldlM mergeDisjointModes emptyMode . modesOf) (Modal.selections every (Modal.Type.selection modal))
+
+-- The mode with nothing in it, mergeDisjointModes' identity.
+emptyMode :: Mode.Mode Card.Card (GrantedAbility.GrantedAbility Card.Card)
+emptyMode = Mode.MkMode {Mode.clauses = Seq.empty, Mode.targetSlots = Map.empty}
 
 -- CR 702.102d again, and the collision refusal fuseSpells' header states: the
--- left half's clauses then the right half's, with both halves' target slots --
+-- left operand's clauses then the right's, with both operands' target slots --
 -- unless the two name a slot alike, where there is no honest union to take.
 --
 -- The ORDER is written from the rule and is not proved: no board in the pool

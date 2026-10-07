@@ -7149,11 +7149,12 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "every file is filed under its own name" (Maybe.mapMaybe offends loaded) []
   -- CR 702.102: every card that prints fuse can actually BE fused.
   --
-  -- Pawl.Engine.Card.fusedFace answers Nothing for a fuse card whose halves are
-  -- modal or whose halves name a target slot alike, and either would be a card
-  -- quietly offering two halves where the printing offers three casts. Slot names
-  -- are card DATA and never printed, so the second is always the card file's to
-  -- fix; the first is a capability nothing in the pool needs yet (gap #2787).
+  -- Pawl.Engine.Card.fusedFace answers Nothing for a fuse card whose halves name
+  -- a target slot alike, or that pairs a modal half with entwine or mode costs,
+  -- and either would be a card quietly offering two halves where the printing
+  -- offers three casts. Slot names are card DATA and never printed, so the first
+  -- is always the card file's to fix; the second is a capability nothing in the
+  -- pool needs yet (gap #4777).
   Spec.it s "CR 702.102 every card with fuse has a fused face" $ do
     root <- Registry.defaultRoot
     loaded <- Registry.loadRoot root
