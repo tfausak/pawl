@@ -9384,11 +9384,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- counter; and where the card settles the batch ("all +1/+1 counters",
         -- "two +1/+1 counters") every counter of it, since rule 122.5's
         -- all-or-nothing forbids removing a counter that has nowhere to land.
+        -- Where the player picks the kind ("two counters of one kind") it is
+        -- that many of one kind, and under "up to one counter" at most one.
         --
-        -- Not implemented: a group destination under MovedKinds.Chosen,
-        -- MovedKinds.UpToOneChosen or MovedKinds.EachAbsentKind, each of which
-        -- asks a question per kind or reads the one destination, and moves
-        -- nothing here (#4774).
+        -- Not implemented: a group destination under MovedKinds.EachAbsentKind,
+        -- which reads the one destination and moves nothing here (#4774).
         distributePair candidates fromOne =
           -- Rule 122.5's first and fourth impossibilities, per recipient: the
           -- first object is not its own destination, and both ends are on the
@@ -9422,8 +9422,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                           MovedKinds.Every -> Just (MoveSpread.Exactly, onFrom)
                           MovedKinds.EveryOfKind wanted -> Just (MoveSpread.Exactly, ofKind wanted)
                           MovedKinds.Named wanted quantity -> Just (MoveSpread.Exactly, Map.filter (> 0) (fmap (min (askedFor quantity)) (ofKind wanted)))
-                          MovedKinds.Chosen _ -> Nothing
-                          MovedKinds.UpToOneChosen -> Nothing
+                          -- Agent's Toolkit's "move a counter" read across the
+                          -- group: one kind the player picks and that many of
+                          -- it. A lone kind on the first object leaves only the
+                          -- recipients to ask, so the batch is settled; a count
+                          -- of zero asks nothing, movePair's Chosen arm.
+                          MovedKinds.Chosen quantity -> case Map.toList onFrom of
+                            [(kind, held)] -> Just (MoveSpread.Exactly, Map.filter (> 0) (Map.singleton kind (min (askedFor quantity) held)))
+                            _
+                              | askedFor quantity == 0 -> Nothing
+                              | otherwise -> Just (MoveSpread.OneKind (askedFor quantity), onFrom)
+                          -- Takesies' "up to one counter": one counter of any
+                          -- kind onto any recipient, or none.
+                          MovedKinds.UpToOneChosen -> Just (MoveSpread.UpToOne, onFrom)
                           MovedKinds.EachAbsentKind -> Nothing
                         -- Places `owed` counters of each kind on the first
                         -- recipient, in offered order, that takes that kind --
@@ -9447,6 +9458,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                         -- alike, so no board refuses it on one recipient of
                         -- "other creatures you control" alone.
                         forced offered = all (\kind -> length (filter (takes kind) others) == 1) (Map.keys offered)
+                        -- The first `n` counters of an allocation, recipients in
+                        -- offered order and kinds ascending, so a transcript is
+                        -- deterministic.
+                        capAt n allocation =
+                          let keep (left, acc) to =
+                                let (left', kept) = Map.mapAccum (\held wanted -> let taken = min held wanted in (held - taken, taken)) left (Map.findWithDefault Map.empty to allocation)
+                                    kept' = Map.filter (> 0) kept
+                                 in (left', if Map.null kept' then acc else Map.insert to kept' acc)
+                           in snd (List.foldl' keep (n, Map.empty) others)
                      in case question of
                           Nothing -> pure Map.empty
                           Just (spread, offered)
@@ -9475,19 +9495,31 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                                                 granted = Map.filter (> 0) (Map.mapMaybeWithKey (\kind n -> if takes kind to then Just (min n (Map.findWithDefault 0 kind remaining)) else Nothing) wanted)
                                              in (Map.differenceWith (\held n -> Just (held - n)) remaining granted, if Map.null granted then acc else Map.insert to granted acc)
                                           (unplaced, filtered) = List.foldl' step (offered, Map.empty) others
-                                      -- An answer short of the spread is then
+                                      -- An answer outside the spread is then
                                       -- REPAIRED, Chosen's fallback posture: a
                                       -- floor answered with nothing takes one
                                       -- counter of the first kind offered
-                                      -- (Map.lookupMin), and a settled batch
-                                      -- places what the answer left over, each
-                                      -- onto the first recipient taking it.
+                                      -- (Map.lookupMin); a settled batch places
+                                      -- what the answer left over, each onto the
+                                      -- first recipient taking it; one kind keeps
+                                      -- the lowest kind answered (else the first
+                                      -- offered), capped and topped up to its
+                                      -- count; and "up to one" keeps the first
+                                      -- counter answered.
                                       pure $ case spread of
                                         MoveSpread.AnyNumber -> filtered
                                         MoveSpread.AtLeastOne
                                           | Map.null filtered -> topUp (foldMap (\(kind, _) -> Map.singleton kind 1) (Map.lookupMin offered)) Map.empty
                                           | otherwise -> filtered
                                         MoveSpread.Exactly -> topUp (Map.filter (> 0) unplaced) filtered
+                                        MoveSpread.OneKind n ->
+                                          case Map.lookupMin (Map.unionsWith (+) (Map.elems filtered)) <|> Map.lookupMin offered of
+                                            Nothing -> Map.empty
+                                            Just (kind, _) ->
+                                              let owed = min n (Map.findWithDefault 0 kind offered)
+                                                  kept = capAt owed (Map.filter (not . Map.null) (fmap (`Map.restrictKeys` Set.singleton kind) filtered))
+                                               in topUp (Map.singleton kind (owed - sum (fmap sum kept))) kept
+                                        MoveSpread.UpToOne -> capAt 1 filtered
                                 -- The REMOVAL half, once per kind for this first
                                 -- object however many recipients share it:
                                 -- movePair's batching, CR 608.2f's first branch.
