@@ -30,6 +30,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Replacement as Replacement
 import Pawl.Engine.Resolve.Effect (announcedOnly, apnapPlayersOf, applyClauseEffects, applyEffectWith, branchSelects, clauseIsImpossible, gateAffordable, happenedBetween, noSubgame, payGatePaid, targetSlotsOf)
 import Pawl.Engine.Resolve.Slots (boundSlots, effectContext, slotsAreExhaustive, slotsOf)
+import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Natural as Natural
 import Pawl.Types.AbilityName (AbilityName)
@@ -526,7 +527,7 @@ applyEpic oid controller = do
             ActivePlayerEffect.MkActivePlayerEffect
               { ActivePlayerEffect.source = oid,
                 ActivePlayerEffect.controller = controller,
-                ActivePlayerEffect.chosenNames = Game.chosenNamesWithLastKnown oid g,
+                ActivePlayerEffect.choices = SourceContext.choicesOf oid g,
                 ActivePlayerEffect.timestamp = ts,
                 ActivePlayerEffect.expiry = Expiry.Type.Never,
                 ActivePlayerEffect.scope = AffectedPlayers.Scoped PlayerScope.You,

@@ -106,6 +106,7 @@ import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import Pawl.Types.RowSource (RowSource)
 import qualified Pawl.Types.RowSource as RowSource
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.SourceChoices as SourceChoices
 import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
 import qualified Pawl.Types.StatedFlip as StatedFlip
 import Pawl.Types.Timestamp (Timestamp)
@@ -448,7 +449,7 @@ affectedBy pid oid name gs =
 -- carries one too -- ActivePlayerEffect.source is the object that resolved -- and
 -- it is what makes Filter.IsSource answerable for Lava Burst's self-naming
 -- clause, which was vacuously False while this walk hardcoded Nothing. A stored
--- row's source also carries the names baked as it began (storedSource), which
+-- row's source also carries the choices baked as it began (storedSource), which
 -- contextFor below reads in place of the object's.
 applying :: PlayerId -> GameState -> [(RowSource, PlayerEffect)]
 applying pid gs =
@@ -514,9 +515,9 @@ applying pid gs =
 liveSource :: Maybe ObjectId -> RowSource
 liveSource source = RowSource.MkRowSource source Nothing
 
--- A stored row's source, carrying the names baked as it began (CR 608.2h).
+-- A stored row's source, carrying the choices baked as it began (CR 608.2h).
 storedSource :: ActivePlayerEffect.ActivePlayerEffect -> RowSource
-storedSource active = RowSource.MkRowSource (Just (ActivePlayerEffect.source active)) (Just (ActivePlayerEffect.chosenNames active))
+storedSource active = RowSource.MkRowSource (Just (ActivePlayerEffect.source active)) (Just (ActivePlayerEffect.choices active))
 
 -- CR 601.2i: how many spells this player has cast this turn. A fold over the
 -- whole event log, which is exactly "this turn" because Engine.handoffTurn clears
@@ -1212,22 +1213,22 @@ contextFrom src oid gs = contextFor (Projection.controllerOf oid gs) src gs
 -- contextFrom with the perspective supplied, which matchesObjectFor above is the
 -- one caller of.
 --
--- The source's CR 607.2d choices come from SourceContext.withChoicesOf, read
--- through CR 608.2h's last known information. A stored row's NAMES are its own
--- instead, baked as it began (RowSource.chosenNames): CR 608.2h determines them
+-- A printed row's CR 607.2d choices come from SourceContext.withChoicesOf, read
+-- through CR 608.2h's last known information. A stored row's are its own
+-- instead, baked as it began (RowSource.choices): CR 608.2h determines them
 -- once, so Cheering Fanatic naming a second card leaves the first row's alone
 -- (the Cheering Fanatic scenario under data/scenarios/cost proves it).
 --
--- Not implemented: a stored row's chosen colour and subtype are not baked, and
--- still read the source live (#4760).
+-- The baked colour and subtype are a fence, not a proven behaviour: CR 614.1c's
+-- as-enters choice (Pawl.Engine.Event's EntryRewrite arms) is the only writer of
+-- either, so no source changes them under a stored row today.
 contextFor :: Maybe PlayerId -> RowSource -> GameState -> Filter.Context
 contextFor you row gs =
   let src = RowSource.object row
-      framed = maybe id (`SourceContext.withChoicesOf` gs) src (Filter.contextFor (Game.teams gs) you src)
-   in framed
-        { Filter.sourceAttachedTo = src >>= \s -> Projection.hostOf s gs,
-          Filter.sourceChosenNames = Maybe.fromMaybe (Filter.sourceChosenNames framed) (RowSource.chosenNames row)
-        }
+      choose = case RowSource.choices row of
+        Just baked -> SourceContext.withChoices baked
+        Nothing -> maybe id (`SourceContext.withChoicesOf` gs) src
+   in (choose (Filter.contextFor (Game.teams gs) you src)) {Filter.sourceAttachedTo = src >>= \s -> Projection.hostOf s gs}
 
 -- CR 601.3a's LOOKAHEAD, asked of a prohibition that matches the spell as it
 -- stands: could a choice still to be made during this spell's proposal cause the
@@ -1331,14 +1332,19 @@ prohibitsAtManaValue pid oid manaValue gs =
 -- "CR 601.2e Serra Paragon admits Protean Hydra at X = 2 and not at X = 3" is
 -- the proof.
 --
--- Not implemented: a stored permission is re-matched with its source's names
--- read live, not the ones baked onto the row (#4760).
-admitsAtManaValue :: Maybe (ObjectId, CastFromZone.CastFromZone) -> ObjectId -> Integer -> GameState -> Bool
-admitsAtManaValue permission oid manaValue gs = case permission of
+-- The permission names only its source and grant, so the rows under that pair
+-- are looked up again for their RowSource, which carries a stored row's baked
+-- choices (CR 608.2h); any of them admitting it is enough. A pair no row answers
+-- to any more falls back to the source read live. A fence: no card in the pool
+-- stores a cast permission that reads a choice.
+admitsAtManaValue :: PlayerId -> Maybe (ObjectId, CastFromZone.CastFromZone) -> ObjectId -> Integer -> GameState -> Bool
+admitsAtManaValue pid permission oid manaValue gs = case permission of
   Nothing -> True
-  Just (source, grant) ->
+  Just (sid, grant) ->
     let view = (Projection.viewOfObject oid gs) {Filter.manaValue = Just manaValue}
-     in Filter.matches (contextFrom (liveSource (Just source)) oid gs) view (CastFromZone.matching grant)
+        admits source = Filter.matches (contextFrom source oid gs) view (CastFromZone.matching grant)
+        rows = [source | (source, PlayerEffect.CastFrom granted) <- applying pid gs, RowSource.object source == Just sid, granted == grant]
+     in if null rows then admits (liveSource (Just sid)) else any admits rows
 
 -- CR 613.11 / 601.2f: the cost increases, the cost reductions and the additional
 -- non-mana components that apply to `pid` CASTING `oid`.
@@ -2837,8 +2843,11 @@ protectedFromGiven rows oid gs =
 -- for Runed Halo that quality is Filter.HasChosenName, which the shield's
 -- Context answers off the carrier, so CR 201.4's names stay a LIVE read
 -- at the damage event (CR 609.7b's recheck) rather than a set frozen when the row
--- was gathered. A card-stated quality needs the same treatment for CR 613's sake
--- and gets it for free, being a Filter either way.
+-- was gathered. A STORED row hands over the choices it baked as it began (CR
+-- 608.2h) for that Context to use instead; the Synthetic Name Ward scenario
+-- under data/scenarios/cast-prohibition proves it. A card-stated quality needs
+-- the same treatment for CR 613's sake and gets it for free, being a Filter
+-- either way.
 --
 -- A row with no carrier makes no row here, which costs nothing today -- both
 -- carriers on this axis name their source (see `applying`) -- and is the honest
@@ -2851,16 +2860,13 @@ protectedFromGiven rows oid gs =
 -- A walk per SEAT, which is what `applying` is, rather than one gather over the
 -- axis: CR 116.2d's ignore and every scope in Pawl.Types.PlayerScope are asked
 -- about a particular player, so a single-pass version would restate both.
---
--- Not implemented: a stored row's shield reads its source's chosen names live
--- through Replacement.candidateContext, not the ones baked onto the row (#4760).
-protectionCarriers :: GameState -> [(PlayerId, ObjectId, Filter Keyword)]
+protectionCarriers :: GameState -> [(PlayerId, ObjectId, Maybe SourceChoices.SourceChoices, Filter Keyword)]
 protectionCarriers gs =
   let carrier pid (source, effect) = case effect of
         -- The quality the CARD states, handed on as written: the shield's source
         -- side is this Filter, so the three consequences of rule 702.16 read one
         -- quality (protectedFromGiven above is the other two).
-        PlayerEffect.HasProtectionFrom quality -> fmap (\oid -> (pid, oid, quality)) (RowSource.object source)
+        PlayerEffect.HasProtectionFrom quality -> fmap (\oid -> (pid, oid, RowSource.choices source, quality)) (RowSource.object source)
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing

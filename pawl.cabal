@@ -1171,6 +1171,8 @@ library codec
     Pawl.Codec.SlotPerPlayer
     Pawl.Codec.SlotPerPlayerSpec
     Pawl.Codec.Source
+    Pawl.Codec.SourceChoices
+    Pawl.Codec.SourceChoicesSpec
     Pawl.Codec.SourceSpec
     Pawl.Codec.SpecialAction
     Pawl.Codec.SpecialActionSpec
@@ -1431,6 +1433,7 @@ library engine
     Pawl.Engine.IgnoredAbility
     Pawl.Engine.Initiative
     Pawl.Engine.Interchangeable
+    Pawl.Engine.Interchangeable.Mentions
     Pawl.Engine.Keyword
     Pawl.Engine.Learn
     Pawl.Engine.Mana
@@ -2552,6 +2555,7 @@ library types
     Pawl.Types.SlotName
     Pawl.Types.SlotPerPlayer
     Pawl.Types.Source
+    Pawl.Types.SourceChoices
     Pawl.Types.SpecialAction
     Pawl.Types.SpeedDecrease
     Pawl.Types.SpellCast

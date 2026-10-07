@@ -9,6 +9,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.SourceChoices as SourceChoices
 
 -- | Filter.contextFor framed by `source`, with its choices (withChoicesOf).
 sourceContext :: GameState.GameState -> Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Filter.Context
@@ -20,9 +21,23 @@ sourceContext gs perspective source =
 -- through CR 608.2h's last known information, the reading CR 113.7a gives an
 -- ability whose source has left.
 withChoicesOf :: ObjectId.ObjectId -> GameState.GameState -> Filter.Context -> Filter.Context
-withChoicesOf source gs context =
+withChoicesOf source gs = withChoices (choicesOf source gs)
+
+-- | The choices `source` has made so far, through CR 608.2h's last known
+-- information; what a stored effect bakes as it begins.
+choicesOf :: ObjectId.ObjectId -> GameState.GameState -> SourceChoices.SourceChoices
+choicesOf source gs =
+  SourceChoices.MkSourceChoices
+    { SourceChoices.names = Game.chosenNamesWithLastKnown source gs,
+      SourceChoices.colors = Game.chosenColorsWithLastKnown source gs,
+      SourceChoices.subtype = Game.chosenSubtypeWithLastKnown source gs
+    }
+
+-- | `context` with these choices as the source's.
+withChoices :: SourceChoices.SourceChoices -> Filter.Context -> Filter.Context
+withChoices choices context =
   context
-    { Filter.sourceChosenColors = Game.chosenColorsWithLastKnown source gs,
-      Filter.sourceChosenSubtype = Game.chosenSubtypeWithLastKnown source gs,
-      Filter.sourceChosenNames = Game.chosenNamesWithLastKnown source gs
+    { Filter.sourceChosenColors = SourceChoices.colors choices,
+      Filter.sourceChosenSubtype = SourceChoices.subtype choices,
+      Filter.sourceChosenNames = SourceChoices.names choices
     }

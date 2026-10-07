@@ -556,6 +556,7 @@ import qualified Pawl.Codec.SkipNextPhaseSpec
 import qualified Pawl.Codec.SlotCountSpec
 import qualified Pawl.Codec.SlotNameSpec
 import qualified Pawl.Codec.SlotPerPlayerSpec
+import qualified Pawl.Codec.SourceChoicesSpec
 import qualified Pawl.Codec.SourceSpec
 import qualified Pawl.Codec.SpecialActionSpec
 import qualified Pawl.Codec.SpeedDecreaseSpec
@@ -875,6 +876,7 @@ spec s registry = do
   Pawl.Codec.ActiveBlockRequirementSpec.spec s
   Pawl.Codec.ActiveCopySpec.spec s
   Pawl.Codec.ActivePlayerEffectSpec.spec s
+  Pawl.Codec.SourceChoicesSpec.spec s
   Pawl.Codec.ActiveReplacementSpec.spec s
   Pawl.Codec.ActiveUnregeneratableSpec.spec s
   Pawl.Codec.ActiveUntapProhibitionSpec.spec s
