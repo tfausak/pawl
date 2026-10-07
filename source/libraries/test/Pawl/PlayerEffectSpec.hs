@@ -36,7 +36,7 @@
 -- Conjurer's Ban is the same two prohibitions on the STORED carrier, which is
 -- what makes the pair worth having: its name is chosen by CR 608.2c during the
 -- resolution rather than by CR 614.1c as a permanent enters, so the rows it
--- stores carry the name baked (Pawl.Types.ActivePlayerEffect.chosenNames).
+-- stores carry the name baked (Pawl.Types.ActivePlayerEffect.choices).
 -- Cheering Fanatic is the stored carrier's other producer, whose source stays on
 -- the battlefield and names again (data/scenarios/cost).
 --
@@ -118,6 +118,7 @@ import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
@@ -2379,7 +2380,7 @@ addPlayerEffectAt source expiry scope effect controller gs =
         ActivePlayerEffect.MkActivePlayerEffect
           { ActivePlayerEffect.source = source,
             ActivePlayerEffect.controller = controller,
-            ActivePlayerEffect.chosenNames = Game.chosenNamesWithLastKnown source gs,
+            ActivePlayerEffect.choices = SourceContext.choicesOf source gs,
             ActivePlayerEffect.timestamp = ts,
             ActivePlayerEffect.expiry = expiry,
             ActivePlayerEffect.scope = scope,

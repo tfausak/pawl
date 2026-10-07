@@ -264,7 +264,8 @@ collect sources floating =
             -- No resolution installed this segment, so there is nothing it could
             -- have bound: a printed static ability is re-derived from the board,
             -- and Filter.IsBound is vacuously False in it.
-            ReplacementCandidate.slots = Map.empty
+            ReplacementCandidate.slots = Map.empty,
+            ReplacementCandidate.choices = Nothing
           }
       fromFloating active =
         ReplacementCandidate.MkReplacementCandidate
@@ -296,7 +297,8 @@ collect sources floating =
             ReplacementCandidate.rider = ActiveReplacement.rider active,
             -- The installing resolution's bindings, carried through so a row's
             -- own pattern can name one object (see Pawl.Types.ActiveReplacement).
-            ReplacementCandidate.slots = ActiveReplacement.slots active
+            ReplacementCandidate.slots = ActiveReplacement.slots active,
+            ReplacementCandidate.choices = Nothing
           }
       -- CR 702.16e's PLAYER half: "any damage that would be dealt by sources that
       -- have the stated quality to a permanent or player with protection is
@@ -312,8 +314,11 @@ collect sources floating =
       -- "prevented this way" must not see it -- which is precisely what Minted
       -- says (see Pawl.Types.ReplacementProvenance). The effect value names the
       -- protected player, so one carrier protecting two seats is two instances,
-      -- and the ordinal is 0 because equal rows here are the same (player,
-      -- carrier) pair, which CR 702.16m makes redundant anyway.
+      -- and the ordinal is 0 because equal rows here are interchangeable: two of
+      -- one carrier's stored rows share it while baking different names (CR
+      -- 608.2h), and whichever applies prevents all of that damage (CR
+      -- 702.16e), leaving the other nothing to prevent. A per-row ordinal leaves
+      -- the Synthetic Name Ward scenario green, so it was not added.
       --
       -- No collision with segment 1's rows off the same carrier: `whichRecipient`
       -- is engine-baked and no card may write it (Pawl.CardSpec's
@@ -337,7 +342,7 @@ collect sources floating =
       -- Nothing to consume and no rider: this segment is re-derived from the board
       -- every iteration, exactly as segment 1 is, and CR 615.10 leaves a static
       -- shield unreduced.
-      fromProtectedPlayer (pid, src, quality) =
+      fromProtectedPlayer (pid, src, baked, quality) =
         ReplacementCandidate.MkReplacementCandidate
           { ReplacementCandidate.identity =
               CandidateId.OfPermanent
@@ -353,7 +358,8 @@ collect sources floating =
             ReplacementCandidate.lifetime = Nothing,
             ReplacementCandidate.origin = ReplacementOrigin.Other,
             ReplacementCandidate.rider = Nothing,
-            ReplacementCandidate.slots = Map.empty
+            ReplacementCandidate.slots = Map.empty,
+            ReplacementCandidate.choices = baked
           }
       -- Rule 702.16e's row for one (protected player, carrier) pair.
       --
@@ -1748,15 +1754,17 @@ matchesFiltered viewOf gs candidate filter_ oid =
 -- installation and the damage is the one this reads. The names, with the
 -- colour and subtype beside them, go through Pawl.Engine.SourceContext, which
 -- falls back to CR 608.2h's last known information for a source already in a
--- graveyard; the player has no such
+-- graveyard; a stored effect's shield reads the choices it baked as it began
+-- instead (ReplacementCandidate.choices, CR 608.2h). The player has no such
 -- fallback because Pawl.Types.LastKnown records no chosen player, and rule
 -- 702.16k's carrier is a permanent on the battlefield whenever its own static
 -- ability mints a row.
 candidateContext :: GameState -> ReplacementCandidate -> Filter.Context
 candidateContext gs candidate =
-  ( SourceContext.withChoicesOf
-      (ReplacementCandidate.source candidate)
-      gs
+  ( maybe
+      (SourceContext.withChoicesOf (ReplacementCandidate.source candidate) gs)
+      SourceContext.withChoices
+      (ReplacementCandidate.choices candidate)
       ( Filter.contextWithSlots
           (Game.teams gs)
           (ReplacementCandidate.controller candidate)

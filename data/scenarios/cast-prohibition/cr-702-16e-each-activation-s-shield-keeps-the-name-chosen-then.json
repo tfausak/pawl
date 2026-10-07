@@ -1,0 +1,155 @@
+{
+  "description": "CR 702.16e each activation's shield keeps the name chosen then, not the later one",
+  "note": "Synthetic Name Ward names Goblin Piker, then Hill Giant, during bob's upkeep, so two stored protection rows share one source. Both attackers' combat damage is prevented: read live, both shields would name Hill Giant and the Piker's 2 would land.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Synthetic Name Ward",
+            "label": "ward"
+          },
+          {
+            "card": "Plains",
+            "label": "p1"
+          },
+          {
+            "card": "Plains",
+            "label": "p2"
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "ready": true
+          },
+          {
+            "card": "Hill Giant",
+            "label": "giant",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      }
+    ],
+    "active": "bob",
+    "step": "Upkeep"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "Upkeep",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$ward",
+          "mana": [
+            "$p1",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "Upkeep",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "Upkeep",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseCardName",
+          "with": "Goblin Piker"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "Upkeep",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$ward",
+          "mana": [
+            "$p2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "Upkeep",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "Upkeep",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseCardName",
+          "with": "Hill Giant"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "bob",
+      "do": {
+        "Attack": [
+          "$piker",
+          "$giant"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "bob",
+      "check": {
+        "Life": {
+          "player": "alice",
+          "life": 20
+        }
+      }
+    }
+  ]
+}

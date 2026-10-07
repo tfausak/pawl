@@ -2454,7 +2454,7 @@ castSpellWith perform timed offered applied widened pid oid name facing = Event.
           let refusedAt castFor permission manaValue =
                 let board = proposedFor oid castFor proposed
                  in PlayerEffect.prohibitsAtManaValue pid oid manaValue board
-                      || not (PlayerEffect.admitsAtManaValue permission oid manaValue board)
+                      || not (PlayerEffect.admitsAtManaValue pid permission oid manaValue board)
                       || (timed && flashRefusedAt pid oid name manaValue board)
           castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefore candidates spent permissions (riders sid) refusedAt before
 

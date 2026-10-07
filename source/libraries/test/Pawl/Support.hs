@@ -133,6 +133,7 @@ import qualified Pawl.Types.Seat as Seat
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.SourceChoices as SourceChoices
 import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
@@ -1934,7 +1935,7 @@ addPlayerEffect expiry scope effect controller gs =
         ActivePlayerEffect.MkActivePlayerEffect
           { ActivePlayerEffect.source = ObjectId.MkObjectId 998,
             ActivePlayerEffect.controller = controller,
-            ActivePlayerEffect.chosenNames = Set.empty,
+            ActivePlayerEffect.choices = SourceChoices.MkSourceChoices {SourceChoices.names = Set.empty, SourceChoices.colors = Set.empty, SourceChoices.subtype = Nothing},
             ActivePlayerEffect.timestamp = ts,
             ActivePlayerEffect.expiry = expiry,
             ActivePlayerEffect.scope = scope,
