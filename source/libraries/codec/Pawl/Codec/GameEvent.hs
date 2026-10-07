@@ -31,6 +31,7 @@ import qualified Pawl.Codec.Discarded as Discarded
 import qualified Pawl.Codec.Drew as Drew
 import qualified Pawl.Codec.Exploited as Exploited
 import qualified Pawl.Codec.HalfUnlocked as HalfUnlocked
+import qualified Pawl.Codec.LandPlayed as LandPlayed
 import qualified Pawl.Codec.LeftTheGame as LeftTheGame
 import qualified Pawl.Codec.LifeChange as LifeChange
 import qualified Pawl.Codec.ManaAbilityResolved as ManaAbilityResolved
@@ -117,6 +118,7 @@ codec =
       Arm.payload "LeftTheGame" LeftTheGame.codec GameEvent.LeftTheGame (\x -> case x of GameEvent.LeftTheGame y -> Just y; _ -> Nothing),
       Arm.payload "LostTheGame" PlayerId.codec GameEvent.LostTheGame (\x -> case x of GameEvent.LostTheGame y -> Just y; _ -> Nothing),
       Arm.payload "Scried" PlayerId.codec GameEvent.Scried (\x -> case x of GameEvent.Scried y -> Just y; _ -> Nothing),
+      Arm.payload "LandPlayed" LandPlayed.codec GameEvent.LandPlayed (\x -> case x of GameEvent.LandPlayed y -> Just y; _ -> Nothing),
       -- CR 309.7's completion, with only the completing player on the wire: the
       -- rule names no card, so there is nothing else to carry.
       Arm.payload "DungeonCompleted" PlayerId.codec GameEvent.DungeonCompleted (\x -> case x of GameEvent.DungeonCompleted y -> Just y; _ -> Nothing),
@@ -217,6 +219,7 @@ tagOf x = case x of
   GameEvent.LeftTheGame {} -> "LeftTheGame"
   GameEvent.LostTheGame {} -> "LostTheGame"
   GameEvent.Scried {} -> "Scried"
+  GameEvent.LandPlayed {} -> "LandPlayed"
   GameEvent.DungeonCompleted {} -> "DungeonCompleted"
   GameEvent.Surveiled {} -> "Surveiled"
   GameEvent.Proliferated {} -> "Proliferated"

@@ -1279,6 +1279,7 @@ eventBindingSlots cond = case cond of
   TriggerCondition.PlayerScries _ -> Set.empty
   TriggerCondition.RingTemptsPlayer _ -> Set.empty
   TriggerCondition.PlayerSurveils _ -> Set.empty
+  TriggerCondition.PlayerPlaysLand _ -> Set.empty
   TriggerCondition.PlayerProliferates _ -> Set.empty
   TriggerCondition.SelfBecomesPlotted -> Set.empty
   TriggerCondition.PermanentExplores _ -> Set.empty

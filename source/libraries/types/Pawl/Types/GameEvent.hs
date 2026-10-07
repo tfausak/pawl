@@ -25,6 +25,7 @@ import qualified Pawl.Types.Discarded as Discarded
 import qualified Pawl.Types.Drew as Drew
 import qualified Pawl.Types.Exploited as Exploited
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
+import qualified Pawl.Types.LandPlayed as LandPlayed
 import qualified Pawl.Types.LeftTheGame as LeftTheGame
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.ManaAbilityResolved as ManaAbilityResolved
@@ -438,6 +439,9 @@ data GameEvent
     -- that were impossible; CR 701.22b's zero is no scry at all. Nothing else in
     -- the log says a scry happened, the reorder crossing no zone boundary.
     Scried PlayerId.PlayerId
+  | -- | CR 305.1: a player played a land, recorded by Pawl.Engine.Cast.playLand
+    -- beside the Moved event the land's arrival records.
+    LandPlayed LandPlayed.LandPlayed
   | -- | CR 701.25d, Scried's twin, with CR 701.25c as its own non-event. Distinct
     -- from the Moved entries the graveyard half of CR 701.25a records and from
     -- Milled above, a surveil binning a card without milling it -- a reader

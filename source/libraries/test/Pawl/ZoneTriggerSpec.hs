@@ -92,6 +92,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.Keyword as Keyword.Type
+import qualified Pawl.Types.LandPlayed as LandPlayed
 import qualified Pawl.Types.LeftTheGame as LeftTheGame
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
@@ -132,6 +133,7 @@ import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.PlaysLand as PlaysLand
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
@@ -2333,6 +2335,8 @@ representativeEvents cond =
         -- is what keeps this pin honest: an arm matching a scry here would claim
         -- the floor for the wrong keyword action.
         TriggerCondition.PlayerSurveils _ -> one (GameEvent.Surveiled S.bob)
+        -- CR 305.1's own event: a land play binds nothing.
+        TriggerCondition.PlayerPlaysLand p -> one (GameEvent.LandPlayed (LandPlayed.MkLandPlayed S.bob departed (PlaysLand.from p)))
         TriggerCondition.PlayerProliferates _ -> one (GameEvent.Proliferated S.bob)
         -- TWO: CR 701.62b's manifest dread that binned nothing, and one that
         -- binned a card, which is what parts the floor from the ceiling.
@@ -2617,6 +2621,7 @@ everyTriggerCondition =
     TriggerCondition.PlayerScries PlayerRelation.Opponent,
     TriggerCondition.PlayerSurveils PlayerRelation.You,
     TriggerCondition.PlayerSurveils PlayerRelation.Opponent,
+    TriggerCondition.PlayerPlaysLand (PlaysLand.MkPlaysLand PlayerRelation.You Zone.Exile),
     TriggerCondition.PlayerProliferates PlayerRelation.You,
     TriggerCondition.PlayerProliferates PlayerRelation.Opponent,
     TriggerCondition.PlayerManifestsDread PlayerRelation.You,
