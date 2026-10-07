@@ -1214,6 +1214,9 @@ contextFrom src oid gs = contextFor (Projection.controllerOf oid gs) src gs
 -- instead, baked as it began (RowSource.chosenNames): CR 608.2h determines them
 -- once, so Cheering Fanatic naming a second card leaves the first row's alone
 -- (the Cheering Fanatic scenario under data/scenarios/cost proves it).
+--
+-- Not implemented: a stored row's chosen colour and subtype are not baked, and
+-- still read the source live (#4760).
 contextFor :: Maybe PlayerId -> RowSource -> GameState -> Filter.Context
 contextFor you row gs =
   let src = RowSource.object row
@@ -1324,6 +1327,9 @@ prohibitsAtManaValue pid oid manaValue gs =
 -- Nothing, a cast needing no permission, always does. Pawl.CastPermissionSpec's
 -- "CR 601.2e Serra Paragon admits Protean Hydra at X = 2 and not at X = 3" is
 -- the proof.
+--
+-- Not implemented: a stored permission is re-matched with its source's names
+-- read live, not the ones baked onto the row (#4760).
 admitsAtManaValue :: Maybe (ObjectId, CastFromZone.CastFromZone) -> ObjectId -> Integer -> GameState -> Bool
 admitsAtManaValue permission oid manaValue gs = case permission of
   Nothing -> True
@@ -2830,6 +2836,9 @@ protectedFromGiven rows oid gs =
 -- A walk per SEAT, which is what `applying` is, rather than one gather over the
 -- axis: CR 116.2d's ignore and every scope in Pawl.Types.PlayerScope are asked
 -- about a particular player, so a single-pass version would restate both.
+--
+-- Not implemented: a stored row's shield reads its source's chosen names live
+-- through Replacement.candidateContext, not the ones baked onto the row (#4760).
 protectionCarriers :: GameState -> [(PlayerId, ObjectId, Filter Keyword)]
 protectionCarriers gs =
   let carrier pid (source, effect) = case effect of
