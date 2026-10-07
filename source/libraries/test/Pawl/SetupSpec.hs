@@ -1086,7 +1086,7 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
         outerId = ObjectId.MkObjectId 9001
         parent =
           g2
-            { GameState.outsideObjects = Map.singleton outerId (OutsideObject.MkOutsideObject S.alice printingId Facing.FaceUp)
+            { GameState.outsideObjects = Map.singleton outerId (OutsideObject.MkOutsideObject S.alice printingId Facing.FaceUp (printingId NonEmpty.:| []))
             }
         sub0 = Setup.subgameStateFrom S.alice parent
         (_, crossedSub) = Event.bringInFrom OutsideDestination.Hand S.alice outerId sub0
@@ -1160,7 +1160,7 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
         after = Setup.funnelBack departedSub (Setup.applyCrossings departedSub parent)
     Spec.assertEqWith s "the subgame really did mint him a copy" (Maybe.isJust minted) True
     Spec.assertEqWith s "the subgame really was multiplayer, so CR 800.4a's removal fired" (Departure.continuesAfterDeparture departedSub) True
-    Spec.assertEqWith s "CR 800.4a: the subgame's copy left with him" (fmap (`Map.member` GameState.objects departedSub) minted) (Just False)
+    Spec.assertEqWith s "CR 800.4a: the subgame's copy left with him" (fmap (any (`Map.member` GameState.objects departedSub)) minted) (Just False)
     Spec.assertEqWith s "CR 729.4a: the main game's copy left when the subgame took it" (Map.member bobsId (GameState.objects after)) False
     Spec.assertEqWith s "so bob owns nothing in the main game afterwards" (Map.keys (Map.filter (\o -> Object.owner o == S.bob) (GameState.objects after))) []
     Spec.assertEqWith s "and his pool, which no wish reached, is still empty" (fmap Player.outsideTheGame (Map.lookup S.bob (GameState.players after))) (Just Map.empty)
