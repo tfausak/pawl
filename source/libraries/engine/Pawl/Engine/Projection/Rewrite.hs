@@ -175,6 +175,7 @@ import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
+import qualified Pawl.Types.PlaysLand as PlaysLand
 import qualified Pawl.Types.PlotFromZone as PlotFromZone
 import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
@@ -2028,7 +2029,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PlayerFirebends _ -> condition
   TriggerCondition.PlayerCompletesDungeon _ -> condition
   TriggerCondition.PlayerSurveils _ -> condition
-  TriggerCondition.PlayerPlaysLand _ -> condition
+  TriggerCondition.PlayerPlaysLand payload -> TriggerCondition.PlayerPlaysLand payload {PlaysLand.filter = Filter.rewrite pairs (PlaysLand.filter payload)}
   TriggerCondition.PlayerProliferates _ -> condition
   TriggerCondition.PlayerManifestsDread _ -> condition
   TriggerCondition.PlayerRollsDice _ -> condition
