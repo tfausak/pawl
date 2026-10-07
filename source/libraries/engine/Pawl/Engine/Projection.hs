@@ -2805,9 +2805,9 @@ abilitiesRemoved = abilitiesRemovedBy Nothing (const True)
 -- `name` is the name of the ability asked about. A WIPE counts for every
 -- ability (wipesAbilities); a named removal only for the static ability
 -- carrying its name, Nothing for a player or rule ability, which carries none.
--- Pawl.KeywordTriggerSpec's "CR 613.1f Glittering Lion losing its shield keeps
--- the restriction backup granted it" proves the second half, and
--- Pawl.ActivateSpec's Synthetic Muted Captain group the first.
+-- Pawl.ActivateSpec's Synthetic Muted Captain group proves the named removal,
+-- and Pawl.KeywordTriggerSpec's "CR 613.1f Glittering Lion losing its shield
+-- keeps the restriction backup granted it" the rule ability it leaves.
 abilitiesRemovedBy :: Maybe AbilityName.AbilityName -> (Gathered -> Bool) -> [Gathered] -> GameState -> ObjectId -> Bool
 abilitiesRemovedBy name keep cands gs oid =
   let counts m = wipesAbilities m || removesNamed name m
