@@ -16,7 +16,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Count as Count
-import Pawl.Engine.Event.Binding (admittedAttackers, admittedDepartures, admittedPreventedSources, postEventView)
+import Pawl.Engine.Event.Binding (admitsDeparture, admittedAttackers, admittedDepartures, admittedPreventedSources, postEventView)
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
@@ -76,6 +76,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
+import qualified Pawl.Types.LeftTheGame as LeftTheGame
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.ManaAbilityResolved as ManaAbilityResolved
@@ -6654,10 +6655,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- Matched on `departed` for SelfDies' reason (CR 603.10a).
   --
   -- CR 603.6c's OTHER trigger event is the second arm: a phased-in permanent
-  -- leaving the game because its owner left it (CR 800.4a). No zone pair to
-  -- check there -- the permanent was on the battlefield or the event would not
-  -- have been recorded, and CR 702.26k's exclusion of a phased-out one is
-  -- applied where the event is emitted, in Pawl.Engine.Departure.
+  -- leaving the game because its owner left it (CR 800.4a), or a subgame taking
+  -- it (CR 729.4a). The zone it left is checked because the second road records
+  -- the event for a card in any zone; CR 702.26k's exclusion of a phased-out
+  -- one is applied where the event is emitted.
   --
   -- SelfDies deliberately does NOT take the same arm: CR 700.4 makes "dies" a
   -- move to a graveyard, and leaving the game reaches no zone at all.
@@ -6666,7 +6667,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
       ZoneChange.departed zc == bearer
         && ZoneChange.from zc == Zone.Battlefield
         && ZoneChange.to zc /= Zone.Battlefield
-    GameEvent.LeftTheGame oid -> oid == bearer
+    GameEvent.LeftTheGame l -> LeftTheGame.object l == bearer && LeftTheGame.from l == Zone.Battlefield
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.LostTheGame _ -> False
@@ -6866,7 +6867,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
             | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc /= Zone.Battlefield ->
                 admits (ZoneChange.departed zc)
           GameEvent.Moved {} -> False
-          GameEvent.LeftTheGame oid -> admits oid
+          GameEvent.LeftTheGame l -> LeftTheGame.from l == Zone.Battlefield && admits (LeftTheGame.object l)
           GameEvent.Milled {} -> False
           GameEvent.Scried _ -> False
           GameEvent.LostTheGame _ -> False
@@ -7184,9 +7185,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- characteristic of the departing card says whose turn it is, and CR 109.5 with
   -- CR 603.3a fixes "you" as the ability's controller.
   --
-  -- GameEvent.LeftTheGame is declined, the PermanentReturnedToHand arm's reason
-  -- one zone over: CR 800.4a's departure reaches no zone, so no zone change names
-  -- a graveyard it came out of.
+  -- GameEvent.LeftTheGame is CR 729.4a's crossing out of the zone the condition
+  -- names, admitted only where the condition names no destination: leaving the
+  -- game reaches no zone, so it cannot be the hand or exile a printing names.
+  -- Pawl.OutsideTheGameSpec's Spirit Mascot case proves it.
   TriggerCondition.CardLeavesZone p ->
     let admitted = admittedDepartures gs bearer you p
      in case event of
@@ -7196,6 +7198,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
                 Turn.turnScopeAdmits gs (CardLeavesZone.scope p) (GameState.activePlayer gs) you
                   && not (Seq.null (admitted m))
           GameEvent.Moved {} -> False
+          GameEvent.LeftTheGame l
+            | LeftTheGame.from l == CardLeavesZone.from p,
+              Maybe.isNothing (CardLeavesZone.to p) ->
+                Turn.turnScopeAdmits gs (CardLeavesZone.scope p) (GameState.activePlayer gs) you
+                  && admitsDeparture gs bearer you p (LeftTheGame.object l)
           GameEvent.LeftTheGame _ -> False
           GameEvent.Milled {} -> False
           GameEvent.Scried _ -> False
