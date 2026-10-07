@@ -25,6 +25,7 @@ import qualified Pawl.Scenario.Load as Load
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
+import qualified Pawl.Types.Answer as Answer
 import qualified Pawl.Types.Board as Board
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Choices as Choices
@@ -38,10 +39,12 @@ import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Move as Move
+import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Placement as Placement
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Readiness as Readiness
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Reply as Reply
 import qualified Pawl.Types.Scenario as Scenario.Type
 import qualified Pawl.Types.ScenarioFailure as ScenarioFailure
 import qualified Pawl.Types.Seat as Seat
@@ -402,6 +405,33 @@ spec s registry = Spec.describe s "Scenario" $ do
       Left failure -> Spec.assertFailure s (S.renderFailure failure)
       Right _ -> Spec.assertFailure s "the unoffered attacker was silently dropped"
 
+  -- Two settled Forests, and CR 601.2g's window offering the first alone, as
+  -- Pawl.Engine.Interchangeable has it offer one of two identical sources. The
+  -- engine reads a source it did not offer as a decline
+  -- (Pawl.Engine.Cost.chooseSource), so a script naming the second would pass on
+  -- that decline rather than on the tap it wrote.
+  Spec.it s "an Answer naming a mana source the prompt did not offer is a failure" $ do
+    outcome <- manaSourceAnswer s registry "$f2" False
+    case outcome of
+      Left (ScenarioFailure.MkUnofferedAnswer _ _ kind) ->
+        Spec.assertEqWith s "the prompt it answered" kind (Text.pack "ChooseManaSource")
+      Left failure -> Spec.assertFailure s (S.renderFailure failure)
+      Right _ -> Spec.assertFailure s "the unoffered source passed as a decline"
+
+  Spec.it s "an Answer flagged unoffered reaches the engine" $ do
+    outcome <- manaSourceAnswer s registry "$f2" True
+    case outcome of
+      Left failure -> Spec.assertFailure s (S.renderFailure failure)
+      Right (chosen, second) -> Spec.assertEqWith s "the unoffered source, as written" chosen (Just second)
+
+  Spec.it s "an Answer flagged unoffered that the prompt offers is a failure" $ do
+    outcome <- manaSourceAnswer s registry "$f1" True
+    case outcome of
+      Left (ScenarioFailure.MkOfferedAnswer _ _ kind) ->
+        Spec.assertEqWith s "the prompt it answered" kind (Text.pack "ChooseManaSource")
+      Left failure -> Spec.assertFailure s (S.renderFailure failure)
+      Right _ -> Spec.assertFailure s "a flag the answer contradicts passed"
+
   Spec.it s "a qualified assignment is matched by its source, not by its position" $ do
     -- Two double-blocked attackers are prompted in the engine's order over
     -- Combat.attackers, which the script does not know. The assignments are
@@ -582,3 +612,18 @@ attackThenAttacking attacker =
     <> "\"timeline\":[{\"turn\":1,\"step\":\"DeclareAttackers\",\"player\":\"alice\",\"do\":{\"Attack\":[\""
     <> attacker
     <> "\"]}}]}"
+
+-- Alice answering a ChooseManaSource prompt that offers the first of two settled
+-- Forests with this reference, flagged unoffered or not: the rehearsal's answer
+-- and the second Forest's id.
+manaSourceAnswer :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> Bool -> m (Either ScenarioFailure.ScenarioFailure (Maybe ObjectId.ObjectId, ObjectId.ObjectId))
+manaSourceAnswer s registry named flagged = do
+  let setup = S.duel S.precombatMain [S.settled "f1" "Forest", S.settled "f2" "Forest"] []
+      answer = Answer.MkAnswer (Text.pack "ChooseManaSource") (Reply.Text (Text.pack named)) flagged
+      script = S.turn 1 [S.on S.precombatMain S.alice (Move.Answer answer)]
+  built <- S.buildBoardOrFail s registry setup
+  case (Map.lookup (Label.MkLabel (Text.pack "f1")) (Staged.objects built), Map.lookup (Label.MkLabel (Text.pack "f2")) (Staged.objects built)) of
+    (Just first, Just second) -> do
+      let prompt = Prompt.ChooseManaSource (Decider.MkDecider S.alice) S.alice (first NonEmpty.:| [])
+      pure (fmap (\(chosen, _) -> (chosen, second)) (Scenario.rehearse script built (Game.ask prompt)))
+    _ -> Spec.assertFailure s "the board omitted an alias"

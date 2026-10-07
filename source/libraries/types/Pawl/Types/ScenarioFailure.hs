@@ -55,6 +55,10 @@ data ScenarioFailure
   | MkActionNotOffered When.When Move.Move [Text.Text]
   | MkAmbiguousAction When.When Move.Move [Text.Text]
   | MkUnexpectedActionChoice When.When Move.Move Text.Text
+  | -- | An Answer outside what its prompt offered, not flagged unoffered.
+    MkUnofferedAnswer When.When Move.Move Text.Text
+  | -- | An Answer flagged unoffered that its prompt did offer.
+    MkOfferedAnswer When.When Move.Move Text.Text
   | MkUnusedActionChoices When.When Move.Move Choices.Choices
   | -- | A move the timeline said the engine would refuse, which stood: the
     -- prompt asked next (Nothing when none was), not the one it answered.

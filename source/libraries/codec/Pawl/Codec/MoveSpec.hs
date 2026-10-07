@@ -56,7 +56,7 @@ spec s = Spec.describe s "Pawl.Codec.Move" $ do
   Spec.it s "ChooseCopyTarget declined" $
     Common.assertCodec s Move.codec (Move.Type.ChooseCopyTarget Nothing) " {\"ChooseCopyTarget\":null} "
   Spec.it s "Answer" $
-    Common.assertCodec s Move.codec (Move.Type.Answer (Answer.Type.MkAnswer (Text.pack "ChooseDiscard") (Reply.Type.Array [Reply.Type.Text (Text.pack "@card")]))) " {\"Answer\":{\"prompt\":\"ChooseDiscard\",\"with\":[\"@card\"]}} "
+    Common.assertCodec s Move.codec (Move.Type.Answer (Answer.Type.MkAnswer (Text.pack "ChooseDiscard") (Reply.Type.Array [Reply.Type.Text (Text.pack "@card")]) False)) " {\"Answer\":{\"prompt\":\"ChooseDiscard\",\"with\":[\"@card\"]}} "
   Spec.it s "ChooseTypeSwap" $
     Common.assertCodec s Move.codec (Move.Type.ChooseTypeSwap (TypeSwap.Type.MkTypeSwap Subtype.Type.Goblin Subtype.Type.Elf)) " {\"ChooseTypeSwap\":{\"from\":{\"type\":\"Goblin\"},\"to\":{\"type\":\"Elf\"}}} "
   Spec.it s "Take" $

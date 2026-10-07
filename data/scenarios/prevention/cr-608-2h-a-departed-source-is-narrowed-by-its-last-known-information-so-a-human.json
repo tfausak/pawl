@@ -122,7 +122,8 @@
       "do": {
         "Answer": {
           "prompt": "ChooseDamageSource",
-          "with": "$cat"
+          "with": "$cat",
+          "unoffered": true
         }
       }
     },

@@ -54,7 +54,8 @@
       "do": {
         "Answer": {
           "prompt": "ChoosePaidEnergy",
-          "with": 9
+          "with": 9,
+          "unoffered": true
         }
       }
     },

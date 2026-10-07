@@ -52,7 +52,8 @@
       "do": {
         "Answer": {
           "prompt": "ChooseProtector",
-          "with": "alice"
+          "with": "alice",
+          "unoffered": true
         }
       }
     },

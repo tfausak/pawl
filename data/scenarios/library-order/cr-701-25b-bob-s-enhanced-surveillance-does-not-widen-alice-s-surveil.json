@@ -77,7 +77,8 @@
             [
               "$mountain"
             ]
-          ]
+          ],
+          "unoffered": true
         }
       }
     },

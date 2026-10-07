@@ -146,7 +146,8 @@
           "with": [
             "Goblin Piker#5",
             "Goblin Piker"
-          ]
+          ],
+          "unoffered": true
         }
       }
     },

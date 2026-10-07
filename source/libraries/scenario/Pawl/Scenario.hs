@@ -736,7 +736,16 @@ answerGeneric gs key kind index timed prompt = case Timed.entry timed of
     popAt key index
     chosen <- decodeAnswer verb answer
     allowed <- legalAnswer gs prompt chosen
-    if allowed then pure chosen else failWith (Failure.MkUnexpectedActionChoice key verb (kind <> Text.pack ": the rule refuses it"))
+    -- An answer outside the offer reaches the engine only when the script says
+    -- it means one (Answer.unoffered), and then it must be outside: a script
+    -- out of line with its prompt fails either way rather than passing on the
+    -- engine's fallback.
+    case (allowed, withinOffer prompt chosen, Answer.unoffered answer) of
+      (False, _, _) -> failWith (Failure.MkUnexpectedActionChoice key verb (kind <> Text.pack ": the rule refuses it"))
+      (True, True, False) -> pure chosen
+      (True, False, True) -> pure chosen
+      (True, False, False) -> failWith (Failure.MkUnofferedAnswer key verb kind)
+      (True, True, True) -> failWith (Failure.MkOfferedAnswer key verb kind)
   -- An answer the runner judges, as an interpreter does (legalAnswer), is
   -- one a refused Answer can carry; the prompt then takes the next entry.
   Entry.Refuse verb@(Move.Answer answer) -> do
@@ -776,8 +785,13 @@ legalAnswer gs prompt chosen = case prompt of
   _ -> pure True
 
 -- | Whether an answer names only what its prompt offers, for a prompt that
--- offers a list, and stays within its bounds, for one that offers a range. A refused answer naming more is refused already; an answer
--- taken goes to the engine, which handles one naming more itself.
+-- offers a list, and stays within its bounds, for one that offers a range. A
+-- refused answer naming more is refused already; a taken one must carry
+-- Answer.unoffered to reach the engine, which reads it with its own fallback.
+--
+-- Total over the prompts, so a new one is an arm here. An arm answering True
+-- outright is a prompt whose every answer is on offer, or whose answer the
+-- engine judges whole; the groups below say which.
 withinOffer :: Prompt.Type.Prompt r -> r -> Bool
 withinOffer prompt chosen = case prompt of
   Prompt.Type.RandomCard names -> chosen `elem` names
@@ -868,7 +882,100 @@ withinOffer prompt chosen = case prompt of
   Prompt.Type.MulliganAction _ _ actions -> all (`elem` actions) chosen
   Prompt.Type.OpeningHandAction _ _ actions -> all (`elem` actions) chosen
   Prompt.Type.ChooseCost _ _ _ costs -> chosen `elem` costs
-  _ -> True
+  Prompt.Type.ChooseManaSource _ _ candidates -> all (`elem` candidates) chosen
+  Prompt.Type.ChooseExtraManaSource _ _ candidates -> all (`elem` candidates) chosen
+  Prompt.Type.ChooseCopyTarget _ _ _ objects -> all (`elem` objects) chosen
+  Prompt.Type.ChooseManaYield _ _ _ options -> chosen `elem` options
+  Prompt.Type.ChooseLoopMembers _ _ _ members -> all (`elem` members) chosen
+  Prompt.Type.ChooseFromOutsideTheGame _ _ cards least most -> all (`elem` cards) chosen && least <= List.genericLength chosen && List.genericLength chosen <= most
+  Prompt.Type.DeclareAttackers _ _ attackers -> all (`elem` attackers) chosen
+  Prompt.Type.DeclareBlockers _ _ blockers attackers -> all (`elem` blockers) (Map.keys chosen) && all (all (`elem` attackers)) chosen
+  Prompt.Type.ChooseTargets _ _ _ offered -> Map.isSubmapOfBy (\picked (_, legal) -> Set.isSubsetOf picked legal) chosen offered
+  Prompt.Type.AnnounceTargets _ _ _ offered -> all (`Map.member` offered) (Map.keys chosen)
+  Prompt.Type.AssignCombatDamage _ _ _ offered _ -> all (`Map.member` offered) (Map.keys chosen)
+  Prompt.Type.ChooseRedistribution _ _ totals -> all (`elem` fmap fst totals) (Map.keys chosen <> Map.elems chosen)
+  Prompt.Type.ChooseDistributedMovedCounters _ _ _ _ candidates -> all (`elem` candidates) (Map.keys chosen)
+  Prompt.Type.ChooseMovedCounters _ _ _ _ available -> Map.isSubmapOfBy (<=) chosen available
+  Prompt.Type.ChooseMovedCountersAtLeastOne _ _ _ _ available -> Map.isSubmapOfBy (<=) chosen available
+  Prompt.Type.ChooseStoredRerolls _ _ _ stored -> Map.isSubmapOfBy (<=) chosen stored
+  -- An index into the list offered.
+  Prompt.Type.ChooseReplacement _ _ entries -> indexInto entries chosen
+  Prompt.Type.ChooseEntryOption _ _ _ options -> indexInto options chosen
+  Prompt.Type.ChooseDelayedTriggerEvent _ _ _ events -> indexInto (NonEmpty.toList events) chosen
+  Prompt.Type.ChooseRollModifier _ _ modifiers -> indexInto (NonEmpty.toList modifiers) chosen
+  -- A permutation of the indices of what is ordered (Pawl.Engine.Game.permute).
+  Prompt.Type.OrderTriggers _ _ entries -> permutationOf entries chosen
+  Prompt.Type.OrderTimestamps _ _ objects -> permutationOf objects chosen
+  Prompt.Type.OrderManaActivations _ _ objects -> permutationOf objects chosen
+  Prompt.Type.OrderCombatTolls _ _ objects -> permutationOf objects chosen
+  Prompt.Type.OrderComponentCards _ _ _ printings -> permutationOf printings chosen
+  Prompt.Type.OrderCostComponents _ _ _ components -> permutationOf components chosen
+  Prompt.Type.OrderDamage _ _ events -> permutationOf events chosen
+  Prompt.Type.OrderForEach _ _ _ recipients -> permutationOf recipients chosen
+  Prompt.Type.ArrangeLibraryCards _ _ objects -> permutationOf objects chosen
+  Prompt.Type.ArrangeLibraryArrivals _ _ _ objects -> permutationOf objects chosen
+  Prompt.Type.Shuffle objects -> List.sort chosen == List.sort objects
+  -- A number up to a bound.
+  Prompt.Type.ChooseAssistAmount _ _ _ most -> chosen <= most
+  Prompt.Type.ChoosePaidEnergy _ _ _ most -> chosen <= most
+  Prompt.Type.ChooseNumber _ _ _ most -> all (chosen <=) most
+  -- Every value of the answer's type is on offer: a yes or no, a coin face, a
+  -- side, an end of the library, a decision whose every arm the prompt allows.
+  Prompt.Type.CallCoin {} -> True
+  Prompt.Type.FlipCoin -> True
+  Prompt.Type.Concede {} -> True
+  Prompt.Type.ChooseBuyback {} -> True
+  Prompt.Type.ChooseEntwine {} -> True
+  Prompt.Type.ChooseKicker {} -> True
+  Prompt.Type.ChooseExert {} -> True
+  Prompt.Type.ChooseExplore {} -> True
+  Prompt.Type.ChooseDredge {} -> True
+  Prompt.Type.ChooseRiot {} -> True
+  Prompt.Type.ChooseUnleash {} -> True
+  Prompt.Type.ChooseTribute {} -> True
+  Prompt.Type.ChooseRepeat {} -> True
+  Prompt.Type.ChooseRedirect {} -> True
+  Prompt.Type.ChoosePayLifeOnEntry {} -> True
+  Prompt.Type.ChooseTurnUpAttachment {} -> True
+  Prompt.Type.ChooseCommandZoneOfferFirst {} -> True
+  Prompt.Type.ChooseOptional {} -> True
+  Prompt.Type.ChooseToPay {} -> True
+  Prompt.Type.ChooseForage {} -> True
+  Prompt.Type.ChooseMutateSide {} -> True
+  Prompt.Type.ChooseLibraryEnd {} -> True
+  Prompt.Type.OfferedCast {} -> True
+  Prompt.Type.OfferedMiracleReveal {} -> True
+  Prompt.Type.RerollDie {} -> True
+  Prompt.Type.ReverseManaAbilities {} -> True
+  Prompt.Type.ReturnCommander {} -> True
+  Prompt.Type.DeclareMulligan {} -> True
+  -- Any member of an open class the prompt does not list: a creature type, a
+  -- basic land type, a card name (legalAnswer's question).
+  Prompt.Type.ChooseCreatureType {} -> True
+  Prompt.Type.ChooseBasicLandType {} -> True
+  Prompt.Type.ChooseCardName {} -> True
+  -- A distribution or an adjustment rather than a pick from a list, judged
+  -- whole by the engine.
+  Prompt.Type.AllocateDamage {} -> True
+  Prompt.Type.AdjustDieRoll {} -> True
+  Prompt.Type.ArrangeGraveyardArrivals {} -> True
+  Prompt.Type.ChooseClash {} -> True
+  Prompt.Type.ChooseReadAheadChapter {} -> True
+  -- Never answered by an Answer: a move answers ChooseAction, and the rest are
+  -- the engine's own lookups and its randomness.
+  Prompt.Type.ChooseAction {} -> True
+  Prompt.Type.LookUpCard {} -> True
+  Prompt.Type.ReferenceCards {} -> True
+  Prompt.Type.ReferenceNames {} -> True
+  Prompt.Type.RandomDepth {} -> True
+
+-- Whether an index answer points into the list offered.
+indexInto :: [a] -> Natural -> Bool
+indexInto offered i = toInteger i < toInteger (length offered)
+
+-- Whether an ordering answer is a permutation of the offered list's indices.
+permutationOf :: [a] -> [Natural] -> Bool
+permutationOf offered order = List.sort order == zipWith const [0 ..] offered
 
 -- | A priority prompt: first the checks at the head of this moment, in timeline
 -- order, then the first move that takes priority, and a pass when there is
@@ -1602,6 +1709,10 @@ render failure = case failure of
     renderWhen key <> Text.pack ": " <> renderMove verb <> Text.pack " matched more than one offer" <> renderOffers offers
   Failure.MkUnexpectedActionChoice key verb kind ->
     renderWhen key <> Text.pack ": " <> renderMove verb <> Text.pack " has no answer for the " <> kind <> Text.pack " prompt"
+  Failure.MkUnofferedAnswer key verb kind ->
+    renderWhen key <> Text.pack ": " <> renderMove verb <> Text.pack " is not among what the " <> kind <> Text.pack " prompt offered; flag it unoffered if that is the point"
+  Failure.MkOfferedAnswer key verb kind ->
+    renderWhen key <> Text.pack ": " <> renderMove verb <> Text.pack " is flagged unoffered, but the " <> kind <> Text.pack " prompt offered it"
   Failure.MkUnusedActionChoices key verb choices ->
     renderWhen key <> Text.pack ": " <> renderMove verb <> Text.pack " finished without using " <> Common.render (Codec.encode Codec.Choices.codec choices)
   Failure.MkUnrefusedMove key verb next ->

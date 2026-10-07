@@ -126,38 +126,44 @@
         "Answer": {
           "prompt": "Shuffle",
           "with": [
+            "$goblin-piker",
+            "$goblin-chariot",
+            "$hill-giant",
+            "$serra-avatar",
+            "$bird-maiden",
+            "$swamp"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "Shuffle",
+          "with": [
+            "$hill-giant",
+            "$goblin-piker"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "Shuffle",
+          "with": [
             "Hill Giant",
-            "Goblin Piker"
-          ]
-        }
-      }
-    },
-    {
-      "turn": 1,
-      "step": "PrecombatMain",
-      "player": "alice",
-      "do": {
-        "Answer": {
-          "prompt": "Shuffle",
-          "with": [
-            "Hill Giant"
-          ]
-        }
-      }
-    },
-    {
-      "turn": 1,
-      "step": "PrecombatMain",
-      "player": "alice",
-      "do": {
-        "Answer": {
-          "prompt": "Shuffle",
-          "with": [
             "Goblin Piker",
-            "Goblin Chariot",
-            "Hill Giant",
-            "Serra Avatar",
-            "Swamp"
+            "$goblin-chariot",
+            "$serra-avatar",
+            "$bird-maiden",
+            "$swamp"
           ]
         }
       }

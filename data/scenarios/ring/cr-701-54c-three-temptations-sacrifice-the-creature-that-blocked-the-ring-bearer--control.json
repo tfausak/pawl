@@ -160,7 +160,7 @@
         "Answer": {
           "prompt": "ChooseDiscard",
           "with": [
-            "Goblin Piker"
+            "$e3"
           ]
         }
       }
