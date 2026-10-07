@@ -410,6 +410,27 @@ moonedSlivdrazi slivdrazi drone ashaya bloodMoon moonFirst =
          in (token, sliv, (if moonFirst then id else moon) g3)
    in (build True, build False)
 
+-- A Forest, an Urborg, Tomb of Yawgmoth with a Convincing Mirage on it (Plains
+-- chosen), and Synthetic Muddled Veil on the Mirage, all alice's; the Veil enters
+-- before the Mirage when the flag is set. Returns the Forest's, Urborg's and the
+-- Mirage's ids and the board.
+veiledMirage :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+veiledMirage forest urborg mirage veil veilFirst =
+  let (forestId, g0) = S.addPermanent forest S.alice (Setup.emptyGame S.bothPlayers)
+      (urborgId, g1) = S.addPermanent urborg S.alice g0
+      ((veilId, mirageId), g3) =
+        if veilFirst
+          then
+            let (v, g2) = S.addPermanent veil S.alice g1
+                (m, g2') = S.addPermanent mirage S.alice g2
+             in ((v, m), g2')
+          else
+            let (m, g2) = S.addPermanent mirage S.alice g1
+                (v, g2') = S.addPermanent veil S.alice g2
+             in ((v, m), g2')
+      board = S.attach veilId mirageId (S.withChosenSubtype Subtype.Type.Plains mirageId (S.attach mirageId urborgId g3))
+   in (forestId, urborgId, mirageId, board)
+
 -- A Goblin Piker carrying a Bonesplitter, and Synthetic Gilded Trellis, all
 -- alice's, built twice: with a Pacifism on the Piker as well, and without.
 -- Returns the Bonesplitter's id and the two boards.
@@ -2250,6 +2271,35 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     grove <- S.printingOf s registry "Synthetic Entwined Grove"
     let (plainsId, _, gs, _) = mutedMirage plains mirage grove False
     Spec.assertEqWith s "the Plains is still a Plains, order-independent" (Projection.subtypesOf plainsId gs) (Set.singleton Subtype.Type.Plains)
+
+  -- CR 205.3d / 305.7: the Veil reaches the Mirage, but the Mirage is no land, so
+  -- the Veil sets no subtype there and strips nothing. The Mirage still makes
+  -- Urborg a Plains, which takes Urborg's "each land is a Swamp".
+  Spec.it s "CR 205.3d a Veil on a Convincing Mirage strips nothing, so Urborg still loses its text (Mirage older)" $ do
+    forest <- S.printingOf s registry "Forest"
+    urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
+    mirage <- S.printingOf s registry "Convincing Mirage"
+    veil <- S.printingOf s registry "Synthetic Muddled Veil"
+    let (forestId, urborgId, mirageId, gs) = veiledMirage forest urborg mirage veil False
+    Spec.assertEqWith s "CR 305.7 Urborg's ability is gone, so the Forest is only a Forest" (Projection.subtypesOf forestId gs) (Set.singleton Subtype.Type.Forest)
+    Spec.assertEqWith s "Urborg is a Plains" (Projection.subtypesOf urborgId gs) (Set.singleton Subtype.Type.Plains)
+    Spec.assertEqWith s "CR 205.3d the Mirage is no land and no Mountain" (Projection.cardTypesOf mirageId gs, Projection.subtypesOf mirageId gs) (Set.singleton CardType.Enchantment, Set.singleton Subtype.Type.Aura)
+
+  Spec.it s "CR 205.3d the Veil still strips nothing with the timestamps swapped (Veil older)" $ do
+    forest <- S.printingOf s registry "Forest"
+    urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
+    mirage <- S.printingOf s registry "Convincing Mirage"
+    veil <- S.printingOf s registry "Synthetic Muddled Veil"
+    let (forestId, _, _, gs) = veiledMirage forest urborg mirage veil True
+    Spec.assertEqWith s "the Forest is still only a Forest, order-independent" (Projection.subtypesOf forestId gs) (Set.singleton Subtype.Type.Forest)
+
+  Spec.it s "CR 305.7 Synthetic Muddled Veil on a land makes it a Mountain" $ do
+    plains <- S.printingOf s registry "Plains"
+    veil <- S.printingOf s registry "Synthetic Muddled Veil"
+    let (plainsId, g0) = S.addPermanent plains S.alice (Setup.emptyGame S.bothPlayers)
+        (veilId, g1) = S.addPermanent veil S.alice g0
+        gs = S.attach veilId plainsId g1
+    Spec.assertEqWith s "the Plains is a Mountain" (Projection.subtypesOf plainsId gs) (Set.singleton Subtype.Type.Mountain)
 
   -- The proving case for `resolve` reading a peer's attachments off its running
   -- board: read through a full projection, the Bonesplitter is re-projected from

@@ -1870,14 +1870,23 @@ setSubtypeStripped cands setEffs gs = case appliedSetEffects setEffs gs of
 --
 -- CR 613.8a clause (b)'s two limbs that can hold between two setters: the other
 -- strips this one's source (existence), or applying it moves an object into or
--- out of this one's set (what it applies to).
+-- out of this one's set (what it applies to). A setter strips a source only if
+-- that source is a land, at layer 1 or by the setter's own parts: CR 205.3d gives
+-- a nonland no land type, so CR 305.7 takes nothing from it. Pawl.ProjectionSpec's
+-- Synthetic Muddled Veil pair proves it for the drop; for the existence limb it
+-- is a regression fence, since no board orders two setters differently by it.
 appliedSetEffects :: [SetEffect] -> GameState -> [SetEffect]
 appliedSetEffects setEffs gs =
   let indexed = zip [0 :: Int ..] setEffs
       stampOf (_, (src, _, _)) = fmap Object.timestamp (Game.lookupObject src gs)
       -- CR 613.8a, for these effects: does `other` strip `e`'s source, or move
       -- what `e` applies to?
-      dependsOn (_, (src, _, aff)) (_, (osrc, _, oaff)) = affectsBase osrc src oaff gs || movesSet osrc oaff src aff
+      dependsOn (_, (src, _, aff)) (_, (osrc, _, oaff)) = strips osrc oaff src || movesSet osrc oaff src aff
+      strips osrc oaff src =
+        affectsBase osrc src oaff gs
+          && ( hasLandType (copiableCharacteristics src gs)
+                 || hasLandType (projectWith (<= Layer.Type) (setterPartsOf osrc oaff gs) src gs)
+             )
       movesSet osrc oaff src aff = movesSetBy (setterPartsOf osrc oaff gs) osrc oaff src aff gs
       earliest :: [(Int, SetEffect)] -> (Int, SetEffect)
       earliest = List.minimumBy (Ord.comparing (\e -> (stampOf e, fst e)))
@@ -1889,7 +1898,7 @@ appliedSetEffects setEffs gs =
               -- CR 613.8b: nothing ready means every remaining effect is in a loop.
               next = earliest (if null ready then remaining else ready)
               (nsrc, _, _) = snd next
-              stripped = any (\(src, _, aff) -> affectsBase src nsrc aff gs) applied
+              stripped = any (\(src, _, aff) -> strips src aff nsrc) applied
            in go (filter (\o -> fst o /= fst next) remaining) (if stripped then applied else snd next : applied)
    in go indexed []
 
