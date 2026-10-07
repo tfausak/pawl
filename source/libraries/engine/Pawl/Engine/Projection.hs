@@ -27,6 +27,7 @@ import qualified Pawl.Engine.Keyword as Keyword
 import Pawl.Engine.Projection.Rewrite (Modification, composeWordChanges, rewriteActivatedAbility, rewriteAffected, rewriteCharacteristicPT, rewriteCondition, rewriteMinted, rewriteModification, rewritePlayerStaticAbility, rewritePrintedReplacement, rewriteRuleAbilities, rewriteStaticAbility, rewriteTriggeredAbility)
 import Pawl.Engine.Projection.View (ControlGrant, abilitiesFromCharacteristics, abilityFaceOf, abilityFaceOfId, abilitySources, controlGrants, controllerOf, controllerOfGiven, copiableCharacteristics, copiableRuleAbilitiesOf, copiableSnapshotOf, copiableSpecialActionsOf, countersOf, definesColorless, definesEveryCreatureType, enchantedPlayerOf, functionsFromZone, grantedStaticAbilitiesOf, hostOf, inSourceRangeGiven, lastKnownView, staticAbilitiesOf, staticTimestampOf, viewOfCard, viewOfCharacteristics, withAnnouncedX)
 import qualified Pawl.Engine.Quantity as Quantity
+import qualified Pawl.Engine.RuleAbilities as RuleAbilities.Engine
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Subtype as Subtype
@@ -83,6 +84,7 @@ import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
@@ -396,14 +398,18 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
         -- A printed static ability's effect is not in this record: it is
         -- dropped where it is gathered (abilitiesRemovedBy, by name), which
         -- Pawl.ActivateSpec's Synthetic Muted Captain group proves. A GRANTED
-        -- one goes here in CR 613.7 order, as LoseAllAbilities' arm takes it.
-        -- Unproven: no card in data/cards/ grants a named static ability.
+        -- static, player or rule ability goes here in CR 613.7 order, as
+        -- LoseAllAbilities' arm takes it. Pawl.ActivateSpec's Synthetic
+        -- Tethering Charm group proves the rule ability; the static and player
+        -- ones are unproven, since no card in data/cards/ grants a named one.
         Modification.LoseNamedAbility n ->
           pc
             { PC.activatedAbilities = filter ((/= Just n) . ActivatedAbility.name) (PC.activatedAbilities pc),
               PC.triggeredAbilities = filter ((/= Just n) . TriggeredAbility.name) (PC.triggeredAbilities pc),
               PC.replacementEffects = filter ((/= Just n) . PrintedReplacement.name) (PC.replacementEffects pc),
-              PC.grantedStaticAbilities = filter ((/= Just n) . StaticAbility.name . snd) (PC.grantedStaticAbilities pc)
+              PC.grantedStaticAbilities = filter ((/= Just n) . StaticAbility.name . snd) (PC.grantedStaticAbilities pc),
+              PC.grantedPlayerAbilities = filter ((/= Just n) . PlayerStaticAbility.name . snd) (PC.grantedPlayerAbilities pc),
+              PC.grantedRuleAbilities = RuleAbilities.Engine.keepNamed (/= Just n) (PC.grantedRuleAbilities pc)
             }
         -- CR 613.1f layer 6: the mirror of GainKeyword above. A DELETE and not a
         -- decrement: the clause takes the ABILITY away, and the CR has no
@@ -2674,7 +2680,7 @@ abilityRemoval gs = namedAbilityRemoval gs Nothing
 
 -- abilityRemoval asked of ONE ability carrying `name`: a wipe removes it, and so
 -- does a CR 613.1f removal of that name. For the rule and player abilities that
--- carry a name (Pawl.Engine.CombatRestriction.nameOf,
+-- carry a name (Pawl.Engine.RuleAbilities.nameOf,
 -- PlayerStaticAbility.name, ActivationProhibition.name); Nothing answers as
 -- abilityRemoval does. Pawl.ActivateSpec's Synthetic Grounded Sentry and
 -- Synthetic Hushed Warden groups prove it.
@@ -2720,11 +2726,19 @@ gatedGather gs =
 -- gate away leaves the suite green -- the sibling above is where the same change
 -- is proved.
 abilityRemovalAfter :: GameState -> Timestamp -> ObjectId -> Bool
-abilityRemovalAfter gs =
+abilityRemovalAfter gs = namedAbilityRemovalAfter gs Nothing
+
+-- abilityRemovalAfter asked of ONE ability carrying `name`, as
+-- namedAbilityRemoval asks abilityRemoval's question.
+namedAbilityRemovalAfter :: GameState -> Maybe AbilityName.AbilityName -> Timestamp -> ObjectId -> Bool
+namedAbilityRemovalAfter gs =
   let gated = gatedGather gs
-   in if any (wipesAbilities . gModification) gated
-        then \ts -> abilitiesRemovedBy Nothing ((> ts) . gTimestamp) gated gs
-        else \_ _ -> False
+      wiped = any (wipesAbilities . gModification) gated
+      named = Set.fromList [n | c <- gated, Modification.LoseNamedAbility n <- [gModification c]]
+   in \name ->
+        if wiped || maybe False (`Set.member` named) name
+          then \ts -> abilitiesRemovedBy name ((> ts) . gTimestamp) gated gs
+          else \_ _ -> False
 
 -- CR 613.11 / 613.1f: the rule abilities layer-6 grants give `oid`, which each
 -- of the fourteen gatherers (Pawl.Engine.CombatRestriction and its siblings)
@@ -2749,9 +2763,12 @@ grantedRuleAbilities gs =
         (Modification.GainAbility (GrantedAbility.Rules rules), Affected.TheseObjects holders) -> Just (ContinuousEffect.timestamp eff, holders, rules)
         _ -> Nothing
       grants = List.sortOn (\(ts, _, _) -> ts) (Maybe.mapMaybe grant (GameState.continuousEffects gs))
-      removedAfter = abilityRemovalAfter gs
+      removedAfter = namedAbilityRemovalAfter gs
+      -- Each row asked by its own name, so a CR 613.1f removal naming one
+      -- takes that one alone. A regression fence: no card in data/cards/ both
+      -- grants a named rule ability by resolution and removes it.
       heldBy oid (ts, holders, rules) =
-        if Set.member oid holders && not (removedAfter ts oid) then rules else mempty
+        if Set.member oid holders then RuleAbilities.Engine.keepNamed (\name -> not (removedAfter name ts oid)) rules else mempty
       stored = if null grants then const mempty else \oid -> foldMap (heldBy oid) grants
       -- The fold already took any grant a later removal reaches (CR 613.7).
       pcs = projectAll gs

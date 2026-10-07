@@ -41,6 +41,7 @@ import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Engine.RuleAbilities as RuleAbilities.Engine
 import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Types.AbilityName as AbilityName
@@ -467,29 +468,6 @@ gate cr = case cr of
   CombatRestriction.CantAttackMoreThan (AttackLimitUnless.MkAttackLimitUnless _ _ c) -> c
   CombatRestriction.CantBlockMoreThan (LimitUnless.MkLimitUnless _ c) -> c
 
--- CR 116.2d: the name the source's face gives the ability stating this
--- restriction, so a payment can say WHICH effect it ignores, and a CR 613.1f
--- removal which one it removes (gathered). Read off any arm
--- that names a SUBJECT, because the clause is the same one on all of them --
--- Volrath's Curse's single sentence names both halves of "can't attack or block"
--- alike, and one payment covers both.
---
--- The two BOUNDING arms answer Nothing and carry no such field: CR 116.2d's
--- offer goes to a player, every printed producer's sentence derives that player
--- from the object the effect is aimed at ("that creature's controller"), and a
--- bound names no creature for anyone to be the controller of. So a named bound
--- would be a name nothing could ever pay to ignore.
-nameOf :: CombatRestriction.CombatRestriction -> Maybe AbilityName.AbilityName
-nameOf cr = case cr of
-  CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless _ _ n) -> n
-  CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless _ _ n) -> n
-  CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy _ _ _ n) -> n
-  CombatRestriction.CantBlockCreatures (CantBlockCreatures.MkCantBlockCreatures _ _ _ n) -> n
-  CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer _ _ _ _ n) -> n
-  CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless _ _ n) -> n
-  CombatRestriction.CantAttackMoreThan {} -> Nothing
-  CombatRestriction.CantBlockMoreThan {} -> Nothing
-
 -- Every combat restriction some permanent on the battlefield -- or some object in
 -- the command zone, whose abilities CR 114.4 makes function there -- states right
 -- now, each paired with its SOURCE and with CR 612.1's word swap over that
@@ -638,10 +616,11 @@ gathered gs =
       -- can settle with a bare bit.
       keepsRulesText source = null setEffs || Projection.liveAfterLayers setEffs source gs
       --
-      -- The CR 613.1f half is asked per ROW, by the row's name (nameOf): a
-      -- removal naming one restriction leaves the source's others standing.
+      -- The CR 613.1f half is asked per ROW, by the row's name
+      -- (RuleAbilities.Engine.nameOf): a removal naming one restriction
+      -- leaves the source's others standing.
       -- Pawl.ActivateSpec's Synthetic Grounded Sentry group proves it.
-      keepsAbilities source restriction = keepsRulesText source && not (removed (nameOf restriction) source)
+      keepsAbilities source restriction = keepsRulesText source && not (removed (RuleAbilities.Engine.nameOf restriction) source)
       -- CR 613.1f: the restrictions a stored grant gave the permanent (Chomping
       -- Kavu's backup), whose gates Projection.grantedRuleAbilities has asked
       -- already, so no `keepsAbilities` and no CR 612.1 word swap (CR 612.3).
@@ -830,7 +809,7 @@ restrictedIn rows select candidates gs =
         Nothing -> []
         Just affected ->
           filter
-            (\creature -> named source (if null changes then affected else Projection.rewriteAffected changes affected) creature && not (IgnoredAbility.ignoredForSubject creature source (nameOf restriction) gs))
+            (\creature -> named source (if null changes then affected else Projection.rewriteAffected changes affected) creature && not (IgnoredAbility.ignoredForSubject creature source (RuleAbilities.Engine.nameOf restriction) gs))
             candidates
    in Set.fromList (concatMap fromRestriction rows)
 
@@ -856,7 +835,7 @@ namedSubjects source name gs =
       fromRestriction (rowSource, changes, restriction) = case subjectOf restriction of
         Just affected
           | rowSource == source,
-            nameOf restriction == Just name ->
+            RuleAbilities.Engine.nameOf restriction == Just name ->
               filter
                 (\candidate -> Projection.affectsOn pcs grants source candidate (if null changes then affected else Projection.rewriteAffected changes affected) gs)
                 candidates
@@ -865,7 +844,8 @@ namedSubjects source name gs =
 
 -- The union of the six subject-naming selectors above -- what CR 116.2d's offer
 -- reads, where each declaration's reader takes one of them. The two BOUNDING
--- arms name no creature, `nameOf`'s reason for refusing them a name at all.
+-- arms name no creature, Pawl.Engine.RuleAbilities.nameOf's reason for refusing
+-- them a name at all.
 subjectOf :: CombatRestriction.CombatRestriction -> Maybe Affected.Affected
 subjectOf cr = case cr of
   CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless a _ _) -> Just a
@@ -955,7 +935,7 @@ cantBeBlockedBy defending blockers attackers gs =
               -- and the two that aim at an object both state CantAttack and
               -- CantBlock -- so the filter is a regression fence here rather
               -- than a proven behaviour.
-              unignored attacker = not (IgnoredAbility.ignoredForSubject attacker source (nameOf restriction) gs)
+              unignored attacker = not (IgnoredAbility.ignoredForSubject attacker source (RuleAbilities.Engine.nameOf restriction) gs)
            in concatMap barred (filter (\attacker -> named source subject attacker && unignored attacker) attackers)
    in Set.fromList (concatMap fromRestriction (inForce defending gs))
 
@@ -1014,7 +994,7 @@ cantBlockCreatures defending blockers attackers gs =
               barred blocker = fmap (\attacker -> (blocker, attacker)) (filter (matched blocker) attackers)
               -- CR 116.2d, `cantBeBlockedBy`'s filter with the BLOCKERS as the
               -- subject; a regression fence for its reason.
-              unignored blocker = not (IgnoredAbility.ignoredForSubject blocker source (nameOf restriction) gs)
+              unignored blocker = not (IgnoredAbility.ignoredForSubject blocker source (RuleAbilities.Engine.nameOf restriction) gs)
            in concatMap barred (filter (\blocker -> named source subject blocker && unignored blocker) blockers)
    in Set.fromList (concatMap fromRestriction (inForce defending gs))
 
@@ -1090,7 +1070,7 @@ cantAttackPlayer candidates players gs =
                 Just you -> filter (\pid -> PlayerEffect.inScope pid you gs scope) [player]
               -- CR 116.2d, `cantBeBlockedBy`'s filter on the other pairwise
               -- arm and a regression fence for the same reason.
-              unignored creature = not (IgnoredAbility.ignoredForSubject creature source (nameOf restriction) gs)
+              unignored creature = not (IgnoredAbility.ignoredForSubject creature source (RuleAbilities.Engine.nameOf restriction) gs)
            in do
                 creature <- filter (\creature -> named source subject creature && unignored creature) candidates
                 pid <- barred

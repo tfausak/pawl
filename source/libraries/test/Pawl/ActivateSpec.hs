@@ -66,6 +66,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Label as Label
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -81,6 +82,7 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Placement as Placement
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerDesignation as PlayerDesignation
@@ -169,6 +171,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   mutedCaptainSpec s registry
   groundedSentrySpec s registry
   hushedWardenSpec s registry
+  tetheringCharmSpec s registry
 
   Spec.it s "CR 602 activating Prodigal Sorcerer's {T} puts an ability on the stack and taps it" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
@@ -4507,6 +4510,41 @@ hushedWardenSpec s registry = Spec.describe s "Synthetic Hushed Warden (CR 613.1
     (_, after) <- S.runScriptOrFail s (S.turn 1 [unhushing, attacking, noBlock]) built S.combatGame
     Spec.assertEqWith s "CR 613.1f the named player ability is gone, so bob gains 1 life" (S.lifeOf S.bob after) (Just 21)
     Spec.assertEqWith s "CR 613.1f the activated ability, named by nothing, stays" (fmap (length . (`Projection.abilitiesOf` after)) (wardensOf after)) [1]
+
+-- CR 613.1f / 613.7: Synthetic Tethering Charm GRANTS "This creature can't
+-- block." and its "{W}: Until end of turn, enchanted creature loses 'This
+-- creature can't block.'" removes that grant by name, the later timestamp
+-- winning. bob's enchanted Hill Giant then blocks alice's Grizzly Bears, and the
+-- Charm stays on it. The negative is the same script without the {W}, where the
+-- harness refuses the block because it was never offered.
+tetheringCharmSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+tetheringCharmSpec s registry = Spec.describe s "Synthetic Tethering Charm (CR 613.1f)" $ do
+  let giant = S.aliasRef "giant"
+      board =
+        S.board
+          ( S.battlefield S.alice [S.settled "bears" "Grizzly Bears"]
+              NonEmpty.:| [ S.battlefield
+                              S.bob
+                              [ S.settled "giant" "Hill Giant",
+                                (S.settled "charm" "Synthetic Tethering Charm") {Placement.attached = Just (Label.MkLabel (Text.pack "giant"))},
+                                S.settled "mana" "Plains"
+                              ]
+                          ]
+          )
+          S.alice
+          S.beginningOfCombat
+      untethering = S.on S.beginningOfCombat S.bob (S.activateAction (S.aliasRef "charm") Choices.none {Choices.manaSources = Seq.singleton (Just (S.aliasRef "mana"))})
+      attacking = S.on S.declareAttackers S.alice (S.attack [S.aliasRef "bears"])
+      blocking = S.on S.declareBlockers S.bob (S.block [(giant, S.aliasRef "bears")])
+      charmsOf gs = [o | o <- Game.zoneMembers Zone.Battlefield S.bob gs, Set.member (CardName.MkCardName (Text.pack "Synthetic Tethering Charm")) (Projection.namesOf o gs)]
+  Spec.it s "CR 509.1b without the {W} the enchanted Giant can't block" $ do
+    built <- S.buildBoardOrFail s registry board
+    Spec.assertBool s (Either.isLeft (Scenario.rehearse (S.turn 1 [attacking, blocking]) built S.combatGame)) "the block is never offered"
+  Spec.it s "CR 613.1f after the {W} the Giant blocks, and the Charm stays" $ do
+    built <- S.buildBoardOrFail s registry board
+    (_, after) <- S.runScriptOrFail s (S.turn 1 [untethering, attacking, blocking]) built S.combatGame
+    Spec.assertEqWith s "CR 613.1f the granted restriction is gone, so the Giant blocked and bob took no damage" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "the Charm is still on the battlefield" (length (charmsOf after)) 1
 
 -- CR 602.5c / 113.2c: Gliding Licid's "{U}, {T}: This creature loses this
 -- ability and becomes an Aura enchantment with enchant creature. Attach it to

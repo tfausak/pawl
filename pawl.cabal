@@ -1471,6 +1471,7 @@ library engine
     Pawl.Engine.Reversal
     Pawl.Engine.Ring
     Pawl.Engine.Room
+    Pawl.Engine.RuleAbilities
     Pawl.Engine.SacrificeRestriction
     Pawl.Engine.Saga
     Pawl.Engine.Sba
