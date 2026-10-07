@@ -5,6 +5,8 @@
 -- an effect.
 module Pawl.Types.Layout where
 
+import qualified Pawl.Types.CardName as CardName
+
 data Layout
   = -- | A card with exactly one face: every card printed without a second set
     -- of characteristics, which is all but a handful of the pool.
@@ -175,7 +177,9 @@ data Layout
     --
     -- Two rules need the classification, and they are the whole of what this
     -- constructor buys over Normal. CR 701.42b: "Tokens, cards that aren't meld
-    -- cards, or meld cards that don't form a meld pair can't be melded." CR
+    -- cards, or meld cards that don't form a meld pair can't be melded" -- the
+    -- payload is the counterpart's printed name (CR 712.5's pairs, the printed
+    -- "(Melds with ...)"), and two cards form a pair when each names the other. CR
     -- 712.4c: "Unlike other double-faced cards, meld cards cannot be transformed
     -- or converted. Any instructions to do so are ignored" -- which CR 712.9
     -- states again from the permanent's side, and which is what keeps this arm off
@@ -183,5 +187,5 @@ data Layout
     --
     -- The keyword action itself (CR 701.42a) is Pawl.Types.Effect's Meld, and
     -- Pawl.Engine.Event.meld reads this arm to answer CR 701.42b.
-    Meld
-  deriving (Bounded, Enum, Eq, Ord, Show)
+    Meld CardName.CardName
+  deriving (Eq, Ord, Show)

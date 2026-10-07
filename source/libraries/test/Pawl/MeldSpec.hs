@@ -10,8 +10,10 @@
 -- Pawl.Types.Effect's Meld opcode, Pawl.Engine.Event.meld and the CR 608.2d
 -- choice its exile makes -- driven through the printed card.
 --
--- Hanweir Battlements and Hanweir Garrison are the pool's only meld pair, and
--- the Battlements is the half CR 712.4a puts the melding ability on.
+-- Hanweir Battlements and Hanweir Garrison are the pair most cases use, and the
+-- Battlements is the half CR 712.4a puts the melding ability on. Graf Rats and
+-- Midnight Scavengers are the second pair, which CR 701.42b's pair membership
+-- needs.
 module Pawl.MeldSpec where
 
 import qualified Control.Monad as Monad
@@ -50,6 +52,7 @@ import qualified Pawl.Types.CardArrivedIn as CardArrivedIn
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Count as Count.Type
@@ -187,7 +190,7 @@ spec s registry = Spec.describe s "Meld" $ do
     Spec.assertEqWith s "CR 108.2 an ordinary card represents only itself" (Game.componentsOf (Source.OfCard garrison)) Seq.empty
   -- CR 701.42a's keyword action, driven straight rather than through the card:
   -- the melding ability has its own cases above, and what is proven here is the
-  -- opcode on its own. Both halves of the pool's only meld pair sit in exile,
+  -- opcode on its own. Both halves of the Hanweir meld pair sit in exile,
   -- where the card's own "exile them" puts them, and the slot naming them is a
   -- slot such an exile would have bound (CR 400.7j).
   --
@@ -461,6 +464,75 @@ spec s registry = Spec.describe s "Meld" $ do
         -- time state-based actions are checked. The land is a card and stays.
         Spec.assertEqWith s "CR 111.8 the token ceases and the land is left exiled alone" (exileNames (S.settleSba after)) [S.nameOf (Printing.card battlements)]
       abilities -> Spec.assertFailure s ("expected three activated abilities on Hanweir Battlements, got " <> show (length abilities))
+
+  -- CR 701.42b: "meld cards that don't form a meld pair can't be melded", and
+  -- CR 701.42c leaves them where they are. The opcode alone, over two meld cards
+  -- of DIFFERENT pairs; the case above it with Hanweir Garrison in the second
+  -- seat is the positive control.
+  Spec.it s "CR 701.42b/701.42c two meld cards of different pairs meld nothing, and both stay put" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    scavengers <- S.printingOf s registry "Midnight Scavengers"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (bId, sId, after) = melded battlements scavengers piker
+    Spec.assertEqWith s "both cards are still in exile" (List.sort (Game.zoneMembers Zone.Exile S.alice after)) (List.sort [bId, sId])
+    Spec.assertEqWith s "nothing entered the battlefield" (Set.size (GameState.battlefield after)) 0
+
+  -- The same refusal reached through the printed cards. Mirrorweave makes alice's
+  -- Midnight Scavengers a copy of her Hanweir Garrison, so the Battlements'
+  -- ability can choose it as "a creature named Hanweir Garrison"; the exile ends
+  -- the copy (CR 400.7) and a meld card of the Graf Rats pair reaches the meld.
+  -- Two boards differing in ONE thing: which of the two Garrisons is chosen.
+  Spec.it s "CR 701.42b/701.42c a meld card of another pair melds nothing, and both stay exiled" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    scavengers <- S.printingOf s registry "Midnight Scavengers"
+    mirrorweave <- S.printingOf s registry "Mirrorweave"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    let (bId, g1) = S.addPermanent battlements S.alice (S.landsInPlay island 4)
+        (gId, g2) = S.addPermanent garrison S.alice g1
+        (sId, g3) = S.addPermanent scavengers S.alice g2
+        (staged, weaveId) = S.handOne mirrorweave g3
+        woven = S.runPure (aimedAt gId) staged (S.cast S.alice weaveId >> Stack.resolveTop >> Engine.settleForPriority)
+        board = readyFor mountain woven
+        garrisonName = S.nameOf (Printing.card garrison)
+        meldChoosing chosen = case Projection.abilitiesOf bId board of
+          [_, _, melding] -> Just (S.runPure (sparing bId (choosingPermanent chosen)) board (do Activate.activateAbility S.alice bId melding; Stack.resolveTop))
+          _ -> Nothing
+    Spec.assertEqWith s "setup: Mirrorweave made the Scavengers a Hanweir Garrison" (Projection.namesOf sId board) (Set.singleton garrisonName)
+    case (meldChoosing sId, meldChoosing gId) of
+      (Just after, Just control) -> do
+        Spec.assertEqWith s "CR 701.42c the land and the Scavengers both stay exiled" (List.sort (exileNames after)) (List.sort [S.nameOf (Printing.card battlements), S.nameOf (Printing.card scavengers)])
+        Spec.assertEqWith s "CR 701.42b nothing melded" (S.countOnBattlefieldByName townshipName S.alice after) 0
+        Spec.assertEqWith s "the real Garrison is left on the battlefield" (fmap Object.zone (Game.lookupObject gId after)) (Just Zone.Battlefield)
+        Spec.assertEqWith s "control: choosing the real Garrison melds the Township" (S.countOnBattlefieldByName townshipName S.alice control) 1
+      _ -> Spec.assertFailure s "expected three activated abilities on Hanweir Battlements"
+
+  -- The Graf Rats pair end to end: "At the beginning of combat on your turn, if
+  -- you both own and control this creature and a creature named Midnight
+  -- Scavengers, exile them, then meld them into Chittering Host." CR 603.4's
+  -- intervening if, then CR 701.42a; the Host's own enters trigger (CR 603.6a)
+  -- gives alice's Goblin Piker +1/+0 and menace.
+  Spec.it s "CR 701.42a Graf Rats and Midnight Scavengers meld into Chittering Host at the beginning of combat" $ do
+    rats <- S.printingOf s registry "Graf Rats"
+    scavengers <- S.printingOf s registry "Midnight Scavengers"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (ratsId, g1) = S.addPermanent rats S.alice (Setup.emptyGame S.bothPlayers)
+        (scavId, g2) = S.addPermanent scavengers S.alice g1
+        (pikerId, g3) = S.addPermanent piker S.alice g2
+        atCombat = g3 {GameState.phase = Phase.Combat CombatStep.BeginningOfCombat, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+        after = S.runPure S.identityAnswer atCombat (Engine.runStep >> Engine.priorityLoop)
+        hostName = CardName.MkCardName (Text.pack "Chittering Host")
+        hosts = filter (\oid -> fmap S.nameOf (Game.cardOf oid after) == Just hostName) (Game.zoneMembers Zone.Battlefield S.alice after)
+    case hosts of
+      [hostId] -> do
+        Spec.assertEqWith s "CR 712.8g it is the combined back face's 5/6" (S.powerToughnessOf hostId after) (Just (5, 6))
+        Spec.assertBool s (Projection.hasKeyword Keyword.Haste hostId after && Projection.hasKeyword Keyword.Menace hostId after) "with haste and menace"
+        Spec.assertEqWith s "CR 603.6a its enters trigger gave the Piker +1/+0" (S.powerToughnessOf pikerId after) (Just (3, 1))
+        Spec.assertBool s (Projection.hasKeyword Keyword.Menace pikerId after) "and menace"
+      other -> Spec.assertFailure s ("expected exactly one Chittering Host, got " <> show (length other))
+    Spec.assertEqWith s "the Rats' own id is gone" (fmap Object.owner (Game.lookupObject ratsId after)) Nothing
+    Spec.assertEqWith s "and the Scavengers'" (fmap Object.owner (Game.lookupObject scavId after)) Nothing
 
   -- CR 612.7 with CR 701.42b/c: a Spy Kit host is named Hanweir Garrison with no
   -- Garrison card anywhere in the game, so the land's condition holds and "exile
@@ -1293,6 +1365,14 @@ turningOver mkEffect oids gs =
   let slot = SlotName.MkSlotName (Text.pack "turning")
       bound = Map.singleton slot (Set.fromList (fmap Recipient.ToObject oids))
    in S.runPure S.identityAnswer gs (Resolve.applyEffect S.noSource S.noSource S.alice bound Map.empty (mkEffect (ObjectRef.InSlot slot)))
+
+-- CR 608.2d's choice of counterpart pinned by identity; the first offer when
+-- `chosen` is not among them, so a wrong offer set fails the assertion rather
+-- than being repaired. Every other prompt is S.identityAnswer's.
+choosingPermanent :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+choosingPermanent chosen p = case p of
+  Prompt.ChoosePermanent _ _ _ offered -> if chosen `elem` offered then chosen else NonEmpty.head offered
+  _ -> S.identityAnswer p
 
 -- alice's Hanweir Battlements and Hanweir Garrison added to `base`, her five
 -- Mountains beside them, and the printed melding ability activated and resolved:
