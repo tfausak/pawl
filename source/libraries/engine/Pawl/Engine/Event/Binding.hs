@@ -47,6 +47,7 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
+import qualified Pawl.Types.LeftTheGame as LeftTheGame
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.ManaAbilityResolved as ManaAbilityResolved
 import qualified Pawl.Types.ManifestedDread as ManifestedDread
@@ -354,8 +355,8 @@ eventBindingsOver board gs bearerBecame becameInGraveyard bearer you cond event 
   -- CR 608.2h is the only way to read a permanent that left the GAME. Which is
   -- what keeps eventBindingSlots' promise for this condition honest across all
   -- three of its events.
-  (TriggerCondition.PermanentLeavesTheBattlefield _, GameEvent.LeftTheGame oid) ->
-    Binding.setDepartedPermanent oid Map.empty
+  (TriggerCondition.PermanentLeavesTheBattlefield _, GameEvent.LeftTheGame l) ->
+    Binding.setDepartedPermanent (LeftTheGame.object l) Map.empty
   -- The arm above with the destination pinned to a hand, which CR 400.3 makes
   -- the OWNER's: Warped Devotion's "whenever a permanent is returned to a
   -- player's hand, THAT PLAYER discards a card" names the owner, and
@@ -1037,6 +1038,9 @@ eventBindingsOver board gs bearerBecame becameInGraveyard bearer you cond event 
   -- admits a zone change only.
   (TriggerCondition.CardsLeaveZone p, GameEvent.Moved m) ->
     Binding.setEventAmount (Natural.length (admittedDepartures gs bearer you p m)) Map.empty
+  -- CR 729.4a's crossing moves one card, which the match arm has admitted.
+  (TriggerCondition.CardsLeaveZone _, GameEvent.LeftTheGame _) ->
+    Binding.setEventAmount 1 Map.empty
   -- The card a hand received, under Binding.handArrival rather than CR 400.7e's
   -- `became`, which a hidden destination withholds (CR 400.2). Kithkin
   -- Brinefarer, Volatile Rift and Veteran Ghoulcaller read it.
@@ -1152,11 +1156,14 @@ postEventView board gs oid = case Map.lookup oid board of
 -- (CR 701.42a). The zones and the turn are CardLeavesZone's match arm's
 -- questions, not this one's.
 admittedDepartures :: GameState -> ObjectId -> PlayerId -> CardLeavesZone.CardLeavesZone -> Moved.Moved -> Seq.Seq ObjectId
-admittedDepartures gs bearer you p = Seq.filter admits . Moved.departures
-  where
-    admits departed = case Projection.viewWithLastKnown departed gs departed of
-      Nothing -> False
-      Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view (CardLeavesZone.filter p)
+admittedDepartures gs bearer you p = Seq.filter (admitsDeparture gs bearer you p) . Moved.departures
+
+-- Whether the condition's filter admits one departed card, read off CR 608.2h's
+-- last known information.
+admitsDeparture :: GameState -> ObjectId -> PlayerId -> CardLeavesZone.CardLeavesZone -> ObjectId -> Bool
+admitsDeparture gs bearer you p departed = case Projection.viewWithLastKnown departed gs departed of
+  Nothing -> False
+  Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view (CardLeavesZone.filter p)
 
 -- CR 615.13 / 120.1: the sources of one prevention that a SelfPreventsDamage
 -- Filter admits, each with its per-recipient share, read off CR 608.2h's last

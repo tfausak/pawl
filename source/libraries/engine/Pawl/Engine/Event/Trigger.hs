@@ -79,6 +79,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.LastKnown as LastKnown
+import qualified Pawl.Types.LeftTheGame as LeftTheGame
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.ManaAbilityResolved as ManaAbilityResolved
@@ -396,7 +397,7 @@ participants event =
         GameEvent.BecameTarget t -> ([BecameTarget.source t], []) <> recipient (BecameTarget.targeted t)
         GameEvent.BecameAttached a -> ([BecameAttached.attachment a], []) <> recipient (BecameAttached.host a)
         GameEvent.BecameUnattached a -> ([BecameUnattached.attachment a], []) <> recipient (BecameUnattached.host a)
-        GameEvent.LeftTheGame oid -> one oid
+        GameEvent.LeftTheGame l -> one (LeftTheGame.object l)
         GameEvent.Scried pid -> player pid
         GameEvent.LostTheGame pid -> player pid
         GameEvent.DungeonCompleted pid -> player pid
@@ -1329,9 +1330,15 @@ eventTriggers events gs =
         -- only reading of it there is. The id is its own -- nothing was minted
         -- for it to become -- and it too no longer exists, so this collides with
         -- no other source.
-        GameEvent.LeftTheGame oid -> case Map.lookup oid (GameState.lastKnown gs) of
-          Nothing -> Map.empty
-          Just lk -> Map.singleton oid (LastKnown.controller lk, battlefieldAbilitiesOf oid (LastKnown.characteristics lk))
+        --
+        -- Battlefield only: CR 729.4a's crossing records the event for a card
+        -- leaving any main-game zone, and a card in a graveyard has no
+        -- battlefield abilities to offer.
+        GameEvent.LeftTheGame (LeftTheGame.MkLeftTheGame oid from)
+          | from == Zone.Battlefield -> case Map.lookup oid (GameState.lastKnown gs) of
+              Nothing -> Map.empty
+              Just lk -> Map.singleton oid (LastKnown.controller lk, battlefieldAbilitiesOf oid (LastKnown.characteristics lk))
+          | otherwise -> Map.empty
         GameEvent.Milled {} -> Map.empty
         GameEvent.Scried _ -> Map.empty
         GameEvent.LostTheGame _ -> Map.empty

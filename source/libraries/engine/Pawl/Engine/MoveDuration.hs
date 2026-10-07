@@ -24,6 +24,7 @@ import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.LeftTheGame as LeftTheGame
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.Moved as Moved
@@ -123,7 +124,7 @@ departedIn src gs =
   Foldable.foldl'
     ( \found logged -> case (found, LoggedEvent.event logged) of
         (Nothing, GameEvent.Moved m) | src `elem` Moved.departures m -> Just (LoggedEvent.group logged)
-        (Nothing, GameEvent.LeftTheGame oid) | oid == src -> Just (LoggedEvent.group logged)
+        (Nothing, GameEvent.LeftTheGame l) | LeftTheGame.object l == src -> Just (LoggedEvent.group logged)
         _ -> found
     )
     Nothing

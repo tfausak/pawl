@@ -92,6 +92,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.Keyword as Keyword.Type
+import qualified Pawl.Types.LeftTheGame as LeftTheGame
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.MadnessCost as MadnessCost
@@ -1759,6 +1760,8 @@ representativeEvents cond =
   let departed = representativeDeparted
       arrived = ObjectId.MkObjectId 2
       moved from to = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange departed arrived from to) S.emptyCharacteristics)
+      -- CR 729.4a's crossing: the zone left, and no destination.
+      leftTheGameFrom from = GameEvent.LeftTheGame (LeftTheGame.MkLeftTheGame departed from)
       -- CR 608.2n's own move: the same shape with Moved.duringResolution set,
       -- which is the only thing the condition one rule over reads.
       resolvedIntoGraveyard = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange departed arrived Zone.Stack Zone.Graveyard) S.emptyCharacteristics) {Moved.duringResolution = True}
@@ -2005,7 +2008,7 @@ representativeEvents cond =
         -- all, so there is no arriving object for CR 400.7e to offer and it
         -- binds nothing -- which is what keeps the floor empty.
         TriggerCondition.SelfLeavesTheBattlefield ->
-          noTable (moved Zone.Battlefield Zone.Graveyard) NonEmpty.:| [noTable (moved Zone.Battlefield Zone.Hand), noTable (GameEvent.LeftTheGame departed)]
+          noTable (moved Zone.Battlefield Zone.Graveyard) NonEmpty.:| [noTable (moved Zone.Battlefield Zone.Hand), noTable (leftTheGameFrom Zone.Battlefield)]
         -- The one destination the arm above narrows to, and the only event this
         -- condition admits; every instance listed below names a public zone.
         TriggerCondition.SelfPutFromBattlefieldInto destination -> one (moved Zone.Battlefield (OwnedZone.zone destination))
@@ -2014,7 +2017,7 @@ representativeEvents cond =
         -- the floor is NOT empty: CR 603.10a's departed permanent is bound by
         -- every one of the three, which is what these events pin.
         TriggerCondition.PermanentLeavesTheBattlefield _ ->
-          noTable (moved Zone.Battlefield Zone.Graveyard) NonEmpty.:| [noTable (moved Zone.Battlefield Zone.Hand), noTable (GameEvent.LeftTheGame departed)]
+          noTable (moved Zone.Battlefield Zone.Graveyard) NonEmpty.:| [noTable (moved Zone.Battlefield Zone.Hand), noTable (leftTheGameFrom Zone.Battlefield)]
         -- The one destination the arm above's three events narrow to, and the
         -- only event this condition admits at all: CR 400.2 makes a hand hidden,
         -- so CR 400.7e withholds the arrival; what the floor holds is the
@@ -2031,14 +2034,17 @@ representativeEvents cond =
         -- condition admits has the same floor, so one event out of the zone it
         -- names says as much as a list would -- SelfPutIntoGraveyardFromAnywhere's
         -- reasoning pointed the other way. Empty, except Binding.handArrival for a
-        -- move reaching a hand, which a destination-free condition also admits.
+        -- move reaching a hand, which a destination-free condition also admits --
+        -- as it admits CR 729.4a's crossing out of the zone, which reaches none.
         TriggerCondition.CardLeavesZone p -> case CardLeavesZone.to p of
           Just to -> one (moved (CardLeavesZone.from p) to)
-          Nothing -> noTable (moved (CardLeavesZone.from p) Zone.Battlefield) NonEmpty.:| [noTable (moved (CardLeavesZone.from p) Zone.Hand)]
-        -- The same one event, PermanentsReturnedToHand's reason: the batch arm
-        -- delegates to the singular's, so the two match alike. It binds the
+          Nothing -> noTable (moved (CardLeavesZone.from p) Zone.Battlefield) NonEmpty.:| [noTable (moved (CardLeavesZone.from p) Zone.Hand), noTable (leftTheGameFrom (CardLeavesZone.from p))]
+        -- The same events, PermanentsReturnedToHand's reason: the batch arm
+        -- delegates to the singular's, so the two match alike. Each binds the
         -- event's share of CR 603.2c's "that many".
-        TriggerCondition.CardsLeaveZone p -> one (moved (CardLeavesZone.from p) (Maybe.fromMaybe Zone.Battlefield (CardLeavesZone.to p)))
+        TriggerCondition.CardsLeaveZone p -> case CardLeavesZone.to p of
+          Just to -> one (moved (CardLeavesZone.from p) to)
+          Nothing -> noTable (moved (CardLeavesZone.from p) Zone.Battlefield) NonEmpty.:| [noTable (leftTheGameFrom (CardLeavesZone.from p))]
         -- The arrival side, pinned on the destination the condition names. Empty:
         -- it binds nothing.
         TriggerCondition.CardsPutIntoZone p -> one (moved Zone.Graveyard (CardsPutIntoZone.to p))
