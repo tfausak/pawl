@@ -663,6 +663,26 @@ spitefulEdictSpec s registry =
           (pairedId, paired) = board 1
       Spec.assertBool s (not (any (isActivateOf aloneId) (Action.legalActions S.bob alone))) "with the target the only creature no announcement pays the added sacrifice, so the activation is not offered"
       Spec.assertBool s (any (isActivateOf pairedId) (Action.legalActions S.bob paired)) "and one more creature makes some announcement pay, so it is"
+    -- CR 700.2 / 602.2b: Synthetic Twin Reprisal ("{T}, Sacrifice a creature
+    -- that isn't a target of this ability: Choose two -- Tap target creature you
+    -- control; tap target creature an opponent controls") must choose both
+    -- modes, so every announcement targets bob's Hill Giant and alice's Goblin
+    -- Piker, and its sacrifice finds no creature of bob's left. One mode alone
+    -- would aim at the Piker and leave the Giant.
+    Spec.it s "CR 700.2 a choose-two activation is priced across both modes' targets" $ do
+      giant <- S.printingOf s registry "Hill Giant"
+      piker <- S.printingOf s registry "Goblin Piker"
+      reprisal <- S.printingOf s registry "Synthetic Twin Reprisal"
+      let board extra =
+            let (_, withPiker) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
+                (_, withGiant) = S.addPermanent giant S.bob withPiker
+                withExtra = List.foldl' (\g _ -> snd (S.addPermanent giant S.bob g)) withGiant [1 .. extra]
+                (reprisalId, gs) = S.addPermanent reprisal S.bob withExtra
+             in (reprisalId, gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.bob, GameState.priority = Just S.bob})
+          (aloneId, alone) = board (0 :: Int)
+          (pairedId, paired) = board 1
+      Spec.assertBool s (not (any (isActivateOf aloneId) (Action.legalActions S.bob alone))) "CR 700.2 both modes target bob's only creature, so the activation is not offered"
+      Spec.assertBool s (any (isActivateOf pairedId) (Action.legalActions S.bob paired)) "and a second creature of bob's leaves one to sacrifice, so it is"
 
 -- Headless Skaab {2}{U} Creature -- Zombie Warrior 3/6: "As an additional cost
 -- to cast this spell, exile a creature card from your graveyard. This creature
