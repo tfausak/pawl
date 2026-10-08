@@ -263,6 +263,13 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       (CostComponent.CollectEvidence 3)
       " {\"type\":\"CollectEvidence\",\"value\":3} "
+  -- CR 701.59a with the total read off the targets: Urgent Necropsy.
+  Spec.it s "CollectEvidenceOfTargets" $
+    Common.assertCodec
+      s
+      codec
+      CostComponent.CollectEvidenceOfTargets
+      " {\"type\":\"CollectEvidenceOfTargets\"} "
   -- CR 406.2 out of the hand: a bare criterion, one card.
   Spec.it s "ExileCardFromHand" $
     Common.assertCodec

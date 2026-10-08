@@ -1580,6 +1580,7 @@ collectsEvidenceAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
 collectsEvidenceAsCost =
   let isCollect component = case component of
         CostComponent.CollectEvidence _ -> True
+        CostComponent.CollectEvidenceOfTargets -> True
         _ -> False
    in any isCollect . Cost.Type.components
 
@@ -3759,6 +3760,7 @@ costComponentFilters component = case component of
   CostComponent.ExileTopFromGraveyard f -> [f]
   -- CR 701.59a carries no filter: the cards are described by a total mana value.
   CostComponent.CollectEvidence _ -> []
+  CostComponent.CollectEvidenceOfTargets -> []
   -- CR 601.2f's discard as a cost: Magmatic Insight's "a land card".
   CostComponent.DiscardCards (DiscardCards.MkDiscardCards _ f) -> [f]
   CostComponent.PutCardFromHandOntoBattlefield f -> [f]

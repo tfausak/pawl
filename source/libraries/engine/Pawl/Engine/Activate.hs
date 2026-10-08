@@ -258,7 +258,7 @@ activateAbilityWith runSubgame pid srcId ability = Event.announcing $ do
           -- The map CR 601.2c is ANSWERED from is the second one below, taken once
           -- the X exists.
           unannouncedSets = Target.legalSets (Just pid) True Map.empty srcId slots gs
-          aimableUnannounced = [fmap Activatable.recipientObjects unannouncedSets]
+          aimableUnannounced = [(Target.aimingRanges (Just pid) srcId Nothing slots unannouncedSets gs, fmap Activatable.recipientObjects unannouncedSets)]
           -- CR 101.1: the ceiling this ABILITY's own words put on the value about
           -- to be announced -- Blighted Nightmare's "X can't be greater than the
           -- greatest toughness among creatures you control". Read HERE and once,
@@ -317,7 +317,7 @@ activateAbilityWith runSubgame pid srcId ability = Event.announcing $ do
           -- where the seed cannot supply the number).
           seed = Binding.fromChoices Map.empty mAmount Seq.empty
           sets = Target.legalSets (Just pid) False seed srcId slots gs
-          aimable = [fmap Activatable.recipientObjects sets]
+          aimable = [(Target.aimingRanges (Just pid) srcId (Just (Maybe.fromMaybe 0 mAmount)) slots sets gs, fmap Activatable.recipientObjects sets)]
       -- CR 602.2: an activation a player cannot comply with is illegal, and the
       -- game returns to the moment before it started. The X just named is where
       -- that can first become true: `activatable` measured the cost at the
@@ -449,7 +449,9 @@ activateAbilityWith runSubgame pid srcId ability = Event.announcing $ do
               let aimedAt = Set.unions (fmap Activatable.recipientObjects (Map.elems chosen))
                   targeted = Cost.activationAdjustments aimedAt stamp AbilityKind.NonManaAbility (Cost.loyaltyKindOf (ActivatedAbility.cost ability)) pid srcId gs
               adjustments <- Cost.announceReductions pid srcId gs announcedCost targeted
-              let paidCost = Cost.totalWith adjustments announcedCost
+              -- Cast.castProposed's lock of a computed amount, one road over.
+              boundGs <- State.get
+              let paidCost = Cost.fixComputedIn (fmap Activatable.recipientObjects chosen) boundGs (Cost.totalWith adjustments announcedCost)
               -- CR 602.2: log the activation as BEGUN, before its payment, so a
               -- mana ability activated to pay it is logged after it (Tezzeret,
               -- Betrayer of Flesh's ruling) -- and off `announced`, CR 601.2c's

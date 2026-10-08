@@ -8,6 +8,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
@@ -1218,35 +1219,98 @@ stillAdmitted pcs grants pools perspective source recipient slot gs =
 
 -- CR 601.2c's announcements a payability gate still has to consider, as the slot
 -- maps each would bind: every way of filling every slot of the map handed in,
--- which holds one slot's WHOLE legal set per slot (legalSets). A gate asked before the announcement exists is an
--- EXISTENCE question over these -- CR 601.2 makes a casting legal when the
--- player can comply with every step, not when they can comply blind.
+-- which holds one slot's WHOLE legal set per slot (legalSets), at every count
+-- `ranges` (aimingRanges) admits for it. A gate asked before the announcement
+-- exists is an EXISTENCE question over these -- CR 601.2 makes a casting legal
+-- when the player can comply with every step, not when they can comply blind.
 --
--- ONE object per slot, so a slot that takes several binds only one of them.
--- Exact for a slot of count 1, which is every target slot a slot-reading cost
--- sits beside in `data/cards/`. Not implemented: a slot of a higher count, whose
--- announcement binds more than these maps do -- a criterion reading the slot
--- positively then finds fewer objects than the payment will, and one reading it
--- negatively excludes fewer, and a per-target cost change (Hinata, Dawn-Crowned)
--- counts fewer targets; nor binds none to an "up to" slot (#2959).
+-- Every SUBSET of a slot's legal set whose size the range admits, so a slot
+-- taking two binds two, and an "up to" slot binds none as one of its answers:
+-- Urgent Necropsy, cast with nothing targeted, owes no evidence at all.
+-- Pawl.CostSpec's "Urgent Necropsy" group proves the empty answer. A
+-- subset left empty is omitted from the map rather than bound to the empty set,
+-- which is what a slot with nothing to bind has always been.
 --
--- A slot with nothing to bind is dropped rather than assigned the empty set: a
--- product that treated such a slot as having no choices would collapse to no
--- announcement at all.
+-- Exponential in a plural slot's legal set; aimingsBy is the bounded search a
+-- gate takes wherever it can say which targets are interchangeable.
 --
 -- Over whatever a slot binds: Activatable's maps hold objects, and
 -- Pawl.Engine.Cast.castAimable's whole recipients, so a player target counts
 -- for a per-target cost change.
-aimings :: Map SlotName (Set a) -> [Map SlotName (Set a)]
-aimings slots =
-  foldr
-    ( \(name, objects) rest -> do
-        object <- Set.toList objects
-        chosen <- rest
-        pure (Map.insert name (Set.singleton object) chosen)
-    )
-    [Map.empty]
-    (filter (not . Set.null . snd) (Map.toList slots))
+aimings :: (Ord a) => Map SlotName (Natural, Natural) -> Map SlotName (Set a) -> [Map SlotName (Set a)]
+aimings = aimingsBy id id
+
+-- `aimings` up to interchangeable targets: `referent` names what a slot's member
+-- IS (a creature and the same object as a permanent are one target, CR 601.2c's
+-- "each become a target"), and two referents with one `signature` and the same
+-- slots they are legal for are told apart by nothing the caller reads
+-- (Pawl.Engine.Cost.aimingSignature). So one aiming per way of drawing COUNTS
+-- from each such class stands for all of them.
+--
+-- Per class, each slot draws some number of its members, and the slots' draws may
+-- share members (CR 115.3: one object may answer two instances of "target"), so
+-- the distinct members a class contributes range from the largest draw to the
+-- smaller of the draws' sum and the class's size. Every such number is
+-- realised: the first that-many members, dealt to the slots round the class in
+-- turn, which covers them all and repeats none within a slot.
+--
+-- Polynomial in the slots' legal sets for a fixed number of classes -- one class
+-- of twenty permanents under Hinata, Dawn-Crowned is twenty-one aimings, where
+-- every subset was a million. Pawl.CostSpec's "Clever Concealment" group is the
+-- board that would not finish.
+aimingsBy :: (Ord a, Ord r, Ord k) => (a -> r) -> (r -> k) -> Map SlotName (Natural, Natural) -> Map SlotName (Set a) -> [Map SlotName (Set a)]
+aimingsBy referent signature ranges slots =
+  let forms = Map.fromListWith Map.union [(referent a, Map.singleton name a) | (name, members) <- Map.toList slots, a <- Set.toList members]
+      classes = zip [0 :: Int ..] (Map.elems (Map.fromListWith (flip (<>)) [((signature r, Map.keysSet fs), [r]) | (r, fs) <- Map.toList forms]))
+      legalIn name i = case Map.lookup i (Map.fromList classes) of
+        Just (r : _) -> maybe False (Map.member name) (Map.lookup r forms)
+        _ -> False
+      -- One slot's draws: how many members of each class it may hold, at every
+      -- count its range admits.
+      draws name =
+        let (lo, hi) = Map.findWithDefault (1, 1) name ranges
+            open = [(i, length members) | (i, members) <- classes, legalIn name i]
+            split k avail = case avail of
+              [] -> [Map.empty | k == 0]
+              (i, n) : rest -> [if j == 0 then m else Map.insert i j m | j <- [0 .. min k n], m <- split (k - j) rest]
+         in concatMap (`split` open) [Natural.toIntSaturating lo .. Natural.toIntSaturating hi]
+      realise drawn =
+        let demands i = [(name, j) | (name, m) <- drawn, Just j <- [Map.lookup i m]]
+            unions = [fmap ((,) i) [maximum (fmap snd ds) .. min (sum (fmap snd ds)) (length members)] | (i, members) <- classes, let ds = demands i, not (null ds)]
+         in fmap (build drawn . Map.fromList) (sequence unions)
+      build drawn sizes =
+        let dealt (i, members) =
+              case Map.lookup i sizes of
+                Nothing -> []
+                Just u ->
+                  let chosen = take u members
+                      go _ [] = []
+                      go at ((name, j) : rest) = fmap ((,) name) (take j (drop (at `mod` u) (cycle chosen))) <> go (at + j) rest
+                   in go 0 [(name, j) | (name, m) <- drawn, Just j <- [Map.lookup i m]]
+            place m (name, r) = maybe m (\a -> Map.insertWith Set.union name (Set.singleton a) m) (Map.lookup name =<< Map.lookup r forms)
+         in List.foldl' place Map.empty (concatMap dealt classes)
+   in concatMap realise (traverse (\name -> fmap ((,) name) (draws name)) (Map.keys slots))
+
+-- CR 601.2c: the counts each slot may be answered with, narrowed by its legal set
+-- exactly as chooseTargets narrows the offer (announcedRange, slotCapacities) --
+-- what `aimings` above enumerates.
+--
+-- `announced` is CR 601.2b's X, or Nothing for a map measured before the
+-- announcement (`unannounced` in legalSetsGiven): a slot whose count reads the X
+-- then admits every count, since the announcement could still make any of them.
+aimingRanges :: Maybe PlayerId -> ObjectId -> Maybe Natural -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> GameState -> Map SlotName (Natural, Natural)
+aimingRanges perspective source announced slots sets gs =
+  let counting = countingByGiven (Projection.projectAll gs) perspective (Binding.fromChoices Map.empty announced Seq.empty) source gs
+      x = Maybe.fromMaybe 0 announced
+      countOf slot = case (announced, TargetSlot.count slot) of
+        (Nothing, SlotCount.AnnouncedX) -> TargetCount.anyNumber
+        (Nothing, SlotCount.UpToAnnouncedX) -> TargetCount.anyNumber
+        (_, c) -> SlotCount.at counting x c
+      rangeOf slot capacity =
+        let count = countOf slot
+            ceiling_ = TargetCount.ceilingOn capacity count
+         in (min (TargetCount.least count) ceiling_, ceiling_)
+   in Map.intersectionWith rangeOf slots (slotCapacities counting x slots sets gs)
 
 -- One legal set per named slot; casting prompts with exactly this map. `source`
 -- is the object the targeting is relative to -- the spell object at cast, the

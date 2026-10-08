@@ -513,11 +513,10 @@ readsAnnouncedX pid oid cost gs =
 -- is not monotone in the targets. A cost reading neither answers the same under
 -- every aiming and skips the search.
 --
--- Not implemented: Cost.readsBoundSlot is asked of the PRINTED cost, so a
--- criterion arriving on a component CR 601.2f's adjustments add is not seen here
--- and its cost skips the search (#2959), exactly as on the activation road. No
--- cost adjustment in `data/cards/` adds a component with a criterion naming a
--- slot.
+-- Cost.readsBoundSlot is asked of the cost the adjustments have added to, so a
+-- criterion arriving on an added component (Synthetic Spiteful Edict's) sends
+-- the gate down the search too, as on the activation road. Pawl.CostSpec's
+-- "Synthetic Spiteful Edict" group proves it.
 --
 -- CR 702.51b's, CR 702.66b's and CR 702.126b's substitutes are part of this
 -- question and not a later one: a Siege Wurm is castable off six creatures and no
@@ -550,18 +549,25 @@ payableCostAtGiven modes pcs sources x extra spending pid oid gs cost =
       assisted = Cost.assistable (PaymentSubject.Casting oid) pid oid gs
       withX o = o {Object.bindings = Map.union (Binding.fromChoices Map.empty (Just x) Seq.empty) (Object.bindings o)}
       priced = if readsAnnouncedX pid oid cost gs then gs {GameState.objects = Map.adjust withX oid (GameState.objects gs)} else gs
-      ask aiming =
-        let adjustments = Cost.plusReductions extra (Cost.spellAdjustments (Set.unions (Map.elems aiming)) pid oid priced)
-            totalled = Cost.plusComponents adjustments substituted
+      adjustmentsFor aiming = Cost.plusReductions extra (Cost.spellAdjustments (Set.unions (Map.elems aiming)) pid oid priced)
+      askWith adjustments aiming =
+        let totalled = Cost.plusComponents adjustments substituted
             slots = fmap (Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList) aiming
          in Cost.canPaySomeCompletionGiven slots (PaymentSubject.Casting oid) spending sources pcs pid oid (fmap assisted . Cost.totalManas adjustments) (Cost.manaSubstitutions (Cost.Type.components totalled) slots pid oid gs) totalled gs
-   in if Cost.readsBoundSlot substituted || Cost.readsTargets pid oid gs
-        then any (any ask . Target.aimings) (castAimable modes pid oid gs)
-        else ask Map.empty
+      -- The adjustments with nothing aimed at, which are the adjustments under
+      -- EVERY aiming unless they read the targets (readsTargets below), so the
+      -- components they add are inspected for a criterion naming a slot exactly as
+      -- the printed ones are.
+      blind = adjustmentsFor Map.empty
+      blindCost = Cost.plusComponents blind substituted
+   in if Cost.readsBoundSlot blindCost || Cost.readsTargets pid oid gs
+        then any (\aiming -> askWith (adjustmentsFor aiming) aiming) (castAimable (Cost.aimingKey pid oid gs blindCost) modes x pid oid gs)
+        else askWith blind Map.empty
 
--- What CR 601.2c could still bind for this proposal, one slot map per selection
--- of fillable modes CR 601.2b could announce -- or for the one it did, once it
--- has. Activatable.candidateSlotsGiven's cast-side twin, except that it does not
+-- What CR 601.2c could still bind for this proposal: every aiming
+-- (Target.aimings) of every selection of fillable modes CR 601.2b could
+-- announce -- or of the one it did, once it has -- each at the target counts
+-- the X `x` admits. Activatable.candidateSlotsGiven's cast-side twin, except that it does not
 -- stop at one mode: an announcement may choose several (CR 700.2), and each
 -- selection's slots are built as castProposed builds them. Read off the SAME board and the same slots `targetable` above
 -- measures, including CR 702.103b's enchant slot, so the gate that offers the
@@ -587,8 +593,8 @@ payableCostAtGiven modes pcs sources x extra spending pid oid gs cost =
 -- slot, neither of which takes this
 -- road. A card printing an X-bounded target slot beside a slot-reading
 -- additional cost is what would make the two values differ.
-castAimable :: Maybe (Seq.Seq ModeIndex.ModeIndex) -> PlayerId -> ObjectId -> GameState -> [Map.Map SlotName.SlotName (Set.Set Recipient.Recipient)]
-castAimable announced pid oid gs = case Game.faceOf oid gs of
+castAimable :: (Ord k) => (Recipient.Recipient -> k) -> Maybe (Seq.Seq ModeIndex.ModeIndex) -> Natural -> PlayerId -> ObjectId -> GameState -> [Map.Map SlotName.SlotName (Set.Set Recipient.Recipient)]
+castAimable key announced x pid oid gs = case Game.faceOf oid gs of
   Nothing -> []
   Just face ->
     let modal = Face.spell face
@@ -601,11 +607,14 @@ castAimable announced pid oid gs = case Game.faceOf oid gs of
         -- FENCE: no card pairs a per-player slot with a target-reading cost.
         slotsOf chosen = Target.announcedSlots pid oid gs (Card.modesTargetSlotsGiven enchants mutating chosen face)
         setsOf slots = Target.legalSets (Just pid) True Map.empty oid slots gs
+        -- Every aiming of one selection's slots, at the counts CR 601.2c admits
+        -- for the X this gate is asking about (Target.aimingRanges).
+        aimingsOf slots = let sets = setsOf slots in Target.aimingsBy Cost.aimedReferent key (Target.aimingRanges (Just pid) oid (Just x) slots sets gs) sets
         -- CR 700.2: the modes CR 601.2b announced, or every selection the printed
         -- instruction admits among the fillable modes -- a "choose two" spell
         -- (Ojutai's Command) aims across both.
         selected = maybe (Modal.selections (Target.fillableModes (Just pid) Map.empty oid enchant modal gs) (Modal.Type.selection modal)) pure announced
-     in fmap (setsOf . slotsOf) selected
+     in concatMap (aimingsOf . slotsOf) selected
 
 -- CR 601.2b: the greatest value of X this player could actually pay for, which is
 -- what Prompt.ChooseX carries -- measured on the cost the cast is measuring, with
@@ -3389,12 +3398,13 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                   -- route the payer is entitled to. Pawl.ManaSymbolSpec's "CR
                   -- 601.2f Dismember under Hinata offers both mana routes" proves
                   -- it.
-                  let gatheredFor targets = Cost.plusReductions chosenReductions (Cost.spellAdjustments targets pid sid announcedBoard)
+                  let aimedSets = Target.legalSets (Just pid) False (Binding.fromChoices Map.empty mAmount Seq.empty) sid slots announcedBoard
+                      gatheredFor targets = Cost.plusReductions chosenReductions (Cost.spellAdjustments targets pid sid announcedBoard)
                       gathered = gatheredFor Set.empty
                       aimedGathers
                         | Cost.readsTargets pid sid announcedBoard =
                             -- Merged by value: aimings counting alike total alike.
-                            Set.toList . Set.fromList $ gathered : fmap (gatheredFor . Set.unions . Map.elems) (Target.aimings (Target.legalSets (Just pid) False (Binding.fromChoices Map.empty mAmount Seq.empty) sid slots announcedBoard))
+                            Set.toList . Set.fromList $ gathered : fmap (gatheredFor . Set.unions . Map.elems) (Target.aimingsBy Cost.aimedReferent (Cost.aimingKey pid sid announcedBoard announcedAtX) (Target.aimingRanges (Just pid) sid (Just (Maybe.fromMaybe 0 mAmount)) slots aimedSets announcedBoard) aimedSets)
                         | otherwise = [gathered]
                       routeTotals mana = concatMap (`Cost.totalManas` mana) aimedGathers
                   let totalledCost = Cost.plusComponents gathered announcedAtX
@@ -3546,7 +3556,12 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                       -- choices at 601.2b and nothing here reopens them.
                       let lateCost = Cost.plusComponents adjustments announcedAtX
                           announcedSuffix = Cost.Type.components announcedCost List.\\ Cost.Type.components (Cost.plusComponents gathered announcedAtX)
-                          paidCost = Cost.totalWith adjustments announcedCost {Cost.Type.components = Cost.Type.components lateCost <> announcedSuffix}
+                          -- CR 601.2f: a computed amount (Urgent Necropsy's
+                          -- evidence) is read off the targets just chosen and
+                          -- locked in here, before any of it is paid, per its
+                          -- ruling. A fence: the payment reads the same slots,
+                          -- and no board changes a target's mana value mid-payment.
+                          paidCost = Cost.fixComputedIn (fmap (Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList) chosen) pricedGs (Cost.totalWith adjustments announcedCost {Cost.Type.components = Cost.Type.components lateCost <> announcedSuffix})
                       -- CR 702.51b / 702.66b / 702.126b: convoke, delve and
                       -- improvise apply once the total cost is determined, so the
                       -- offer is handed to the payment rather than made here --

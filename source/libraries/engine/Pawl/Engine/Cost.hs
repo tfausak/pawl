@@ -1632,6 +1632,9 @@ substituteXInComponent x component = case component of
   CostComponent.ExileMaterials {} -> component
   CostComponent.ExileTopFromGraveyard _ -> component
   CostComponent.CollectEvidence _ -> component
+  -- CR 601.2f's computed amount, not CR 601.2b's X: fixComputed reads it once the
+  -- targets exist.
+  CostComponent.CollectEvidenceOfTargets -> component
   CostComponent.ExileCardFromHand _ -> component
   CostComponent.RevealCardFromHand _ -> component
   CostComponent.Behold _ -> component
@@ -1704,6 +1707,7 @@ componentHasVariable component = case component of
   CostComponent.ExileMaterials {} -> False
   CostComponent.ExileTopFromGraveyard _ -> False
   CostComponent.CollectEvidence _ -> False
+  CostComponent.CollectEvidenceOfTargets -> False
   CostComponent.ExileCardFromHand _ -> False
   CostComponent.RevealCardFromHand _ -> False
   CostComponent.Behold _ -> False
@@ -1813,6 +1817,7 @@ componentDemandGrowsWithX component = case component of
   CostComponent.ExileMaterials {} -> False
   CostComponent.ExileTopFromGraveyard _ -> False
   CostComponent.CollectEvidence _ -> False
+  CostComponent.CollectEvidenceOfTargets -> False
   CostComponent.ExileCardFromHand _ -> False
   CostComponent.RevealCardFromHand _ -> False
   CostComponent.Behold _ -> False
@@ -2115,6 +2120,7 @@ loyaltyAmountOf component = case component of
   CostComponent.ExileMaterials {} -> Nothing
   CostComponent.ExileTopFromGraveyard _ -> Nothing
   CostComponent.CollectEvidence _ -> Nothing
+  CostComponent.CollectEvidenceOfTargets -> Nothing
   CostComponent.ExileCardFromHand _ -> Nothing
   CostComponent.RevealCardFromHand _ -> Nothing
   CostComponent.Behold _ -> Nothing
@@ -2197,6 +2203,7 @@ zoneOfComponent component = case component of
   CostComponent.ExileCardsFromGraveyard {} -> Nothing
   CostComponent.ExileTopFromGraveyard _ -> Nothing
   CostComponent.CollectEvidence _ -> Nothing
+  CostComponent.CollectEvidenceOfTargets -> Nothing
   -- Nothing for the arms above's reason and one more: CR 702.167a's component
   -- moves objects out of TWO zones, so there is no single zone to name even if
   -- rule 113.6m asked about them.
@@ -2309,6 +2316,7 @@ componentStatesHiddenQuality component = case component of
   CostComponent.ExileMaterials {} -> False
   CostComponent.ExileTopFromGraveyard _ -> False
   CostComponent.CollectEvidence _ -> False
+  CostComponent.CollectEvidenceOfTargets -> False
   -- No cards at all, so there is no "action involving cards" to classify.
   CostComponent.TapThis -> False
   CostComponent.UntapThis -> False
@@ -2847,6 +2855,8 @@ claimOf slots pid oid component gs =
         CostComponent.CollectEvidence n
           | n > 0 -> reaching (ClaimAxis.Removal Zone.Graveyard) (toInteger n) (`evidenceValue` gs) (evidenceCandidates slots pid oid gs)
           | otherwise -> Nothing
+        -- The arm above at the amount these slots fix (fixComputed).
+        CostComponent.CollectEvidenceOfTargets -> claimOf slots pid oid (fixComputed slots gs component) gs
         -- A pool of at most ONE, CR 404.2's order having picked it.
         CostComponent.ExileTopFromGraveyard criterion ->
           claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (Maybe.maybeToList (topExileCandidate slots pid oid criterion gs))) 1
@@ -3363,6 +3373,9 @@ uncountedCeiling pid oid claims gs component = case component of
               (fmap (`evidenceValue` gs) (evidenceCandidates Map.empty pid oid gs))
           )
     | otherwise -> Nothing
+  -- The arm above at the amount no targets fix: CR 605.3b's mana ability has no
+  -- CR 601.2c step (fixComputed).
+  CostComponent.CollectEvidenceOfTargets -> uncountedCeiling pid oid claims gs (fixComputed Map.empty gs component)
   -- Counted by `objectCeiling`, on ClaimAxis.Tapping: the count is exact, so the
   -- pool of untapped candidates divided by it is how many times in a row the
   -- component can be paid. Heritage Druid's nine Elves are three activations
@@ -3675,6 +3688,76 @@ fixHalfLife pid gs cost =
         _ -> component
    in cost {Cost.components = fmap fixed (Cost.components cost)}
 
+-- CR 601.2f: a component whose amount the targets compute, fixed to the amount
+-- `slots` give it -- CR 601.2c's targets, or the aiming a gate measures. Urgent
+-- Necropsy's "the total mana value of the permanents this spell targets": each
+-- DISTINCT object once, so an artifact creature named by two of its slots counts
+-- once, and only those still on the battlefield, which is what a permanent is
+-- (CR 110.1). A player target has no mana value and is not in `slots`.
+fixComputed :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> GameState -> CostComponent.CostComponent Keyword.Type.Keyword -> CostComponent.CostComponent Keyword.Type.Keyword
+fixComputed slots gs component
+  | targetComputed component =
+      let permanents = Set.filter (\candidate -> Game.zoneOf candidate gs == Just Zone.Battlefield) (Set.unions (Map.elems slots))
+       in CostComponent.CollectEvidence (Integer.toNaturalSaturating (sum (fmap (`evidenceValue` gs) (Set.toList permanents))))
+  | otherwise = component
+
+-- fixComputed over a whole cost. Urgent Necropsy's ruling locks its X in once
+-- the targets are chosen and before any of the cost is paid, which is where
+-- Pawl.Engine.Cast.castProposed and Pawl.Engine.Activate.activateAbility call
+-- this.
+fixComputedIn :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> GameState -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
+fixComputedIn slots gs cost = cost {Cost.components = fmap (fixComputed slots gs) (Cost.components cost)}
+
+-- Is this component's amount computed from the targets? EXHAUSTIVE with no
+-- wildcard: a new such component owes an answer here, or neither readsBoundSlot
+-- nor fixComputed sees it.
+targetComputed :: CostComponent.CostComponent Keyword.Type.Keyword -> Bool
+targetComputed component = case component of
+  CostComponent.CollectEvidenceOfTargets -> True
+  CostComponent.CollectEvidence _ -> False
+  CostComponent.TapThis -> False
+  CostComponent.UntapThis -> False
+  CostComponent.SacrificeThis -> False
+  CostComponent.ReturnThis -> False
+  CostComponent.PayLife _ -> False
+  CostComponent.PayLifeX -> False
+  CostComponent.PayHalfLife _ -> False
+  CostComponent.Sacrifice _ -> False
+  CostComponent.SacrificeX _ -> False
+  CostComponent.TapForTotalPower _ -> False
+  CostComponent.TapPermanents _ -> False
+  CostComponent.ReturnPermanents _ -> False
+  CostComponent.DiscardCards _ -> False
+  CostComponent.DiscardThis _ -> False
+  CostComponent.PutCardFromHandOntoBattlefield _ -> False
+  CostComponent.PayEnergy _ -> False
+  CostComponent.PayEnergyX -> False
+  CostComponent.AddLoyaltyToThis _ -> False
+  CostComponent.RemoveLoyaltyFromThis _ -> False
+  CostComponent.RemoveLoyaltyFromThisX -> False
+  CostComponent.RemoveCountersFromThis _ -> False
+  CostComponent.RemoveCounters _ -> False
+  CostComponent.RemovePlusOneCountersX _ -> False
+  CostComponent.PutPlusOneCountersOnThis _ -> False
+  CostComponent.Blight _ -> False
+  CostComponent.Forage -> False
+  CostComponent.FlipCoin -> False
+  CostComponent.BlightX -> False
+  CostComponent.ExileThisFromGraveyard -> False
+  CostComponent.ExileThis -> False
+  CostComponent.ExileCardsFromGraveyard _ -> False
+  CostComponent.ExileMaterials _ -> False
+  CostComponent.ExileTopFromGraveyard _ -> False
+  CostComponent.ExileCardFromHand _ -> False
+  CostComponent.RevealCardFromHand _ -> False
+  CostComponent.Behold _ -> False
+  CostComponent.BeholdAndExile _ -> False
+  CostComponent.MillCards _ -> False
+  CostComponent.ChooseOpponent -> False
+  CostComponent.Waterbend _ -> False
+  CostComponent.WaterbendInstead _ -> False
+  CostComponent.WaterbendX -> False
+
 -- CR 119.4's payments a cost owes OUTSIDE its mana part, added up -- what CR
 -- 118.3 makes the mana part's own life share a total with. Total, so a new
 -- life-spending component cannot be added without answering here. The payer and
@@ -3727,6 +3810,7 @@ lifeOwedByComponent pid gs component = case component of
   CostComponent.ExileMaterials {} -> 0
   CostComponent.ExileTopFromGraveyard _ -> 0
   CostComponent.CollectEvidence _ -> 0
+  CostComponent.CollectEvidenceOfTargets -> 0
   CostComponent.ExileCardFromHand _ -> 0
   CostComponent.RevealCardFromHand _ -> 0
   CostComponent.Behold _ -> 0
@@ -3780,6 +3864,7 @@ energyOwedByComponent component = case component of
   CostComponent.ExileMaterials {} -> 0
   CostComponent.ExileTopFromGraveyard _ -> 0
   CostComponent.CollectEvidence _ -> 0
+  CostComponent.CollectEvidenceOfTargets -> 0
   CostComponent.ExileCardFromHand _ -> 0
   CostComponent.RevealCardFromHand _ -> 0
   CostComponent.Behold _ -> 0
@@ -3841,6 +3926,7 @@ countersOwedByComponent component = case component of
   CostComponent.ExileMaterials {} -> []
   CostComponent.ExileTopFromGraveyard _ -> []
   CostComponent.CollectEvidence _ -> []
+  CostComponent.CollectEvidenceOfTargets -> []
   CostComponent.ExileCardFromHand _ -> []
   CostComponent.RevealCardFromHand _ -> []
   CostComponent.Behold _ -> []
@@ -4023,6 +4109,8 @@ canPayComponent slots pid oid component gs = case component of
   -- empty set with no special case.
   CostComponent.CollectEvidence n ->
     sum (fmap (`evidenceValue` gs) (evidenceCandidates slots pid oid gs)) >= toInteger n
+  -- The arm above at the amount these slots fix (fixComputed).
+  CostComponent.CollectEvidenceOfTargets -> canPayComponent slots pid oid (fixComputed slots gs component) gs
   -- CR 118.3 again: payable only if the graveyard holds a matching card at all,
   -- since the top one is then determined.
   CostComponent.ExileTopFromGraveyard criterion ->
@@ -4157,8 +4245,118 @@ announcedSlots announced gs = case announced >>= \a -> Game.lookupObject a gs of
 --
 -- The classification is a Filter's, never a component's identity: every
 -- criterion a component carries goes through Filter.boundSlots.
+--
+-- So does an amount the targets compute (targetComputed), priced per aiming. A
+-- REGRESSION FENCE: Urgent Necropsy's slots all take "up to one", so the empty
+-- aiming is always its cheapest and measuring with nothing bound answers alike.
 readsBoundSlot :: Cost Keyword.Type.Keyword -> Bool
-readsBoundSlot = not . all (Set.null . Set.unions . fmap Filter.boundSlots . criteriaOf) . Cost.components
+readsBoundSlot = any (\component -> targetComputed component || not (Set.null (Set.unions (fmap Filter.boundSlots (criteriaOf component))))) . Cost.components
+
+-- CR 601.2c's targets as a payability gate can tell them apart: two targets with
+-- one signature are interchangeable to every reader of the aiming, so
+-- Pawl.Engine.Target.aimingsBy may try one of them in place of each. Without
+-- this the lookahead is exponential in a plural slot's legal set (Clever
+-- Concealment under Hinata, Dawn-Crowned).
+--
+-- The readers, each answered here: a cost change's per-target questions
+-- (PlayerEffect.targetQuestions), the spell's own whichTargets sentences
+-- (selfReductions), every claim the cost's components make with nothing bound
+-- -- membership, and what the object adds towards a threshold -- and, beside a
+-- targetComputed component, whether a permanent is there and its mana value
+-- (fixComputed).
+--
+-- And what a target is to the MANA half, which CR 601.2g pays before 601.2h and
+-- whose sources' own costs claim objects jointly with the components
+-- (Mana.canPayCommittingGiven): a target's membership in every claim a mana
+-- source makes on an axis the components also claim, and, for a target that is
+-- itself such a source, its routes with itself written as "self". Blood Pet and
+-- Grizzly Bears are alike to Synthetic Spiteful Rite's sacrifice but not to the
+-- {B} it needs -- Pawl.CostSpec's "CR 601.2g a target the components cannot
+-- tell apart may still be the mana source". Two Treasures stay alike. Only the
+-- components' axes, because a target leaves no other claim's pool.
+--
+-- Claims read with nothing bound are what a target LEAVES when its criterion
+-- says "isn't a target". A criterion reading a slot any other way could tell
+-- interchangeable-looking targets apart, so the answer is Nothing and the caller
+-- falls back to every subset. No cost in data/cards/ reads a slot otherwise
+-- (grep of IsBound under additional and activation costs, 2026-10-08).
+aimingSignature :: PlayerId -> ObjectId -> GameState -> Cost Keyword.Type.Keyword -> Maybe (Recipient.Recipient -> ([Integer], [(Activations.Activations, [(Bool, Maybe (Maybe Integer), Claim)], Mana.Type.Mana, ManaCost.ManaCost)]))
+aimingSignature pid oid gs cost
+  | not (all onlyExcludesTargets criteria) = Nothing
+  -- One excluded slot across the whole cost: aimingsBy fixes each class's
+  -- union over the slots and each slot's draw, which settles how many targets
+  -- one slot excludes, but not the overlap of two excluded slots beside a third.
+  | Set.size (Set.fromList (concatMap excludedSlots criteria)) > 1 || any ((> 1) . length . excludedSlots) criteria = Nothing
+  | otherwise =
+      let context = Filter.contextFor (Game.teams gs) (Just pid) (Just oid)
+          wanted = Maybe.mapMaybe CostReduction.whichTargets (selfSentences pid oid gs)
+          claims = claimsOf Map.empty pid oid (Cost.components cost) gs
+          computed = any targetComputed (Cost.components cost)
+          ofObject r f = maybe 0 f (Recipient.objectOf r)
+          self r = fmap (\w -> ofObject r (\o -> toInteger (fromEnum (Filter.matches context (Projection.viewOfObject o gs) w)))) wanted
+          claimed r = concatMap (\c -> [ofObject r (toInteger . fromEnum . (`Set.member` Claim.Type.pool c)), maybe 0 (\t -> ofObject r (\o -> Map.findWithDefault 0 o (Threshold.amounts t))) (Claim.Type.threshold c)]) claims
+          evidence r = if computed then [ofObject r (\o -> toInteger (fromEnum (Game.zoneOf o gs == Just Zone.Battlefield))), ofObject r (`evidenceValue` gs)] else []
+          axes = Set.fromList (fmap Claim.Type.axis claims)
+          capacity = Mana.supplyCapacity (midPayment (manaActivationsGiven (PlayerEffect.applying pid gs)))
+          pcs = Projection.projectAll gs
+          supplies =
+            if Set.null axes
+              then []
+              else [(source, supply) | source <- Mana.manaSourcesGiven Set.empty capacity (Projection.controlGrants gs) pcs pid gs, supply <- Mana.manaSuppliesGiven capacity pcs pid source gs]
+          relevant (activations, _, _) = filter ((`Set.member` axes) . Claim.Type.axis) (Activations.claims activations)
+          -- Is the target in each source's claim pool, one entry per claim for
+          -- every target alike, so the lists line up by source. A pool of the
+          -- source alone is left out: only that source is in it, and its routes
+          -- say so, so two Treasures stay alike. A REGRESSION FENCE: no test
+          -- puts a source between two self-only sources' ObjectIds.
+          pooled r = [ofObject r (\o -> toInteger (fromEnum (Set.member o (Claim.Type.pool c)))) | (source, supply) <- supplies, c <- relevant supply, Claim.Type.pool c /= Set.singleton source]
+          -- The target's own routes, itself written out of every pool.
+          selfless o c =
+            ( Set.member o (Claim.Type.pool c),
+              fmap (Map.lookup o . Threshold.amounts) (Claim.Type.threshold c),
+              c {Claim.Type.pool = Set.delete o (Claim.Type.pool c), Claim.Type.threshold = fmap (\t -> t {Threshold.amounts = Map.delete o (Threshold.amounts t)}) (Claim.Type.threshold c)}
+            )
+          routes r = case Recipient.objectOf r of
+            Nothing -> []
+            Just o -> [(activations {Activations.claims = []}, fmap (selfless o) (relevant supply), mana, cost') | (source, supply@(activations, mana, cost')) <- supplies, source == o, not (null (relevant supply))]
+       in Just (\r -> (fmap (toInteger . fromEnum) (PlayerEffect.targetQuestions pid gs r) <> self r <> claimed r <> evidence r <> pooled r, routes r))
+  where
+    criteria = concatMap criteriaOf (Cost.components cost)
+
+-- aimingSignature as the key Pawl.Engine.Target.aimingsBy classes targets by:
+-- the target itself where no signature can be given, so the search falls back
+-- to every subset.
+aimingKey :: PlayerId -> ObjectId -> GameState -> Cost Keyword.Type.Keyword -> Recipient.Recipient -> Either Recipient.Recipient ([Integer], [(Activations.Activations, [(Bool, Maybe (Maybe Integer), Claim)], Mana.Type.Mana, ManaCost.ManaCost)])
+aimingKey pid oid gs cost = maybe Left (Right .) (aimingSignature pid oid gs cost)
+
+-- What a recipient IS, for aimingsBy: a creature, a planeswalker and a permanent
+-- named generically are one object, so one object answering two slots under two
+-- tags counts once, as PlayerEffect.perTargetCount counts it.
+aimedReferent :: Recipient.Recipient -> Recipient.Recipient
+aimedReferent r = maybe r Recipient.ToObject (Recipient.objectOf r)
+
+-- The slots a criterion excludes with a top-level Not (IsBound _).
+excludedSlots :: Filter.Type.Filter Keyword.Type.Keyword -> [SlotName.SlotName]
+excludedSlots criterion =
+  let excluded f = case f of
+        Filter.Type.Not (Filter.Type.IsBound name) -> [name]
+        _ -> []
+   in case criterion of
+        Filter.Type.And conjuncts -> concatMap excluded conjuncts
+        _ -> excluded criterion
+
+-- Does this criterion read a slot only as "isn't a target" -- a top-level
+-- Not (IsBound _), alone or as a conjunct beside slotless ones? aimingSignature's
+-- condition.
+onlyExcludesTargets :: Filter.Type.Filter Keyword.Type.Keyword -> Bool
+onlyExcludesTargets criterion =
+  let excludes f = case f of
+        Filter.Type.Not (Filter.Type.IsBound _) -> True
+        _ -> False
+      rest = case criterion of
+        Filter.Type.And conjuncts -> filter (not . excludes) conjuncts
+        _ -> [criterion | not (excludes criterion)]
+   in all (Set.null . Filter.boundSlots) rest
 
 -- Every criterion a cost component carries, as the Filters a slot name could
 -- hide in. EXHAUSTIVE with no wildcard, claimOf's posture: a new component with
@@ -4184,6 +4382,7 @@ criteriaOf component = case component of
   -- No criterion: rule 701.59a describes the cards by a TOTAL and by nothing else,
   -- so this belongs with the amount-carrying arms below.
   CostComponent.CollectEvidence _ -> []
+  CostComponent.CollectEvidenceOfTargets -> []
   -- The rest carry no criterion at all: each names either the source object or
   -- a bare amount.
   CostComponent.TapThis -> []
@@ -4935,6 +5134,7 @@ paidInSecondPass component = case component of
   CostComponent.ExileMaterials {} -> False
   CostComponent.ExileTopFromGraveyard _ -> False
   CostComponent.CollectEvidence _ -> False
+  CostComponent.CollectEvidenceOfTargets -> False
   CostComponent.ExileCardFromHand _ -> False
   -- These move no object at all.
   CostComponent.TapThis -> False
@@ -5058,6 +5258,7 @@ orderSensitive component = case component of
   CostComponent.ExileMaterials {} -> True
   CostComponent.ExileTopFromGraveyard _ -> True
   CostComponent.CollectEvidence _ -> True
+  CostComponent.CollectEvidenceOfTargets -> True
   CostComponent.ExileCardFromHand _ -> True
   -- FALSE, one of the two object-choosing components that answer so: CR 701.20b
   -- leaves the card where it was, so paying this changes no other part's pool.
@@ -6704,6 +6905,12 @@ payPayable moment slots pid oid component = case component of
         State.modify' (Event.recordEvent (GameEvent.CollectedEvidence pid))
         pure (Payment.Paid (Binding.paidObjects Binding.collectedEvidence (Set.map Recipient.ToObject chosen)))
       else pure Payment.Unpaid
+  -- The arm above at the amount these slots fix (fixComputed). A REGRESSION
+  -- FENCE: Cast.castProposed fixes the amount before CR 601.2h pays, per Urgent
+  -- Necropsy's ruling, so a payment reaching here unfixed has no caller.
+  CostComponent.CollectEvidenceOfTargets -> do
+    gs <- State.get
+    payPayable moment slots pid oid (fixComputed slots gs component)
   -- CR 406.2 with no prompt: CR 404.2's order determines the card. Unpaid where
   -- the graveyard holds no matching card, agreeing with canPayComponent above.
   CostComponent.ExileTopFromGraveyard criterion -> do
