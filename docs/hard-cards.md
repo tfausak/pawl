@@ -83,5 +83,5 @@ not repeated.
 - Flip cards, modal double-faced cards and the other layouts: once one
   alternate layout works, the rest follow from it.
 - Fiend Hunter: linked abilities split across two triggers are too narrow.
-- Dexterity (Chaos Orb) and ante: out of scope for the same reason as Un-cards,
-  until Pawl implements them.
+- Dexterity (Chaos Orb): out of scope; see `docs/design.md` section 6.
+- Ante: out of scope for the same reason as Un-cards, until Pawl implements it.
