@@ -4304,8 +4304,12 @@ aimingSignature pid oid gs cost
               then []
               else [(source, supply) | source <- Mana.manaSourcesGiven Set.empty capacity (Projection.controlGrants gs) pcs pid gs, supply <- Mana.manaSuppliesGiven capacity pcs pid source gs]
           relevant (activations, _, _) = filter ((`Set.member` axes) . Claim.Type.axis) (Activations.claims activations)
-          -- Every other source's claim pools: is the target in each.
-          pooled r = [ofObject r (\o -> toInteger (fromEnum (Set.member o (Claim.Type.pool c)))) | (source, supply) <- supplies, Recipient.objectOf r /= Just source, c <- relevant supply]
+          -- Is the target in each source's claim pool, one entry per claim for
+          -- every target alike, so the lists line up by source. A pool of the
+          -- source alone is left out: only that source is in it, and its routes
+          -- say so, so two Treasures stay alike. A REGRESSION FENCE: no test
+          -- puts a source between two self-only sources' ObjectIds.
+          pooled r = [ofObject r (\o -> toInteger (fromEnum (Set.member o (Claim.Type.pool c)))) | (source, supply) <- supplies, c <- relevant supply, Claim.Type.pool c /= Set.singleton source]
           -- The target's own routes, itself written out of every pool.
           selfless o c =
             ( Set.member o (Claim.Type.pool c),
