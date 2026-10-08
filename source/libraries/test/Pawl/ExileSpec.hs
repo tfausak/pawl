@@ -35,6 +35,8 @@
 -- what the draw runs over the whole pile for. Windbrisk Heights is the reading
 -- no spell reaches: CR 702.75a's keyword names the permanent's controller, and
 -- rule 406.3 then keeps the look with every seat that read has ever named.
+-- Synthetic Ledger Glimpse's "target card you own in exile" is the owner-scoped
+-- slot a draw out of Extract Power's two-owner pile can land outside of.
 --
 -- Each group shares ONE board across its readings, which is the point: exile
 -- holds the same cards either way, and only how they got there differs.
@@ -91,6 +93,7 @@ spec s registry = Spec.describe s "Face-down exile" $ do
   foretold s registry
   runicRepetition s registry
   extractPower s registry
+  glimpseRefusedDraws s registry
   windbriskHeights s registry
   Spec.describe s "Ignorant Bliss" $ do
     -- CR 406.3a and CR 406.4's first half, read through the pool that offers
@@ -606,6 +609,75 @@ extractPower s registry = Spec.describe s "Extract Power" $ do
         -- only tapped permanents alice has.
         Spec.assertEqWith s "alice's six Islands are still the only tapped permanents she has" (S.tappedCount S.alice resolved) 6
       _ -> Spec.assertFailure s "Extract Power should exile alice's Goblin Piker face down"
+
+-- CR 406.4's draw landing on a card the slot REFUSES, on the two roads that
+-- re-aim a spell already on the stack. Extract Power's pile holds one card of
+-- each owner and bob may look at neither, so Synthetic Ledger Glimpse's "target
+-- card you own in exile" is offered to him as the pile, and a draw pinned to
+-- alice's Goblin Piker names a card it refuses. The new target must be legal
+-- (CR 707.10c, CR 115.7a), so the spell keeps its old target, a face-up card of
+-- bob's, and resolves: the Glimpse's draw is what tells that from a spell
+-- recording the illegal card and being countered (CR 608.2b).
+glimpseRefusedDraws :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+glimpseRefusedDraws s registry = Spec.describe s "Ledger Glimpse" $ do
+  Spec.it s "CR 707.10c a copy whose re-choice draws a card it refuses keeps its old target, so both spells resolve" $ do
+    (board, faceUp, pikerId, glimpseId, twincastId, _) <- glimpseBoard s registry
+    let aimed = S.runPure S.identityAnswer (S.runPure (aimedAt faceUp) board (S.cast S.bob glimpseId)) (S.cast S.bob twincastId)
+        after = S.runPure (drawing pikerId) aimed Engine.priorityLoop
+    Spec.assertEqWith s "the copy and the original each drew bob a card" (libraryDrop board after) 2
+    -- Proxy, AFTER the behaviour: the re-choice was offered the pile.
+    glimpseOffersPile s registry board faceUp
+  Spec.it s "CR 115.7a a change of target that draws a card the spell refuses leaves the old target, so the spell resolves" $ do
+    (board, faceUp, pikerId, glimpseId, _, deflectionId) <- glimpseBoard s registry
+    let aimed = S.runPure S.identityAnswer (S.runPure (aimedAt faceUp) board (S.cast S.bob glimpseId)) (S.cast S.bob deflectionId)
+        after = S.runPure (drawing pikerId) aimed Engine.priorityLoop
+    Spec.assertEqWith s "the Glimpse still resolved on its face-up target and drew bob a card" (libraryDrop board after) 1
+    glimpseOffersPile s registry board faceUp
+
+-- How many cards left bob's library between two boards.
+libraryDrop :: GameState.GameState -> GameState.GameState -> Int
+libraryDrop before after = length (Game.zoneMembers Zone.Library S.bob before) - length (Game.zoneMembers Zone.Library S.bob after)
+
+-- Anti-vacuity for the Ledger Glimpse pair: bob is offered his face-up card by
+-- name and the two-owner pile in place of his own hidden card.
+glimpseOffersPile :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> GameState.GameState -> ObjectId.ObjectId -> m ()
+glimpseOffersPile s registry board faceUp = do
+  glimpse <- S.printingOf s registry "Synthetic Ledger Glimpse"
+  case S.spellTargetSlot glimpse of
+    Just theSlot ->
+      Spec.assertEqWith
+        s
+        "bob is offered his face-up card and the pile (CR 406.4)"
+        (offerTo S.bob theSlot board)
+        (Set.insert (Recipient.ToObject faceUp) (Set.fromList (fmap firstDraw (pilesIn board))))
+    Nothing -> Spec.assertFailure s "Synthetic Ledger Glimpse should print one target slot"
+
+-- castExtractPower's board, with bob holding priority, five Islands, three more
+-- library cards for the draws, a face-up Riftsweeper of his in exile, and
+-- Synthetic Ledger Glimpse, Twincast and Deflection in hand. Returns the board,
+-- the Riftsweeper, alice's hidden Goblin Piker and the three spells.
+glimpseBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+glimpseBoard s registry = do
+  exiled <- castExtractPower s registry
+  island <- S.printingOf s registry "Island"
+  piker <- S.printingOf s registry "Goblin Piker"
+  sentry <- S.printingOf s registry "Ogre Sentry"
+  riftsweeper <- S.printingOf s registry "Riftsweeper"
+  glimpse <- S.printingOf s registry "Synthetic Ledger Glimpse"
+  twincast <- S.printingOf s registry "Twincast"
+  deflection <- S.printingOf s registry "Deflection"
+  let stocked = foldr (\_ g -> snd (S.addLibraryCard sentry S.bob g)) (S.landsFor island S.bob 5 exiled) [1 .. (3 :: Int)]
+      (faceUp, g1) = S.addExiledCard riftsweeper S.bob stocked
+      (glimpseId, g2) = S.addHandCard glimpse S.bob g1
+      (twincastId, g3) = S.addHandCard twincast S.bob g2
+      (deflectionId, g4) = S.addHandCard deflection S.bob g3
+      board = g4 {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.bob}
+      pikerId = Maybe.fromMaybe S.noSource (List.find (\oid -> namesOf [oid] board == Set.singleton (S.printingName piker)) (faceDownExiled board))
+  pure (board, faceUp, pikerId, glimpseId, twincastId, deflectionId)
 
 -- alice casts Extract Power off six Islands. Each library's top card is a
 -- DIFFERENT one, so a failure names which seat's card came out where, and each

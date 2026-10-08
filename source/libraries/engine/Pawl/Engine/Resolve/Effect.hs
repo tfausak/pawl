@@ -3005,10 +3005,10 @@ chooseNewTargetsFor unannounced chooser controller copyId = do
         -- never a target that was left unchanged. An unchanged target is
         -- admitted whatever it is, which is the rule's own first sentence.
         --
-        -- A REGRESSION FENCE: without this line the copy records the illegal
-        -- card and CR 608.2b counters it, where the rule leaves it resolving
-        -- on its old target, but no test draws a card this slot refuses
-        -- (gap #4812).
+        -- Pawl.ExileSpec's "CR 707.10c a copy whose re-choice draws a card it
+        -- refuses keeps its old target, so both spells resolve" proves this
+        -- line: without it the copy records the illegal card and CR 608.2b
+        -- counters it, where the rule leaves it resolving on its old target.
         --
         -- CR 115.7d's joint half: the new targets "must not cause any unchanged
         -- targets to become illegal". So the joint check refuses only what was
@@ -3066,7 +3066,9 @@ retargetEach reaim legal resolving controller source ref = do
 -- Reject-not-repair, chooseNewTargetsFor's posture and for its reason: an
 -- answer outside the offer, a CR 406.4 draw landing on a refused or current
 -- target, or a final set CR 601.2c's joint check refuses (CR 115.7e judges only
--- the final set) leaves every target unchanged.
+-- the final set) leaves every target unchanged. Pawl.ExileSpec's "CR 115.7a a
+-- change of target that draws a card the spell refuses leaves the old target,
+-- so the spell resolves" proves the refused draw.
 changeTargetsFor :: PlayerId -> PlayerId -> ObjectId -> Game ()
 changeTargetsFor chooser controller oid = do
   gs <- State.get
