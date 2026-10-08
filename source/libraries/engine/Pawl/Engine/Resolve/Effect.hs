@@ -2981,12 +2981,13 @@ chooseNewTargetsFor unannounced chooser controller copyId = do
         -- the pile it sits in, exactly as at CR 601.2c. The targets already
         -- CHOSEN are offered unchanged whatever they are, rule 707.10c letting
         -- one stand even when it is now illegal.
-        offer slot (n, recipients) = (n, Set.union recipients (Target.piledOffer (Just chooser) gs (Map.findWithDefault Set.empty slot fresh)))
+        piled slot n = Target.piledOffer (Just n) (Just chooser) gs (Map.findWithDefault Set.empty slot fresh)
+        offer slot (n, recipients) = (n, Set.union recipients (piled slot n))
         asked = Map.mapWithKey offer (Map.union (fmap (\recipients -> (Natural.length recipients, recipients)) current) (fmap (\n -> (n, Set.empty)) blank))
         held = Map.union current (Set.empty <$ blank)
         -- Every slot answerable only one way means the options are
         -- indistinguishable, and CR 707.10c's offer is elided.
-        settled slot = Set.isSubsetOf (Target.piledOffer (Just chooser) gs (Map.findWithDefault Set.empty slot fresh))
+        settled slot = Set.isSubsetOf (piled slot (maybe 0 fst (Map.lookup slot asked)))
     Monad.unless (and (Map.elems (Map.mapWithKey settled held))) $ do
       answer <- Game.choose (Prompt.ChooseTargets (Decide.deciderFor chooser gs) chooser copyId asked)
       let admits slot (n, offered) picked = picked == Map.findWithDefault Set.empty slot current || (Natural.length picked == n && Set.isSubsetOf picked offered)
@@ -3004,10 +3005,10 @@ chooseNewTargetsFor unannounced chooser controller copyId = do
         -- never a target that was left unchanged. An unchanged target is
         -- admitted whatever it is, which is the rule's own first sentence.
         --
-        -- Pawl.ExileSpec's "CR 707.10c a copy's re-target keeps its old target
-        -- when the draw names a card the slot refuses" is what proves this
-        -- line: without it the copy records the illegal card and CR 608.2b
-        -- counters it, where the rule leaves it resolving on its old target.
+        -- A REGRESSION FENCE: without this line the copy records the illegal
+        -- card and CR 608.2b counters it, where the rule leaves it resolving
+        -- on its old target, but no test draws a card this slot refuses
+        -- (gap #4812).
         --
         -- CR 115.7d's joint half: the new targets "must not cause any unchanged
         -- targets to become illegal". So the joint check refuses only what was
@@ -3076,7 +3077,9 @@ changeTargetsFor chooser controller oid = do
         aimer = Maybe.fromMaybe oid (Game.abilitySourceOf oid gs)
         fresh = Target.legalSets (Just controller) False seed aimer slots gs
         another old = Set.filter (\r -> not (any (Recipient.sameReferent r) old))
-        offer slot old = (Natural.length old, Target.piledOffer (Just chooser) gs (another old (Map.findWithDefault Set.empty slot fresh)))
+        -- CR 406.4's draws capped at the slot's count, chooseNewTargetsFor's
+        -- cap. A REGRESSION FENCE: no test drives a pile through this road.
+        offer slot old = (Natural.length old, Target.piledOffer (Just (Natural.length old)) (Just chooser) gs (another old (Map.findWithDefault Set.empty slot fresh)))
         asked = Map.mapWithKey offer current
         enough (n, offered) = Natural.length offered >= n
         settled (n, offered) = Natural.length offered == n

@@ -1,7 +1,7 @@
 module Pawl.Types.Recipient where
 
 import qualified Pawl.Types.ObjectId as ObjectId
-import qualified Pawl.Types.Pile as Pile
+import qualified Pawl.Types.PileDraw as PileDraw
 import qualified Pawl.Types.PlayerId as PlayerId
 
 -- | CR 510.1: combat damage is assigned to a blocking creature, or to the player,
@@ -32,8 +32,8 @@ data Recipient
     -- Pawl.Engine.Target.drawFromPiles replaces it with the card the rule's
     -- random draw named before any target is recorded, so nothing downstream of
     -- CR 601.2c ever sees one -- which is why every arm written for it elsewhere
-    -- is unreachable.
-    ToPile Pile.Pile
+    -- is unreachable. Offered once per card a slot may draw out of the pile.
+    ToPile PileDraw.PileDraw
   deriving (Eq, Ord, Show)
 
 -- | The object a recipient names, if any -- Nothing for a player, which CR 115.1

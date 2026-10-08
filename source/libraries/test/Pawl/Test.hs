@@ -451,6 +451,7 @@ import qualified Pawl.Codec.PhasePatternSpec
 import qualified Pawl.Codec.PhaseSelectorSpec
 import qualified Pawl.Codec.PhaseSpec
 import qualified Pawl.Codec.PhasedOutSpec
+import qualified Pawl.Codec.PileDrawSpec
 import qualified Pawl.Codec.PileSpec
 import qualified Pawl.Codec.PlacementSpec
 import qualified Pawl.Codec.PlanarDieFaceSpec
@@ -1311,6 +1312,7 @@ spec s registry = do
   Pawl.Codec.ActivationSpec.spec s
   Pawl.Codec.PhasedOutSpec.spec s
   Pawl.Codec.PileSpec.spec s
+  Pawl.Codec.PileDrawSpec.spec s
   Pawl.Codec.PlayPermissionOriginSpec.spec s
   Pawl.Codec.PlayerCounterKindSpec.spec s
   Pawl.Codec.PlayerAttacksPlayerSpec.spec s

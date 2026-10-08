@@ -5,6 +5,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Pile as Pile
+import qualified Pawl.Types.PileDraw as PileDraw
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Timestamp as Timestamp
@@ -49,6 +50,6 @@ spec s = Spec.describe s "Pawl.Codec.Recipient" $ do
     Common.assertCodec
       s
       Recipient.codec
-      (Recipient.ToPile (Pile.OfFaceDown (Timestamp.MkTimestamp 6)))
-      " {\"type\":\"ToPile\",\"value\":{\"type\":\"OfFaceDown\",\"value\":6}} "
+      (Recipient.ToPile (PileDraw.MkPileDraw {PileDraw.pile = Pile.OfFaceDown (Timestamp.MkTimestamp 6), PileDraw.ordinal = 1}))
+      " {\"type\":\"ToPile\",\"value\":{\"ordinal\":1,\"pile\":{\"type\":\"OfFaceDown\",\"value\":6}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Recipient.codec

@@ -952,6 +952,8 @@ library codec
     Pawl.Codec.PhaseSelectorSpec
     Pawl.Codec.PhaseSpec
     Pawl.Codec.Pile
+    Pawl.Codec.PileDraw
+    Pawl.Codec.PileDrawSpec
     Pawl.Codec.PileSpec
     Pawl.Codec.Placement
     Pawl.Codec.PlacementSpec
@@ -2440,6 +2442,7 @@ library types
     Pawl.Types.PhaseSelector
     Pawl.Types.PhyrexianPayment
     Pawl.Types.Pile
+    Pawl.Types.PileDraw
     Pawl.Types.Placement
     Pawl.Types.PlanarDieFace
     Pawl.Types.PlanarDieRolled

@@ -44,6 +44,7 @@ import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Pile as Pile
+import qualified Pawl.Types.PileDraw as PileDraw
 import Pawl.Types.PlayerEffect (PlayerEffect)
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -1661,8 +1662,9 @@ askChooser :: PlayerId -> PlayerId -> ObjectId -> ObjectId -> Map SlotName Bindi
 askChooser controller chooser oid source seed x slots sets mine = do
   gs <- State.get
   let decider = Decide.deciderFor chooser gs
-      offered = fmap (piledOffer (Just chooser) gs) sets
       counting = countingByGiven (Projection.projectAll gs) (Just controller) seed source gs
+      most slot = TargetCount.most . SlotCount.at counting x . TargetSlot.count =<< Map.lookup slot slots
+      offered = Map.mapWithKey (\slot -> piledOffer (most slot) (Just chooser) gs) sets
       ranges = Map.restrictKeys (Map.intersectionWith (announcedRange counting x) slots (slotCapacities counting x slots offered gs)) mine
       variable = Map.keysSet (Map.filter (uncurry (/=)) ranges)
       offers = Map.restrictKeys (Map.intersectionWith (\targetSlot legal -> (SlotCount.at counting x (TargetSlot.count targetSlot), legal)) slots offered) variable
@@ -1691,19 +1693,21 @@ askChooser controller chooser oid source seed x slots sets mine = do
 -- "otherwise, they may choose a pile of face-down exiled cards".
 --
 -- A SUBSTITUTION rather than an addition, which is the rule's "otherwise": the
--- pile is what the chooser gets INSTEAD of the card. Two cards of one pile
--- collapse to one candidate, so the offer says how many piles there are and
--- never how many cards are in one.
---
--- Not implemented: naming one pile TWICE, which a slot wanting two exiled cards
--- would want -- an announcement is a Set Recipient, so it holds a pile once
--- (#2936).
+-- pile is what the chooser gets INSTEAD of the card. Each pile is offered once
+-- per card the slot may draw out of it -- the fewer of the pile's size and the
+-- slot's most (`most`, Nothing for no maximum) -- so a slot wanting two exiled
+-- cards can name one pile twice, CR 115.3 restricting the card each draw names
+-- rather than the pile. A single-target slot is offered each pile once, so the
+-- copies of a pile are never an indistinguishable choice there. Pawl.ExileSpec's
+-- "CR 406.4 a slot wanting two cards names one pile twice" and "CR 707.10c a
+-- copy wanting two cards names one pile twice" are the proofs.
 --
 -- Taken here rather than in the pool, because the two halves of rule 406.4 are
 -- about different moments: legality is the card's (basePoolGiven's exile arm),
 -- and only the ANNOUNCEMENT is narrowed. Every caller that raises a prompt over
--- a target set owes this call -- Pawl.Engine.Resolve.Effect.chooseNewTargetsFor is the
--- other one -- or it would offer by name what the rule says may not be named.
+-- a target set owes this call -- Pawl.Engine.Resolve.Effect's
+-- chooseNewTargetsFor and changeTargetsFor are the others -- or it would offer
+-- by name what the rule says may not be named.
 --
 -- Applied to the set the slot's Filter already narrowed, so a pile reaches the
 -- offer only where at least one of its cards is a legal target. That is CR
@@ -1722,19 +1726,27 @@ askChooser controller chooser oid source seed x slots sets mine = do
 -- pawl's own answer, and Pawl.ExileSpec's Runic Repetition group proves it: a
 -- slot wanting flashback admits no card of a face-down pile, so no pile is
 -- offered for it at all.
-piledOffer :: Maybe PlayerId -> GameState -> Set Recipient -> Set Recipient
-piledOffer perspective gs =
-  let replace recipient = Maybe.fromMaybe recipient $ do
+piledOffer :: Maybe Natural -> Maybe PlayerId -> GameState -> Set Recipient -> Set Recipient
+piledOffer most perspective gs recipients =
+  let pileFor recipient = do
         oid <- Recipient.objectOf recipient
         if Exile.mayChoose perspective oid gs
           then Nothing
-          else fmap Recipient.ToPile (Exile.pileOf oid gs)
-   in Set.map replace
+          else Exile.pileOf oid gs
+      named = Set.filter (Maybe.isNothing . pileFor) recipients
+      piles = Set.fromList (Maybe.mapMaybe pileFor (Set.toList recipients))
+      draws pile =
+        let size = Natural.length (pileMembers perspective pile gs)
+         in fmap
+              (\n -> Recipient.ToPile PileDraw.MkPileDraw {PileDraw.pile = pile, PileDraw.ordinal = n})
+              [1 .. maybe size (min size) most]
+   in Set.union named (Set.fromList (concatMap draws (Set.toList piles)))
 
 -- CR 406.4: "and then a card is chosen at random from within that pile" -- every
 -- pile an announcement named, replaced by the card the draw picked out of it, so
 -- what CR 601.2c records as a target is a card and nothing downstream of this
--- ever meets a pile.
+-- ever meets a pile. A pile named twice is drawn from twice, the second draw
+-- over the cards the first left.
 --
 -- Prompt.RandomObject is the draw, which is the engine asking rather than
 -- rolling, and Game.ask rather than Game.choose: randomness is not CR 104.4b's
@@ -1767,29 +1779,38 @@ piledOffer perspective gs =
 -- them wherever the slot is unqualified, rule 406.4 keeping every exiled card
 -- legal for one.
 --
--- A pile whose members have gone is DROPPED rather than kept: an answer holding
--- a pile no longer offered is short by one target, which selectionLegal then
--- refuses under CR 601.2e. Keeping it would record a pile as a target.
+-- A draw out of a pile whose members have gone is DROPPED rather than kept: an
+-- answer holding it is short by one target, which selectionLegal then refuses
+-- under CR 601.2e. Keeping it would record a pile as a target.
 --
 -- Not implemented: CR 406.4's last sentence, which delays the drawn card's
 -- reveal until a cost is paid. Nothing in pawl reveals a chosen target at all,
 -- and no cost in `data/cards/` chooses an exiled card (#2568).
 drawFromPiles :: Maybe PlayerId -> Set Recipient -> Game (Set Recipient)
 drawFromPiles perspective picked = do
-  let draw recipient = case recipient of
-        Recipient.ToPile pile -> do
-          gs <- State.get
-          case pileMembers perspective pile gs of
-            [] -> pure Nothing
-            [only] -> pure (Just (Recipient.ToObject only))
-            first : second : more -> do
-              let offered = first NonEmpty.:| (second : more)
-              answer <- Game.ask (Prompt.RandomObject offered)
-              pure . Just . Recipient.ToObject $
-                if List.elem answer (NonEmpty.toList offered) then answer else first
-        _ -> pure (Just recipient)
-  drawn <- traverse draw (Set.toList picked)
-  pure (Set.fromList (Maybe.catMaybes drawn))
+  let drawOf recipient = case recipient of
+        Recipient.ToPile pileDraw -> Just (PileDraw.pile pileDraw)
+        _ -> Nothing
+      named = Set.filter (Maybe.isNothing . drawOf) picked
+      wanted = Map.fromListWith (+) (fmap (\pile -> (pile, 1 :: Natural)) (Maybe.mapMaybe drawOf (Set.toList picked)))
+      -- Without replacement: the draws out of one pile are for one instance of
+      -- "target", which CR 115.3 forbids naming one card twice.
+      drawOut pile = go []
+        where
+          go taken n =
+            if n == 0
+              then pure taken
+              else do
+                gs <- State.get
+                case filter (`notElem` taken) (pileMembers perspective pile gs) of
+                  [] -> pure taken
+                  [only] -> go (only : taken) (n - 1)
+                  first : second : more -> do
+                    let offered = first NonEmpty.:| (second : more)
+                    answer <- Game.ask (Prompt.RandomObject offered)
+                    go ((if List.elem answer (NonEmpty.toList offered) then answer else first) : taken) (n - 1)
+  drawn <- Map.traverseWithKey drawOut wanted
+  pure (Set.union named (Set.fromList (fmap Recipient.ToObject (concat (Map.elems drawn)))))
 
 -- CR 406.4's pile itself: every exiled card this chooser may not name that
 -- Pawl.Engine.Exile.pileOf sorts into this pile. Ascending by object id, which is

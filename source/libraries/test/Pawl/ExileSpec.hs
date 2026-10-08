@@ -74,6 +74,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Pile as Pile
+import qualified Pawl.Types.PileDraw as PileDraw
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
@@ -113,7 +114,7 @@ spec s registry = Spec.describe s "Face-down exile" $ do
             s
             "the offer names the face-up card and the PILE the two face-down ones are in (CR 406.4)"
             (offerTo S.alice theSlot board)
-            (Set.union (Set.fromList (fmap Recipient.ToPile (pilesIn board))) (Set.fromList (fmap Recipient.ToObject (faceUpExiled board))))
+            (Set.union (Set.fromList (fmap firstDraw (pilesIn board))) (Set.fromList (fmap Recipient.ToObject (faceUpExiled board))))
           Spec.assertEqWith s "and that is ONE pile, both cards having been hidden by one casting" (length (pilesIn board)) 1
           Spec.assertEqWith s "and the face-up card is exactly one" (length (faceUpExiled board)) 1
           -- The other half of the same rule: the pile stands for cards that are
@@ -240,12 +241,68 @@ spec s registry = Spec.describe s "Face-down exile" $ do
       case pilesIn exiled of
         [pile] -> do
           let board = exiled {GameState.lastChoice = Timestamp.MkTimestamp 0}
-              (drawn, after) = S.runPureWith throughPile board (Target.drawFromPiles (Just S.alice) (Set.singleton (Recipient.ToPile pile)))
+              (drawn, after) = S.runPureWith throughPile board (Target.drawFromPiles (Just S.alice) (Set.singleton (firstDraw pile)))
           case membersOfPile board pile of
             [_, second] -> Spec.assertEqWith s "the draw was honoured, naming the last card of the pile" (Set.toList drawn) [Recipient.ToObject second]
             _ -> Spec.assertFailure s "the casting should hide two cards in one pile"
           Spec.assertEqWith s "and nobody was recorded as having been offered a choice" (GameState.lastChoice after) (Timestamp.MkTimestamp 0)
         _ -> Spec.assertFailure s "one casting should make one pile"
+    -- CR 406.4 under CR 115.3: a slot wanting TWO exiled cards may name the one
+    -- pile twice, each naming a draw, and the second draw is over what the first
+    -- left. The face-up Ogre Sentry is offered too, so a slot offered the pile
+    -- only once could still be filled -- just not out of the pile alone, which is
+    -- what the answerer asks for.
+    Spec.it s "CR 406.4 a slot wanting two cards names one pile twice, and both of its cards are drawn" $ do
+      exiled <- castBliss s registry
+      plains <- S.printingOf s registry "Plains"
+      piker <- S.printingOf s registry "Goblin Piker"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      sentry <- S.printingOf s registry "Ogre Sentry"
+      recall <- S.printingOf s registry "Synthetic Twin Recall"
+      let (spellId, g1) = S.addHandCard recall S.alice (S.landsFor plains S.alice 2 exiled)
+          board = g1 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+          after = resolveAll (S.runPure throughPile board (S.cast S.alice spellId))
+      Spec.assertBool
+        s
+        (Set.isSubsetOf (Set.fromList [S.printingName piker, S.printingName bolt]) (namesIn Zone.Graveyard S.alice after))
+        "both cards of the one pile reached alice's graveyard"
+      -- Proxies, AFTER the behaviour so neither can absorb a mutation.
+      Spec.assertEqWith s "the face-up card stayed in exile" (namesOf (Set.toList (GameState.exile after)) after) (Set.singleton (S.printingName sentry))
+      case S.spellTargetSlot recall of
+        Just theSlot -> Spec.assertEqWith s "the pile was offered twice beside the face-up card" (Set.size (offerTo S.alice theSlot board)) 3
+        Nothing -> Spec.assertFailure s "Synthetic Twin Recall should print one target slot"
+    -- The same over CR 707.10c's road (Pawl.Engine.Resolve.Effect's
+    -- chooseNewTargetsFor): the original aims at two face-up cards, and its
+    -- Twincast copy re-chooses both of its targets out of the one pile.
+    Spec.it s "CR 707.10c a copy wanting two cards names one pile twice, and both of its cards are drawn" $ do
+      exiled <- castBliss s registry
+      plains <- S.printingOf s registry "Plains"
+      island <- S.printingOf s registry "Island"
+      piker <- S.printingOf s registry "Goblin Piker"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      riftsweeper <- S.printingOf s registry "Riftsweeper"
+      recall <- S.printingOf s registry "Synthetic Twin Recall"
+      twincast <- S.printingOf s registry "Twincast"
+      let (_, g1) = S.addExiledCard riftsweeper S.bob (S.landsFor island S.alice 2 (S.landsFor plains S.alice 2 exiled))
+          (recallId, g2) = S.addHandCard recall S.alice g1
+          (twincastId, g3) = S.addHandCard twincast S.alice g2
+          board = g3 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+          isPile recipient = case recipient of
+            Recipient.ToPile _ -> True
+            _ -> False
+          faceUpOnly :: Prompt.Prompt r -> r
+          faceUpOnly p = case p of
+            Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (not . isPile) . snd) sets
+            _ -> S.identityAnswer p
+          aimed = S.runPure S.identityAnswer (S.runPure faceUpOnly board (S.cast S.alice recallId)) (S.cast S.alice twincastId)
+          after = S.runPure throughPile aimed Engine.priorityLoop
+      Spec.assertBool
+        s
+        (Set.isSubsetOf (Set.fromList [S.printingName piker, S.printingName bolt]) (namesIn Zone.Graveyard S.alice after))
+        "both cards of the one pile reached alice's graveyard through the copy"
+      -- Proxy, AFTER the behaviour: the original still resolved on its two
+      -- face-up targets, so exile is empty.
+      Spec.assertEqWith s "and the original took the two face-up cards" (Set.size (GameState.exile after)) 0
     -- The same gate from the other side, on a board differing in ONE thing: the
     -- two cards reach exile FACE UP instead, by the same route every other test
     -- puts a card there. Same printings, same seats, same zone, same count -- so a
@@ -365,7 +422,7 @@ foretold s registry = Spec.describe s "Augury Raven" $ do
           s
           "bob is offered the face-up one by name and the foretold card only as its own pile"
           (offerTo S.bob unqualified board)
-          (Set.fromList [Recipient.ToObject upId, Recipient.ToPile (Pile.OfForetold (timestampOf downId board))])
+          (Set.fromList [Recipient.ToObject upId, firstDraw (Pile.OfForetold (timestampOf downId board))])
         Spec.assertEqWith
           s
           "and Riftsweeper's printed face-up qualifier refuses the foretold card even to alice, offering no pile in its place"
@@ -505,7 +562,7 @@ extractPower s registry = Spec.describe s "Extract Power" $ do
           s
           "bob was shown nothing, so neither card is offered to him by name, his own included (CR 406.4)"
           (offerTo S.bob theSlot board)
-          (Set.fromList (fmap Recipient.ToPile (pilesIn board)))
+          (Set.fromList (fmap firstDraw (pilesIn board)))
         -- Proxies, AFTER the two behavioural assertions so neither can absorb a
         -- mutation: one instruction hid two cards, so they are ONE pile, and
         -- both seats own one of them.
@@ -614,7 +671,7 @@ windbriskHeights s registry = Spec.describe s "Windbrisk Heights" $ do
           s
           "bob controls nothing that exiled it, so he is offered the pile instead (CR 406.4)"
           (offerTo S.bob theSlot board)
-          (Set.fromList (fmap Recipient.ToPile (pilesIn board)))
+          (Set.fromList (fmap firstDraw (pilesIn board)))
         Spec.assertEqWith s "exactly one card is in exile face down" (length (faceDownExiled board)) 1
       Nothing -> Spec.assertFailure s "Synthetic Blind Reclamation should print one target slot"
 
@@ -652,7 +709,7 @@ windbriskHeights s registry = Spec.describe s "Windbrisk Heights" $ do
           s
           "and before the steal bob was offered the pile instead (CR 406.4)"
           (offerTo S.bob theSlot board)
-          (Set.fromList (fmap Recipient.ToPile (pilesIn board)))
+          (Set.fromList (fmap firstDraw (pilesIn board)))
       Nothing -> Spec.assertFailure s "Synthetic Blind Reclamation should print one target slot"
 
   -- THE COPY TRIPWIRE for the read above, as a PAIR of boards differing in which
@@ -680,7 +737,7 @@ windbriskHeights s registry = Spec.describe s "Windbrisk Heights" $ do
           s
           "taking the land it copied leaves him the pile (CR 406.4)"
           (offerTo S.bob theSlot tookCopied)
-          (Set.fromList (fmap Recipient.ToPile (pilesIn tookCopied)))
+          (Set.fromList (fmap firstDraw (pilesIn tookCopied)))
         -- Proxy, AFTER the pair: both boards really moved control, so what they
         -- differ in is which permanent bob took.
         Spec.assertEqWith
@@ -747,7 +804,7 @@ windbriskHeights s registry = Spec.describe s "Windbrisk Heights" $ do
           s
           "and having held the land that exiled NOTHING he is offered the pile instead (CR 406.4)"
           (offerTo S.bob theSlot tookCopied)
-          (Set.fromList (fmap Recipient.ToPile (pilesIn tookCopied)))
+          (Set.fromList (fmap firstDraw (pilesIn tookCopied)))
         -- Anti-vacuity, AFTER the behaviour: the Graft really put both lands back
         -- under alice, so nothing bob controls answers rule 702.75a on either leg.
         Spec.assertEqWith
@@ -1161,8 +1218,15 @@ drawing oid p = case p of
 -- What CR 601.2c would put in front of this player: the slot's legal set with CR
 -- 406.4's substitution taken over it, which is the pair Pawl.Engine.Target's
 -- chooseTargets raises a prompt with.
+--
+-- The slot's most is its fixed count, which every slot this spec offers has.
 offerTo :: PlayerId.PlayerId -> TargetSlot.TargetSlot -> GameState.GameState -> Set.Set Recipient.Recipient
-offerTo pid slot gs = Target.piledOffer (Just pid) gs (Target.legalRecipients (Just pid) S.noSource slot gs)
+offerTo pid slot gs = Target.piledOffer (Target.fixedCount slot) (Just pid) gs (Target.legalRecipients (Just pid) S.noSource slot gs)
+
+-- The first draw a slot may name out of a pile, which is the only one a
+-- single-target slot is offered (CR 406.4).
+firstDraw :: Pile.Pile -> Recipient.Recipient
+firstDraw pile = Recipient.ToPile PileDraw.MkPileDraw {PileDraw.pile = pile, PileDraw.ordinal = 1}
 
 -- CR 613.7d's stamp, which is what names a foretold card's pile.
 timestampOf :: ObjectId.ObjectId -> GameState.GameState -> Timestamp.Timestamp
@@ -1273,7 +1337,7 @@ resolveAll gs = S.runPure S.identityAnswer gs Engine.priorityLoop
 -- is answered with the LAST card of whatever pile it is given.
 throughPileOf :: Pile.Pile -> Prompt.Prompt r -> r
 throughPileOf pile p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> S.preferring (Recipient.ToPile pile ==) sets
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (firstDraw pile ==) sets
   Prompt.RandomObject members -> NonEmpty.last members
   _ -> S.identityAnswer p
 
