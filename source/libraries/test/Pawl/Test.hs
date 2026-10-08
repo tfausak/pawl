@@ -8,6 +8,7 @@ import qualified Pawl.ActivateSpec
 import qualified Pawl.ActivationProhibitionSpec
 import qualified Pawl.AdventureSpec
 import qualified Pawl.AirbendSpec
+import qualified Pawl.AlternatingTeamsSpec
 import qualified Pawl.ArchenemySpec
 import qualified Pawl.AttackKeywordTriggerSpec
 import qualified Pawl.AttractionSpec
@@ -851,6 +852,7 @@ spec s registry = do
   Pawl.AbilitySlotLintSpec.spec s registry
   Pawl.EffectLintSpec.spec s registry
   Pawl.EmperorSpec.spec s registry
+  Pawl.AlternatingTeamsSpec.spec s registry
   Pawl.FilterPositionLintSpec.spec s registry
   Pawl.CardsSpec.spec s
   Pawl.OracleSpec.spec s

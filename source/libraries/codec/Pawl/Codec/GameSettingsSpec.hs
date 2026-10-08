@@ -20,22 +20,22 @@ spec s = Spec.describe s "Pawl.Codec.GameSettings" $ do
     Common.assertCodec
       s
       GameSettings.codec
-      GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Nothing, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.sharedTeamLife = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False, GameSettings.emperors = Emperors.none, GameSettings.twoHeadedGiant = False}
-      " {\"brawl\":false,\"attackOption\":null,\"teams\":{},\"sharedTeamTurns\":false,\"sharedTeamLife\":false,\"rangeOfInfluence\":{},\"deployCreatures\":false,\"emperors\":{},\"twoHeadedGiant\":false} "
+      GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Nothing, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.sharedTeamLife = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False, GameSettings.emperors = Emperors.none, GameSettings.twoHeadedGiant = False, GameSettings.alternatingTeams = False}
+      " {\"brawl\":false,\"attackOption\":null,\"teams\":{},\"sharedTeamTurns\":false,\"sharedTeamLife\":false,\"rangeOfInfluence\":{},\"deployCreatures\":false,\"emperors\":{},\"twoHeadedGiant\":false,\"alternatingTeams\":false} "
   -- CR 903.12a: the same record with the Brawl option turned on.
   Spec.it s "a Brawl game" $
     Common.assertCodec
       s
       GameSettings.codec
-      GameSettings.MkGameSettings {GameSettings.brawl = True, GameSettings.attackOption = Nothing, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.sharedTeamLife = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False, GameSettings.emperors = Emperors.none, GameSettings.twoHeadedGiant = False}
-      " {\"brawl\":true,\"attackOption\":null,\"teams\":{},\"sharedTeamTurns\":false,\"sharedTeamLife\":false,\"rangeOfInfluence\":{},\"deployCreatures\":false,\"emperors\":{},\"twoHeadedGiant\":false} "
+      GameSettings.MkGameSettings {GameSettings.brawl = True, GameSettings.attackOption = Nothing, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.sharedTeamLife = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False, GameSettings.emperors = Emperors.none, GameSettings.twoHeadedGiant = False, GameSettings.alternatingTeams = False}
+      " {\"brawl\":true,\"attackOption\":null,\"teams\":{},\"sharedTeamTurns\":false,\"sharedTeamLife\":false,\"rangeOfInfluence\":{},\"deployCreatures\":false,\"emperors\":{},\"twoHeadedGiant\":false,\"alternatingTeams\":false} "
   -- CR 802.1: and the option every game pawl starts uses.
   Spec.it s "a game using the attack multiple players option" $
     Common.assertCodec
       s
       GameSettings.codec
-      GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.sharedTeamLife = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False, GameSettings.emperors = Emperors.none, GameSettings.twoHeadedGiant = False}
-      " {\"brawl\":false,\"attackOption\":{\"type\":\"MultiplePlayers\"},\"teams\":{},\"sharedTeamTurns\":false,\"sharedTeamLife\":false,\"rangeOfInfluence\":{},\"deployCreatures\":false,\"emperors\":{},\"twoHeadedGiant\":false} "
+      GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.sharedTeamLife = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False, GameSettings.emperors = Emperors.none, GameSettings.twoHeadedGiant = False, GameSettings.alternatingTeams = False}
+      " {\"brawl\":false,\"attackOption\":{\"type\":\"MultiplePlayers\"},\"teams\":{},\"sharedTeamTurns\":false,\"sharedTeamLife\":false,\"rangeOfInfluence\":{},\"deployCreatures\":false,\"emperors\":{},\"twoHeadedGiant\":false,\"alternatingTeams\":false} "
   -- CR 803.1a: the option CR 807.2b makes the Grand Melee default. Its sibling
   -- Rightward is Pawl.Codec.AttackOptionSpec's business; what is this record's
   -- is that the field carries a NAMED option rather than a flag.
@@ -43,8 +43,8 @@ spec s = Spec.describe s "Pawl.Codec.GameSettings" $ do
     Common.assertCodec
       s
       GameSettings.codec
-      GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.Leftward, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.sharedTeamLife = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False, GameSettings.emperors = Emperors.none, GameSettings.twoHeadedGiant = False}
-      " {\"brawl\":false,\"attackOption\":{\"type\":\"Leftward\"},\"teams\":{},\"sharedTeamTurns\":false,\"sharedTeamLife\":false,\"rangeOfInfluence\":{},\"deployCreatures\":false,\"emperors\":{},\"twoHeadedGiant\":false} "
+      GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.Leftward, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.sharedTeamLife = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False, GameSettings.emperors = Emperors.none, GameSettings.twoHeadedGiant = False, GameSettings.alternatingTeams = False}
+      " {\"brawl\":false,\"attackOption\":{\"type\":\"Leftward\"},\"teams\":{},\"sharedTeamTurns\":false,\"sharedTeamLife\":false,\"rangeOfInfluence\":{},\"deployCreatures\":false,\"emperors\":{},\"twoHeadedGiant\":false,\"alternatingTeams\":false} "
   -- CR 810.1 / 810.2 / 810.4 / 804.1: a Two-Headed Giant game, two teams of two
   -- each taking its turns together and sharing one life total, with the deploy
   -- creatures option.
@@ -69,9 +69,10 @@ spec s = Spec.describe s "Pawl.Codec.GameSettings" $ do
           GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited,
           GameSettings.deployCreatures = True,
           GameSettings.emperors = Emperors.none,
-          GameSettings.twoHeadedGiant = True
+          GameSettings.twoHeadedGiant = True,
+          GameSettings.alternatingTeams = False
         }
-      " {\"brawl\":false,\"attackOption\":{\"type\":\"MultiplePlayers\"},\"teams\":{\"0\":0,\"1\":1,\"2\":0,\"3\":1},\"sharedTeamTurns\":true,\"sharedTeamLife\":true,\"rangeOfInfluence\":{},\"deployCreatures\":true,\"emperors\":{},\"twoHeadedGiant\":true} "
+      " {\"brawl\":false,\"attackOption\":{\"type\":\"MultiplePlayers\"},\"teams\":{\"0\":0,\"1\":1,\"2\":0,\"3\":1},\"sharedTeamTurns\":true,\"sharedTeamLife\":true,\"rangeOfInfluence\":{},\"deployCreatures\":true,\"emperors\":{},\"twoHeadedGiant\":true,\"alternatingTeams\":false} "
   -- CR 801.2a: the limited range of influence option, one seat for two players.
   Spec.it s "a game using a limited range of influence" $
     Common.assertCodec
@@ -86,9 +87,10 @@ spec s = Spec.describe s "Pawl.Codec.GameSettings" $ do
           GameSettings.rangeOfInfluence = RangeOfInfluence.MkRangeOfInfluence (Map.fromList [(PlayerId.MkPlayerId 0, 1), (PlayerId.MkPlayerId 1, 1)]),
           GameSettings.deployCreatures = False,
           GameSettings.emperors = Emperors.none,
-          GameSettings.twoHeadedGiant = False
+          GameSettings.twoHeadedGiant = False,
+          GameSettings.alternatingTeams = False
         }
-      " {\"brawl\":false,\"attackOption\":{\"type\":\"MultiplePlayers\"},\"teams\":{},\"sharedTeamTurns\":false,\"sharedTeamLife\":false,\"rangeOfInfluence\":{\"0\":1,\"1\":1},\"deployCreatures\":false,\"emperors\":{},\"twoHeadedGiant\":false} "
+      " {\"brawl\":false,\"attackOption\":{\"type\":\"MultiplePlayers\"},\"teams\":{},\"sharedTeamTurns\":false,\"sharedTeamLife\":false,\"rangeOfInfluence\":{\"0\":1,\"1\":1},\"deployCreatures\":false,\"emperors\":{},\"twoHeadedGiant\":false,\"alternatingTeams\":false} "
   -- CR 809.2 / 809.3: an Emperor game, two teams of three with each team's
   -- emperor in its middle seat.
   Spec.it s "an Emperor game" $
@@ -104,6 +106,17 @@ spec s = Spec.describe s "Pawl.Codec.GameSettings" $ do
           GameSettings.rangeOfInfluence = RangeOfInfluence.MkRangeOfInfluence (Map.fromList [(PlayerId.MkPlayerId p, if p == 1 || p == 4 then 2 else 1) | p <- [0 .. 5]]),
           GameSettings.deployCreatures = True,
           GameSettings.emperors = Emperors.MkEmperors (Map.fromList [(TeamId.MkTeamId 0, PlayerId.MkPlayerId 1), (TeamId.MkTeamId 1, PlayerId.MkPlayerId 4)]),
-          GameSettings.twoHeadedGiant = False
+          GameSettings.twoHeadedGiant = False,
+          GameSettings.alternatingTeams = False
         }
-      " {\"brawl\":false,\"attackOption\":{\"type\":\"Adjacent\"},\"teams\":{\"0\":0,\"1\":0,\"2\":0,\"3\":1,\"4\":1,\"5\":1},\"sharedTeamTurns\":false,\"sharedTeamLife\":false,\"rangeOfInfluence\":{\"0\":1,\"1\":2,\"2\":1,\"3\":1,\"4\":2,\"5\":1},\"deployCreatures\":true,\"emperors\":{\"0\":1,\"1\":4},\"twoHeadedGiant\":false} "
+      " {\"brawl\":false,\"attackOption\":{\"type\":\"Adjacent\"},\"teams\":{\"0\":0,\"1\":0,\"2\":0,\"3\":1,\"4\":1,\"5\":1},\"sharedTeamTurns\":false,\"sharedTeamLife\":false,\"rangeOfInfluence\":{\"0\":1,\"1\":2,\"2\":1,\"3\":1,\"4\":2,\"5\":1},\"deployCreatures\":true,\"emperors\":{\"0\":1,\"1\":4},\"twoHeadedGiant\":false,\"alternatingTeams\":false} "
+  -- CR 811: an Alternating Teams game, two teams of two seated alternately.
+  Spec.it s "an Alternating Teams game" $
+    Common.assertCodec
+      s
+      GameSettings.codec
+      GameSettings.plain
+        { GameSettings.teams = Teams.MkTeams (Map.fromList [(PlayerId.MkPlayerId p, TeamId.MkTeamId (mod p 2)) | p <- [0 .. 3]]),
+          GameSettings.alternatingTeams = True
+        }
+      " {\"brawl\":false,\"attackOption\":{\"type\":\"MultiplePlayers\"},\"teams\":{\"0\":0,\"1\":1,\"2\":0,\"3\":1},\"sharedTeamTurns\":false,\"sharedTeamLife\":false,\"rangeOfInfluence\":{},\"deployCreatures\":false,\"emperors\":{},\"twoHeadedGiant\":false,\"alternatingTeams\":true} "

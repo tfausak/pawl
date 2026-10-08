@@ -170,18 +170,29 @@ attackableOpponents gs =
       others = drop 1 seats
       opponents = filter (\pid -> Game.areOpponents gs active pid && List.elem pid playing && Game.inRangeOf active pid gs) seats
       seatedAt neighbour = filter (\pid -> Just pid == neighbour) opponents
-   in case GameSettings.attackOption (GameState.settings gs) of
+      beside = filter (\pid -> List.elem pid (Game.neighbours active gs))
+      allowed = case GameSettings.attackOption (GameState.settings gs) of
         Just AttackOption.Leftward -> seatedAt (Maybe.listToMaybe others)
         Just AttackOption.Rightward -> seatedAt (Maybe.listToMaybe (reverse others))
         -- CR 809.3c: either neighbour, over CR 801.2c's seats rather than the
         -- roster (Game.neighbours), so a seat emptied before this turn has
         -- closed up.
-        Just AttackOption.Adjacent -> filter (\pid -> List.elem pid (Game.neighbours active gs)) opponents
+        Just AttackOption.Adjacent -> beside opponents
         -- Exhaustive rather than a wildcard, so a further attack option is named
         -- by -Werror here instead of silently inheriting CR 507.1's
         -- unrestricted list.
         Just AttackOption.MultiplePlayers -> opponents
         Nothing -> opponents
+   in -- CR 811.4: Alternating Teams cuts whatever the option allowed to the
+      -- opponents seated next to the attacker -- a no-op under attack left or
+      -- right, two seats under attack multiple players (CR 811.2b). "Seated
+      -- next to" is read as CR 809.3c's identical phrase is, over
+      -- Game.neighbours.
+      --
+      -- Not implemented: CR 802.2 designating the opponents CR 811.4 cuts as
+      -- defending players all the same, since this list is also who is
+      -- designated (#4800).
+      if GameSettings.alternatingTeams (GameState.settings gs) then beside allowed else allowed
 
 -- CR 508.1b: what the active player may announce a chosen creature is attacking,
 -- for ONE defending player -- which player, planeswalker or battle. CR 506.2's
@@ -1820,8 +1831,9 @@ noteAttackingNothing gs =
 -- No candidates leaves the field empty, which declareAttackers reads through
 -- Defender.defendingPlayers as no attack being possible. That is CR 803.1a's
 -- and CR 803.1b's own second sentence -- the adjacent seat is empty and the
--- nearest opponent in that direction is more than one seat away -- and is
--- otherwise unreachable in a running game (CR 104.2a).
+-- nearest opponent in that direction is more than one seat away -- CR 801.3's
+-- with no opponent in range, and CR 809.3c's and CR 811.4's with no opponent
+-- seated next to the attacker.
 --
 -- An answer outside the candidate list is a broken interpreter, not a game state,
 -- and degrades to the first candidate -- the same value Replay.defaultAnswer gives

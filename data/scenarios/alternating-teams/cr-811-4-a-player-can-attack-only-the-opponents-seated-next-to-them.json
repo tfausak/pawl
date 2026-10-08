@@ -1,0 +1,76 @@
+{
+  "description": "CR 811.4 a player can't attack opponents who aren't seated next to them",
+  "note": "Three teams of two seated as CR 811.3's example: alice and dave are team 1, bob and erin team 2, carol and frank team 3, under CR 802's attack multiple players option (CR 811.2b). alice's opponents are bob, carol, erin and frank, but only bob and frank sit next to her, so only they are defending players; the --control file is the same board without the variant.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1,
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "team": 2
+      },
+      {
+        "name": "carol",
+        "team": 3
+      },
+      {
+        "name": "dave",
+        "team": 1
+      },
+      {
+        "name": "erin",
+        "team": 2
+      },
+      {
+        "name": "frank",
+        "team": 3
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "alternatingTeams": true
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$piker"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "$piker",
+      "do": {
+        "ChooseAttackTarget": "$frank"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Defenders": {
+          "players": [
+            "bob",
+            "frank"
+          ]
+        }
+      }
+    }
+  ]
+}
