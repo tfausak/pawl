@@ -1,0 +1,78 @@
+{
+  "description": "CR 810.8a a teammate's loss is the team's (control)",
+  "note": "The same board without twoHeadedGiant: Carol Bolts bob, on 3 life, so he loses (CR 104.3b, 704.5a) while alice is on 20. Alice plays on, so nobody has won.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1
+      },
+      {
+        "name": "bob",
+        "team": 1,
+        "life": 3
+      },
+      {
+        "name": "carol",
+        "team": 2,
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Lightning Bolt",
+            "label": "bolt"
+          }
+        ]
+      },
+      {
+        "name": "dave",
+        "team": 2
+      }
+    ],
+    "active": "carol",
+    "step": "PrecombatMain",
+    "sharedTeamTurns": true
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": {
+        "Cast": {
+          "object": "$bolt",
+          "targets": [
+            "$bob"
+          ],
+          "mana": [
+            "$mountain"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": "Pass"
+    }
+  ],
+  "final": [
+    {
+      "View": {
+        "of": "Result",
+        "is": null
+      }
+    },
+    {
+      "Life": {
+        "player": "bob",
+        "life": 0
+      }
+    }
+  ]
+}

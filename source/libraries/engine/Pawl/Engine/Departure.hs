@@ -36,6 +36,7 @@ import qualified Pawl.Types.Departure as Departure
 import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LastKnown as LastKnown
@@ -88,7 +89,8 @@ depart reason pid = departTogether reason [pid]
 -- flip done.
 --
 -- CR 809.5b / 809.5c: a departing emperor's team leaves in the same event
--- (Emperor.fallsWith), after the players named.
+-- (Emperor.fallsWith), after the players named; CR 810.8a / 810.8b, so does a
+-- Two-Headed Giant player's (teamFallsWith).
 departTogether :: Departure -> [PlayerId] -> Game ()
 departTogether reason named = Monad.join (leaveTogether reason named)
 
@@ -102,7 +104,7 @@ leaveTogether :: Departure -> [PlayerId] -> Game (Game ())
 leaveTogether reason named = do
   continues <- State.gets continuesAfterDeparture
   before <- State.get
-  let departing = fmap (\pid -> (reason, pid)) named <> Emperor.fallsWith reason named before
+  let departing = fmap (\pid -> (reason, pid)) named <> Emperor.fallsWith reason named before <> teamFallsWith reason named before
       pids = fmap snd departing
       lose why p = p {Player.status = Status.Departed why}
       -- CR 801.2c: the seat keeps counting toward range of influence until the
@@ -132,6 +134,26 @@ leaveTogether reason named = do
     Monad.mapM_ remainingControlledExiled pids
     -- CR 901.10: the replacement plane, once CR 800.4a is done.
     Planechase.ownersLeft before pids
+
+-- | CR 810.8a / 810.8b: the players who leave the game alongside these
+-- departures in Two-Headed Giant -- each departing player's teammates still
+-- playing, losing when that player loses or concedes. None outside the variant,
+-- where CR 104.3g waits for every member instead. A draw is not a loss, so it
+-- takes nobody with it: CR 104.4g settles a team's draw member by member.
+--
+-- Not implemented: CR 810.8a's "can't lose" and "can't win" reaching the team,
+-- since no effect says a player can't lose (#4783) or can't win (#4793) the
+-- game.
+teamFallsWith :: Departure -> [PlayerId] -> GameState -> [(Departure, PlayerId)]
+teamFallsWith reason leaving gs =
+  let teams = Game.teams gs
+      followed pid = List.notElem pid leaving && any (Teams.sameTeam teams pid) leaving
+   in case reason of
+        Departure.Drew -> []
+        _
+          | GameSettings.twoHeadedGiant (GameState.settings gs) ->
+              [(Departure.Lost, pid) | pid <- GameState.turnOrder gs, List.elem pid (Game.stillPlaying gs), followed pid]
+          | otherwise -> []
 
 -- CR 800.4: a multiplayer game can continue after players leave, and CR 800.1
 -- makes "multiplayer" mean a game that BEGINS with more than two players.

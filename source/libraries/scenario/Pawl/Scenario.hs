@@ -127,6 +127,7 @@ import qualified Pawl.Types.SubtypesAre as SubtypesAre
 import qualified Pawl.Types.Taking as Taking
 import qualified Pawl.Types.TappedIs as TappedIs
 import qualified Pawl.Types.TargetCount as TargetCount
+import qualified Pawl.Types.TeamId as TeamId
 import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Timed as Timed
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
@@ -1637,7 +1638,7 @@ renderView gs viewIs =
         View.Result -> case GameState.result gs of
           Nothing -> pure ReplyType.Null
           Just (Result.Won pid) -> fmap (\l -> ReplyType.Object [(Text.pack "won", ReplyType.Text (Label.unwrap l))]) (labelOf pid)
-          Just (Result.TeamWon team) -> pure (ReplyType.Object [(Text.pack "teamWon", ReplyType.Text (Text.pack (show team)))])
+          Just (Result.TeamWon team) -> pure (ReplyType.Object [(Text.pack "teamWon", ReplyType.Number (toInteger (TeamId.unwrap team)))])
           Just Result.Drawn -> pure (ReplyType.Text (Text.pack "Drawn"))
         View.ActivePlayer -> named (labelOf (GameState.activePlayer gs))
         View.Priority -> maybe (pure ReplyType.Null) (named . labelOf) (GameState.priority gs)
