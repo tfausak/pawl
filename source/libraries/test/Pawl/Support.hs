@@ -250,7 +250,8 @@ board seats active step =
               Board.brawl = False,
               Board.sharedTeamTurns = False,
               Board.sharedTeamLife = False,
-              Board.deployCreatures = False
+              Board.deployCreatures = False,
+              Board.twoHeadedGiant = False
             }
         else error "S.board: seats must be listed alice, bob, carol, dave"
 
