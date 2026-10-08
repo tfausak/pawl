@@ -109,6 +109,7 @@ import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counter as Counter
+import qualified Pawl.Types.CounterDestination as CounterDestination
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.CounterPlacement as CounterPlacement
@@ -993,7 +994,11 @@ countedDiscardNames asking x = case x of
 
 counterNames :: Asking -> Counter.Counter -> Bool
 counterNames asking x = case x of
-  Counter.MkCounter ref slot sources exileInstead -> objectRefNames asking ref || any (slotNames asking) slot || any (slotNames asking) sources || any (slotNames asking) exileInstead
+  Counter.MkCounter ref slot sources instead -> objectRefNames asking ref || any (slotNames asking) slot || any (slotNames asking) sources || any (counterDestinationNames asking) instead
+
+counterDestinationNames :: Asking -> CounterDestination.CounterDestination -> Bool
+counterDestinationNames asking x = case x of
+  CounterDestination.MkCounterDestination _zone _position only slot -> any (filterNames asking) only || any (slotNames asking) slot
 
 counterKindNames :: Asking -> (keyword -> Bool) -> CounterKind.CounterKind keyword -> Bool
 counterKindNames _asking onKeyword x = case x of

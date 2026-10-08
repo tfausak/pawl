@@ -184,6 +184,7 @@ import qualified Pawl.Codec.CountIsSpec
 import qualified Pawl.Codec.CountSpec
 import qualified Pawl.Codec.CountedDiscardSpec
 import qualified Pawl.Codec.CounterChangeSpec
+import qualified Pawl.Codec.CounterDestinationSpec
 import qualified Pawl.Codec.CounterKindSpec
 import qualified Pawl.Codec.CounterNameSpec
 import qualified Pawl.Codec.CounterPatternSpec
@@ -1019,6 +1020,7 @@ spec s registry = do
   Pawl.Codec.CounterNameSpec.spec s
   Pawl.Codec.CounterPatternSpec.spec s
   Pawl.Codec.CounterRSpec.spec s
+  Pawl.Codec.CounterDestinationSpec.spec s
   Pawl.Codec.CounterSpec.spec s
   Pawl.Codec.CounterSpreadSpec.spec s
   Pawl.Codec.CountersFromPermanentsSpec.spec s

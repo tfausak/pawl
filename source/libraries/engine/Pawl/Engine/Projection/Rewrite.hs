@@ -81,6 +81,7 @@ import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counter as Counter
+import qualified Pawl.Types.CounterDestination as CounterDestination
 import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.CounterPlacement as CounterPlacement
 import qualified Pawl.Types.CounterR as CounterR
@@ -803,7 +804,7 @@ rewriteEffect pairs effect = case effect of
   -- holds no word.
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration kind amount from whatRecipient whoRecipient to chosenSource) ->
     Effect.RedirectDamage (RedirectDamage.MkRedirectDamage (rewriteDuration pairs duration) kind (fmap (rewriteQuantity pairs) amount) (fmap (rewriteObjectRef pairs) from) (fmap (Filter.rewrite pairs) whatRecipient) whoRecipient (rewriteObjectRef pairs to) (fmap (Filter.rewrite pairs) chosenSource))
-  Effect.Counter (Counter.MkCounter ref mSlot mSources mExiled) -> Effect.Counter (Counter.MkCounter (rewriteObjectRef pairs ref) mSlot mSources mExiled)
+  Effect.Counter (Counter.MkCounter ref mSlot mSources mInstead) -> Effect.Counter (Counter.MkCounter (rewriteObjectRef pairs ref) mSlot mSources (fmap (\destination -> destination {CounterDestination.only = fmap (Filter.rewrite pairs) (CounterDestination.only destination)}) mInstead))
   -- CR 612.1 through the KIND as well, where Filter's HasCounters arm rewrites
   -- the same one: CR 122.1b's keyword counter carries a keyword, and a word
   -- inside it is swapped like any other. Pawl.CounterspellSpec's Synthetic

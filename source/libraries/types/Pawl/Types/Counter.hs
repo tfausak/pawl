@@ -1,5 +1,6 @@
 module Pawl.Types.Counter where
 
+import qualified Pawl.Types.CounterDestination as CounterDestination
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.SlotName as SlotName
 
@@ -36,15 +37,14 @@ import qualified Pawl.Types.SlotName as SlotName
 -- the battlefield is no permanent, so neither is in it. Absent for a countering
 -- that never looks back this way.
 --
--- `exileInstead` is Delay's "if the spell is countered this way, exile it ...
--- instead of putting it into its owner's graveyard": a countered SPELL goes to
--- exile rather than to CR 701.6a's graveyard, and the cards it became there are
--- written into the slot as a group for a later effect to name. Absent for the
--- ordinary countering.
+-- `instead` is where a countered SPELL goes rather than CR 701.6a's graveyard
+-- (Pawl.Types.CounterDestination): Delay's "exile it ... instead of putting it
+-- into its owner's graveyard", Desertion's "put that card onto the battlefield
+-- under your control instead". Absent for the ordinary countering.
 data Counter = MkCounter
   { ref :: ObjectRef.ObjectRef,
     slot :: Maybe SlotName.SlotName,
     sources :: Maybe SlotName.SlotName,
-    exileInstead :: Maybe SlotName.SlotName
+    instead :: Maybe CounterDestination.CounterDestination
   }
   deriving (Eq, Ord, Show)
