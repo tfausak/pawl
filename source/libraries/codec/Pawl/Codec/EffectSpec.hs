@@ -89,6 +89,7 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryAttack as EntryAttack
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeBlocks as ExchangeBlocks
+import qualified Pawl.Types.ExchangeOwnership as ExchangeOwnership
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
 import qualified Pawl.Types.ExchangeWithTopOfLibrary as ExchangeWithTopOfLibrary
@@ -1207,6 +1208,14 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.SetOwner (SetOwner.MkSetOwner (PlayerRef.Relative PlayerRelation.You) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "card")))))
       " {\"type\":\"SetOwner\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"ref\":{\"type\":\"InSlot\",\"value\":\"card\"}}} "
+  -- CR 701.12a: the two refs whose objects trade owners.
+  Spec.it s "ExchangeOwnership" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (ObjectRef.FromAnywhere (SlotName.MkSlotName (Text.pack "self")))))
+      " {\"type\":\"ExchangeOwnership\",\"value\":{\"one\":{\"type\":\"InSlot\",\"value\":\"target\"},\"other\":{\"type\":\"FromAnywhere\",\"value\":\"self\"}}} "
   -- CR 701.12d: the card and whose library's top card it trades places with.
   Spec.it s "ExchangeWithTopOfLibrary" $
     Common.assertJsonCodec

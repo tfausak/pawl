@@ -325,6 +325,7 @@ zoneFunctionedFrom itself delayed effect = case effect of
   Effect.ShuffleIntoLibrary {} -> Nothing
   Effect.Ante {} -> Nothing
   Effect.SetOwner {} -> Nothing
+  Effect.ExchangeOwnership {} -> Nothing
   Effect.ExchangeWithTopOfLibrary {} -> Nothing
   Effect.Shuffle {} -> Nothing
   Effect.OfferCast {} -> Nothing

@@ -118,6 +118,7 @@ import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRestriction as EntryRestriction
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
+import qualified Pawl.Types.ExchangeOwnership as ExchangeOwnership
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
 import qualified Pawl.Types.ExchangeWithTopOfLibrary as ExchangeWithTopOfLibrary
 import qualified Pawl.Types.ExchangedValue as ExchangedValue
@@ -993,6 +994,7 @@ rewriteEffect pairs effect = case effect of
   -- ShuffleIntoLibrary's descent: the ref's filters are card text.
   Effect.Ante (Ante.MkAnte player ref mSlot) -> Effect.Ante (Ante.MkAnte player (rewriteObjectRef pairs ref) mSlot)
   Effect.SetOwner (SetOwner.MkSetOwner player ref) -> Effect.SetOwner (SetOwner.MkSetOwner player (rewriteObjectRef pairs ref))
+  Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership one other) -> Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership (rewriteObjectRef pairs one) (rewriteObjectRef pairs other))
   Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary ref player) -> Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary (rewriteObjectRef pairs ref) player)
   -- No ObjectRef to rewrite: the opcode names a library and no objects.
   Effect.Shuffle {} -> effect

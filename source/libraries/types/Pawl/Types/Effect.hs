@@ -39,6 +39,7 @@ import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.Earthbend as Earthbend
 import qualified Pawl.Types.ExchangeBlocks as ExchangeBlocks
+import qualified Pawl.Types.ExchangeOwnership as ExchangeOwnership
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
 import qualified Pawl.Types.ExchangeWithTopOfLibrary as ExchangeWithTopOfLibrary
@@ -312,6 +313,8 @@ data Effect card ability
     ExchangeWithCardInHand ChosenCardInHand.ChosenCardInHand
   | -- | CR 108.3 / 407.3: a player becomes the owner of the named objects.
     SetOwner SetOwner.SetOwner
+  | -- | CR 701.12a / 108.3: two named objects trade owners.
+    ExchangeOwnership ExchangeOwnership.ExchangeOwnership
   | -- | CR 701.12d: a named card and the top card of a library exchange zones.
     ExchangeWithTopOfLibrary ExchangeWithTopOfLibrary.ExchangeWithTopOfLibrary
   | -- | CR 119.5: the players the PlayerRef names each gain or lose the

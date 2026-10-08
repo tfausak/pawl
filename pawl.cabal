@@ -601,6 +601,7 @@ library codec
     Pawl.Codec.ExchangeBlocksSpec
     Pawl.Codec.ExchangedValue
     Pawl.Codec.ExchangedValueSpec
+    Pawl.Codec.ExchangeOwnership
     Pawl.Codec.ExchangeSides
     Pawl.Codec.ExchangeSidesSpec
     Pawl.Codec.ExchangeValues
@@ -2246,6 +2247,7 @@ library types
     Pawl.Types.ExcessDestination
     Pawl.Types.ExchangeBlocks
     Pawl.Types.ExchangedValue
+    Pawl.Types.ExchangeOwnership
     Pawl.Types.ExchangeSides
     Pawl.Types.ExchangeValues
     Pawl.Types.ExchangeWithTopOfLibrary

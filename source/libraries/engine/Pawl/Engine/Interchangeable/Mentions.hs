@@ -167,6 +167,7 @@ import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.ExchangeBlocks as ExchangeBlocks
+import qualified Pawl.Types.ExchangeOwnership as ExchangeOwnership
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
 import qualified Pawl.Types.ExchangeWithTopOfLibrary as ExchangeWithTopOfLibrary
@@ -1377,6 +1378,7 @@ effectNames asking onCard onAbility x = case x of
   Effect.ShuffleIntoLibrary shuffleIntoLibrary -> shuffleIntoLibraryNames asking shuffleIntoLibrary
   Effect.Ante ante -> anteNames asking ante
   Effect.SetOwner (SetOwner.MkSetOwner player ref) -> playerRefNames asking player || objectRefNames asking ref
+  Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership one other) -> objectRefNames asking one || objectRefNames asking other
   Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary ref player) -> objectRefNames asking ref || playerRefNames asking player
   Effect.Shuffle playerRef -> playerRefNames asking playerRef
   Effect.OfferCast offerCast -> offerCastNames asking offerCast

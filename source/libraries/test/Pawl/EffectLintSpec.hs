@@ -106,6 +106,7 @@ import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.Earthbend as Earthbend
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRiders as EntryRiders
+import qualified Pawl.Types.ExchangeOwnership as ExchangeOwnership
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
 import qualified Pawl.Types.ExchangeWithTopOfLibrary as ExchangeWithTopOfLibrary
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
@@ -427,6 +428,7 @@ ownQuantities effect = case effect of
   Effect.ShuffleIntoLibrary {} -> []
   Effect.Ante {} -> []
   Effect.SetOwner {} -> []
+  Effect.ExchangeOwnership {} -> []
   Effect.ExchangeWithTopOfLibrary {} -> []
   Effect.Shuffle {} -> []
   Effect.OfferNamedCopy {} -> []
@@ -1586,6 +1588,7 @@ effectObjectRefs effect =
         Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ refs) -> read_ (NonEmpty.toList refs)
         Effect.Ante (Ante.MkAnte _ ref _) -> read_ [ref]
         Effect.SetOwner (SetOwner.MkSetOwner _ ref) -> read_ [ref]
+        Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership one other) -> read_ [one, other]
         Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary ref _) -> read_ [ref]
         -- No ObjectRef at all: the opcode names a library.
         Effect.Shuffle {} -> []

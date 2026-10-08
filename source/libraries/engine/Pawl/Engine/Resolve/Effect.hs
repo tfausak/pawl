@@ -212,6 +212,7 @@ import qualified Pawl.Types.EntryAttack as EntryAttack
 import qualified Pawl.Types.EntryBlock as EntryBlock
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeBlocks as ExchangeBlocks
+import qualified Pawl.Types.ExchangeOwnership as ExchangeOwnership
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
 import qualified Pawl.Types.ExchangeWithTopOfLibrary as ExchangeWithTopOfLibrary
@@ -3413,6 +3414,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.GiveControl {} -> False
   Effect.ExchangeControl {} -> False
   Effect.SetOwner {} -> False
+  Effect.ExchangeOwnership {} -> False
   Effect.ExchangeWithTopOfLibrary {} -> False
   Effect.ArmDelayedTrigger {} -> False
   Effect.AffectPlayers {} -> False
@@ -5661,6 +5663,21 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     let named = ListUtils.nubOrd (objectRefObjects legal resolving controller source gs ref)
     case playerRefPlayers legal controller gs player of
       [owner] -> State.put (List.foldl' (\g oid -> Game.setOwner oid owner g) gs named)
+      _ -> pure ()
+  -- CR 701.12a / 108.3: the one object each ref names trade owners. All or
+  -- nothing: a ref naming no object or several, or both naming the same one,
+  -- exchanges nothing. Two Game.setOwner writes on the objects as they stand,
+  -- no zone change; one owner on both sides changes nothing.
+  Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership one other) -> do
+    gs <- State.get
+    let named ref = ListUtils.nubOrd (objectRefObjects legal resolving controller source gs ref)
+        ownerOf oid = fmap Object.owner (Game.lookupObject oid gs)
+    case (named one, named other) of
+      ([a], [b])
+        | a /= b,
+          Just ownerA <- ownerOf a,
+          Just ownerB <- ownerOf b ->
+            State.put (Game.setOwner b ownerA (Game.setOwner a ownerB gs))
       _ -> pure ()
   -- CR 701.12d: the one named card and the top card of the named player's
   -- library exchange zones. All or nothing (CR 701.12a): one card named, a top

@@ -181,6 +181,7 @@ import qualified Pawl.Types.EntryRestriction as EntryRestriction
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Equip as Equip
+import qualified Pawl.Types.ExchangeOwnership as ExchangeOwnership
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
 import qualified Pawl.Types.ExchangeWithTopOfLibrary as ExchangeWithTopOfLibrary
 import qualified Pawl.Types.ExchangeZones as ExchangeZones
@@ -689,6 +690,7 @@ objectRefPositions =
         ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary Nothing (NonEmpty.singleton (plantedRef "sl"))), [plantedRef "sl"]),
         ("ante", Effect.Ante (Ante.MkAnte (PlayerRef.Relative PlayerRelation.You) (plantedRef "an") Nothing), [plantedRef "an"]),
         ("set-owner", Effect.SetOwner (SetOwner.MkSetOwner (PlayerRef.Relative PlayerRelation.You) (plantedRef "so")), [plantedRef "so"]),
+        ("exchange-ownership", Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership (plantedRef "eo") (plantedRef "ep")), [plantedRef "eo", plantedRef "ep"]),
         ("exchange-top", Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary (plantedRef "et") (PlayerRef.Relative PlayerRelation.You)), [plantedRef "et"]),
         ("offer-cast", Effect.OfferCast (OfferCast.MkOfferCast (plantedRef "oc") (PlayerRef.Relative PlayerRelation.You) CastObligation.Optional PermissionVerb.Cast CastOffer.defaultValue CastRepetition.Once False False Nothing), [plantedRef "oc"]),
         ("grant-play-from-exile", Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.UntilEndOfTurn (PlayerRef.Relative PlayerRelation.You) (plantedRef "gp") ManaSpending.AsProduced Nothing Nothing PermissionVerb.Play 0 TapState.Untapped), [plantedRef "gp"]),
@@ -1467,6 +1469,7 @@ ownCounts effect = case effect of
   Effect.ShuffleIntoLibrary {} -> []
   Effect.Ante {} -> []
   Effect.SetOwner {} -> []
+  Effect.ExchangeOwnership {} -> []
   Effect.ExchangeWithTopOfLibrary {} -> []
   Effect.Shuffle {} -> []
   Effect.OfferNamedCopy {} -> []
@@ -1950,6 +1953,7 @@ effectNestedEffects effect = case effect of
   Effect.ShuffleIntoLibrary {} -> []
   Effect.Ante {} -> []
   Effect.SetOwner {} -> []
+  Effect.ExchangeOwnership {} -> []
   Effect.ExchangeWithTopOfLibrary {} -> []
   Effect.Shuffle {} -> []
   Effect.OfferNamedCopy {} -> []
@@ -2491,6 +2495,7 @@ effectReplacements effect = case effect of
   Effect.ShuffleIntoLibrary {} -> []
   Effect.Ante {} -> []
   Effect.SetOwner {} -> []
+  Effect.ExchangeOwnership {} -> []
   Effect.ExchangeWithTopOfLibrary {} -> []
   Effect.Shuffle {} -> []
   Effect.OfferNamedCopy {} -> []
@@ -3021,6 +3026,7 @@ effectMintedFaces effect = case effect of
   Effect.ShuffleIntoLibrary {} -> []
   Effect.Ante {} -> []
   Effect.SetOwner {} -> []
+  Effect.ExchangeOwnership {} -> []
   Effect.ExchangeWithTopOfLibrary {} -> []
   Effect.Shuffle {} -> []
   Effect.OfferNamedCopy {} -> []
@@ -6232,6 +6238,7 @@ effectFilters effect = case effect of
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ refs) -> frame SourceHostFramed (foldMap objectRefFilters refs)
   Effect.Ante (Ante.MkAnte _ ref _) -> frame SourceHostFramed (objectRefFilters ref)
   Effect.SetOwner (SetOwner.MkSetOwner _ ref) -> frame SourceHostFramed (objectRefFilters ref)
+  Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership one other) -> frame SourceHostFramed (objectRefFilters one <> objectRefFilters other)
   Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary ref _) -> frame SourceHostFramed (objectRefFilters ref)
   -- A PlayerRef carries no Filter, exactly as GainPlayerCounters' does not.
   Effect.Shuffle {} -> []
@@ -7237,6 +7244,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let antes effect = case effect of
           Effect.Ante {} -> True
           Effect.SetOwner {} -> True
+          Effect.ExchangeOwnership {} -> True
           _ -> False
         movesIntoAnte effect = case effect of
           Effect.MoveToZone m -> MoveToZone.zone m == Zone.Ante

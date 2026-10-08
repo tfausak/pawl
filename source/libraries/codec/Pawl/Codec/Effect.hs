@@ -51,6 +51,7 @@ import qualified Pawl.Codec.Draw as Draw
 import qualified Pawl.Codec.DurationRef as DurationRef
 import qualified Pawl.Codec.Earthbend as Earthbend
 import qualified Pawl.Codec.ExchangeBlocks as ExchangeBlocks
+import qualified Pawl.Codec.ExchangeOwnership as ExchangeOwnership
 import qualified Pawl.Codec.ExchangeSides as ExchangeSides
 import qualified Pawl.Codec.ExchangeValues as ExchangeValues
 import qualified Pawl.Codec.ExchangeWithTopOfLibrary as ExchangeWithTopOfLibrary
@@ -295,6 +296,7 @@ codec cardCodec abilityCodec =
           Arm.payload "ShuffleIntoLibrary" ShuffleIntoLibrary.codec Effect.ShuffleIntoLibrary (\x -> case x of Effect.ShuffleIntoLibrary y -> Just y; _ -> Nothing),
           Arm.payload "Ante" Ante.codec Effect.Ante (\x -> case x of Effect.Ante y -> Just y; _ -> Nothing),
           Arm.payload "SetOwner" SetOwner.codec Effect.SetOwner (\x -> case x of Effect.SetOwner y -> Just y; _ -> Nothing),
+          Arm.payload "ExchangeOwnership" ExchangeOwnership.codec Effect.ExchangeOwnership (\x -> case x of Effect.ExchangeOwnership y -> Just y; _ -> Nothing),
           Arm.payload "ExchangeWithTopOfLibrary" ExchangeWithTopOfLibrary.codec Effect.ExchangeWithTopOfLibrary (\x -> case x of Effect.ExchangeWithTopOfLibrary y -> Just y; _ -> Nothing),
           Arm.payload "Shuffle" PlayerRef.codec Effect.Shuffle (\x -> case x of Effect.Shuffle y -> Just y; _ -> Nothing),
           Arm.payload "OfferCast" OfferCast.codec Effect.OfferCast (\x -> case x of Effect.OfferCast y -> Just y; _ -> Nothing),
@@ -473,6 +475,7 @@ tagOf x = case x of
   Effect.ShuffleIntoLibrary {} -> "ShuffleIntoLibrary"
   Effect.Ante {} -> "Ante"
   Effect.SetOwner {} -> "SetOwner"
+  Effect.ExchangeOwnership {} -> "ExchangeOwnership"
   Effect.ExchangeWithTopOfLibrary {} -> "ExchangeWithTopOfLibrary"
   Effect.Shuffle {} -> "Shuffle"
   Effect.OfferCast {} -> "OfferCast"

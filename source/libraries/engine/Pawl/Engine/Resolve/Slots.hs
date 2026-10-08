@@ -116,6 +116,7 @@ import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeBlocks as ExchangeBlocks
+import qualified Pawl.Types.ExchangeOwnership as ExchangeOwnership
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
 import qualified Pawl.Types.ExchangeWithTopOfLibrary as ExchangeWithTopOfLibrary
@@ -899,6 +900,7 @@ effectObjectRefs effect = case effect of
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ refs) -> NonEmpty.toList refs
   Effect.Ante (Ante.MkAnte _ ref _) -> [ref]
   Effect.SetOwner (SetOwner.MkSetOwner _ ref) -> [ref]
+  Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership one other) -> [one, other]
   Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary ref _) -> [ref]
   Effect.Shuffle {} -> []
   Effect.OfferCast (OfferCast.MkOfferCast ref _ _ _ _ _ _ _ _) -> [ref]
@@ -1121,6 +1123,7 @@ effectPlayerRefs effect = case effect of
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named _) -> Maybe.maybeToList named
   Effect.Ante (Ante.MkAnte player _ _) -> [player]
   Effect.SetOwner (SetOwner.MkSetOwner player _) -> [player]
+  Effect.ExchangeOwnership {} -> []
   Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary _ player) -> [player]
   Effect.Shuffle ref -> [ref]
   Effect.OfferCast (OfferCast.MkOfferCast _ caster _ _ _ _ _ _ _) -> [caster]
@@ -1529,6 +1532,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.ShuffleIntoLibrary {} -> Map.empty
   Effect.Ante {} -> Map.empty
   Effect.SetOwner {} -> Map.empty
+  Effect.ExchangeOwnership {} -> Map.empty
   Effect.ExchangeWithTopOfLibrary {} -> Map.empty
   -- The arm above's library read, reported at the head; nothing is shuffled into
   -- it, so there is no ref beside it either.
@@ -2242,6 +2246,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.ShuffleIntoLibrary {} -> True
   Effect.Ante {} -> True
   Effect.SetOwner {} -> True
+  Effect.ExchangeOwnership {} -> True
   Effect.ExchangeWithTopOfLibrary {} -> True
   Effect.Shuffle {} -> True
   Effect.OfferCast {} -> True
@@ -2493,6 +2498,7 @@ readsX =
         Effect.ShuffleIntoLibrary {} -> False
         Effect.Ante {} -> False
         Effect.SetOwner {} -> False
+        Effect.ExchangeOwnership {} -> False
         Effect.ExchangeWithTopOfLibrary {} -> False
         Effect.Shuffle {} -> False
         Effect.OfferCast offer -> any Quantity.readsX (repetitionQuantities (OfferCast.repetition offer))
@@ -2520,6 +2526,7 @@ boundSlots effect = case effect of
   -- MoveToZone's reason: the anted incarnations (CR 400.7).
   Effect.Ante (Ante.MkAnte _ _ mSlot) -> foldMap Set.singleton mSlot
   Effect.SetOwner {} -> Set.empty
+  Effect.ExchangeOwnership {} -> Set.empty
   Effect.ExchangeWithTopOfLibrary {} -> Set.empty
   -- The tokens this Create minted, for CR 603.7c's delayed trigger to name.
   Effect.Create (Create.MkCreate _ _ _ mSlot _) -> foldMap Set.singleton mSlot
