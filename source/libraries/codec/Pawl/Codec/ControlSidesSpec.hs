@@ -5,6 +5,7 @@ import qualified Pawl.Codec.ControlSides as ControlSides
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ControlSides as ControlSides
+import qualified Pawl.Types.ControlSlots as ControlSlots
 import qualified Pawl.Types.SlotName as SlotName
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -21,4 +22,10 @@ spec s = Spec.describe s "Pawl.Codec.ControlSides" $ do
       ControlSides.codec
       (ControlSides.WithSource (SlotName.MkSlotName (Text.pack "permanent")))
       " {\"type\":\"WithSource\",\"value\":\"permanent\"} "
+  Spec.it s "BetweenSlots" $
+    Common.assertCodec
+      s
+      ControlSides.codec
+      (ControlSides.BetweenSlots (ControlSlots.MkControlSlots (SlotName.MkSlotName (Text.pack "mine")) (SlotName.MkSlotName (Text.pack "theirs"))))
+      " {\"type\":\"BetweenSlots\",\"value\":{\"first\":\"mine\",\"second\":\"theirs\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ControlSides.codec

@@ -1,5 +1,6 @@
 module Pawl.Types.ControlSides where
 
+import qualified Pawl.Types.ControlSlots as ControlSlots
 import qualified Pawl.Types.SlotName as SlotName
 
 -- | Which two permanents a control exchange runs between (CR 701.12b, whose
@@ -21,4 +22,7 @@ data ControlSides
   | -- | Avarice Totem's "exchange control of this artifact and target nonland
     -- permanent": CR 113.7's source object and the one permanent the slot names.
     WithSource SlotName.SlotName
+  | -- | Spawnbroker's "exchange control of target creature you control and target
+    -- creature ... an opponent controls": one permanent out of each of two slots.
+    BetweenSlots ControlSlots.ControlSlots
   deriving (Eq, Ord, Show)

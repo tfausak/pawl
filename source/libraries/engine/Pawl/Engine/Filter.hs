@@ -7,6 +7,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Types.Behold as Behold
 import qualified Pawl.Types.CardName as CardName
@@ -1056,8 +1057,8 @@ data Context = MkContext
     -- Pawl.FilterPositionLintSpec's lint, sourceManaValue's pair.
     sourceNames :: Set.Set CardName.CardName,
     -- CR 202.3, the computed half: the number the TARGET SLOT being matched names
-    -- as its mana-value bound, for the two atoms that ask
-    -- (ManaValueAtMostAmount, ManaValueEqualToAmount) -- Celestine, the Living
+    -- as its bound, for the three atoms that ask (ManaValueAtMostAmount,
+    -- ManaValueEqualToAmount, PowerAtMostAmount) -- Celestine, the Living
     -- Saint's "where X is the amount of life you gained this turn". The slot carries the Quantity
     -- (Pawl.Types.TargetSlot's `amount`); this is that Quantity already
     -- evaluated, because this module holds no game state and cannot evaluate one.
@@ -1073,8 +1074,8 @@ data Context = MkContext
     slotAmount :: Maybe Integer,
     -- CR 601.2b: the slot NAMES a computed bound and the announcement that fixes
     -- it has not been made yet, so `slotAmount` above is Nothing for a reason that
-    -- is not "no bound was stated". Neither ManaValueAtMostAmount nor
-    -- ManaValueEqualToAmount narrows then --
+    -- is not "no bound was stated". None of the three atoms that read it
+    -- narrows then --
     -- Stir the Grave's "mana value X or less" states no ceiling until its caster
     -- names X, and CR 601.2b puts no ceiling on the value they may name.
     --
@@ -1815,6 +1816,12 @@ matches context view predicate = case predicate of
     -- still make legal.
     (Just _, Nothing) -> boundUnannounced context
     _ -> False
+  -- CR 208.1 against the slot's computed bound, ManaValueAtMostAmount's arm with
+  -- power in place of mana value and False on the same absences for its reasons.
+  Filter.PowerAtMostAmount -> case (power view, slotAmount context) of
+    (Just p, Just n) -> p <= n
+    (Just _, Nothing) -> boundUnannounced context
+    _ -> False
   -- PlayerRelation.holds is what each arm MEANS, and its haddock carries the
   -- argument: an Opponent is CR 102.3's player not on your team, which is every
   -- other player in a free-for-all (CR 806.1) and at two seats (CR 102.2), and
@@ -1940,6 +1947,8 @@ matches context view predicate = case predicate of
   Filter.IsBound slot -> case identity view of
     Just oid -> Set.member oid (Map.findWithDefault Set.empty slot (slotObjects context))
     Nothing -> False
+  -- IsBound over the announcement's every target at once (Binding.announcedTargets).
+  Filter.IsTarget -> matches context view (Filter.IsBound Binding.announcedTargets)
   -- CR 709.4a at both ends: the candidate has the bound object's name if one of
   -- its names is one of that object's, which is a non-empty INTERSECTION. A slot
   -- naming nothing, and a bound object with no name (CR 708.2a), each leave the
@@ -2406,6 +2415,7 @@ rewrite pairs predicate = case predicate of
   Filter.ManaValueIsEven -> predicate
   Filter.ManaValueAtMostAmount -> predicate
   Filter.ManaValueEqualToAmount -> predicate
+  Filter.PowerAtMostAmount -> predicate
   Filter.ControlledBy _ -> predicate
   -- Untouched for ControlledBy's reason.
   Filter.ControlledByDefendingPlayer -> predicate
@@ -2433,6 +2443,7 @@ rewrite pairs predicate = case predicate of
   Filter.TargetsMatching f -> Filter.TargetsMatching (rewrite pairs f)
   Filter.TargetsPlayer _ -> predicate
   Filter.IsBound _ -> predicate
+  Filter.IsTarget -> predicate
   Filter.SameNameAsBound _ -> predicate
   Filter.SameNameAsSource -> predicate
   Filter.SameOwnerAsSource -> predicate
@@ -3174,6 +3185,7 @@ bakeBound players predicate = case predicate of
   Filter.ManaValueIsEven -> predicate
   Filter.ManaValueAtMostAmount -> predicate
   Filter.ManaValueEqualToAmount -> predicate
+  Filter.PowerAtMostAmount -> predicate
   Filter.ControlledBy _ -> predicate
   Filter.ControlledByDefendingPlayer -> predicate
   Filter.OwnedBy _ -> predicate
@@ -3195,6 +3207,7 @@ bakeBound players predicate = case predicate of
   -- CR 603.2's binding map holds PLAYERS and this atom names a slot holding an
   -- OBJECT. Pawl.Engine.Filter.matches answers it as it stands.
   Filter.IsBound _ -> predicate
+  Filter.IsTarget -> predicate
   Filter.SameNameAsBound _ -> predicate
   Filter.SameNameAsSource -> predicate
   Filter.SameOwnerAsSource -> predicate
@@ -3342,6 +3355,8 @@ manaValueThresholds predicate = case predicate of
   -- The arm above's comparison at equality, and empty for its reason: it names no
   -- literal either, and its position is the same target slot.
   Filter.ManaValueEqualToAmount -> []
+  -- Reads power, not mana value, so it bounds nothing here.
+  Filter.PowerAtMostAmount -> []
   Filter.HasCardType _ -> []
   Filter.HasSupertype _ -> []
   Filter.HasColor _ -> []
@@ -3378,6 +3393,7 @@ manaValueThresholds predicate = case predicate of
   Filter.TargetsMatching f -> manaValueThresholds f
   Filter.TargetsPlayer _ -> []
   Filter.IsBound _ -> []
+  Filter.IsTarget -> []
   Filter.SameNameAsBound _ -> []
   Filter.SameNameAsSource -> []
   Filter.SameOwnerAsSource -> []
@@ -3510,6 +3526,8 @@ statesAQuality predicate = case predicate of
   -- A quality for the arm above's reason: "with mana value X" describes the card
   -- as much at equality as "X or less" does under order.
   Filter.ManaValueEqualToAmount -> True
+  -- A quality for the arm above's reason: "with power X or less" describes the card.
+  Filter.PowerAtMostAmount -> True
   Filter.HasCardType _ -> True
   Filter.HasSupertype _ -> True
   Filter.HasColor _ -> True
@@ -3551,6 +3569,7 @@ statesAQuality predicate = case predicate of
   Filter.TargetsMatching _ -> True
   Filter.TargetsPlayer _ -> True
   Filter.IsBound _ -> True
+  Filter.IsTarget -> True
   Filter.SameNameAsBound _ -> True
   Filter.SameNameAsSource -> True
   Filter.SameOwnerAsSource -> True
@@ -3683,6 +3702,9 @@ overBoundSlots f predicate = case predicate of
   -- same sense the atom above is -- here rather than one module over, off the
   -- Context `matches` is already handed.
   Filter.IsBound slot -> fmap Filter.IsBound (f slot)
+  -- Reports the reserved slot it reads and is never renamed: CR 700.2d's rename
+  -- is of a card's own slot names, and this one is the engine's.
+  Filter.IsTarget -> fmap (const Filter.IsTarget) (f Binding.announcedTargets)
   -- Named for the atom above's reason, and answerable in the same place: it
   -- reads the Context too, one field over.
   Filter.SameNameAsBound slot -> fmap Filter.SameNameAsBound (f slot)

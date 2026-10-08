@@ -2746,6 +2746,7 @@ reservedSlots =
       Binding.manaSource,
       Binding.castSpell,
       Binding.thisAbility,
+      Binding.announcedTargets,
       Binding.targetingObject,
       Binding.blockingCreature,
       Binding.blockedCreature,
@@ -4840,6 +4841,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.ManaValueIsEven -> []
   Filter.Type.ManaValueAtMostAmount -> []
   Filter.Type.ManaValueEqualToAmount -> []
+  Filter.Type.PowerAtMostAmount -> []
   Filter.Type.ControlledBy _ -> []
   Filter.Type.ControlledByDefendingPlayer -> []
   -- A PLAYER slot, not an object one -- the disjoint namespace above.
@@ -4861,6 +4863,7 @@ filterSlotsReadSingly predicate = case predicate of
   -- Reads the whole bound set off Filter.Context, so a group is every one of its
   -- members rather than nothing -- the atom this lint must NOT report.
   Filter.Type.IsBound _ -> []
+  Filter.Type.IsTarget -> []
   -- Reads the whole set too, one field over.
   Filter.Type.SameNameAsBound _ -> []
   -- Names no slot at all: CR 702.60a's comparison is against the SOURCE, whose

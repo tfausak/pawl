@@ -74,6 +74,7 @@ import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.ConjureCards as ConjureCards
 import qualified Pawl.Types.Connive as Connive
 import qualified Pawl.Types.ControlSides as ControlSides
+import qualified Pawl.Types.ControlSlots as ControlSlots
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.CopyOriginal as CopyOriginal
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
@@ -2170,9 +2171,10 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           -- CR 122.8's read.
           Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom from _ _) -> [from]
           Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ _ slot _) -> [slot]
-          -- CR 701.12b's WithSource alone: BetweenTargets takes both permanents
-          -- out of the one slot (CR 601.2c) and reads it whole.
+          -- CR 701.12b's WithSource and BetweenSlots: BetweenTargets takes both
+          -- permanents out of the one slot (CR 601.2c) and reads it whole.
           Effect.ExchangeControl (ControlSides.WithSource slot) -> [slot]
+          Effect.ExchangeControl (ControlSides.BetweenSlots (ControlSlots.MkControlSlots one two)) -> [one, two]
           -- CR 122.5 names NO slot read singly: both its sides are ObjectRefs and
           -- go through objectRefObjects, which reads slotGroup and moves counters
           -- off every member of one and onto every member of the other. Its third

@@ -3432,6 +3432,7 @@ filterReads f = case f of
   Filter.Type.TargetsPlayer _ -> Set.empty
   -- Reads an IDENTITY, which CR 109.3 does not count as a characteristic.
   Filter.Type.IsBound _ -> Set.empty
+  Filter.Type.IsTarget -> Set.empty
   -- Reads NAMES at both ends, which no Modification writes.
   Filter.Type.SameNameAsBound _ -> Set.empty
   -- Reads NAMES at both ends too, the source's arriving on the Context.
@@ -3673,6 +3674,7 @@ filterReads f = case f of
   Filter.Type.ManaValueIsEven -> Set.empty
   Filter.Type.ManaValueAtMostAmount -> Set.empty
   Filter.Type.ManaValueEqualToAmount -> Set.empty
+  Filter.Type.PowerAtMostAmount -> Set.singleton PowerA
   Filter.Type.And fs -> foldMap filterReads fs
   Filter.Type.Or fs -> foldMap filterReads fs
   Filter.Type.Not g -> filterReads g
@@ -3770,6 +3772,7 @@ filterReadsPeers f = case f of
   Filter.Type.HasSingleTarget -> False
   Filter.Type.TargetsPlayer _ -> False
   Filter.Type.IsBound _ -> False
+  Filter.Type.IsTarget -> False
   Filter.Type.SameNameAsBound _ -> False
   Filter.Type.SameNameAsSource -> False
   -- The source's owner arrives on the Context, read off Object.owner rather than
@@ -3852,6 +3855,7 @@ filterReadsPeers f = case f of
   Filter.Type.ManaValueIsEven -> False
   Filter.Type.ManaValueAtMostAmount -> False
   Filter.Type.ManaValueEqualToAmount -> False
+  Filter.Type.PowerAtMostAmount -> False
 
 -- filterReadsPeers through an affected set. TheseObjects names ids (CR 611.2c)
 -- and Attached reads its source's attachment (CR 303.4m); neither builds a view.

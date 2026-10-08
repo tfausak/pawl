@@ -74,6 +74,7 @@ codec keywordCodec =
       Arm.nullary "ManaValueIsEven" Filter.ManaValueIsEven,
       Arm.nullary "ManaValueAtMostAmount" Filter.ManaValueAtMostAmount,
       Arm.nullary "ManaValueEqualToAmount" Filter.ManaValueEqualToAmount,
+      Arm.nullary "PowerAtMostAmount" Filter.PowerAtMostAmount,
       Arm.payload "ControlledBy" PlayerRelation.codec Filter.ControlledBy (\x -> case x of Filter.ControlledBy y -> Just y; _ -> Nothing),
       Arm.payload "OwnedBy" PlayerRelation.codec Filter.OwnedBy (\x -> case x of Filter.OwnedBy y -> Just y; _ -> Nothing),
       Arm.nullary "OwnedByRecipient" Filter.OwnedByRecipient,
@@ -95,6 +96,7 @@ codec keywordCodec =
       Arm.payload "TargetsMatching" (codec keywordCodec) Filter.TargetsMatching (\x -> case x of Filter.TargetsMatching y -> Just y; _ -> Nothing),
       Arm.payload "TargetsPlayer" PlayerRelation.codec Filter.TargetsPlayer (\x -> case x of Filter.TargetsPlayer y -> Just y; _ -> Nothing),
       Arm.payload "IsBound" SlotName.codec Filter.IsBound (\x -> case x of Filter.IsBound y -> Just y; _ -> Nothing),
+      Arm.nullary "IsTarget" Filter.IsTarget,
       Arm.payload "SameNameAsBound" SlotName.codec Filter.SameNameAsBound (\x -> case x of Filter.SameNameAsBound y -> Just y; _ -> Nothing),
       Arm.nullary "SameNameAsSource" Filter.SameNameAsSource,
       Arm.nullary "SameOwnerAsSource" Filter.SameOwnerAsSource,
@@ -212,6 +214,7 @@ tagOf x = case x of
   Filter.ManaValueIsEven {} -> "ManaValueIsEven"
   Filter.ManaValueAtMostAmount {} -> "ManaValueAtMostAmount"
   Filter.ManaValueEqualToAmount {} -> "ManaValueEqualToAmount"
+  Filter.PowerAtMostAmount {} -> "PowerAtMostAmount"
   Filter.ControlledBy {} -> "ControlledBy"
   Filter.OwnedBy {} -> "OwnedBy"
   Filter.OwnedByRecipient {} -> "OwnedByRecipient"
@@ -228,6 +231,7 @@ tagOf x = case x of
   Filter.TargetsMatching {} -> "TargetsMatching"
   Filter.TargetsPlayer {} -> "TargetsPlayer"
   Filter.IsBound {} -> "IsBound"
+  Filter.IsTarget {} -> "IsTarget"
   Filter.SameNameAsBound {} -> "SameNameAsBound"
   Filter.SameNameAsSource {} -> "SameNameAsSource"
   Filter.SameOwnerAsSource {} -> "SameOwnerAsSource"

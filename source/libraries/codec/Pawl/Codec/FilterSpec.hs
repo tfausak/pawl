@@ -229,6 +229,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.ManaValueEqualToAmount
       " {\"type\":\"ManaValueEqualToAmount\"} "
+  Spec.it s "PowerAtMostAmount" $
+    Common.assertCodec
+      s
+      codec
+      Filter.PowerAtMostAmount
+      " {\"type\":\"PowerAtMostAmount\"} "
   Spec.it s "ControlledBy" $
     Common.assertCodec
       s
@@ -318,6 +324,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       (Filter.IsBound (SlotName.MkSlotName (Text.pack "looked")))
       " {\"type\":\"IsBound\",\"value\":\"looked\"} "
+  Spec.it s "IsTarget" $
+    Common.assertCodec
+      s
+      codec
+      Filter.IsTarget
+      " {\"type\":\"IsTarget\"} "
   Spec.it s "SameNameAsBound" $
     Common.assertCodec
       s

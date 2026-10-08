@@ -41,39 +41,72 @@
                   {
                     "effects": [
                       {
-                        "type": "Destroy",
+                        "type": "Tap",
                         "value": {
-                          "ref": {
-                            "type": "InSlot",
-                            "value": "target"
-                          },
-                          "regenerability": {
-                            "type": "Regenerable"
-                          }
+                          "type": "InSlot",
+                          "value": "yours"
                         }
                       }
                     ]
                   }
                 ],
                 "targetSlots": {
-                  "target": {
+                  "yours": {
+                    "filter": {
+                      "type": "ControlledBy",
+                      "value": {
+                        "type": "You"
+                      }
+                    },
+                    "pool": {
+                      "type": "Creatures"
+                    }
+                  }
+                }
+              },
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Tap",
+                        "value": {
+                          "type": "InSlot",
+                          "value": "theirs"
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "targetSlots": {
+                  "theirs": {
+                    "filter": {
+                      "type": "ControlledBy",
+                      "value": {
+                        "type": "Opponent"
+                      }
+                    },
                     "pool": {
                       "type": "Creatures"
                     }
                   }
                 }
               }
-            ]
+            ],
+            "selection": {
+              "type": "ChooseExactly",
+              "value": 2
+            }
           }
         }
       ],
       "manaCost": [
         {
           "type": "Generic",
-          "value": 1
+          "value": 2
         }
       ],
-      "name": "Synthetic Spiteful Altar",
+      "name": "Synthetic Twin Reprisal",
       "typeLine": {
         "types": [
           {

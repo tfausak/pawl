@@ -4,7 +4,6 @@ import Control.Applicative ((<|>))
 import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
-import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.ActivationProhibition as ActivationProhibition
@@ -570,7 +569,7 @@ aimingSomewhere costWith aimable stamp loyalty pid srcId gs payable =
       -- Targets the cost cannot tell apart are tried once (Cost.aimingSignature).
       key = Cost.aimingKey pid srcId gs (costWith blind) . Recipient.ToObject
    in if slotReading
-        then any (\(ranges, sets) -> any (\aiming -> payable aiming (gather (Set.unions (Map.elems aiming)))) (Target.aimingsBy id key ranges sets)) aimable
+        then any (\(ranges, sets) -> any (\aiming -> payable (Binding.withAnnouncedTargets aiming) (gather (Set.unions (Map.elems aiming)))) (Target.aimingsBy id key ranges sets)) aimable
         else
           payable Map.empty blind
             || (gather candidates /= blind && any (payable Map.empty . gather . Set.singleton) (Set.toList candidates))
@@ -583,14 +582,15 @@ recipientObjects :: Set.Set Recipient.Recipient -> Set.Set ObjectId
 recipientObjects = Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList
 
 -- What CR 601.2c could still bind, for a gate that has to measure the cost
--- before it asks: one slot map per fillable mode, each slot holding every object
--- that mode could name for it. One mode at a time and kept apart, rather than
--- Modal.modesTargetSlots over the whole fillable set at once: two modes may
--- print the same slot name, and a union of the SLOT MAPS would drop one of them.
---
--- Not implemented: a selection of two or more modes (CR 700.2, Synthetic
--- Prismatic Wellspring's "choose two"), whose announcement may aim across them;
--- Pawl.Engine.Cast.castAimable enumerates selections and this does not (#4816).
+-- before it asks: one slot map per selection of fillable modes CR 602.2b's
+-- announcement could make (CR 700.2, Modal.selections), each slot holding every
+-- object that selection could name for it -- Pawl.Engine.Cast.castAimable's
+-- shape. Whole selections, because an announcement choosing two modes aims
+-- across both: Pawl.CostSpec's "CR 700.2 a choose-two activation is priced
+-- across both modes' targets" (Synthetic Twin Reprisal) proves it. Built per
+-- selection by Modal.modesTargetSlots, which renames a repeated mode's slots
+-- (CR 700.2d), rather than as a union of slot maps, which would drop a slot
+-- name two modes share.
 --
 -- Only the FILLABLE modes (CR 700.2a), which is the set activatableGiven's mode
 -- conjunct measures: a slot belonging to a mode this board cannot choose is not
@@ -599,7 +599,7 @@ candidateSlotsGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> [Projecti
 candidateSlotsGiven pcs grants pools pid srcId modal fillable gs =
   let -- CR 601.2c's per-player copies, as the announcement will offer them. A
       -- REGRESSION FENCE: no card pairs a per-player slot with a target-reading cost.
-      slotsOf mi = Target.announcedSlots pid srcId gs (Modal.modesTargetSlots (Seq.singleton mi) modal)
+      slotsOf chosen = Target.announcedSlots pid srcId gs (Modal.modesTargetSlots chosen modal)
       -- CR 601.2b's announcement has NOT been made at this point, which is what
       -- `unannounced` says: a slot's CR 202.3 computed bound reading the X states
       -- no bound here rather than an unmeetable one, so the gate is measured
@@ -611,7 +611,7 @@ candidateSlotsGiven pcs grants pools pid srcId modal fillable gs =
       setsOf slots = Target.legalSetsGiven pcs grants pools (Just pid) True Map.empty srcId slots gs
       -- Before CR 601.2b, so a count reading the X admits every count.
       aimableOf slots = let sets = setsOf slots in (Target.aimingRanges (Just pid) srcId Nothing slots sets gs, fmap recipientObjects sets)
-   in fmap (aimableOf . slotsOf) (Set.toList fillable)
+   in fmap (aimableOf . slotsOf) (Modal.selections fillable (Modal.Type.selection modal))
 
 -- CR 601.2b via 602.2b: the greatest X this player could actually pay for, which
 -- is what Prompt.ChooseX carries. The climb itself is Cost.greatestPayableX,

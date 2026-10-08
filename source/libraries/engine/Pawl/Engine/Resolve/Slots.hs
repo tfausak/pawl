@@ -71,6 +71,7 @@ import qualified Pawl.Types.ConjureCards as ConjureCards
 import qualified Pawl.Types.Connive as Connive
 import qualified Pawl.Types.ControlPlayer as ControlPlayer
 import qualified Pawl.Types.ControlSides as ControlSides
+import qualified Pawl.Types.ControlSlots as ControlSlots
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.CopyOriginal as CopyOriginal
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
@@ -1165,6 +1166,7 @@ controlSidesSlots :: ControlSides.ControlSides -> Map.Map SlotName SlotArity
 controlSidesSlots sides = case sides of
   ControlSides.BetweenTargets slot -> Map.singleton slot SlotArity.Many
   ControlSides.WithSource slot -> Map.singleton slot SlotArity.One
+  ControlSides.BetweenSlots (ControlSlots.MkControlSlots one two) -> Map.fromList [(one, SlotArity.One), (two, SlotArity.One)]
 
 -- The one legitimate home of `case effect of`: this module is the VM's opcode
 -- semantics (design.md section 1). slotsOf is the read half of the dataflow lint;

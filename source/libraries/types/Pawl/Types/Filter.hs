@@ -138,6 +138,10 @@ data Filter keyword
     -- reference pick (Pawl.Types.FromReference's @amount@). Vacuously False where
     -- either number is absent.
     ManaValueEqualToAmount
+  | -- | CR 208.1 against the same computed bound: the object's power is <= the
+    -- amount the enclosing target slot names -- Spawnbroker's "power less than or
+    -- equal to that creature's power". Vacuously False where either is absent.
+    PowerAtMostAmount
   | ControlledBy PlayerRelation.PlayerRelation -- CR 109.5 / 102.2: controller relates thus to the perspective.
   | -- | CR 508.5: the candidate's controller is the DEFENDING PLAYER for the
     -- object the evaluation comes from (CR 702.39a's provoke), or, for a source
@@ -222,6 +226,10 @@ data Filter keyword
     -- card of the library. Membership where CR 115.10a's group binding names
     -- several, and vacuously False where the slot names no object.
     IsBound SlotName.SlotName
+  | -- | CR 115.1 / 601.2c: the candidate is a target of the spell or ability
+    -- whose cost is being paid -- "a creature that isn't a target of that
+    -- spell" (Synthetic Spiteful Edict), whatever its target slots are named.
+    IsTarget
   | -- | CR 201.2 / 709.4a asked of TWO objects: the candidate shares a name with
     -- the object this slot holds -- Harness the Storm's "target card with the
     -- same name as that spell". Set intersection, so an object showing two names

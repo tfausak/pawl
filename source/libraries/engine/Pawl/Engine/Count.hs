@@ -347,6 +347,7 @@ bakePerspective viewOf context gs candidate predicate =
         Filter.Type.ManaValueIsEven -> predicate
         Filter.Type.ManaValueAtMostAmount -> predicate
         Filter.Type.ManaValueEqualToAmount -> predicate
+        Filter.Type.PowerAtMostAmount -> predicate
         Filter.Type.ControlledBy _ -> predicate
         Filter.Type.ControlledByDefendingPlayer -> predicate
         Filter.Type.ControlledByBound _ -> predicate
@@ -368,6 +369,7 @@ bakePerspective viewOf context gs candidate predicate =
         Filter.Type.TargetsMatching _ -> predicate
         Filter.Type.TargetsPlayer _ -> predicate
         Filter.Type.IsBound _ -> predicate
+        Filter.Type.IsTarget -> predicate
         Filter.Type.SameNameAsBound _ -> predicate
         Filter.Type.SameNameAsSource -> predicate
         Filter.Type.SameOwnerAsSource -> predicate
