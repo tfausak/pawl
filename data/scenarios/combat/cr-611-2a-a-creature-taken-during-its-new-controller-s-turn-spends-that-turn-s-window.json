@@ -1,0 +1,53 @@
+{
+  "description": "CR 611.2a a creature taken during its new controller's turn is in that turn's window even though summoning sickness keeps it home",
+  "note": "Bob's Wall of Dust blocks alice's Hill Giant on turn 1. On turn 2 bob takes the Giant with Control Magic. It is his at his declare attackers step, so turn 2 is its controller's next turn; it could not attack anyway (CR 302.6), which the Gideon, Battle-Forged ruling of 2015-06-22 says leaves it inside the window. The window is spent, so the Giant attacks on bob's turn 4.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Hill Giant", "label": "giant", "ready": true }],
+        "library": [{ "card": "Island" }, { "card": "Island" }, { "card": "Island" }, { "card": "Island" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Wall of Dust", "label": "wall", "ready": true },
+          { "card": "Grizzly Bears", "label": "bears", "ready": true },
+          { "card": "Island", "label": "i1" },
+          { "card": "Island", "label": "i2" },
+          { "card": "Island", "label": "i3" },
+          { "card": "Island", "label": "i4" }
+        ],
+        "hand": [{ "card": "Control Magic", "label": "magic" }],
+        "library": [{ "card": "Island" }, { "card": "Island" }, { "card": "Island" }, { "card": "Island" }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$giant"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$wall": ["$giant"] } } },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": { "Cast": { "object": "$magic", "targets": ["$giant"], "mana": ["$i1", "$i2", "$i3", "$i4"] } }
+    },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "do": "Pass" },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": { "View": { "of": "Controller", "object": "$giant", "is": "bob" } }
+    },
+    { "turn": 2, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": [] } },
+    { "turn": 4, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["$giant"] } },
+    {
+      "turn": 4,
+      "step": "DeclareAttackers",
+      "player": "bob",
+      "check": { "Attackers": { "attackers": { "$giant": "$alice" } } }
+    }
+  ]
+}

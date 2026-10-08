@@ -1,0 +1,51 @@
+{
+  "description": "CR 611.2a / 500.11 a turn whose combat phase is skipped is still the window of Wall of Dust's \"during its controller's next turn\"",
+  "note": "Bob's Wall of Dust blocks alice's Hill Giant on turn 1. Bob's Stonehorn Dignitary makes alice skip her next combat phase, so turn 3, her next turn, has no declare attackers step, but it is still the window and ends at its cleanup. The Giant attacks on turn 5 (her Goblin Piker keeps that declaration a real prompt).",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Hill Giant", "label": "giant", "ready": true },
+          { "card": "Goblin Piker", "label": "piker", "ready": true }
+        ],
+        "library": [{ "card": "Island" }, { "card": "Island" }, { "card": "Island" }, { "card": "Island" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Wall of Dust", "label": "wall", "ready": true },
+          { "card": "Plains", "label": "p1" },
+          { "card": "Plains", "label": "p2" },
+          { "card": "Plains", "label": "p3" },
+          { "card": "Plains", "label": "p4" }
+        ],
+        "hand": [{ "card": "Stonehorn Dignitary", "label": "dignitary" }],
+        "library": [{ "card": "Island" }, { "card": "Island" }, { "card": "Island" }, { "card": "Island" }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$giant"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$wall": ["$giant"] } } },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": { "Cast": { "object": "$dignitary", "mana": ["$p1", "$p2", "$p3", "$p4"] } }
+    },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "do": "Pass" },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "do": { "ChooseTargets": { "target": ["$alice"] } } },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "do": "Pass" },
+    { "turn": 4, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": [] } },
+    { "turn": 5, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$giant"] } },
+    {
+      "turn": 5,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": { "Attackers": { "attackers": { "$giant": "$bob" } } }
+    }
+  ]
+}
