@@ -78,6 +78,7 @@ import qualified Pawl.Types.CostBasis as CostBasis
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counter as Counter
+import qualified Pawl.Types.CounterDestination as CounterDestination
 import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.CounterR as CounterR
 import qualified Pawl.Types.CounterSubject as CounterSubject
@@ -2647,7 +2648,7 @@ boundSlots effect = case effect of
   Effect.RedirectDamage {} -> Set.empty
   -- How many spells this countering ACTUALLY countered, for a "for each spell
   -- countered this way", and the permanents whose abilities were (CR 113.7).
-  Effect.Counter (Counter.MkCounter _ mSlot mSources mExiled) -> foldMap Set.singleton mSlot <> foldMap Set.singleton mSources <> foldMap Set.singleton mExiled
+  Effect.Counter (Counter.MkCounter _ mSlot mSources mInstead) -> foldMap Set.singleton mSlot <> foldMap Set.singleton mSources <> foldMap (foldMap Set.singleton . CounterDestination.slot) mInstead
   Effect.PutCounters {} -> Set.empty
   Effect.DistributeCounters {} -> Set.empty
   Effect.PutCountersFrom {} -> Set.empty

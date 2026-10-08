@@ -6061,9 +6061,17 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
         -- battlefield, that player puts it into its owner's graveyard." So a
         -- refusal FROM THE STACK moves the object on rather than leaving it where
         -- it was, and the two rules are told apart by `fromZone` alone -- a zone
-        -- read, never the resolving card's identity. Nothing but a resolving
-        -- permanent spell reaches this funnel from the stack asking for the
-        -- battlefield (Pawl.Engine.Stack's two branches).
+        -- read, never the resolving card's identity.
+        --
+        -- The other road here from the stack is a countered card some effect
+        -- puts onto the battlefield instead of into its owner's graveyard
+        -- (Desertion, Pawl.Types.CounterDestination). CR 608.3e speaks only of a
+        -- RESOLVING spell, so for that road the graveyard is CR 701.6a's: the
+        -- spell is countered and removed from the stack whatever, CR 614.6
+        -- ignores the replaced move's impossible instruction, and what remains
+        -- is the countering's own "put into its owner's graveyard".
+        -- The counterspell scenario "Desertion under Sealed Horizon still counters
+        -- the Bears into bob's graveyard" proves it.
         --
         -- Through the funnel again rather than by hand, because CR 608.3e's "puts
         -- it into its owner's graveyard" is an ordinary zone change: a
@@ -6071,11 +6079,11 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
         -- it. The recursion is one deep -- the second move's destination is the
         -- graveyard, and this guard asks only about the battlefield.
         --
-        -- Not implemented: the graveyard id this arm answers is the card's new
-        -- incarnation, and a caller that BINDS the result binds a graveyard object
-        -- where it asked for a battlefield one. Unreachable today -- both stack
-        -- callers void the result, and no card in data/cards/ moves a spell from
-        -- the stack to the battlefield (#2869).
+        -- The answer is the graveyard incarnation, the contract a CR 616.1
+        -- redirect already has: the ids name where the move LANDED, not where it
+        -- was asked to go. Pawl.Engine.Stack voids it; counterOne reads it as
+        -- "countered", which the spell was, and the Counter opcode binds only
+        -- what landed in its destination.
         Just settled
           | ZoneChange.to settled == Zone.Battlefield && EntryRestriction.prohibited oid fromZone gs ->
               if fromZone == Zone.Stack
@@ -7493,7 +7501,7 @@ destroyIn asOf cause regenerability oids = simultaneously $ do
 -- 117.5 scan reads this event the controller can no longer be asked for exactly
 -- (see Pawl.Types.Countering).
 counter :: ObjectId -> PlayerId -> ObjectId -> Game ()
-counter source controller oid = Monad.void (counterOne Zone.Graveyard source controller oid)
+counter source controller oid = Monad.void (counterOne (Zone.Graveyard, LibraryPosition.defaultValue) source controller oid)
 
 -- counter over a whole batch, answering with the objects it ACTUALLY countered
 -- (CR 701.6a) -- which is emphatically not the batch it was handed: an id naming
@@ -7509,19 +7517,25 @@ counter source controller oid = Monad.void (counterOne Zone.Graveyard source con
 -- three time counters on it" wants the incarnation. An ability leaves no new
 -- object at all (CR 608.2n), so it has none.
 --
--- `zone` is where a countered SPELL goes: CR 701.6a's graveyard, or exile for
--- Delay's "exile it ... instead of putting it into its owner's graveyard".
+-- `destinationOf` is where each countered SPELL goes: CR 701.6a's graveyard, or
+-- the zone a Pawl.Types.CounterDestination names instead -- Delay's exile,
+-- Remand's hand, Memory Lapse's library top, Desertion's battlefield, which the
+-- card enters under `controller` (CR 110.2a's "under your control").
 --
 -- A second door rather than a return type on `counter`, the destroyReturning
 -- posture: only the Counter opcode's bound slots use the answer.
-counterReturning :: Zone.Zone -> ObjectId -> PlayerId -> [ObjectId] -> Game [(ObjectId, Seq.Seq ObjectId)]
-counterReturning zone source controller =
-  fmap Maybe.catMaybes . traverse (\oid -> fmap (fmap ((,) oid)) (counterOne zone source controller oid))
+counterReturning :: (ObjectId -> (Zone.Zone, LibraryPosition.LibraryPosition)) -> ObjectId -> PlayerId -> [ObjectId] -> Game [(ObjectId, Seq.Seq ObjectId)]
+counterReturning destinationOf source controller =
+  fmap Maybe.catMaybes . traverse (\oid -> fmap (fmap ((,) oid)) (counterOne (destinationOf oid) source controller oid))
 
 -- The shared body of both doors: counter ONE object, answering Nothing when it
 -- was not countered and the incarnations its move minted when it was.
-counterOne :: Zone.Zone -> ObjectId -> PlayerId -> ObjectId -> Game (Maybe (Seq.Seq ObjectId))
-counterOne zone source controller oid = do
+--
+-- A spell whose entry CR 101.2 refuses is still countered: the funnel's CR
+-- 608.3e-shaped arm puts it into its owner's graveyard and answers that
+-- incarnation, which is CR 701.6a's own ending.
+counterOne :: (Zone.Zone, LibraryPosition.LibraryPosition) -> ObjectId -> PlayerId -> ObjectId -> Game (Maybe (Seq.Seq ObjectId))
+counterOne (zone, position) source controller oid = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure Nothing
@@ -7554,7 +7568,7 @@ counterOne zone source controller oid = do
     Just _ -> case fmap Face.counterability (Game.faceOf oid gs) of
       Just Counterability.CantBeCountered -> pure Nothing
       _ -> do
-        moved <- changeZoneReturning oid zone
+        moved <- changeZoneAttaching Nothing Set.empty oid zone position Nothing TapState.Untapped Map.empty (Just controller) Nothing Facing.FaceUp False CarryOver.NotCarried False Seq.empty
         if Seq.null moved
           then pure Nothing
           else do

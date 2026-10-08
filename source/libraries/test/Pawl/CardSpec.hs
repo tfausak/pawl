@@ -131,6 +131,7 @@ import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counter as Counter
+import qualified Pawl.Types.CounterDestination as CounterDestination
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.CounterPlacement as CounterPlacement
@@ -6073,7 +6074,10 @@ effectFilters effect = case effect of
   Effect.ExchangeBlocks _ -> []
   -- Swift Silence's "all other spells" is an ObjectRef Filter like Destroy's,
   -- so the lint reaches it.
-  Effect.Counter (Counter.MkCounter ref _ _ _) -> frame SourceHostFramed (objectRefFilters ref)
+  -- Desertion's "if an artifact or creature spell" is no ObjectRef's filter:
+  -- the Counter arm matches it through Resolve.Slots.effectContext with no
+  -- host overlay, so it is Unframed.
+  Effect.Counter (Counter.MkCounter ref _ _ instead) -> frame SourceHostFramed (objectRefFilters ref) <> fmap ((,) Unframed) (foldMap (Foldable.toList . CounterDestination.only) instead)
   -- All THREE positions: the ObjectRef carries Renegade Krasis' "each other
   -- creature you control with a +1/+1 counter on it", and a Filter there would
   -- otherwise escape the lint; the count is a Quantity like any other; and CR

@@ -27,7 +27,12 @@
                   {
                     "type": "Counter",
                     "value": {
-                      "exileInstead": "delayed",
+                      "instead": {
+                        "slot": "delayed",
+                        "zone": {
+                          "type": "Exile"
+                        }
+                      },
                       "ref": {
                         "type": "InSlot",
                         "value": "spell"

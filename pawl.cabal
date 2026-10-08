@@ -410,6 +410,8 @@ library codec
     Pawl.Codec.CounterabilitySpec
     Pawl.Codec.CounterChange
     Pawl.Codec.CounterChangeSpec
+    Pawl.Codec.CounterDestination
+    Pawl.Codec.CounterDestinationSpec
     Pawl.Codec.Countering
     Pawl.Codec.CounteringSpec
     Pawl.Codec.CounterKind
@@ -2129,6 +2131,7 @@ library types
     Pawl.Types.Counterability
     Pawl.Types.CounterCause
     Pawl.Types.CounterChange
+    Pawl.Types.CounterDestination
     Pawl.Types.Countering
     Pawl.Types.CounterKind
     Pawl.Types.CounterKindFamily
