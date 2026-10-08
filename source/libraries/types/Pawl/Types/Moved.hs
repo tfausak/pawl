@@ -41,14 +41,18 @@ data Moved = MkMoved
     -- names the first card that left and this names every one after it, in
     -- Pawl.Engine.Event.meldable's order. Empty for every other move.
     otherDepartures :: Seq.Seq ObjectId.ObjectId,
-    -- | CR 608.2n: True only for the move that puts an instant or sorcery spell
-    -- into its owner's graveyard as the final part of its own resolution.
+    -- | CR 608.2n / 608.3: True only for a spell's own resolution move -- an
+    -- instant or sorcery into its owner's graveyard, or a permanent spell onto
+    -- the battlefield.
     --
-    -- The one thing that tells that move apart from a COUNTERED spell's (CR
-    -- 701.6a) and a FIZZLED one's (CR 608.2b), which share its zone pair and
-    -- carry no cause of their own. Written by the single door
-    -- Pawl.Engine.Event.changeZoneResolvingReturning, and read by
-    -- TriggerCondition.SelfPutIntoGraveyardDuringResolution alone.
+    -- The one thing that tells those moves apart from a COUNTERED spell's (CR
+    -- 701.6a), a FIZZLED one's (CR 608.2b) and a countered card put onto the
+    -- battlefield instead (Desertion), which share their zone pairs. Written by
+    -- Pawl.Engine.Event.changeZoneResolvingReturning and Pawl.Engine.Stack's
+    -- CarryOver.Carried move; read by
+    -- TriggerCondition.SelfPutIntoGraveyardDuringResolution and by CR 400.7d's
+    -- look-backs at the cast (Quantity.WasCastFrom, Projection.View's
+    -- becamePermanents).
     duringResolution :: Bool
   }
   deriving (Eq, Ord, Show)

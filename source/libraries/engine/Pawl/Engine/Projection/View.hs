@@ -432,6 +432,9 @@ becamePermanents spell events =
     let zc = Moved.change m,
     ZoneChange.departed zc == spell,
     ZoneChange.to zc == Zone.Battlefield,
+    -- "as it resolved": a countered card put onto the battlefield instead
+    -- (Desertion) is not the permanent the spell became.
+    Moved.duringResolution m,
     arrival <- Foldable.toList (Moved.arrivals m)
   ]
 
