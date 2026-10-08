@@ -1,0 +1,201 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "TapThis"
+              }
+            ],
+            "mana": [
+              {
+                "type": "Generic",
+                "value": 4
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "MoveToZone",
+                        "value": {
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "self"
+                          },
+                          "slot": "tablet",
+                          "zone": {
+                            "type": "Exile"
+                          }
+                        }
+                      },
+                      {
+                        "type": "MoveToZone",
+                        "value": {
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "target"
+                          },
+                          "slot": "exiled",
+                          "zone": {
+                            "type": "Exile"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "effects": [
+                      {
+                        "type": "MoveToZone",
+                        "value": {
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "tablet"
+                          },
+                          "zone": {
+                            "type": "Graveyard"
+                          }
+                        }
+                      }
+                    ],
+                    "payGate": {
+                      "branch": {
+                        "type": "IfPaid"
+                      },
+                      "cost": {
+                        "components": [
+                          {
+                            "type": "PayLife",
+                            "value": 10
+                          }
+                        ],
+                        "mana": []
+                      },
+                      "payer": {
+                        "type": "OwnerOfBound",
+                        "value": "target"
+                      }
+                    }
+                  },
+                  {
+                    "effects": [
+                      {
+                        "type": "SetOwner",
+                        "value": {
+                          "player": {
+                            "type": "OwnerOfBound",
+                            "value": "target"
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "tablet"
+                          }
+                        }
+                      },
+                      {
+                        "type": "SetOwner",
+                        "value": {
+                          "player": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "exiled"
+                          }
+                        }
+                      }
+                    ],
+                    "payGate": {
+                      "branch": {
+                        "type": "IfNotPaid"
+                      },
+                      "cost": {
+                        "components": [
+                          {
+                            "type": "PayLife",
+                            "value": 10
+                          }
+                        ],
+                        "mana": []
+                      },
+                      "offeredAt": 1,
+                      "payer": {
+                        "type": "OwnerOfBound",
+                        "value": "target"
+                      }
+                    }
+                  }
+                ],
+                "targetSlots": {
+                  "target": {
+                    "filter": {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "Not",
+                          "value": {
+                            "type": "IsToken"
+                          }
+                        },
+                        {
+                          "type": "OwnedBy",
+                          "value": {
+                            "type": "Opponent"
+                          }
+                        }
+                      ]
+                    },
+                    "pool": {
+                      "type": "Permanents"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "anteOnly": true,
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 6
+        }
+      ],
+      "name": "Bronze Tablet",
+      "oracleText": "Remove this card from your deck before playing if you're not playing for ante.\nThis artifact enters tapped.\n{4}, {T}: Exile this artifact and target nontoken permanent an opponent owns. That player may pay 10 life. If they do, put this card into its owner's graveyard. Otherwise, that player owns this card and you own the other exiled card.",
+      "replacementEffects": [
+        {
+          "effect": {
+            "type": "EntryR",
+            "value": {
+              "matching": {
+                "type": "IsSource"
+              },
+              "rewrite": {
+                "type": "Tapped"
+              }
+            }
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}

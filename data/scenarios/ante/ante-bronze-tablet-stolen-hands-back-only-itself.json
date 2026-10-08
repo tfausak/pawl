@@ -1,0 +1,117 @@
+{
+  "description": "CR 407.3 a Bronze Tablet alice controls through Confiscate: bob declines, keeps owning his Tablet, and alice takes his Ornithopter",
+  "note": "Ruling 2004-10-04. An exchange of ownership would leave both cards with bob.",
+  "board": {
+    "ante": true,
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Confiscate",
+            "attached": "tablet"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-1"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-2"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-3"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-4"
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Ornithopter",
+            "label": "thopter"
+          },
+          {
+            "card": "Bronze Tablet",
+            "label": "tablet"
+          }
+        ],
+        "library": [
+          {
+            "card": "Plains"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$tablet",
+          "ability": 0,
+          "targets": [
+            "$thopter"
+          ],
+          "mana": [
+            "$mountain-1",
+            "$mountain-2",
+            "$mountain-3",
+            "$mountain-4"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "ChooseToPay": {
+          "decision": {
+            "type": "Declines"
+          }
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Exile",
+        "card": "Ornithopter",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Exile",
+        "card": "Bronze Tablet",
+        "count": 1
+      }
+    }
+  ]
+}

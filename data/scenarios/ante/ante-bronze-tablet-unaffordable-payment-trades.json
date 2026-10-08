@@ -1,0 +1,108 @@
+{
+  "description": "CR 119.4 Bronze Tablet: bob at 5 life cannot pay 10, is not offered the payment, and the trade happens",
+  "note": "No ChooseToPay is scheduled, so an offer would fail the scenario.",
+  "board": {
+    "ante": true,
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Bronze Tablet",
+            "label": "tablet"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-1"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-2"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-3"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-4"
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Ornithopter",
+            "label": "thopter"
+          }
+        ],
+        "library": [
+          {
+            "card": "Plains"
+          }
+        ],
+        "life": 5
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$tablet",
+          "ability": 0,
+          "targets": [
+            "$thopter"
+          ],
+          "mana": [
+            "$mountain-1",
+            "$mountain-2",
+            "$mountain-3",
+            "$mountain-4"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Exile",
+        "card": "Ornithopter",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Exile",
+        "card": "Bronze Tablet",
+        "count": 1
+      }
+    },
+    {
+      "Life": {
+        "player": "bob",
+        "life": 5
+      }
+    }
+  ]
+}
