@@ -270,6 +270,7 @@ stage registry board =
                     GameSettings.sharedTeamLife = Board.sharedTeamLife board,
                     GameSettings.deployCreatures = Board.deployCreatures board,
                     GameSettings.twoHeadedGiant = Board.twoHeadedGiant board,
+                    GameSettings.alternatingTeams = Board.alternatingTeams board,
                     GameSettings.teams = Teams.MkTeams (Map.fromList [(pid, team) | (seat, pid) <- NonEmpty.toList seated, Just team <- [Seat.team seat]]),
                     GameSettings.rangeOfInfluence = RangeOfInfluence.MkRangeOfInfluence (Map.fromList [(pid, range) | (seat, pid) <- NonEmpty.toList seated, Just range <- [Seat.range seat]]),
                     GameSettings.emperors = Emperors.MkEmperors (Map.fromList [(team, pid) | (seat, pid) <- NonEmpty.toList seated, Seat.emperor seat, Just team <- [Seat.team seat]])

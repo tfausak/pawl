@@ -29,6 +29,8 @@ data Board = MkBoard
     -- | CR 804.2: whether each creature can be deployed to a teammate.
     deployCreatures :: Bool,
     -- | CR 810: whether the game is Two-Headed Giant.
-    twoHeadedGiant :: Bool
+    twoHeadedGiant :: Bool,
+    -- | CR 811: whether the game is Alternating Teams.
+    alternatingTeams :: Bool
   }
   deriving (Eq, Ord, Show)

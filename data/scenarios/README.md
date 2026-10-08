@@ -26,9 +26,9 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   `attackOption` (CR 806.2b) is `MultiplePlayers` unless given, and `null` is
   CR 507.1's choice among every opponent; `brawl` (CR 903.12a),
   `sharedTeamTurns` (CR 805.1), `sharedTeamLife` (CR 810.4, which wants every
-  teammate's `life` equal), `deployCreatures` (CR 804.2) and `twoHeadedGiant`
-  (CR 810, which wants every teammate's poison `counters` equal) are off unless
-  given. Setup is a
+  teammate's `life` equal), `deployCreatures` (CR 804.2), `twoHeadedGiant`
+  (CR 810, which wants every teammate's poison `counters` equal) and
+  `alternatingTeams` (CR 811) are off unless given. Setup is a
   state, not a history: nothing placed triggers anything.
 - **Note.** An optional `note` says in prose what the scenario rules out and
   why its board is built the way it is. It is free text: nothing reads it, and

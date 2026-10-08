@@ -98,7 +98,13 @@ data GameSettings = MkGameSettings
     -- Pawl.Engine.Sba.poisonThreshold for CR 704.6b's. The variant's other
     -- options are their own fields: a caller sets teams (CR 810.1),
     -- sharedTeamTurns (CR 810.2) and sharedTeamLife (CR 810.4) beside it.
-    twoHeadedGiant :: Bool
+    twoHeadedGiant :: Bool,
+    -- | CR 811: whether this is an Alternating Teams game. Read through
+    -- Pawl.Engine.Combat.attackableOpponents for CR 811.4's attack limit, which
+    -- filters whatever the attack option above allows (CR 811.2b).
+    -- Pawl.Engine.AlternatingTeams.setUp writes it with teams (CR 811.1) over a
+    -- seating it checks (CR 811.3).
+    alternatingTeams :: Bool
   }
   deriving (Eq, Ord, Show)
 
@@ -119,5 +125,6 @@ plain =
       rangeOfInfluence = RangeOfInfluence.unlimited,
       deployCreatures = False,
       emperors = Emperors.none,
-      twoHeadedGiant = False
+      twoHeadedGiant = False,
+      alternatingTeams = False
     }
