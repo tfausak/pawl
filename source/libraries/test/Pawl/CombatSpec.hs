@@ -1890,6 +1890,68 @@ perDefenderRestrictionSpec s registry = Spec.describe s "PerDefenderAttackRestri
         Spec.assertEqWith s "Jace is on the board with loyalty" (S.counterOf CounterKind.Loyalty jaceId board) 3
       _ -> Spec.assertFailure s "fixture should give alice a Galleon and bob a Jace"
 
+-- CR 508.5a / 802.3a: a restriction judged against the WHOLE declaration --
+-- "can't attack alone", and an unscoped "no more than N creatures can attack" --
+-- whose gate names the defending player. The restriction applies to attacking
+-- creatures, so the gate is read per creature, at the seat THAT creature is
+-- announced against. Scryfall o:"attack alone unless" and o:"can attack each
+-- combat unless", 2026-10-08, find only Pipsqueak, Rebel Strongarm, gated on
+-- itself, so the producers are Synthetic Tidal Palisade ({3} Artifact,
+-- "No more than one creature can attack each combat unless defending player
+-- controls an Island.") and Synthetic Tidal Sentry ({1} Artifact Creature --
+-- Construct 2/1, "This creature can't attack alone unless defending player
+-- controls an Island.").
+--
+-- bob, the FIRST defending player in turn order, holds the only Island, so the
+-- old reading -- the gate judged at that one seat -- lifted both restrictions for
+-- every announcement.
+perDefenderWholeRestrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+perDefenderWholeRestrictionSpec s registry = Spec.describe s "PerDefenderWholeRestriction" $ do
+  let declaring g =
+        g
+          { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+            GameState.combat = (GameState.combat g) {Combat.Type.defenders = [S.bob, S.carol]}
+          }
+  Spec.it s "CR 508.5a the bound counts only the creatures attacking a defender without an Island" $ do
+    palisade <- S.printingOf s registry "Synthetic Tidal Palisade"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    island <- S.printingOf s registry "Island"
+    let (gs, mine, _, _) = S.threePlayerCombat [palisade, bears, bears] [island] []
+        board = declaring gs
+    case mine of
+      [_, first, second] -> do
+        Spec.assertBool s (not (Combat.legalAttackDeclarationAs S.alice [(first, AttackTarget.OfPlayer S.carol), (second, AttackTarget.OfPlayer S.carol)] board)) "two attacking carol, who controls no Island, is over the bound"
+        Spec.assertBool s (Combat.legalAttackDeclarationAs S.alice [(first, AttackTarget.OfPlayer S.bob), (second, AttackTarget.OfPlayer S.bob)] board) "two attacking bob, who controls the Island, is not bound at all"
+        Spec.assertBool s (Combat.legalAttackDeclarationAs S.alice [(first, AttackTarget.OfPlayer S.bob), (second, AttackTarget.OfPlayer S.carol)] board) "one at each seat counts one against the bound"
+      _ -> Spec.assertFailure s "fixture should give alice a Palisade and two Bears"
+  Spec.it s "CR 508.5a can't attack alone binds only a creature announced at a defender without an Island" $ do
+    sentry <- S.printingOf s registry "Synthetic Tidal Sentry"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    island <- S.printingOf s registry "Island"
+    let (gs, mine, _, _) = S.threePlayerCombat [sentry, bears] [island] []
+        board = declaring gs
+    case mine of
+      [sentryId, bearsId] -> do
+        Spec.assertBool s (not (Combat.legalAttackDeclarationAs S.alice [(sentryId, AttackTarget.OfPlayer S.carol)] board)) "the Sentry alone may not attack carol, who controls no Island"
+        Spec.assertBool s (Combat.legalAttackDeclarationAs S.alice [(sentryId, AttackTarget.OfPlayer S.bob)] board) "and alone may attack bob, who does"
+        Spec.assertBool s (Combat.legalAttackDeclarationAs S.alice [(sentryId, AttackTarget.OfPlayer S.carol), (bearsId, AttackTarget.OfPlayer S.carol)] board) "with a companion it may attack carol"
+      _ -> Spec.assertFailure s "fixture should give alice a Sentry and a Bears"
+  Spec.it s "CR 508.1d the maximum sends both Berserkers at the defender the bound does not count" $ do
+    -- Berserkers of Blood Ridge attacks each combat if able. Both may attack,
+    -- at bob, so the maximum is two and one Berserker alone falls short of it --
+    -- which a search treating the gated bound as a bound on every seat would
+    -- call the maximum.
+    palisade <- S.printingOf s registry "Synthetic Tidal Palisade"
+    berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
+    island <- S.printingOf s registry "Island"
+    let (gs, mine, _, _) = S.threePlayerCombat [palisade, berserkers, berserkers] [island] []
+        board = declaring gs
+    case mine of
+      [_, first, second] -> do
+        Spec.assertBool s (not (Combat.legalAttackDeclarationAs S.alice [(first, AttackTarget.OfPlayer S.bob)] board)) "one Berserker alone obeys fewer requirements than the maximum"
+        Spec.assertBool s (Combat.legalAttackDeclarationAs S.alice [(first, AttackTarget.OfPlayer S.bob), (second, AttackTarget.OfPlayer S.carol)] board) "both attacking, one at each seat, obeys it"
+      _ -> Spec.assertFailure s "fixture should give alice a Palisade and two Berserkers"
+
 -- CR 612.1 reaching a combat restriction's GATE. Glacial Crasher ({4}{U}{U}
 -- Creature -- Elemental 5/5, "Trample. This creature can't attack unless there is
 -- a Mountain on the battlefield." -- checked against Scryfall, 2026-08-05) is the
@@ -2800,6 +2862,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   defendingPlayerRestrictionSpec s registry
   aimedAttackRestrictionSpec s registry
   perDefenderRestrictionSpec s registry
+  perDefenderWholeRestrictionSpec s registry
   textChangedCombatRestrictionSpec s registry
   textChangedCombatAffectedSpec s registry
   controlChangeSicknessSpec s registry
