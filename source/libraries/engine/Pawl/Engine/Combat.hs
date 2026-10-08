@@ -526,8 +526,8 @@ aloneAnnouncements candidates gs =
 -- the declaration check and the ceiling cannot judge different boards.
 --
 -- A FENCE, because nothing else is one: attackCeilingGiven's flow is exact
--- only while this answer is a laminar family of cardinality caps plus the
--- size-one exception. A third conjunct naming WHICH creatures may attack together would
+-- only while this answer is a family of cardinality caps over announcements plus
+-- the size-one exception. A third conjunct naming WHICH creatures may attack together would
 -- make that search answer CR 508.1d with a number no player can attain, and
 -- -Werror would say nothing. Re-derive the argument there before adding one.
 --
@@ -607,9 +607,10 @@ withinLimit limit size = case limit of
 --      caps plus one exception at size one (aloneAllows): CR 802.3a's
 --      whole-declaration bounds over its per-seat ones, a whole bound counting
 --      the announcements at the seats its gate fails (every seat when ungated,
---      CR 508.5a) and each seat's the one announcement OfPlayer that seat. That
---      family is laminar while one distinct gate is in force, so it is a flow
---      network's capacities (heaviestBySize names the exception). It never asks
+--      CR 508.5a) and each seat's the one announcement OfPlayer that seat. Those
+--      caps become a flow network's capacities once a count per class of
+--      announcements is fixed, and heaviestBySize ranges over the counts the
+--      whole bounds allow. It never asks
 --      WHICH creatures beyond the size-one exception -- only how many, and at
 --      which seat.
 --   2. attackRequirementsMet's PAIR half is a sum of non-negative weights over
@@ -631,8 +632,8 @@ withinLimit limit size = case limit of
 -- Either failing silently invalidates this: a restriction naming WHICH
 -- creatures may attack together, a pair requirement keyed by something other
 -- than a pair, an arity that is neither one-per-subject nor one-over-all, a
--- bound scoped to anything but one seat or a set of whole seats (two bounds
--- that overlap without nesting are not a flow), or an attack cost read off the
+-- bound scoped to anything but one announcement or a set of announcements, or
+-- an attack cost read off the
 -- whole declaration. attackDeclarationAllowed and AttackRequirement.instances
 -- both carry a comment saying so, because -Werror cannot.
 --
@@ -868,55 +869,68 @@ attackCeilingGiven limits alone barred candidates gs =
           else Map.fromList (fmap (\(oid, (target, _)) -> (oid, target)) witness)
       )
 
--- CR 508.1d's maximization under CR 802.3a's laminar bounds: the heaviest
--- assignment of creatures to announcements at EVERY size, element k being the
--- most weight exactly k creatures can carry, ending at the largest size the
--- bounds admit. Each creature is its weighted announcements; each of `groups`
--- bounds how many are announced at one of its members, and `roomAt` how many may
--- share one announcement (Nothing for no bound).
+-- CR 508.1d's maximization under CR 802.3a's bounds: the heaviest assignment of
+-- creatures to announcements at EVERY size, element k being the most weight
+-- exactly k creatures can carry, ending at the largest size the bounds admit.
+-- Each creature is its weighted announcements; each of `groups` bounds how many
+-- are announced at one of its members, and `roomAt` how many may share one
+-- announcement (Nothing for no bound).
 --
--- A minimum-cost flow by successive shortest paths: a start node to each creature,
--- creature to each of its announcements at the negated weight, and each
--- announcement and each group on to the smallest group strictly containing it
--- under its own room, or to the finish when none does. Each augmenting path adds
--- one creature, re-aiming any others along it, and the flow of value k it leaves
--- is the cheapest of that value, so the running sums are the answer at each size.
--- The initial network is acyclic and successive shortest paths never makes a
--- negative cycle, so Bellman-Ford is sound throughout.
---
--- Exact while `groups` is LAMINAR, any two nested or disjoint, which is what
--- makes "the smallest group containing it" one group. An ungated bound counts
--- every announcement and a gated one those at the seats its gate fails, so one
--- distinct gate in force keeps the family laminar. Not implemented: two unscoped
--- bounds whose gates fail at crossing sets of seats, where this tree drops part
--- of one bound and CR 508.1d's maximum can come out too high (#4809).
+-- Exact for ANY family of groups, crossing ones included -- two gated bounds
+-- whose gates fail at overlapping seat sets (Synthetic Tidal Palisade beside
+-- Synthetic Ridge Palisade). The announcements fall into CLASSES by which groups
+-- hold them, and the groups bound only the number in each class: every
+-- assignment has a count per class that the groups allow, and every assignment
+-- under such counts obeys the groups. So the answer at each size is the best
+-- over the class counts the groups allow -- the maximal ones suffice, a smaller
+-- count admitting fewer assignments -- of one flow per count, capped there.
+-- Pawl.CombatSpec's CrossingAttackBounds group is the proof.
+heaviestBySize :: (Ord target) => [(Set target, Integer)] -> (target -> Maybe Integer) -> [[(target, Natural)]] -> [Natural]
+heaviestBySize groups roomAt creatures =
+  let present = Set.fromList (concatMap (fmap fst) creatures)
+      -- Each bound over the announcements some creature can make; one reaching
+      -- none of them constrains nothing.
+      bounds = zip [0 :: Int ..] (filter (not . Set.null . fst) (fmap (Bifunctor.bimap (Set.intersection present) (max 0)) groups))
+      classOf target = Set.fromList [index | (index, (members, _)) <- bounds, Set.member target members]
+      -- The classes some group holds, each with the most it can ever take.
+      bounded = [(sig, minimum (toInteger (length creatures) : [room | (index, (_, room)) <- bounds, Set.member index sig])) | sig <- Set.toList (Set.fromList (fmap classOf (Set.toList present))), not (Set.null sig)]
+      allows counts = all (\(index, (_, room)) -> sum [n | (sig, n) <- counts, Set.member index sig] <= room) bounds
+      countings = filter allows (Monad.mapM (\(sig, most) -> fmap ((,) sig) [0 .. most]) bounded)
+      maximal counts = not (any (\(sig, n) -> allows (fmap (\(other, m) -> (other, if other == sig then m + 1 else m)) counts) && Just (n + 1) <= lookup sig bounded) counts)
+      pointwise xs ys = case (xs, ys) of
+        ([], _) -> ys
+        (_, []) -> xs
+        (x : more, y : rest) -> max x y : pointwise more rest
+   in List.foldl' pointwise [] (fmap (\counts -> flowBySize classOf (Map.fromList counts) roomAt creatures) (filter maximal countings))
+
+-- `heaviestBySize` under one count per class: a minimum-cost flow by successive
+-- shortest paths, a start node to each creature, creature to each of its
+-- announcements at the negated weight, announcement to its class under its room,
+-- and class to the finish under its count (unbounded for a class no group
+-- holds). Each augmenting path adds one creature, re-aiming any others along it,
+-- and the flow of value k it leaves is the cheapest of that value, so the running
+-- sums are the answer at each size. The initial network is acyclic and
+-- successive shortest paths never makes a negative cycle, so Bellman-Ford is
+-- sound throughout.
 --
 -- The backward arcs are a fence rather than a proof: dropping them keeps the
 -- Combat subtree green, since Pawl.CombatEffectSpec's Crawlspace board re-aims
 -- its third creature at carol directly rather than along a path moving another.
-heaviestBySize :: (Ord target) => [(Set target, Integer)] -> (target -> Maybe Integer) -> [[(target, Natural)]] -> [Natural]
-heaviestBySize groups roomAt creatures =
+flowBySize :: (Ord target, Ord klass) => (target -> klass) -> Map klass Integer -> (target -> Maybe Integer) -> [[(target, Natural)]] -> [Natural]
+flowBySize classOf counts roomAt creatures =
   let start = 0 :: Int
       finish = 1 :: Int
       creatureNodes = zip [2 :: Int ..] creatures
       present = Set.fromList (concatMap (fmap fst) creatures)
       targetNodes = Map.fromList (zip (Set.toList present) [2 + length creatures ..])
-      -- Each bound over the announcements some creature can make, one node per
-      -- distinct set at the tightest room any bound gives it; a bound reaching
-      -- none of them constrains nothing.
-      boundSets = Map.toList (Map.filterWithKey (\members _ -> not (Set.null members)) (Map.fromListWith min (fmap (Bifunctor.first (Set.intersection present)) groups)))
-      groupNodes = zip [2 + length creatures + Map.size targetNodes ..] boundSets
-      nodeCount = 2 + length creatures + Map.size targetNodes + length groupNodes
-      -- The smallest group whose members satisfy `inside`, or the finish.
-      smallest inside = case List.sortOn (Set.size . fst . snd) (filter (inside . fst . snd) groupNodes) of
-        (node, _) : _ -> node
-        [] -> finish
+      classNodes = Map.fromList (zip (Set.toList (Set.map classOf present)) [2 + length creatures + Map.size targetNodes ..])
+      nodeCount = 2 + length creatures + Map.size targetNodes + Map.size classNodes
       -- (from, to, capacity, cost), Nothing being no capacity bound.
       arcs =
         [(start, node, Just 1, 0) | (node, _) <- creatureNodes]
           <> [(node, Map.findWithDefault finish target targetNodes, Just 1, negate (toInteger weight)) | (node, options) <- creatureNodes, (target, weight) <- options]
-          <> [(node, smallest (Set.member target), roomAt target, 0) | (target, node) <- Map.toList targetNodes]
-          <> [(node, smallest (Set.isProperSubsetOf members), Just room, 0) | (node, (members, room)) <- groupNodes]
+          <> [(node, Map.findWithDefault finish (classOf target) classNodes, roomAt target, 0) | (target, node) <- Map.toList targetNodes]
+          <> [(node, finish, Map.lookup klass counts, 0) | (klass, node) <- Map.toList classNodes]
       indexed = zip [0 :: Int ..] arcs
       -- The residual network under `flows`: each arc forward while it has
       -- capacity left, and backward while it carries flow, each tagged with the
