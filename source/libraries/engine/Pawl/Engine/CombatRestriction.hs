@@ -959,13 +959,18 @@ cantBeBlockedBy defending blockers attackers gs =
 -- CR 509.1b's pairwise restrictions from BOTH sides: every (blocker, attacker)
 -- pair `cantBeBlockedBy`, `cantBlockCreatures` or `storedEvasions` forbids. What
 -- Pawl.Engine.Combat reads.
-barredBlocks :: Maybe PlayerId -> [ObjectId] -> [ObjectId] -> GameState -> Set (ObjectId, ObjectId)
-barredBlocks defending blockers attackers gs =
-  Set.unions
-    [ cantBeBlockedBy defending blockers attackers gs,
-      cantBlockCreatures defending blockers attackers gs,
-      storedEvasions blockers attackers gs
-    ]
+--
+-- A gate naming the defending player is read per ATTACKER, at the player it is
+-- attacking (CR 508.5 / 805.10e), not at the blocker's controller: the two
+-- differ once a teammate's creature blocks under the shared team turns option
+-- (CR 805.10d), or once a block is switched. Pawl.CombatSpec's
+-- DefendingPlayerOfBlockGate group is the proof.
+barredBlocks :: [ObjectId] -> [ObjectId] -> GameState -> Set (ObjectId, ObjectId)
+barredBlocks blockers attackers gs =
+  let seatOf attacker = Defender.playerOfAttacker Projection.controllerWithLastKnown attacker gs
+      bySeat = Map.fromListWith (flip (<>)) (fmap (\attacker -> (seatOf attacker, [attacker])) attackers)
+      atSeat (seat, theirs) = Set.union (cantBeBlockedBy seat blockers theirs gs) (cantBlockCreatures seat blockers theirs gs)
+   in Set.unions (storedEvasions blockers attackers gs : fmap atSeat (Map.toList bySeat))
 
 -- CR 509.1b / 611.2c: every (blocker, attacker) pair a stored,
 -- resolution-generated "can't be blocked" forbids -- Veiling Oddity's

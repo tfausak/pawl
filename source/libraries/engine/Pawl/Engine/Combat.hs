@@ -1286,12 +1286,7 @@ menaceAllowsGiven pcs declaration gs =
 -- blockDeclarationAllowed.
 pairAllowed :: [ObjectId] -> [ObjectId] -> ObjectId -> ObjectId -> GameState -> Bool
 pairAllowed candidates attackers blocker attacker gs =
-  -- CR 508.5's seat for a gate that names the defending player: the BLOCKER's
-  -- controller, who is the defending player declaring it (CR 802.4a), where
-  -- blockCeilingGiven and legalBlockDeclaration hand that player over. Nothing in
-  -- the pool gates a pairwise blocking restriction, so no test observes this
-  -- seat.
-  pairAllowedGiven (Projection.controlGrants gs) Map.empty (CombatRestriction.barredBlocks (Projection.controllerOf blocker gs) candidates attackers gs) candidates attackers blocker attacker gs
+  pairAllowedGiven (Projection.controlGrants gs) Map.empty (CombatRestriction.barredBlocks candidates attackers gs) candidates attackers blocker attacker gs
 
 -- pairAllowed against a pre-projected board: this is asked once per (blocker,
 -- attacker) PAIR, so each evasion read would otherwise be a fresh gather in a
@@ -1531,8 +1526,9 @@ legalBlockDeclaration pid declaration gs =
 -- option the defending team's one combined block, whose creatures may block a
 -- creature attacking any of its players.
 --
--- Each player's restrictions are read at their own seat, the defending player
--- CR 509.1a names, and the tightest bound among them binds the whole block.
+-- Each player's bound is read at their own seat, the defending player CR 509.1a
+-- names, and the tightest among them binds the whole block; a pairwise gate is
+-- read at the attacker's defending player instead (`barredBlocks`).
 -- One walk for the whole search: CR 509.1b's pairwise restrictions are decided
 -- once here and read by every pair the caller judges.
 blockScopeGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> ([ObjectId], [ObjectId], Set (ObjectId, ObjectId), Maybe Natural)
@@ -1540,7 +1536,7 @@ blockScopeGiven grants pcs pid gs =
   let side = sideOf pid gs
       attackers = concatMap (`attackersOn` gs) side
       seats = fmap (\p -> (p, legalBlockersGiven grants pcs p gs)) side
-      barred = Set.unions (fmap (\(p, mine) -> CombatRestriction.barredBlocks (Just p) mine attackers gs) seats)
+      barred = CombatRestriction.barredBlocks (concatMap snd seats) attackers gs
       limit = case Maybe.mapMaybe (\p -> CombatRestriction.blockLimit (Just p) gs) side of
         [] -> Nothing
         bounds -> Just (minimum bounds)

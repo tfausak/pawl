@@ -60,6 +60,7 @@ import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KickerDecision as KickerDecision
@@ -1952,6 +1953,70 @@ perDefenderWholeRestrictionSpec s registry = Spec.describe s "PerDefenderWholeRe
         Spec.assertBool s (Combat.legalAttackDeclarationAs S.alice [(first, AttackTarget.OfPlayer S.bob), (second, AttackTarget.OfPlayer S.carol)] board) "both attacking, one at each seat, obeys it"
       _ -> Spec.assertFailure s "fixture should give alice a Palisade and two Berserkers"
 
+-- CR 508.5 / 805.10e: a pairwise blocking gate naming the defending player is
+-- read at the player the ATTACKER is attacking, not at the first defending player
+-- and not at the blocker's controller. Graxiplon ("can't be blocked unless
+-- defending player controls three or more creatures that share a creature type")
+-- is the producer; every board gives the attacked player three Hill Giants and
+-- the other defender at most one.
+defendingPlayerOfBlockGateSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+defendingPlayerOfBlockGateSpec s registry = Spec.describe s "DefendingPlayerOfBlockGate" $ do
+  -- Free for all, three seats: Graxiplon and a Goblin Piker attack carol, a
+  -- second Piker attacks bob (the first defending player, with no creature).
+  -- carol's Giant blocks the Piker, and General Jarkeld's switch
+  -- (Combat.switchBlockers, which its effect performs) moves it onto Graxiplon.
+  Spec.it s "CR 508.5 a switched blocker reads Graxiplon's gate at carol, whom it attacks" $ do
+    graxiplon <- S.printingOf s registry "Graxiplon"
+    piker <- S.printingOf s registry "Goblin Piker"
+    giant <- S.printingOf s registry "Hill Giant"
+    let (gs, mine, _, hers) = S.threePlayerCombat [graxiplon, piker, piker] [] [giant, giant, giant]
+    case (mine, hers) of
+      ([grax, atCarol, atBob], blocker : _) -> do
+        let board =
+              gs
+                { GameState.phase = Phase.Combat CombatStep.DeclareBlockers,
+                  GameState.combat =
+                    (GameState.combat gs)
+                      { Combat.Type.defenders = [S.bob, S.carol],
+                        Combat.Type.attackers = Map.fromList [(grax, AttackTarget.OfPlayer S.carol), (atCarol, AttackTarget.OfPlayer S.carol), (atBob, AttackTarget.OfPlayer S.bob)],
+                        Combat.Type.blockers = Map.singleton atCarol (Set.singleton blocker)
+                      }
+                }
+            switched = Combat.switchBlockers atCarol grax board
+        Spec.assertEqWith s "CR 508.5: the Giant now blocks Graxiplon" (Combat.blockersOf grax switched) (Set.singleton blocker)
+        Spec.assertEqWith s "and no longer the Piker" (Combat.blockersOf atCarol switched) Set.empty
+      _ -> Spec.assertFailure s "fixture should give alice three attackers and carol three Giants"
+  -- Two-Headed Giant's combat (CR 810.7, 805.10d): alice's Graxiplon attacks
+  -- dave, and his teammate carol -- first in APNAP order, holding one Giant --
+  -- blocks it. The gate is dave's, so with his three Giants the block is legal;
+  -- the pair differs only in dave's third Giant.
+  Spec.it s "CR 805.10e a teammate's block reads Graxiplon's gate at dave, whom it attacks" $ do
+    graxiplon <- S.printingOf s registry "Graxiplon"
+    giant <- S.printingOf s registry "Hill Giant"
+    let twoHeaded = S.inTeams [[S.alice, S.bob], [S.carol, S.dave]] S.fourPlayerGame
+        shared = twoHeaded {GameState.settings = (GameState.settings twoHeaded) {GameSettings.sharedTeamTurns = True}}
+        board daveGiants =
+          let (grax, g1) = S.addPermanent graxiplon S.alice shared
+              (blocker, g2) = S.addPermanent giant S.carol g1
+              g3 = withPermanents S.dave (replicate daveGiants giant) g2
+           in ( grax,
+                blocker,
+                g3
+                  { GameState.activePlayer = S.alice,
+                    GameState.phase = Phase.Combat CombatStep.DeclareBlockers,
+                    GameState.combat =
+                      (GameState.combat g3)
+                        { Combat.Type.defenders = [S.carol, S.dave],
+                          Combat.Type.attackers = Map.singleton grax (AttackTarget.OfPlayer S.dave)
+                        }
+                  }
+              )
+        legal daveGiants =
+          let (grax, blocker, gs) = board daveGiants
+           in Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton grax)) gs
+    Spec.assertBool s (legal 3) "CR 805.10e: dave controls three Giants, so carol's Giant may block"
+    Spec.assertBool s (not (legal 2)) "and with two it may not"
+
 -- CR 612.1 reaching a combat restriction's GATE. Glacial Crasher ({4}{U}{U}
 -- Creature -- Elemental 5/5, "Trample. This creature can't attack unless there is
 -- a Mountain on the battlefield." -- checked against Scryfall, 2026-08-05) is the
@@ -2863,6 +2928,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   aimedAttackRestrictionSpec s registry
   perDefenderRestrictionSpec s registry
   perDefenderWholeRestrictionSpec s registry
+  defendingPlayerOfBlockGateSpec s registry
   textChangedCombatRestrictionSpec s registry
   textChangedCombatAffectedSpec s registry
   controlChangeSicknessSpec s registry
