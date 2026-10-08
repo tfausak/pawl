@@ -1065,6 +1065,8 @@ library codec
     Pawl.Codec.RemoveCounters
     Pawl.Codec.RemoveCountersAmong
     Pawl.Codec.RemoveCountersSpec
+    Pawl.Codec.RemovePlayerCounters
+    Pawl.Codec.RemovePlayerCountersSpec
     Pawl.Codec.Repeat
     Pawl.Codec.RepeatIf
     Pawl.Codec.RepeatIfSpec
@@ -2494,6 +2496,7 @@ library types
     Pawl.Types.RemovalCount
     Pawl.Types.RemoveCounters
     Pawl.Types.RemoveCountersAmong
+    Pawl.Types.RemovePlayerCounters
     Pawl.Types.Repeat
     Pawl.Types.RepeatIf
     Pawl.Types.Replace

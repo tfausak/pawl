@@ -336,6 +336,7 @@ import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
+import qualified Pawl.Types.RemovePlayerCounters as RemovePlayerCounters
 import qualified Pawl.Types.Repeat as Repeat
 import qualified Pawl.Types.RepeatIf as RepeatIf
 import qualified Pawl.Types.Replace as Replace
@@ -9865,7 +9866,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         Just n
           | n > 0 -> Monad.void (Event.putPlayerCounters (CounterCause.ByEffect controller) pid kind (Integer.toNaturalSaturating n))
         _ -> pure ()
-  Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters ref kind quantity) -> do
+  Effect.RemovePlayerCounters (RemovePlayerCounters.MkRemovePlayerCounters ref kind quantity mTally) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext gs controller source legal (slotBindings resolving gs)
@@ -9877,14 +9878,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- CR 122: GainPlayerCounters' mirror, through no funnel for
               -- Effect.RemoveCounters' reason. The floor is explicit, since
               -- Natural subtraction would underflow. CR 810.10b: off the team's
-              -- shared count, which every sharer holds (Game.counterSharers);
-              -- no card in data/cards/ removes poison, so no test observes that
-              -- (gap #4796).
-              State.modify'
-                ( \g ->
-                    let lose p = p {Player.counters = Map.adjust (\held -> held - min held (Integer.toNaturalSaturating n)) kind (Player.counters p)}
-                     in g {GameState.players = List.foldl' (flip (Map.adjust lose)) (GameState.players g) (Game.counterSharers kind pid g)}
-                )
+              -- shared count, which every sharer holds (Game.counterSharers).
+              -- The tally is what this player lost, Leeches' "that much".
+              do
+                g <- State.get
+                let held = maybe 0 (Map.findWithDefault 0 kind . Player.counters) (Map.lookup pid (GameState.players g))
+                    lost = min held (Integer.toNaturalSaturating n)
+                    lose p = p {Player.counters = Map.adjust (\had -> had - min had lost) kind (Player.counters p)}
+                State.put g {GameState.players = List.foldl' (flip (Map.adjust lose)) (GameState.players g) (Game.counterSharers kind pid g)}
+                Monad.forM_ mTally $ \slot -> State.modify' (bindAmountSlot resolving source slot lost)
         _ -> pure ()
   -- CR 107.14: "you may pay any amount of {E}". The payer is the resolving
   -- controller (CR 109.5's "you"), the amount is theirs to name, and CR 118.3

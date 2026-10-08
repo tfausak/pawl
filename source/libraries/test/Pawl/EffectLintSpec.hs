@@ -180,6 +180,7 @@ import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
+import qualified Pawl.Types.RemovePlayerCounters as RemovePlayerCounters
 import qualified Pawl.Types.Repeat as Repeat
 import qualified Pawl.Types.RepeatIf as RepeatIf
 import qualified Pawl.Types.Replace as Replace
@@ -354,7 +355,7 @@ ownQuantities effect = case effect of
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _ _) -> [quantity]
   Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count _ _ _) -> Maybe.maybeToList (RemovalCount.quantityOf count)
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> [quantity]
-  Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> [quantity]
+  Effect.RemovePlayerCounters removal -> [RemovePlayerCounters.quantity removal]
   Effect.PayAnyEnergy _ -> []
   Effect.ChooseNumber _ -> []
   Effect.Tap _ -> []

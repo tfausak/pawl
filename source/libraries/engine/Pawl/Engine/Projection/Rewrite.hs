@@ -196,6 +196,7 @@ import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
+import qualified Pawl.Types.RemovePlayerCounters as RemovePlayerCounters
 import qualified Pawl.Types.Repeat as Repeat
 import qualified Pawl.Types.RepeatIf as RepeatIf
 import qualified Pawl.Types.Replace as Replace
@@ -843,7 +844,7 @@ rewriteEffect pairs effect = case effect of
   -- CR 122.1's bare first sentence) with no subtype word in it, so only the count
   -- descends.
   Effect.GainPlayerCounters x -> Effect.GainPlayerCounters x {PlayerCounters.quantity = rewriteQuantity pairs (PlayerCounters.quantity x)}
-  Effect.RemovePlayerCounters x -> Effect.RemovePlayerCounters x {PlayerCounters.quantity = rewriteQuantity pairs (PlayerCounters.quantity x)}
+  Effect.RemovePlayerCounters x -> Effect.RemovePlayerCounters x {RemovePlayerCounters.quantity = rewriteQuantity pairs (RemovePlayerCounters.quantity x)}
   Effect.PayAnyEnergy _ -> effect
   Effect.ChooseNumber _ -> effect
   Effect.Tap ref -> Effect.Tap (rewriteObjectRef pairs ref)

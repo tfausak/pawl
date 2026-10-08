@@ -1,0 +1,115 @@
+{
+  "description": "CR 810.10b Leeches on one teammate takes the team's poison counters (control)",
+  "note": "The same board without twoHeadedGiant: bob loses his three poison counters and takes three damage, and alice keeps hers.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1,
+        "counters": [
+          {
+            "key": {
+              "type": "Poison"
+            },
+            "value": 3
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "team": 1,
+        "counters": [
+          {
+            "key": {
+              "type": "Poison"
+            },
+            "value": 3
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "team": 2,
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "plains-1"
+          },
+          {
+            "card": "Plains",
+            "label": "plains-2"
+          },
+          {
+            "card": "Plains",
+            "label": "plains-3"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Leeches",
+            "label": "leeches"
+          }
+        ]
+      },
+      {
+        "name": "dave",
+        "team": 2
+      }
+    ],
+    "active": "carol",
+    "step": "PrecombatMain",
+    "sharedTeamTurns": true
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": {
+        "Cast": {
+          "object": "$leeches",
+          "targets": [
+            "$bob"
+          ],
+          "mana": [
+            "$plains-1",
+            "$plains-2",
+            "$plains-3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": "Pass"
+    }
+  ],
+  "final": [
+    {
+      "PlayerCounters": {
+        "player": "alice",
+        "kind": {
+          "type": "Poison"
+        },
+        "count": 3
+      }
+    },
+    {
+      "PlayerCounters": {
+        "player": "bob",
+        "kind": {
+          "type": "Poison"
+        },
+        "count": 0
+      }
+    },
+    {
+      "Life": {
+        "player": "bob",
+        "life": 17
+      }
+    }
+  ]
+}
