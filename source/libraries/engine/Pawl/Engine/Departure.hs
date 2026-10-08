@@ -309,7 +309,8 @@ objectsLeaveWith pid gs =
       -- already been removed from. Event.changeZoneInBatch's `asOf` is the same
       -- reading for the same reason.
       --
-      -- Filed for every object the player owned, in every zone, exactly as the
+      -- Filed for every object the player owned, in every zone but the ante
+      -- (CR 800.4n, `owned` above), exactly as the
       -- zone-change funnel files for every move -- the reader decides which ones
       -- it has a question about.
       filed oid = case Map.lookup oid (GameState.objects gs) of

@@ -668,7 +668,8 @@ splitComponents next objects =
 -- `owners` is the still-playing seats in seating order: CR 727.1 / 729.2
 -- rebuild the game for the players who are in it, and CR 103.5's declaration
 -- round goes around the table in turn order. A departed player's cards are not
--- here to skip -- CR 800.4a took them out of the game with them.
+-- here to skip -- CR 800.4a took them out of the game with them -- except their
+-- ante cards, which CR 800.4n keeps and `strandedAnte` leaves in the ante.
 --
 -- `exempt` is CR 727.5's set: "effects may exempt certain cards from the
 -- procedure that restarts the game. These cards are not in their owner's deck as
