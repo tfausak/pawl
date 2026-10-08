@@ -140,6 +140,19 @@ spec s registry = Spec.describe s "Ante" $ do
         back = Setup.funnelBack left parent
     Spec.assertEqWith s "CR 729.5 bob's main-game library is whole again, and not one card more" (length (Game.zoneMembers Zone.Library S.bob back)) 9
     Spec.assertEqWith s "CR 800.4n bob's subgame ante card stayed behind him" (length (anteOf S.bob left)) 1
+  -- CR 729.5: a subgame played for ante antes one card from each library, and
+  -- at its end each still-playing owner's ante card goes into their main-game
+  -- library with the rest of their cards; the main game's own ante is untouched.
+  Spec.it s "CR 729.5 a subgame ante card goes back to its owner's main-game library" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let stock pid gs0 = foldr (\_ gs -> snd (S.addLibraryCard mountain pid gs)) gs0 (replicate 9 ())
+        (mainAnte, parent) = S.addObjectIn Zone.Ante piker S.alice (stock S.bob (stock S.alice (Setup.gameWith anteGame S.bothPlayers)))
+        sub = S.runPure S.identityAnswer (Setup.subgameStateFrom S.alice parent) (Setup.startGameFromCards S.performer Set.empty)
+        back = Setup.funnelBack sub parent
+    Spec.assertEqWith s "CR 729.5 each main-game library is whole again, the anted card in it" (fmap (\pid -> length (Game.zoneMembers Zone.Library pid back)) [S.alice, S.bob]) [9, 9]
+    Spec.assertEqWith s "CR 407.2 the subgame had anted one card from each library" (fmap (\pid -> length (anteOf pid sub)) [S.alice, S.bob]) [1, 1]
+    Spec.assertEqWith s "CR 729.1a the main game's own ante is as it was" (GameState.ante back) (Set.singleton mainAnte)
   -- CR 800.4n / 727.2: bob's ante card stayed when he left, and a restart
   -- involves every card in the game. bob is not in the new game and has no
   -- library for it, so the card begins the new game where it was.

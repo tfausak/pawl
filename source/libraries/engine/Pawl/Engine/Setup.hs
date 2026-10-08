@@ -1712,6 +1712,10 @@ funnelBack finalSub parent =
       -- original of a card they anted in the subgame among it, so that owner's
       -- subgame objects -- only CR 800.4n's ante cards survive objectsLeaveWith
       -- -- are not returned a second time.
+      --
+      -- Not implemented: telling an ante card that came from that library from
+      -- one that entered the subgame from outside it, which CR 729.5 would
+      -- return and this drops (#4829).
       departedOwners = Set.fromList (Maybe.mapMaybe (\oid -> fmap Object.owner (Map.lookup oid (GameState.objects parent))) (Set.toList recoveredIds))
       returned = fmap toLibraryCard (Map.filter (\obj -> isCard obj && Set.notMember (Object.owner obj) departedOwners) (Map.withoutKeys subObjects (Set.unions [subCmdIds, Map.keysSet subAttractions, Map.keysSet subPlanar, Map.keysSet subSchemes])))
       recovered = fmap toLibraryCard (Map.restrictKeys (GameState.objects parent) (Set.difference recoveredIds (Set.union oldCmdIds oldSuppIds)))
@@ -1766,7 +1770,9 @@ funnelBack finalSub parent =
       -- objectsLeaveWith deleted the subgame's, so nothing represents it in
       -- either game. That is the two rules read together rather than an oversight
       -- -- CR 729.4a took it out of the main game and CR 800.4a took it out of
-      -- the subgame -- and Pawl.SetupSpec pins it. CR 729.5's funnel offers no
+      -- the subgame -- and Pawl.SetupSpec pins it. CR 800.4n's ante cards are
+      -- the exception: they stay in the subgame, see `departedOwners` (#4829).
+      -- For every other card, CR 729.5's funnel offers no
       -- third answer: it takes "cards they own that are in the subgame", and
       -- CR 800.4a removed this one before the subgame ended, so the rule's
       -- Example never reaches it. Nor is the card lost -- CR 400.11 makes
