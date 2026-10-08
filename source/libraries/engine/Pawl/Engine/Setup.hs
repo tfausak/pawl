@@ -1641,10 +1641,13 @@ applyCrossings finalSub parent =
 -- never resurrect what objectsLeaveWith deleted. It stays correctly False for a
 -- player who merely decks out in a subgame that never reaches multiplayer:
 -- objectsLeaveWith never fires there, so their cards are still in `finalSub`
--- and `returned` has them. Owner is invariant across a card's life, so an
--- absent owner also implies this `oid` is missing -- no separate id check is
--- needed. CR 800.4n's ante cards are the exception, which is why both
--- `ownersPresentInSub` and `returned` skip them.
+-- and `returned` has them. An owner moves only by CR 407.3's ownership
+-- changers, so outside them an absent owner implies this `oid` is missing -- no
+-- separate id check is needed. CR 800.4n's ante cards are the exception, which
+-- is why both `ownersPresentInSub` and `returned` skip them.
+--
+-- Not implemented: a card whose owner changed inside the subgame, which the
+-- departed former owner's rebuilt library takes back as well (#4835).
 funnelBack :: GameState -> GameState -> GameState
 funnelBack finalSub parent =
   let -- CR 729.5 / CR 712.21, the same split startGameFromCards performs, in a

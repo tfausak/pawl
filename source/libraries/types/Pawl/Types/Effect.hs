@@ -41,6 +41,7 @@ import qualified Pawl.Types.Earthbend as Earthbend
 import qualified Pawl.Types.ExchangeBlocks as ExchangeBlocks
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
+import qualified Pawl.Types.ExchangeWithTopOfLibrary as ExchangeWithTopOfLibrary
 import qualified Pawl.Types.ExchangeZones as ExchangeZones
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
@@ -96,6 +97,7 @@ import qualified Pawl.Types.SacrificeEffect as SacrificeEffect
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
+import qualified Pawl.Types.SetOwner as SetOwner
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Types.SlotName as SlotName
@@ -308,6 +310,10 @@ data Effect card ability
   | -- | CR 701.12d / 702.65a: this permanent (the effect's source) and a card
     -- the named player chooses from their hand exchange zones.
     ExchangeWithCardInHand ChosenCardInHand.ChosenCardInHand
+  | -- | CR 108.3 / 407.3: a player becomes the owner of the named objects.
+    SetOwner SetOwner.SetOwner
+  | -- | CR 701.12d: a named card and the top card of a library exchange zones.
+    ExchangeWithTopOfLibrary ExchangeWithTopOfLibrary.ExchangeWithTopOfLibrary
   | -- | CR 119.5: the players the PlayerRef names each gain or lose the
     -- necessary amount to end up with this life total (Magister Sphinx).
     SetLifeTotal PlayerQuantity.PlayerQuantity

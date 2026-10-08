@@ -616,6 +616,7 @@ poolHeldLastKnown pool view =
         Pool.Abilities -> False
         Pool.CardsInGraveyard _ -> False
         Pool.CardsInExile -> False
+        Pool.CardsInAnte -> False
         Pool.CreaturesAndCardsInGraveyard _ -> hasType CardType.Creature
 
 -- CR 702.18a (shroud), CR 702.11b/702.11d (hexproof) and CR 702.16b
@@ -861,6 +862,7 @@ data Pools = MkPools
     spellsAndPermanentsPool :: Set Recipient,
     playersAndPlaneswalkersPool :: Set Recipient,
     exilePool :: Set Recipient,
+    antePool :: Set Recipient,
     -- Not a pool of recipients: the CR 613.10/613.11 player rows `targetable`
     -- reads for a PLAYER candidate, gathered once per player for the whole
     -- enumeration rather than once per player candidate per slot. A list of
@@ -894,6 +896,7 @@ poolsGiven pcs gs =
       playersAndPlaneswalkersPool =
         Set.union (playerRecipients gs) (planeswalkerRecipientsGiven pcs gs),
       exilePool = exileRecipients gs,
+      antePool = anteRecipients gs,
       playerRowsPool = fmap (\pid -> (pid, PlayerEffect.applying pid gs)) (Game.stillPlaying gs)
     }
 
@@ -932,6 +935,7 @@ basePoolGiven pools context bindings pool gs = case pool of
   -- them. What the rule restricts is the ANNOUNCEMENT, so `piledOffer` takes the
   -- narrowing where the prompt is raised and nowhere else.
   Pool.CardsInExile -> exilePool pools
+  Pool.CardsInAnte -> antePool pools
   -- The union of the two arms above, built HERE rather than hoisted into Pools for
   -- the graveyard arm's reason: half of it is per-slot. The battlefield half is the
   -- shared thunk, so a slot naming this pool pays the creature walk once with every
@@ -1190,6 +1194,12 @@ playerOf recipient = case recipient of
 -- happened to belong to.
 exileRecipients :: GameState -> Set Recipient
 exileRecipients gs = Set.fromList (fmap Recipient.ToObject (Set.toList (GameState.exile gs)))
+
+-- CR 407: the cards in the ante zone, tagged ToObject -- Darkpact's "target
+-- card in the ante". exileRecipients' read for its reason: a shared zone (CR
+-- 400.1), and public (CR 400.2), so no CR 406.4 pile narrows it.
+anteRecipients :: GameState -> Set Recipient
+anteRecipients gs = Set.fromList (fmap Recipient.ToObject (Set.toList (GameState.ante gs)))
 
 -- CR 608.2b: a target that left the zone it was chosen in is illegal (its id
 -- names an object that no longer exists, per CR 400.7), and legality is
@@ -1555,6 +1565,7 @@ scopeSlot pool = case pool of
   Pool.PlayersAndPlaneswalkers -> Nothing
   Pool.CardsInGraveyard scope -> zoneScopeSlot scope
   Pool.CardsInExile -> Nothing
+  Pool.CardsInAnte -> Nothing
   -- Its graveyard half carries the same axis, so the answer is that half's.
   Pool.CreaturesAndCardsInGraveyard scope -> zoneScopeSlot scope
 
@@ -2394,6 +2405,7 @@ bakePerPlayer name pid slot =
         Pool.SpellsAndPermanents -> pool
         Pool.PlayersAndPlaneswalkers -> pool
         Pool.CardsInExile -> pool
+        Pool.CardsInAnte -> pool
    in baked {TargetSlot.pool = bakePool (TargetSlot.pool baked), TargetSlot.perPlayer = Nothing}
 
 -- bakeSlots over a whole modal payload, for the caller that must bake BEFORE the

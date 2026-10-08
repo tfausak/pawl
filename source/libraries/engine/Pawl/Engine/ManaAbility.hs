@@ -472,6 +472,8 @@ manaProduced effect = case effect of
   Effect.TakeExtraTurn {} -> Nothing
   Effect.ShuffleIntoLibrary {} -> Nothing
   Effect.Ante {} -> Nothing
+  Effect.SetOwner {} -> Nothing
+  Effect.ExchangeWithTopOfLibrary {} -> Nothing
   Effect.Shuffle {} -> Nothing
   Effect.OfferCast {} -> Nothing
   Effect.OfferNamedCopy {} -> Nothing
@@ -664,6 +666,8 @@ playerChoice effect = case effect of
   Effect.TakeExtraTurn {} -> Nothing
   Effect.ShuffleIntoLibrary {} -> Nothing
   Effect.Ante {} -> Nothing
+  Effect.SetOwner {} -> Nothing
+  Effect.ExchangeWithTopOfLibrary {} -> Nothing
   Effect.Shuffle {} -> Nothing
   Effect.OfferCast {} -> Nothing
   Effect.OfferNamedCopy {} -> Nothing
@@ -718,6 +722,11 @@ movesLibraryCard effect = case effect of
   Effect.ShuffleIntoLibrary {} -> True
   -- CR 407.4: never INTO a library; out of one where the ref reaches it.
   Effect.Ante (Ante.MkAnte _ ref _) -> refReachesLibrary ref
+  -- CR 108.3: an ownership write moves no card at all.
+  Effect.SetOwner {} -> False
+  -- CR 701.12d: the top card of a library leaves it, and the named card enters
+  -- one.
+  Effect.ExchangeWithTopOfLibrary {} -> True
   -- CR 701.24a randomises a library WITHIN itself, which is Scry's and Fateseal's
   -- answer above: no card crosses the zone's boundary in either direction.
   Effect.Shuffle {} -> False

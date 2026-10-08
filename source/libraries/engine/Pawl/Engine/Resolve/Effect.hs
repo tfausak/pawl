@@ -214,6 +214,7 @@ import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeBlocks as ExchangeBlocks
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
+import qualified Pawl.Types.ExchangeWithTopOfLibrary as ExchangeWithTopOfLibrary
 import qualified Pawl.Types.ExchangeZones as ExchangeZones
 import qualified Pawl.Types.ExchangedValue as ExchangedValue
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
@@ -364,6 +365,7 @@ import qualified Pawl.Types.SearchPlace as SearchPlace
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
+import qualified Pawl.Types.SetOwner as SetOwner
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
@@ -3407,6 +3409,8 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.GainControl {} -> False
   Effect.GiveControl {} -> False
   Effect.ExchangeControl {} -> False
+  Effect.SetOwner {} -> False
+  Effect.ExchangeWithTopOfLibrary {} -> False
   Effect.ArmDelayedTrigger {} -> False
   Effect.AffectPlayers {} -> False
   Effect.RequireBlock {} -> False
@@ -5641,6 +5645,35 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- APNAP (CR 608.2f), which is what makes the ORDER of the Prompt.Shuffle calls
     -- a fact about the rules rather than about PlayerId's Ord.
     Monad.forM_ (filter (`Set.member` owners) (Game.apnapOrder gs)) Event.shuffleLibrary
+  -- CR 108.3 / 407.3: the one named player becomes the owner of each named
+  -- object -- Darkpact's "You own target card in the ante". No zone change and
+  -- no event; a ref naming no one player writes nothing.
+  Effect.SetOwner (SetOwner.MkSetOwner player ref) -> do
+    gs <- State.get
+    let named = ListUtils.nubOrd (objectRefObjects legal resolving controller source gs ref)
+    case playerRefPlayers legal controller gs player of
+      [owner] -> State.put (List.foldl' (\g oid -> Game.setOwner oid owner g) gs named)
+      _ -> pure ()
+  -- CR 701.12d: the one named card and the top card of the named player's
+  -- library exchange zones. All or nothing (CR 701.12a): one card named, a top
+  -- card that is another card, and one owner for both (CR 701.12d's "only if
+  -- all the cards are owned by the same player"). Then one event (CR 608.2f):
+  -- the named card onto the top of its owner's library (CR 400.3), the top card
+  -- into the zone the named card left.
+  Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary ref player) -> do
+    before <- State.get
+    let named = ListUtils.nubOrd (objectRefObjects legal resolving controller source before ref)
+        ownerOf oid = fmap Object.owner (Game.lookupObject oid before)
+        zoneOf oid = fmap Object.zone (Game.lookupObject oid before)
+    case (named, playerRefPlayers legal controller before player) of
+      ([card], [pid]) -> case (Game.zoneMembers Zone.Library pid before, zoneOf card) of
+        (top : _, Just from)
+          | top /= card && ownerOf top == ownerOf card ->
+              Event.simultaneously $ do
+                Monad.void (Event.changeZoneAttaching (Just before) Set.empty card Zone.Library LibraryPosition.Top Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried False Seq.empty)
+                Event.changeZoneInBatch before top from
+        _ -> pure ()
+      _ -> pure ()
   -- CR 407.4: "the owner of an object is the only player who can ante that
   -- object". Each named object one of the named players owns moves to the
   -- ante, all of them as one event (CR 608.2f); any other is left where it is,

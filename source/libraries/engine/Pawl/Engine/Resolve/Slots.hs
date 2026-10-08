@@ -118,6 +118,7 @@ import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeBlocks as ExchangeBlocks
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
+import qualified Pawl.Types.ExchangeWithTopOfLibrary as ExchangeWithTopOfLibrary
 import qualified Pawl.Types.ExchangeZones as ExchangeZones
 import qualified Pawl.Types.ExchangedValue as ExchangedValue
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
@@ -214,6 +215,7 @@ import qualified Pawl.Types.ScryR as ScryR
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
+import qualified Pawl.Types.SetOwner as SetOwner
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import Pawl.Types.SlotArity (SlotArity)
@@ -892,6 +894,8 @@ effectObjectRefs effect = case effect of
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ refs) -> NonEmpty.toList refs
   Effect.Ante (Ante.MkAnte _ ref _) -> [ref]
+  Effect.SetOwner (SetOwner.MkSetOwner _ ref) -> [ref]
+  Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary ref _) -> [ref]
   Effect.Shuffle {} -> []
   Effect.OfferCast (OfferCast.MkOfferCast ref _ _ _ _ _ _ _ _) -> [ref]
   Effect.OfferNamedCopy {} -> []
@@ -1112,6 +1116,8 @@ effectPlayerRefs effect = case effect of
   Effect.TakeExtraTurn takeExtraTurn -> [TakeExtraTurn.player takeExtraTurn]
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named _) -> Maybe.maybeToList named
   Effect.Ante (Ante.MkAnte player _ _) -> [player]
+  Effect.SetOwner (SetOwner.MkSetOwner player _) -> [player]
+  Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary _ player) -> [player]
   Effect.Shuffle ref -> [ref]
   Effect.OfferCast (OfferCast.MkOfferCast _ caster _ _ _ _ _ _ _) -> [caster]
   Effect.OfferNamedCopy {} -> []
@@ -1518,6 +1524,8 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.TakeExtraTurn takeExtraTurn -> quantitySlots (TakeExtraTurn.count takeExtraTurn)
   Effect.ShuffleIntoLibrary {} -> Map.empty
   Effect.Ante {} -> Map.empty
+  Effect.SetOwner {} -> Map.empty
+  Effect.ExchangeWithTopOfLibrary {} -> Map.empty
   -- The arm above's library read, reported at the head; nothing is shuffled into
   -- it, so there is no ref beside it either.
   Effect.Shuffle {} -> Map.empty
@@ -2229,6 +2237,8 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.TakeExtraTurn takeExtraTurn -> Quantity.slotsAreExhaustive (TakeExtraTurn.count takeExtraTurn)
   Effect.ShuffleIntoLibrary {} -> True
   Effect.Ante {} -> True
+  Effect.SetOwner {} -> True
+  Effect.ExchangeWithTopOfLibrary {} -> True
   Effect.Shuffle {} -> True
   Effect.OfferCast {} -> True
   Effect.OfferNamedCopy {} -> True
@@ -2478,6 +2488,8 @@ readsX =
         Effect.TakeExtraTurn takeExtraTurn -> Quantity.readsX (TakeExtraTurn.count takeExtraTurn)
         Effect.ShuffleIntoLibrary {} -> False
         Effect.Ante {} -> False
+        Effect.SetOwner {} -> False
+        Effect.ExchangeWithTopOfLibrary {} -> False
         Effect.Shuffle {} -> False
         Effect.OfferCast offer -> any Quantity.readsX (repetitionQuantities (OfferCast.repetition offer))
         Effect.OfferNamedCopy {} -> False
@@ -2503,6 +2515,8 @@ boundSlots effect = case effect of
   Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ _ mSlot _ _ _) -> foldMap Set.singleton mSlot
   -- MoveToZone's reason: the anted incarnations (CR 400.7).
   Effect.Ante (Ante.MkAnte _ _ mSlot) -> foldMap Set.singleton mSlot
+  Effect.SetOwner {} -> Set.empty
+  Effect.ExchangeWithTopOfLibrary {} -> Set.empty
   -- The tokens this Create minted, for CR 603.7c's delayed trigger to name.
   Effect.Create (Create.MkCreate _ _ _ mSlot _) -> foldMap Set.singleton mSlot
   -- Create's reason: the conjured cards, for CR 603.7c.
@@ -3649,6 +3663,7 @@ poolSlot pool = case pool of
     ZoneScope.ControllerOfBound slot -> oneSlot slot
     ZoneScope.BoundPlayer _ -> Map.empty
   Pool.CardsInExile -> Map.empty
+  Pool.CardsInAnte -> Map.empty
   -- The graveyard half's scope; the battlefield half names no slot.
   Pool.CreaturesAndCardsInGraveyard scope -> case scope of
     ZoneScope.Scoped _ -> Map.empty

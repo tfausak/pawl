@@ -169,6 +169,7 @@ import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.ExchangeBlocks as ExchangeBlocks
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
+import qualified Pawl.Types.ExchangeWithTopOfLibrary as ExchangeWithTopOfLibrary
 import qualified Pawl.Types.ExchangeZones as ExchangeZones
 import qualified Pawl.Types.ExchangedValue as ExchangedValue
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
@@ -315,6 +316,7 @@ import qualified Pawl.Types.SelfCountersRemoved as SelfCountersRemoved
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
+import qualified Pawl.Types.SetOwner as SetOwner
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Types.SlotCount as SlotCount
@@ -1374,6 +1376,8 @@ effectNames asking onCard onAbility x = case x of
   Effect.TakeExtraTurn takeExtraTurn -> takeExtraTurnNames asking takeExtraTurn
   Effect.ShuffleIntoLibrary shuffleIntoLibrary -> shuffleIntoLibraryNames asking shuffleIntoLibrary
   Effect.Ante ante -> anteNames asking ante
+  Effect.SetOwner (SetOwner.MkSetOwner player ref) -> playerRefNames asking player || objectRefNames asking ref
+  Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary ref player) -> objectRefNames asking ref || playerRefNames asking player
   Effect.Shuffle playerRef -> playerRefNames asking playerRef
   Effect.OfferCast offerCast -> offerCastNames asking offerCast
   Effect.OfferNamedCopy _cardName -> False
@@ -2240,6 +2244,7 @@ poolNames asking x = case x of
   Pool.PlayersAndPlaneswalkers -> False
   Pool.CardsInGraveyard zoneScope -> zoneScopeNames asking zoneScope
   Pool.CardsInExile -> False
+  Pool.CardsInAnte -> False
   Pool.CreaturesAndCardsInGraveyard zoneScope -> zoneScopeNames asking zoneScope
 
 powerNames :: Asking -> Power.Power -> Bool

@@ -638,6 +638,12 @@ pileHolderOf oid gs = Foldable.asum (fmap (pileHolderIn oid) [GameState.library 
 pileHolderIn :: ObjectId -> Map.Map PlayerId (Seq.Seq ObjectId) -> Maybe PlayerId
 pileHolderIn oid piles = fmap fst (List.find (Foldable.elem oid . snd) (Map.toList piles))
 
+-- CR 108.3 / 407.3: this player now owns the object. A write on the object as
+-- it stands and not a zone change, so CR 400.7 mints nothing; CR 400.3 reads
+-- the new owner at its next move. Unknown ids are left alone.
+setOwner :: ObjectId -> PlayerId -> GameState -> GameState
+setOwner oid pid gs = gs {GameState.objects = Map.adjust (\obj -> obj {Object.owner = pid}) oid (GameState.objects gs)}
+
 removeFromZones :: ObjectId -> GameState -> GameState
 removeFromZones oid gs =
   let -- CR 400.1: out of the pile that holds it, never Object.owner's, which an

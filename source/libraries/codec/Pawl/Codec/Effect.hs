@@ -53,6 +53,7 @@ import qualified Pawl.Codec.Earthbend as Earthbend
 import qualified Pawl.Codec.ExchangeBlocks as ExchangeBlocks
 import qualified Pawl.Codec.ExchangeSides as ExchangeSides
 import qualified Pawl.Codec.ExchangeValues as ExchangeValues
+import qualified Pawl.Codec.ExchangeWithTopOfLibrary as ExchangeWithTopOfLibrary
 import qualified Pawl.Codec.ExchangeZones as ExchangeZones
 import qualified Pawl.Codec.ExileHaunting as ExileHaunting
 import qualified Pawl.Codec.ExtraPhase as ExtraPhase
@@ -108,6 +109,7 @@ import qualified Pawl.Codec.SacrificeEffect as SacrificeEffect
 import qualified Pawl.Codec.Search as Search
 import qualified Pawl.Codec.SetClassLevel as SetClassLevel
 import qualified Pawl.Codec.SetHalfLocked as SetHalfLocked
+import qualified Pawl.Codec.SetOwner as SetOwner
 import qualified Pawl.Codec.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Codec.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Codec.SlotName as SlotName
@@ -292,6 +294,8 @@ codec cardCodec abilityCodec =
           Arm.payload "TakeExtraTurn" TakeExtraTurn.codec Effect.TakeExtraTurn (\x -> case x of Effect.TakeExtraTurn y -> Just y; _ -> Nothing),
           Arm.payload "ShuffleIntoLibrary" ShuffleIntoLibrary.codec Effect.ShuffleIntoLibrary (\x -> case x of Effect.ShuffleIntoLibrary y -> Just y; _ -> Nothing),
           Arm.payload "Ante" Ante.codec Effect.Ante (\x -> case x of Effect.Ante y -> Just y; _ -> Nothing),
+          Arm.payload "SetOwner" SetOwner.codec Effect.SetOwner (\x -> case x of Effect.SetOwner y -> Just y; _ -> Nothing),
+          Arm.payload "ExchangeWithTopOfLibrary" ExchangeWithTopOfLibrary.codec Effect.ExchangeWithTopOfLibrary (\x -> case x of Effect.ExchangeWithTopOfLibrary y -> Just y; _ -> Nothing),
           Arm.payload "Shuffle" PlayerRef.codec Effect.Shuffle (\x -> case x of Effect.Shuffle y -> Just y; _ -> Nothing),
           Arm.payload "OfferCast" OfferCast.codec Effect.OfferCast (\x -> case x of Effect.OfferCast y -> Just y; _ -> Nothing),
           Arm.payload "OfferNamedCopy" (Common.nonEmpty CardName.codec) Effect.OfferNamedCopy (\x -> case x of Effect.OfferNamedCopy y -> Just y; _ -> Nothing),
@@ -468,6 +472,8 @@ tagOf x = case x of
   Effect.TakeExtraTurn {} -> "TakeExtraTurn"
   Effect.ShuffleIntoLibrary {} -> "ShuffleIntoLibrary"
   Effect.Ante {} -> "Ante"
+  Effect.SetOwner {} -> "SetOwner"
+  Effect.ExchangeWithTopOfLibrary {} -> "ExchangeWithTopOfLibrary"
   Effect.Shuffle {} -> "Shuffle"
   Effect.OfferCast {} -> "OfferCast"
   Effect.OfferNamedCopy {} -> "OfferNamedCopy"
