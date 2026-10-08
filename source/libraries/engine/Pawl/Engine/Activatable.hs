@@ -569,7 +569,7 @@ aimingSomewhere costWith aimable stamp loyalty pid srcId gs payable =
       -- Targets the cost cannot tell apart are tried once (Cost.aimingSignature).
       key = Cost.aimingKey pid srcId gs (costWith blind) . Recipient.ToObject
    in if slotReading
-        then any (\(ranges, sets) -> any (\aiming -> payable aiming (gather (Set.unions (Map.elems aiming)))) (Target.aimingsBy id key ranges sets)) aimable
+        then any (\(ranges, sets) -> any (\aiming -> payable (Binding.withAnnouncedTargets aiming) (gather (Set.unions (Map.elems aiming)))) (Target.aimingsBy id key ranges sets)) aimable
         else
           payable Map.empty blind
             || (gather candidates /= blind && any (payable Map.empty . gather . Set.singleton) (Set.toList candidates))

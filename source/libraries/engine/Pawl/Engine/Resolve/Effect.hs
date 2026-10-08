@@ -2078,6 +2078,9 @@ sourceObjectOf src = case src of
 -- never sees this one unless a card writes it -- and then the card really does name
 -- it. Pawl.ReplacementSpec proves both binding carriers, one case each.
 --
+-- Binding.announcedTargets is dropped too: it repeats the targets the target
+-- slots already name.
+--
 -- Binding.collectedEvidence is the SECOND slot dropped, for the same kind of
 -- reason: it records whether evidence was collected, which is all CR 701.59c's
 -- linked text asks, and no text names the exiled cards through it.
@@ -2086,7 +2089,7 @@ sourceObjectOf src = case src of
 -- each by name (Fling's "the sacrificed creature's power").
 referentsOfBindings :: Map.Map SlotName Binding.Type.Binding -> [ObjectId]
 referentsOfBindings bindings =
-  let named = Map.withoutKeys bindings (Set.fromList [Binding.thisAbility, Binding.collectedEvidence])
+  let named = Map.withoutKeys bindings (Set.fromList [Binding.thisAbility, Binding.collectedEvidence, Binding.announcedTargets])
    in foldMap (Maybe.mapMaybe Recipient.objectOf . Set.toList) (Binding.targetsOf named)
         <> foldMap Foldable.toList (Binding.groupsOf named)
 

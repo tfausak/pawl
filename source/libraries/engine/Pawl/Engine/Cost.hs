@@ -4335,23 +4335,27 @@ aimingKey pid oid gs cost = maybe Left (Right .) (aimingSignature pid oid gs cos
 aimedReferent :: Recipient.Recipient -> Recipient.Recipient
 aimedReferent r = maybe r Recipient.ToObject (Recipient.objectOf r)
 
--- The slots a criterion excludes with a top-level Not (IsBound _).
-excludedSlots :: Filter.Type.Filter Keyword.Type.Keyword -> [SlotName.SlotName]
+-- The slots a criterion excludes with a top-level Not (IsBound _), or every
+-- target at once with Not IsTarget -- Nothing, which aimingsBy's per-class
+-- union over the slots settles exactly.
+excludedSlots :: Filter.Type.Filter Keyword.Type.Keyword -> [Maybe SlotName.SlotName]
 excludedSlots criterion =
   let excluded f = case f of
-        Filter.Type.Not (Filter.Type.IsBound name) -> [name]
+        Filter.Type.Not (Filter.Type.IsBound name) -> [Just name]
+        Filter.Type.Not Filter.Type.IsTarget -> [Nothing]
         _ -> []
    in case criterion of
         Filter.Type.And conjuncts -> concatMap excluded conjuncts
         _ -> excluded criterion
 
 -- Does this criterion read a slot only as "isn't a target" -- a top-level
--- Not (IsBound _), alone or as a conjunct beside slotless ones? aimingSignature's
+-- Not (IsBound _) or Not IsTarget, alone or as a conjunct beside slotless ones? aimingSignature's
 -- condition.
 onlyExcludesTargets :: Filter.Type.Filter Keyword.Type.Keyword -> Bool
 onlyExcludesTargets criterion =
   let excludes f = case f of
         Filter.Type.Not (Filter.Type.IsBound _) -> True
+        Filter.Type.Not Filter.Type.IsTarget -> True
         _ -> False
       rest = case criterion of
         Filter.Type.And conjuncts -> filter (not . excludes) conjuncts

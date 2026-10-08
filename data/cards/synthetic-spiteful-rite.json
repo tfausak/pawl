@@ -18,8 +18,7 @@
                 {
                   "type": "Not",
                   "value": {
-                    "type": "IsBound",
-                    "value": "target"
+                    "type": "IsTarget"
                   }
                 }
               ]
