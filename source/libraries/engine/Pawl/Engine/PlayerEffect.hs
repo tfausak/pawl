@@ -1570,10 +1570,32 @@ spellCostReadsTargets pid oid gs =
 -- twice, and no test names one object under two of CR 115.4's tags.
 perTargetCount :: Set.Set Recipient.Recipient -> PlayerId -> RowSource -> GameState -> Filter Keyword -> Natural
 perTargetCount targets pid source gs wanted =
-  let context = contextFor (Just pid) source gs
-      referent r = (Recipient.objectOf r, Recipient.playerOf r)
-      matched r = maybe False (\view -> Filter.matches context view wanted) (Projection.viewOfRecipient (Projection.fullView gs) gs r)
-   in Natural.length (Set.map referent (Set.filter matched targets))
+  let referent r = (Recipient.objectOf r, Recipient.playerOf r)
+   in Natural.length (Set.map referent (Set.filter (perTargetMatches pid source gs wanted) targets))
+
+-- Does one announced target count towards a per-target change? perTargetCount's
+-- question of a single recipient.
+perTargetMatches :: PlayerId -> RowSource -> GameState -> Filter Keyword -> Recipient.Recipient -> Bool
+perTargetMatches pid source gs wanted r =
+  maybe False (\view -> Filter.matches (contextFor (Just pid) source gs) view wanted) (Projection.viewOfRecipient (Projection.fullView gs) gs r)
+
+-- Every question a cost change in force for `pid` asks of ONE target, answered:
+-- a per-target change's filter (perTargetCount) and ReduceActivationCost's
+-- whichTargets (activationCostAdjustmentsGiven's `aims`). These are the only
+-- reads the gathered adjustments make of CR 601.2c's targets, so two targets
+-- answering alike are interchangeable to them (Pawl.Engine.Cost.aimingSignature).
+-- Asked of every such change in force rather than only those reaching the cost
+-- at hand: an extra question only splits targets further, which stays exact.
+targetQuestions :: PlayerId -> GameState -> Recipient.Recipient -> [Bool]
+targetQuestions pid gs r =
+  let ask (source, effect) = case effect of
+        PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost _ _ (Just wanted)) -> [perTargetMatches pid source gs wanted r]
+        PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost _ _ _ (Just wanted)) -> [perTargetMatches pid source gs wanted r]
+        PlayerEffect.ReduceActivationCost reduction -> case ReduceActivationCost.whichTargets reduction of
+          Just wanted -> [maybe False (\oid -> matchesObjectFor pid source wanted oid gs) (Recipient.objectOf r)]
+          Nothing -> []
+        _ -> []
+   in concatMap ask (applying pid gs)
 
 -- Professor Hojo's "the FIRST activated ability you activate during your turn"
 -- and Kíli the Resourceful's "the first equip ability you activate each turn":

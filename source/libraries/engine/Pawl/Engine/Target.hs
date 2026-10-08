@@ -1231,26 +1231,65 @@ stillAdmitted pcs grants pools perspective source recipient slot gs =
 -- subset left empty is omitted from the map rather than bound to the empty set,
 -- which is what a slot with nothing to bind has always been.
 --
--- The search is exponential in a plural slot's legal set, and only a gate whose
--- cost reads the targets walks it (Cost.readsBoundSlot, Cost.readsTargets);
--- `any` stops at the first aiming that pays.
+-- Exponential in a plural slot's legal set; aimingsBy is the bounded search a
+-- gate takes wherever it can say which targets are interchangeable.
 --
 -- Over whatever a slot binds: Activatable's maps hold objects, and
 -- Pawl.Engine.Cast.castAimable's whole recipients, so a player target counts
 -- for a per-target cost change.
 aimings :: (Ord a) => Map SlotName (Natural, Natural) -> Map SlotName (Set a) -> [Map SlotName (Set a)]
-aimings ranges slots =
-  let choicesOf name objects =
+aimings = aimingsBy id id
+
+-- `aimings` up to interchangeable targets: `referent` names what a slot's member
+-- IS (a creature and the same object as a permanent are one target, CR 601.2c's
+-- "each become a target"), and two referents with one `signature` and the same
+-- slots they are legal for are told apart by nothing the caller reads
+-- (Pawl.Engine.Cost.aimingSignature). So one aiming per way of drawing COUNTS
+-- from each such class stands for all of them.
+--
+-- Per class, each slot draws some number of its members, and the slots' draws may
+-- share members (CR 115.3: one object may answer two instances of "target"), so
+-- the distinct members a class contributes range from the largest draw to the
+-- smaller of the draws' sum and the class's size. Every such number is
+-- realised: the first that-many members, dealt to the slots round the class in
+-- turn, which covers them all and repeats none within a slot.
+--
+-- Polynomial in the slots' legal sets for a fixed number of classes -- one class
+-- of twenty permanents under Hinata, Dawn-Crowned is twenty-one aimings, where
+-- every subset was a million. Pawl.CostSpec's "Clever Concealment" group is the
+-- board that would not finish.
+aimingsBy :: (Ord a, Ord r, Ord k) => (a -> r) -> (r -> k) -> Map SlotName (Natural, Natural) -> Map SlotName (Set a) -> [Map SlotName (Set a)]
+aimingsBy referent signature ranges slots =
+  let forms = Map.fromListWith Map.union [(referent a, Map.singleton name a) | (name, members) <- Map.toList slots, a <- Set.toList members]
+      classes = zip [0 :: Int ..] (Map.elems (Map.fromListWith (flip (<>)) [((signature r, Map.keysSet fs), [r]) | (r, fs) <- Map.toList forms]))
+      legalIn name i = case Map.lookup i (Map.fromList classes) of
+        Just (r : _) -> maybe False (Map.member name) (Map.lookup r forms)
+        _ -> False
+      -- One slot's draws: how many members of each class it may hold, at every
+      -- count its range admits.
+      draws name =
         let (lo, hi) = Map.findWithDefault (1, 1) name ranges
-         in concatMap (`subsetsOfSize` objects) [lo .. hi]
-   in foldr
-        ( \(name, objects) rest -> do
-            chosen <- choicesOf name objects
-            already <- rest
-            pure (if Set.null chosen then already else Map.insert name chosen already)
-        )
-        [Map.empty]
-        (Map.toList slots)
+            open = [(i, length members) | (i, members) <- classes, legalIn name i]
+            split k avail = case avail of
+              [] -> [Map.empty | k == 0]
+              (i, n) : rest -> [if j == 0 then m else Map.insert i j m | j <- [0 .. min k n], m <- split (k - j) rest]
+         in concatMap (`split` open) [Natural.toIntSaturating lo .. Natural.toIntSaturating hi]
+      realise drawn =
+        let demands i = [(name, j) | (name, m) <- drawn, Just j <- [Map.lookup i m]]
+            unions = [fmap ((,) i) [maximum (fmap snd ds) .. min (sum (fmap snd ds)) (length members)] | (i, members) <- classes, let ds = demands i, not (null ds)]
+         in fmap (build drawn . Map.fromList) (sequence unions)
+      build drawn sizes =
+        let dealt (i, members) =
+              case Map.lookup i sizes of
+                Nothing -> []
+                Just u ->
+                  let chosen = take u members
+                      go _ [] = []
+                      go at ((name, j) : rest) = fmap ((,) name) (take j (drop (at `mod` u) (cycle chosen))) <> go (at + j) rest
+                   in go 0 [(name, j) | (name, m) <- drawn, Just j <- [Map.lookup i m]]
+            place m (name, r) = maybe m (\a -> Map.insertWith Set.union name (Set.singleton a) m) (Map.lookup name =<< Map.lookup r forms)
+         in List.foldl' place Map.empty (concatMap dealt classes)
+   in concatMap realise (traverse (\name -> fmap ((,) name) (draws name)) (Map.keys slots))
 
 -- CR 601.2c: the counts each slot may be answered with, narrowed by its legal set
 -- exactly as chooseTargets narrows the offer (announcedRange, slotCapacities) --

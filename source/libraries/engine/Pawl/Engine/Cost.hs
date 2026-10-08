@@ -4252,6 +4252,63 @@ announcedSlots announced gs = case announced >>= \a -> Game.lookupObject a gs of
 readsBoundSlot :: Cost Keyword.Type.Keyword -> Bool
 readsBoundSlot = any (\component -> targetComputed component || not (Set.null (Set.unions (fmap Filter.boundSlots (criteriaOf component))))) . Cost.components
 
+-- CR 601.2c's targets as a payability gate can tell them apart: two targets with
+-- one signature are interchangeable to every reader of the aiming, so
+-- Pawl.Engine.Target.aimingsBy may try one of them in place of each. Without
+-- this the lookahead is exponential in a plural slot's legal set (Clever
+-- Concealment under Hinata, Dawn-Crowned).
+--
+-- The readers, each answered here: a cost change's per-target questions
+-- (PlayerEffect.targetQuestions), the spell's own whichTargets sentences
+-- (selfReductions), every claim the cost's components make with nothing bound
+-- -- membership, and what the object adds towards a threshold -- and, beside a
+-- targetComputed component, whether a permanent is there and its mana value
+-- (fixComputed).
+--
+-- Claims read with nothing bound are what a target LEAVES when its criterion
+-- says "isn't a target". A criterion reading a slot any other way could tell
+-- interchangeable-looking targets apart, so the answer is Nothing and the caller
+-- falls back to every subset. No cost in data/cards/ reads a slot otherwise
+-- (grep of IsBound under additional and activation costs, 2026-10-08).
+aimingSignature :: PlayerId -> ObjectId -> GameState -> Cost Keyword.Type.Keyword -> Maybe (Recipient.Recipient -> [Integer])
+aimingSignature pid oid gs cost
+  | not (all (all onlyExcludesTargets . criteriaOf) (Cost.components cost)) = Nothing
+  | otherwise =
+      let context = Filter.contextFor (Game.teams gs) (Just pid) (Just oid)
+          wanted = Maybe.mapMaybe CostReduction.whichTargets (selfSentences pid oid gs)
+          claims = claimsOf Map.empty pid oid (Cost.components cost) gs
+          computed = any targetComputed (Cost.components cost)
+          ofObject r f = maybe 0 f (Recipient.objectOf r)
+          self r = fmap (\w -> ofObject r (\o -> toInteger (fromEnum (Filter.matches context (Projection.viewOfObject o gs) w)))) wanted
+          claimed r = concatMap (\c -> [ofObject r (toInteger . fromEnum . (`Set.member` Claim.Type.pool c)), maybe 0 (\t -> ofObject r (\o -> Map.findWithDefault 0 o (Threshold.amounts t))) (Claim.Type.threshold c)]) claims
+          evidence r = if computed then [ofObject r (\o -> toInteger (fromEnum (Game.zoneOf o gs == Just Zone.Battlefield))), ofObject r (`evidenceValue` gs)] else []
+       in Just (\r -> fmap (toInteger . fromEnum) (PlayerEffect.targetQuestions pid gs r) <> self r <> claimed r <> evidence r)
+
+-- aimingSignature as the key Pawl.Engine.Target.aimingsBy classes targets by:
+-- the target itself where no signature can be given, so the search falls back
+-- to every subset.
+aimingKey :: PlayerId -> ObjectId -> GameState -> Cost Keyword.Type.Keyword -> Recipient.Recipient -> Either Recipient.Recipient [Integer]
+aimingKey pid oid gs cost = maybe Left (Right .) (aimingSignature pid oid gs cost)
+
+-- What a recipient IS, for aimingsBy: a creature, a planeswalker and a permanent
+-- named generically are one object, so one object answering two slots under two
+-- tags counts once, as PlayerEffect.perTargetCount counts it.
+aimedReferent :: Recipient.Recipient -> Recipient.Recipient
+aimedReferent r = maybe r Recipient.ToObject (Recipient.objectOf r)
+
+-- Does this criterion read a slot only as "isn't a target" -- a top-level
+-- Not (IsBound _), alone or as a conjunct beside slotless ones? aimingSignature's
+-- condition.
+onlyExcludesTargets :: Filter.Type.Filter Keyword.Type.Keyword -> Bool
+onlyExcludesTargets criterion =
+  let excludes f = case f of
+        Filter.Type.Not (Filter.Type.IsBound _) -> True
+        _ -> False
+      rest = case criterion of
+        Filter.Type.And conjuncts -> filter (not . excludes) conjuncts
+        _ -> [criterion | not (excludes criterion)]
+   in all (Set.null . Filter.boundSlots) rest
+
 -- Every criterion a cost component carries, as the Filters a slot name could
 -- hide in. EXHAUSTIVE with no wildcard, claimOf's posture: a new component with
 -- a criterion has to answer here or the gate above stops seeing it.

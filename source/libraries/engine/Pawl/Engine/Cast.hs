@@ -559,8 +559,9 @@ payableCostAtGiven modes pcs sources x extra spending pid oid gs cost =
       -- components they add are inspected for a criterion naming a slot exactly as
       -- the printed ones are.
       blind = adjustmentsFor Map.empty
-   in if Cost.readsBoundSlot (Cost.plusComponents blind substituted) || Cost.readsTargets pid oid gs
-        then any (\aiming -> askWith (adjustmentsFor aiming) aiming) (castAimable modes x pid oid gs)
+      blindCost = Cost.plusComponents blind substituted
+   in if Cost.readsBoundSlot blindCost || Cost.readsTargets pid oid gs
+        then any (\aiming -> askWith (adjustmentsFor aiming) aiming) (castAimable (Cost.aimingKey pid oid gs blindCost) modes x pid oid gs)
         else askWith blind Map.empty
 
 -- What CR 601.2c could still bind for this proposal: every aiming
@@ -592,8 +593,8 @@ payableCostAtGiven modes pcs sources x extra spending pid oid gs cost =
 -- slot, neither of which takes this
 -- road. A card printing an X-bounded target slot beside a slot-reading
 -- additional cost is what would make the two values differ.
-castAimable :: Maybe (Seq.Seq ModeIndex.ModeIndex) -> Natural -> PlayerId -> ObjectId -> GameState -> [Map.Map SlotName.SlotName (Set.Set Recipient.Recipient)]
-castAimable announced x pid oid gs = case Game.faceOf oid gs of
+castAimable :: (Ord k) => (Recipient.Recipient -> k) -> Maybe (Seq.Seq ModeIndex.ModeIndex) -> Natural -> PlayerId -> ObjectId -> GameState -> [Map.Map SlotName.SlotName (Set.Set Recipient.Recipient)]
+castAimable key announced x pid oid gs = case Game.faceOf oid gs of
   Nothing -> []
   Just face ->
     let modal = Face.spell face
@@ -608,7 +609,7 @@ castAimable announced x pid oid gs = case Game.faceOf oid gs of
         setsOf slots = Target.legalSets (Just pid) True Map.empty oid slots gs
         -- Every aiming of one selection's slots, at the counts CR 601.2c admits
         -- for the X this gate is asking about (Target.aimingRanges).
-        aimingsOf slots = let sets = setsOf slots in Target.aimings (Target.aimingRanges (Just pid) oid (Just x) slots sets gs) sets
+        aimingsOf slots = let sets = setsOf slots in Target.aimingsBy Cost.aimedReferent key (Target.aimingRanges (Just pid) oid (Just x) slots sets gs) sets
         -- CR 700.2: the modes CR 601.2b announced, or every selection the printed
         -- instruction admits among the fillable modes -- a "choose two" spell
         -- (Ojutai's Command) aims across both.
@@ -3403,7 +3404,7 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                       aimedGathers
                         | Cost.readsTargets pid sid announcedBoard =
                             -- Merged by value: aimings counting alike total alike.
-                            Set.toList . Set.fromList $ gathered : fmap (gatheredFor . Set.unions . Map.elems) (Target.aimings (Target.aimingRanges (Just pid) sid (Just (Maybe.fromMaybe 0 mAmount)) slots aimedSets announcedBoard) aimedSets)
+                            Set.toList . Set.fromList $ gathered : fmap (gatheredFor . Set.unions . Map.elems) (Target.aimingsBy Cost.aimedReferent (Cost.aimingKey pid sid announcedBoard announcedAtX) (Target.aimingRanges (Just pid) sid (Just (Maybe.fromMaybe 0 mAmount)) slots aimedSets announcedBoard) aimedSets)
                         | otherwise = [gathered]
                       routeTotals mana = concatMap (`Cost.totalManas` mana) aimedGathers
                   let totalledCost = Cost.plusComponents gathered announcedAtX

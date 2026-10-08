@@ -492,13 +492,13 @@ payableCost aimable = payableCostAt aimable 0
 -- announcement exposes.
 payableCostAt :: [(Map.Map SlotName (Natural, Natural), Map.Map SlotName (Set.Set ObjectId))] -> Natural -> Maybe Keyword -> Maybe (Set.Set ManaType.ManaType) -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAt aimable x stamp spendable pid srcId gs cost =
-  aimingSomewhere (\adjustments -> Cost.readsBoundSlot (Cost.plusComponents adjustments (Cost.substituteX x cost))) aimable stamp (Cost.loyaltyKindOf cost) pid srcId gs (\slots adjustments -> let totalled = Cost.plusComponents adjustments (Cost.substituteX x cost) in Cost.canPaySomeCompletion slots (PaymentSubject.Activating srcId stamp spendable) ManaSpending.AsProduced pid srcId (Cost.totalManas adjustments) (Cost.waterbendSubstitutions (Cost.Type.components totalled) slots pid srcId gs) totalled gs)
+  aimingSomewhere (\adjustments -> Cost.plusComponents adjustments (Cost.substituteX x cost)) aimable stamp (Cost.loyaltyKindOf cost) pid srcId gs (\slots adjustments -> let totalled = Cost.plusComponents adjustments (Cost.substituteX x cost) in Cost.canPaySomeCompletion slots (PaymentSubject.Activating srcId stamp spendable) ManaSpending.AsProduced pid srcId (Cost.totalManas adjustments) (Cost.waterbendSubstitutions (Cost.Type.components totalled) slots pid srcId gs) totalled gs)
 
 -- The same predicate on a board the caller already walked -- see
 -- Cost.canPaySomeCompletionGiven.
 payableCostAtGiven :: [(Map.Map SlotName (Natural, Natural), Map.Map SlotName (Set.Set ObjectId))] -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Natural -> Maybe Keyword -> Maybe (Set.Set ManaType.ManaType) -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAtGiven aimable sources pcs x stamp spendable pid srcId gs cost =
-  aimingSomewhere (\adjustments -> Cost.readsBoundSlot (Cost.plusComponents adjustments (Cost.substituteX x cost))) aimable stamp (Cost.loyaltyKindOf cost) pid srcId gs (\slots adjustments -> let totalled = Cost.plusComponents adjustments (Cost.substituteX x cost) in Cost.canPaySomeCompletionGiven slots (PaymentSubject.Activating srcId stamp spendable) ManaSpending.AsProduced sources pcs pid srcId (Cost.totalManas adjustments) (Cost.waterbendSubstitutions (Cost.Type.components totalled) slots pid srcId gs) totalled gs)
+  aimingSomewhere (\adjustments -> Cost.plusComponents adjustments (Cost.substituteX x cost)) aimable stamp (Cost.loyaltyKindOf cost) pid srcId gs (\slots adjustments -> let totalled = Cost.plusComponents adjustments (Cost.substituteX x cost) in Cost.canPaySomeCompletionGiven slots (PaymentSubject.Activating srcId stamp spendable) ManaSpending.AsProduced sources pcs pid srcId (Cost.totalManas adjustments) (Cost.waterbendSubstitutions (Cost.Type.components totalled) slots pid srcId gs) totalled gs)
 
 -- CR 601.2f's totalling asked where CR 601.2c's targets do not exist yet: the
 -- predicate holds if SOME aiming this activation could still take leaves the
@@ -546,8 +546,8 @@ payableCostAtGiven aimable sources pcs x stamp spendable pid srcId gs cost =
 -- `slotReading` is asked of the cost with the blind gather's components added,
 -- so a criterion arriving on a component CR 601.2f's adjustments add takes the
 -- cost search as a printed one does.
-aimingSomewhere :: (CostAdjustments.CostAdjustments -> Bool) -> [(Map.Map SlotName (Natural, Natural), Map.Map SlotName (Set.Set ObjectId))] -> Maybe Keyword -> LoyaltyKind.LoyaltyKind -> PlayerId -> ObjectId -> GameState -> (Map.Map SlotName (Set.Set ObjectId) -> CostAdjustments.CostAdjustments -> Bool) -> Bool
-aimingSomewhere readsSlot aimable stamp loyalty pid srcId gs payable =
+aimingSomewhere :: (CostAdjustments.CostAdjustments -> Cost Keyword) -> [(Map.Map SlotName (Natural, Natural), Map.Map SlotName (Set.Set ObjectId))] -> Maybe Keyword -> LoyaltyKind.LoyaltyKind -> PlayerId -> ObjectId -> GameState -> (Map.Map SlotName (Set.Set ObjectId) -> CostAdjustments.CostAdjustments -> Bool) -> Bool
+aimingSomewhere costWith aimable stamp loyalty pid srcId gs payable =
   -- CR 605.1a's kind is AbilityKind.NonManaAbility at all three sites in this
   -- module, and CR 605.3b is why: activatableGiven refuses a mana ability
   -- outright and the cost conjunct this gate serves sits after that refusal,
@@ -566,9 +566,11 @@ aimingSomewhere readsSlot aimable stamp loyalty pid srcId gs payable =
       blind = gather Set.empty
       -- The added components are the blind gather's under every aiming: only
       -- ReduceActivationCost reads the targets, and it adds no component.
-      slotReading = readsSlot blind
+      slotReading = Cost.readsBoundSlot (costWith blind)
+      -- Targets the cost cannot tell apart are tried once (Cost.aimingSignature).
+      key = Cost.aimingKey pid srcId gs (costWith blind) . Recipient.ToObject
    in if slotReading
-        then any (\(ranges, sets) -> any (\aiming -> payable aiming (gather (Set.unions (Map.elems aiming)))) (Target.aimings ranges sets)) aimable
+        then any (\(ranges, sets) -> any (\aiming -> payable aiming (gather (Set.unions (Map.elems aiming)))) (Target.aimingsBy id key ranges sets)) aimable
         else
           payable Map.empty blind
             || (gather candidates /= blind && any (payable Map.empty . gather . Set.singleton) (Set.toList candidates))

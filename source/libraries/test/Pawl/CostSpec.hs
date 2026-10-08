@@ -2261,6 +2261,35 @@ urgentNecropsySpec s registry =
       let paid = S.runPure (necropsyAnswer (Just myr)) gs (S.cast S.alice necropsy >> Stack.resolveTop)
       Spec.assertEqWith s "CR 601.2f one Soil collects evidence 2, so the Myr is destroyed" (Game.zoneMembers Zone.Battlefield S.bob paid, length (Game.zoneMembers Zone.Exile S.alice paid)) ([], 1)
 
+-- Clever Concealment {2}{W}{W} Instant: "Convoke / Any number of target nonland
+-- permanents you control phase out." bob controls Hinata, Dawn-Crowned, so each
+-- target costs alice {1} more; she controls sixteen Goblin Pikers and `plains`
+-- Plains.
+--
+-- The gate searches CR 601.2c's aimings because Hinata reads the targets, and
+-- the Pikers are one class to it (Cost.aimingSignature), so it tries seventeen
+-- target counts rather than 65,536 subsets: a gate trying each subset does not
+-- finish inside the suite's timeout. With no Plains no aiming pays the {W}{W},
+-- which is the board that walks the whole search; two Plains pay it with
+-- nothing targeted.
+cleverConcealmentSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+cleverConcealmentSpec s registry =
+  Spec.describe s "Clever Concealment" . Spec.it s "CR 601.2f under Hinata the gate tries each target count, not each subset" $ do
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    hinata <- S.printingOf s registry "Hinata, Dawn-Crowned"
+    concealment <- S.printingOf s registry "Clever Concealment"
+    let board lands =
+          let withLands = S.landsFor plains S.alice lands (Setup.emptyGame S.bothPlayers)
+              (_, withHinata) = S.addPermanent hinata S.bob withLands
+              withPikers = List.foldl' (\g _ -> snd (S.addPermanent piker S.alice g)) withHinata [1 .. 16 :: Int]
+              (heldId, gs) = S.addHandCard concealment S.alice withPikers
+           in (heldId, gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice})
+        (shortId, short) = board 0
+        (paidId, paid) = board 2
+    Spec.assertBool s (not (S.castable S.alice shortId short)) "CR 601.2f no aiming pays {W}{W} without a Plains, and the search ends"
+    Spec.assertBool s (S.castable S.alice paidId paid) "and two Plains pay it with nothing targeted"
+
 -- alice's Urgent Necropsy over three Forests and a Swamp, `soils` Acidic Soils
 -- in her graveyard, and bob's `victim`, in her precombat main phase with
 -- priority. Returns the state, the Necropsy and bob's permanent.
@@ -2508,6 +2537,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   forensicResearcherSpec s registry
   evidenceSpec s registry
   urgentNecropsySpec s registry
+  cleverConcealmentSpec s registry
   frailExhumationSpec s registry
   everbarkShamanSpec s registry
   putridRaptorSpec s registry
