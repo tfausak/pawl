@@ -363,7 +363,7 @@ remove oid gs = case Game.lookupObject oid gs of
             { Player.completedDungeons = Player.completedDungeons p + 1,
               Player.completedDungeonNames = maybe id Set.insert name (Player.completedDungeonNames p)
             }
-        stripped = Game.removeFromZones owner oid gs
+        stripped = Game.removeFromZones oid gs
      in Event.recordEvent
           (GameEvent.DungeonCompleted owner)
           stripped

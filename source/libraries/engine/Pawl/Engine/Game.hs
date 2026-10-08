@@ -191,7 +191,7 @@ keptFaceDown oid gs =
 withoutBeingCast :: GameState -> GameState
 withoutBeingCast gs =
   Map.foldrWithKey
-    (\oid object acc -> if Object.castFrom object == Just (Object.zone object) then removeFromZones (Object.owner object) oid acc else acc)
+    (\oid object acc -> if Object.castFrom object == Just (Object.zone object) then removeFromZones oid acc else acc)
     gs
     (GameState.objects gs)
 
@@ -627,29 +627,45 @@ attachments oid gs =
     (\attacher -> (lookupObject attacher gs >>= Object.attachedTo >>= Recipient.objectOf) == Just oid)
     (GameState.battlefield gs)
 
-removeFromZones :: PlayerId -> ObjectId -> GameState -> GameState
-removeFromZones pid oid gs =
-  gs
-    { GameState.library = Map.adjust (Seq.filter (/= oid)) pid (GameState.library gs),
-      GameState.hand = Map.adjust (Seq.filter (/= oid)) pid (GameState.hand gs),
-      GameState.graveyard = Map.adjust (Seq.filter (/= oid)) pid (GameState.graveyard gs),
-      GameState.battlefield = Set.delete oid (GameState.battlefield gs),
-      -- CR 702.26k: "phased-out permanents owned by a player who leaves the game
-      -- also leave the game", one of the three rules on the far side of CR 702.26b's
-      -- "except for rules and effects that specifically mention phased-out
-      -- permanents" -- so the battlefield line above does not reach them and this
-      -- one has to. Rule 702.26k's second sentence ("this doesn't cause zone-change
-      -- abilities to trigger") is free: nothing here funnels through
-      -- Pawl.Engine.Event.
-      GameState.phasedOut = Map.delete oid (GameState.phasedOut gs),
-      GameState.exile = Set.delete oid (GameState.exile gs),
-      GameState.command = Set.delete oid (GameState.command gs),
-      GameState.ante = Set.delete oid (GameState.ante gs),
-      GameState.attractionDecks = Map.adjust (Seq.filter (/= oid)) pid (GameState.attractionDecks gs),
-      GameState.planarDecks = Map.adjust (Seq.filter (/= oid)) pid (GameState.planarDecks gs),
-      GameState.schemeDecks = Map.adjust (Seq.filter (/= oid)) pid (GameState.schemeDecks gs),
-      GameState.stack = filter (/= oid) (GameState.stack gs)
-    }
+-- CR 400.1: the player whose library, hand or graveyard holds this card -- its
+-- owner (CR 400.3) except between an ownership change and the move that follows
+-- it in one resolution (CR 407.3). Found by search for that reason; Nothing for
+-- an object in no player's pile.
+pileHolderOf :: ObjectId -> GameState -> Maybe PlayerId
+pileHolderOf oid gs = Foldable.asum (fmap (pileHolderIn oid) [GameState.library gs, GameState.hand gs, GameState.graveyard gs])
+
+-- The player whose pile in one per-player zone holds the id.
+pileHolderIn :: ObjectId -> Map.Map PlayerId (Seq.Seq ObjectId) -> Maybe PlayerId
+pileHolderIn oid piles = fmap fst (List.find (Foldable.elem oid . snd) (Map.toList piles))
+
+removeFromZones :: ObjectId -> GameState -> GameState
+removeFromZones oid gs =
+  let -- CR 400.1: out of the pile that holds it, never Object.owner's, which an
+      -- ownership change can have moved first.
+      fromPile piles = case pileHolderIn oid piles of
+        Just pid -> Map.adjust (Seq.filter (/= oid)) pid piles
+        Nothing -> piles
+   in gs
+        { GameState.library = fromPile (GameState.library gs),
+          GameState.hand = fromPile (GameState.hand gs),
+          GameState.graveyard = fromPile (GameState.graveyard gs),
+          GameState.battlefield = Set.delete oid (GameState.battlefield gs),
+          -- CR 702.26k: "phased-out permanents owned by a player who leaves the game
+          -- also leave the game", one of the three rules on the far side of CR 702.26b's
+          -- "except for rules and effects that specifically mention phased-out
+          -- permanents" -- so the battlefield line above does not reach them and this
+          -- one has to. Rule 702.26k's second sentence ("this doesn't cause zone-change
+          -- abilities to trigger") is free: nothing here funnels through
+          -- Pawl.Engine.Event.
+          GameState.phasedOut = Map.delete oid (GameState.phasedOut gs),
+          GameState.exile = Set.delete oid (GameState.exile gs),
+          GameState.command = Set.delete oid (GameState.command gs),
+          GameState.ante = Set.delete oid (GameState.ante gs),
+          GameState.attractionDecks = fromPile (GameState.attractionDecks gs),
+          GameState.planarDecks = fromPile (GameState.planarDecks gs),
+          GameState.schemeDecks = fromPile (GameState.schemeDecks gs),
+          GameState.stack = filter (/= oid) (GameState.stack gs)
+        }
 
 -- CR 401.2: a library is an ORDERED pile, so a library arrival needs the END it
 -- arrives at. The Seq's HEAD is the top -- Event.drawCard takes the head, which

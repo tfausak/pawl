@@ -6550,7 +6550,7 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
               -- CR 712.13a's rollback point; see the branch after the entry loop.
               unentered <- State.get
               State.modify' $ \g ->
-                let g1 = Game.removeFromZones pid oid g
+                let g1 = Game.removeFromZones oid g
                  in g1
                       { GameState.objects = Map.delete oid (GameState.objects g1),
                         -- CR 506.4, first clause: "a permanent is removed from
@@ -8207,8 +8207,8 @@ createTokens controller card copy n tapped entering attached = do
 unmake :: ObjectId -> Game ()
 unmake oid = State.modify' $ \gs -> case Game.lookupObject oid gs of
   Nothing -> gs
-  Just obj ->
-    let gs1 = Game.removeFromZones (Object.owner obj) oid gs
+  Just _ ->
+    let gs1 = Game.removeFromZones oid gs
      in gs1 {GameState.objects = Map.delete oid (GameState.objects gs1)}
 
 -- The tail createTokens and conjureOntoBattlefield share, run after every entry
@@ -8717,7 +8717,7 @@ forgetObject gs oid = case Game.lookupObject oid gs of
   Just obj ->
     let snapshot = Projection.project oid gs
         lastController = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
-        cleared = Game.removeFromZones (Object.owner obj) oid gs
+        cleared = Game.removeFromZones oid gs
      in cleared
           { GameState.objects = Map.delete oid (GameState.objects cleared),
             GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Game.attachments oid gs) (Object.chosenNames obj) (Object.chosenPlayer obj) (Object.chosenColors obj) (Object.chosenSubtype obj) (Game.isAttacking oid gs) (Game.attackTargetOf oid gs) (Game.isBlocking oid gs) (Object.protector obj) (Object.paidCosts obj) (Object.controlClock obj) (Object.zone obj)) (GameState.lastKnown cleared)

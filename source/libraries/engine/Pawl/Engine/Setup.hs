@@ -532,7 +532,7 @@ createInCommandZone pid printingId = do
   oid <- createCard pid printingId
   State.modify' $ \gs ->
     let moved =
-          Game.insertIntoZone Zone.Command LibraryPosition.defaultValue pid oid (Game.removeFromZones pid oid gs)
+          Game.insertIntoZone Zone.Command LibraryPosition.defaultValue pid oid (Game.removeFromZones oid gs)
      in moved
           { GameState.objects =
               Map.adjust (\o -> o {Object.zone = Zone.Command}) oid (GameState.objects moved)
@@ -545,7 +545,7 @@ createInAttractionDeck :: PlayerId -> PrintingId.PrintingId -> Game ()
 createInAttractionDeck pid printingId = do
   oid <- createCard pid printingId
   State.modify' $ \gs ->
-    let moved = Game.removeFromZones pid oid gs
+    let moved = Game.removeFromZones oid gs
      in moved
           { GameState.objects = Map.adjust (\o -> o {Object.zone = Zone.Command}) oid (GameState.objects moved),
             GameState.attractionDecks = Map.insertWith (flip (Seq.><)) pid (Seq.singleton oid) (GameState.attractionDecks moved)
@@ -557,7 +557,7 @@ createInPlanarDeck :: PlayerId -> PrintingId.PrintingId -> Game ()
 createInPlanarDeck pid printingId = do
   oid <- createCard pid printingId
   State.modify' $ \gs ->
-    let moved = Game.removeFromZones pid oid gs
+    let moved = Game.removeFromZones oid gs
      in moved
           { GameState.objects = Map.adjust (\o -> o {Object.zone = Zone.Command}) oid (GameState.objects moved),
             GameState.planarDecks = Map.insertWith (flip (Seq.><)) pid (Seq.singleton oid) (GameState.planarDecks moved)
@@ -569,7 +569,7 @@ createInSchemeDeck :: PlayerId -> PrintingId.PrintingId -> Game ()
 createInSchemeDeck pid printingId = do
   oid <- createCard pid printingId
   State.modify' $ \gs ->
-    let moved = Game.removeFromZones pid oid gs
+    let moved = Game.removeFromZones oid gs
      in moved
           { GameState.objects = Map.adjust (\o -> o {Object.zone = Zone.Command}) oid (GameState.objects moved),
             GameState.schemeDecks = Map.insertWith (flip (Seq.><)) pid (Seq.singleton oid) (GameState.schemeDecks moved)
@@ -1466,8 +1466,8 @@ applyCrossings finalSub parent =
         -- no id crosses twice -- Event.bringInFrom drops the entry it
         -- spent, so a second wish cannot reach the same card.
         Nothing -> g
-        Just obj ->
-          let g1 = Game.removeFromZones (Object.owner obj) oid g
+        Just _ ->
+          let g1 = Game.removeFromZones oid g
               combat = GameState.combat g1
            in g1
                 { GameState.objects = Map.delete oid (GameState.objects g1),

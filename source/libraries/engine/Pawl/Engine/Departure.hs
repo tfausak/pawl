@@ -280,7 +280,7 @@ objectsLeaveWith pid gs =
       owned = Map.keys (Map.filter (\obj -> Object.owner obj == pid && Object.zone obj /= Zone.Ante) (GameState.objects gs))
       leave :: GameState -> ObjectId -> GameState
       leave g oid =
-        let g1 = Game.removeFromZones pid oid g
+        let g1 = Game.removeFromZones oid g
             combat = Game.recordDefending oid (GameState.combat g1)
          in g1
               { GameState.objects = Map.delete oid (GameState.objects g1),
@@ -610,8 +610,8 @@ nonCardStackObjectsCease pid gs =
       theirs oid = Projection.controllerOf oid gs == Just pid && notACard oid
       cease g oid = case Game.lookupObject oid g of
         Nothing -> g
-        Just obj ->
-          let g1 = Game.removeFromZones (Object.owner obj) oid g
+        Just _ ->
+          let g1 = Game.removeFromZones oid g
            in g1 {GameState.objects = Map.delete oid (GameState.objects g1)}
    in List.foldl' cease gs (filter theirs (GameState.stack gs))
 
