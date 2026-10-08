@@ -2079,6 +2079,9 @@ sourceObjectOf src = case src of
 -- never sees this one unless a card writes it -- and then the card really does name
 -- it. Pawl.ReplacementSpec proves both binding carriers, one case each.
 --
+-- Binding.announcedTargets is dropped too: it repeats the targets the target
+-- slots already name.
+--
 -- Binding.collectedEvidence is the SECOND slot dropped, for the same kind of
 -- reason: it records whether evidence was collected, which is all CR 701.59c's
 -- linked text asks, and no text names the exiled cards through it.
@@ -2087,7 +2090,7 @@ sourceObjectOf src = case src of
 -- each by name (Fling's "the sacrificed creature's power").
 referentsOfBindings :: Map.Map SlotName Binding.Type.Binding -> [ObjectId]
 referentsOfBindings bindings =
-  let named = Map.withoutKeys bindings (Set.fromList [Binding.thisAbility, Binding.collectedEvidence])
+  let named = Map.withoutKeys bindings (Set.fromList [Binding.thisAbility, Binding.collectedEvidence, Binding.announcedTargets])
    in foldMap (Maybe.mapMaybe Recipient.objectOf . Set.toList) (Binding.targetsOf named)
         <> foldMap Foldable.toList (Binding.groupsOf named)
 
@@ -7598,7 +7601,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       Just ability ->
         -- CR 603.7d-f: the controller is the player who controlled the spell or
         -- ability AS IT RESOLVED, baked in now.
-        let captured = maybe Map.empty Object.bindings (Game.lookupObject resolving gs)
+        --
+        -- Binding.announcedTargets is left behind: it serves CR 601.2h's payment,
+        -- and a copy given new targets (CR 707.10c) still carries the old group.
+        -- A FENCE: no board in the suite arms a delayed ability off a retargeted copy.
+        let captured = maybe Map.empty (Map.delete Binding.announcedTargets . Object.bindings) (Game.lookupObject resolving gs)
          in -- CR 603.7a's other end: the BOUNDARY, not a turn number, for one
             -- printed "on your next turn". Which turn that names is settled as
             -- that turn begins (Event.settleOnsets). CR 603.7b's stated duration:

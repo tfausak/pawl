@@ -24,15 +24,7 @@
                       {
                         "type": "Not",
                         "value": {
-                          "type": "IsBound",
-                          "value": "yours"
-                        }
-                      },
-                      {
-                        "type": "Not",
-                        "value": {
-                          "type": "IsBound",
-                          "value": "theirs"
+                          "type": "IsTarget"
                         }
                       }
                     ]

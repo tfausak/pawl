@@ -415,7 +415,7 @@ activateAbilityWith runSubgame pid srcId ability = Event.announcing $ do
               -- ability keeps all three once its source is gone: "Once activated or
               -- triggered, an ability exists on the stack independently of its
               -- source."
-              State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setThisAbility abilId (Binding.setYou pid (Binding.setTriggerSource srcId (Target.stampDefendingPlayers srcId chosen g (Binding.fromChoices chosen mAmount chosenModes))))}) abilId (GameState.objects g)})
+              State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setAnnouncedTargets chosen (Binding.setThisAbility abilId (Binding.setYou pid (Binding.setTriggerSource srcId (Target.stampDefendingPlayers srcId chosen g (Binding.fromChoices chosen mAmount chosenModes)))))}) abilId (GameState.objects g)})
               -- CR 601.2c's board, before CR 601.2g/h's window and payment can
               -- change it: what Event.becameTarget samples below.
               announced <- State.get

@@ -614,6 +614,12 @@ spitefulSpec s registry =
           (_, pairedId, paired) = spitefulBoard S.addPermanent swamp giant piker altar 1
       Spec.assertBool s (not (any (isActivateOf aloneId) (Action.legalActions S.alice alone))) "with the target the only creature no announcement pays, so the activation is not offered"
       Spec.assertBool s (any (isActivateOf pairedId) (Action.legalActions S.alice paired)) "and one more creature makes some announcement pay, so it is"
+      -- CR 601.2h through CR 602.2b: the payment, not just the gate, keeps the
+      -- Giant it aims at out of the sacrifice (Binding.announcedTargets, stamped
+      -- by Activate.activateAbility), so the Piker goes and the Giant is destroyed.
+      let paid = S.runPure (targeting giantId) paired (Activate.activateAbility S.alice pairedId (theAbility altar) >> Stack.resolveTop)
+          (giantId, _, _) = spitefulBoard S.addPermanent swamp giant piker altar 1
+      Spec.assertEqWith s "CR 601.2h the Piker paid and the targeted Giant was destroyed" (length (Game.zoneMembers Zone.Battlefield S.alice paid), length (Game.zoneMembers Zone.Graveyard S.alice paid)) (2, 2)
 
 -- Synthetic Spiteful Edict {2}{B} Enchantment: "Spells your opponents cast cost
 -- an additional 'Sacrifice a creature that isn't a target of that spell' to
@@ -644,6 +650,28 @@ spitefulEdictSpec s registry =
           (pairedId, paired) = board 1
       Spec.assertBool s (not (any (S.isCastOf aloneId) (Action.legalActions S.bob alone))) "with the target the only creature no announcement pays the added sacrifice, so Murder is not offered"
       Spec.assertBool s (any (S.isCastOf pairedId) (Action.legalActions S.bob paired)) "and one more creature makes some announcement pay, so it is"
+    -- CR 115.1 / 601.2c: "a target of that spell" is whatever the spell
+    -- targets, not a slot of one name. Swords to Plowshares names its slot
+    -- `creature`, and the Edict's Filter.IsTarget still sees the Giant it aims
+    -- at: with no other creature the cast is not offered, and with a second
+    -- Giant the payment sacrifices that one and the target is exiled.
+    Spec.it s "CR 601.2c the added sacrifice excludes a target whatever its slot is named" $ do
+      plains <- S.printingOf s registry "Plains"
+      giant <- S.printingOf s registry "Hill Giant"
+      edict <- S.printingOf s registry "Synthetic Spiteful Edict"
+      swords <- S.printingOf s registry "Swords to Plowshares"
+      let board extra =
+            let withLands = S.landsFor plains S.bob 1 (Setup.emptyGame S.bothPlayers)
+                (_, withEdict) = S.addPermanent edict S.alice withLands
+                (giantId, withGiant) = S.addPermanent giant S.bob withEdict
+                withExtra = List.foldl' (\g _ -> snd (S.addPermanent giant S.bob g)) withGiant [1 .. extra]
+                (swordsId, gs) = S.addHandCard swords S.bob withExtra
+             in (giantId, swordsId, gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.bob, GameState.priority = Just S.bob})
+          (_, aloneId, alone) = board (0 :: Int)
+          (target, pairedId, paired) = board 1
+          cast = S.runPure (targeting target) paired (S.cast S.bob pairedId >> Stack.resolveTop)
+      Spec.assertBool s (not (any (S.isCastOf aloneId) (Action.legalActions S.bob alone))) "CR 601.2c the only Giant is the target, so nothing is left to sacrifice and Swords is not offered"
+      Spec.assertEqWith s "with two, the other Giant is sacrificed and the target is exiled" (length (Game.zoneMembers Zone.Graveyard S.bob cast), length (Game.zoneMembers Zone.Exile S.bob cast)) (2, 1)
     -- CR 602.2b's twin: Synthetic Spiteful Decree adds the same component to
     -- activated abilities its controller's opponents activate, and bob's
     -- Hammerheim ("{T}: Target creature loses all landwalk abilities until end of

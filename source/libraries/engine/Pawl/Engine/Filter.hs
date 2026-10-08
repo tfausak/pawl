@@ -7,6 +7,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Types.Behold as Behold
 import qualified Pawl.Types.CardName as CardName
@@ -1946,6 +1947,8 @@ matches context view predicate = case predicate of
   Filter.IsBound slot -> case identity view of
     Just oid -> Set.member oid (Map.findWithDefault Set.empty slot (slotObjects context))
     Nothing -> False
+  -- IsBound over the announcement's every target at once (Binding.announcedTargets).
+  Filter.IsTarget -> matches context view (Filter.IsBound Binding.announcedTargets)
   -- CR 709.4a at both ends: the candidate has the bound object's name if one of
   -- its names is one of that object's, which is a non-empty INTERSECTION. A slot
   -- naming nothing, and a bound object with no name (CR 708.2a), each leave the
@@ -2440,6 +2443,7 @@ rewrite pairs predicate = case predicate of
   Filter.TargetsMatching f -> Filter.TargetsMatching (rewrite pairs f)
   Filter.TargetsPlayer _ -> predicate
   Filter.IsBound _ -> predicate
+  Filter.IsTarget -> predicate
   Filter.SameNameAsBound _ -> predicate
   Filter.SameNameAsSource -> predicate
   Filter.SameOwnerAsSource -> predicate
@@ -3203,6 +3207,7 @@ bakeBound players predicate = case predicate of
   -- CR 603.2's binding map holds PLAYERS and this atom names a slot holding an
   -- OBJECT. Pawl.Engine.Filter.matches answers it as it stands.
   Filter.IsBound _ -> predicate
+  Filter.IsTarget -> predicate
   Filter.SameNameAsBound _ -> predicate
   Filter.SameNameAsSource -> predicate
   Filter.SameOwnerAsSource -> predicate
@@ -3388,6 +3393,7 @@ manaValueThresholds predicate = case predicate of
   Filter.TargetsMatching f -> manaValueThresholds f
   Filter.TargetsPlayer _ -> []
   Filter.IsBound _ -> []
+  Filter.IsTarget -> []
   Filter.SameNameAsBound _ -> []
   Filter.SameNameAsSource -> []
   Filter.SameOwnerAsSource -> []
@@ -3563,6 +3569,7 @@ statesAQuality predicate = case predicate of
   Filter.TargetsMatching _ -> True
   Filter.TargetsPlayer _ -> True
   Filter.IsBound _ -> True
+  Filter.IsTarget -> True
   Filter.SameNameAsBound _ -> True
   Filter.SameNameAsSource -> True
   Filter.SameOwnerAsSource -> True
@@ -3695,6 +3702,9 @@ overBoundSlots f predicate = case predicate of
   -- same sense the atom above is -- here rather than one module over, off the
   -- Context `matches` is already handed.
   Filter.IsBound slot -> fmap Filter.IsBound (f slot)
+  -- Reports the reserved slot it reads and is never renamed: CR 700.2d's rename
+  -- is of a card's own slot names, and this one is the engine's.
+  Filter.IsTarget -> fmap (const Filter.IsTarget) (f Binding.announcedTargets)
   -- Named for the atom above's reason, and answerable in the same place: it
   -- reads the Context too, one field over.
   Filter.SameNameAsBound slot -> fmap Filter.SameNameAsBound (f slot)

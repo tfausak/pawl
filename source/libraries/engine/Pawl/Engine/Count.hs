@@ -369,6 +369,7 @@ bakePerspective viewOf context gs candidate predicate =
         Filter.Type.TargetsMatching _ -> predicate
         Filter.Type.TargetsPlayer _ -> predicate
         Filter.Type.IsBound _ -> predicate
+        Filter.Type.IsTarget -> predicate
         Filter.Type.SameNameAsBound _ -> predicate
         Filter.Type.SameNameAsSource -> predicate
         Filter.Type.SameOwnerAsSource -> predicate

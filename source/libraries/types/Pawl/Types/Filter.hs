@@ -226,6 +226,10 @@ data Filter keyword
     -- card of the library. Membership where CR 115.10a's group binding names
     -- several, and vacuously False where the slot names no object.
     IsBound SlotName.SlotName
+  | -- | CR 115.1 / 601.2c: the candidate is a target of the spell or ability
+    -- whose cost is being paid -- "a creature that isn't a target of that
+    -- spell" (Synthetic Spiteful Edict), whatever its target slots are named.
+    IsTarget
   | -- | CR 201.2 / 709.4a asked of TWO objects: the candidate shares a name with
     -- the object this slot holds -- Harness the Storm's "target card with the
     -- same name as that spell". Set intersection, so an object showing two names

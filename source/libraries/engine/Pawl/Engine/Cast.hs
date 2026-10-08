@@ -552,7 +552,7 @@ payableCostAtGiven modes pcs sources x extra spending pid oid gs cost =
       adjustmentsFor aiming = Cost.plusReductions extra (Cost.spellAdjustments (Set.unions (Map.elems aiming)) pid oid priced)
       askWith adjustments aiming =
         let totalled = Cost.plusComponents adjustments substituted
-            slots = fmap (Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList) aiming
+            slots = Binding.withAnnouncedTargets (fmap (Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList) aiming)
          in Cost.canPaySomeCompletionGiven slots (PaymentSubject.Casting oid) spending sources pcs pid oid (fmap assisted . Cost.totalManas adjustments) (Cost.manaSubstitutions (Cost.Type.components totalled) slots pid oid gs) totalled gs
       -- The adjustments with nothing aimed at, which are the adjustments under
       -- EVERY aiming unless they read the targets (readsTargets below), so the
@@ -3495,7 +3495,7 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                             g
                               { GameState.objects =
                                   Map.adjust
-                                    (\o -> o {Object.bindings = Binding.setYou pid (Binding.setTriggerSource sid (Target.stampDefendingPlayers sid chosen g (Binding.fromChoices chosen mAmount chosenModes)))})
+                                    (\o -> o {Object.bindings = Binding.setAnnouncedTargets chosen (Binding.setYou pid (Binding.setTriggerSource sid (Target.stampDefendingPlayers sid chosen g (Binding.fromChoices chosen mAmount chosenModes))))})
                                     sid
                                     (GameState.objects g)
                               }
