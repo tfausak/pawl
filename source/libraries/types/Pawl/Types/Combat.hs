@@ -322,6 +322,16 @@ data Combat = MkCombat
     -- Read through Pawl.Engine.Defender.defendingPlayers rather than directly,
     -- which is where CR 802.2a's narrowing to one is made explicit at each site
     -- that needs one.
-    defenders :: [PlayerId.PlayerId]
+    --
+    -- Only the defending players who MAY BE ATTACKED: CR 811.4's opponents not
+    -- seated next to the attacker are defending players under CR 802.2 all the
+    -- same, and are `barred` below instead. Every combat rule reading this field
+    -- asks who can be attacked, blocks, or is attacked.
+    defenders :: [PlayerId.PlayerId],
+    -- | CR 802.2 / 811.4: the defending players no creature may attack, in APNAP
+    -- order. Empty outside Alternating Teams. Read through
+    -- Pawl.Engine.Defender.designatedPlayers, for a reference to "defending
+    -- player" with no attacking creature to resolve it (CR 802.2a, Yare).
+    barred :: [PlayerId.PlayerId]
   }
   deriving (Eq, Ord, Show)

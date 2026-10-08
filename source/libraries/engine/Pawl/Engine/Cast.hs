@@ -3485,7 +3485,7 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                             g
                               { GameState.objects =
                                   Map.adjust
-                                    (\o -> o {Object.bindings = Binding.setYou pid (Binding.setTriggerSource sid (Binding.fromChoices chosen mAmount chosenModes))})
+                                    (\o -> o {Object.bindings = Binding.setYou pid (Binding.setTriggerSource sid (Target.stampDefendingPlayers sid chosen g (Binding.fromChoices chosen mAmount chosenModes)))})
                                     sid
                                     (GameState.objects g)
                               }

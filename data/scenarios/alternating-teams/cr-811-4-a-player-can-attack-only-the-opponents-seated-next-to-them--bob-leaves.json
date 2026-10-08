@@ -1,6 +1,6 @@
 {
   "description": "CR 811.4 a player can't attack opponents who aren't seated next to them",
-  "note": "Three teams of two seated as CR 811.3's example: alice and dave are team 1, bob and erin team 2, carol and frank team 3, under CR 802's attack multiple players option (CR 811.2b). bob concedes on alice's turn: his seat is still there that turn, so frank alone defends; from her next turn the seats have closed up (CR 801.2c, as CR 809.3c reads the same phrase) and carol, now beside her, defends with frank.",
+  "note": "Three teams of two seated as CR 811.3's example: alice and dave are team 1, bob and erin team 2, carol and frank team 3, under CR 802's attack multiple players option (CR 811.2b). bob concedes on alice's turn: his seat is still there that turn, so only frank may be attacked; from her next turn the seats have closed up (CR 801.2c, as CR 809.3c reads the same phrase) and carol, now beside her, may be attacked too.",
   "board": {
     "seats": [
       {

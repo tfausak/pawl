@@ -149,11 +149,9 @@ cantAttackDefender candidates players gs =
 -- gate about them (CR 508.5) is read at that seat rather than at the first
 -- defending player in turn order -- the caller has it in hand and hands it over.
 --
--- No board proves that seat: nothing in data/cards gates a BLOCKING restriction
--- on the defending player, Armored Galleon -- the pool's only card writing
--- Filter.ControlledByDefendingPlayer, and CardSpec's "CR 508.5 no card writes
--- ControlledByDefendingPlayer outside a combat restriction" is the lint -- being
--- an attacking one. A regression fence rather than a proven behaviour, and the
+-- No board proves that seat: Graxiplon's gate on being blocked is tested at two
+-- seats (Pawl.CombatSpec's CR 205.3m group), where the declaring defender is
+-- also the first one. A regression fence rather than a proven behaviour, and the
 -- mutation that swaps this seat for the old one leaves the suite green.
 cantBlock :: Maybe PlayerId -> [ObjectId] -> GameState -> Set ObjectId
 cantBlock defending candidates gs =
@@ -719,7 +717,7 @@ lifted defending gs (source, changes, restriction) = case gate restriction of
     Condition.holds
       (Projection.fullView gs)
       (SourceContext.sourceContext gs (Projection.controllerOf source gs) source)
-        { Filter.defendingPlayer = defending
+        { Filter.defendingPlayers = Maybe.maybeToList defending
         }
       gs
       source

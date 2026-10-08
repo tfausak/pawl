@@ -2708,6 +2708,7 @@ reservedSlots =
       Binding.triggerPlayer,
       Binding.gatePlayers,
       Binding.mayPlayers,
+      Binding.chosenDefendingPlayers,
       Binding.facingPlayers,
       Binding.became,
       Binding.handArrival,

@@ -1,0 +1,144 @@
+{
+  "description": "CR 802.2a Yare's target is re-checked against the defending player its caster chose",
+  "note": "A free-for-all under attack multiple players (CR 802.2): alice attacks bob, so bob and carol are both defending players. bob casts Yare on his own Grizzly Bears, choosing himself (CR 802.2a). In response carol takes the Bears with Ray of Command; at resolution they are a defending player's creature still, but not the chosen defending player's, so Yare's only target is illegal and it does nothing (CR 608.2b). The Bears stay 2/2.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Grizzly Bears",
+            "label": "bears"
+          },
+          {
+            "card": "Plains",
+            "label": "bob plains 1"
+          },
+          {
+            "card": "Plains",
+            "label": "bob plains 2"
+          },
+          {
+            "card": "Plains",
+            "label": "bob plains 3"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Yare",
+            "label": "yare"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "carol island 1"
+          },
+          {
+            "card": "Island",
+            "label": "carol island 2"
+          },
+          {
+            "card": "Island",
+            "label": "carol island 3"
+          },
+          {
+            "card": "Island",
+            "label": "carol island 4"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Ray of Command",
+            "label": "ray"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$piker"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "$piker",
+      "do": {
+        "ChooseAttackTarget": "$bob"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "$yare",
+          "targets": [
+            "$bears"
+          ],
+          "mana": [
+            "$bob plains 1",
+            "$bob plains 2",
+            "$bob plains 3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "carol",
+      "do": {
+        "Cast": {
+          "object": "$ray",
+          "targets": [
+            "$bears"
+          ],
+          "mana": [
+            "$carol island 1",
+            "$carol island 2",
+            "$carol island 3",
+            "$carol island 4"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$bears",
+          "power": 2,
+          "toughness": 2
+        }
+      }
+    }
+  ]
+}
