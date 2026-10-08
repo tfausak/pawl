@@ -363,7 +363,7 @@ arborBoard dryadArbor mTeferi =
 goldfishResult :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (Result.Result, GameState.GameState)
 goldfishResult s registry = do
   matchup <- S.shortRedRed (S.printingOf s registry)
-  pure (Engine.runMatchPure S.identityAnswer matchup)
+  pure (Engine.runMatchPure S.identityAnswer GameSettings.plain matchup)
 
 landState :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m GameState.GameState
 landState s registry = do

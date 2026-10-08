@@ -17,6 +17,7 @@ import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Deck as Deck
+import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
@@ -44,20 +45,20 @@ playersFrom n = PlayerId.MkPlayerId n NonEmpty.:| [PlayerId.MkPlayerId (n + 1)]
 goldfish :: Deck.Deck -> Natural -> Result
 goldfish deck n =
   let players = playersFrom n
-   in fst (Engine.runMatchPure Script.passing (Setup.mirror deck players))
+   in fst (Engine.runMatchPure Script.passing GameSettings.plain (Setup.mirror deck players))
 {-# NOINLINE goldfish #-}
 
 -- Parameterized for the same reason as 'goldfish'.
 casting :: Deck.Deck -> Natural -> Result
 casting deck n =
   let players = playersFrom n
-   in fst (Engine.runMatchPure Script.casting (Setup.mirror deck players))
+   in fst (Engine.runMatchPure Script.casting GameSettings.plain (Setup.mirror deck players))
 {-# NOINLINE casting #-}
 
 fighting :: Deck.Deck -> Natural -> Result
 fighting deck n =
   let players = playersFrom n
-   in fst (Engine.runMatchPure Script.fighting (Setup.mirror deck players))
+   in fst (Engine.runMatchPure Script.fighting GameSettings.plain (Setup.mirror deck players))
 {-# NOINLINE fighting #-}
 
 -- #435: the first player's precombat main phase with five Mountains, three

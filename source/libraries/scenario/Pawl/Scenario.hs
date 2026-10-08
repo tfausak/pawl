@@ -261,7 +261,18 @@ stage registry board =
         (_, Nothing, _) -> pure (Left (Failure.MkUnknownActivePlayer (Board.active board)))
         (_, _, Left failure) -> pure (Left failure)
         (Nothing, Just active, Right monarch) -> do
-          let base = Setup.emptyGame (fmap snd seated)
+          let settings =
+                GameSettings.MkGameSettings
+                  { GameSettings.attackOption = Board.attackOption board,
+                    GameSettings.brawl = Board.brawl board,
+                    GameSettings.sharedTeamTurns = Board.sharedTeamTurns board,
+                    GameSettings.sharedTeamLife = Board.sharedTeamLife board,
+                    GameSettings.deployCreatures = Board.deployCreatures board,
+                    GameSettings.teams = Teams.MkTeams (Map.fromList [(pid, team) | (seat, pid) <- NonEmpty.toList seated, Just team <- [Seat.team seat]]),
+                    GameSettings.rangeOfInfluence = RangeOfInfluence.MkRangeOfInfluence (Map.fromList [(pid, range) | (seat, pid) <- NonEmpty.toList seated, Just range <- [Seat.range seat]]),
+                    GameSettings.emperors = Emperors.MkEmperors (Map.fromList [(team, pid) | (seat, pid) <- NonEmpty.toList seated, Seat.emperor seat, Just team <- [Seat.team seat]])
+                  }
+              base = Setup.gameWith settings (fmap snd seated)
               lives = Map.fromList (fmap (\(seat, pid) -> (pid, Seat.life seat)) (NonEmpty.toList seated))
               counters = Map.fromList (fmap (\(seat, pid) -> (pid, Seat.counters seat)) (NonEmpty.toList seated))
               positioned =
@@ -272,18 +283,7 @@ stage registry board =
                     GameState.phase = Board.phase board,
                     GameState.remaining = Seq.drop 1 (Seq.dropWhileL (/= Board.phase board) (Seq.fromList Turn.allPhases)),
                     GameState.players = Map.mapWithKey (\pid p -> p {Player.life = Map.findWithDefault (Player.life p) pid lives, Player.counters = Map.findWithDefault (Player.counters p) pid counters}) (GameState.players base),
-                    GameState.monarch = monarch,
-                    GameState.settings =
-                      (GameState.settings base)
-                        { GameSettings.attackOption = Board.attackOption board,
-                          GameSettings.brawl = Board.brawl board,
-                          GameSettings.sharedTeamTurns = Board.sharedTeamTurns board,
-                          GameSettings.sharedTeamLife = Board.sharedTeamLife board,
-                          GameSettings.deployCreatures = Board.deployCreatures board,
-                          GameSettings.teams = Teams.MkTeams (Map.fromList [(pid, team) | (seat, pid) <- NonEmpty.toList seated, Just team <- [Seat.team seat]]),
-                          GameSettings.rangeOfInfluence = RangeOfInfluence.MkRangeOfInfluence (Map.fromList [(pid, range) | (seat, pid) <- NonEmpty.toList seated, Just range <- [Seat.range seat]]),
-                          GameSettings.emperors = Emperors.MkEmperors (Map.fromList [(team, pid) | (seat, pid) <- NonEmpty.toList seated, Seat.emperor seat, Just team <- [Seat.team seat]])
-                        }
+                    GameState.monarch = monarch
                   }
           placed <- placeSeats registry (NonEmpty.toList seated) (Staged.MkStaged positioned ids Map.empty)
           pure (fmap (designateDefenders . settleStartingLife) (placed >>= attachAll (placementsOf board)))

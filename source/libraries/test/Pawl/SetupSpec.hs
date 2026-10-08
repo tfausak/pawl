@@ -209,10 +209,19 @@ setupSpec s registry = Spec.describe s "Setup" $ do
 
   Spec.it s "runMatch derives the players from the matchup (#24)" $ do
     matchup <- S.shortRedRed (S.printingOf s registry)
-    let (result, final) = Engine.runMatchPure S.identityAnswer matchup
+    let (result, final) = Engine.runMatchPure S.identityAnswer GameSettings.plain matchup
     Spec.assertBool s (Maybe.isJust (GameState.result final)) "has a result"
     Spec.assertEqWith s "both players have a life total" (Map.size (GameState.players final)) 2
     Spec.assertEqWith s "the result is the run's result" (GameState.result final) (Just result)
+
+  -- CR 800.2 / 903.12f: the options are settled before the game begins, so the
+  -- ordinary entry point takes them, and the Brawl life total follows with no
+  -- record update afterwards. The same matchup without the option is the control.
+  Spec.it s "CR 903.12f a match started as Brawl starts its players at 25" $ do
+    matchup <- S.shortRedRed (S.printingOf s registry)
+    let startingOf settings = fmap Player.startingLife (GameState.players (snd (Engine.runMatchPure S.identityAnswer settings matchup)))
+    Spec.assertEqWith s "two-player Brawl: 25 each" (startingOf GameSettings.plain {GameSettings.brawl = True}) (Map.fromList [(S.alice, 25), (S.bob, 25)])
+    Spec.assertEqWith s "the same matchup without the option: CR 103.4's twenty" (startingOf GameSettings.plain) (Map.fromList [(S.alice, 20), (S.bob, 20)])
 
   Spec.it s "CR 122.1 a new player starts with no counters" $ do
     let gs = Setup.emptyGame S.bothPlayers
@@ -254,7 +263,7 @@ setupSpec s registry = Spec.describe s "Setup" $ do
   Spec.it s "CR 903.12f a Brawl game starts its players at 25 at two seats and 30 at three" $ do
     shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
     let build seats brawl =
-          S.runPure S.identityAnswer (settingsOf brawl (Setup.emptyGame seats)) $
+          S.runPure S.identityAnswer (Setup.gameWith (settingsOf brawl) seats) $
             Setup.createDeck S.alice Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Set.singleton shimatsu, Deck.vanguard = Nothing, Deck.dungeons = Set.empty, Deck.sideboard = Map.empty, Deck.conspiracies = Map.empty, Deck.attractions = Map.empty, Deck.planes = Set.empty, Deck.schemes = Map.empty}
     Spec.assertEqWith s "two-player Brawl: 25" (S.lifeOf S.alice (build S.bothPlayers True)) (Just 25)
     Spec.assertEqWith s "multiplayer Brawl: 30" (S.lifeOf S.alice (build S.threePlayers True)) (Just 30)
@@ -266,10 +275,8 @@ setupSpec s registry = Spec.describe s "Setup" $ do
   -- do not -- so the option and the team size are each the sole difference.
   Spec.it s "CR 810.4 a team sharing a life total starts at 30, and CR 810.11 at 45 with three members" $ do
     let build teams shared =
-          let gs = S.inTeams teams (Setup.emptyGame S.fourPlayers)
-              settled = gs {GameState.settings = (GameState.settings gs) {GameSettings.sharedTeamLife = shared}}
-           in S.runPure S.identityAnswer settled $
-                Setup.createDeck S.alice Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Set.empty, Deck.vanguard = Nothing, Deck.dungeons = Set.empty, Deck.sideboard = Map.empty, Deck.conspiracies = Map.empty, Deck.attractions = Map.empty, Deck.planes = Set.empty, Deck.schemes = Map.empty}
+          S.runPure S.identityAnswer (S.inTeams teams (Setup.gameWith GameSettings.plain {GameSettings.sharedTeamLife = shared} S.fourPlayers)) $
+            Setup.createDeck S.alice Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Set.empty, Deck.vanguard = Nothing, Deck.dungeons = Set.empty, Deck.sideboard = Map.empty, Deck.conspiracies = Map.empty, Deck.attractions = Map.empty, Deck.planes = Set.empty, Deck.schemes = Map.empty}
     Spec.assertEqWith s "CR 810.4 two heads: 30" (S.lifeOf S.alice (build [[S.alice, S.bob], [S.carol, S.dave]] True)) (Just 30)
     Spec.assertEqWith s "CR 810.11 three heads: 45" (S.lifeOf S.alice (build [[S.alice, S.bob, S.carol], [S.dave]] True)) (Just 45)
     Spec.assertEqWith s "the same teams without the option: CR 103.4's twenty" (S.lifeOf S.alice (build [[S.alice, S.bob], [S.carol, S.dave]] False)) (Just 20)
@@ -285,7 +292,7 @@ setupSpec s registry = Spec.describe s "Setup" $ do
     mountain <- S.printingOf s registry "Mountain"
     let deck = Deck.MkDeck {Deck.cards = Map.singleton mountain 10, Deck.commander = Set.singleton shimatsu, Deck.vanguard = Nothing, Deck.dungeons = Set.empty, Deck.sideboard = Map.empty, Deck.conspiracies = Map.empty, Deck.attractions = Map.empty, Deck.planes = Set.empty, Deck.schemes = Map.empty}
         built brawl =
-          S.runPure S.identityAnswer (settingsOf brawl (Setup.emptyGame S.bothPlayers)) $
+          S.runPure S.identityAnswer (Setup.gameWith (settingsOf brawl) S.bothPlayers) $
             Setup.createDeck S.alice deck
         restarted brawl = S.runPure S.identityAnswer (built brawl) (Setup.restartGame S.performer Set.empty S.alice)
         subgame brawl = S.runPure S.identityAnswer (Setup.subgameStateFrom S.alice (built brawl)) (Setup.startGameFromCards S.performer Set.empty)
@@ -301,18 +308,17 @@ setupSpec s registry = Spec.describe s "Setup" $ do
     shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
     mountain <- S.printingOf s registry "Mountain"
     let deck = Deck.MkDeck {Deck.cards = Map.singleton mountain 10, Deck.commander = Set.singleton shimatsu, Deck.vanguard = Nothing, Deck.dungeons = Set.empty, Deck.sideboard = Map.empty, Deck.conspiracies = Map.empty, Deck.attractions = Map.empty, Deck.planes = Set.empty, Deck.schemes = Map.empty}
-        built = S.runPure S.identityAnswer (settingsOf True (Setup.emptyGame S.bothPlayers)) (Setup.createDeck S.alice deck)
+        built = S.runPure S.identityAnswer (Setup.gameWith (settingsOf True) S.bothPlayers) (Setup.createDeck S.alice deck)
         knocked = built {GameState.players = Map.adjust (\p -> p {Player.life = 7, Player.startingLife = 99}) S.alice (GameState.players built)}
         restarted = S.runPure S.identityAnswer knocked (Setup.restartGame S.performer Set.empty S.alice)
         subgame = S.runPure S.identityAnswer (Setup.subgameStateFrom S.alice knocked) (Setup.startGameFromCards S.performer Set.empty)
         startingOf gs = fmap Player.startingLife (Map.lookup S.alice (GameState.players gs))
     Spec.assertEqWith s "CR 103.4d two-player Brawl's 25, each time" (startingOf built, startingOf restarted, startingOf subgame) (Just 25, Just 25, Just 25)
 
--- CR 800.2: put this game's options where the test wants them. The seat count
--- is untouched, so the Brawl legs above differ from their controls in exactly
--- one thing.
-settingsOf :: Bool -> GameState.GameState -> GameState.GameState
-settingsOf brawl gs = gs {GameState.settings = (GameState.settings gs) {GameSettings.brawl = brawl}}
+-- CR 800.2: the options this game starts with. The seat count is the caller's,
+-- so the Brawl legs above differ from their controls in exactly one thing.
+settingsOf :: Bool -> GameSettings.GameSettings
+settingsOf brawl = GameSettings.plain {GameSettings.brawl = brawl}
 
 greenBlackSetup :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m GameState.GameState
 greenBlackSetup s registry = do

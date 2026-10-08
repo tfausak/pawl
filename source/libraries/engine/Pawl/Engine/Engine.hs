@@ -149,14 +149,15 @@ runGamePure :: (forall r. Prompt r -> r) -> GameState -> Game a -> (a, GameState
 runGamePure answer = runGameAskedPure (answer . Asked.prompt)
 
 -- One entry point from matchup to played game: the player list is DERIVED from it,
--- so a matchup player without a Player record is unrepresentable.
-runMatch :: (Monad m) => (forall r. Prompt r -> m r) -> NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> m (Result, GameState)
-runMatch answer matchup =
-  runGame answer (Setup.emptyGame (fmap fst matchup)) (playFrom matchup)
+-- so a matchup player without a Player record is unrepresentable. CR 800.2: the
+-- options are settled before the game begins, so they are an argument here.
+runMatch :: (Monad m) => (forall r. Prompt r -> m r) -> GameSettings.GameSettings -> NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> m (Result, GameState)
+runMatch answer settings matchup =
+  runGame answer (Setup.gameWith settings (fmap fst matchup)) (playFrom matchup)
 
-runMatchPure :: (forall r. Prompt r -> r) -> NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> (Result, GameState)
-runMatchPure answer matchup =
-  runGamePure answer (Setup.emptyGame (fmap fst matchup)) (playFrom matchup)
+runMatchPure :: (forall r. Prompt r -> r) -> GameSettings.GameSettings -> NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> (Result, GameState)
+runMatchPure answer settings matchup =
+  runGamePure answer (Setup.gameWith settings (fmap fst matchup)) (playFrom matchup)
 
 -- The next entry of a cyclic order after 'pid', falling back to 'pid' when the
 -- order is empty or does not mention it.
