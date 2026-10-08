@@ -329,14 +329,17 @@ candidateCostsFor = candidateCostsGiven False
 -- CR 712.11d / 613.1f: the keywords a double-faced card's FRONT face has where
 -- the card lies -- its projection with the object stamped as that face, face up
 -- -- rather than the ones it prints, so a disturb or more than meets the eye an
--- effect grants counts and one a layer-6 removal takes away does not. Read by
+-- effect grants counts and one a layer-6 removal takes away does not. A card
+-- exiled face down is read turned up, since CR 406.3a turns it up before it is
+-- played: Pawl.CastPermissionSpec's "CR 406.3a / 702.162a a Ratchet exiled face
+-- down with Urianger is offered and cast converted". Read by
 -- the converted-face offer and price alike (Pawl.Engine.Cast.castableFacesFor,
 -- candidateCostsGiven below), so the two cannot disagree. Pawl.TransformSpec's
 -- "CR 702.146a a disturb granted to a card in a graveyard casts it transformed"
 -- proves the grant.
 frontFaceKeywords :: ObjectId -> Card.Type.Card -> GameState -> Set.Set Keyword.Type.Keyword
 frontFaceKeywords oid card gs =
-  let front o = o {Object.face = Just (Face.name (Card.frontFace card)), Object.facing = Facing.FaceUp}
+  let front o = o {Object.face = Just (Face.name (Card.frontFace card)), Object.facing = Facing.FaceUp, Object.exiledFaceDown = False}
    in Map.keysSet (Projection.keywordsOf oid gs {GameState.objects = Map.adjust front oid (GameState.objects gs)})
 
 -- CR 118.8 / 601.2b: one candidate per way of paying this face's CHOICE costs --

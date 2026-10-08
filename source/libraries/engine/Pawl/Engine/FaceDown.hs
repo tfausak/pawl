@@ -97,28 +97,27 @@ morphCostsOf oid gs = Keyword.morphCosts (faceUpKeywords oid gs)
 disguiseCostsOf :: ObjectId -> GameState -> [Cost Keyword]
 disguiseCostsOf oid gs = Keyword.disguiseCosts (faceUpKeywords oid gs)
 
--- The keywords rule 702.37e's and rule 702.168d's counterfactual asks about,
--- from two reads joined.
+-- The keywords rule 702.37e's and rule 702.168d's counterfactual asks about:
+-- the permanent's own projection on a board where it is face up. CR 708.8's
+-- "any effects that have been applied to the face-down permanent still apply"
+-- is why that board, so a grant counts and a removal counts. The MKM and DSK
+-- rulings: "If a face-down creature loses its abilities, it can't be turned face
+-- up with a disguise or morph ability because it will no longer have that
+-- ability (or the associated cost) once face up." Pawl.FaceDownSpec's "CR
+-- 702.37e / 708.8 a face-down permanent that lost its abilities can't be turned
+-- up by morph" proves the removal.
 --
--- The CARD's: Game.faceUpCastingFaceOf, the one door that steps around CR
--- 708.2's substitution, which has taken the card's keywords off the face-down
--- permanent. CR 707.2: morph is copiable, so a card carrying copied values has
--- the copied card's. Not a projected read, so a layer-6 removal applied to the
--- face-down permanent leaves it -- Pawl.FaceDownSpec's "CR 613.7f turning face up
--- restamps the permanent after a removal that had wiped its grant" turns a
--- Turn to Frog'd Tracker up by its morph.
---
--- And the GRANTED ones: the permanent's own projection on a board where it is
--- face up, which is where CR 708.8's "any effects that have been applied to the
--- face-down permanent still apply" puts an effect that gives it the ability. A
--- disguise granted at the card's own mana cost (Disguise Agent) is priced there
--- at that face-up cost rather than at the face-down permanent's none (CR
--- 708.2a). Pawl.CommanderSpec's "CR 702.168a Disguise Agent's disguise casts a
--- commander face down and turns it up for its mana cost" proves it.
+-- A projected read of the face-down permanent itself would find none of the
+-- card's keywords (CR 708.2), only what the allower listed. Face up, the
+-- copiable values are the card's or a copy stamp's (CR 707.2), and a disguise
+-- granted at the card's own mana cost (Disguise Agent) is priced at that face-up
+-- cost rather than at the face-down permanent's none (CR 708.2a):
+-- Pawl.CommanderSpec's "CR 702.168a Disguise Agent's disguise casts a commander
+-- face down and turns it up for its mana cost".
 faceUpKeywords :: ObjectId -> GameState -> Set.Set Keyword
 faceUpKeywords oid gs =
   let up = gs {GameState.objects = Map.adjust (\o -> o {Object.facing = Facing.FaceUp}) oid (GameState.objects gs)}
-   in foldMap Face.keywordSet (Game.faceUpCastingFaceOf oid gs) <> Map.keysSet (Projection.keywordsOf oid up)
+   in Map.keysSet (Projection.keywordsOf oid up)
 
 -- CR 701.40b and CR 701.58b, which say it in the same words: "show all players
 -- that the card representing that permanent IS A CREATURE CARD and what THAT

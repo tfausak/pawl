@@ -1841,6 +1841,22 @@ uriangerSpec s registry =
       Spec.assertBool s (not (offered handGiant)) "and the one in her hand, which no permission reduces, is not castable off them"
       Spec.assertBool s (offered exiledGiant) "the exiled Hill Giant is offered"
 
+    -- CR 406.3a / 712.11d: a card exiled FACE DOWN is turned face up just before
+    -- it is played, so its front face's more than meets the eye (CR 702.162a)
+    -- still offers the converted cast. Ratchet, Field Medic // Ratchet, Rescue
+    -- Racer, exiled with Draw Arcanum and played with Play Arcanum; one Plains
+    -- pays the {1}{W} the permission makes {W}.
+    Spec.it s "CR 406.3a / 702.162a a Ratchet exiled face down with Urianger is offered and cast converted" $ do
+      (exiledRatchet, _, board) <- uriangerPlayBoard s registry "Ratchet, Field Medic" 0
+      plains <- S.printingOf s registry "Plains"
+      let gs = S.landsFor plains S.alice 1 board
+          racer = CardName.MkCardName (Text.pack "Ratchet, Rescue Racer")
+          offeredNames = [name | Action.Type.Cast o name _ <- Action.legalActions S.alice gs, o == exiledRatchet]
+          cast = S.runPure exilingAnswer gs (Cast.castSpell S.manaPerformer S.alice exiledRatchet racer Facing.FaceUp >> Monad.void Stack.resolveTop)
+          racers = filter (\oid -> Projection.namesOf oid cast == Set.singleton racer) (Game.zoneMembers Zone.Battlefield S.alice cast)
+      Spec.assertEqWith s "CR 702.162a cast converted from exile, it arrives as Ratchet, Rescue Racer" (length racers) 1
+      Spec.assertBool s (elem racer offeredNames) "and the converted face is offered there"
+
 -- Urianger's play board: alice's Urianger and `mountains` Mountains, one copy
 -- of `name` on top of her library and another in her hand, Draw Arcanum run
 -- (exiling the top copy face down) and Play Arcanum active. Answers the exiled
