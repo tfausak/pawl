@@ -1318,6 +1318,7 @@ effectNames asking onCard onAbility x = case x of
   Effect.Unsuspect objectRef -> objectRefNames asking objectRef
   Effect.SetHalfLocked setHalfLocked -> setHalfLockedNames asking setHalfLocked
   Effect.Evolve slotName -> slotNames asking slotName
+  Effect.BecomeProtector slotName -> slotNames asking slotName
   Effect.Mentor slotName -> slotNames asking slotName
   Effect.Train slotName -> slotNames asking slotName
   Effect.Firebend manaAddition -> manaAdditionNames asking manaAddition

@@ -844,6 +844,7 @@ effectObjectRefs effect = case effect of
   Effect.Unsuspect ref -> [ref]
   Effect.SetHalfLocked {} -> []
   Effect.Evolve {} -> []
+  Effect.BecomeProtector {} -> []
   Effect.Mentor {} -> []
   Effect.Exploit -> []
   Effect.GiveGift -> []
@@ -1058,6 +1059,7 @@ effectPlayerRefs effect = case effect of
   Effect.Unsuspect {} -> []
   Effect.SetHalfLocked {} -> []
   Effect.Evolve {} -> []
+  Effect.BecomeProtector {} -> []
   Effect.Mentor {} -> []
   Effect.Exploit -> []
   Effect.GiveGift -> []
@@ -1467,6 +1469,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _ slot) -> oneSlot slot
   -- A READ, Designate's: the slot names where rule 702.100a's counter goes.
   Effect.Evolve slot -> oneSlot slot
+  Effect.BecomeProtector slot -> oneSlot slot
   Effect.Mentor slot -> oneSlot slot
   Effect.Exploit -> Map.empty
   Effect.GiveGift -> Map.empty
@@ -2194,6 +2197,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.Unsuspect _ -> True
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> True
   Effect.Evolve _ -> True
+  Effect.BecomeProtector _ -> True
   Effect.Mentor _ -> True
   Effect.Exploit -> True
   Effect.GiveGift -> True
@@ -2437,6 +2441,7 @@ readsX =
         Effect.Unsuspect _ -> False
         Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> False
         Effect.Evolve _ -> False
+        Effect.BecomeProtector _ -> False
         Effect.Mentor _ -> False
         Effect.Exploit -> False
         Effect.GiveGift -> False
@@ -2700,6 +2705,7 @@ boundSlots effect = case effect of
   Effect.Unsuspect _ -> Set.empty
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> Set.empty
   Effect.Evolve _ -> Set.empty
+  Effect.BecomeProtector _ -> Set.empty
   Effect.Mentor _ -> Set.empty
   Effect.Exploit -> Set.empty
   Effect.GiveGift -> Set.empty

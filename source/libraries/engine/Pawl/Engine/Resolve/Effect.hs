@@ -3418,6 +3418,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
     Nothing -> False
     Just target -> null (if locked then Room.unlockedHalves target gs else Room.lockedHalves target gs)
   Effect.Evolve {} -> False
+  Effect.BecomeProtector {} -> False
   Effect.Mentor {} -> False
   Effect.Exploit -> False
   Effect.GiveGift -> False
@@ -8452,6 +8453,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       pure (if List.elem answered (NonEmpty.toList offered) then answered else first)
                   if locked then Event.lockHalf target half else Event.unlockHalves controller target (Set.singleton half)
       _ -> pure ()
+  -- CR 310.9f: the resolving controller becomes the slot's battle's protector,
+  -- the previous one ceasing to be. A state write on Object.protector, which CR
+  -- 310.9g keeps through a type change; CR 704.5y repairs a protector who can't
+  -- be one, and CR 506.4 takes the battle out of combat
+  -- (Pawl.Engine.Combat.noteAttackingNothing). An illegal slot (CR 608.2b)
+  -- writes nothing.
+  Effect.BecomeProtector slot -> case legalOne slot legal >>= Recipient.objectOf of
+    Nothing -> pure ()
+    Just battle -> State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.protector = Just controller}) battle (GameState.objects g)})
   -- CR 702.100a's counter and CR 702.100b's marker: the creature evolves only if
   -- the placement actually put one or more counters on it.
   Effect.Evolve slot ->

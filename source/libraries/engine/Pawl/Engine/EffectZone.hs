@@ -299,6 +299,7 @@ zoneFunctionedFrom itself delayed effect = case effect of
   Effect.Unsuspect _ -> Nothing
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> Nothing
   Effect.Evolve _ -> Nothing
+  Effect.BecomeProtector _ -> Nothing
   Effect.Mentor _ -> Nothing
   Effect.Exploit -> Nothing
   Effect.GiveGift -> Nothing

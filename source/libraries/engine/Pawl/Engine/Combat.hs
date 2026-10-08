@@ -317,16 +317,15 @@ stillAttacked oid gs =
 -- candidate list CR 508.1b drew the declaration from -- so CR 613.1d's type change
 -- and CR 506.4's "leaves the battlefield" both fall out of the list.
 --
--- The list also asks who protects the battle, so a protector moved to a third
--- player mid-combat (CR 310.9f) reads here as removed from combat, which is what
--- rule 506.4 says. CR 704.5y's repair moves one -- a protector who steals the
--- battle -- but moves the CONTROLLER in the same breath, so that board cannot
--- tell this clause from noteAttackingNothing's. Not implemented: an effect that
--- moves a LEGAL designation, which is CR 310.9f's own event (#2980).
+-- The list asks only whether SOME defending player protects the battle, so a
+-- protector moved (CR 310.9f) to a player who also defends (CR 802.2) still
+-- finds it. Rule 506.4's PROTECTOR clause is therefore noteAttackingNothing's,
+-- against the protector recorded in Pawl.Types.Combat's attackedUnder; the
+-- "protector changes mid-combat" pair in data/scenarios/battle is the board.
 --
--- Rule 506.4's CONTROLLER clause is NOT here, because this list cannot see it: a
--- control change leaves the protector where it was, so every candidate list still
--- finds the battle. noteAttackingNothing asks it separately, against
+-- Rule 506.4's CONTROLLER clause is NOT here either, because this list cannot
+-- see it: a control change leaves the protector where it was, so every candidate
+-- list still finds the battle. noteAttackingNothing asks it separately, against
 -- Pawl.Types.Combat's attackedControlledBy.
 stillAttackedBattle :: ObjectId -> GameState -> Bool
 stillAttackedBattle oid gs =
@@ -1783,12 +1782,19 @@ noteAttackingNothing gs =
       battleSeatMoved attacker battle = case Map.lookup attacker (Combat.attackedControlledBy c) of
         Nothing -> False
         Just seat -> Projection.controllerOf battle gs /= Just seat
+      -- CR 506.4's PROTECTOR clause, read against the protector recorded as this
+      -- creature joined combat (attackedUnder, CR 310.9d's seat). The candidate
+      -- lists stillAttackedBattle asks cannot see it whenever the new protector is
+      -- a defending player too, which CR 802.2 makes the usual case.
+      protectorMoved attacker battle = case Map.lookup attacker (Combat.attackedUnder c) of
+        Nothing -> False
+        Just seat -> Battle.protectorOf battle gs /= Just seat
       removed attacker target = case target of
         -- CR 800.4e, not CR 506.4: a departed player is still being attacked, and
         -- Damage.combatRecipient is where the damage goes missing.
         AttackTarget.OfPlayer _ -> False
         AttackTarget.OfPlaneswalker pw -> not (targetStillAttacked target gs) || seatMoved attacker pw
-        AttackTarget.OfBattle battle -> not (targetStillAttacked target gs) || battleSeatMoved attacker battle
+        AttackTarget.OfBattle battle -> not (targetStillAttacked target gs) || battleSeatMoved attacker battle || protectorMoved attacker battle
       gone = Map.keysSet (Map.filterWithKey removed (Combat.attackers c))
    in gs {GameState.combat = c {Combat.attackingNothing = Set.union gone (Combat.attackingNothing c)}}
 
