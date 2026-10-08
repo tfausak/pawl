@@ -1056,8 +1056,8 @@ data Context = MkContext
     -- Pawl.FilterPositionLintSpec's lint, sourceManaValue's pair.
     sourceNames :: Set.Set CardName.CardName,
     -- CR 202.3, the computed half: the number the TARGET SLOT being matched names
-    -- as its mana-value bound, for the two atoms that ask
-    -- (ManaValueAtMostAmount, ManaValueEqualToAmount) -- Celestine, the Living
+    -- as its bound, for the three atoms that ask (ManaValueAtMostAmount,
+    -- ManaValueEqualToAmount, PowerAtMostAmount) -- Celestine, the Living
     -- Saint's "where X is the amount of life you gained this turn". The slot carries the Quantity
     -- (Pawl.Types.TargetSlot's `amount`); this is that Quantity already
     -- evaluated, because this module holds no game state and cannot evaluate one.
@@ -1073,8 +1073,8 @@ data Context = MkContext
     slotAmount :: Maybe Integer,
     -- CR 601.2b: the slot NAMES a computed bound and the announcement that fixes
     -- it has not been made yet, so `slotAmount` above is Nothing for a reason that
-    -- is not "no bound was stated". Neither ManaValueAtMostAmount nor
-    -- ManaValueEqualToAmount narrows then --
+    -- is not "no bound was stated". None of the three atoms that read it
+    -- narrows then --
     -- Stir the Grave's "mana value X or less" states no ceiling until its caster
     -- names X, and CR 601.2b puts no ceiling on the value they may name.
     --
@@ -1815,6 +1815,12 @@ matches context view predicate = case predicate of
     -- still make legal.
     (Just _, Nothing) -> boundUnannounced context
     _ -> False
+  -- CR 208.1 against the slot's computed bound, ManaValueAtMostAmount's arm with
+  -- power in place of mana value and False on the same absences for its reasons.
+  Filter.PowerAtMostAmount -> case (power view, slotAmount context) of
+    (Just p, Just n) -> p <= n
+    (Just _, Nothing) -> boundUnannounced context
+    _ -> False
   -- PlayerRelation.holds is what each arm MEANS, and its haddock carries the
   -- argument: an Opponent is CR 102.3's player not on your team, which is every
   -- other player in a free-for-all (CR 806.1) and at two seats (CR 102.2), and
@@ -2406,6 +2412,7 @@ rewrite pairs predicate = case predicate of
   Filter.ManaValueIsEven -> predicate
   Filter.ManaValueAtMostAmount -> predicate
   Filter.ManaValueEqualToAmount -> predicate
+  Filter.PowerAtMostAmount -> predicate
   Filter.ControlledBy _ -> predicate
   -- Untouched for ControlledBy's reason.
   Filter.ControlledByDefendingPlayer -> predicate
@@ -3174,6 +3181,7 @@ bakeBound players predicate = case predicate of
   Filter.ManaValueIsEven -> predicate
   Filter.ManaValueAtMostAmount -> predicate
   Filter.ManaValueEqualToAmount -> predicate
+  Filter.PowerAtMostAmount -> predicate
   Filter.ControlledBy _ -> predicate
   Filter.ControlledByDefendingPlayer -> predicate
   Filter.OwnedBy _ -> predicate
@@ -3342,6 +3350,8 @@ manaValueThresholds predicate = case predicate of
   -- The arm above's comparison at equality, and empty for its reason: it names no
   -- literal either, and its position is the same target slot.
   Filter.ManaValueEqualToAmount -> []
+  -- Reads power, not mana value, so it bounds nothing here.
+  Filter.PowerAtMostAmount -> []
   Filter.HasCardType _ -> []
   Filter.HasSupertype _ -> []
   Filter.HasColor _ -> []
@@ -3510,6 +3520,8 @@ statesAQuality predicate = case predicate of
   -- A quality for the arm above's reason: "with mana value X" describes the card
   -- as much at equality as "X or less" does under order.
   Filter.ManaValueEqualToAmount -> True
+  -- A quality for the arm above's reason: "with power X or less" describes the card.
+  Filter.PowerAtMostAmount -> True
   Filter.HasCardType _ -> True
   Filter.HasSupertype _ -> True
   Filter.HasColor _ -> True

@@ -4832,6 +4832,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.ManaValueIsEven -> []
   Filter.Type.ManaValueAtMostAmount -> []
   Filter.Type.ManaValueEqualToAmount -> []
+  Filter.Type.PowerAtMostAmount -> []
   Filter.Type.ControlledBy _ -> []
   Filter.Type.ControlledByDefendingPlayer -> []
   -- A PLAYER slot, not an object one -- the disjoint namespace above.

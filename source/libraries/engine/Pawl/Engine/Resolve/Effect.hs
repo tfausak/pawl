@@ -163,6 +163,7 @@ import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.ControlDuration as ControlDuration
 import qualified Pawl.Types.ControlPlayer as ControlPlayer
 import qualified Pawl.Types.ControlSides as ControlSides
+import qualified Pawl.Types.ControlSlots as ControlSlots
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.CopyOriginal as CopyOriginal
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
@@ -10294,6 +10295,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             ControlSides.WithSource slot ->
               case (battlefieldMatching legal resolving controller source gs Filter.Type.IsSource, legalOne slot legal >>= Recipient.objectOf) of
                 ([self], Just other) -> [self, other]
+                _ -> []
+            ControlSides.BetweenSlots (ControlSlots.MkControlSlots one two) ->
+              case (legalOne one legal >>= Recipient.objectOf, legalOne two legal >>= Recipient.objectOf) of
+                (Just this, Just that) -> [this, that]
                 _ -> []
        in case twoSides of
             [one, two] -> case (Projection.controllerOf one gs, Projection.controllerOf two gs) of

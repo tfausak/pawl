@@ -74,6 +74,7 @@ codec keywordCodec =
       Arm.nullary "ManaValueIsEven" Filter.ManaValueIsEven,
       Arm.nullary "ManaValueAtMostAmount" Filter.ManaValueAtMostAmount,
       Arm.nullary "ManaValueEqualToAmount" Filter.ManaValueEqualToAmount,
+      Arm.nullary "PowerAtMostAmount" Filter.PowerAtMostAmount,
       Arm.payload "ControlledBy" PlayerRelation.codec Filter.ControlledBy (\x -> case x of Filter.ControlledBy y -> Just y; _ -> Nothing),
       Arm.payload "OwnedBy" PlayerRelation.codec Filter.OwnedBy (\x -> case x of Filter.OwnedBy y -> Just y; _ -> Nothing),
       Arm.nullary "OwnedByRecipient" Filter.OwnedByRecipient,
@@ -212,6 +213,7 @@ tagOf x = case x of
   Filter.ManaValueIsEven {} -> "ManaValueIsEven"
   Filter.ManaValueAtMostAmount {} -> "ManaValueAtMostAmount"
   Filter.ManaValueEqualToAmount {} -> "ManaValueEqualToAmount"
+  Filter.PowerAtMostAmount {} -> "PowerAtMostAmount"
   Filter.ControlledBy {} -> "ControlledBy"
   Filter.OwnedBy {} -> "OwnedBy"
   Filter.OwnedByRecipient {} -> "OwnedByRecipient"

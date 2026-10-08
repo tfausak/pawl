@@ -3673,6 +3673,7 @@ filterReads f = case f of
   Filter.Type.ManaValueIsEven -> Set.empty
   Filter.Type.ManaValueAtMostAmount -> Set.empty
   Filter.Type.ManaValueEqualToAmount -> Set.empty
+  Filter.Type.PowerAtMostAmount -> Set.singleton PowerA
   Filter.Type.And fs -> foldMap filterReads fs
   Filter.Type.Or fs -> foldMap filterReads fs
   Filter.Type.Not g -> filterReads g
@@ -3852,6 +3853,7 @@ filterReadsPeers f = case f of
   Filter.Type.ManaValueIsEven -> False
   Filter.Type.ManaValueAtMostAmount -> False
   Filter.Type.ManaValueEqualToAmount -> False
+  Filter.Type.PowerAtMostAmount -> False
 
 -- filterReadsPeers through an affected set. TheseObjects names ids (CR 611.2c)
 -- and Attached reads its source's attachment (CR 303.4m); neither builds a view.

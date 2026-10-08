@@ -96,6 +96,7 @@ import qualified Pawl.Types.ConjureCards as ConjureCards
 import qualified Pawl.Types.Connive as Connive
 import qualified Pawl.Types.ControlPlayer as ControlPlayer
 import qualified Pawl.Types.ControlSides as ControlSides
+import qualified Pawl.Types.ControlSlots as ControlSlots
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.CopyOriginal as CopyOriginal
@@ -436,6 +437,7 @@ filterNames asking criterion = case criterion of
   Filter.ManaValueIsEven -> False
   Filter.ManaValueAtMostAmount -> contextNames asking
   Filter.ManaValueEqualToAmount -> contextNames asking
+  Filter.PowerAtMostAmount -> contextNames asking
   Filter.ControlledBy _relation -> False
   Filter.ControlledByDefendingPlayer -> False
   Filter.ControlledByBound slot -> slotNames asking slot
@@ -881,6 +883,7 @@ controlSidesNames :: Asking -> ControlSides.ControlSides -> Bool
 controlSidesNames asking x = case x of
   ControlSides.BetweenTargets slotName -> slotNames asking slotName
   ControlSides.WithSource slotName -> slotNames asking slotName
+  ControlSides.BetweenSlots (ControlSlots.MkControlSlots one two) -> slotNames asking one || slotNames asking two
 
 controllerRelationNames :: Asking -> ControllerRelation.ControllerRelation -> Bool
 controllerRelationNames asking x = case x of

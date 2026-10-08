@@ -376,6 +376,8 @@ library codec
     Pawl.Codec.ControlPlayerSpec
     Pawl.Codec.ControlSides
     Pawl.Codec.ControlSidesSpec
+    Pawl.Codec.ControlSlots
+    Pawl.Codec.ControlSlotsSpec
     Pawl.Codec.Convoking
     Pawl.Codec.ConvokingSpec
     Pawl.Codec.CopyException
@@ -2115,6 +2117,7 @@ library types
     Pawl.Types.ControllerRelation
     Pawl.Types.ControlPlayer
     Pawl.Types.ControlSides
+    Pawl.Types.ControlSlots
     Pawl.Types.Convoking
     Pawl.Types.CopyException
     Pawl.Types.CopyOriginal

@@ -1969,12 +1969,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- returns 22 cards, and no mode of any of them prints a target slot with a
   -- computed bound.
   --
-  -- Pawl.Types.Scope's OverBound fold over a bound slot is the bound, rather than
-  -- Quantity.AgainstSlot's power read, because the OFFER hands a dependent slot
-  -- the UNION of what the slot it names could take (legalSetsGiven): a fold over
-  -- three candidates answers 3, where a read that insists on ONE object
-  -- (Binding.onlyOne) answers nothing at all and empties the slot. The union is a
+  -- Pawl.Types.Scope's OverBound fold over a bound slot is the bound, so the
+  -- OFFER measures it against the UNION of what the slot it names could take
+  -- (legalSetsGiven): a fold over three candidates answers 3. The union is a
   -- widening and selectionLegal is where the announcement is narrowed.
+  -- Spawnbroker (Pawl.BoardEffectSpec) is the read of ONE object instead.
   --
   -- TWO RUNS off one board, differing in exactly one thing -- which creature fills
   -- occurrence 1's victim slot -- with the same {2}{B} paid off the same three
