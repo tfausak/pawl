@@ -601,6 +601,55 @@ spitefulSpec s registry =
       Spec.assertBool s (not (any (isActivateOf aloneId) (Action.legalActions S.alice alone))) "with the target the only creature no announcement pays, so the activation is not offered"
       Spec.assertBool s (any (isActivateOf pairedId) (Action.legalActions S.alice paired)) "and one more creature makes some announcement pay, so it is"
 
+-- Synthetic Spiteful Edict {2}{B} Enchantment: "Spells your opponents cast cost
+-- an additional 'Sacrifice a creature that isn't a target of that spell' to
+-- cast." Synthetic Spiteful Rite's cost, arriving as CR 601.2f's addition rather
+-- than printed on the spell, which no printing does; see #2959 for the search.
+--
+-- alice controls the Edict; bob holds Murder over three Swamps and controls a
+-- Hill Giant and `pikers` Goblin Pikers, with priority in his own precombat main
+-- phase. No other creature exists, so with no Piker every announcement aims
+-- Murder at the Giant and leaves nothing to sacrifice.
+spitefulEdictSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+spitefulEdictSpec s registry =
+  Spec.describe s "Synthetic Spiteful Edict" $ do
+    Spec.it s "CR 601.2f an added component naming the target is priced per aiming" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      giant <- S.printingOf s registry "Hill Giant"
+      piker <- S.printingOf s registry "Goblin Piker"
+      edict <- S.printingOf s registry "Synthetic Spiteful Edict"
+      murder <- S.printingOf s registry "Murder"
+      let board pikers =
+            let withLands = S.landsFor swamp S.bob 3 (Setup.emptyGame S.bothPlayers)
+                (_, withEdict) = S.addPermanent edict S.alice withLands
+                (_, withGiant) = S.addPermanent giant S.bob withEdict
+                withPikers = List.foldl' (\g _ -> snd (S.addPermanent piker S.bob g)) withGiant [1 .. pikers]
+                (murderId, gs) = S.addHandCard murder S.bob withPikers
+             in (murderId, gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.bob, GameState.priority = Just S.bob})
+          (aloneId, alone) = board (0 :: Int)
+          (pairedId, paired) = board 1
+      Spec.assertBool s (not (any (S.isCastOf aloneId) (Action.legalActions S.bob alone))) "with the target the only creature no announcement pays the added sacrifice, so Murder is not offered"
+      Spec.assertBool s (any (S.isCastOf pairedId) (Action.legalActions S.bob paired)) "and one more creature makes some announcement pay, so it is"
+    -- CR 602.2b's twin: Synthetic Spiteful Decree adds the same component to
+    -- activated abilities its controller's opponents activate, and bob's
+    -- Hammerheim ("{T}: Target creature loses all landwalk abilities until end of
+    -- turn") prints a cost that names no slot.
+    Spec.it s "CR 602.2b an added activation component naming the target is priced per aiming" $ do
+      giant <- S.printingOf s registry "Hill Giant"
+      piker <- S.printingOf s registry "Goblin Piker"
+      decree <- S.printingOf s registry "Synthetic Spiteful Decree"
+      hammerheim <- S.printingOf s registry "Hammerheim"
+      let board pikers =
+            let (_, withDecree) = S.addPermanent decree S.alice (Setup.emptyGame S.bothPlayers)
+                (_, withGiant) = S.addPermanent giant S.bob withDecree
+                withPikers = List.foldl' (\g _ -> snd (S.addPermanent piker S.bob g)) withGiant [1 .. pikers]
+                (landId, gs) = S.addPermanent hammerheim S.bob withPikers
+             in (landId, gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.bob, GameState.priority = Just S.bob})
+          (aloneId, alone) = board (0 :: Int)
+          (pairedId, paired) = board 1
+      Spec.assertBool s (not (any (isActivateOf aloneId) (Action.legalActions S.bob alone))) "with the target the only creature no announcement pays the added sacrifice, so the activation is not offered"
+      Spec.assertBool s (any (isActivateOf pairedId) (Action.legalActions S.bob paired)) "and one more creature makes some announcement pay, so it is"
+
 -- Headless Skaab {2}{U} Creature -- Zombie Warrior 3/6: "As an additional cost
 -- to cast this spell, exile a creature card from your graveyard. This creature
 -- enters tapped."
@@ -2174,6 +2223,76 @@ evidenceSpec s registry =
           Spec.assertEqWith s "CR 609.7a no collected Soil is offered to bob as a source" (concatMap (filter (`elem` soils)) offered) []
           Spec.assertBool s (List.elem piker (concat offered)) "and he was asked, over the Piker among others"
 
+-- Urgent Necropsy {2}{B}{G} Instant: "As an additional cost to cast this spell,
+-- collect evidence X, where X is the total mana value of the permanents this
+-- spell targets. / Destroy up to one target artifact, up to one target
+-- creature, up to one target enchantment, and up to one target planeswalker."
+-- (Oracle checked against Scryfall 2026-10-08.)
+--
+-- alice holds it over three Forests and a Swamp with `soils` Acidic Soils
+-- (mana value 3 each) in her graveyard; bob's Hill Giant (mana value 4) is the
+-- only permanent any of its four slots admits. Distinct numbers: 3 and 6 of
+-- evidence against an X of 4 or 0.
+urgentNecropsySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+urgentNecropsySpec s registry =
+  Spec.describe s "Urgent Necropsy" $ do
+    -- CR 601.2c: an "up to one" slot may be answered with no target, which makes
+    -- X 0, so one Soil pays a cast that names nothing. A gate binding one object
+    -- per slot would price X at the Giant's 4 and refuse the cast.
+    Spec.it s "CR 601.2c a cast naming no target owes no evidence, so it is offered" $ do
+      (gs, necropsy, giant) <- necropsyBoard s registry "Hill Giant" 1
+      let cast = S.runPure (necropsyAnswer Nothing) gs (S.cast S.alice necropsy >> Stack.resolveTop)
+      Spec.assertBool s (S.castable S.alice necropsy gs) "CR 601.2c with nothing targeted X is 0, so the cast is offered"
+      Spec.assertEqWith s "it resolved destroying nothing, and the Soil stayed" (elem giant (Game.zoneMembers Zone.Battlefield S.bob cast), length (Game.zoneMembers Zone.Graveyard S.alice cast)) (True, 2)
+    -- CR 601.2f: X is the Giant's mana value once it is targeted -- one Soil (3)
+    -- cannot reach it and CR 601.2h reverses the cast, two (6) can.
+    Spec.it s "CR 601.2f targeting the Hill Giant makes X its mana value" $ do
+      (short, necropsy, giant) <- necropsyBoard s registry "Hill Giant" 1
+      (enough, necropsy', giant') <- necropsyBoard s registry "Hill Giant" 2
+      let refused = S.runPure (necropsyAnswer (Just giant)) short (S.cast S.alice necropsy)
+          paid = S.runPure (necropsyAnswer (Just giant')) enough (S.cast S.alice necropsy' >> Stack.resolveTop)
+      Spec.assertEqWith s "CR 601.2h one Soil cannot collect evidence 4, so the Giant survives and the Necropsy is back in hand" (elem giant (Game.zoneMembers Zone.Battlefield S.bob refused), S.handSize S.alice refused) (True, 1)
+      Spec.assertEqWith s "two Soils can, so the Giant is destroyed and both Soils are exiled" (Game.zoneMembers Zone.Battlefield S.bob paid, length (Game.zoneMembers Zone.Exile S.alice paid)) ([], 2)
+    -- CR 115.3 lets the artifact slot and the creature slot name one Alpha Myr
+    -- (mana value 2), and "the permanents this spell targets" counts it once: X is
+    -- 2, which one Soil (3) reaches, where counting per slot would ask for 4.
+    Spec.it s "CR 601.2f a permanent named by two slots counts once" $ do
+      (gs, necropsy, myr) <- necropsyBoard s registry "Alpha Myr" 1
+      let paid = S.runPure (necropsyAnswer (Just myr)) gs (S.cast S.alice necropsy >> Stack.resolveTop)
+      Spec.assertEqWith s "CR 601.2f one Soil collects evidence 2, so the Myr is destroyed" (Game.zoneMembers Zone.Battlefield S.bob paid, length (Game.zoneMembers Zone.Exile S.alice paid)) ([], 1)
+
+-- alice's Urgent Necropsy over three Forests and a Swamp, `soils` Acidic Soils
+-- in her graveyard, and bob's `victim`, in her precombat main phase with
+-- priority. Returns the state, the Necropsy and bob's permanent.
+necropsyBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> Int -> m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+necropsyBoard s registry victim soils = do
+  forest <- S.printingOf s registry "Forest"
+  swamp <- S.printingOf s registry "Swamp"
+  soil <- S.printingOf s registry "Acidic Soil"
+  giant <- S.printingOf s registry victim
+  necropsy <- S.printingOf s registry "Urgent Necropsy"
+  let withLands = S.landsFor swamp S.alice 1 (S.landsFor forest S.alice 3 (Setup.emptyGame S.bothPlayers))
+      withSoils = List.foldl' (\g _ -> snd (S.addGraveyardCard soil S.alice g)) withLands [1 .. soils]
+      (giantId, withGiant) = S.addPermanent giant S.bob withSoils
+      (necropsyId, gs) = S.addHandCard necropsy S.alice withGiant
+  pure
+    ( gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice},
+      necropsyId,
+      giantId
+    )
+
+-- Aim Urgent Necropsy at `victim` alone, or at nothing, and collect every card
+-- offered as evidence where any is owed. The slot counts and targets are FILTERED out of what the
+-- prompts offer, so an answer cannot repair a mutation.
+necropsyAnswer :: Maybe ObjectId.ObjectId -> Prompt.Prompt r -> r
+necropsyAnswer victim p =
+  let named = Set.filter (\r -> Maybe.isJust victim && Recipient.objectOf r == victim)
+   in case p of
+        Prompt.AnnounceTargets _ _ _ asked -> fmap (\(_, legal) -> if Set.null (named legal) then 0 else 1) asked
+        Prompt.ChooseTargets _ _ _ asked -> fmap (named . snd) asked
+        Prompt.ChooseCollectEvidence _ _ _ candidates owed -> if owed == 0 then Set.empty else Set.fromList candidates
+        _ -> S.identityAnswer p
+
 -- `card` in alice's hand over `lands` Forests and a Swamp, two Acidic Soils in
 -- her graveyard, and bob's Goblin Piker, in her precombat main phase with
 -- priority. Returns the state, the card and the Piker.
@@ -2378,6 +2497,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   hatredSpec s registry
   villageRitesSpec s registry
   spitefulSpec s registry
+  spitefulEdictSpec s registry
   headlessSkaabSpec s registry
   cadaverousBloomSpec s registry
   livingDestinySpec s registry
@@ -2387,6 +2507,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   kindleTheInnerFlameSpec s registry
   forensicResearcherSpec s registry
   evidenceSpec s registry
+  urgentNecropsySpec s registry
   frailExhumationSpec s registry
   everbarkShamanSpec s registry
   putridRaptorSpec s registry

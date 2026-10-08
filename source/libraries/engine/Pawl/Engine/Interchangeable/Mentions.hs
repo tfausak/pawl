@@ -970,6 +970,7 @@ costComponentNames asking onKeyword x = case x of
   CostComponent.ExileMaterials exileMaterials -> exileMaterialsNames asking exileMaterials
   CostComponent.ExileTopFromGraveyard filter_ -> filterNames asking filter_
   CostComponent.CollectEvidence _natural -> False
+  CostComponent.CollectEvidenceOfTargets -> False
   CostComponent.ExileCardFromHand filter_ -> filterNames asking filter_
   CostComponent.RevealCardFromHand filter_ -> filterNames asking filter_
   CostComponent.Behold behold -> beholdNames asking behold

@@ -184,6 +184,10 @@ data CostComponent keyword
     -- Quantity.WasBound; CR 118.8b's optional "you may collect evidence" is a
     -- Pawl.Types.CostChoice, Behold's shape below.
     CollectEvidence Natural.Natural
+  | -- | CR 701.59a as a cost / Urgent Necropsy: collect evidence N, N the total
+    -- mana value of the permanents CR 601.2c's targets name
+    -- (Pawl.Engine.Cost.fixComputed).
+    CollectEvidenceOfTargets
   | -- | CR 406.2 out of a hidden zone / Cadaverous Bloom: the paying player
     -- exiles one card matching the Filter from their own hand, which the payer
     -- chooses.
