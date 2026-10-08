@@ -41,6 +41,7 @@ import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
+import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AfterTurn as AfterTurn
@@ -2017,6 +2018,47 @@ defendingPlayerOfBlockGateSpec s registry = Spec.describe s "DefendingPlayerOfBl
     Spec.assertBool s (legal 3) "CR 805.10e: dave controls three Giants, so carol's Giant may block"
     Spec.assertBool s (not (legal 2)) "and with two it may not"
 
+-- CR 508.1d under two CROSSING gated bounds (CR 508.5a / 802.3a). Synthetic Tidal
+-- Palisade counts the attackers at a seat without an Island, Synthetic Ridge
+-- Palisade ("No more than one creature can attack each combat unless defending
+-- player controls a Mountain.") those at a seat without a Mountain. bob holds an
+-- Island, carol a Mountain, dave neither, so Tidal counts {carol, dave} and Ridge
+-- {bob, dave}: overlapping, neither inside the other.
+--
+-- Alluring Siren's resolved "attacks you if able" is stamped onto the store, one
+-- per Siren: carol's names alice's first Piker, dave's her second. Obeying both
+-- puts two announcements in Tidal's count, so the maximum is ONE. A search that
+-- nests one bound inside the other overstates it as two, which no declaration
+-- attains, and its witness then lets declining through.
+crossingAttackBoundsSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+crossingAttackBoundsSpec s registry = Spec.describe s "CrossingAttackBounds" $ do
+  Spec.it s "CR 508.1d one requirement is the maximum when the two bounds cross at dave" $ do
+    tidal <- S.printingOf s registry "Synthetic Tidal Palisade"
+    ridge <- S.printingOf s registry "Synthetic Ridge Palisade"
+    piker <- S.printingOf s registry "Goblin Piker"
+    siren <- S.printingOf s registry "Alluring Siren"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    let g0 = withPermanents S.alice [tidal, ridge] S.fourPlayerGame
+        (toCarol, g1) = S.addPermanent piker S.alice g0
+        (toDave, g2) = S.addPermanent piker S.alice g1
+        (carolSiren, g3) = S.addPermanent siren S.carol (withPermanents S.carol [mountain] (withPermanents S.bob [island] g2))
+        (daveSiren, g4) = S.addPermanent siren S.dave g3
+        lure sirenId pid lured g =
+          let (ts, g') = Game.freshTimestamp g
+              stored = ActiveAttackRequirement.MkActiveAttackRequirement sirenId pid ts Expiry.AtCleanup (RestrictedCreatures.Named lured) (AttackTarget.OfPlayer pid)
+           in g' {GameState.attackRequirements = stored : GameState.attackRequirements g'}
+        g5 = lure daveSiren S.dave toDave (lure carolSiren S.carol toCarol g4)
+        board =
+          g5
+            { GameState.activePlayer = S.alice,
+              GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+              GameState.combat = (GameState.combat g5) {Combat.Type.defenders = [S.bob, S.carol, S.dave]}
+            }
+    Spec.assertBool s (Combat.legalAttackDeclarationAs S.alice [(toDave, AttackTarget.OfPlayer S.dave)] board) "CR 508.1d: obeying dave's Siren alone obeys the maximum"
+    Spec.assertBool s (not (Combat.legalAttackDeclarationAs S.alice [(toDave, AttackTarget.OfPlayer S.dave), (toCarol, AttackTarget.OfPlayer S.carol)] board)) "CR 508.1c: obeying both puts two under Tidal's bound"
+    Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] board)) "and declining obeys fewer than the maximum"
+
 -- CR 612.1 reaching a combat restriction's GATE. Glacial Crasher ({4}{U}{U}
 -- Creature -- Elemental 5/5, "Trample. This creature can't attack unless there is
 -- a Mountain on the battlefield." -- checked against Scryfall, 2026-08-05) is the
@@ -2929,6 +2971,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   perDefenderRestrictionSpec s registry
   perDefenderWholeRestrictionSpec s registry
   defendingPlayerOfBlockGateSpec s registry
+  crossingAttackBoundsSpec s registry
   textChangedCombatRestrictionSpec s registry
   textChangedCombatAffectedSpec s registry
   controlChangeSicknessSpec s registry
