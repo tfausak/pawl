@@ -11,6 +11,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
@@ -29,6 +30,7 @@ import qualified Pawl.Engine.QuantitySlot as QuantitySlot
 import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
+import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Binding as Binding.Type
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardType as CardType
@@ -54,11 +56,13 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Protection as Protection
 import Pawl.Types.Quantity (Quantity)
+import qualified Pawl.Types.Quantity as Quantity.Type
 import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.RowSource (RowSource)
 import qualified Pawl.Types.SlotCount as SlotCount
 import Pawl.Types.SlotName (SlotName)
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SlotPerPlayer as SlotPerPlayer
 import qualified Pawl.Types.TargetChooser as TargetChooser
 import qualified Pawl.Types.TargetCount as TargetCount
@@ -1357,8 +1361,9 @@ legalSets perspective unannounced seed source slots gs =
 --
 -- Ordinary cards pay nothing: `dependent` is empty for every slot map secondPass
 -- reports nothing for, so the second pass is a Map.filter over a map with at
--- most a handful of keys. A slot whose BOUND names a sibling pays one more
--- answer per candidate of that sibling (`rebound` below).
+-- most a handful of keys. A slot whose BOUND names a sibling pays one bound
+-- evaluation per announcement that sibling could make, up to subsetBudget, and
+-- one answer per distinct value (`rebound` below).
 legalSetsGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Bool -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> GameState -> Map SlotName (Set Recipient)
 legalSetsGiven pcs grants pools perspective unannounced seed source slots gs =
   let answer bindings slot = legalRecipientsGiven pcs grants pools perspective unannounced bindings source slot gs
@@ -1369,28 +1374,91 @@ legalSetsGiven pcs grants pools perspective unannounced seed source slots gs =
       independent = fmap (answer seed) slots
       widened = Map.union (fmap Binding.toRecipients independent) seed
       declared = Map.keysSet slots
-      -- A bound naming a sibling is answered once per way of binding each sibling
-      -- it names: to the whole union, where a monotone fold (Scope.OverBound)
-      -- under an at-most atom is widest, or to any ONE of its candidates, the only
-      -- binding a read of one object (Quantity.AgainstSlot, through
-      -- Binding.onlyOne) answers at all. Spawnbroker's `theirs` slot is the
-      -- latter: against the union of every creature its caster controls it reads
-      -- no power, and would be offered nothing.
+      counting = countingByGiven pcs perspective seed source gs
+      -- CR 601.2b's X, where the announcement has made it: the seed's, and the
+      -- zero an announcement naming none means (SlotCount.at) -- unknown only to
+      -- a caller looking ahead of it.
+      announcedX = if unannounced then Binding.amountOf Binding.variableX seed else Just (Maybe.fromMaybe 0 (Binding.amountOf Binding.variableX seed))
+      -- A bound naming a sibling is answered once per way ONE announcement could
+      -- bind each sibling it names (CR 601.2c): every subset of the sibling's
+      -- candidates at every size its count allows, so a fold under an equality
+      -- atom finds the one size that admits a candidate (Synthetic Counted
+      -- Verdict), and a read of one object (Quantity.AgainstSlot, through
+      -- Binding.onlyOne) is answered off each candidate alone (Spawnbroker).
       --
-      -- Not implemented: a binding of the sibling to some but not all of its
-      -- candidates, which a fold under an equality atom can need (#4827).
+      -- Where a sibling's count has no finite ceiling here -- "any number", or CR
+      -- 601.2b's X before it is announced -- or its subsets outnumber
+      -- subsetBudget, the bound is left OPEN instead (openBound) and narrows
+      -- nothing: a wider offer, never a narrower one, and selectionLegal's joint
+      -- check judges the announcement exactly either way.
       rebound slot =
-        let options sibling =
-              fmap
-                ((,) sibling)
-                ( Map.findWithDefault (Binding.toRecipients Set.empty) sibling widened
-                    : fmap (Binding.toRecipients . Set.singleton) (Set.toList (Map.findWithDefault Set.empty sibling independent))
-                )
-            assignments = traverse options (Set.toList (boundSiblings declared slot))
-         in Set.unions (fmap (\assigned -> answer (Map.union (Map.fromList assigned) widened) slot) assignments)
+        let siblings = boundSiblings declared slot
+            sizesOf sibling =
+              let candidates = Map.findWithDefault Set.empty sibling independent
+               in fmap (\sizes -> (sibling, candidates, sizes)) (Map.lookup sibling slots >>= finiteRange counting announcedX (Natural.length candidates) . TargetSlot.count)
+            options (sibling, candidates, sizes) = fmap (\subset -> (sibling, Binding.toRecipients subset)) (concatMap (`subsetsOfSize` candidates) sizes)
+            assignments ranges = fmap (\assigned -> Map.union (Map.fromList assigned) widened) (traverse options ranges)
+            -- Where the slot's pool and filter read none of those siblings, its
+            -- answer turns on the binding only through the bound's VALUE, so one
+            -- answer per distinct value is the whole union: the subsets are many on
+            -- a wide board, the values few.
+            readsOtherwise =
+              maybe False (`Set.member` siblings) (scopeSlot (TargetSlot.pool slot))
+                || not (Set.disjoint siblings (foldMap Filter.boundSlots (TargetSlot.filter slot)))
+            boundValue bindings = Filter.slotAmount (slotContext pcs perspective unannounced bindings source (TargetSlot.amount slot) gs)
+            representatives bindingsList =
+              if readsOtherwise
+                then bindingsList
+                else Map.elems (Map.fromListWith (\_ firstSeen -> firstSeen) (fmap (\bindings -> (boundValue bindings, bindings)) bindingsList))
+         in case traverse sizesOf (Set.toList siblings) of
+              Just ranges -> Set.unions (fmap (`answer` slot) (representatives (assignments ranges)))
+              Nothing -> legalRecipientsGiven pcs grants pools perspective True (Map.delete openSlot widened) source slot {TargetSlot.amount = fmap (const openBound) (TargetSlot.amount slot)} gs
       dependent = fmap rebound (Map.filter (secondPass declared) slots)
    in -- Map.union is left-biased, so the second pass wins wherever it answered.
       Map.union dependent independent
+
+-- The sizes one announcement could name a slot of this count at, among this
+-- many candidates, given CR 601.2b's X where it has been announced -- Nothing
+-- where the count has no finite ceiling ("any number", an X not yet announced),
+-- or where the subsets of those sizes outnumber subsetBudget, which is
+-- legalSetsGiven's cue to leave the bound open.
+finiteRange :: (Quantity -> Natural) -> Maybe Natural -> Natural -> SlotCount.SlotCount -> Maybe [Natural]
+finiteRange counting announced candidates count =
+  let readsX = case count of
+        SlotCount.AnnouncedX -> True
+        SlotCount.UpToAnnouncedX -> True
+        SlotCount.Printed _ -> False
+        SlotCount.UpToComputed _ -> False
+      known = if readsX then announced else Just 0
+      sizes range most = [TargetCount.least range .. min most candidates]
+      within sizes_ = if sum (fmap (choose candidates) sizes_) <= subsetBudget then Just sizes_ else Nothing
+   in do
+        x <- known
+        let range = SlotCount.at counting x count
+        most <- TargetCount.most range
+        within (sizes range most)
+
+-- How many subsets legalSetsGiven's second pass enumerates for one sibling
+-- before leaving the bound open: "up to three" over seventeen candidates is 834,
+-- and "up to two" over forty-four is 991.
+subsetBudget :: Natural
+subsetBudget = 1024
+
+-- A bound no binding answers, so that a slot carrying it in place of its own is
+-- matched with its bound OPEN -- Filter.boundUnannounced's reading, which needs
+-- the slot to name a bound that evaluates to nothing. It reads the one object at
+-- openSlot, which legalSetsGiven deletes from the bindings it matches it under.
+openBound :: Quantity
+openBound = Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot openSlot (Quantity.Type.Literal 0))
+
+openSlot :: SlotName
+openSlot = SlotName.MkSlotName (Text.pack "openBound")
+
+-- n choose k, the size of subsetsOfSize's answer.
+choose :: Natural -> Natural -> Natural
+choose n k
+  | k > n = 0
+  | otherwise = product [n - k + 1 .. n] `div` product [1 .. k]
 
 -- Which slots the second pass re-answers. The POOL's dependency is one half; the
 -- CR 202.3 computed BOUND's is the other, and it is here for the pool's reason
@@ -1400,8 +1468,8 @@ legalSetsGiven pcs grants pools perspective unannounced seed source slots gs =
 -- -- so ManaValueAtMostAmount and ManaValueEqualToAmount narrow to the mana value
 -- -- 0 candidates or to none,
 -- and the first pass would offer such a slot an empty set. Re-answering it
--- against the union, and against each one candidate (legalSetsGiven's
--- `rebound`), is the widening every other dependent slot gets, and
+-- against every announcement the named slot could make (legalSetsGiven's
+-- `rebound`) is the widening every other dependent slot gets, and
 -- jointlyJudged below is where the announcement is narrowed back.
 --
 -- The FILTER's dependency is deliberately not here -- see jointlyJudged, whose
@@ -2053,10 +2121,14 @@ jointlyIllegalGiven pcs grants pools perspective seed source slots chosen gs =
 -- `data/cards/` is counted exactly one -- Bioshift's, Fate Transfer's and
 -- Resourceful Defense's `from`, Fall of the Hammer's and Itzquinth's `dealer`,
 -- and Synthetic Hammer Refrain's `dealer` per occurrence -- so for those the
--- range is one size and the product is a handful of re-derivations; Measured
--- Refrain's gauge, the pool's one bound-named slot, is "up to two" and pays the
--- subsets of size zero, one and two. None of those is counted "any number", which
--- is the count that would make this every subset of the slot's candidates.
+-- range is one size and the product is a handful of re-derivations. Of the
+-- slots a sibling's BOUND names, Spawnbroker's `yours` is counted one, Measured
+-- Refrain's gauge "up to two" and Synthetic Counted Verdict's "up to three", which
+-- pays every subset of at most three. None is counted "any number", which is the
+-- count that would make this every subset of the slot's candidates.
+--
+-- Not implemented: a bounded search for a named slot counted "any number", or
+-- one counted by an X this gate reads at its zero floor (#4830).
 jointlyFillableGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> GameState -> Bool
 jointlyFillableGiven pcs grants pools perspective seed source slots sets gs =
   let declared = Map.keysSet slots
