@@ -920,7 +920,9 @@ resolveFace mName card = case mName of
     -- 702.102a's fused cast under the combined view's rendered name (CR 709.4a),
     -- which is by construction none of the card's own faces. What it resolves to
     -- is the combined characteristics rule 702.102b gives it, plus the payload of
-    -- both halves that Pawl.Engine.Card.fusedFace builds (CR 702.102d).
+    -- both halves that Pawl.Engine.Card.fusedFace builds (CR 702.102d). Asked
+    -- of the name alone and never of fuse, which an effect may have granted
+    -- only while the card lay in a hand.
     Nothing -> case Card.fusedFace card of
       Just fused | Face.name fused == n -> fused
       _ -> Card.combined card

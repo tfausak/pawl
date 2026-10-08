@@ -3090,9 +3090,10 @@ withCost keyword cost = case keyword of
   CostKeyword.Encore -> Keyword.Encore cost
 
 -- CR 702.102a: does this card's keyword set let both halves be cast as one fused
--- split spell? Its one reader is Pawl.Engine.Card.fusedFace, which builds the
--- spell rule 702.102b describes; Pawl.Engine.Cast.castableSpells is what applies
--- the rule's OWN zone gate, "while the card with fuse is in a player's hand".
+-- split spell? Its one reader is Pawl.Engine.Cast.fusedFaceOf, which asks it of
+-- the projected keywords before Pawl.Engine.Card.fusedFace builds the spell rule
+-- 702.102b describes; that function's callers apply the rule's OWN zone gate,
+-- "while the card with fuse is in a player's hand".
 --
 -- MEMBERSHIP, not a count: the permission is to cast both halves, and rule
 -- 702.102a states nothing a second instance could add.
