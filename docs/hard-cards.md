@@ -45,6 +45,31 @@ issue; an expressible card not yet in the pool is a plain card add.
 | Fork | Copying a spell with a colour exception and new targets (CR 707.10, 707.9b) | Expressible, not in pool |
 | Isochron Scepter | Linked imprint; casting a copy of an exiled card, repeatably (CR 607.2a, 707.12) | Expressible, not in pool |
 
+## Rules written for one card
+
+The comprehensive rules name some cards outright: "One card (X) ...". Each is
+machinery the rules carve out for a single printing. Find them with `grep -nE
+'(One|Two) cards? \(' docs/rules.txt`. Rules naming a card already in the table
+above (Karn Liberated, Volrath's Shapeshifter, Shahrazad, Word of Command) are
+not repeated.
+
+| Rule | Card | Status |
+|---|---|---|
+| CR 103.1c | Power Play | Tested in `ConspiracySpec` |
+| CR 106.13 | Drain Power | Tested in `ManaSpec`, `data/scenarios/mana/cr-106-13-*` |
+| CR 116.2e | Circling Vultures | Tested in `CostSpec`, `CounterspellSpec`, `SplitSecondSpec` |
+| CR 206.3a-c | City in a Bottle, Golgothian Sylex, Apocalypse Chime | Tested in `FilterSpec`, `BoardEffectSpec`, `data/scenarios/board-effect/` |
+| CR 207.5 | Cryptic Spires | Gap (#884) |
+| CR 612.5, 701.12h | Exchange of Words | Tested in `ProjectionSpec`, `data/scenarios/projection/` |
+| CR 612.7 | Spy Kit | Tested in `CastProhibitionSpec`, `DamageSpec` |
+| CR 702.158 | Space Beleren | Gap (#3522) |
+| CR 706.5 | Celebr-8000 | Gap (#3243) |
+| CR 706.8 | Centaur of Attention | Tested in `data/scenarios/dice/cr-706-8-*` |
+| CR 707.13 | Garth One-Eye | Tested in `CopySpec`, `data/scenarios/copy/cr-400-11-*` |
+| CR 707.14 | Magar of the Magic Strings | Tested in `CopySpec`, `data/scenarios/copy/` |
+| CR 723.2 | Opposition Agent | Gap (#3348) |
+| CR 724.2 | Mandate of Peace | Tested in `TurnSpec`, `data/scenarios/turn/cr-724-2*` |
+
 ## Considered and left out
 
 - Emrakul, the Promised End and Mindslaver: Word of Command is the harder form
