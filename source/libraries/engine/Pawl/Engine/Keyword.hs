@@ -3079,7 +3079,7 @@ madnessCostFor manaCost payload = case payload of
   MadnessCost.Stated cost -> cost
   MadnessCost.OwnManaCost -> Cost.MkCost {Cost.mana = manaCost, Cost.components = []}
 
--- CR 702.34a / 702.97a / 702.128a / 702.141a: the keyword a
+-- CR 702.34a / 702.97a / 702.128a / 702.141a / 702.168a: the keyword a
 -- Modification.GainKeywordAtManaCost names, carrying the [cost] it was priced
 -- at. Pawl.Engine.Projection supplies the receiving object's mana cost.
 withCost :: CostKeyword.CostKeyword -> Cost Keyword -> Keyword
@@ -3088,6 +3088,7 @@ withCost keyword cost = case keyword of
   CostKeyword.Scavenge -> Keyword.Scavenge cost
   CostKeyword.Embalm -> Keyword.Embalm cost
   CostKeyword.Encore -> Keyword.Encore cost
+  CostKeyword.Disguise -> Keyword.Disguise cost
 
 -- CR 702.102a: does this card's keyword set let both halves be cast as one fused
 -- split spell? Its one reader is Pawl.Engine.Cast.fusedFaceOf, which asks it of
@@ -3152,9 +3153,8 @@ escapeCosts keywords =
 -- Handed the FRONT face's keywords by both its callers rather than the half
 -- being cast, which is CR 712.11d's own scope: the ability is "an ability of a
 -- double-faced card's front face" and the spell it permits is the back face.
--- Pawl.Engine.Cast.permitsDisturb projects that face where the card lies;
--- Pawl.Engine.Cost.candidateCostsGiven reads it printed, so a disturb ability
--- GRANTED to a card in a graveyard is not priced (gap #4706).
+-- Both read that face where the card lies, through
+-- Pawl.Engine.Cost.frontFaceKeywords, so a granted disturb is priced and offered.
 disturbCosts :: Set Keyword -> [Cost Keyword]
 disturbCosts keywords =
   let costOf keyword = case keyword of

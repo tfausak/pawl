@@ -79,12 +79,16 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
@@ -92,6 +96,7 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
@@ -99,6 +104,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Departure as Departure.Type
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
@@ -114,6 +120,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.Subtype as Subtype.Type
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 import qualified Pawl.Types.Zone as Zone
 
 -- Alice's board: `lands` Mountains, and Shimatsu designated as her commander and
@@ -365,6 +372,34 @@ castSpec s registry = Spec.describe s "Cast" $ do
     case inCommandZone gs of
       [oid] -> Spec.assertEqWith s "not castable once it is nobody's commander" (S.castable S.alice oid undesignated) False
       _ -> Spec.assertBool s False "expected one commander"
+  -- Disguise Agent {1}{U} 1/3, "Commanders you own have disguise. Their disguise
+  -- cost is equal to their mana cost." Isamaru, Hound of Konda {W} prints no
+  -- disguise, so the face-down cast from the command zone is the grant's (CR
+  -- 613.1f, 702.168a), and the two boards differ only in the Agent.
+  --
+  -- Four Plains: {3} for the cast, then rule 702.168d's "what the permanent's
+  -- disguise cost would be if it were face up" -- Isamaru's own {W}, which no
+  -- face-down permanent has (CR 708.2a) and which the Agent's {1}{U} is not.
+  Spec.it s "CR 702.168a Disguise Agent's disguise casts a commander face down and turns it up for its mana cost" $ do
+    plains <- S.printingOf s registry "Plains"
+    isamaru <- S.printingOf s registry "Isamaru, Hound of Konda"
+    agent <- S.printingOf s registry "Disguise Agent"
+    let bare = commanderBoard plains isamaru 4
+        agented = snd (S.addPermanent agent S.alice bare)
+        isamaruName = CardName.MkCardName (Text.pack "Isamaru, Hound of Konda")
+        faceDownCasts gs = [(oid, facing) | A.Cast oid _ facing@(Facing.FaceDown _) <- Action.legalActions S.alice gs]
+    Spec.assertEqWith s "CR 702.168a the Agent offers the commander face down, and without it nothing does" (fmap fst (faceDownCasts agented), faceDownCasts bare) (inCommandZone bare, [])
+    case (inCommandZone bare, faceDownCasts agented) of
+      ([oid], [(_, facing)]) -> do
+        let cast = S.runPure S.identityAnswer agented (Cast.castSpell S.manaPerformer S.alice oid isamaruName facing >> Stack.resolveTop)
+        case Set.toList (Set.difference (GameState.battlefield cast) (GameState.battlefield agented)) of
+          [permanent] -> do
+            Spec.assertEqWith s "CR 702.168d the disguise procedure is open at Isamaru's {W}" (FaceDown.turnableFaceUp S.alice cast) [(permanent, TurnUpProcedure.Disguise)]
+            let up = S.runPure S.identityAnswer cast (FaceDown.turnFaceUp S.manaPerformer S.alice TurnUpProcedure.Disguise permanent)
+            Spec.assertEqWith s "CR 702.168d it is face up" (fmap Object.facing (Game.lookupObject permanent up)) (Just Facing.FaceUp)
+            Spec.assertEqWith s "{3} and then {W}: all four Plains tapped" (tappedCount up) 4
+          entered -> Spec.assertFailure s ("expected one permanent to enter, got " <> show entered)
+      (commanders, offers) -> Spec.assertFailure s ("expected one commander and one face-down offer, got " <> show (commanders, offers))
 
 taxSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 taxSpec s registry = Spec.describe s "Tax" $ do

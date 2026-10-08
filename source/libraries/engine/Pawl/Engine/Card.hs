@@ -32,6 +32,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -800,10 +801,10 @@ castableFaces card = case Card.layout card of
   -- cost, so Pawl.Engine.Resolve.Effect.offerCast drops it from an offer that
   -- states an alternative of its own.
   --
-  -- Read off the front face's PRINTED keywords, which is CR 712.11d's own scope
-  -- and the posture Pawl.Engine.Cast.castableSpells takes for rule 702.37a's morph
-  -- ability. A more than meets the eye or disturb ability GRANTED to a card in a
-  -- zone is not expanded here (gap #4706).
+  -- Read off the front face's PRINTED keywords here, this being a function of
+  -- the card alone; Pawl.Engine.Cast.castableFacesFor is what every cast road
+  -- reads, and it answers from the keywords that face HAS where the card lies
+  -- (convertedFaceGiven), so a granted ability counts.
   --
   -- The other roads to a back face still do not come through this list. An effect
   -- allowing the card to be cast "transformed" names the face itself --
@@ -986,13 +987,18 @@ mergeDisjointModes l r =
 -- Pawl.Engine.Resolve.Effect.offerCast drops it, and Pawl.InvestigateSpec's "CR
 -- 118.9a a free offer does not also offer the converted face" is the proof.
 convertedFace :: Card.Card -> Maybe (Face.Face Card.Card)
-convertedFace card =
-  let printed = Face.keywordSet (frontFace card)
-   in case Card.layout card of
-        Layout.Transforming
-          | not (null (Keyword.moreThanMeetsTheEyeCosts printed)) || not (null (Keyword.disturbCosts printed)) ->
-              backFace card
-        _ -> Nothing
+convertedFace card = convertedFaceGiven (Face.keywordSet (frontFace card)) card
+
+-- convertedFace with the FRONT face's keywords supplied by the caller, which is
+-- how a reader holding the board asks it of the keywords that face HAS where the
+-- card lies (Pawl.Engine.Cost.frontFaceKeywords) rather than the printed ones,
+-- so a disturb an effect grants counts (CR 613.1f).
+convertedFaceGiven :: Set.Set Keyword.Type.Keyword -> Card.Card -> Maybe (Face.Face Card.Card)
+convertedFaceGiven front card = case Card.layout card of
+  Layout.Transforming
+    | not (null (Keyword.moreThanMeetsTheEyeCosts front)) || not (null (Keyword.disturbCosts front)) ->
+        backFace card
+  _ -> Nothing
 
 -- CR 305.1 / 712.12: the faces of this card a player may PLAY as a land, each
 -- paired with the name the play carries -- the castableFaces of the special

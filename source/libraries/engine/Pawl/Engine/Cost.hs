@@ -69,6 +69,7 @@ import qualified Pawl.Types.AppliedReduction as AppliedReduction
 import qualified Pawl.Types.Behold as Behold
 import qualified Pawl.Types.Binding as Binding.Type
 import qualified Pawl.Types.CandidateCost as CandidateCost
+import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import Pawl.Types.Claim (Claim)
@@ -324,6 +325,22 @@ costsFor pid name oid gs = fmap CandidateCost.cost (candidateCostsFor pid name o
 -- 702.127a's aftermath asks about the ZONE instead and needs no tag of its own.
 candidateCostsFor :: PlayerId -> CardName.CardName -> ObjectId -> GameState -> [CandidateCost.CandidateCost]
 candidateCostsFor = candidateCostsGiven False
+
+-- CR 712.11d / 613.1f: the keywords a double-faced card's FRONT face has where
+-- the card lies -- its projection with the object stamped as that face, face up
+-- -- rather than the ones it prints, so a disturb or more than meets the eye an
+-- effect grants counts and one a layer-6 removal takes away does not. A card
+-- exiled face down is read turned up, since CR 406.3a turns it up before it is
+-- played: Pawl.CastPermissionSpec's "CR 406.3a / 702.162a a Ratchet exiled face
+-- down with Urianger is offered and cast converted". Read by
+-- the converted-face offer and price alike (Pawl.Engine.Cast.castableFacesFor,
+-- candidateCostsGiven below), so the two cannot disagree. Pawl.TransformSpec's
+-- "CR 702.146a a disturb granted to a card in a graveyard casts it transformed"
+-- proves the grant.
+frontFaceKeywords :: ObjectId -> Card.Type.Card -> GameState -> Set.Set Keyword.Type.Keyword
+frontFaceKeywords oid card gs =
+  let front o = o {Object.face = Just (Face.name (Card.frontFace card)), Object.facing = Facing.FaceUp, Object.exiledFaceDown = False}
+   in Map.keysSet (Projection.keywordsOf oid gs {GameState.objects = Map.adjust front oid (GameState.objects gs)})
 
 -- CR 118.8 / 601.2b: one candidate per way of paying this face's CHOICE costs --
 -- Caustic Exhale's "behold a Dragon or pay {1}". Folded into every candidate
@@ -664,11 +681,13 @@ candidateCostsGiven permitted pid name oid gs =
                   (\cost -> CandidateCost.plain (Just (Keyword.Type.Warp cost)) (withAdditional cost))
                   (Keyword.warpCosts onStack)
               -- CR 712.11d: the face this card may be cast TRANSFORMED or CONVERTED
-              -- as, which is what Pawl.Engine.Card.convertedFace answers and what
-              -- put that face in castableFaces. Asked through that function rather
-              -- than against Card.backFace so the pricing below cannot come to
-              -- disagree with the offer about which half either rule reaches.
-              isConvertedFace = fmap Face.name (Card.convertedFace card) == Just (Face.name face)
+              -- as, which is what Pawl.Engine.Card.convertedFaceGiven answers and
+              -- what Pawl.Engine.Cast.castableFacesFor offers. Asked through that
+              -- function, of the same front-face keywords, rather than against
+              -- Card.backFace so the pricing below cannot come to disagree with the
+              -- offer about which half either rule reaches.
+              front = frontFaceKeywords oid card gs
+              isConvertedFace = fmap Face.name (Card.convertedFaceGiven front card) == Just (Face.name face)
               -- CR 702.162a: more than meets the eye, read from EVERY zone for
               -- bestow's reason -- "a static ability that functions in any zone from
               -- which the spell may be cast".
@@ -679,24 +698,23 @@ candidateCostsGiven permitted pid name oid gs =
               -- up. Pawl.Engine.Card.castableFaces is what puts that face on the
               -- table (CR 712.11d); this prices it.
               --
-              -- The keywords are the FRONT face's, printed, which is CR 712.11d's own
-              -- scope: the ability is "an ability of a double-faced card's front
-              -- face". So it is read off the card rather than off the projection of
-              -- the half being proposed, which carries the BACK face's keywords. A
-              -- more than meets the eye ability GRANTED to a card in a zone is
-              -- therefore not expanded (gap #4706).
+              -- The keywords are the FRONT face's, which is CR 712.11d's own scope:
+              -- the ability is "an ability of a double-faced card's front face". So
+              -- they are `front`, the projection with the object stamped as that
+              -- face, rather than the projection of the half being proposed, which
+              -- carries the BACK face's keywords.
               converted =
                 if isConvertedFace
                   then
                     fmap
                       (\cost -> CandidateCost.plain (Just (Keyword.Type.MoreThanMeetsTheEye cost)) (withAdditional cost))
-                      (Keyword.moreThanMeetsTheEyeCosts (Face.keywordSet (Card.frontFace card)))
+                      (Keyword.moreThanMeetsTheEyeCosts front)
                   else []
               -- CR 702.146a: disturb, `converted`'s offer with rule 702.146a's ZONE
               -- attached -- "you may cast this card transformed FROM YOUR GRAVEYARD
-              -- by paying [cost] rather than its mana cost". Read off the front
-              -- face's printed keywords and scoped to the back face for that list's
-              -- CR 712.11d reasons, and wrapped in `withAdditional` for flashback's.
+              -- by paying [cost] rather than its mana cost". Read off `front` and
+              -- scoped to the back face for that list's CR 712.11d reasons, and
+              -- wrapped in `withAdditional` for flashback's.
               --
               -- The graveyard half is asked at `orConverted` below rather than here,
               -- beside the zone it names; the CR 601.3 permission that matches it is
@@ -704,7 +722,7 @@ candidateCostsGiven permitted pid name oid gs =
               disturbed =
                 fmap
                   (\cost -> CandidateCost.plain (Just (Keyword.Type.Disturb cost)) (withAdditional cost))
-                  (Keyword.disturbCosts (Face.keywordSet (Card.frontFace card)))
+                  (Keyword.disturbCosts front)
               -- The converted face's candidates REPLACE the zone's own list rather
               -- than joining it: the back face is a candidate at all only because
               -- rule 702.162a's or rule 702.146a's permission put it there, so that

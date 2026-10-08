@@ -633,10 +633,9 @@ aimAtCreature oid p = case p of
 -- through the CR 704.5f pass that follows: three other creatures go face down, so
 -- it settles a 3/3.
 --
--- Ainok Tracker is the FACE-UP card: turning a permanent face up needs a
--- procedure, and CR 702.37e's asks about the card's morph cost rather than a
--- projected one -- which is what lets the Tracker be turned face up while Turn to
--- Frog is removing its abilities.
+-- Ainok Tracker is the FACE-UP card. Under Turn to Frog its morph cannot turn it
+-- up (CR 702.37e, 708.8), so Break Open's effect does, and the Tracker's morph
+-- is what the negative case beside it reads.
 --
 -- Turn to Frog {1}{U} ("until end of turn, target creature loses all abilities and
 -- becomes a blue Frog with base power and toughness 1/1") is the REMOVER, and a
@@ -678,6 +677,11 @@ restampSpec s registry = Spec.describe s "Timestamps (CR 613.7f)" $ do
     Spec.assertEqWith s "Ixidron is a 3/3, one for each creature its own sweep turned face down" (fmap (\oid -> S.powerToughnessOf oid after) entered) (Just (Just (3, 3)))
     Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton other (Set.singleton attacker)) after) "while the unsuspected Piker beside it blocks"
 
+  -- Turned face up by an EFFECT rather than by the Tracker's morph: under Turn to
+  -- Frog the morph procedure is closed (CR 702.37e, 708.8; the case below), and
+  -- CR 613.7f's restamp is the same whichever road turns it. Break Open {1}{R}
+  -- Instant, "Turn target face-down creature an opponent controls face up", cast
+  -- by alice off two Mountains.
   Spec.it s "CR 613.7f turning face up restamps the permanent after a removal that had wiped its grant" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     island <- S.printingOf s registry "Island"
@@ -685,22 +689,44 @@ restampSpec s registry = Spec.describe s "Timestamps (CR 613.7f)" $ do
     ainok <- S.printingOf s registry "Ainok Tracker"
     frog <- S.printingOf s registry "Turn to Frog"
     ixidron <- S.printingOf s registry "Ixidron"
-    let (board, suspect, other, attacker) = suspectedBoard piker ainok [island, mountain, mountain, mountain, mountain, mountain, mountain, mountain]
+    breakOpen <- S.printingOf s registry "Break Open"
+    let (board, suspect, other, attacker) = suspectedBoard piker ainok [island, mountain]
         (hidden, _) = entering ixidron board
         frogged = frogging frog suspect hidden
-        after = S.runPure S.identityAnswer frogged (FaceDown.turnFaceUp S.manaPerformer S.bob TurnUpProcedure.Morph suspect >> Engine.settleForPriority)
+        (breakId, withSpell) = S.addHandCard breakOpen S.alice (S.landsFor mountain S.alice 2 frogged)
+        after = S.runPure (aimAtCreature suspect) withSpell (S.cast S.alice breakId >> Stack.resolveTop >> Engine.settleForPriority)
     -- THE BEFORE moment: the Tracker is face down, and Turn to Frog resolved after
     -- the sweep restamped it, so the removal is the younger effect this time and
     -- the grant is gone again.
     Spec.assertEqWith s "CR 708.2a the sweep turned the Tracker face down" (fmap Object.facing (Game.lookupObject suspect hidden)) (Just (Facing.faceDown FaceDownReason.TurnedFaceDown))
     Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton suspect (Set.singleton attacker)) frogged) "CR 613.1f before: the removal is younger than the face-down stamp, so it can block"
-    Spec.assertEqWith s "CR 702.37e the procedure is open to bob, and the removal has not taken it away" (FaceDown.turnableFaceUp S.bob frogged) [(suspect, TurnUpProcedure.Morph)]
-    -- THE assertion, gameplay level and first: CR 702.37e's procedure turned it
-    -- face up and CR 613.7f stamped it again, past the removal.
+    -- THE assertion, gameplay level and first: Break Open turned it face up and
+    -- CR 613.7f stamped it again, past the removal.
     Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton suspect (Set.singleton attacker)) after)) "CR 613.7f the permanent it turned face up is stamped after the removal, so it can't block again"
     Spec.assertBool s (Projection.hasKeyword Keyword.Menace suspect after) "CR 613.7f and the menace half is back with it"
-    Spec.assertEqWith s "CR 702.37e the morph cost was paid and the Tracker is face up" (fmap Object.facing (Game.lookupObject suspect after)) (Just Facing.FaceUp)
+    Spec.assertEqWith s "Break Open turned the Tracker face up" (fmap Object.facing (Game.lookupObject suspect after)) (Just Facing.FaceUp)
     Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton other (Set.singleton attacker)) after) "while the unsuspected Piker beside it blocks"
+
+  -- CR 702.37e's parenthetical, with CR 708.8: "if the permanent wouldn't have a
+  -- morph cost if it were face up, it can't be turned face up this way", and an
+  -- effect applied to the face-down permanent still applies face up. The MKM and
+  -- DSK rulings say it outright: "If a face-down creature loses its abilities, it
+  -- can't be turned face up with a disguise or morph ability because it will no
+  -- longer have that ability (or the associated cost) once face up." A pair of
+  -- moments of one board, differing only in Turn to Frog, with bob holding the
+  -- Tracker's {4}{R}.
+  Spec.it s "CR 702.37e / 708.8 a face-down permanent that lost its abilities can't be turned up by morph" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    ainok <- S.printingOf s registry "Ainok Tracker"
+    frog <- S.printingOf s registry "Turn to Frog"
+    ixidron <- S.printingOf s registry "Ixidron"
+    island <- S.printingOf s registry "Island"
+    let (board, suspect, _, _) = suspectedBoard piker ainok [island, island, mountain, mountain, mountain, mountain, mountain]
+        (hidden, _) = entering ixidron board
+        frogged = frogging frog suspect hidden
+    Spec.assertEqWith s "under Turn to Frog the morph procedure is closed" (FaceDown.turnableFaceUp S.bob frogged) []
+    Spec.assertEqWith s "and without it bob may turn the Tracker up for {4}{R}" (FaceDown.turnableFaceUp S.bob hidden) [(suspect, TurnUpProcedure.Morph)]
 
 -- CR 614.1c / 608.2h: an as-enters effect is part of the entry, so a later
 -- instruction of the same resolution reads the board it left.

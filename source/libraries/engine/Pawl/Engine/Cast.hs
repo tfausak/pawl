@@ -1849,22 +1849,22 @@ lookedWays looks ways = if looks then ways else filter Maybe.isNothing ways
 -- castableWhileSearching both offer every one, so neither decides a card's
 -- facing for its player.
 --
--- Both abilities are the face's printed keywords, dropped once a layer-6 wipe
--- is in force on the object (CR 613.1f); the projection is asked only of a
--- face printing one. Pawl.CastSpec's "CR 702.37a an Ainok Tracker that
--- perpetually lost all abilities cannot be cast face down" proves it.
---
--- Not implemented: a morph or disguise GRANTED to a face printing neither is
--- never offered (#4713).
+-- Both abilities are the keywords the face HAS where the card lies, projected
+-- with the object stamped as that face up (CR 613.1f names no zone, and rules
+-- 702.37a and 702.168a function in any zone the card could be played from). So a
+-- layer-6 wipe takes a printed one away -- Pawl.CastSpec's "CR 702.37a an Ainok
+-- Tracker that perpetually lost all abilities cannot be cast face down" -- and a
+-- grant adds one: Pawl.CommanderSpec's "CR 702.168a Disguise Agent's disguise
+-- casts a commander face down and turns it up for its mana cost".
 castFacings :: ObjectId -> Face.Face Card.Type.Card -> GameState -> [Facing.Facing]
 castFacings oid face gs =
-  let has present = present && not (PC.lostAllAbilities (Projection.project oid gs))
+  let keywords = projectedKeywords oid (asProposed oid (Face.name face) Facing.FaceUp gs)
    in Facing.FaceUp
         -- CR 702.37c names the allower for the face-down cast -- "turn it face
         -- down and ANNOUNCE THAT YOU'RE USING A MORPH ABILITY" -- so the
         -- facing this proposes carries FaceDownReason.Morphed, and CR 701.40b's
         -- procedure is closed to the permanent it becomes.
-        : (if has (not (null (Keyword.morphCosts (Face.keywordSet face)))) then [Facing.faceDown FaceDownReason.Morphed] else [])
+        : (if not (null (Keyword.morphCosts keywords)) then [Facing.faceDown FaceDownReason.Morphed] else [])
           -- CR 702.168b names its own allower the same way -- "turn the card face
           -- down and ANNOUNCE THAT YOU ARE USING A DISGUISE ABILITY" -- and lists
           -- ward {2} where rule 702.37c lists nothing, so this facing carries both
@@ -1877,7 +1877,7 @@ castFacings oid face gs =
           -- printing with both would be the card that refutes it, and the rules
           -- allow one (CR 701.58c and CR 701.58d put both procedures on one
           -- permanent).
-          <> ( if has (not (null (Keyword.disguiseCosts (Face.keywordSet face))))
+          <> ( if not (null (Keyword.disguiseCosts keywords))
                  then [Facing.FaceDown FaceDownState.MkFaceDownState {FaceDownState.reason = FaceDownReason.Disguised, FaceDownState.listed = FaceDownCharacteristics.disguisedValue}]
                  else []
              )
@@ -1903,10 +1903,10 @@ castFacings oid face gs =
 -- cast is prohibited or unaffordable may still be castable face down, and the
 -- other way round.
 --
--- Read off the card's PRINTED keywords, which is rule 702.37a's own scope ("a
--- static ability that functions in any zone from which you could play the
--- card"), and off the face being proposed, so a multi-face card offers the
--- morph cast only for the half that prints one. No printing has one.
+-- Read off the keywords the face being proposed HAS (castFacings), which is rule
+-- 702.37a's own scope ("a static ability that functions in any zone from which
+-- you could play the card"), so a multi-face card offers the morph cast only for
+-- the half that has one.
 --
 -- AND ONE MORE FOR A HAND'S FUSE CARD, rule 702.102a's own permission, offered
 -- the same way for the same reason -- see `fusedProposals` below.
@@ -1924,7 +1924,7 @@ castableSpells pid gs =
 castProposals :: PlayerId -> GameState -> [(ObjectId, CardName.CardName, Facing.Facing)]
 castProposals pid gs =
   let proposals oid = do
-        face <- Game.castableFacesOfId oid gs
+        face <- castableFacesFor oid gs
         facing <- castFacings oid face gs
         pure (oid, Face.name face, facing)
       -- CR 702.102a's third offer, beside the two halves and never instead of
@@ -2014,15 +2014,35 @@ permitsCastFromGraveyard pid oid face gs =
 -- carries the back face's keywords: Yixlid Jailer's "lose all abilities" takes
 -- disturb away there. Pawl.TransformSpec's "CR 702.146a / 613.1f under Yixlid
 -- Jailer a buried Baithook Angler offers no disturb cast" proves it.
--- A disturb GRANTED to a card printing none is still never proposed, since
--- Pawl.Engine.Card.castableFaces reads the printed front face (gap #4706).
+-- A GRANTED one counts the same way, and castableFacesFor below is what
+-- proposes the face it reaches.
 permitsDisturb :: ObjectId -> Face.Face Card.Type.Card -> GameState -> Bool
 permitsDisturb oid face gs = case Game.cardOf oid gs of
   Nothing -> False
   Just card ->
-    let front = Face.name (Card.frontFace card)
-     in fmap Face.name (Card.convertedFace card) == Just (Face.name face)
-          && not (null (Keyword.disturbCosts (projectedKeywords oid (asProposed oid front Facing.FaceUp gs))))
+    let front = Cost.frontFaceKeywords oid card gs
+     in fmap Face.name (Card.convertedFaceGiven front card) == Just (Face.name face)
+          && not (null (Keyword.disturbCosts front))
+
+-- CR 712.11d: the faces this object may be cast as (Game.castableFacesOfId), with
+-- the converted face -- the back face rule 702.146a's disturb or rule 702.162a's
+-- more than meets the eye reaches -- decided by the keywords the FRONT face HAS
+-- where the card lies (Cost.frontFaceKeywords) rather than the ones it prints.
+-- So a granted one proposes the face, and a removed one withdraws it. Every road
+-- to a proposed cast reads this: castProposals, castableWhileSearching and
+-- Pawl.Engine.Resolve.Effect.offerCast. Pawl.TransformSpec's "CR 702.146a a
+-- disturb granted to a card in a graveyard casts it transformed" proves it.
+--
+-- An object carrying a copy stamp is left to Game.castableFacesOf alone: its
+-- faces are the stamp's (CR 707.2), and the printed card's back face is not one.
+castableFacesFor :: ObjectId -> GameState -> [Face.Face Card.Type.Card]
+castableFacesFor oid gs = case (Game.lookupObject oid gs, Game.cardOf oid gs) of
+  (Just obj, _) | Maybe.isJust (Game.copyStampOf obj) -> Game.castableFacesOfId oid gs
+  (_, Nothing) -> Game.castableFacesOfId oid gs
+  (_, Just card) ->
+    let printed = fmap Face.name (Card.convertedFace card)
+        converted = Card.convertedFaceGiven (Cost.frontFaceKeywords oid card gs) card
+     in filter (\face -> Just (Face.name face) /= printed) (Game.castableFacesOfId oid gs) <> Maybe.maybeToList converted
 
 -- CR 400.1 / 400.3: is this the object's owner, and so the player whose copy of a
 -- per-player zone it lies in?
@@ -2114,7 +2134,7 @@ castableWhileSearching pid gs =
          in permitsCastWhileSearching oid face proposed
               && castableWhenOffered ManaSpending.AsProduced pid oid name (Cost.candidateCostsFor pid name oid proposed) proposed
       proposals oid = do
-        face <- Game.castableFacesOfId oid gs
+        face <- castableFacesFor oid gs
         facing <- castFacings oid face gs
         Monad.guard (allowed oid face facing)
         pure (oid, Face.name face, facing)
