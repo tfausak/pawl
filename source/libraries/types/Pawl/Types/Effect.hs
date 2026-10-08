@@ -83,6 +83,7 @@ import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
+import qualified Pawl.Types.RemovePlayerCounters as RemovePlayerCounters
 import qualified Pawl.Types.Repeat as Repeat
 import qualified Pawl.Types.RepeatIf as RepeatIf
 import qualified Pawl.Types.Replace as Replace
@@ -424,7 +425,7 @@ data Effect card ability
   | -- | CR 122: the players the PlayerRef names each lose N counters of a
     -- player-counter kind (CR 728.1); removing more than they have removes what
     -- they have.
-    RemovePlayerCounters PlayerCounters.PlayerCounters
+    RemovePlayerCounters RemovePlayerCounters.RemovePlayerCounters
   | -- | CR 107.14: "you may pay any amount of {E}" -- the resolving controller
     -- names an amount, removes that many energy counters, and the amount is
     -- bound to this SlotName for a later effect to read (Harnessed Lightning).

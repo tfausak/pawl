@@ -286,6 +286,7 @@ import qualified Pawl.Types.Reinforce as Reinforce
 import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
+import qualified Pawl.Types.RemovePlayerCounters as RemovePlayerCounters
 import qualified Pawl.Types.Repeat as Repeat
 import qualified Pawl.Types.RepeatIf as RepeatIf
 import qualified Pawl.Types.Replace as Replace
@@ -1273,7 +1274,7 @@ effectNames asking onCard onAbility x = case x of
   Effect.MoveCounters moveCounters -> moveCountersNames asking moveCounters
   Effect.PutCountersFrom putCountersFrom -> putCountersFromNames asking putCountersFrom
   Effect.GainPlayerCounters playerCounters -> playerCountersNames asking playerCounters
-  Effect.RemovePlayerCounters playerCounters -> playerCountersNames asking playerCounters
+  Effect.RemovePlayerCounters removal -> removePlayerCountersNames asking removal
   Effect.PayAnyEnergy slotName -> slotNames asking slotName
   Effect.ChooseNumber chooseNumber -> chooseNumberNames asking chooseNumber
   Effect.Tap objectRef -> objectRefNames asking objectRef
@@ -2400,6 +2401,10 @@ removalCountNames asking x = case x of
 removeCountersNames :: Asking -> RemoveCounters.RemoveCounters -> Bool
 removeCountersNames asking x = case x of
   RemoveCounters.MkRemoveCounters kind quantity slot tally -> counterKindNames asking (keywordNames asking) kind || quantityNames asking quantity || slotNames asking slot || any (slotNames asking) tally
+
+removePlayerCountersNames :: Asking -> RemovePlayerCounters.RemovePlayerCounters -> Bool
+removePlayerCountersNames asking x = case x of
+  RemovePlayerCounters.MkRemovePlayerCounters player _kind quantity tally -> playerRefNames asking player || quantityNames asking quantity || any (slotNames asking) tally
 
 removeCountersAmongNames :: Asking -> RemoveCountersAmong.RemoveCountersAmong -> Bool
 removeCountersAmongNames asking x = case x of

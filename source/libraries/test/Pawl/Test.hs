@@ -504,6 +504,7 @@ import qualified Pawl.Codec.ReferenceSpec
 import qualified Pawl.Codec.RegenerabilitySpec
 import qualified Pawl.Codec.ReinforceSpec
 import qualified Pawl.Codec.RemoveCountersSpec
+import qualified Pawl.Codec.RemovePlayerCountersSpec
 import qualified Pawl.Codec.RepeatIfSpec
 import qualified Pawl.Codec.RepeatSpec
 import qualified Pawl.Codec.ReplaceSpec
@@ -1352,6 +1353,7 @@ spec s registry = do
   Pawl.Codec.RegenerabilitySpec.spec s
   Pawl.Codec.ReinforceSpec.spec s
   Pawl.Codec.RemoveCountersSpec.spec s
+  Pawl.Codec.RemovePlayerCountersSpec.spec s
   Pawl.Codec.CountersFromThisSpec.spec s
   Pawl.Codec.ReplaceSpec.spec s
   Pawl.Codec.ReplacementEffectSpec.spec s

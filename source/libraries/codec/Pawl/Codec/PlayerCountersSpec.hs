@@ -11,9 +11,7 @@ import qualified Pawl.Types.Quantity as Quantity
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.PlayerCounters" $ do
-  -- Shared by GainPlayerCounters and RemovePlayerCounters, which differ only in
-  -- their tag. All three keys are required: this payload has no optional part,
-  -- which is what makes it shareable at all.
+  -- GainPlayerCounters' payload. All three keys are required.
   Spec.it s "MkPlayerCounters, all three keys" $
     Common.assertCodec
       s

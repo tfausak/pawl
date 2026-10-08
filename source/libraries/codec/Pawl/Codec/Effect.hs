@@ -95,6 +95,7 @@ import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Codec.RedirectDamage as RedirectDamage
 import qualified Pawl.Codec.RemoveCounters as RemoveCounters
 import qualified Pawl.Codec.RemoveCountersAmong as RemoveCountersAmong
+import qualified Pawl.Codec.RemovePlayerCounters as RemovePlayerCounters
 import qualified Pawl.Codec.Repeat as Repeat
 import qualified Pawl.Codec.RepeatIf as RepeatIf
 import qualified Pawl.Codec.Replace as Replace
@@ -225,7 +226,7 @@ codec cardCodec abilityCodec =
           Arm.payload "RemoveCounters" RemoveCounters.codec Effect.RemoveCounters (\x -> case x of Effect.RemoveCounters y -> Just y; _ -> Nothing),
           Arm.payload "RemoveCountersAmong" RemoveCountersAmong.codec Effect.RemoveCountersAmong (\x -> case x of Effect.RemoveCountersAmong y -> Just y; _ -> Nothing),
           Arm.payload "GainPlayerCounters" PlayerCounters.codec Effect.GainPlayerCounters (\x -> case x of Effect.GainPlayerCounters y -> Just y; _ -> Nothing),
-          Arm.payload "RemovePlayerCounters" PlayerCounters.codec Effect.RemovePlayerCounters (\x -> case x of Effect.RemovePlayerCounters y -> Just y; _ -> Nothing),
+          Arm.payload "RemovePlayerCounters" RemovePlayerCounters.codec Effect.RemovePlayerCounters (\x -> case x of Effect.RemovePlayerCounters y -> Just y; _ -> Nothing),
           Arm.payload "PayAnyEnergy" SlotName.codec Effect.PayAnyEnergy (\x -> case x of Effect.PayAnyEnergy y -> Just y; _ -> Nothing),
           Arm.payload "ChooseNumber" ChooseNumber.codec Effect.ChooseNumber (\x -> case x of Effect.ChooseNumber y -> Just y; _ -> Nothing),
           Arm.payload "Tap" ObjectRef.codec Effect.Tap (\x -> case x of Effect.Tap y -> Just y; _ -> Nothing),

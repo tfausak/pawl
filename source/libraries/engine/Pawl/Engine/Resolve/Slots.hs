@@ -194,6 +194,7 @@ import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
+import qualified Pawl.Types.RemovePlayerCounters as RemovePlayerCounters
 import qualified Pawl.Types.Repeat as Repeat
 import qualified Pawl.Types.RepeatIf as RepeatIf
 import qualified Pawl.Types.Replace as Replace
@@ -1002,7 +1003,7 @@ effectPlayerRefs effect = case effect of
   Effect.MoveCounters {} -> []
   Effect.PutCountersFrom {} -> []
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters ref _ _) -> [ref]
-  Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters ref _ _) -> [ref]
+  Effect.RemovePlayerCounters removal -> [RemovePlayerCounters.player removal]
   Effect.PayAnyEnergy {} -> []
   Effect.ChooseNumber {} -> []
   Effect.Tap {} -> []
@@ -1396,7 +1397,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- (quantitySlots above).
   Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> foldMap quantitySlots (MovedKinds.quantityOf kinds)
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantitySlots quantity
-  Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantitySlots quantity
+  Effect.RemovePlayerCounters removal -> quantitySlots (RemovePlayerCounters.quantity removal)
   -- The SlotName is a DEFINITION, not a read; it belongs to boundSlots below.
   Effect.PayAnyEnergy _ -> Map.empty
   Effect.ChooseNumber _ -> Map.empty
@@ -2126,7 +2127,7 @@ ownSlotsAreExhaustive effect = case effect of
   -- compiling (#2729).
   Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> all Quantity.slotsAreExhaustive (MovedKinds.quantityOf kinds)
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.slotsAreExhaustive quantity
-  Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.slotsAreExhaustive quantity
+  Effect.RemovePlayerCounters removal -> Quantity.slotsAreExhaustive (RemovePlayerCounters.quantity removal)
   Effect.PayAnyEnergy _ -> True
   Effect.ChooseNumber _ -> True
   Effect.Tap _ -> True
@@ -2391,7 +2392,7 @@ readsX =
         Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count _ _ _) -> any Quantity.readsX (RemovalCount.quantityOf count)
         Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> any Quantity.readsX (MovedKinds.quantityOf kinds)
         Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
-        Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
+        Effect.RemovePlayerCounters removal -> Quantity.readsX (RemovePlayerCounters.quantity removal)
         -- CR 107.14's amount is asked for as the spell resolves, never CR
         -- 601.2b's announced X.
         Effect.PayAnyEnergy _ -> False
@@ -2652,7 +2653,7 @@ boundSlots effect = case effect of
   -- How many counters CR 122.5 ACTUALLY moved, for a "that much life".
   Effect.MoveCounters (MoveCounters.MkMoveCounters _ _ mSlot _) -> foldMap Set.singleton mSlot
   Effect.GainPlayerCounters {} -> Set.empty
-  Effect.RemovePlayerCounters {} -> Set.empty
+  Effect.RemovePlayerCounters removal -> foldMap Set.singleton (RemovePlayerCounters.tally removal)
   -- CR 107.14: how much {E} the payer paid, for a later effect of the same
   -- resolution to read as Quantity.InSlot.
   Effect.PayAnyEnergy slot -> Set.singleton slot

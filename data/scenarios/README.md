@@ -27,7 +27,8 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   CR 507.1's choice among every opponent; `brawl` (CR 903.12a),
   `sharedTeamTurns` (CR 805.1), `sharedTeamLife` (CR 810.4, which wants every
   teammate's `life` equal), `deployCreatures` (CR 804.2) and `twoHeadedGiant`
-  (CR 810) are off unless given. Setup is a
+  (CR 810, which wants every teammate's poison `counters` equal) are off unless
+  given. Setup is a
   state, not a history: nothing placed triggers anything.
 - **Note.** An optional `note` says in prose what the scenario rules out and
   why its board is built the way it is. It is free text: nothing reads it, and
