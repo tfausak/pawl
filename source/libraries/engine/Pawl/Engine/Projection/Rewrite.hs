@@ -950,6 +950,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Unsuspect ref -> Effect.Unsuspect (rewriteObjectRef pairs ref)
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> effect
   Effect.Evolve _ -> effect
+  Effect.BecomeProtector _ -> effect
   Effect.Mentor _ -> effect
   Effect.Exploit -> effect
   Effect.GiveGift -> effect

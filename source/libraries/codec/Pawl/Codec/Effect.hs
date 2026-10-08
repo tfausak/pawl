@@ -267,6 +267,7 @@ codec cardCodec abilityCodec =
           Arm.payload "Unsuspect" ObjectRef.codec Effect.Unsuspect (\x -> case x of Effect.Unsuspect y -> Just y; _ -> Nothing),
           Arm.payload "SetHalfLocked" SetHalfLocked.codec Effect.SetHalfLocked (\x -> case x of Effect.SetHalfLocked y -> Just y; _ -> Nothing),
           Arm.payload "Evolve" SlotName.codec Effect.Evolve (\x -> case x of Effect.Evolve y -> Just y; _ -> Nothing),
+          Arm.payload "BecomeProtector" SlotName.codec Effect.BecomeProtector (\x -> case x of Effect.BecomeProtector y -> Just y; _ -> Nothing),
           Arm.payload "Mentor" SlotName.codec Effect.Mentor (\x -> case x of Effect.Mentor y -> Just y; _ -> Nothing),
           Arm.nullary "Exploit" Effect.Exploit,
           Arm.nullary "GiveGift" Effect.GiveGift,
@@ -441,6 +442,7 @@ tagOf x = case x of
   Effect.Unsuspect {} -> "Unsuspect"
   Effect.SetHalfLocked {} -> "SetHalfLocked"
   Effect.Evolve {} -> "Evolve"
+  Effect.BecomeProtector {} -> "BecomeProtector"
   Effect.Mentor {} -> "Mentor"
   Effect.Exploit {} -> "Exploit"
   Effect.GiveGift {} -> "GiveGift"

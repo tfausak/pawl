@@ -582,6 +582,8 @@ data Effect card ability
     BecomeMonarch MonarchTarget.MonarchTarget
   | -- | CR 726.1: a player the InitiativeTarget names takes the initiative.
     TakeTheInitiative InitiativeTarget.InitiativeTarget
+  | -- | CR 310.9f: the resolving controller becomes the protector of the slot's battle.
+    BecomeProtector SlotName.SlotName
   | -- | The permanent in the slot gains this designation -- CR 702.112a's
     -- renown, CR 701.37a's monstrous, CR 701.60a's suspect and CR 719.3a's
     -- solved. Writes Object.designations, which CR 613 could not carry, and is

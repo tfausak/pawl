@@ -447,6 +447,7 @@ manaProduced effect = case effect of
   Effect.Unsuspect _ -> Nothing
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> Nothing
   Effect.Evolve _ -> Nothing
+  Effect.BecomeProtector _ -> Nothing
   Effect.Mentor _ -> Nothing
   Effect.Exploit -> Nothing
   Effect.GiveGift -> Nothing
@@ -637,6 +638,7 @@ playerChoice effect = case effect of
   Effect.Unsuspect _ -> Nothing
   Effect.SetHalfLocked {} -> Nothing
   Effect.Evolve _ -> Nothing
+  Effect.BecomeProtector _ -> Nothing
   Effect.Mentor _ -> Nothing
   Effect.Exploit -> Nothing
   Effect.GiveGift -> Nothing
@@ -911,6 +913,7 @@ movesLibraryCard effect = case effect of
   Effect.Unsuspect _ -> False
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> False
   Effect.Evolve _ -> False
+  Effect.BecomeProtector _ -> False
   Effect.Mentor _ -> False
   Effect.Exploit -> False
   Effect.GiveGift -> False

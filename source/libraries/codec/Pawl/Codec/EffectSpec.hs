@@ -2127,6 +2127,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Evolve (SlotName.MkSlotName (Text.pack "self")))
       " {\"type\":\"Evolve\",\"value\":\"self\"} "
+  Spec.it s "BecomeProtector" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.BecomeProtector (SlotName.MkSlotName (Text.pack "target")))
+      " {\"type\":\"BecomeProtector\",\"value\":\"target\"} "
   -- CR 702.134a's counter and CR 702.134c's marker. The slot is the ability's
   -- chosen target rather than "self", which is what parts it from Evolve above.
   Spec.it s "Mentor" $

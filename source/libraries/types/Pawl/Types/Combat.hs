@@ -76,7 +76,8 @@ data Combat = MkCombat
     -- Pawl.Engine.Defender.playerOfAttacker as CR 802.2a's answer, and by
     -- Pawl.Engine.Combat.noteAttackingNothing and
     -- Pawl.Engine.Projection.View.viewOfCharacteristics as CR 506.4's comparand for
-    -- "if its controller ... changes".
+    -- "if its controller ... changes" -- and, for a battle, "its protector
+    -- changes", the seat being its protector (CR 310.9d).
     attackedUnder :: Map.Map ObjectId.ObjectId PlayerId.PlayerId,
     -- | CR 506.4 for an attacked BATTLE: who controlled it as the attacking
     -- creature joined combat -- the comparand for "if its controller ...

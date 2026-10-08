@@ -399,6 +399,7 @@ ownQuantities effect = case effect of
   Effect.Unsuspect _ -> []
   Effect.SetHalfLocked {} -> []
   Effect.Evolve _ -> []
+  Effect.BecomeProtector _ -> []
   Effect.Mentor _ -> []
   Effect.Exploit -> []
   Effect.GiveGift -> []
@@ -1557,6 +1558,7 @@ effectObjectRefs effect =
         Effect.Unsuspect ref -> read_ [ref]
         Effect.SetHalfLocked {} -> []
         Effect.Evolve {} -> []
+        Effect.BecomeProtector {} -> []
         Effect.Mentor {} -> []
         Effect.Exploit -> []
         Effect.GiveGift -> []
@@ -2147,6 +2149,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ slot) -> [slot]
           Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _ slot) -> [slot]
           Effect.Evolve slot -> [slot]
+          Effect.BecomeProtector slot -> [slot]
           Effect.Mentor slot -> [slot]
           Effect.Train slot -> [slot]
           -- Effect.Attach is NOT one: CR 301.5c makes a slot naming several
