@@ -41,7 +41,6 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as View
-import qualified Pawl.Engine.Summoning as Summoning
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Types.ActiveActivationProhibition as ActiveActivationProhibition
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
@@ -321,11 +320,8 @@ begun gs expiry = case expiry of
   Expiry.DuringTurnOf afterTurn ->
     Turn.isActive gs (AfterTurn.player afterTurn)
       && GameState.turnNumber gs > AfterTurn.turn afterTurn
-  -- Read live until pinned: open on a later turn while whoever controls the
-  -- object now is active.
-  Expiry.DuringTurnOfControllerOf afterObjectTurn ->
-    GameState.turnNumber gs > AfterObjectTurn.turn afterObjectTurn
-      && maybe False (Turn.isActive gs) (View.controllerOf (AfterObjectTurn.object afterObjectTurn) gs)
+  -- Read live until pinned: open on a turn that is its window.
+  Expiry.DuringTurnOfControllerOf afterObjectTurn -> windowReached gs afterObjectTurn
   -- CR 500.7: open exactly while the extra turn it names is the one under way.
   Expiry.DuringExtraTurn stamp -> GameState.extraTurnUnderWay gs == Just stamp
   Expiry.AtCleanup -> True
@@ -392,10 +388,13 @@ dropAtCleanup gs =
         Expiry.DuringTurnOf afterTurn ->
           not (Turn.isActive gs (AfterTurn.player afterTurn))
             || GameState.turnNumber gs <= AfterTurn.turn afterTurn
-        -- Unpinned, so its window has not come: kept while the object exists
-        -- to have a controller, and dropped as hygiene once it does not.
+        -- Unpinned. Ended by the cleanup of a turn that was its window but had
+        -- no declare attackers step to pin it (CR 500.11, a skipped combat);
+        -- otherwise kept while the object exists, and dropped as hygiene once
+        -- it does not.
         Expiry.DuringTurnOfControllerOf afterObjectTurn ->
           Maybe.isJust (Game.lookupObject (AfterObjectTurn.object afterObjectTurn) gs)
+            && not (windowReached gs afterObjectTurn)
         -- CR 611.2a / 500.7: kept while the turn it names is still pending, so
         -- the cleanup that ends that turn -- it was popped as it began -- ends
         -- it, and so does the first cleanup after CR 800.4k spent it unbegun.
@@ -706,33 +705,42 @@ dropAtTurnOf pid gs =
           GameState.objects = clearedGoads pid (clearedDetentions pid (clearedPermissions (survives . ExilePlayPermission.expiry) gs))
         }
 
--- CR 611.2a: "during its controller's next turn" pinned to a seat once the
--- creature has had its chance to attack: as a declare attackers step ends on a
--- later turn whose active player controls the object, and it could have been
--- declared as far as CR 302.6 goes (a creature that came under their control
--- this turn without haste had no chance). From here the row is an
--- ordinary DuringTurnOf, so it lasts the rest of this turn (an extra combat
--- included) and dropAtCleanup ends it. A control change before then moves the
--- window, one after does not (Gideon, Battle-Forged's 2015-06-22 ruling); a
--- turn with no combat phase gave no chance, so the row stays unpinned.
+-- CR 611.2a: "during its controller's next turn" pinned to a seat as a declare
+-- attackers step ends on a turn that is its window (`windowReached`). From here
+-- the row is an ordinary DuringTurnOf, so it lasts the rest of this turn (an
+-- extra combat included) and dropAtCleanup ends it. A control change before
+-- then moves the window, one after does not (Gideon, Battle-Forged's 2015-06-22
+-- ruling). A turn with no combat reaches no declare attackers step, so
+-- dropAtCleanup asks `windowReached` itself.
 --
--- data/scenarios/combat/cr-611-2a-wall-of-dust-follows-the-attacker-to-its-new-controller.json
--- and cr-611-2a-gideon-s-requirement-follows-a-creature-handed-over-before-combat.json
+-- data/scenarios/combat/cr-611-2a-wall-of-dust-follows-the-attacker-to-its-new-controller.json,
+-- cr-611-2a-gideon-s-requirement-follows-a-creature-handed-over-before-combat.json,
+-- cr-611-2a-a-skipped-combat-still-spends-wall-of-dust-s-window.json,
+-- cr-611-2a-a-creature-taken-during-its-new-controller-s-turn-spends-that-turn-s-window.json
+-- and cr-611-2a-a-window-spent-at-declare-attackers-stays-spent-after-a-later-control-change.json
 -- prove it.
 pinAfterDeclareAttackers :: GameState -> GameState
 pinAfterDeclareAttackers gs =
   let pin expiry = case expiry of
         Expiry.DuringTurnOfControllerOf afterObjectTurn
-          | GameState.turnNumber gs > AfterObjectTurn.turn afterObjectTurn,
-            Just pid <- View.controllerOf (AfterObjectTurn.object afterObjectTurn) gs,
-            Turn.isActive gs pid,
-            hadTheChance pid (AfterObjectTurn.object afterObjectTurn) ->
+          | windowReached gs afterObjectTurn,
+            Just pid <- View.controllerOf (AfterObjectTurn.object afterObjectTurn) gs ->
               Expiry.DuringTurnOf (AfterTurn.MkAfterTurn pid (AfterObjectTurn.turn afterObjectTurn))
         _ -> expiry
-      -- The chance to attack: a permanent (CR 506.3, so not phased out, CR
-      -- 702.26b) that summoning sickness did not keep home (CR 302.6 / 702.10b).
-      hadTheChance pid oid = Set.member oid (GameState.battlefield gs) && Summoning.settledOrHasty pid oid gs
    in mapExpiries pin gs
+
+-- Is this turn the window "during its controller's next turn" names? A later
+-- turn whose active player controls the object now. Whether the creature could
+-- legally attack does not matter: the Gideon ruling's first paragraph keeps a
+-- tapped or summoning-sick creature inside the window, where it just doesn't
+-- attack. A phased-out permanent is not under its controller's control (CR
+-- 702.26d), so its window waits.
+windowReached :: GameState -> AfterObjectTurn.AfterObjectTurn -> Bool
+windowReached gs afterObjectTurn =
+  let oid = AfterObjectTurn.object afterObjectTurn
+   in GameState.turnNumber gs > AfterObjectTurn.turn afterObjectTurn
+        && Set.member oid (GameState.battlefield gs)
+        && maybe False (Turn.isActive gs) (View.controllerOf oid gs)
 
 -- Every stored expiry rewritten in place, over every carrier sourcedExpiries
 -- reads.

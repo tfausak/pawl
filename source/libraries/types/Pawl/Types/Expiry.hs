@@ -76,8 +76,9 @@ data Expiry
     DuringTurnOf AfterTurn.AfterTurn
   | -- | CR 611.2a: DuringTurnOf with its seat not yet known -- "during its
     -- controller's next turn", open on any later turn while that object's
-    -- current controller is active, and pinned to DuringTurnOf once such a turn's
-    -- declare attackers step ends (Pawl.Engine.Expiry.pinAfterDeclareAttackers).
+    -- current controller is active, pinned to DuringTurnOf once such a turn's
+    -- declare attackers step ends (Pawl.Engine.Expiry.pinAfterDeclareAttackers),
+    -- and ended by such a turn's cleanup if it had none.
     -- Wall of Dust and Gideon, Battle-Forged are the producers.
     DuringTurnOfControllerOf AfterObjectTurn.AfterObjectTurn
   | -- | CR 611.2a / 500.7: Duration.DuringThatExtraTurn, stored as the

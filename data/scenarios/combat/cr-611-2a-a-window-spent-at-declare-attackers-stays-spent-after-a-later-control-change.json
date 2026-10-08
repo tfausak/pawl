@@ -1,6 +1,6 @@
 {
-  "description": "CR 611.2a Wall of Dust's \"can't attack during its controller's next turn\" follows the attacker to its new controller",
-  "note": "Bob's Wall of Dust blocks alice's Hill Giant on turn 1. On turn 3, before combat, alice Switcheroos the Giant for bob's Grizzly Bears, so it is not hers at her declare attackers step: her turn is not its window. Bob's turn 4 is: the Giant cannot attack then (his Goblin Piker keeps the declaration a real prompt), and can on turn 6 once that window has closed.",
+  "description": "CR 611.2a Wall of Dust's window is spent once its controller's declare attackers step passes, so a control change later that turn does not carry it over",
+  "note": "Bob's Wall of Dust blocks alice's Hill Giant on turn 1. Turn 3 is the window: the Giant is hers at her declare attackers step and stays home. In her postcombat main phase she Switcheroos it for bob's Grizzly Bears. The window is spent, so on bob's turn 4 the Giant attacks (his Goblin Piker keeps that declaration a real prompt).",
   "board": {
     "active": "alice",
     "step": "BeginningOfCombat",
@@ -9,6 +9,7 @@
         "name": "alice",
         "battlefield": [
           { "card": "Hill Giant", "label": "giant", "ready": true },
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
           { "card": "Island", "label": "i1" },
           { "card": "Island", "label": "i2" },
           { "card": "Island", "label": "i3" },
@@ -23,7 +24,7 @@
         "battlefield": [
           { "card": "Wall of Dust", "label": "wall", "ready": true },
           { "card": "Grizzly Bears", "label": "bears", "ready": true },
-          { "card": "Goblin Piker", "label": "piker", "ready": true }
+          { "card": "Goblin Piker", "label": "bobspiker", "ready": true }
         ],
         "library": [{ "card": "Island" }, { "card": "Island" }, { "card": "Island" }, { "card": "Island" }]
       }
@@ -33,25 +34,24 @@
     { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$giant"] } },
     { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$wall": ["$giant"] } } },
     { "turn": 2, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": [] } },
+    { "turn": 3, "step": "DeclareAttackers", "player": "alice", "refuse": { "Attack": ["$giant"] } },
+    { "turn": 3, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": [] } },
     {
       "turn": 3,
-      "step": "PrecombatMain",
+      "step": "PostcombatMain",
       "player": "alice",
       "do": { "Cast": { "object": "$switch", "targets": ["$giant", "$bears"], "mana": ["$i1", "$i2", "$i3", "$i4", "$i5"] } }
     },
-    { "turn": 3, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 3, "step": "PostcombatMain", "player": "alice", "do": "Pass" },
     {
       "turn": 3,
-      "step": "PrecombatMain",
+      "step": "PostcombatMain",
       "player": "alice",
       "check": { "View": { "of": "Controller", "object": "$giant", "is": "bob" } }
     },
-    { "turn": 4, "step": "DeclareAttackers", "player": "bob", "refuse": { "Attack": ["$giant"] } },
-    { "turn": 4, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": [] } },
-    { "turn": 5, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": [] } },
-    { "turn": 6, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["$giant"] } },
+    { "turn": 4, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["$giant"] } },
     {
-      "turn": 6,
+      "turn": 4,
       "step": "DeclareAttackers",
       "player": "bob",
       "check": { "Attackers": { "attackers": { "$giant": "$alice" } } }

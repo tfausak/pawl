@@ -5,8 +5,8 @@ import qualified Pawl.Types.ObjectId as ObjectId
 
 -- | CR 611.2a's "during its controller's next turn" before the turn is known:
 -- the object whose controller it names, and the turn the duration began on.
--- Pawl.Types.AfterTurn with the seat left open until that object's controller
--- has had a declare attackers step (Pawl.Engine.Expiry.pinAfterDeclareAttackers).
+-- Pawl.Types.AfterTurn with the seat left open until a turn of that object's
+-- controller comes (Pawl.Engine.Expiry.windowReached).
 data AfterObjectTurn = MkAfterObjectTurn
   { object :: ObjectId.ObjectId,
     turn :: Natural.Natural
