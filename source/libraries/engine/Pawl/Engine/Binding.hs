@@ -1409,7 +1409,7 @@ targetsOf = Map.filter (not . Set.null) . Map.mapMaybe Binding.targets
 -- what they aim at is a slot the EVENT bound (Binding.became), which was never
 -- chosen and so was never a target to become illegal.
 objectSlots :: Map SlotName Binding -> Map SlotName ObjectId
-objectSlots = Map.mapMaybe (Recipient.objectOf Monad.<=< onlyOne) . targetsOf
+objectSlots = objectsIn . targetsOf
 
 -- The PLAYERS a binding environment names, one slot at a time: objectSlots' twin
 -- on the other kind of Recipient, and what Pawl.Engine.Filter.bakeBound
@@ -1441,6 +1441,12 @@ slotPlayers = fmap (Set.fromList . Maybe.mapMaybe Recipient.playerOf . Set.toLis
 -- condition is baked against at Pawl.Engine.Expiry.arm.
 playersIn :: Map SlotName (Set Recipient) -> Map SlotName PlayerId
 playersIn = Map.mapMaybe (Recipient.playerOf Monad.<=< onlyOne)
+
+-- playersIn's twin on the OBJECT recipients, which is objectSlots' inner half:
+-- what Pawl.Engine.Quantity.bakeBound bakes a ControllerOfBound or OwnerOfBound
+-- to as a CR 611.2b duration begins.
+objectsIn :: Map SlotName (Set Recipient) -> Map SlotName ObjectId
+objectsIn = Map.mapMaybe (Recipient.objectOf Monad.<=< onlyOne)
 
 -- The ONE recipient a slot names, or Nothing when it names none or several. What
 -- every reader that can point at one object and no more asks of a slot -- CR

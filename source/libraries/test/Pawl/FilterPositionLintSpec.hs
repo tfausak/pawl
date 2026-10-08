@@ -2792,9 +2792,11 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
   -- (Pawl.Codec.Expiry serialises a whole stored condition), so nothing but this
   -- keeps card JSON from naming a seat. The UNBAKED PlayerRef.InSlot beside it is
   -- card data -- Garland, Royal Kidnapper writes it -- and is not swept.
+  -- ControllerOfObject and OwnerOfObject are the same baked half for an object
+  -- slot, and swept beside it.
   Spec.it s "CR 611.2b no card writes a Specific PlayerRef" $ do
     ps <- S.allPrintings s
-    let atoms c = jsonAtoms (Text.pack "Specific") (Codec.encode (Face.Codec.codec Card.codec) c)
+    let atoms c = sum (fmap (\tag -> jsonAtoms (Text.pack tag) (Codec.encode (Face.Codec.codec Card.codec) c)) ["Specific", "ControllerOfObject", "OwnerOfObject"])
         offenders = filter (anyFace ((/= 0) . atoms) . Printing.card) ps
     Spec.assertEqWith s "the baked reference is the engine's alone" (fmap (S.nameOf . Printing.card) offenders) []
     -- Not vacuous, for the sibling sweeps' reason: the same counter over a

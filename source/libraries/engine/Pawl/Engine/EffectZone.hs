@@ -21,6 +21,7 @@ import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
@@ -74,18 +75,18 @@ import Pawl.Types.Zone (Zone)
 -- carries only the name (Pawl.Types.Face.delayedAbilities holds the payload,
 -- Effect being first-order). Every caller supplies the map off the same card the
 -- ability is read from, which is where Pawl.Engine.Game.declaredDelayedAbility
--- resolves the name at run time.
---
--- Not implemented: rule 702's own delayed abilities
--- (Pawl.Engine.Keyword.mintedDelayedAbilities), which Resolve falls back to and
--- no caller unions in here, so an arm naming one reads as a name no face
--- declares. Inert as that roster stands -- decayed's is a sacrifice and unearth's
--- exile moves a slot the arming ability BOUND rather than the reserved source
--- slot, both of which every arm below answers Nothing for -- and a minted ability
--- that MOVED its object out of a zone through that slot is what would want the
--- union (#3083).
+-- resolves the name at run time. Rule 702's own roster
+-- (Pawl.Engine.Keyword.mintedDelayedAbilities) is unioned in BEHIND that map, the
+-- order Pawl.Engine.Resolve.Effect's arm resolves a name in, so the two cannot
+-- disagree about what a minted name stands for. A regression fence rather than a
+-- proof: every move on that roster states no origin, so the walk answers Nothing
+-- for each with or without it.
 zoneFunctionedFrom :: Set.Set SlotName.SlotName -> Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Maybe Zone
-zoneFunctionedFrom itself delayed effect = case effect of
+zoneFunctionedFrom itself delayed = zoneFunctionedAgainst itself (Map.union delayed Keyword.mintedDelayedAbilities)
+
+-- zoneFunctionedFrom's walk, against exactly the map it is given.
+zoneFunctionedAgainst :: Set.Set SlotName.SlotName -> Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Maybe Zone
+zoneFunctionedAgainst itself delayed effect = case effect of
   -- Only an InSlot naming one of the `itself` slots can be "the object it's on".
   -- A swept set is never one object, so no sweeping arm can be; a library's
   -- top card is one object, but it is named by POSITION rather than by that slot,
@@ -277,13 +278,13 @@ zoneFunctionedFrom itself delayed effect = case effect of
   -- the created ability's effect and not what that in turn creates, and the empty
   -- map is also what makes this walk terminate on a card that arms itself.
   --
-  -- Nothing for a name no face declares, which is a card-data error rather than a
-  -- rules question: Pawl.CardSpec's D4 dataflow lint rejects such a card, and the
-  -- answer here is the same Nothing the arm gave before.
+  -- Nothing for a name neither a face nor rule 702 declares, which is a card-data
+  -- error rather than a rules question: Pawl.CardSpec's D4 dataflow lint rejects
+  -- such a card, and the answer here is the same Nothing the arm gave before.
   Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger {ArmDelayedTrigger.name = name}) ->
     case Map.lookup name delayed of
       Nothing -> Nothing
-      Just ability -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom itself Map.empty) (Modal.allEffects (TriggeredAbility.modal ability)))
+      Just ability -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedAgainst itself Map.empty) (Modal.allEffects (TriggeredAbility.modal ability)))
   Effect.AffectPlayers {} -> Nothing
   Effect.RequireBlock {} -> Nothing
   Effect.CantBeRegenerated {} -> Nothing
@@ -340,10 +341,10 @@ zoneFunctionedFrom itself delayed effect = case effect of
   -- states, and CR 113.6m reads it. The loop's own reference names the members
   -- and is never "the object it's on", so only the body can answer at all. No
   -- card in the pool writes such a body.
-  Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom itself delayed) (Foldable.toList body))
-  Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom itself delayed) (Foldable.toList body))
-  Effect.Repeat (Repeat.MkRepeat _ body _) -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom itself delayed) (Foldable.toList body))
-  Effect.RepeatIf (RepeatIf.MkRepeatIf process _ ifHolds) -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom itself delayed) (Foldable.toList (process <> ifHolds)))
+  Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedAgainst itself delayed) (Foldable.toList body))
+  Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedAgainst itself delayed) (Foldable.toList body))
+  Effect.Repeat (Repeat.MkRepeat _ body _) -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedAgainst itself delayed) (Foldable.toList body))
+  Effect.RepeatIf (RepeatIf.MkRepeatIf process _ ifHolds) -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedAgainst itself delayed) (Foldable.toList (process <> ifHolds)))
   Effect.Heal _ -> Nothing
   Effect.ChooseNewTargets _ -> Nothing
   Effect.ChangeTargets _ -> Nothing

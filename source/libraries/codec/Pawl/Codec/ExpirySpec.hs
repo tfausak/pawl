@@ -4,6 +4,7 @@ import qualified Pawl.Codec.Expiry as Expiry
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.AfterObjectTurn as AfterObjectTurn
 import qualified Pawl.Types.AfterTurn as AfterTurn
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatStep as CombatStep
@@ -15,6 +16,7 @@ import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PaidExpiry as PaidExpiry
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
@@ -105,6 +107,17 @@ spec s = Spec.describe s "Pawl.Codec.Expiry" $ do
             }
       )
       " {\"type\":\"DuringTurnOf\",\"value\":{\"player\":1,\"turn\":3}} "
+  Spec.it s "DuringTurnOfControllerOf carries its object and turn" $
+    Common.assertCodec
+      s
+      Expiry.codec
+      ( Expiry.DuringTurnOfControllerOf
+          AfterObjectTurn.MkAfterObjectTurn
+            { AfterObjectTurn.object = ObjectId.MkObjectId 5,
+              AfterObjectTurn.turn = 3
+            }
+      )
+      " {\"type\":\"DuringTurnOfControllerOf\",\"value\":{\"object\":5,\"turn\":3}} "
   -- CR 500.7: the extra turn's creation stamp, the identity a later-created
   -- extra turn cannot share.
   Spec.it s "DuringExtraTurn carries its creation stamp" $

@@ -1,0 +1,49 @@
+{
+  "description": "CR 611.2a / 508.1d Gideon, Battle-Forged's +2 follows a creature handed to another player after its controller's turn began but before it could attack",
+  "note": "Alice's +2 targets bob's Hill Giant. In bob's precombat main phase of turn 2 he Switcheroos it for carol's Goblin Piker, so the Giant never had its chance to attack under bob (Gideon's 2015-06-22 ruling). Carol's turn 3 is its controller's next turn: her two declines are refused and then degraded, and the Giant attacks Gideon.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Kytheon, Hero of Akros", "face": "Gideon, Battle-Forged", "label": "gideon", "counters": [{ "key": { "type": "Loyalty" }, "value": 3 }] }
+        ],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Hill Giant", "label": "giant", "ready": true },
+          { "card": "Island", "label": "i1" },
+          { "card": "Island", "label": "i2" },
+          { "card": "Island", "label": "i3" },
+          { "card": "Island", "label": "i4" },
+          { "card": "Island", "label": "i5" }
+        ],
+        "hand": [{ "card": "Switcheroo", "label": "switch" }],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      },
+      {
+        "name": "carol",
+        "battlefield": [{ "card": "Goblin Piker", "label": "piker", "ready": true }],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "$gideon", "ability": 0, "targets": ["$giant"] } } },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": { "Cast": { "object": "$switch", "targets": ["$giant", "$piker"], "mana": ["$i1", "$i2", "$i3", "$i4", "$i5"] } }
+    },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "do": "Pass" },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "check": { "View": { "of": "Controller", "object": "$giant", "is": "carol" } } },
+    { "turn": 3, "step": "DeclareAttackers", "player": "carol", "do": { "Attack": [] } },
+    { "turn": 3, "step": "DeclareAttackers", "player": "carol", "do": { "Attack": [] } },
+    { "turn": 3, "step": "EndOfCombat", "player": "carol", "check": { "Attackers": { "attackers": { "$giant": "$gideon" } } } }
+  ]
+}

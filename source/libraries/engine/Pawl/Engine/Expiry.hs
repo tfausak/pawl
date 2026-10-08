@@ -40,6 +40,7 @@ import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as View
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Types.ActiveActivationProhibition as ActiveActivationProhibition
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
@@ -52,7 +53,9 @@ import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
 import qualified Pawl.Types.ActiveUntapProhibition as ActiveUntapProhibition
+import qualified Pawl.Types.AfterObjectTurn as AfterObjectTurn
 import qualified Pawl.Types.AfterTurn as AfterTurn
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.Designation as Designation
@@ -69,6 +72,7 @@ import qualified Pawl.Types.IgnoredAbility as IgnoredAbility
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PaidExpiry as PaidExpiry
+import qualified Pawl.Types.Phase as Phase
 import Pawl.Types.PhaseSelector (PhaseSelector)
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import Pawl.Types.PlayerId (PlayerId)
@@ -131,12 +135,19 @@ arm targets controller source duration gs = case duration of
   -- reasons, and Nothing where the reference names nobody for that arm's reason
   -- too -- a window that cannot begin stores nothing.
   --
-  -- Not implemented: a ControllerOfBound seat following its object to a new
-  -- controller before the window opens (#4696).
-  Duration.DuringNextTurnOf ref ->
-    fmap
-      (\pid -> Expiry.DuringTurnOf (AfterTurn.MkAfterTurn pid (GameState.turnNumber gs)))
-      (seatOf targets controller source gs ref)
+  -- A ControllerOfBound naming an object still in the game is NOT sampled: its
+  -- seat is read live and pinned once its controller's declare attackers step
+  -- has passed (pinAfterDeclareAttackers), so a control change before then
+  -- moves the window (CR 611.2a).
+  Duration.DuringNextTurnOf ref -> case ref of
+    PlayerRef.ControllerOfBound slot
+      | Just oid <- Map.lookup slot targets >>= Binding.onlyOne >>= Recipient.objectOf,
+        Maybe.isJust (Game.lookupObject oid gs) ->
+          Just (Expiry.DuringTurnOfControllerOf (AfterObjectTurn.MkAfterObjectTurn oid (GameState.turnNumber gs)))
+    _ ->
+      fmap
+        (\pid -> Expiry.DuringTurnOf (AfterTurn.MkAfterTurn pid (GameState.turnNumber gs)))
+        (seatOf targets controller source gs ref)
   -- CR 611.2a: the arm above's window with the seat taken from CR 109.5's "you",
   -- as UntilYourNextTurn takes it. Never Nothing -- a controller is always a
   -- seat, so this window always begins.
@@ -155,7 +166,7 @@ arm targets controller source duration gs = case duration of
   -- ability, never start at all, since the same unresolvable reference is read
   -- one line below.
   Duration.ForAsLongAs cond ->
-    let baked = Condition.bakeBound (Binding.playersIn targets) cond
+    let baked = Condition.bakeBound targets cond
      in if Condition.holds (Projection.fullView gs) (Filter.contextFor (Game.teams gs) (Just controller) (Just source)) gs source baked
           then Just (Expiry.While (While.MkWhile controller baked))
           else Nothing
@@ -222,6 +233,8 @@ seatOf targets controller source gs ref = case ref of
   PlayerRef.EachInSlot _ -> counted
   PlayerRef.Specific _ -> counted
   PlayerRef.OwnerOfBound _ -> counted
+  PlayerRef.ControllerOfObject _ -> counted
+  PlayerRef.OwnerOfObject _ -> counted
   PlayerRef.ChosenPlayerOfBound _ -> counted
   PlayerRef.Attacking _ -> counted
   where
@@ -280,6 +293,7 @@ follows expiry = case expiry of
   Expiry.AtUpkeepOf _ -> False
   Expiry.AtEndOfTurnOf _ -> False
   Expiry.DuringTurnOf _ -> False
+  Expiry.DuringTurnOfControllerOf _ -> False
   Expiry.DuringExtraTurn _ -> False
   Expiry.AtEndOf _ -> False
   Expiry.AtEndOfCombatOn _ -> False
@@ -306,6 +320,8 @@ begun gs expiry = case expiry of
   Expiry.DuringTurnOf afterTurn ->
     Turn.isActive gs (AfterTurn.player afterTurn)
       && GameState.turnNumber gs > AfterTurn.turn afterTurn
+  -- Read live until pinned: open on a turn that is its window.
+  Expiry.DuringTurnOfControllerOf afterObjectTurn -> windowReached gs afterObjectTurn
   -- CR 500.7: open exactly while the extra turn it names is the one under way.
   Expiry.DuringExtraTurn stamp -> GameState.extraTurnUnderWay gs == Just stamp
   Expiry.AtCleanup -> True
@@ -372,6 +388,13 @@ dropAtCleanup gs =
         Expiry.DuringTurnOf afterTurn ->
           not (Turn.isActive gs (AfterTurn.player afterTurn))
             || GameState.turnNumber gs <= AfterTurn.turn afterTurn
+        -- Unpinned. Ended by the cleanup of a turn that was its window but had
+        -- no declare attackers step to pin it (CR 500.11, a skipped combat);
+        -- otherwise kept while the object exists, and dropped as hygiene once
+        -- it does not.
+        Expiry.DuringTurnOfControllerOf afterObjectTurn ->
+          Maybe.isJust (Game.lookupObject (AfterObjectTurn.object afterObjectTurn) gs)
+            && not (windowReached gs afterObjectTurn)
         -- CR 611.2a / 500.7: kept while the turn it names is still pending, so
         -- the cleanup that ends that turn -- it was popped as it began -- ends
         -- it, and so does the first cleanup after CR 800.4k spent it unbegun.
@@ -455,6 +478,7 @@ sweepConditional = do
         Expiry.AtUpkeepOf _ -> True
         Expiry.AtEndOfTurnOf _ -> True
         Expiry.DuringTurnOf _ -> True
+        Expiry.DuringTurnOfControllerOf _ -> True
         Expiry.DuringExtraTurn _ -> True
         Expiry.AtEndOf _ -> True
         Expiry.AtEndOfCombatOn _ -> True
@@ -635,6 +659,8 @@ dropAtTurnOf pid gs =
         -- still in the game keeps it, and this is the very moment `begun` starts
         -- answering True for the turn it names.
         Expiry.DuringTurnOf afterTurn -> not (departed && AfterTurn.player afterTurn == pid)
+        -- Pinned by dropAtEndOf rather than ended here.
+        Expiry.DuringTurnOfControllerOf _ -> True
         -- Named by a turn rather than a seat, so no seat's handoff ends it; an
         -- extra turn CR 800.4k spent unbegun is dropAtCleanup's to end.
         Expiry.DuringExtraTurn _ -> True
@@ -679,6 +705,65 @@ dropAtTurnOf pid gs =
           GameState.objects = clearedGoads pid (clearedDetentions pid (clearedPermissions (survives . ExilePlayPermission.expiry) gs))
         }
 
+-- CR 611.2a: "during its controller's next turn" pinned to a seat as a declare
+-- attackers step ends on a turn that is its window (`windowReached`). From here
+-- the row is an ordinary DuringTurnOf, so it lasts the rest of this turn (an
+-- extra combat included) and dropAtCleanup ends it. A control change before
+-- then moves the window, one after does not (Gideon, Battle-Forged's 2015-06-22
+-- ruling). A turn with no combat reaches no declare attackers step, so
+-- dropAtCleanup asks `windowReached` itself.
+--
+-- data/scenarios/combat/cr-611-2a-wall-of-dust-follows-the-attacker-to-its-new-controller.json,
+-- cr-611-2a-gideon-s-requirement-follows-a-creature-handed-over-before-combat.json,
+-- cr-611-2a-a-skipped-combat-still-spends-wall-of-dust-s-window.json,
+-- cr-611-2a-a-creature-taken-during-its-new-controller-s-turn-spends-that-turn-s-window.json
+-- and cr-611-2a-a-window-spent-at-declare-attackers-stays-spent-after-a-later-control-change.json
+-- prove it.
+pinAfterDeclareAttackers :: GameState -> GameState
+pinAfterDeclareAttackers gs =
+  let pin expiry = case expiry of
+        Expiry.DuringTurnOfControllerOf afterObjectTurn
+          | windowReached gs afterObjectTurn,
+            Just pid <- View.controllerOf (AfterObjectTurn.object afterObjectTurn) gs ->
+              Expiry.DuringTurnOf (AfterTurn.MkAfterTurn pid (AfterObjectTurn.turn afterObjectTurn))
+        _ -> expiry
+   in mapExpiries pin gs
+
+-- Is this turn the window "during its controller's next turn" names? A later
+-- turn whose active player controls the object now. Whether the creature could
+-- legally attack does not matter: the Gideon ruling's first paragraph keeps a
+-- tapped or summoning-sick creature inside the window, where it just doesn't
+-- attack. A phased-out permanent is not under its controller's control (CR
+-- 702.26d), so its window waits.
+windowReached :: GameState -> AfterObjectTurn.AfterObjectTurn -> Bool
+windowReached gs afterObjectTurn =
+  let oid = AfterObjectTurn.object afterObjectTurn
+   in GameState.turnNumber gs > AfterObjectTurn.turn afterObjectTurn
+        && Set.member oid (GameState.battlefield gs)
+        && maybe False (Turn.isActive gs) (View.controllerOf oid gs)
+
+-- Every stored expiry rewritten in place, over every carrier sourcedExpiries
+-- reads.
+mapExpiries :: (Expiry -> Expiry) -> GameState -> GameState
+mapExpiries f gs =
+  gs
+    { GameState.continuousEffects = fmap (\x -> x {ContinuousEffect.expiry = f (ContinuousEffect.expiry x)}) (GameState.continuousEffects gs),
+      GameState.copyEffects = fmap (\x -> x {ActiveCopy.expiry = f (ActiveCopy.expiry x)}) (GameState.copyEffects gs),
+      GameState.replacements = fmap (\x -> x {ActiveReplacement.expiry = f (ActiveReplacement.expiry x)}) (GameState.replacements gs),
+      GameState.playerEffects = fmap (\x -> x {ActivePlayerEffect.expiry = f (ActivePlayerEffect.expiry x)}) (GameState.playerEffects gs),
+      GameState.blockRequirements = fmap (\x -> x {ActiveBlockRequirement.expiry = f (ActiveBlockRequirement.expiry x)}) (GameState.blockRequirements gs),
+      GameState.attackRequirements = fmap (\x -> x {ActiveAttackRequirement.expiry = f (ActiveAttackRequirement.expiry x)}) (GameState.attackRequirements gs),
+      GameState.unregeneratables = fmap (\x -> x {ActiveUnregeneratable.expiry = f (ActiveUnregeneratable.expiry x)}) (GameState.unregeneratables gs),
+      GameState.blockProhibitions = fmap (\x -> x {ActiveBlockProhibition.expiry = f (ActiveBlockProhibition.expiry x)}) (GameState.blockProhibitions gs),
+      GameState.attackProhibitions = fmap (\x -> x {ActiveAttackProhibition.expiry = f (ActiveAttackProhibition.expiry x)}) (GameState.attackProhibitions gs),
+      GameState.activationProhibitions = fmap (\x -> x {ActiveActivationProhibition.expiry = f (ActiveActivationProhibition.expiry x)}) (GameState.activationProhibitions gs),
+      GameState.untapProhibitions = fmap (\x -> x {ActiveUntapProhibition.expiry = f (ActiveUntapProhibition.expiry x)}) (GameState.untapProhibitions gs),
+      GameState.evasions = fmap (\x -> x {ActiveEvasion.expiry = f (ActiveEvasion.expiry x)}) (GameState.evasions gs),
+      GameState.ignoredAbilities = fmap (\x -> x {IgnoredAbility.expiry = f (IgnoredAbility.expiry x)}) (GameState.ignoredAbilities gs),
+      GameState.delayedTriggers = fmap (\x -> x {DelayedTrigger.expiry = fmap f (DelayedTrigger.expiry x)}) (GameState.delayedTriggers gs),
+      GameState.objects = fmap (\o -> o {Object.playableFromExile = fmap (\p -> p {ExilePlayPermission.expiry = f (ExilePlayPermission.expiry p)}) (Object.playableFromExile o)}) (GameState.objects gs)
+    }
+
 -- CR 500.5's first clause: effects lasting until the end of a step or phase
 -- expire as it ends. The window that is ending is passed in, because only the
 -- caller knows which one it is -- Engine.runStepThatBegan for a step that ended
@@ -711,12 +796,13 @@ dropAtEndOf ending gs =
         Expiry.AtUpkeepOf _ -> True
         Expiry.AtEndOfTurnOf _ -> True
         Expiry.DuringTurnOf _ -> True
+        Expiry.DuringTurnOfControllerOf _ -> True
         Expiry.DuringExtraTurn _ -> True
         -- CR 116.2c: no window of the turn ends it.
         Expiry.WhenPaid _ -> True
         -- No step or phase ending is a use.
         Expiry.WhenUsed -> True
-   in keepSurvivors survives gs
+   in (if ending == PhaseSelector.Step (Phase.Combat CombatStep.DeclareAttackers) then pinAfterDeclareAttackers else id) (keepSurvivors survives gs)
 
 -- CR 503 / 611.2a: "until the beginning of your next upkeep" ends as that
 -- upkeep step begins. Engine.runStepThatBegan calls this for every active
@@ -735,6 +821,7 @@ dropAtUpkeepOf pid =
     Expiry.AtTurnOf _ -> True
     Expiry.AtEndOfTurnOf _ -> True
     Expiry.DuringTurnOf _ -> True
+    Expiry.DuringTurnOfControllerOf _ -> True
     Expiry.DuringExtraTurn _ -> True
     Expiry.AtEndOf _ -> True
     Expiry.AtEndOfCombatOn _ -> True
@@ -800,6 +887,7 @@ paidExpiries gs =
         Expiry.AtUpkeepOf _ -> []
         Expiry.AtEndOfTurnOf _ -> []
         Expiry.DuringTurnOf _ -> []
+        Expiry.DuringTurnOfControllerOf _ -> []
         Expiry.DuringExtraTurn _ -> []
         Expiry.AtEndOf _ -> []
         Expiry.AtEndOfCombatOn _ -> []
@@ -850,6 +938,7 @@ dropWhenPaidBy oid gs =
         Expiry.AtUpkeepOf _ -> True
         Expiry.AtEndOfTurnOf _ -> True
         Expiry.DuringTurnOf _ -> True
+        Expiry.DuringTurnOfControllerOf _ -> True
         Expiry.DuringExtraTurn _ -> True
         Expiry.AtEndOf _ -> True
         Expiry.AtEndOfCombatOn _ -> True
@@ -904,6 +993,7 @@ expiresWhenUsed expiry = case expiry of
   Expiry.AtUpkeepOf _ -> False
   Expiry.AtEndOfTurnOf _ -> False
   Expiry.DuringTurnOf _ -> False
+  Expiry.DuringTurnOfControllerOf _ -> False
   Expiry.DuringExtraTurn _ -> False
   Expiry.AtEndOf _ -> False
   Expiry.AtEndOfCombatOn _ -> False
