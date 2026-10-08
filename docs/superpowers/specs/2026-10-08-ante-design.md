@@ -51,8 +51,8 @@ writing the JSON.
 | Rebirth | 1 | none: "each player may" + `SetLifeTotal` |
 | Jeweled Bird | 1 | owner-only ante gating "If you do"; "cards you own from the ante" |
 | Amulet of Quoz | 1 | none: opponent may ante, else `FlipCoin` / `LoseGame` |
-| Darkpact | 2 | set owner; exchange an ante card with top of library |
-| Bronze Tablet | 2 | exchange ownership of two exiled cards behind a `PayGate` |
+| Darkpact | 2 | set owner; target card in the ante; exchange it with top of library |
+| Bronze Tablet | 2 | set the owner of two exiled cards behind a `PayGate` |
 | Tempest Efreet | 2 | exchange ownership; "from anywhere" |
 | Timmerian Fiends | 2 | exchange ownership; "from anywhere"; ante as refusal |
 
@@ -112,39 +112,62 @@ started by Shahrazad.
 ## Unit 2: ownership changes
 
 **Pile membership.** A card's library, hand or graveyard is the pile that
-holds it, not its owner's. `Game.removeFromZones` locates the pile by search
-(`Game.pileHolderOf`), and every caller that passes `Object.owner` stops
-passing it: `Event.changeZone`, `Event.unmake`, `Event.forgetObject`,
-`Sba.ceaseToExist`, `Departure.objectsLeaveWith`'s cease path,
-`Setup.applyCrossings`, `Planechase`'s cease, `Dungeon.remove`,
-`Game.withoutBeingCast`, `Resolve/Effect`'s `sinkInLibrary`. The owner still
-picks the destination (CR 400.3): `placeObject (Object.owner obj)` stays.
+holds it, not its owner's (CR 400.1). `Game.removeFromZones` drops its player
+argument and locates the pile by search (`Game.pileHolderOf`), so every caller
+that passes `Object.owner` stops passing it: `Event.changeZoneWithCause`,
+`Event.unmake`, `Event.forgetObject`, `Sba`'s `ceaseToExist`,
+`Departure.objectsLeaveWith` and its cease path, `Setup.applyCrossings` and the
+`Setup.createIn*` helpers, `Planechase`'s cease, `Dungeon.remove`,
+`Game.withoutBeingCast`. The owner still picks the destination (CR 400.3):
+`placeObject (Object.owner obj)` stays, and so does `Resolve/Effect`'s
+`Game.sinkInLibrary` call, which reads the library the card has just arrived
+in.
 
-**"Your graveyard" reads the pile.** `ZoneChange` and `LastKnown` record the
-pile holder the object left, and a `CardLeavesZone` trigger's "your
-graveyard" reads it in place of `Filter.OwnedBy`. Before unit 2 the two always
-agree; between Tempest Efreet's exchange and its put they do not. Proving
-board: Kishla Skimmer under the Efreet's controller triggers as the Efreet
-leaves their graveyard for the opponent's; one under the opponent does not.
+**"Your graveyard" reads the pile.** `LastKnown.pile` records the pile holder
+the object left. `ZoneChange` does not: every departure reader reaches the
+departed id's record, and it has over a hundred positional constructions. A
+`CardLeavesZone` gains `whose`, read against `LastKnown.pile`, and the
+printings that wrote "your graveyard" or "your library" as a `Filter.OwnedBy`
+conjunct move it there; an `OwnedBy` kept for "into your hand" is an arrival
+read, which CR 400.3 keeps exact. Before unit 2 the two always agree; between
+Tempest Efreet's exchange and its put they do not. Proving board: Kishla
+Skimmer under the Efreet's controller, on that player's turn, triggers as the
+Efreet leaves their graveyard for the opponent's; one under the opponent, on
+the opponent's turn, does not (Kishla reads "during your turn", so the
+opponent's must be tested on theirs).
 
-**Opcodes.** `SetOwner` (Darkpact's "You own target card in the ante") and
-`ExchangeOwnership` of two object references (Bronze Tablet, Tempest Efreet,
-Timmerian Fiends), each a write of `Object.owner` on the current incarnation.
-`newIncarnation` already carries `owner` forward. An ownership change is not a
-zone change and emits no `Moved`; it emits a `GameEvent.OwnerChanged` for the
-report. Darkpact's "Exchange that card with the top card of your library" is
-an exchange of positions: the ante card goes to the top of its (new) owner's
-library and the top card to ante, simultaneously.
+**Opcodes.** `SetOwner` (Darkpact's "You own target card in the ante", and
+Bronze Tablet's two writes) and `ExchangeOwnership` of two object references
+(Tempest Efreet, Timmerian Fiends), each a write of `Object.owner` on the
+current incarnation. Bronze Tablet is two `SetOwner`s and not an exchange: its
+2004-10-04 ruling has a stolen Tablet's controller give back only the Tablet
+while still taking the other card. `newIncarnation` already carries `owner`
+forward. An ownership change is not a zone change and emits no event: unit 3's
+report reads `Object.startingOwner`, and the event log is cleared every turn.
+Darkpact's "Exchange that card with the top card of your library" is
+`ExchangeWithTopOfLibrary`, an exchange of zones (CR 701.12d): the ante card
+goes to the top of its (new) owner's library and the top card to the ante, as
+one event, and nothing moves unless both can (CR 701.12a). Its target needs
+`Pool.CardsInAnte` (CR 115.2).
 
 **"From anywhere."** A new `ObjectRef` that follows a bound object through the
 `Moved` log (`ZoneChange.departed` to `ZoneChange.object`) to its current
-incarnation, answering nothing once it has left the game. Proving board:
-Timmerian Fiends sacrificed under Rest in Peace, then put from exile into the
-other player's graveyard.
+incarnation, answering nothing once it has left the game. A move with several
+arrivals (CR 730.3's merged permanent) ends the chain, an elision with an
+issue. Proving board: Timmerian Fiends sacrificed under the artifact owner's
+Leyline of the Void, then put from exile into that player's graveyard. Rest
+in Peace would exile the final put too, so the Fiends would end in exile
+whether or not it was found.
 
 **Commander.** `Commander.commanderPrintingOf` reads the owner's
 `Player.commander`; an ownership change to a commander is filed and cited
 there, not handled.
+
+**Subgames.** `Setup.funnelBack` rebuilds a departed owner's main-game library
+from the parent's copies on the reading that an owner never changes. A card
+whose owner changed inside the subgame breaks that for a departed former
+owner; telling the copies apart needs the card lineage #4829 needs, so it is
+filed and cited there.
 
 ## Unit 3: the ownership report
 
@@ -185,10 +208,11 @@ Gameplay-level, one concern each, in the spec module the implementer's
   faces no flip; a departed player's ante card stays (CR 800.4n); Burning Wish cannot
   fetch an ante card outside an ante game, nor a main-game ante card from a
   Shahrazad subgame.
-- Unit 2: Darkpact's taken card, later destroyed, goes to the Darkpact
-  controller's graveyard (the discriminator against a zone-only move); the
-  Kishla Skimmer pair above; Bronze Tablet's refused payment swaps owners;
-  Timmerian Fiends from exile under Rest in Peace.
+- Unit 2: Darkpact's taken card lands on top of its caster's library (a
+  zone-only move would send it to its old owner's); the Kishla Skimmer pair
+  above; Bronze Tablet's refused payment swaps owners, and a stolen Tablet
+  hands back only itself; Timmerian Fiends from exile under Leyline of the
+  Void.
 - Unit 3: the winner owns every ante card and the report lists them; a draw
   reports none; a Shahrazad subgame's ante goes to the subgame winner's
   main-game library.
@@ -199,5 +223,6 @@ Every proving test is mutated away per CLAUDE.md, the gameplay assertion named.
 
 No. `Zone.Ante` is CR 400.1's zone list, the setup step and payout are CR
 407.2, the owner-only check is CR 407.4 on a zone move, and pile lookup is CR
-400.1. The nine cards' effects live in the open half; `SetOwner` and
-`ExchangeOwnership` are opcodes the core classifies, never inspects.
+400.1. The nine cards' effects live in the open half; `SetOwner`,
+`ExchangeOwnership` and `ExchangeWithTopOfLibrary` are opcodes the core
+classifies, never inspects.
