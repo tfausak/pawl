@@ -38,6 +38,7 @@ import qualified Pawl.Types.AimedPlayers as AimedPlayers
 import qualified Pawl.Types.AlternativeActivationCost as AlternativeActivationCost
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.Amass as Amass
+import qualified Pawl.Types.Ante as Ante
 import qualified Pawl.Types.AnyNumberDiscard as AnyNumberDiscard
 import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
@@ -1367,6 +1368,7 @@ effectNames asking onCard onAbility x = case x of
   Effect.Vote vote -> voteNames asking vote
   Effect.TakeExtraTurn takeExtraTurn -> takeExtraTurnNames asking takeExtraTurn
   Effect.ShuffleIntoLibrary shuffleIntoLibrary -> shuffleIntoLibraryNames asking shuffleIntoLibrary
+  Effect.Ante ante -> anteNames asking ante
   Effect.Shuffle playerRef -> playerRefNames asking playerRef
   Effect.OfferCast offerCast -> offerCastNames asking offerCast
   Effect.OfferNamedCopy _cardName -> False
@@ -2535,6 +2537,10 @@ setClassLevelNames asking x = case x of
 setHalfLockedNames :: Asking -> SetHalfLocked.SetHalfLocked -> Bool
 setHalfLockedNames asking x = case x of
   SetHalfLocked.MkSetHalfLocked _every _locked slot -> slotNames asking slot
+
+anteNames :: Asking -> Ante.Ante -> Bool
+anteNames asking x = case x of
+  Ante.MkAnte player ref slot -> playerRefNames asking player || objectRefNames asking ref || any (slotNames asking) slot
 
 shuffleIntoLibraryNames :: Asking -> ShuffleIntoLibrary.ShuffleIntoLibrary -> Bool
 shuffleIntoLibraryNames asking x = case x of

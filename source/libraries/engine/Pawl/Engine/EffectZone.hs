@@ -321,6 +321,7 @@ zoneFunctionedFrom itself delayed effect = case effect of
   Effect.FlipCoin {} -> Nothing
   Effect.TakeExtraTurn {} -> Nothing
   Effect.ShuffleIntoLibrary {} -> Nothing
+  Effect.Ante {} -> Nothing
   Effect.Shuffle {} -> Nothing
   Effect.OfferCast {} -> Nothing
   Effect.OfferNamedCopy {} -> Nothing

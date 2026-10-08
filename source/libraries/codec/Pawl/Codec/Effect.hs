@@ -16,6 +16,7 @@ import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.ActivateManaAbilities as ActivateManaAbilities
 import qualified Pawl.Codec.AffectPlayers as AffectPlayers
 import qualified Pawl.Codec.Amass as Amass
+import qualified Pawl.Codec.Ante as Ante
 import qualified Pawl.Codec.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Codec.AttachAll as AttachAll
 import qualified Pawl.Codec.AttachBound as AttachBound
@@ -290,6 +291,7 @@ codec cardCodec abilityCodec =
           Arm.payload "FlipCoin" FlipCoin.codec Effect.FlipCoin (\x -> case x of Effect.FlipCoin y -> Just y; _ -> Nothing),
           Arm.payload "TakeExtraTurn" TakeExtraTurn.codec Effect.TakeExtraTurn (\x -> case x of Effect.TakeExtraTurn y -> Just y; _ -> Nothing),
           Arm.payload "ShuffleIntoLibrary" ShuffleIntoLibrary.codec Effect.ShuffleIntoLibrary (\x -> case x of Effect.ShuffleIntoLibrary y -> Just y; _ -> Nothing),
+          Arm.payload "Ante" Ante.codec Effect.Ante (\x -> case x of Effect.Ante y -> Just y; _ -> Nothing),
           Arm.payload "Shuffle" PlayerRef.codec Effect.Shuffle (\x -> case x of Effect.Shuffle y -> Just y; _ -> Nothing),
           Arm.payload "OfferCast" OfferCast.codec Effect.OfferCast (\x -> case x of Effect.OfferCast y -> Just y; _ -> Nothing),
           Arm.payload "OfferNamedCopy" (Common.nonEmpty CardName.codec) Effect.OfferNamedCopy (\x -> case x of Effect.OfferNamedCopy y -> Just y; _ -> Nothing),
@@ -465,6 +467,7 @@ tagOf x = case x of
   Effect.FlipCoin {} -> "FlipCoin"
   Effect.TakeExtraTurn {} -> "TakeExtraTurn"
   Effect.ShuffleIntoLibrary {} -> "ShuffleIntoLibrary"
+  Effect.Ante {} -> "Ante"
   Effect.Shuffle {} -> "Shuffle"
   Effect.OfferCast {} -> "OfferCast"
   Effect.OfferNamedCopy {} -> "OfferNamedCopy"

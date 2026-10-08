@@ -160,6 +160,7 @@ library codec
     Pawl.Codec.Amass
     Pawl.Codec.Answer
     Pawl.Codec.AnswerSpec
+    Pawl.Codec.Ante
     Pawl.Codec.AnyNumberDiscard
     Pawl.Codec.AnyNumberDiscardSpec
     Pawl.Codec.AnyNumberMatching
@@ -1994,6 +1995,7 @@ library types
     Pawl.Types.AlternativeCost
     Pawl.Types.Amass
     Pawl.Types.Answer
+    Pawl.Types.Ante
     Pawl.Types.AnyNumberDiscard
     Pawl.Types.AnyNumberMatching
     Pawl.Types.AppliedReduction
