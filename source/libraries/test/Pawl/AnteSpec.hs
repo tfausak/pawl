@@ -16,6 +16,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Deck as Deck
+import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
@@ -104,3 +105,35 @@ spec s registry = Spec.describe s "Ante" $ do
         sub = S.runPure S.identityAnswer sub0 (Setup.startGameFromCards S.performer Set.empty)
     Spec.assertEqWith s "CR 729.2 the subgame starts with no ante of its own" (GameState.ante sub0) Set.empty
     Spec.assertEqWith s "CR 407.2 alice antes one of her two cards, bob nothing" (length (anteOf S.alice sub), length (anteOf S.bob sub)) (1, 0)
+  -- CR 800.4n: three seats so bob's concession leaves a game to stay in, and
+  -- a card of his in exile that CR 800.4a does take.
+  Spec.it s "CR 800.4n a departed player's card in the ante stays in the game" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let g0 = Setup.gameWith anteGame S.threePlayers
+        (bobsAnte, g1) = S.addObjectIn Zone.Ante piker S.bob g0
+        (bobsExile, g2) = S.addObjectIn Zone.Exile piker S.bob g1
+        after = S.departs Departure.Type.Conceded S.bob g2
+    Spec.assertEqWith s "CR 800.4n bob's ante card is still in the ante" (Set.member bobsAnte (GameState.ante after), fmap Object.zone (Game.lookupObject bobsAnte after)) (True, Just Zone.Ante)
+    Spec.assertEqWith s "CR 800.4a while his exiled card left the game with him" (fmap Object.zone (Game.lookupObject bobsExile after)) Nothing
+  -- CR 800.4n / 729.5: bob concedes a subgame played for ante. His subgame
+  -- ante card stays behind him (CR 800.4n), and at the subgame's end his
+  -- main-game library comes back whole -- once, not with the ante card twice.
+  -- Three seats, because a two-seat concession ends the game first.
+  Spec.it s "CR 800.4n/729.5 a player who leaves a subgame played for ante gets their main-game library back once" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    let stock pid gs0 = foldr (\_ gs -> snd (S.addLibraryCard mountain pid gs)) gs0 (replicate 9 ())
+        parent = stock S.carol (stock S.bob (stock S.alice (Setup.gameWith anteGame S.threePlayers)))
+        sub = S.runPure S.identityAnswer (Setup.subgameStateFrom S.alice parent) (Setup.startGameFromCards S.performer Set.empty)
+        left = S.departs Departure.Type.Conceded S.bob sub
+        back = Setup.funnelBack left parent
+    Spec.assertEqWith s "CR 729.5 bob's main-game library is whole again, and not one card more" (length (Game.zoneMembers Zone.Library S.bob back)) 9
+    Spec.assertEqWith s "CR 800.4n bob's subgame ante card stayed behind him" (length (anteOf S.bob left)) 1
+  -- CR 800.4n / 727.2: bob's ante card stayed when he left, and a restart
+  -- involves every card in the game. bob is not in the new game and has no
+  -- library for it, so the card begins the new game where it was.
+  Spec.it s "CR 800.4n/727.2 a departed player's ante card stays in the ante through a restart" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (bobsAnte, g1) = S.addObjectIn Zone.Ante piker S.bob (Setup.gameWith anteGame S.threePlayers)
+        left = S.departs Departure.Type.Conceded S.bob g1
+        restarted = S.runPure S.identityAnswer left (Setup.restartGame S.performer Set.empty S.alice)
+    Spec.assertEqWith s "CR 727.2 bob's ante card is still in the ante" (GameState.ante restarted, fmap Object.zone (Game.lookupObject bobsAnte restarted)) (Set.singleton bobsAnte, Just Zone.Ante)

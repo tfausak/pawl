@@ -761,7 +761,11 @@ startGameFromCards perform exemptions = do
       planarCards = fmap toCommandCard (Map.filterWithKey (\oid _ -> Plane.isPlanarCard oid gs) (Map.withoutKeys rebuilt inCommandIds))
       schemeCards = fmap toCommandCard (Map.filterWithKey (\oid _ -> Scheme.isScheme oid gs) (Map.withoutKeys rebuilt inCommandIds))
       supplementary = Set.unions [Map.keysSet attractionCards, Map.keysSet planarCards, Map.keysSet schemeCards]
-      cards = fmap toLibraryCard (Map.withoutKeys rebuilt (Set.union inCommandIds supplementary))
+      -- CR 800.4n / 727.2: a departed player's ante card stayed in the game,
+      -- and its owner has no library in the new one, so it begins the new game
+      -- in the ante.
+      strandedAnte = fmap (\obj -> (Object.newIncarnation obj) {Object.zone = Zone.Ante}) (Map.filter (\obj -> Object.zone obj == Zone.Ante && notElem (Object.owner obj) owners) rebuilt)
+      cards = fmap toLibraryCard (Map.withoutKeys rebuilt (Set.unions [inCommandIds, supplementary, Map.keysSet strandedAnte]))
       ownedIn pool pid = Seq.fromList (Map.keys (Map.filter (\obj -> Object.owner obj == pid) pool))
       libraryOf = ownedIn cards
       attractionDeckOf = ownedIn attractionCards
@@ -786,7 +790,7 @@ startGameFromCards perform exemptions = do
   State.put
     gs
       { GameState.players = Map.mapWithKey withStartingDeck (GameState.players gs),
-        GameState.objects = Map.unions [Map.restrictKeys (GameState.objects gs) exempt, cards, commandZoneCards, attractionCards, planarCards, schemeCards],
+        GameState.objects = Map.unions [Map.restrictKeys (GameState.objects gs) exempt, cards, commandZoneCards, attractionCards, planarCards, schemeCards, strandedAnte],
         GameState.library = Map.fromList (fmap (\pid -> (pid, libraryOf pid)) owners),
         GameState.attractionDecks = Map.filter (not . Seq.null) (Map.fromList (fmap (\pid -> (pid, attractionDeckOf pid)) owners)),
         GameState.planarDecks = decksOf (GameState.planarDecks gs) planarCards,
@@ -797,9 +801,9 @@ startGameFromCards perform exemptions = do
         GameState.phasedOut = mempty,
         GameState.exile = exempt,
         GameState.command = inCommandIds,
-        -- CR 727.2 / 729.2: every card is rebuilt above, an ante card among
-        -- the library cards, so no old ante id survives.
-        GameState.ante = Set.empty,
+        -- CR 727.2 / 729.2: every card is rebuilt above, a seated player's ante
+        -- card among the library cards, so no other old ante id survives.
+        GameState.ante = Map.keysSet strandedAnte,
         GameState.stack = []
       }
   Monad.forM_ owners Event.shuffleLibrary
@@ -1634,7 +1638,8 @@ applyCrossings finalSub parent =
 -- objectsLeaveWith never fires there, so their cards are still in `finalSub`
 -- and `returned` has them. Owner is invariant across a card's life, so an
 -- absent owner also implies this `oid` is missing -- no separate id check is
--- needed.
+-- needed. CR 800.4n's ante cards are the exception, which is why both
+-- `ownersPresentInSub` and `returned` skip them.
 funnelBack :: GameState -> GameState -> GameState
 funnelBack finalSub parent =
   let -- CR 729.5 / CR 712.21, the same split startGameFromCards performs, in a
@@ -1674,7 +1679,6 @@ funnelBack finalSub parent =
       subAttractions = Map.filterWithKey (\oid obj -> isCard obj && Game.astrotoriumBack oid finalSub) (Map.withoutKeys subObjects subCmdIds)
       subPlanar = Map.filterWithKey (\oid obj -> isCard obj && Plane.isPlanarCard oid finalSub) subObjects
       subSchemes = Map.filterWithKey (\oid obj -> isCard obj && Scheme.isScheme oid finalSub) subObjects
-      returned = fmap toLibraryCard (Map.filter isCard (Map.withoutKeys subObjects (Set.unions [subCmdIds, Map.keysSet subAttractions, Map.keysSet subPlanar, Map.keysSet subSchemes])))
       backFromSub =
         fmap
           toCommandCard
@@ -1692,11 +1696,19 @@ funnelBack finalSub parent =
       oldCmdIds = Set.filter (\oid -> Commander.isCommander oid parent || Vanguard.isVanguard oid parent) (GameState.command parent)
       oldSuppIds = supplementaryDeckIds parent
       movedIds = Set.unions [oldLibIds, oldCmdIds, oldSuppIds]
-      ownersPresentInSub = Set.fromList (fmap Object.owner (Map.elems subObjects))
+      -- CR 800.4n: a departed owner's ante cards stay in the subgame, so they
+      -- are not evidence the owner is still in it.
+      ownersPresentInSub = Set.fromList (fmap Object.owner (filter (\obj -> Object.zone obj /= Zone.Ante) (Map.elems subObjects)))
       removedByDeparture oid = case Map.lookup oid (GameState.objects parent) of
         Nothing -> False
         Just obj -> Set.notMember (Object.owner obj) ownersPresentInSub
       recoveredIds = Set.filter removedByDeparture movedIds
+      -- `recovered` rebuilds a departed owner's whole main-game library, the
+      -- original of a card they anted in the subgame among it, so that owner's
+      -- subgame objects -- only CR 800.4n's ante cards survive objectsLeaveWith
+      -- -- are not returned a second time.
+      departedOwners = Set.fromList (Maybe.mapMaybe (\oid -> fmap Object.owner (Map.lookup oid (GameState.objects parent))) (Set.toList recoveredIds))
+      returned = fmap toLibraryCard (Map.filter (\obj -> isCard obj && Set.notMember (Object.owner obj) departedOwners) (Map.withoutKeys subObjects (Set.unions [subCmdIds, Map.keysSet subAttractions, Map.keysSet subPlanar, Map.keysSet subSchemes])))
       recovered = fmap toLibraryCard (Map.restrictKeys (GameState.objects parent) (Set.difference recoveredIds (Set.union oldCmdIds oldSuppIds)))
       -- A supplementary deck whose owner departed inside the subgame goes back
       -- to being their deck, the commander's reason below.
