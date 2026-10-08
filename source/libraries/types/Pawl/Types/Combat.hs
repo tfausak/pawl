@@ -98,7 +98,8 @@ data Combat = MkCombat
     -- Written by Pawl.Engine.Combat.declareAttackers and
     -- Pawl.Engine.Combat.putOntoBattlefieldAttacking, pruned by
     -- Pawl.Engine.Game.removeFromCombat, and read by
-    -- Pawl.Engine.Combat.noteAttackingNothing alone.
+    -- Pawl.Engine.Combat.noteAttackingNothing and
+    -- Pawl.Engine.Projection.View.attackedControllerHeld, as attackedUnder is.
     attackedControlledBy :: Map.Map ObjectId.ObjectId PlayerId.PlayerId,
     -- | WHAT has been attacked this combat phase: the CR 508.1b target announced
     -- for each creature declared as an attacker or put onto the battlefield
