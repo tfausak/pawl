@@ -14344,10 +14344,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     -- is empty for every other trigger, so their slot atoms stay vacuous.
     --
     -- The bearer's mana value too (CR 202.3), lazily, for a condition comparing
-    -- against "this card" (Filter.ManaValueGreaterThanSource): read through CR
-    -- 608.2h's last known information, so a bearer in a graveyard answers its
-    -- own. Pawl.ZoneTriggerSpec's "CR 113.6k a Kami of Mourning grant returns the
-    -- card when a greater creature dies" proves it.
+    -- against "this card" (Filter.ManaValueGreaterThanSource): live for a bearer
+    -- in a graveyard, and its last known information for one the event itself
+    -- removed, CR 603.10a's look back. Pawl.ZoneTriggerSpec's "CR 113.6m a Kami
+    -- of Mourning grant returns the card when a greater creature dies" proves
+    -- it.
     bearerContext =
       (SourceContext.sourceContext gs (Just you) bearer)
         { Filter.slotObjects = Binding.slotObjects bindings,

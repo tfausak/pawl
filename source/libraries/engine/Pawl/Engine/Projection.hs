@@ -5654,13 +5654,14 @@ grantInForce writes gs =
     || storedWrites writes gs
     || elsewhereGrants writes gs
 
--- CR 113.6k / 613.1f: does anything grant a keyword the roster `mints` answers
--- for (mintingGrantInForce), or a TRIGGERED ability outright? The gate
--- Pawl.Engine.Event.Trigger's graveyard and exile scans take, in one walk,
--- before projecting a card whose ability face carries no trigger functioning
--- there -- Kami of Mourning's perpetual grant to a card in a graveyard is the
--- second disjunct's producer. A classification of the granted ability's KIND
--- (CR 113.3), never of what it does.
+-- CR 113.6k / 113.6m / 613.1f: does anything grant a keyword the roster
+-- `mints` answers for (mintingGrantInForce), or a TRIGGERED ability outright?
+-- The gate Pawl.Engine.Event.Trigger's graveyard and exile scans take, in one
+-- walk, before projecting a card whose ability face carries no trigger
+-- functioning there. Kami of Mourning's perpetual grant to a card in a
+-- graveyard is the second disjunct's producer, an ability that functions there
+-- by CR 113.6m. A classification of the granted ability's KIND (CR 113.3),
+-- never of what it does.
 mintingOrTriggeredGrantInForce :: (Set Keyword -> [a]) -> GameState -> Bool
 mintingOrTriggeredGrantInForce mints =
   grantInForce

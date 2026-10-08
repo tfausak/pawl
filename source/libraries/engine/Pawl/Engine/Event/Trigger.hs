@@ -1610,10 +1610,22 @@ eventTriggers events gs =
       -- one group. Proved by Pawl.ZoneTriggerSpec's "CR 603.10a a card's own
       -- leaves-your-graveyard trigger sees its own departure".
       leftGraveyardSame = fmap (Map.filter (not . null . snd) . Map.map (fmap (filter (looksBack . fst))) . Map.unions . fmap (leftGraveyard . LoggedEvent.event) . NonEmpty.toList) groups
+      -- CR 603.10a on the ARRIVAL side: a look-back condition is checked against
+      -- "the appearance of objects immediately prior to the event", when a card
+      -- the event's OWN group put into a graveyard was not there yet. So such a
+      -- card keeps only its first-sentence conditions for that group -- the
+      -- Nether Traitor ruling, "if Nether Traitor and another creature are put
+      -- into your graveyard at the same time, Nether Traitor's ability won't
+      -- trigger". Pawl.ZoneTriggerSpec's "CR 603.10a a Kami of Mourning grant
+      -- does not see the death that buried its own card" proves it.
+      arrivedSame = fmap arrivalsIn groups
+      notYetThere arrived =
+        Map.filter (not . null . snd) . Map.mapWithKey (\oid entry -> if Set.member oid arrived then fmap (filter (not . looksBack . fst)) entry else entry)
       -- The graveyard each group's events are checked against: the live read,
       -- plus what departed later or looks back at its own departure, less what
-      -- arrived later.
-      graveyardAt = List.zipWith3 (\same later arrived -> Map.withoutKeys (Map.unions [inGraveyards, later, same]) arrived) leftGraveyardSame leftGraveyardLater arrivedLater
+      -- arrived later, and less the look-back conditions of what arrived in
+      -- this very group.
+      graveyardAt = List.zipWith4 (\same later arrived here -> notYetThere here (Map.withoutKeys (Map.unions [inGraveyards, later, same]) arrived)) leftGraveyardSame leftGraveyardLater arrivedLater arrivedSame
       -- CR 603.10a, the other half of that rule: for a LOOK-BACK condition the
       -- board that matters is "the appearance of objects immediately prior to the
       -- event", on which every permanent this same event removed was still
@@ -1782,7 +1794,7 @@ eventTriggers events gs =
       -- from triggering" proves it. A card whose ability face has no such
       -- ability is projected only while a keyword grant or a triggered-ability
       -- grant is in force (`graveyardGrantInForce`), which is how Kami of
-      -- Mourning's perpetual grant is seen -- Pawl.ZoneTriggerSpec's "CR 113.6k a
+      -- Mourning's perpetual grant is seen -- Pawl.ZoneTriggerSpec's "CR 113.6m a
       -- Kami of Mourning grant returns the card when a greater creature dies".
       -- The controller is the OWNER, CR 113.8's second clause: a card in a
       -- graveyard has no controller (CR 108.4).
