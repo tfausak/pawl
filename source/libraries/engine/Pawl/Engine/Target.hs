@@ -1370,12 +1370,15 @@ legalSetsGiven pcs grants pools perspective unannounced seed source slots gs =
       widened = Map.union (fmap Binding.toRecipients independent) seed
       declared = Map.keysSet slots
       -- A bound naming a sibling is answered once per way of binding each sibling
-      -- it names: to the whole union, which is what a fold over the slot
-      -- (Scope.OverBound) is widest at, or to any ONE of its candidates, which is
-      -- the only binding a read of one object (Quantity.AgainstSlot, through
-      -- Binding.onlyOne) answers at all. Spawnbroker's victim slot is the latter:
-      -- against the union of every creature its caster controls it reads no power,
-      -- and would be offered nothing.
+      -- it names: to the whole union, where a monotone fold (Scope.OverBound)
+      -- under an at-most atom is widest, or to any ONE of its candidates, the only
+      -- binding a read of one object (Quantity.AgainstSlot, through
+      -- Binding.onlyOne) answers at all. Spawnbroker's `theirs` slot is the
+      -- latter: against the union of every creature its caster controls it reads
+      -- no power, and would be offered nothing.
+      --
+      -- Not implemented: a binding of the sibling to some but not all of its
+      -- candidates, which a fold under an equality atom can need (#4827).
       rebound slot =
         let options sibling =
               fmap

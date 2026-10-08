@@ -2977,10 +2977,10 @@ switcherooSpec s registry = Spec.describe s "Switcheroo" $ do
 -- alice controls the Spawnbroker (power 1), a Goblin Piker (2) and a Bog Wraith
 -- (3), so the `yours` slot's candidates are plural and the `theirs` slot can only
 -- be offered bob's Wraith by measuring each of them alone: against all three at
--- once the bound reads no power (Binding.onlyOne) and the offer is empty, so CR
--- 603.3d removes the trigger (#2967). bob's Typhoid Rats keep the `theirs` choice
--- a real one. The two runs differ in exactly one thing, which creature fills
--- `yours`.
+-- once the bound reads no power (Binding.onlyOne), the offer is empty, and
+-- placement removes the trigger as though no legal choice existed. bob's
+-- Typhoid Rats keep the `theirs` choice a real one. The two runs differ in
+-- exactly one thing, which creature fills `yours`.
 spawnbrokerRun :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, GameState.GameState)
 spawnbrokerRun s registry measuredByWraith = do
   spawnbroker <- S.printingOf s registry "Spawnbroker"
@@ -3010,8 +3010,10 @@ spawnbrokerSpec s registry = Spec.describe s "Spawnbroker" $ do
     Spec.assertEqWith s "alice controls bob's Wraith, whose power 3 her own Wraith's power admits" (Projection.controllerOf bobWraith measured) (Just S.alice)
     Spec.assertEqWith s "and bob controls alice's Wraith" (Projection.controllerOf aliceWraith measured) (Just S.bob)
     -- CR 601.2c's joint check, the other run: measured against the power 2
-    -- Piker, bob's Wraith is not a legal target, so CR 603.3d removes the trigger
-    -- rather than putting it on the stack to fail at CR 608.2b.
+    -- Piker, bob's Wraith is not a legal target, so the announcement is refused
+    -- at placement rather than put on the stack to fail at CR 608.2b. Legal
+    -- choices exist, so this is not CR 603.3d: the decider repeats the refused
+    -- answer and Engine.placeBorne's `attempt` gives up and ceases the trigger.
     Spec.assertEqWith s "measured against her Piker instead, the trigger never reaches the stack" (length (GameState.stack refusedPlaced)) 0
     Spec.assertEqWith s "where measured against her Wraith it did" (length (GameState.stack measuredPlaced)) 1
     Spec.assertEqWith s "and bob keeps his Wraith" (Projection.controllerOf bobWraith refused) (Just S.bob)

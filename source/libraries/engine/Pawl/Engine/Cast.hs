@@ -583,9 +583,10 @@ payableCostAtGiven modes pcs sources x extra spending pid oid gs cost =
 --
 -- Inert on today's pool: this map is built only for a cost whose criterion
 -- names a slot (Cost.readsBoundSlot), and no card in `data/cards/` has both
--- that and a target slot bounded by X. Filter.ManaValueAtMostAmount and
--- Filter.ManaValueEqualToAmount are the atoms that read boundUnannounced, so
--- their cards are the whole list; grepped
+-- that and a target slot bounded by X. Filter.ManaValueAtMostAmount,
+-- Filter.ManaValueEqualToAmount and Filter.PowerAtMostAmount are the atoms that
+-- read boundUnannounced, so their cards are the whole list (Spawnbroker, the
+-- power atom's one card, bounds a triggered ability's slot); grepped
 -- over data/cards/ on 2026-09-14 the SPELLS among them are Stir the Grave,
 -- Synthetic Borrowed Exhumation and Synthetic Measured Refrain, each a bare
 -- mana cost with no component to carry a criterion; the rest of that list --
