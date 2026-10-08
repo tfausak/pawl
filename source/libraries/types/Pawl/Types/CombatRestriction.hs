@@ -125,8 +125,9 @@ import qualified Pawl.Types.LimitUnless as LimitUnless
 -- gates the whole sentence rather than a creature, which is the same clause CR 508.1c describes
 -- and the same posture CantAttackAlone's gate is in. Relic Runner prints the
 -- first ("can't be blocked if you've cast a historic spell this turn", carried
--- here as the unless of that condition's negation); the bound's gate and
--- CantAttackAlone's are unprinted in data/cards, and the field is there because
+-- here as the unless of that condition's negation); no printing gates the bound
+-- or CantAttackAlone (Synthetic Tidal Palisade and Synthetic Tidal Sentry do),
+-- and the field is there because
 -- whether a restriction is gated is independent of its shape rather than because
 -- a card asks. Nothing is the unconditional
 -- restriction (Pacifism), which is not the same as a condition that never
