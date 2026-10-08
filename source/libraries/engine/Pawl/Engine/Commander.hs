@@ -371,6 +371,9 @@ isCommander oid gs = Maybe.isJust (commanderPrintingOf oid gs)
 -- commander; rule 903.8's cast permission wants only the Bool, and cannot be
 -- reached by a melded permanent at all, since none is ever in the command zone
 -- to be cast from.
+--
+-- Not implemented: keeping the designation of a commander whose owner an ante
+-- card changed (#4839).
 commanderPrintingOf :: ObjectId -> GameState -> Maybe PrintingId.PrintingId
 commanderPrintingOf oid gs = do
   obj <- Game.lookupObject oid gs
