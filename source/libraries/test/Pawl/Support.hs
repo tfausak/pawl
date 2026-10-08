@@ -221,7 +221,8 @@ playerSetup pid =
       Seat.graveyard = Seq.empty,
       Seat.library = Seq.empty,
       Seat.exile = Seq.empty,
-      Seat.command = Seq.empty
+      Seat.command = Seq.empty,
+      Seat.ante = Seq.empty
     }
 
 battlefield :: PlayerId.PlayerId -> [Placement.Placement] -> Seat.Seat
@@ -2121,6 +2122,7 @@ oneMountainState mountain ph =
           GameState.phasedOut = mempty,
           GameState.exile = mempty,
           GameState.command = mempty,
+          GameState.ante = mempty,
           GameState.attractionDecks = Map.empty,
           GameState.planarDecks = Map.empty,
           GameState.schemeDecks = Map.empty,

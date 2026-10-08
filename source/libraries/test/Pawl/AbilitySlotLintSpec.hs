@@ -121,8 +121,8 @@ import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneScope as ZoneScope
 
 -- CR 400.1: "each player has their own library, hand, and graveyard. The
--- other zones are shared by all players." Battlefield/Stack/Exile/Command are
--- shared; Library/Hand/Graveyard are per-player.
+-- other zones are shared by all players." Battlefield/Stack/Exile/Command/Ante
+-- are shared; Library/Hand/Graveyard are per-player.
 isSharedZone :: Zone.Zone -> Bool
 isSharedZone zone = case zone of
   Zone.Library -> False
@@ -132,6 +132,7 @@ isSharedZone zone = case zone of
   Zone.Stack -> True
   Zone.Exile -> True
   Zone.Command -> True
+  Zone.Ante -> True
 
 -- A Count over a shared zone paired with anything but EachPlayer names a
 -- per-player fold over a zone no player individually owns -- permitted by the

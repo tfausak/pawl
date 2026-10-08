@@ -88,6 +88,8 @@ data GameState = MkGameState
     exile :: Set.Set ObjectId.ObjectId,
     -- | CR 400.1: the command zone, shared rather than per-player.
     command :: Set.Set ObjectId.ObjectId,
+    -- | CR 400.1 / 407: the ante zone, shared rather than per-player.
+    ante :: Set.Set ObjectId.ObjectId,
     -- | CR 717.2: each player's Attraction deck, head on top. Its cards are in
     -- the command zone (Object.zone) but not in `command`, which holds what is
     -- face up there.

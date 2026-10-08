@@ -7915,6 +7915,9 @@ sacrificeIn asOf victims = simultaneously $ do
         -- CR 408.1: a command-zone object is not a permanent, so it is never
         -- sacrificed.
         Zone.Command -> pure ()
+        -- CR 407 / 110.1: a card in the ante is not a permanent, so it is never
+        -- sacrificed.
+        Zone.Ante -> pure ()
 
 -- CR 111.2: create `n` tokens with the given effect-defined characteristics under
 -- `controller`'s control, summoning-sick (CR 302.6). A token is created from

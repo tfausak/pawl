@@ -43,6 +43,12 @@ spec s = Spec.describe s "Pawl.Codec.Zone" $ do
       Zone.codec
       Zone.Exile
       " {\"type\":\"Exile\"} "
+  Spec.it s "Ante" $
+    Common.assertCodec
+      s
+      Zone.codec
+      Zone.Ante
+      " {\"type\":\"Ante\"} "
   Spec.it s "Command" $
     Common.assertCodec
       s

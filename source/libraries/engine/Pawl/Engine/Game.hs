@@ -408,8 +408,11 @@ isHiddenZone zone = case zone of
   Zone.Battlefield -> False
   Zone.Stack -> False
   Zone.Exile -> False
-  -- CR 400.2 names the command zone among the public ones, alongside ante.
+  -- CR 400.2 names the command zone among the public ones.
   Zone.Command -> False
+  -- CR 400.2: "graveyard, battlefield, stack, exile, ante, and command are
+  -- public zones".
+  Zone.Ante -> False
 
 zoneMembers :: Zone -> PlayerId -> GameState -> [ObjectId]
 zoneMembers zone pid gs =
@@ -425,6 +428,7 @@ zoneMembers zone pid gs =
         Zone.Battlefield -> ownedShared (GameState.battlefield gs)
         Zone.Exile -> ownedShared (GameState.exile gs)
         Zone.Command -> ownedShared (GameState.command gs)
+        Zone.Ante -> ownedShared (GameState.ante gs)
         Zone.Stack -> filter ownedBy (GameState.stack gs)
 
 -- CR 404.1: the top card of a player's graveyard, its NEWEST arrival and so its
@@ -640,6 +644,7 @@ removeFromZones pid oid gs =
       GameState.phasedOut = Map.delete oid (GameState.phasedOut gs),
       GameState.exile = Set.delete oid (GameState.exile gs),
       GameState.command = Set.delete oid (GameState.command gs),
+      GameState.ante = Set.delete oid (GameState.ante gs),
       GameState.attractionDecks = Map.adjust (Seq.filter (/= oid)) pid (GameState.attractionDecks gs),
       GameState.planarDecks = Map.adjust (Seq.filter (/= oid)) pid (GameState.planarDecks gs),
       GameState.schemeDecks = Map.adjust (Seq.filter (/= oid)) pid (GameState.schemeDecks gs),
@@ -652,7 +657,7 @@ removeFromZones pid oid gs =
 -- appends.
 --
 -- Every other zone ignores the position, because none of them lets an effect
--- pick an end: the battlefield, exile and the command zone are Sets (CR 400.1's
+-- pick an end: the battlefield, exile, the command zone and the ante are Sets (CR 400.1's
 -- shared zones, with no order at all), CR 402.3 lets a player arrange their hand
 -- "in any convenient fashion", and the graveyard and the stack each have ONE
 -- arrival rule of their own -- CR 404.1's "on top of its owner's graveyard" and
@@ -669,6 +674,7 @@ insertIntoZone zone position pid oid gs = case zone of
   Zone.Battlefield -> gs {GameState.battlefield = Set.insert oid (GameState.battlefield gs)}
   Zone.Exile -> gs {GameState.exile = Set.insert oid (GameState.exile gs)}
   Zone.Command -> gs {GameState.command = Set.insert oid (GameState.command gs)}
+  Zone.Ante -> gs {GameState.ante = Set.insert oid (GameState.ante gs)}
   Zone.Stack -> gs {GameState.stack = oid : GameState.stack gs}
 
 -- Move a card already in a library to this many cards down from its top, 0

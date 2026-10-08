@@ -12,8 +12,8 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   `team` number (CR 808.1), a `range` of influence (CR 801.2a, default
   unlimited), `emperor` (CR 809.2), a `manaPool` of unrestricted mana one
   letter per unit (`"RRC"`, CR 106.4) and
-  `battlefield`, `hand`, `graveyard`, `library`, `exile` and `command` (CR
-  408.1) placements (a
+  `battlefield`, `hand`, `graveyard`, `library`, `exile`, `command` (CR
+  408.1) and `ante` (CR 407) placements (a
   library top card first; an exiled card face up and linked to nothing). A
   placement names its `card` and may give a `label`, `tapped`, `ready` (CR
   302.6), `damage`, `counters`, `token` (CR 111.1, battlefield only), a

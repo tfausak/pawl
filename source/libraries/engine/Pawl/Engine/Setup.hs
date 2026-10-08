@@ -223,6 +223,7 @@ gameWith settings order =
           GameState.phasedOut = mempty,
           GameState.exile = mempty,
           GameState.command = mempty,
+          GameState.ante = mempty,
           GameState.attractionDecks = Map.empty,
           GameState.planarDecks = Map.empty,
           GameState.schemeDecks = Map.empty,
@@ -794,6 +795,9 @@ startGameFromCards perform exemptions = do
         GameState.phasedOut = mempty,
         GameState.exile = exempt,
         GameState.command = inCommandIds,
+        -- CR 727.2 / 729.2: every card is rebuilt above, an ante card among
+        -- the library cards, so no old ante id survives.
+        GameState.ante = Set.empty,
         GameState.stack = []
       }
   Monad.forM_ owners Event.shuffleLibrary
@@ -1255,6 +1259,9 @@ subgameStateFrom starter parent =
           -- CR 729.2c, above. startGameFromCards keeps them here rather than
           -- funnelling them into a library, which is CR 903.6 for the subgame.
           GameState.command = cmdIds,
+          -- CR 729.2: a subgame's zones are new, and no main-game ante card is
+          -- among CR 729.2a-c's movers.
+          GameState.ante = mempty,
           GameState.stack = [],
           GameState.manaPool = Map.empty,
           GameState.combat = Combat.emptyCombat,

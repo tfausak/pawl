@@ -1673,6 +1673,8 @@ leavesBattlefieldSpec s registry =
           Spec.assertEqWith s "exile is public" (leftFor Zone.Exile) bound
           Spec.assertEqWith s "the stack is public" (leftFor Zone.Stack) bound
           Spec.assertEqWith s "the command zone is public" (leftFor Zone.Command) bound
+          Spec.assertEqWith s "the ante is public" (leftFor Zone.Ante) bound
+          Spec.assertEqWith s "CR 400.2 Game.isHiddenZone calls the ante public" (Game.isHiddenZone Zone.Ante) False
           Spec.assertEqWith s "a hand is hidden" (leftFor Zone.Hand) Map.empty
           Spec.assertEqWith s "a library is hidden" (leftFor Zone.Library) Map.empty
         -- CR 603.6c's "to ANOTHER zone", which is the one destination this

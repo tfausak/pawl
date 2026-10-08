@@ -33,6 +33,8 @@ data Seat = MkSeat
     -- | Face up (CR 406.3), owned by this seat.
     exile :: Seq.Seq Placement.Placement,
     -- | CR 408.1: the command zone, owned by this seat.
-    command :: Seq.Seq Placement.Placement
+    command :: Seq.Seq Placement.Placement,
+    -- | CR 407: the ante zone, owned by this seat.
+    ante :: Seq.Seq Placement.Placement
   }
   deriving (Eq, Ord, Show)
