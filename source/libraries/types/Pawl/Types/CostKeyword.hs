@@ -13,4 +13,6 @@ data CostKeyword
     Embalm
   | -- | CR 702.141a (Wire Surgeons).
     Encore
+  | -- | CR 702.168a (Disguise Agent).
+    Disguise
   deriving (Bounded, Enum, Eq, Ord, Show)

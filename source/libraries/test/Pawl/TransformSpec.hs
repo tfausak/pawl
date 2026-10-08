@@ -1503,6 +1503,26 @@ disturbSpec s registry = Spec.describe s "Disturb" $ do
             (Action.legalActions S.alice gs)
     Spec.assertEqWith s "CR 613.1f under the Jailer the graveyard offers no cast" (offeredNames underJailer) []
     Spec.assertEqWith s "CR 702.146a without it the transformed cast is offered" (offeredNames without) [anglerBack]
+  -- The same rule from the other side: a disturb GRANTED. Synthetic Restless
+  -- Vigil {2}{U} Enchantment, "Creature cards in your graveyard have disturb
+  -- {1}{U}", over Thraben Gargoyle {1} 2/2 // Stonewing Antagonizer 4/2, which
+  -- prints no disturb. CR 613.1f gives the buried front face the ability, and CR
+  -- 712.11d lets it reach the back face. A pair of boards differing only in the
+  -- Vigil; two Islands pay the granted {1}{U}, and the Gargoyle's own {1} is no
+  -- route out of a graveyard at all.
+  Spec.it s "CR 702.146a a disturb granted to a card in a graveyard casts it transformed" $ do
+    gargoyle <- S.printingOf s registry "Thraben Gargoyle"
+    island <- S.printingOf s registry "Island"
+    vigil <- S.printingOf s registry "Synthetic Restless Vigil"
+    let onTurn gs = gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+        (buried, without) = fmap onTurn (S.addGraveyardCard gargoyle S.alice (S.landsInPlay island 2))
+        granted = snd (S.addPermanent vigil S.alice without)
+        antagonizer = CardName.MkCardName (Text.pack "Stonewing Antagonizer")
+        offeredNames gs = [n | A.Cast o n _ <- Action.legalActions S.alice gs, o == buried]
+        resolved = S.runPure S.identityAnswer (S.runPure S.identityAnswer granted (Cast.castSpell S.manaPerformer S.alice buried antagonizer Facing.FaceUp)) Stack.resolveTop
+        gargoyleIn gs = filter (\o -> fmap S.nameOf (Game.cardOf o gs) == Just (S.printingName gargoyle)) (Game.zoneMembers Zone.Battlefield S.alice gs)
+    Spec.assertEqWith s "CR 712.11a / 702.146b it arrives back face up: the 4/2 Antagonizer" (fmap (\o -> (Projection.namesOf o resolved, S.powerToughnessOf o resolved)) (gargoyleIn resolved)) [(Set.singleton antagonizer, Just (4, 2))]
+    Spec.assertEqWith s "CR 613.1f the Vigil offers the back face, and without it the graveyard offers nothing" (offeredNames granted, offeredNames without) ([antagonizer], [])
 
 -- CR 702.162a: more than meets the eye, on the same Ratchet, Field Medic //
 -- Ratchet, Rescue Racer the convert group runs on -- "More Than Meets the Eye

@@ -43,6 +43,7 @@ module Pawl.Engine.FaceDown where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
@@ -53,6 +54,7 @@ import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
+import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Types.CardType as CardType
 import Pawl.Types.Cost (Cost)
@@ -82,46 +84,41 @@ import qualified Pawl.Types.TurnedFaceUp as TurnedFaceUp
 import qualified Pawl.Types.TypeLine as TypeLine
 
 -- CR 702.37e: "what the permanent's morph cost WOULD BE if it were face up",
--- one entry per distinct morph cost the card prints (Keyword.morphCosts). Empty
--- when the card underneath has no morph ability, which is the rule's own
+-- one entry per distinct morph cost (Keyword.morphCosts). Empty when the
+-- permanent would have no morph ability face up, which is the rule's own
 -- parenthesis -- "if the permanent wouldn't have a morph cost if it were face
--- up, it can't be turned face up this way".
---
--- Read through Game.faceUpFaceOf, the one door that steps around CR 708.2's
--- substitution, because that substitution is exactly what makes a projected read
--- useless here: a face-down permanent has none of the CARD's keywords (CR
--- 708.2), so Projection.keywordsOf would answer Nothing for every morph creature
--- ever printed. The rule's counterfactual is what licenses it. What a projected
--- read does find is whatever the allower LISTED -- disguise's ward {2} (CR
--- 702.168b) -- which is never a morph or disguise cost.
---
--- Not a projected read, therefore not affected by Humility: a face-down
--- permanent under a layer-6 ability removal can still be turned face up, since
--- the ability rule 702.37e consults is the one the CARD would have. That is what
--- "would be if it were face up" says, and nothing in the pool observes it.
---
--- CR 707.2: morph is copiable, so a card carrying copied values has the copied
--- card's (Game.faceUpCastingFaceOf), as do the two readers below.
+-- up, it can't be turned face up this way". Read off `faceUpKeywords` below.
 morphCostsOf :: ObjectId -> GameState -> [Cost Keyword]
-morphCostsOf oid gs =
-  foldMap (Keyword.morphCosts . Face.keywordSet) (Game.faceUpCastingFaceOf oid gs)
+morphCostsOf oid gs = Keyword.morphCosts (faceUpKeywords oid gs)
 
 -- CR 702.168d: "show all players what the permanent's disguise cost WOULD BE if
--- it were face up", one entry per distinct disguise cost the card prints
--- (Keyword.disguiseCosts). Empty when the card underneath has no disguise
--- ability, which is the rule's own parenthesis -- "if the permanent wouldn't
--- have a disguise cost if it were face up, it can't be turned face up this
--- way".
---
--- morphCostsOf with rule 702.168d's price list in place of rule 702.37e's, and
--- every note above applies here word for word: the read goes through
--- Game.faceUpFaceOf because CR 708.2's substitution has taken the card's
--- keywords away, and the rule's counterfactual is what licenses it. The face-down
--- permanent's ONE keyword is the ward CR 702.168b listed, which is not the
--- ability this asks about.
+-- it were face up" -- morphCostsOf with rule 702.168d's price list in place of
+-- rule 702.37e's, read off the same keywords.
 disguiseCostsOf :: ObjectId -> GameState -> [Cost Keyword]
-disguiseCostsOf oid gs =
-  foldMap (Keyword.disguiseCosts . Face.keywordSet) (Game.faceUpCastingFaceOf oid gs)
+disguiseCostsOf oid gs = Keyword.disguiseCosts (faceUpKeywords oid gs)
+
+-- The keywords rule 702.37e's and rule 702.168d's counterfactual asks about,
+-- from two reads joined.
+--
+-- The CARD's: Game.faceUpCastingFaceOf, the one door that steps around CR
+-- 708.2's substitution, which has taken the card's keywords off the face-down
+-- permanent. CR 707.2: morph is copiable, so a card carrying copied values has
+-- the copied card's. Not a projected read, so a layer-6 removal applied to the
+-- face-down permanent leaves it -- Pawl.FaceDownSpec's "CR 613.7f turning face up
+-- restamps the permanent after a removal that had wiped its grant" turns a
+-- Turn to Frog'd Tracker up by its morph.
+--
+-- And the GRANTED ones: the permanent's own projection on a board where it is
+-- face up, which is where CR 708.8's "any effects that have been applied to the
+-- face-down permanent still apply" puts an effect that gives it the ability. A
+-- disguise granted at the card's own mana cost (Disguise Agent) is priced there
+-- at that face-up cost rather than at the face-down permanent's none (CR
+-- 708.2a). Pawl.CommanderSpec's "CR 702.168a Disguise Agent's disguise casts a
+-- commander face down and turns it up for its mana cost" proves it.
+faceUpKeywords :: ObjectId -> GameState -> Set.Set Keyword
+faceUpKeywords oid gs =
+  let up = gs {GameState.objects = Map.adjust (\o -> o {Object.facing = Facing.FaceUp}) oid (GameState.objects gs)}
+   in foldMap Face.keywordSet (Game.faceUpCastingFaceOf oid gs) <> Map.keysSet (Projection.keywordsOf oid up)
 
 -- CR 701.40b and CR 701.58b, which say it in the same words: "show all players
 -- that the card representing that permanent IS A CREATURE CARD and what THAT

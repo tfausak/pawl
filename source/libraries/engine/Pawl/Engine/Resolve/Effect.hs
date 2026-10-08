@@ -1497,7 +1497,7 @@ offerCastOnce runSubgame context named caster optionality verb retake offer = do
       faces oid card
         | CastOffer.transformed offer = fmap pure (Card.backFace card)
         | alternative = Just (filter (\face -> fmap Face.name (Card.convertedFace card) /= Just (Face.name face)) (Game.castableFacesOfId oid gs) <> fusedFaces oid)
-        | otherwise = Just (Game.castableFacesOfId oid gs <> fusedFaces oid)
+        | otherwise = Just (Cast.castableFacesFor oid gs <> fusedFaces oid)
       -- One proposal per half, gated on its own (CR 709.3a, CR 712.11c), which
       -- is why the whole tuple is built per face rather than once per card.
       --
