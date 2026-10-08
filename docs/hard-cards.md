@@ -27,6 +27,7 @@ issue; an expressible card not yet in the pool is a plain card add.
 | Time Stop | Ending the turn: exiling the stack, skipping to cleanup (CR 724.1) | Proven: `TurnSpec` `endTurnSpec`; a trigger during the process is untested (#4785) |
 | Sphinx of the Second Sun | An extra beginning phase: a second untap, upkeep and draw in one turn (CR 500.8, 302.6, 305.2) | Gap (#4782) |
 | Gemstone Caverns | A pregame action from the opening hand, gated on the starting player (CR 103.6) | Proven: `MulliganSpec`, `ManaSpec` |
+| Serum Powder | An action taken inside the mulligan procedure, any time a player could mulligan (CR 103.5b) | Proven: `MulliganSpec` CR 103.5b cases |
 | Tovolar, Dire Overlord | Day and night: a game designation switched at untap, forced by a card, transforming daybound permanents (CR 731, 702.145) | Proven: `DaytimeSpec`, `data/scenarios/daytime/` |
 | Palace Jailer | The monarch, and a duration that waits for an opponent to be crowned, outliving its source (CR 725, 610.3d) | Proven: `LibraryOrderSpec` "CR 725" cases, `GameSpec` M5.6d gate |
 | Acererak the Archlich | Dungeons: command-zone cards, completion read by name behind an intervening "if" (CR 309.7, 701.49, 603.4) | Proven: `DungeonSpec` "Acererak asks WHICH dungeon"; its attack trigger is untested (#4788) |
