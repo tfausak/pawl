@@ -35,6 +35,7 @@ import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Ante as Ante
 import qualified Pawl.Engine.Attach as Attach
 import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Binding as Binding
@@ -1427,7 +1428,10 @@ createEmblem pid card = do
 --
 -- CR 315.3: "conspiracy cards that aren't in the game can't be brought into the
 -- game", whatever the filter admits -- a card-type classification, read off the
--- printing. Pawl.OutsideTheGameSpec's Ring of Ma'rûf pair proves it.
+-- printing. Pawl.OutsideTheGameSpec's Ring of Ma'rûf pair proves it. CR 407.3
+-- bars an ante card the same way when the game is not played for ante
+-- (Pawl.Engine.Ante.barred), face down or not; Pawl.OutsideTheGameSpec's
+-- Burning Wish pair proves it.
 eligible :: Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> PlayerId -> GameState.GameState -> [OutsideCard.OutsideCard]
 eligible predicate source pid gs =
   let pool = maybe Map.empty Player.outsideTheGame (Map.lookup pid (GameState.players gs))
@@ -1435,12 +1439,16 @@ eligible predicate source pid gs =
       matchesFace face = Filter.matches context (Projection.viewOfCard face) predicate
       admits printingId = case Game.cardOfPrinting printingId gs of
         Nothing -> False
-        Just card -> let face = Game.resolveFaceFor Nothing card in not (Conspiracy.isConspiracyFace face) && matchesFace face
+        Just card -> let face = Game.resolveFaceFor Nothing card in not (Conspiracy.isConspiracyFace face) && not (Ante.barred (GameState.settings gs) face) && matchesFace face
+      -- CR 407.3 whatever the facing: a face-down ante card is still one.
+      barredPrinting printingId = case Game.cardOfPrinting printingId gs of
+        Nothing -> False
+        Just card -> Ante.barred (GameState.settings gs) (Game.resolveFaceFor Nothing card)
       -- Pawl.Engine.Card.faceDownFace is the same substitution
       -- Pawl.Engine.Game.faceOfObject performs for an object in this game, so
       -- the two frames cannot disagree about what a face-down object is.
       admitsOutside entry = case OutsideObject.facing entry of
-        Facing.FaceDown state -> matchesFace (Card.faceDownFace (FaceDownState.listed state))
+        Facing.FaceDown state -> not (barredPrinting (OutsideObject.printing entry)) && matchesFace (Card.faceDownFace (FaceDownState.listed state))
         Facing.FaceUp -> admits (OutsideObject.printing entry)
       fromPool = fmap (\(printingId, _) -> OutsideCard.InPool printingId) (filter (\(printingId, n) -> n > 0 && admits printingId) (Map.toAscList pool))
       -- CR 108.3b scopes the reach to the acting player's OWN cards outside the

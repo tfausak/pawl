@@ -1230,9 +1230,13 @@ subgameStateFrom starter parent =
       -- what makes that resumption read the slots the resolution had filled,
       -- proved by Pawl.OutsideTheGameSpec's "a wish that takes the resolving
       -- Shahrazad itself still finishes resolving with the winner it bound".
+      --
+      -- CR 407.3: the nine ante cards are the only ones that remove a card from
+      -- the ante, and a subgame's road out of the main game is not one of them,
+      -- so a main-game ante card is not offered as outside the subgame.
       outside =
         Map.union
-          (Map.mapMaybe asOutside (Map.withoutKeys (GameState.objects parent) (Set.unions [libIds, cmdIds, suppIds])))
+          (Map.mapMaybe asOutside (Map.withoutKeys (GameState.objects parent) (Set.unions [libIds, cmdIds, suppIds, GameState.ante parent])))
           (GameState.outsideObjects parent)
       -- CR 110.5's face-up/face-down status rides along with the printing, and
       -- is the one thing about the parent's object that does. It is not an
