@@ -505,7 +505,7 @@ slotContext pcs perspective unannounced bindings source amount gs =
             Filter.sourceLastExiled = Nothing
           }
       evaluated = amount >>= Quantity.evaluate (Projection.fullView gs) base gs source
-   in -- CR 202.3 / 601.2c: the slot's own computed mana-value bound, evaluated
+   in -- CR 202.3 / 601.2c: the slot's own computed bound, evaluated
       -- against the context above and handed to Filter.ManaValueAtMostAmount,
       -- Filter.ManaValueEqualToAmount and Filter.PowerAtMostAmount.
       -- THIS is the one site that fills it, sourcePower's and slotNames' sibling
