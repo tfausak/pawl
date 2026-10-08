@@ -1,0 +1,81 @@
+{
+  "description": "CR 810.8a a teammate's loss is the team's",
+  "note": "A Two-Headed Giant game. Carol Bolts bob, on 3 life, so he loses (CR 104.3b, 704.5a) while alice is on 20. Alice loses with him, so carol and dave's team wins (CR 104.2c). The control is the same team game without the variant, where CR 104.3g waits for alice too.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1
+      },
+      {
+        "name": "bob",
+        "team": 1,
+        "life": 3
+      },
+      {
+        "name": "carol",
+        "team": 2,
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Lightning Bolt",
+            "label": "bolt"
+          }
+        ]
+      },
+      {
+        "name": "dave",
+        "team": 2
+      }
+    ],
+    "active": "carol",
+    "step": "PrecombatMain",
+    "sharedTeamTurns": true,
+    "twoHeadedGiant": true
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": {
+        "Cast": {
+          "object": "$bolt",
+          "targets": [
+            "$bob"
+          ],
+          "mana": [
+            "$mountain"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": "Pass"
+    }
+  ],
+  "final": [
+    {
+      "View": {
+        "of": "Result",
+        "is": {
+          "teamWon": 2
+        }
+      }
+    },
+    {
+      "Life": {
+        "player": "bob",
+        "life": 0
+      }
+    }
+  ]
+}

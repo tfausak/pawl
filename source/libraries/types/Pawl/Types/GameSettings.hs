@@ -92,13 +92,13 @@ data GameSettings = MkGameSettings
     -- and Pawl.Engine.Departure reads it for CR 809.5b and 809.5c.
     emperors :: Emperors.Emperors,
     -- | CR 810: whether this is a Two-Headed Giant game. Read through
-    -- Pawl.Engine.Engine.skipsDraw for CR 810.6's skipped first draw. The
-    -- variant's other options are their own fields: a caller sets teams (CR
+    -- Pawl.Engine.Engine.skipsDraw for CR 810.6's skipped first draw, and
+    -- Pawl.Engine.Departure.teamFallsWith for CR 810.8a / 810.8b's team loss.
+    -- The variant's other options are their own fields: a caller sets teams (CR
     -- 810.1), sharedTeamTurns (CR 810.2) and sharedTeamLife (CR 810.4) beside
     -- it.
     --
-    -- Not implemented: CR 810.8a's team win and loss (#4495), and CR 810.10's
-    -- shared poison counters (#4494).
+    -- Not implemented: CR 810.10's shared poison counters (#4494).
     twoHeadedGiant :: Bool
   }
   deriving (Eq, Ord, Show)
