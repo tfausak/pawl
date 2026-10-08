@@ -1610,10 +1610,22 @@ eventTriggers events gs =
       -- one group. Proved by Pawl.ZoneTriggerSpec's "CR 603.10a a card's own
       -- leaves-your-graveyard trigger sees its own departure".
       leftGraveyardSame = fmap (Map.filter (not . null . snd) . Map.map (fmap (filter (looksBack . fst))) . Map.unions . fmap (leftGraveyard . LoggedEvent.event) . NonEmpty.toList) groups
+      -- CR 603.10a on the ARRIVAL side: a look-back condition is checked against
+      -- "the appearance of objects immediately prior to the event", when a card
+      -- the event's OWN group put into a graveyard was not there yet. So such a
+      -- card keeps only its first-sentence conditions for that group -- the
+      -- Nether Traitor ruling, "if Nether Traitor and another creature are put
+      -- into your graveyard at the same time, Nether Traitor's ability won't
+      -- trigger". Pawl.ZoneTriggerSpec's "CR 603.10a a Kami of Mourning grant
+      -- does not see the death that buried its own card" proves it.
+      arrivedSame = fmap arrivalsIn groups
+      notYetThere arrived =
+        Map.filter (not . null . snd) . Map.mapWithKey (\oid entry -> if Set.member oid arrived then fmap (filter (not . looksBack . fst)) entry else entry)
       -- The graveyard each group's events are checked against: the live read,
       -- plus what departed later or looks back at its own departure, less what
-      -- arrived later.
-      graveyardAt = List.zipWith3 (\same later arrived -> Map.withoutKeys (Map.unions [inGraveyards, later, same]) arrived) leftGraveyardSame leftGraveyardLater arrivedLater
+      -- arrived later, and less the look-back conditions of what arrived in
+      -- this very group.
+      graveyardAt = List.zipWith4 (\same later arrived here -> notYetThere here (Map.withoutKeys (Map.unions [inGraveyards, later, same]) arrived)) leftGraveyardSame leftGraveyardLater arrivedLater arrivedSame
       -- CR 603.10a, the other half of that rule: for a LOOK-BACK condition the
       -- board that matters is "the appearance of objects immediately prior to the
       -- event", on which every permanent this same event removed was still
@@ -1780,8 +1792,10 @@ eventTriggers events gs =
       -- Yixlid Jailer's "cards in graveyards lose all abilities" silences them --
       -- Pawl.ZoneTriggerSpec's "CR 613.1f Yixlid Jailer keeps a milled Narcomoeba
       -- from triggering" proves it. A card whose ability face has no such
-      -- ability is projected only for a keyword grant, so a triggered ability an
-      -- effect GRANTS in a graveyard is not seen (gap #4708).
+      -- ability is projected only while a keyword grant or a triggered-ability
+      -- grant is in force (`graveyardGrantInForce`), which is how Kami of
+      -- Mourning's perpetual grant is seen -- Pawl.ZoneTriggerSpec's "CR 113.6m a
+      -- Kami of Mourning grant returns the card when a greater creature dies".
       -- The controller is the OWNER, CR 113.8's second clause: a card in a
       -- graveyard has no controller (CR 108.4).
       --
@@ -1820,7 +1834,9 @@ eventTriggers events gs =
       -- Does anything grant a keyword that mints a graveyard trigger? A thunk,
       -- `exileGrantInForce`'s twin. Haunt mints only on an instant or sorcery,
       -- so the roster is asked with both types: a superset.
-      graveyardGrantInForce = Projection.mintingGrantInForce (Keyword.graveyardTriggeredAbilitiesOf Projection.spellStaticTypes) gs
+      -- A triggered ability granted outright counts too (CR 613.1f), in the same
+      -- walk.
+      graveyardGrantInForce = Projection.mintingOrTriggeredGrantInForce (Keyword.graveyardTriggeredAbilitiesOf Projection.spellStaticTypes) gs
       inGraveyards =
         Map.fromList
           (concatMap (Maybe.mapMaybe graveyardCandidate . Foldable.toList) (Map.elems (GameState.graveyard gs)))
@@ -1840,10 +1856,9 @@ eventTriggers events gs =
       -- Abilities from the last known projection rather than a printed face: a
       -- ceased id has no face to look up, and `LastKnown` carries none. So a
       -- granted ability is seen here -- Oglor, Devoted Assistant's perpetual
-      -- leaves-your-graveyard trigger, which only this source serves, and
+      -- leaves-your-graveyard trigger, for a card that has already left, and
       -- Pawl.ZoneTriggerSpec's "CR 603.10a Oglor's perpetual grant fires as the
-      -- milled card leaves the graveyard" proves it -- where `inGraveyards`'
-      -- ability-face gate would miss one (gap #4708). Not `abilitiesOf` either,
+      -- milled card leaves the graveyard" proves it. Not `abilitiesOf` either,
       -- and not `graveyardTriggeredAbilitiesOf`, which `inGraveyards` does consult:
       -- both abilities on that roster -- CR 702.59a's recover and CR 702.55a's
       -- haunt on an instant or sorcery -- move the card they are on, and an id
@@ -1906,11 +1921,8 @@ eventTriggers events gs =
       -- exiled -- Pawl.SpecialActionSpec's "CR 702.62a Delay" group proves it.
       -- Gated so the scan does not project every exiled card: a card is
       -- projected only when its ability face (Projection.abilityFaceOf) yields
-      -- such an ability or some grantor writes a keyword that mints one
-      -- (`exileGrantInForce`).
-      --
-      -- Not implemented: a triggered ability granted to a card in exile with no
-      -- keyword behind it, which that gate does not consult (#4708).
+      -- such an ability, some grantor writes a keyword that mints one,
+      -- or some grantor hands out a triggered ability (`exileGrantInForce`).
       --
       -- The controller is the OWNER (CR 108.4a), for `inGraveyards`' reason: CR
       -- 108.4 gives a card in exile no controller at all, so Blind Hunter's "you
@@ -1947,9 +1959,10 @@ eventTriggers events gs =
                             [] -> Nothing
                             abilities -> Just (oid, (Object.owner obj, abilities))
         _ -> Nothing
-      -- Does anything grant a keyword that mints an exile trigger? A thunk:
+      -- Does anything grant a keyword that mints an exile trigger, or a triggered
+      -- ability outright? A thunk:
       -- only an exiled card whose ability face yields none forces it.
-      exileGrantInForce = Projection.mintingGrantInForce Keyword.exileTriggeredAbilitiesOf gs
+      exileGrantInForce = Projection.mintingOrTriggeredGrantInForce Keyword.exileTriggeredAbilitiesOf gs
       inExile = Map.fromList (Maybe.mapMaybe exileCandidate (Set.toAscList (GameState.exile gs)))
       -- CR 702.35a's SECOND ability, for the card its first ability exiled:
       -- minted off the madness ability the discard RECORDED as applied

@@ -429,6 +429,7 @@ filterNames asking criterion = case criterion of
   Filter.PowerAtLeastAmountInSlot slot -> slotNames asking slot
   Filter.ManaValueAtMost _n -> False
   Filter.ManaValueLessThanSource -> False
+  Filter.ManaValueGreaterThanSource -> False
   Filter.ManaValueEqualToSource -> False
   Filter.ManaValueIsEven -> False
   Filter.ManaValueAtMostAmount -> contextNames asking

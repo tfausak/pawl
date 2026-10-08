@@ -116,6 +116,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.ManaValueLessThanSource
       " {\"type\":\"ManaValueLessThanSource\"} "
+  Spec.it s "ManaValueGreaterThanSource" $
+    Common.assertCodec
+      s
+      codec
+      Filter.ManaValueGreaterThanSource
+      " {\"type\":\"ManaValueGreaterThanSource\"} "
   Spec.it s "ManaValueEqualToSource" $ do
     Common.assertCodec
       s

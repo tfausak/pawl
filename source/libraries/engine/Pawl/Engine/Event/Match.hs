@@ -14342,7 +14342,18 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     -- CR 603.7c: a delayed ability's filters read the objects its creating
     -- effect named, The Ruinous Powers' "a spell [cast] this way". `bindings`
     -- is empty for every other trigger, so their slot atoms stay vacuous.
-    bearerContext = (SourceContext.sourceContext gs (Just you) bearer) {Filter.slotObjects = Binding.slotObjects bindings}
+    --
+    -- The bearer's mana value too (CR 202.3), lazily, for a condition comparing
+    -- against "this card" (Filter.ManaValueGreaterThanSource): live for a bearer
+    -- in a graveyard, and its last known information for one the event itself
+    -- removed, CR 603.10a's look back. Pawl.ZoneTriggerSpec's "CR 113.6m a Kami
+    -- of Mourning grant returns the card when a greater creature dies" proves
+    -- it.
+    bearerContext =
+      (SourceContext.sourceContext gs (Just you) bearer)
+        { Filter.slotObjects = Binding.slotObjects bindings,
+          Filter.sourceManaValue = Filter.manaValue =<< Projection.viewWithLastKnown bearer gs bearer
+        }
 
 -- CR 106.12a's second half: did an activation that produced @produced@ produce
 -- the mana this condition specified? The narrowing half of the
