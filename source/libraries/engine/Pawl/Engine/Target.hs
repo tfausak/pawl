@@ -347,12 +347,12 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- attacking creature, and `source` is the object CR 113.7 says the
             -- ability came from. A source that never attacked -- Yare, a spell
             -- -- has no creature to resolve it by, so CR 802.2a's controller
-            -- chooses among every defending player, and choosing the target
-            -- is that choice: its controller is the one chosen. CR 601.2
-            -- announces no such choice, so it is made wherever the reference
-            -- is read, CR 608.2b's re-check included: the target stays legal
-            -- while any defending player controls it.
-            Filter.defendingPlayers = maybe (Defender.designatedPlayers gs) pure (Defender.defendingPlayerOf Projection.controllerWithLastKnown source gs),
+            -- chooses one defending player: any of them while the targets are
+            -- being chosen, and at CR 608.2b the one the announcement chose
+            -- (stampDefendingPlayers).
+            Filter.defendingPlayers = case Defender.defendingPlayerOf Projection.controllerWithLastKnown source gs of
+              Just defending -> [defending]
+              Nothing -> maybe (Defender.designatedPlayers gs) Set.toList (Map.lookup Binding.chosenDefendingPlayers (Binding.slotPlayers bindings)),
             -- Nothing: a target slot is judged before the effect names anyone, so
             -- there is no recipient it could have reached yet. CR 119.5's atom
             -- lives in an effect's QUANTITY, which is evaluated later and
@@ -2139,6 +2139,31 @@ announcedSlots controller source gs =
   splitPerPlayer
     (\_ each -> List.filter (PlayerRelation.holds (Game.teams gs) (SlotPerPlayer.players each) controller) (Game.reachableBy controller gs))
     (\copy -> not (Set.null (legalRecipients (Just controller) source copy gs)))
+
+-- CR 802.2a: the defending player an announcement chose, for a source with no
+-- attacking creature to resolve "defending player" by. The target settles it --
+-- its controller is the one defending player that makes it legal -- so the
+-- choice is elided rather than asked, and recorded under
+-- Binding.chosenDefendingPlayers for CR 608.2b's re-check. Nothing is stamped
+-- for an attacking source, whose defending player CR 508.5 already fixes, nor
+-- when no chosen target is a defending player's.
+--
+-- Not implemented: a choice the targets do not settle -- targets of several
+-- defending players are all recorded, and a negated atom names nobody (#4804).
+stampDefendingPlayers :: ObjectId -> Map SlotName (Set Recipient) -> GameState -> Map SlotName Binding.Type.Binding -> Map SlotName Binding.Type.Binding
+stampDefendingPlayers source chosen gs bindings = case Defender.defendingPlayerOf Projection.controllerWithLastKnown source gs of
+  Just _ -> bindings
+  Nothing ->
+    let designated = Defender.designatedPlayers gs
+        chosenBy =
+          Set.fromList
+            [ pid
+            | recipient <- concatMap Set.toList (Map.elems chosen),
+              Just oid <- [Recipient.objectOf recipient],
+              Just pid <- [Projection.controllerOf oid gs],
+              List.elem pid designated
+            ]
+     in if Set.null chosenBy then bindings else Map.insert Binding.chosenDefendingPlayers (Binding.toPlayers chosenBy) bindings
 
 -- CR 608.2b: the copies an announcement BOUND, read back off the binding names,
 -- so each target is re-judged against the player it was chosen for. By name

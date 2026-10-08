@@ -192,9 +192,11 @@ attackableOpponents gs =
       -- designateDefenders files them as Combat.barred.
       if GameSettings.alternatingTeams (GameState.settings gs) then beside allowed else allowed
 
--- CR 802.2 / 801.3: the active player's opponents still playing and within
--- their range of influence, in APNAP order -- attackableOpponents before any
--- attack option or CR 811.4 cuts it, and under CR 802.2 the defending players.
+-- CR 801.3: the active player's opponents still playing and within their range
+-- of influence, in APNAP order -- attackableOpponents before any attack option
+-- or CR 811.4 cuts it. Under CR 802.2 these are the defending players: CR 802.2
+-- names every opponent, but CR 801.2's range covers attacking and making
+-- choices, so an opponent outside it is not designated.
 opponentsInRange :: GameState -> [PlayerId]
 opponentsInRange gs =
   let playing = Game.stillPlaying gs
@@ -1862,10 +1864,10 @@ designateDefenders = do
   Monad.forM_ (Game.ruleChooser gs pid) $ \chooser -> do
     let settings = GameState.settings gs
         attackable = attackableOpponents gs
-    -- CR 802.2 / 811.4: every opponent is a defending player, the ones no
-    -- creature may attack included -- filed apart from the rest, and even when
-    -- nobody can be attacked at all. Pawl.Engine.Defender.designatedPlayers
-    -- reads them.
+    -- CR 802.2 / 811.4: every opponent in range is a defending player (CR
+    -- 801.2 keeps the rest out), the ones no creature may attack included --
+    -- filed apart from the rest, and even when nobody can be attacked at all.
+    -- Pawl.Engine.Defender.designatedPlayers reads them.
     let barred = filter (`List.notElem` attackable) (opponentsInRange gs)
     Monad.when (GameSettings.attackOption settings == Just AttackOption.MultiplePlayers && not (GameSettings.sharedTeamTurns settings)) $
       State.modify' (\g -> g {GameState.combat = (GameState.combat g) {Combat.barred = barred}})
