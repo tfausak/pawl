@@ -131,6 +131,7 @@ import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counter as Counter
+import qualified Pawl.Types.CounterDestination as CounterDestination
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.CounterPlacement as CounterPlacement
@@ -303,6 +304,7 @@ import qualified Pawl.Types.Reinforce as Reinforce
 import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
+import qualified Pawl.Types.RemovePlayerCounters as RemovePlayerCounters
 import qualified Pawl.Types.Repeat as Repeat
 import qualified Pawl.Types.RepeatIf as RepeatIf
 import qualified Pawl.Types.Replace as Replace
@@ -730,7 +732,7 @@ playerRefPositions =
         ("create", Effect.Create (Create.MkCreate one () EntryRiders.defaultValue Nothing (plantedPlayer "cr")), [plantedPlayer "cr"]),
         ("skip-next-phase", Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase (plantedPlayer "sn") PhaseSelector.CombatPhase), [plantedPlayer "sn"]),
         ("gain-player-counters", Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters (plantedPlayer "gp") PlayerCounterKind.Rad one), [plantedPlayer "gp"]),
-        ("remove-player-counters", Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters (plantedPlayer "rp") PlayerCounterKind.Rad one), [plantedPlayer "rp"]),
+        ("remove-player-counters", Effect.RemovePlayerCounters (RemovePlayerCounters.MkRemovePlayerCounters (plantedPlayer "rp") PlayerCounterKind.Rad one Nothing), [plantedPlayer "rp"]),
         ("require-attack", Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (RestrictedCreatures.Named (plantedRef "ra")) (AttackTargetRef.Players (plantedPlayer "ra-defender"))), [plantedPlayer "ra-defender"]),
         ("give-control", Effect.GiveControl (GiveControl.MkGiveControl (plantedPlayer "gv") (plantedRef "gv")), [plantedPlayer "gv"]),
         ("blight", Effect.Blight (Blight.MkBlight (plantedPlayer "bl") one Nothing), [plantedPlayer "bl"]),
@@ -1038,6 +1040,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 603.6a's Filter is a predicate over the entering permanent, and a
   -- Filter holds no Count (Pawl.Types.Filter's atoms are all characteristics).
   TriggerCondition.PermanentEnters _ -> []
+  TriggerCondition.PermanentsEnter _ -> []
   TriggerCondition.CardPutIntoGraveyard _ -> []
   TriggerCondition.PermanentDies _ -> []
   TriggerCondition.PermanentsDie _ -> []
@@ -1379,7 +1382,7 @@ ownCounts effect = case effect of
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _ _) -> quantityCounts quantity
   Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count _ _ _) -> foldMap quantityCounts (RemovalCount.quantityOf count)
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
-  Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
+  Effect.RemovePlayerCounters removal -> quantityCounts (RemovePlayerCounters.quantity removal)
   Effect.PayAnyEnergy _ -> []
   Effect.ChooseNumber _ -> []
   Effect.Tap _ -> []
@@ -1426,6 +1429,7 @@ ownCounts effect = case effect of
   Effect.Unsuspect _ -> []
   Effect.SetHalfLocked {} -> []
   Effect.Evolve _ -> []
+  Effect.BecomeProtector _ -> []
   Effect.Mentor _ -> []
   Effect.Exploit -> []
   Effect.GiveGift -> []
@@ -1898,6 +1902,7 @@ effectNestedEffects effect = case effect of
   Effect.Unsuspect {} -> []
   Effect.SetHalfLocked {} -> []
   Effect.Evolve {} -> []
+  Effect.BecomeProtector {} -> []
   Effect.Mentor {} -> []
   Effect.Exploit -> []
   Effect.GiveGift -> []
@@ -2445,6 +2450,7 @@ effectReplacements effect = case effect of
   Effect.Unsuspect _ -> []
   Effect.SetHalfLocked {} -> []
   Effect.Evolve _ -> []
+  Effect.BecomeProtector _ -> []
   Effect.Mentor _ -> []
   Effect.Exploit -> []
   Effect.GiveGift -> []
@@ -2704,6 +2710,7 @@ reservedSlots =
       Binding.triggerPlayer,
       Binding.gatePlayers,
       Binding.mayPlayers,
+      Binding.chosenDefendingPlayers,
       Binding.facingPlayers,
       Binding.became,
       Binding.handArrival,
@@ -2969,6 +2976,7 @@ effectMintedFaces effect = case effect of
   Effect.Unsuspect _ -> []
   Effect.SetHalfLocked {} -> []
   Effect.Evolve _ -> []
+  Effect.BecomeProtector _ -> []
   Effect.Mentor _ -> []
   Effect.Exploit -> []
   Effect.GiveGift -> []
@@ -4276,6 +4284,7 @@ staticAbilityFilters ability =
 triggerConditionFilters :: TriggerCondition.TriggerCondition -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PermanentEnters f -> unframed [f]
+  TriggerCondition.PermanentsEnter f -> unframed [f]
   -- CR 709.5h names a half by name; nothing about the door is a Filter.
   TriggerCondition.SelfHalfUnlocked _ -> []
   -- CR 709.5i names a PlayerRelation; nothing about it is a Filter.
@@ -4582,6 +4591,7 @@ triggerConditionSlots :: TriggerCondition.TriggerCondition -> [SlotName.SlotName
 triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.SelfEnters -> []
   TriggerCondition.PermanentEnters _ -> []
+  TriggerCondition.PermanentsEnter _ -> []
   TriggerCondition.StepBegins _ -> []
   -- CR 603.8's state trigger holds a Condition, which is a pair of Quantities
   -- and Filters -- no SlotName of its own.
@@ -4815,6 +4825,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.PowerAtLeastAmountInSlot _ -> []
   Filter.Type.ManaValueAtMost _ -> []
   Filter.Type.ManaValueLessThanSource -> []
+  Filter.Type.ManaValueGreaterThanSource -> []
   Filter.Type.ManaValueEqualToSource -> []
   Filter.Type.ManaValueIsEven -> []
   Filter.Type.ManaValueAtMostAmount -> []
@@ -6066,7 +6077,10 @@ effectFilters effect = case effect of
   Effect.ExchangeBlocks _ -> []
   -- Swift Silence's "all other spells" is an ObjectRef Filter like Destroy's,
   -- so the lint reaches it.
-  Effect.Counter (Counter.MkCounter ref _ _ _) -> frame SourceHostFramed (objectRefFilters ref)
+  -- Desertion's "if an artifact or creature spell" is no ObjectRef's filter:
+  -- the Counter arm matches it through Resolve.Slots.effectContext with no
+  -- host overlay, so it is Unframed.
+  Effect.Counter (Counter.MkCounter ref _ _ instead) -> frame SourceHostFramed (objectRefFilters ref) <> fmap ((,) Unframed) (foldMap (Foldable.toList . CounterDestination.only) instead)
   -- All THREE positions: the ObjectRef carries Renegade Krasis' "each other
   -- creature you control with a +1/+1 counter on it", and a Filter there would
   -- otherwise escape the lint; the count is a Quantity like any other; and CR
@@ -6091,7 +6105,7 @@ effectFilters effect = case effect of
   -- RemoveCounters' two unframed positions, and MoveCounters' `from`.
   Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count from which _) -> frame Unframed (whichCountersFilters which <> foldMap quantityFilters (RemovalCount.quantityOf count)) <> frame SourceHostFramed (objectRefFilters from)
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> frame Unframed (quantityFilters quantity)
-  Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> frame Unframed (quantityFilters quantity)
+  Effect.RemovePlayerCounters removal -> frame Unframed (quantityFilters (RemovePlayerCounters.quantity removal))
   Effect.PayAnyEnergy _ -> []
   Effect.ChooseNumber _ -> []
   Effect.Tap ref -> frame SourceHostFramed (objectRefFilters ref)
@@ -6161,6 +6175,7 @@ effectFilters effect = case effect of
   Effect.Unsuspect ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.SetHalfLocked {} -> []
   Effect.Evolve _ -> []
+  Effect.BecomeProtector _ -> []
   Effect.Mentor _ -> []
   Effect.Exploit -> []
   Effect.GiveGift -> []

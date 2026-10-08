@@ -1,0 +1,161 @@
+{
+  "description": "CR 802.2 an opponent who can't be attacked is still a defending player",
+  "note": "Alternating Teams as CR 811.3's example seats it, under attack multiple players (CR 811.2b): alice and dave are team 1, bob and erin team 2, carol and frank team 3. alice attacks bob; carol, not seated next to her, can't be attacked (CR 811.4) but is a defending player all the same, so her Yare reaches her own Grizzly Bears (CR 802.2a, the caster choosing among the defending players). dave, alice's teammate, is no defending player, so his Yare can't target his own Bears.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1,
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "team": 2
+      },
+      {
+        "name": "carol",
+        "team": 3,
+        "hand": [
+          {
+            "card": "Yare",
+            "label": "carol yare"
+          }
+        ],
+        "battlefield": [
+          {
+            "card": "Grizzly Bears",
+            "label": "carol bears",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "carol plains 1"
+          },
+          {
+            "card": "Plains",
+            "label": "carol plains 2"
+          },
+          {
+            "card": "Plains",
+            "label": "carol plains 3"
+          }
+        ]
+      },
+      {
+        "name": "dave",
+        "team": 1,
+        "hand": [
+          {
+            "card": "Yare",
+            "label": "dave yare"
+          }
+        ],
+        "battlefield": [
+          {
+            "card": "Grizzly Bears",
+            "label": "dave bears",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "dave plains 1"
+          },
+          {
+            "card": "Plains",
+            "label": "dave plains 2"
+          },
+          {
+            "card": "Plains",
+            "label": "dave plains 3"
+          }
+        ]
+      },
+      {
+        "name": "erin",
+        "team": 2
+      },
+      {
+        "name": "frank",
+        "team": 3
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "alternatingTeams": true
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$piker"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "$piker",
+      "do": {
+        "ChooseAttackTarget": "$bob"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "dave",
+      "refuse": {
+        "Cast": {
+          "object": "$dave yare",
+          "targets": [
+            "$dave bears"
+          ],
+          "mana": [
+            "$dave plains 1",
+            "$dave plains 2",
+            "$dave plains 3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "carol",
+      "do": {
+        "Cast": {
+          "object": "$carol yare",
+          "targets": [
+            "$carol bears"
+          ],
+          "mana": [
+            "$carol plains 1",
+            "$carol plains 2",
+            "$carol plains 3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$carol bears",
+          "power": 5,
+          "toughness": 2
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,152 @@
+{
+  "description": "CR 811.4 a player can't attack opponents who aren't seated next to them",
+  "note": "Three teams of two seated as CR 811.3's example: alice and dave are team 1, bob and erin team 2, carol and frank team 3, under CR 802's attack multiple players option (CR 811.2b). bob concedes on alice's turn: his seat is still there that turn, so only frank may be attacked; from her next turn the seats have closed up (CR 801.2c, as CR 809.3c reads the same phrase) and carol, now beside her, may be attacked too.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1,
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "team": 2,
+        "library": [
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "team": 3,
+        "library": [
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          }
+        ]
+      },
+      {
+        "name": "dave",
+        "team": 1,
+        "library": [
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          }
+        ]
+      },
+      {
+        "name": "erin",
+        "team": 2,
+        "library": [
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          }
+        ]
+      },
+      {
+        "name": "frank",
+        "team": 3,
+        "library": [
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain",
+    "alternatingTeams": true
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": "Concede"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$piker"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Defenders": {
+          "players": [
+            "frank"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 6,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$piker"
+        ]
+      }
+    },
+    {
+      "turn": 6,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "$piker",
+      "do": {
+        "ChooseAttackTarget": "$carol"
+      }
+    },
+    {
+      "turn": 6,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Defenders": {
+          "players": [
+            "carol",
+            "frank"
+          ]
+        }
+      }
+    }
+  ]
+}

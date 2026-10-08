@@ -8,6 +8,7 @@ import qualified Pawl.ActivateSpec
 import qualified Pawl.ActivationProhibitionSpec
 import qualified Pawl.AdventureSpec
 import qualified Pawl.AirbendSpec
+import qualified Pawl.AlternatingTeamsSpec
 import qualified Pawl.ArchenemySpec
 import qualified Pawl.AttackKeywordTriggerSpec
 import qualified Pawl.AttractionSpec
@@ -183,6 +184,7 @@ import qualified Pawl.Codec.CountIsSpec
 import qualified Pawl.Codec.CountSpec
 import qualified Pawl.Codec.CountedDiscardSpec
 import qualified Pawl.Codec.CounterChangeSpec
+import qualified Pawl.Codec.CounterDestinationSpec
 import qualified Pawl.Codec.CounterKindSpec
 import qualified Pawl.Codec.CounterNameSpec
 import qualified Pawl.Codec.CounterPatternSpec
@@ -193,6 +195,7 @@ import qualified Pawl.Codec.CounterSpec
 import qualified Pawl.Codec.CounterSpreadSpec
 import qualified Pawl.Codec.CounterSubjectSpec
 import qualified Pawl.Codec.CounterabilitySpec
+import qualified Pawl.Codec.CounteredEndSpec
 import qualified Pawl.Codec.CounteringSpec
 import qualified Pawl.Codec.CountersAreSpec
 import qualified Pawl.Codec.CountersFromPermanentsSpec
@@ -448,6 +451,7 @@ import qualified Pawl.Codec.PhasePatternSpec
 import qualified Pawl.Codec.PhaseSelectorSpec
 import qualified Pawl.Codec.PhaseSpec
 import qualified Pawl.Codec.PhasedOutSpec
+import qualified Pawl.Codec.PileDrawSpec
 import qualified Pawl.Codec.PileSpec
 import qualified Pawl.Codec.PlacementSpec
 import qualified Pawl.Codec.PlanarDieFaceSpec
@@ -504,6 +508,7 @@ import qualified Pawl.Codec.ReferenceSpec
 import qualified Pawl.Codec.RegenerabilitySpec
 import qualified Pawl.Codec.ReinforceSpec
 import qualified Pawl.Codec.RemoveCountersSpec
+import qualified Pawl.Codec.RemovePlayerCountersSpec
 import qualified Pawl.Codec.RepeatIfSpec
 import qualified Pawl.Codec.RepeatSpec
 import qualified Pawl.Codec.ReplaceSpec
@@ -850,6 +855,7 @@ spec s registry = do
   Pawl.AbilitySlotLintSpec.spec s registry
   Pawl.EffectLintSpec.spec s registry
   Pawl.EmperorSpec.spec s registry
+  Pawl.AlternatingTeamsSpec.spec s registry
   Pawl.FilterPositionLintSpec.spec s registry
   Pawl.CardsSpec.spec s
   Pawl.OracleSpec.spec s
@@ -1016,6 +1022,8 @@ spec s registry = do
   Pawl.Codec.CounterNameSpec.spec s
   Pawl.Codec.CounterPatternSpec.spec s
   Pawl.Codec.CounterRSpec.spec s
+  Pawl.Codec.CounterDestinationSpec.spec s
+  Pawl.Codec.CounteredEndSpec.spec s
   Pawl.Codec.CounterSpec.spec s
   Pawl.Codec.CounterSpreadSpec.spec s
   Pawl.Codec.CountersFromPermanentsSpec.spec s
@@ -1304,6 +1312,7 @@ spec s registry = do
   Pawl.Codec.ActivationSpec.spec s
   Pawl.Codec.PhasedOutSpec.spec s
   Pawl.Codec.PileSpec.spec s
+  Pawl.Codec.PileDrawSpec.spec s
   Pawl.Codec.PlayPermissionOriginSpec.spec s
   Pawl.Codec.PlayerCounterKindSpec.spec s
   Pawl.Codec.PlayerAttacksPlayerSpec.spec s
@@ -1352,6 +1361,7 @@ spec s registry = do
   Pawl.Codec.RegenerabilitySpec.spec s
   Pawl.Codec.ReinforceSpec.spec s
   Pawl.Codec.RemoveCountersSpec.spec s
+  Pawl.Codec.RemovePlayerCountersSpec.spec s
   Pawl.Codec.CountersFromThisSpec.spec s
   Pawl.Codec.ReplaceSpec.spec s
   Pawl.Codec.ReplacementEffectSpec.spec s

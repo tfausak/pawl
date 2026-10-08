@@ -1,0 +1,112 @@
+{
+  "description": "CR 704.6b a team with fifteen poison counters loses",
+  "note": "A Two-Headed Giant game with alice and bob's team on thirteen poison counters. Carol's Ichor Rats gives each player a poison counter as it enters. The team reaches fifteen and loses (CR 704.6b, 810.8d), while carol and dave's team, on two, wins.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1,
+        "counters": [
+          {
+            "key": {
+              "type": "Poison"
+            },
+            "value": 13
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "team": 1,
+        "counters": [
+          {
+            "key": {
+              "type": "Poison"
+            },
+            "value": 13
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "team": 2,
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "swamp-1"
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-2"
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-3"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Ichor Rats",
+            "label": "rats"
+          }
+        ]
+      },
+      {
+        "name": "dave",
+        "team": 2
+      }
+    ],
+    "active": "carol",
+    "step": "PrecombatMain",
+    "sharedTeamTurns": true,
+    "twoHeadedGiant": true
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": {
+        "Cast": {
+          "object": "$rats",
+          "mana": [
+            "$swamp-1",
+            "$swamp-2",
+            "$swamp-3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": "Pass"
+    }
+  ],
+  "final": [
+    {
+      "View": {
+        "of": "Result",
+        "is": {
+          "teamWon": 2
+        }
+      }
+    },
+    {
+      "PlayerCounters": {
+        "player": "carol",
+        "kind": {
+          "type": "Poison"
+        },
+        "count": 2
+      }
+    }
+  ]
+}

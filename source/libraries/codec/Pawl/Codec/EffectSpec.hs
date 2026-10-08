@@ -162,6 +162,7 @@ import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
+import qualified Pawl.Types.RemovePlayerCounters as RemovePlayerCounters
 import qualified Pawl.Types.Repeat as Repeat
 import qualified Pawl.Types.RepeatIf as RepeatIf
 import qualified Pawl.Types.Replace as Replace
@@ -1379,7 +1380,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad (Quantity.InSlot (SlotName.MkSlotName (Text.pack "milled")))))
+      (Effect.RemovePlayerCounters (RemovePlayerCounters.MkRemovePlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad (Quantity.InSlot (SlotName.MkSlotName (Text.pack "milled"))) Nothing))
       " {\"type\":\"RemovePlayerCounters\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"kind\":{\"type\":\"Rad\"},\"quantity\":{\"type\":\"InSlot\",\"value\":\"milled\"}}} "
   -- CR 701.26a's Tap is Untap's mirror and shares its wire shape, so the two
   -- must not collapse into one tag.
@@ -2126,6 +2127,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Evolve (SlotName.MkSlotName (Text.pack "self")))
       " {\"type\":\"Evolve\",\"value\":\"self\"} "
+  Spec.it s "BecomeProtector" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.BecomeProtector (SlotName.MkSlotName (Text.pack "target")))
+      " {\"type\":\"BecomeProtector\",\"value\":\"target\"} "
   -- CR 702.134a's counter and CR 702.134c's marker. The slot is the ability's
   -- chosen target rather than "self", which is what parts it from Evolve above.
   Spec.it s "Mentor" $

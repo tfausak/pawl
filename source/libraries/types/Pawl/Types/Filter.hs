@@ -111,6 +111,10 @@ data Filter keyword
     -- reading one characteristic over -- read off Pawl.Engine.Filter.Context's
     -- sourceManaValue, and vacuously False where either mana value is absent.
     ManaValueLessThanSource
+  | -- | CR 202.3: the object's mana value is strictly greater than the source's
+    -- -- Kami of Mourning's "a creature you control with greater mana value than
+    -- this card"; vacuously False where either mana value is absent.
+    ManaValueGreaterThanSource
   | -- | CR 202.3 compared against the SOURCE for EQUALITY rather than order: the
     -- object's mana value is the same as the mana value of the object the
     -- evaluation comes from (CR 702.53a's transmute, CR 702.71a's transfigure).
@@ -136,10 +140,11 @@ data Filter keyword
     ManaValueEqualToAmount
   | ControlledBy PlayerRelation.PlayerRelation -- CR 109.5 / 102.2: controller relates thus to the perspective.
   | -- | CR 508.5: the candidate's controller is the DEFENDING PLAYER for the
-    -- object the evaluation comes from (CR 702.39a's provoke). Not @ControlledBy
-    -- Opponent@, which on a three-seat board admits a creature controlled by an
-    -- opponent who is not being attacked at all. Vacuously False where the source
-    -- has no defending player.
+    -- object the evaluation comes from (CR 702.39a's provoke), or, for a source
+    -- with no attack to resolve it, any defending player (CR 802.2a, Yare). Not
+    -- @ControlledBy Opponent@, which on a three-seat board admits a creature
+    -- controlled by an opponent who is not being attacked at all. Vacuously False
+    -- outside combat.
     ControlledByDefendingPlayer
   | -- | CR 603.2: the candidate's controller is the PLAYER BOUND at this slot --
     -- Trygon Predator's "that player", the one the trigger's own event named.

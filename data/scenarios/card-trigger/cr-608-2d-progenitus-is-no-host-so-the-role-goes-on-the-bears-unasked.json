@@ -1,6 +1,6 @@
 {
-  "description": "CR 603.7b a fourth seat in the batch is still not a question",
-  "note": "The same line with four seats: one Relapse trigger and no question (an unscheduled prompt would fail the run), alice at 21 and dave, like bob and carol, at 24.",
+  "description": "CR 608.2d Progenitus is no host, so the Role goes on the Bears unasked",
+  "note": "Rise of the Dark Realms returns Progenitus and Grizzly Bears together, so the armed boon fires once for both. Progenitus's protection from everything leaves the Bears the only legal host, so alice is asked nothing (an unscheduled prompt would fail the run) and the Role is not lost.",
   "board": {
     "seats": [
       {
@@ -17,32 +17,76 @@
             "ready": true
           },
           {
-            "card": "Forest",
-            "label": "f",
+            "card": "Swamp",
+            "label": "s3",
             "ready": true
           },
           {
-            "card": "Plains",
-            "label": "p",
+            "card": "Swamp",
+            "label": "s4",
             "ready": true
           },
           {
-            "card": "Mountain",
-            "label": "m",
+            "card": "Swamp",
+            "label": "b1",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "b2",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "b3",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "b4",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "b5",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "b6",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "b7",
             "ready": true
           }
         ],
         "hand": [
           {
-            "card": "Synthetic Communal Relapse",
-            "label": "relapse"
+            "card": "Dunbarrow Revivalist",
+            "label": "rev"
           },
           {
-            "card": "Centaur Peacemaker",
-            "label": "peacemaker"
+            "card": "Rise of the Dark Realms",
+            "label": "rise"
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Progenitus"
+          },
+          {
+            "card": "Grizzly Bears"
           }
         ],
         "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
           {
             "card": "Island"
           },
@@ -59,23 +103,7 @@
           },
           {
             "card": "Island"
-          }
-        ]
-      },
-      {
-        "name": "carol",
-        "library": [
-          {
-            "card": "Island"
           },
-          {
-            "card": "Island"
-          }
-        ]
-      },
-      {
-        "name": "dave",
-        "library": [
           {
             "card": "Island"
           },
@@ -95,7 +123,7 @@
       "player": "alice",
       "do": {
         "Cast": {
-          "object": "$relapse",
+          "object": "$rev",
           "mana": [
             "$s1",
             "$s2",
@@ -114,13 +142,36 @@
       "turn": 1,
       "step": "PrecombatMain",
       "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
       "do": {
         "Cast": {
-          "object": "$peacemaker",
+          "object": "$rise",
           "mana": [
-            "$m",
-            "$f",
-            "$p"
+            "$s3",
+            "$s4",
+            "$b1",
+            "$b2",
+            "$b3",
+            "$b4",
+            "$b5",
+            "$b6",
+            "$b7"
           ]
         }
       }
@@ -135,30 +186,22 @@
       "turn": 1,
       "step": "PrecombatMain",
       "player": "alice",
-      "check": {
-        "View": {
-          "of": "Stack",
-          "is": [
-            "trigger of Centaur Peacemaker"
-          ]
-        }
+      "do": {
+        "OrderTimestamps": [
+          "Progenitus",
+          "Grizzly Bears"
+        ]
       }
     },
     {
       "turn": 1,
       "step": "PrecombatMain",
       "player": "alice",
-      "do": "Pass"
-    },
-    {
-      "turn": 1,
-      "step": "PrecombatMain",
-      "player": "alice",
       "check": {
         "View": {
           "of": "Stack",
           "is": [
-            "trigger of Synthetic Communal Relapse"
+            "trigger of Dunbarrow Revivalist"
           ]
         }
       }
@@ -185,9 +228,10 @@
       "step": "PrecombatMain",
       "player": "alice",
       "check": {
-        "Life": {
-          "player": "alice",
-          "life": 21
+        "View": {
+          "of": "AttachedTo",
+          "object": "Wicked",
+          "is": "Grizzly Bears"
         }
       }
     },
@@ -196,31 +240,10 @@
       "step": "PrecombatMain",
       "player": "alice",
       "check": {
-        "Life": {
-          "player": "bob",
-          "life": 24
-        }
-      }
-    },
-    {
-      "turn": 1,
-      "step": "PrecombatMain",
-      "player": "alice",
-      "check": {
-        "Life": {
-          "player": "carol",
-          "life": 24
-        }
-      }
-    },
-    {
-      "turn": 1,
-      "step": "PrecombatMain",
-      "player": "alice",
-      "check": {
-        "Life": {
-          "player": "dave",
-          "life": 24
+        "PowerToughness": {
+          "object": "Grizzly Bears",
+          "power": 3,
+          "toughness": 3
         }
       }
     }

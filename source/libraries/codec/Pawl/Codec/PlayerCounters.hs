@@ -10,9 +10,7 @@ import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
 
 -- | A bare object keyed by the record's field names. The tag that picks it is
--- written by whichever Pawl.Codec.Effect arm carries it, which is what lets
--- GainPlayerCounters and RemovePlayerCounters share one payload codec without
--- sharing a tag.
+-- written by Pawl.Codec.Effect's GainPlayerCounters arm.
 codec :: Codec.Codec PlayerCounters.PlayerCounters
 codec = Fields.object $ do
   player <- Fields.required "player" PlayerRef.codec PlayerCounters.player

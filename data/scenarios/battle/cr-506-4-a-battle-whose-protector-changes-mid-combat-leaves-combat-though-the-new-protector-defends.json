@@ -1,0 +1,194 @@
+{
+  "description": "CR 506.4 a battle whose protector changes mid-combat leaves combat, though the new protector is a defending player too",
+  "note": "alice attacks her own Invasion of Dominaria, which bob protects, with her Goblin Piker; carol, also a defending player (CR 802.2), casts Synthetic Shifting Allegiance on it in the declare blockers step. The protector change removes the battle from combat (CR 506.4), so the spell's second sentence does not find the Piker, and the Piker, attacking nothing (CR 506.4c), deals the battle no damage. The --control file has bob, already its protector, cast the same spell: nothing changes, and the Piker is exiled.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Invasion of Dominaria",
+            "label": "invasion",
+            "protector": "bob",
+            "counters": [
+              {
+                "key": {
+                  "type": "Defense"
+                },
+                "value": 5
+              }
+            ]
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "bi1"
+          },
+          {
+            "card": "Plains",
+            "label": "bp1"
+          },
+          {
+            "card": "Plains",
+            "label": "bp2"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Synthetic Shifting Allegiance",
+            "label": "bspell"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "ci1"
+          },
+          {
+            "card": "Plains",
+            "label": "cp1"
+          },
+          {
+            "card": "Plains",
+            "label": "cp2"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Synthetic Shifting Allegiance",
+            "label": "cspell"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$piker"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "$piker",
+      "do": {
+        "ChooseAttackTarget": "$invasion"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Attackers": {
+          "attackers": {
+            "$piker": "$invasion"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "do": {
+        "Cast": {
+          "object": "$cspell",
+          "targets": [
+            "$invasion"
+          ],
+          "mana": [
+            "$ci1",
+            "$cp1",
+            "$cp2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Goblin Piker",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Exile",
+          "card": "Goblin Piker",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "$invasion",
+          "kind": {
+            "type": "Defense"
+          },
+          "count": 5
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Protector",
+          "object": "$invasion",
+          "is": "carol"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "Attackers": {
+          "attackers": {
+            "$piker": "$invasion"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "description": "CR 810.8b a teammate's concession takes the team out (control)",
+  "note": "The same board without twoHeadedGiant: bob's concession takes only him out (CR 104.3a), alice plays on and nobody has won.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1
+      },
+      {
+        "name": "bob",
+        "team": 1
+      },
+      {
+        "name": "carol",
+        "team": 2
+      },
+      {
+        "name": "dave",
+        "team": 2
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain",
+    "sharedTeamTurns": true
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": "Concede"
+    }
+  ],
+  "final": [
+    {
+      "View": {
+        "of": "Result",
+        "is": null
+      }
+    }
+  ]
+}

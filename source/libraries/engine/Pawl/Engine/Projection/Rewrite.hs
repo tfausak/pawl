@@ -81,6 +81,7 @@ import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counter as Counter
+import qualified Pawl.Types.CounterDestination as CounterDestination
 import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.CounterPlacement as CounterPlacement
 import qualified Pawl.Types.CounterR as CounterR
@@ -196,6 +197,7 @@ import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
+import qualified Pawl.Types.RemovePlayerCounters as RemovePlayerCounters
 import qualified Pawl.Types.Repeat as Repeat
 import qualified Pawl.Types.RepeatIf as RepeatIf
 import qualified Pawl.Types.Replace as Replace
@@ -802,7 +804,7 @@ rewriteEffect pairs effect = case effect of
   -- holds no word.
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration kind amount from whatRecipient whoRecipient to chosenSource) ->
     Effect.RedirectDamage (RedirectDamage.MkRedirectDamage (rewriteDuration pairs duration) kind (fmap (rewriteQuantity pairs) amount) (fmap (rewriteObjectRef pairs) from) (fmap (Filter.rewrite pairs) whatRecipient) whoRecipient (rewriteObjectRef pairs to) (fmap (Filter.rewrite pairs) chosenSource))
-  Effect.Counter (Counter.MkCounter ref mSlot mSources mExiled) -> Effect.Counter (Counter.MkCounter (rewriteObjectRef pairs ref) mSlot mSources mExiled)
+  Effect.Counter (Counter.MkCounter ref mSlot mSources mInstead) -> Effect.Counter (Counter.MkCounter (rewriteObjectRef pairs ref) mSlot mSources (fmap (\destination -> destination {CounterDestination.only = fmap (Filter.rewrite pairs) (CounterDestination.only destination)}) mInstead))
   -- CR 612.1 through the KIND as well, where Filter's HasCounters arm rewrites
   -- the same one: CR 122.1b's keyword counter carries a keyword, and a word
   -- inside it is swapped like any other. Pawl.CounterspellSpec's Synthetic
@@ -843,7 +845,7 @@ rewriteEffect pairs effect = case effect of
   -- CR 122.1's bare first sentence) with no subtype word in it, so only the count
   -- descends.
   Effect.GainPlayerCounters x -> Effect.GainPlayerCounters x {PlayerCounters.quantity = rewriteQuantity pairs (PlayerCounters.quantity x)}
-  Effect.RemovePlayerCounters x -> Effect.RemovePlayerCounters x {PlayerCounters.quantity = rewriteQuantity pairs (PlayerCounters.quantity x)}
+  Effect.RemovePlayerCounters x -> Effect.RemovePlayerCounters x {RemovePlayerCounters.quantity = rewriteQuantity pairs (RemovePlayerCounters.quantity x)}
   Effect.PayAnyEnergy _ -> effect
   Effect.ChooseNumber _ -> effect
   Effect.Tap ref -> Effect.Tap (rewriteObjectRef pairs ref)
@@ -949,6 +951,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Unsuspect ref -> Effect.Unsuspect (rewriteObjectRef pairs ref)
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> effect
   Effect.Evolve _ -> effect
+  Effect.BecomeProtector _ -> effect
   Effect.Mentor _ -> effect
   Effect.Exploit -> effect
   Effect.GiveGift -> effect
@@ -1872,6 +1875,7 @@ rewriteTriggerCondition :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Tri
 rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.StateIs c -> TriggerCondition.StateIs (rewriteCondition pairs c)
   TriggerCondition.PermanentEnters f -> TriggerCondition.PermanentEnters (Filter.rewrite pairs f)
+  TriggerCondition.PermanentsEnter f -> TriggerCondition.PermanentsEnter (Filter.rewrite pairs f)
   TriggerCondition.CardPutIntoGraveyard p -> TriggerCondition.CardPutIntoGraveyard p {CardPutIntoGraveyard.filter = Filter.rewrite pairs (CardPutIntoGraveyard.filter p)}
   TriggerCondition.PermanentDies f -> TriggerCondition.PermanentDies (Filter.rewrite pairs f)
   TriggerCondition.PermanentsDie f -> TriggerCondition.PermanentsDie (Filter.rewrite pairs f)

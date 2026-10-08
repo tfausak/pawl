@@ -53,6 +53,7 @@ codec =
         tagOf
         [ Arm.nullary "SelfEnters" TriggerCondition.SelfEnters,
           Arm.payload "PermanentEnters" filterCodec TriggerCondition.PermanentEnters (\x -> case x of TriggerCondition.PermanentEnters y -> Just y; _ -> Nothing),
+          Arm.payload "PermanentsEnter" filterCodec TriggerCondition.PermanentsEnter (\x -> case x of TriggerCondition.PermanentsEnter y -> Just y; _ -> Nothing),
           Arm.payload "StepBegins" StepBegins.codec TriggerCondition.StepBegins (\x -> case x of TriggerCondition.StepBegins y -> Just y; _ -> Nothing),
           Arm.payload "StateIs" Condition.codec TriggerCondition.StateIs (\x -> case x of TriggerCondition.StateIs y -> Just y; _ -> Nothing),
           Arm.payload "SelfDealsCombatDamageToPlayer" PlayerRelation.codec TriggerCondition.SelfDealsCombatDamageToPlayer (\x -> case x of TriggerCondition.SelfDealsCombatDamageToPlayer y -> Just y; _ -> Nothing),
@@ -219,6 +220,7 @@ tagOf :: TriggerCondition.TriggerCondition -> String
 tagOf x = case x of
   TriggerCondition.SelfEnters {} -> "SelfEnters"
   TriggerCondition.PermanentEnters {} -> "PermanentEnters"
+  TriggerCondition.PermanentsEnter {} -> "PermanentsEnter"
   TriggerCondition.StepBegins {} -> "StepBegins"
   TriggerCondition.StateIs {} -> "StateIs"
   TriggerCondition.SelfDealsCombatDamageToPlayer {} -> "SelfDealsCombatDamageToPlayer"

@@ -432,6 +432,9 @@ becamePermanents spell events =
     let zc = Moved.change m,
     ZoneChange.departed zc == spell,
     ZoneChange.to zc == Zone.Battlefield,
+    -- "as it resolved": a countered card put onto the battlefield instead
+    -- (Desertion) is not the permanent the spell became.
+    Moved.duringResolution m,
     arrival <- Foldable.toList (Moved.arrivals m)
   ]
 
@@ -565,10 +568,12 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- Maybe equality on that path, which two Nothings satisfy; the arm answers
       -- Nothing there either way.
       --
-      -- A REGRESSION FENCE rather than a proven behavior, the battle arm's
-      -- posture below: THE RECORD already answers at every moment CR 117.5
-      -- samples, so mutating this conjunct to True leaves the suite green. Not
-      -- implemented: a board that separates the two readings (#2839).
+      -- THE RECORD answers at every moment CR 117.5 samples, so only a read
+      -- inside the resolution that moved control reaches this conjunct:
+      -- data/scenarios/planeswalker-combat's "stolen mid-resolution" pair, where
+      -- Synthetic Turncoat Oath steals the attacked planeswalker and then looks
+      -- for its attackers, proves the recorded-seat branch. The fallback branch
+      -- is reached only by a hand-built combat record.
       --
       -- CARD TYPE, through `peers`, which is what makes rule 506.4's planeswalker
       -- clause reachable without Projection.isPlaneswalkerOf: that one calls project,
@@ -608,9 +613,11 @@ viewOfCharacteristics peers oid pc controller counters gs =
         -- disjunct of Pawl.Engine.Combat.targetStillAttacked's battle arm. A
         -- regression fence: mutating it away leaves the suite green, as no test
         -- puts Soul Snare on that board.
-        Just (AttackTarget.OfBattle pw)
+        Just target@(AttackTarget.OfBattle pw)
           | Set.notMember oid (Combat.attackingNothing (GameState.combat gs)),
             Set.member pw (GameState.battlefield gs),
+            attackedControllerHeld oid target gs,
+            attackedProtectorHeld oid pw gs,
             Maybe.isJust (Battle.protectorOf pw gs),
             controllerOf pw gs == Battle.protectorOf pw gs,
             List.any (\defending -> controllerOf pw gs == Just defending) (Defender.defendingPlayers gs),
@@ -635,37 +642,48 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- Battle.protectorOf is an Object.protector lookup and reads no projection,
       -- so unlike controllerOf above it re-enters nothing at all.
       --
-      -- The other two conjuncts are rule 506.4's battle clauses, arm for arm with the
-      -- planeswalker field above and with Combat.stillAttackedBattle's own list: the
-      -- PROTECTOR compared against Defender.defendingPlayers -- membership, for the
-      -- planeswalker field's reason -- which CR 310.9d makes the
-      -- defending player while a battle is attacked, and the CARD TYPE through
-      -- `peers`. The type conjunct is load-bearing precisely because CR 310.9g keeps
+      -- The other conjuncts are rule 506.4's battle clauses, arm for arm with the
+      -- planeswalker field above: the PROTECTOR, which CR 310.9d makes the
+      -- defending player while a battle is attacked, compared against the seat
+      -- recorded as this creature joined combat (attackedProtectorHeld), and the
+      -- CARD TYPE through `peers`. The type conjunct is load-bearing precisely because CR 310.9g keeps
       -- the designation when a permanent stops being a battle, so Battle.protectorOf
       -- goes on answering; Pawl.BattleSpec's "CR 506.4 a battle that stops being a
       -- battle" pair is the board.
       --
-      -- The PROTECTOR conjunct is a regression fence rather than a proven behavior:
-      -- mutating it away leaves the suite green, CR 310.9f's change needing an
-      -- effect that moves a designation. Not implemented: any such effect (#2980).
+      -- The CONTROLLER clause is attackedControllerHeld, for the planeswalker
+      -- field's reason: THE RECORD answers at CR 117.5's moments, and only a read
+      -- inside the resolution that moved control reaches the conjunct.
+      -- data/scenarios/battle's "steals mid-resolution" pair is the board, its
+      -- protector stealing the battle with Synthetic Turncoat Oath. The 506.4e
+      -- arms of both fields ask it too, unobserved: no test puts Soul Snare or
+      -- Synthetic Bulwark Snare on that board.
+      --
+      -- The PROTECTOR conjunct answers mid-resolution for the same reason: the
+      -- record answers at CR 117.5's moments. data/scenarios/battle's "protector
+      -- changes mid-combat" pair is the board, Synthetic Shifting Allegiance
+      -- handing the role to a player who also defends (CR 802.2) and then looking
+      -- for its attackers.
       --
       -- Combat.attackingNothing leads here as it does above, and for the same
-      -- reason: it is the only one of the four that remembers a removal rather
+      -- reason: it is the only conjunct that remembers a removal rather
       -- than re-deriving it.
       Filter.attackingBattleProtector = case Map.lookup oid (Combat.attackers (GameState.combat gs)) of
-        Just (AttackTarget.OfBattle battle)
+        Just target@(AttackTarget.OfBattle battle)
           | Set.notMember oid (Combat.attackingNothing (GameState.combat gs)),
             Set.member battle (GameState.battlefield gs),
-            List.any (\defending -> Battle.protectorOf battle gs == Just defending) (Defender.defendingPlayers gs),
+            attackedControllerHeld oid target gs,
+            attackedProtectorHeld oid battle gs,
             any (Set.member CardType.Battle . Filter.cardTypes) (peers battle) ->
               Battle.protectorOf battle gs
         -- CR 506.4e: a planeswalker announcement whose permanent is a battle
         -- too, or stopped being a planeswalker but is still a battle, is a battle
         -- being attacked. Pawl.PlaneswalkerCombatSpec's PlaneswalkerBattleInCombat
         -- is the board.
-        Just (AttackTarget.OfPlaneswalker battle)
+        Just target@(AttackTarget.OfPlaneswalker battle)
           | Set.notMember oid (Combat.attackingNothing (GameState.combat gs)),
             Set.member battle (GameState.battlefield gs),
+            attackedControllerHeld oid target gs,
             List.any (\defending -> Battle.protectorOf battle gs == Just defending) (Defender.defendingPlayers gs),
             any (Set.member CardType.Battle . Filter.cardTypes) (peers battle) ->
               Battle.protectorOf battle gs
@@ -922,6 +940,35 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- arm being layer 6's only writer.
       Filter.grantsStationToughness = PC.grantsStationToughness pc
     }
+
+-- CR 506.4's controller clause, asked live: does the permanent this attacker's
+-- announcement names still have the controller recorded as the attacker joined
+-- combat (Pawl.Types.Combat's attackedUnder for a planeswalker,
+-- attackedControlledBy for a battle)? Pawl.Engine.Combat.noteAttackingNothing
+-- asks the same at CR 117.5's moments; this answers at every other one. True
+-- where nothing was recorded, as there.
+attackedControllerHeld :: ObjectId -> AttackTarget.AttackTarget -> GameState -> Bool
+attackedControllerHeld attacker target gs =
+  let c = GameState.combat gs
+      held record attacked = maybe True (\seat -> controllerOf attacked gs == Just seat) (Map.lookup attacker (record c))
+   in case target of
+        AttackTarget.OfPlayer _ -> True
+        AttackTarget.OfPlaneswalker pw -> held Combat.attackedUnder pw
+        AttackTarget.OfBattle battle -> held Combat.attackedControlledBy battle
+
+-- CR 506.4's protector clause, asked live: is the battle this attacker's
+-- announcement names still protected by the player recorded as the attacker
+-- joined combat (Pawl.Types.Combat's attackedUnder, CR 310.9d's seat)?
+-- Pawl.Engine.Combat.noteAttackingNothing asks the same at CR 117.5's moments.
+-- Where nothing was recorded -- a combat record built by hand -- membership in
+-- Defender.defendingPlayers stands in, which CR 802.2's several defending
+-- players make only an approximation.
+attackedProtectorHeld :: ObjectId -> ObjectId -> GameState -> Bool
+attackedProtectorHeld attacker battle gs =
+  maybe
+    (List.any (\defending -> Battle.protectorOf battle gs == Just defending) (Defender.defendingPlayers gs))
+    (\seat -> Battle.protectorOf battle gs == Just seat)
+    (Map.lookup attacker (Combat.attackedUnder (GameState.combat gs)))
 
 -- CR 122.1: the counters on an object right now, and none for an id naming nothing.
 countersOf :: ObjectId -> GameState -> Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural

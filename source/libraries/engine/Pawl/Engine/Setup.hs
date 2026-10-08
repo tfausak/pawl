@@ -26,7 +26,6 @@ import qualified Pawl.Engine.Scheme as Scheme
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Extra.Natural as Natural
-import qualified Pawl.Types.AttackOption as AttackOption
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Emperors as Emperors
@@ -53,7 +52,6 @@ import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Prompt as Prompt
-import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.RestartSignal as RestartSignal
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
@@ -151,24 +149,15 @@ deckSize deck = sum (Map.elems (Deck.cards deck)) + Natural.length (Deck.command
 mirror :: Deck.Deck -> NonEmpty.NonEmpty PlayerId -> NonEmpty.NonEmpty (PlayerId, Deck.Deck)
 mirror deck = fmap (\pid -> (pid, deck))
 
--- Takes a NonEmpty so the active player is total (no partial head).
+-- CR 800.2 / CR 103: a game with no option in use, gameWith's plain case.
 emptyGame :: NonEmpty.NonEmpty PlayerId -> GameState
-emptyGame order =
+emptyGame = gameWith GameSettings.plain
+
+-- CR 800.2: a game started with these options, which are settled before it
+-- begins. Takes a NonEmpty so the active player is total (no partial head).
+gameWith :: GameSettings.GameSettings -> NonEmpty.NonEmpty PlayerId -> GameState
+gameWith settings order =
   let order_ = NonEmpty.toList order
-      -- CR 800.2 / CR 103: a game with no option in use, which is what rule 103
-      -- describes on its own.
-      --
-      -- Not implemented: an options argument. Nothing threads one down to here,
-      -- so a game that uses an option is reached by record-updating
-      -- GameState.settings afterwards rather than by being started with it
-      -- (#2837).
-      -- CR 802.1 is the option in use by default: at two seats it coincides
-      -- exactly with CR 506.2, and at three or more CR 806.2b requires one of
-      -- the three and this is the one that needs no seating to be agreed.
-      --
-      -- CR 102.4 / CR 808.1: and a game not played between teams, which every
-      -- variant but CR 808's, CR 809's, CR 810's and CR 811's is.
-      settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.sharedTeamLife = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False, GameSettings.emperors = Emperors.none}
       total = startingLife settings (length order_) Nothing 0
       newPlayer pid =
         ( pid,

@@ -2,6 +2,7 @@
 
 module Pawl.Codec.Counter where
 
+import qualified Pawl.Codec.CounterDestination as CounterDestination
 import qualified Pawl.Codec.ObjectRef as ObjectRef
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -17,11 +18,11 @@ codec = Fields.object $ do
   ref <- Fields.required "ref" ObjectRef.codec Counter.ref
   slot <- Fields.defaulted "slot" Nothing (Common.maybe SlotName.codec) Counter.slot
   sources <- Fields.defaulted "sources" Nothing (Common.maybe SlotName.codec) Counter.sources
-  exileInstead <- Fields.defaulted "exileInstead" Nothing (Common.maybe SlotName.codec) Counter.exileInstead
+  instead <- Fields.defaulted "instead" Nothing (Common.maybe CounterDestination.codec) Counter.instead
   pure
     Counter.MkCounter
       { Counter.ref = ref,
         Counter.slot = slot,
         Counter.sources = sources,
-        Counter.exileInstead = exileInstead
+        Counter.instead = instead
       }

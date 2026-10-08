@@ -1783,6 +1783,7 @@ representativeEvents cond =
    in case cond of
         TriggerCondition.SelfEnters -> one (moved Zone.Stack Zone.Battlefield)
         TriggerCondition.PermanentEnters _ -> one (moved Zone.Stack Zone.Battlefield)
+        TriggerCondition.PermanentsEnter _ -> one (moved Zone.Stack Zone.Battlefield)
         TriggerCondition.StepBegins (StepBegins.MkStepBegins phase _ _) -> one (GameEvent.StepBegan (StepBegan.MkStepBegan phase S.alice))
         -- CR 603.8: a state trigger matches a game STATE, so no log entry fires
         -- it at all (Event.matchesTrigger's StateIs arm answers False for every
@@ -2404,6 +2405,7 @@ everyTriggerCondition :: [TriggerCondition.TriggerCondition]
 everyTriggerCondition =
   [ TriggerCondition.SelfEnters,
     TriggerCondition.PermanentEnters Filter.Type.IsSource,
+    TriggerCondition.PermanentsEnter Filter.Type.IsSource,
     TriggerCondition.CardPutIntoGraveyard (CardPutIntoGraveyard.MkCardPutIntoGraveyard Filter.Type.IsSource Set.empty),
     TriggerCondition.PermanentDies Filter.Type.IsSource,
     TriggerCondition.PermanentsDie Filter.Type.IsSource,

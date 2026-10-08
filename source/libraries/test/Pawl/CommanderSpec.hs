@@ -1065,8 +1065,7 @@ commanderDamageSpec s registry = Spec.describe s "CommanderDamage" $ do
 -- since CR 903.12f's life total is set by Setup.createDeck.
 brawlDesignating :: Printing.Printing -> GameState.GameState
 brawlDesignating commander =
-  let empty = Setup.emptyGame S.bothPlayers
-      brawling = empty {GameState.settings = (GameState.settings empty) {GameSettings.brawl = True}}
+  let brawling = Setup.gameWith GameSettings.plain {GameSettings.brawl = True} S.bothPlayers
       deck = Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Set.singleton commander, Deck.vanguard = Nothing, Deck.dungeons = Set.empty, Deck.sideboard = Map.empty, Deck.conspiracies = Map.empty, Deck.attractions = Map.empty, Deck.planes = Set.empty, Deck.schemes = Map.empty}
    in S.runPure S.identityAnswer brawling (Setup.createDeck S.alice deck)
 

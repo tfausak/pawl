@@ -49,6 +49,9 @@ data TriggerCondition
   | -- | CR 603.6a read by a bystander: "whenever a [type] enters", the bearer
     -- included.
     PermanentEnters (Filter.Filter Keyword.Keyword)
+  | -- | CR 603.2c's batch reading of the arm above: "when one or more creatures
+    -- enter under your control" (Dunbarrow Revivalist's boon), once for the batch.
+    PermanentsEnter (Filter.Filter Keyword.Keyword)
   | -- | CR 603.2b: "at the beginning of [each|your] <step>"; the TurnScope
     -- decides whose turn qualifies.
     StepBegins StepBegins.StepBegins

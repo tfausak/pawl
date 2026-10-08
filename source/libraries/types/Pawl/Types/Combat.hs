@@ -76,7 +76,8 @@ data Combat = MkCombat
     -- Pawl.Engine.Defender.playerOfAttacker as CR 802.2a's answer, and by
     -- Pawl.Engine.Combat.noteAttackingNothing and
     -- Pawl.Engine.Projection.View.viewOfCharacteristics as CR 506.4's comparand for
-    -- "if its controller ... changes".
+    -- "if its controller ... changes" -- and, for a battle, "its protector
+    -- changes", the seat being its protector (CR 310.9d).
     attackedUnder :: Map.Map ObjectId.ObjectId PlayerId.PlayerId,
     -- | CR 506.4 for an attacked BATTLE: who controlled it as the attacking
     -- creature joined combat -- the comparand for "if its controller ...
@@ -98,7 +99,8 @@ data Combat = MkCombat
     -- Written by Pawl.Engine.Combat.declareAttackers and
     -- Pawl.Engine.Combat.putOntoBattlefieldAttacking, pruned by
     -- Pawl.Engine.Game.removeFromCombat, and read by
-    -- Pawl.Engine.Combat.noteAttackingNothing alone.
+    -- Pawl.Engine.Combat.noteAttackingNothing and
+    -- Pawl.Engine.Projection.View.attackedControllerHeld, as attackedUnder is.
     attackedControlledBy :: Map.Map ObjectId.ObjectId PlayerId.PlayerId,
     -- | WHAT has been attacked this combat phase: the CR 508.1b target announced
     -- for each creature declared as an attacker or put onto the battlefield
@@ -320,6 +322,16 @@ data Combat = MkCombat
     -- Read through Pawl.Engine.Defender.defendingPlayers rather than directly,
     -- which is where CR 802.2a's narrowing to one is made explicit at each site
     -- that needs one.
-    defenders :: [PlayerId.PlayerId]
+    --
+    -- Only the defending players who MAY BE ATTACKED: CR 811.4's opponents not
+    -- seated next to the attacker are defending players under CR 802.2 all the
+    -- same, and are `barred` below instead. Every combat rule reading this field
+    -- asks who can be attacked, blocks, or is attacked.
+    defenders :: [PlayerId.PlayerId],
+    -- | CR 802.2 / 811.4: the defending players no creature may attack, in APNAP
+    -- order. Empty outside Alternating Teams. Read through
+    -- Pawl.Engine.Defender.designatedPlayers, for a reference to "defending
+    -- player" with no attacking creature to resolve it (CR 802.2a, Yare).
+    barred :: [PlayerId.PlayerId]
   }
   deriving (Eq, Ord, Show)

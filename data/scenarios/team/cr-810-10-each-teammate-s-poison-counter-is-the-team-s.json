@@ -1,0 +1,128 @@
+{
+  "description": "CR 810.10 each teammate's poison counter is the team's, and nine plus two is not a loss",
+  "note": "A Two-Headed Giant game with alice and bob's team on nine poison counters. Carol's Ichor Rats gives each player a poison counter as it enters. Each player gets theirs individually and the team shares them (CR 810.10), so the team is on eleven, and each member reads the team's count (CR 810.10a). Eleven is no loss: CR 704.5c's ten is ignored for CR 704.6b's fifteen. The control is the same team game without the variant, where alice and bob each reach ten and lose.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1,
+        "counters": [
+          {
+            "key": {
+              "type": "Poison"
+            },
+            "value": 9
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "team": 1,
+        "counters": [
+          {
+            "key": {
+              "type": "Poison"
+            },
+            "value": 9
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "team": 2,
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "swamp-1"
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-2"
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-3"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Ichor Rats",
+            "label": "rats"
+          }
+        ]
+      },
+      {
+        "name": "dave",
+        "team": 2
+      }
+    ],
+    "active": "carol",
+    "step": "PrecombatMain",
+    "sharedTeamTurns": true,
+    "twoHeadedGiant": true
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": {
+        "Cast": {
+          "object": "$rats",
+          "mana": [
+            "$swamp-1",
+            "$swamp-2",
+            "$swamp-3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": "Pass"
+    }
+  ],
+  "final": [
+    {
+      "View": {
+        "of": "Result",
+        "is": null
+      }
+    },
+    {
+      "PlayerCounters": {
+        "player": "alice",
+        "kind": {
+          "type": "Poison"
+        },
+        "count": 11
+      }
+    },
+    {
+      "PlayerCounters": {
+        "player": "bob",
+        "kind": {
+          "type": "Poison"
+        },
+        "count": 11
+      }
+    },
+    {
+      "PlayerCounters": {
+        "player": "carol",
+        "kind": {
+          "type": "Poison"
+        },
+        "count": 2
+      }
+    }
+  ]
+}

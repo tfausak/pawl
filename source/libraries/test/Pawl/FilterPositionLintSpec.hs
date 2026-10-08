@@ -246,6 +246,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.ControlledByRecipient -> 0
   Filter.Type.ManaValueAtMost _ -> 0
   Filter.Type.ManaValueLessThanSource -> 0
+  Filter.Type.ManaValueGreaterThanSource -> 0
   Filter.Type.ManaValueEqualToSource -> 0
   Filter.Type.ManaValueIsEven -> 0
   Filter.Type.ManaValueAtMostAmount -> 0
@@ -429,6 +430,24 @@ jsonAtoms tag value = case value of
   Value.String s -> if String.unwrap s == tag then 1 else 0
   Value.Array a -> sum (fmap (jsonAtoms tag) (Array.unwrap a))
   Value.Object o -> sum (fmap (jsonAtoms tag . Pair.value) (Object.unwrap o))
+  Value.Null _ -> 0
+  Value.Boolean _ -> 0
+  Value.Number _ -> 0
+
+-- How many `tag` atoms sit in a TRIGGERED ability's own condition -- an object
+-- carrying both a "condition" and a "modal", printed or granted -- counted off
+-- the encoding so a grant nested inside an effect is reached too.
+triggerConditionAtoms :: Text.Text -> Value.Value -> Int
+triggerConditionAtoms tag value = case value of
+  Value.Object o ->
+    let pairs = Object.unwrap o
+        named k = [Pair.value p | p <- pairs, String.unwrap (Pair.name p) == Text.pack k]
+        triggered = not (null (named "modal"))
+        own = if triggered then sum (fmap (jsonAtoms tag) (named "condition")) else 0
+        rest = sum [triggerConditionAtoms tag (Pair.value p) | p <- pairs, not (triggered && String.unwrap (Pair.name p) == Text.pack "condition")]
+     in own + rest
+  Value.Array a -> sum (fmap (triggerConditionAtoms tag) (Array.unwrap a))
+  Value.String _ -> 0
   Value.Null _ -> 0
   Value.Boolean _ -> 0
   Value.Number _ -> 0
@@ -2498,9 +2517,9 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "and so is the toughness comparison" (toughness plantedToughness) 1
   -- CR 702.85a's comparison is the pair above's one characteristic over, and
   -- narrower still: Filter.Context.sourceManaValue is filled by
-  -- Pawl.Engine.Resolve.Slots.effectContext alone, so the atom is answerable only
-  -- inside a resolution's own references and would be a silent False in a card's
-  -- target slot, affected set, Count filter or search filter. Only
+  -- Pawl.Engine.Resolve.Slots.effectContext and, for a trigger condition, by
+  -- Pawl.Engine.Event.Match's bearer context, so the atom would be a silent False
+  -- in a card's target slot, affected set, Count filter or search filter. Only
   -- Pawl.Engine.Keyword writes it -- cascade, and the equality atom below that CR
   -- 702.53a's transmute and CR 702.71a's transfigure search with -- and this is
   -- what keeps that true.
@@ -2526,6 +2545,20 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                   (ModeSelection.ChooseExactly 1)
             }
     Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
+  -- The pair above's comparison one operator over, which a CARD may write -- but
+  -- only in a triggered ability's own condition, the one position where
+  -- Pawl.Engine.Event.Match fills the source's mana value. Kami of Mourning's
+  -- granted "a creature you control with greater mana value than this card" is
+  -- the producer, and it is also what keeps the sweep from being vacuous.
+  Spec.it s "CR 202.3 a greater-mana-value-than-source comparison is written only in a trigger condition" $ do
+    ps <- S.allPrintings s
+    let tag = Text.pack "ManaValueGreaterThanSource"
+        encoded = Codec.encode (Face.Codec.codec Card.codec)
+        outside c = jsonAtoms tag (encoded c) - triggerConditionAtoms tag (encoded c)
+        offenders = filter (anyFace (\c -> outside c /= 0) . Printing.card) ps
+    Spec.assertEqWith s "no card writes it outside a trigger condition" (fmap (S.nameOf . Printing.card) offenders) []
+    kami <- S.printingOf s registry "Kami of Mourning"
+    Spec.assertEqWith s "and Kami of Mourning writes it in one" (triggerConditionAtoms tag (encoded (S.combinedFace kami))) 1
   -- CR 702.60a's comparison sits in the pair above's position and is filled by
   -- the same one caller (Pawl.Engine.Resolve.Slots.effectContext), so it is
   -- answerable only inside a resolution's own references and would be a silent
@@ -2574,10 +2607,10 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
             }
     Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
   -- CR 508.5's atom is answerable only where the CONTEXT supplies a defending
-  -- player, and exactly two callers fill Filter.Context.defendingPlayer:
+  -- player, and exactly two callers fill Filter.Context.defendingPlayers:
   -- Pawl.Engine.Target.admittedGiven for a target slot (CR 702.39a's provoke,
-  -- Sensational Spider-Man) and Pawl.Engine.CombatRestriction.inForce for a CR
-  -- 508.1c gate (Armored Galleon). It is Nothing everywhere else, so the atom in
+  -- Sensational Spider-Man, Yare) and Pawl.Engine.CombatRestriction.inForce for a
+  -- CR 508.1c gate (Armored Galleon). It is empty everywhere else, so the atom in
   -- any OTHER position -- a static ability's affected set, a search filter, a
   -- triggered ability's condition -- would be a silent False. This is the lint
   -- that keeps that true: what it sweeps is the atom outside a combat

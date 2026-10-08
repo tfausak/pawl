@@ -26,8 +26,9 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   `attackOption` (CR 806.2b) is `MultiplePlayers` unless given, and `null` is
   CR 507.1's choice among every opponent; `brawl` (CR 903.12a),
   `sharedTeamTurns` (CR 805.1), `sharedTeamLife` (CR 810.4, which wants every
-  teammate's `life` equal) and `deployCreatures` (CR 804.2) are off unless
-  given. Setup is a
+  teammate's `life` equal), `deployCreatures` (CR 804.2), `twoHeadedGiant`
+  (CR 810, which wants every teammate's poison `counters` equal) and
+  `alternatingTeams` (CR 811) are off unless given. Setup is a
   state, not a history: nothing placed triggers anything.
 - **Note.** An optional `note` says in prose what the scenario rules out and
   why its board is built the way it is. It is free text: nothing reads it, and
@@ -105,8 +106,8 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   `Stack` included; the controller's, for the battlefield), `Damage`, `Tapped`, `Counters` (of
   one kind on an object), `Types` (an object's card types, all of them),
   `Attackers` (every attacker and what it attacks), `Blockers` (an attacker's
-  blockers, `null` when unblocked), `Defenders` (the defending players, in
-  order), `Monarch` (`null` for nobody), `PowerToughness` (an object's
+  blockers, `null` when unblocked), `Defenders` (the defending players who
+  may be attacked, in order), `Monarch` (`null` for nobody), `PowerToughness` (an object's
   projected `power` and `toughness`) and `PlayerCounters` (how many of one
   `kind` a `player` has), `Subtypes` (an object's projected subtypes, all of
   them, as bare names) and `Keywords` (how many instances of one `keyword` an

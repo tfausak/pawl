@@ -149,6 +149,19 @@ you = SlotName.MkSlotName (Text.pack "you")
 triggerPlayer :: SlotName
 triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 
+-- CR 802.2a: the reserved slot under which the defending player a spell or
+-- ability CHOSE is bound, where it has no attacking creature to resolve
+-- "defending player" by -- Yare's "target creature defending player controls".
+-- Choosing the target is that choice, so it is the controllers of the chosen
+-- targets that are defending players, stamped as the targets are announced
+-- (Pawl.Engine.Target.stampDefendingPlayers) so that CR 608.2b re-checks a
+-- target against the player chosen rather than against every defending player.
+--
+-- Not a target, so CR 608.2b re-validates nothing -- `gatePlayers`' posture,
+-- and the same "no card's targetSlots may name it" sweep applies.
+chosenDefendingPlayers :: SlotName
+chosenDefendingPlayers = SlotName.MkSlotName (Text.pack "chosenDefendingPlayers")
+
 -- CR 118.12a: the reserved slot under which the players a resolution cost's
 -- answer SELECTED are bound -- the printed word "they" in Rishadan Cutpurse's
 -- "each opponent sacrifices a permanent of their choice unless they pay {1}".

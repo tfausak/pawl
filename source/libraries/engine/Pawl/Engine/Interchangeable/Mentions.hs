@@ -109,6 +109,7 @@ import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counter as Counter
+import qualified Pawl.Types.CounterDestination as CounterDestination
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.CounterPlacement as CounterPlacement
@@ -286,6 +287,7 @@ import qualified Pawl.Types.Reinforce as Reinforce
 import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
+import qualified Pawl.Types.RemovePlayerCounters as RemovePlayerCounters
 import qualified Pawl.Types.Repeat as Repeat
 import qualified Pawl.Types.RepeatIf as RepeatIf
 import qualified Pawl.Types.Replace as Replace
@@ -429,6 +431,7 @@ filterNames asking criterion = case criterion of
   Filter.PowerAtLeastAmountInSlot slot -> slotNames asking slot
   Filter.ManaValueAtMost _n -> False
   Filter.ManaValueLessThanSource -> False
+  Filter.ManaValueGreaterThanSource -> False
   Filter.ManaValueEqualToSource -> False
   Filter.ManaValueIsEven -> False
   Filter.ManaValueAtMostAmount -> contextNames asking
@@ -991,7 +994,11 @@ countedDiscardNames asking x = case x of
 
 counterNames :: Asking -> Counter.Counter -> Bool
 counterNames asking x = case x of
-  Counter.MkCounter ref slot sources exileInstead -> objectRefNames asking ref || any (slotNames asking) slot || any (slotNames asking) sources || any (slotNames asking) exileInstead
+  Counter.MkCounter ref slot sources instead -> objectRefNames asking ref || any (slotNames asking) slot || any (slotNames asking) sources || any (counterDestinationNames asking) instead
+
+counterDestinationNames :: Asking -> CounterDestination.CounterDestination -> Bool
+counterDestinationNames asking x = case x of
+  CounterDestination.MkCounterDestination _zone _position only slot -> any (filterNames asking) only || any (slotNames asking) slot
 
 counterKindNames :: Asking -> (keyword -> Bool) -> CounterKind.CounterKind keyword -> Bool
 counterKindNames _asking onKeyword x = case x of
@@ -1272,7 +1279,7 @@ effectNames asking onCard onAbility x = case x of
   Effect.MoveCounters moveCounters -> moveCountersNames asking moveCounters
   Effect.PutCountersFrom putCountersFrom -> putCountersFromNames asking putCountersFrom
   Effect.GainPlayerCounters playerCounters -> playerCountersNames asking playerCounters
-  Effect.RemovePlayerCounters playerCounters -> playerCountersNames asking playerCounters
+  Effect.RemovePlayerCounters removal -> removePlayerCountersNames asking removal
   Effect.PayAnyEnergy slotName -> slotNames asking slotName
   Effect.ChooseNumber chooseNumber -> chooseNumberNames asking chooseNumber
   Effect.Tap objectRef -> objectRefNames asking objectRef
@@ -1316,6 +1323,7 @@ effectNames asking onCard onAbility x = case x of
   Effect.Unsuspect objectRef -> objectRefNames asking objectRef
   Effect.SetHalfLocked setHalfLocked -> setHalfLockedNames asking setHalfLocked
   Effect.Evolve slotName -> slotNames asking slotName
+  Effect.BecomeProtector slotName -> slotNames asking slotName
   Effect.Mentor slotName -> slotNames asking slotName
   Effect.Train slotName -> slotNames asking slotName
   Effect.Firebend manaAddition -> manaAdditionNames asking manaAddition
@@ -2400,6 +2408,10 @@ removeCountersNames :: Asking -> RemoveCounters.RemoveCounters -> Bool
 removeCountersNames asking x = case x of
   RemoveCounters.MkRemoveCounters kind quantity slot tally -> counterKindNames asking (keywordNames asking) kind || quantityNames asking quantity || slotNames asking slot || any (slotNames asking) tally
 
+removePlayerCountersNames :: Asking -> RemovePlayerCounters.RemovePlayerCounters -> Bool
+removePlayerCountersNames asking x = case x of
+  RemovePlayerCounters.MkRemovePlayerCounters player _kind quantity tally -> playerRefNames asking player || quantityNames asking quantity || any (slotNames asking) tally
+
 removeCountersAmongNames :: Asking -> RemoveCountersAmong.RemoveCountersAmong -> Bool
 removeCountersAmongNames asking x = case x of
   RemoveCountersAmong.MkRemoveCountersAmong count from kind tally -> removalCountNames asking count || objectRefNames asking from || whichCountersNames asking (keywordNames asking) kind || any (slotNames asking) tally
@@ -2625,6 +2637,7 @@ triggerConditionNames :: Asking -> TriggerCondition.TriggerCondition -> Bool
 triggerConditionNames asking x = case x of
   TriggerCondition.SelfEnters -> False
   TriggerCondition.PermanentEnters filter_ -> filterNames asking filter_
+  TriggerCondition.PermanentsEnter filter_ -> filterNames asking filter_
   TriggerCondition.StepBegins _stepBegins -> False
   TriggerCondition.StateIs condition -> conditionNames asking condition
   TriggerCondition.SelfDealsCombatDamageToPlayer _playerRelation -> False

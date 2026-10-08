@@ -34,6 +34,7 @@ import qualified Pawl.Types.Devotion as Devotion
 import qualified Pawl.Types.ExileLink as ExileLink
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Halved as Halved
@@ -47,6 +48,7 @@ import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Player as Player
@@ -1105,7 +1107,18 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
           pids <- playersOf (InZone.player inZone)
           casters <- playersOf (CastFrom.caster castFrom)
           owner <- Filter.owner =<< viewOf oid
-          let spells = fmap ZoneChange.departed (filter (\zc -> ZoneChange.from zc == Zone.Stack) (entriesOf oid))
+          -- CR 400.7d's "as it resolved": the arrival must be the spell's own
+          -- resolution, so a countered card Desertion put onto the battlefield
+          -- instead reads as not cast.
+          let spells =
+                [ ZoneChange.departed zc
+                | GameEvent.Moved m <- fmap LoggedEvent.event (Foldable.toList (GameState.events gs)),
+                  let zc = Moved.change m,
+                  ZoneChange.object zc == oid,
+                  ZoneChange.from zc == Zone.Stack,
+                  ZoneChange.to zc == Zone.Battlefield,
+                  Moved.duringResolution m
+                ]
               castFromZone cast =
                 elem (SpellWasCast.spell cast) spells
                   && SpellWasCast.zone cast == Just (InZone.zone inZone)

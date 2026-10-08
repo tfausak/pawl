@@ -173,8 +173,10 @@ import qualified Pawl.Types.CostChoice as CostChoice
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterCause as CounterCause
+import qualified Pawl.Types.CounterDestination as CounterDestination
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterSpread as CounterSpread
+import qualified Pawl.Types.CounteredEnd as CounteredEnd
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.DamageDirection as DamageDirection
@@ -336,6 +338,7 @@ import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
+import qualified Pawl.Types.RemovePlayerCounters as RemovePlayerCounters
 import qualified Pawl.Types.Repeat as Repeat
 import qualified Pawl.Types.RepeatIf as RepeatIf
 import qualified Pawl.Types.Replace as Replace
@@ -2978,12 +2981,13 @@ chooseNewTargetsFor unannounced chooser controller copyId = do
         -- the pile it sits in, exactly as at CR 601.2c. The targets already
         -- CHOSEN are offered unchanged whatever they are, rule 707.10c letting
         -- one stand even when it is now illegal.
-        offer slot (n, recipients) = (n, Set.union recipients (Target.piledOffer (Just chooser) gs (Map.findWithDefault Set.empty slot fresh)))
+        piled slot n = Target.piledOffer (Just n) (Just chooser) gs (Map.findWithDefault Set.empty slot fresh)
+        offer slot (n, recipients) = (n, Set.union recipients (piled slot n))
         asked = Map.mapWithKey offer (Map.union (fmap (\recipients -> (Natural.length recipients, recipients)) current) (fmap (\n -> (n, Set.empty)) blank))
         held = Map.union current (Set.empty <$ blank)
         -- Every slot answerable only one way means the options are
         -- indistinguishable, and CR 707.10c's offer is elided.
-        settled slot = Set.isSubsetOf (Target.piledOffer (Just chooser) gs (Map.findWithDefault Set.empty slot fresh))
+        settled slot = Set.isSubsetOf (piled slot (maybe 0 fst (Map.lookup slot asked)))
     Monad.unless (and (Map.elems (Map.mapWithKey settled held))) $ do
       answer <- Game.choose (Prompt.ChooseTargets (Decide.deciderFor chooser gs) chooser copyId asked)
       let admits slot (n, offered) picked = picked == Map.findWithDefault Set.empty slot current || (Natural.length picked == n && Set.isSubsetOf picked offered)
@@ -3001,8 +3005,8 @@ chooseNewTargetsFor unannounced chooser controller copyId = do
         -- never a target that was left unchanged. An unchanged target is
         -- admitted whatever it is, which is the rule's own first sentence.
         --
-        -- Pawl.ExileSpec's "CR 707.10c a copy's re-target keeps its old target
-        -- when the draw names a card the slot refuses" is what proves this
+        -- Pawl.ExileSpec's "CR 707.10c a copy whose re-choice draws a card it
+        -- refuses keeps its old target, so both spells resolve" proves this
         -- line: without it the copy records the illegal card and CR 608.2b
         -- counters it, where the rule leaves it resolving on its old target.
         --
@@ -3062,7 +3066,9 @@ retargetEach reaim legal resolving controller source ref = do
 -- Reject-not-repair, chooseNewTargetsFor's posture and for its reason: an
 -- answer outside the offer, a CR 406.4 draw landing on a refused or current
 -- target, or a final set CR 601.2c's joint check refuses (CR 115.7e judges only
--- the final set) leaves every target unchanged.
+-- the final set) leaves every target unchanged. Pawl.ExileSpec's "CR 115.7a a
+-- change of target that draws a card the spell refuses leaves the old target,
+-- so the spell resolves" proves the refused draw.
 changeTargetsFor :: PlayerId -> PlayerId -> ObjectId -> Game ()
 changeTargetsFor chooser controller oid = do
   gs <- State.get
@@ -3073,7 +3079,9 @@ changeTargetsFor chooser controller oid = do
         aimer = Maybe.fromMaybe oid (Game.abilitySourceOf oid gs)
         fresh = Target.legalSets (Just controller) False seed aimer slots gs
         another old = Set.filter (\r -> not (any (Recipient.sameReferent r) old))
-        offer slot old = (Natural.length old, Target.piledOffer (Just chooser) gs (another old (Map.findWithDefault Set.empty slot fresh)))
+        -- CR 406.4's draws capped at the slot's count, chooseNewTargetsFor's
+        -- cap. A REGRESSION FENCE: no test drives a pile through this road.
+        offer slot old = (Natural.length old, Target.piledOffer (Just (Natural.length old)) (Just chooser) gs (another old (Map.findWithDefault Set.empty slot fresh)))
         asked = Map.mapWithKey offer current
         enough (n, offered) = Natural.length offered >= n
         settled (n, offered) = Natural.length offered == n
@@ -3417,6 +3425,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
     Nothing -> False
     Just target -> null (if locked then Room.unlockedHalves target gs else Room.lockedHalves target gs)
   Effect.Evolve {} -> False
+  Effect.BecomeProtector {} -> False
   Effect.Mentor {} -> False
   Effect.Exploit -> False
   Effect.GiveGift -> False
@@ -6948,28 +6957,25 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           [attacker] -> Just (Combat.SpecifiedAttacker attacker)
           _ -> Nothing
     -- CR 303.4i's "attached to", read ONCE ahead of the minting loop for
-    -- mBlocked's reason and through the same reader. THREE-VALUED for
-    -- Event.createTokens, whose own note says why: Nothing where the effect named
-    -- no host at all, Just Nothing where it named a slot that names nothing --
-    -- rule 303.4i's undefined object, which Preston Garvey, Minuteman reaches at
-    -- zero targets -- and Just the recipient otherwise.
-    --
-    -- A HOST AND NOT SEVERAL: every printing of this sentence attaches to one
-    -- object, and a slot answering with more is the undefined case too rather than
-    -- a silent first-of-list.
+    -- mBlocked's reason and through the same reader: Nothing where the effect
+    -- named no host, and otherwise every object the slot names -- none for rule
+    -- 303.4i's undefined object (Preston Garvey, Minuteman at zero targets),
+    -- several for Dunbarrow Revivalist's "one of them", whose CR 608.2d choice
+    -- among the legal hosts Event.createTokens makes once the token exists.
     mAttached <- case EntryRiders.attachedTo entry of
       Nothing -> pure Nothing
-      Just slot -> do
-        named <- fromAmongMembers legal resolving chosen slot
-        pure . Just $ case named of
-          [host] -> Just (Recipient.ToObject host)
-          _ -> Nothing
+      Just slot -> Just . fmap Recipient.ToObject <$> fromAmongMembers legal resolving chosen slot
     -- CR 508.4's rider, read ONCE ahead of the minting loop for mBlocked's
     -- reason.
     let mAttack = entryAttack legal resolving entry gs
     -- PER CREATOR, every amount off the same pre-effect `gs` (CR 608.2f), so one
     -- seat's tokens cannot change how many the next seat gets.
-    minted <- fmap concat . Monad.forM creators $ \creating ->
+    --
+    --
+    -- ONE event for every token and seat (CR 603.6a, CR 608.2f), so a
+    -- batch-scoped "one or more creatures enter" fires once for the lot:
+    -- data/scenarios/card-trigger/cr-603-7b-two-goblins-entering-at-once-spend-the-boon-once.json.
+    minted <- Event.simultaneously . fmap concat . Monad.forM creators $ \creating ->
       case evaluateForRecipient viewOf context gs resolving source creating quantity of
         Just n
           | n > 0 -> do
@@ -7164,7 +7170,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- Event.together orders them all as one CR 613.7m batch -- a
             -- regression fence, since no card in data/cards/ conjures a duplicate
             -- of two or more objects onto the battlefield.
-            ConjureDestination.Battlefield entry -> Event.together $ case cards of
+            ConjureDestination.Battlefield entry -> Event.simultaneously . Event.together $ case cards of
               ConjureCards.Written written -> pickWritten written >>= onto entry n
               ConjureCards.Duplicate ref -> concat <$> Monad.mapM (onto entry n) (duplicatesOf ref)
               ConjureCards.Reference from -> referencePickers from 1 >>= fmap concat . Monad.mapM (\p -> p >>= fmap concat . Monad.mapM (onto entry n) . Maybe.maybeToList)
@@ -7211,7 +7217,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         | n > 0 ->
             -- CR 613.7m over copies of SEVERAL sources, which enter together:
             -- one batch across every createTokens call (Event.together).
-            Event.together . fmap concat . Monad.forM sources $ \src ->
+            Event.simultaneously . Event.together . fmap concat . Monad.forM sources $ \src ->
               fmap concat . Monad.forM (Maybe.maybeToList (Game.cardOfWithLastKnown src gs)) $ \card -> do
                 -- CR 707.2 copies no counters, so what the token arrives with
                 -- is what the EFFECT said and nothing the original carried --
@@ -8451,6 +8457,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       pure (if List.elem answered (NonEmpty.toList offered) then answered else first)
                   if locked then Event.lockHalf target half else Event.unlockHalves controller target (Set.singleton half)
       _ -> pure ()
+  -- CR 310.9f: the resolving controller becomes the slot's battle's protector,
+  -- the previous one ceasing to be. A state write on Object.protector, which CR
+  -- 310.9g keeps through a type change; CR 704.5y repairs a protector who can't
+  -- be one, and CR 506.4 takes the battle out of combat
+  -- (Pawl.Engine.Combat.noteAttackingNothing). An illegal slot (CR 608.2b)
+  -- writes nothing.
+  Effect.BecomeProtector slot -> case legalOne slot legal >>= Recipient.objectOf of
+    Nothing -> pure ()
+    Just battle -> State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.protector = Just controller}) battle (GameState.objects g)})
   -- CR 702.100a's counter and CR 702.100b's marker: the creature evolves only if
   -- the placement actually put one or more counters on it.
   Effect.Evolve slot ->
@@ -8704,7 +8719,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             Monad.forM_ mNew $ \newId ->
               State.modify' (\g -> g {GameState.haunting = Map.insert newId haunted (GameState.haunting g)})
       _ -> pure ()
-  Effect.Counter (Counter.MkCounter ref mSlot mSources mExiled) -> do
+  Effect.Counter (Counter.MkCounter ref mSlot mSources mInstead) -> do
     gs <- State.get
     let named = objectRefObjects legal resolving controller source gs ref
         -- CR 113.7: each named ability's source, read BEFORE the funnel runs --
@@ -8720,27 +8735,54 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- Chief of Compliance reads off the event: by the CR 117.5 trigger scan the
     -- controller can no longer be asked for exactly (see Pawl.Types.Countering).
     --
-    -- Delay's "exile it ... instead" sends a countered spell to exile rather
-    -- than to CR 701.6a's graveyard. A self-replacement effect (CR 614.15),
-    -- which CR 616.1a applies before any other, so it is folded into the
-    -- destination and the funnel offers the rest the exile move -- Delay's
-    -- ruling (2021-03-19) has it exile a spell cast with flashback, "not the
-    -- flashback effect".
-    moved <- Event.counterReturning (maybe Zone.Graveyard (const Zone.Exile) mExiled) source controller named
+    -- Delay's "exile it ... instead", Remand's hand, Desertion's battlefield:
+    -- a self-replacement effect (CR 614.15), which CR 616.1a applies before any
+    -- other, so it is folded into the destination and the funnel offers the
+    -- rest the replaced move -- Delay's ruling (2021-03-19) has it exile a spell
+    -- cast with flashback, "not the flashback effect".
+    --
+    -- Decided per spell off the board BEFORE the funnel (CR 608.2f), against
+    -- the spell as it stands on the stack: Desertion's "if an artifact or
+    -- creature spell is countered this way". A copy of a spell is no card, so
+    -- Desertion's "put that card" has nothing to move and the copy takes CR
+    -- 701.6a's ending, where CR 704.5e ends it; for the other destinations the
+    -- copy ceases wherever it lands, so the reading is the same.
+    let context = effectContext gs controller source legal (slotBindings resolving gs)
+        viewOf = effectViewOf source legal gs
+        isCard oid = case fmap Object.source (Game.lookupObject oid gs) of
+          Just (Source.OfCard _) -> True
+          _ -> False
+        applies destination oid = isCard oid && maybe True (\only -> maybe False (\view -> Filter.matches context view only) (viewOf oid)) (CounterDestination.only destination)
+        -- Hinder's "your choice of the top or bottom": the countering spell's
+        -- controller is asked (CR 401.2's end), and only once the funnel has
+        -- passed the can't-be-countered gates, so a spell that is not
+        -- countered asks nobody.
+        destinationOf oid = case mInstead of
+          Just destination | applies destination oid -> case CounterDestination.position destination of
+            CounteredEnd.Stated position -> pure (CounterDestination.zone destination, position)
+            CounteredEnd.CounteringPlayerChooses
+              | CounterDestination.zone destination == Zone.Library -> do
+                  g <- State.get
+                  position <- Game.choose (Prompt.ChooseLibraryEnd (Decide.deciderFor controller g) controller oid 0)
+                  pure (Zone.Library, position)
+              | otherwise -> pure (CounterDestination.zone destination, LibraryPosition.defaultValue)
+          _ -> pure (Zone.Graveyard, LibraryPosition.defaultValue)
+    moved <- Event.counterReturning destinationOf source controller named
     let countered = fmap fst moved
     -- CR 701.6a's "countered this way" is what the funnel COUNTERED, never what
     -- the sweep named. Bound onto this effect's SOURCE, and bound even at zero.
     Monad.forM_ mSlot $ \slot ->
       State.modify' (bindAmountSlot resolving source slot (Natural.length countered))
     -- Delay's "exile it with three time counters on it": the cards the
-    -- countering put into exile, bound onto `resolving` as a GROUP, Destroy's
-    -- `buried` shape and for its reason. Read off the board after the funnel, so
-    -- a move a replacement sent elsewhere binds nothing; nothing is bound when
-    -- nothing qualifies.
-    Monad.forM_ mExiled $ \slot -> do
+    -- countering put into the destination, bound onto `resolving` as a GROUP,
+    -- Destroy's `buried` shape and for its reason. Read off the board after the
+    -- funnel, so a move a replacement sent elsewhere, or an entry CR 101.2
+    -- refused, binds nothing; nothing is bound when nothing qualifies.
+    Monad.forM_ mInstead $ \destination -> Monad.forM_ (CounterDestination.slot destination) $ \slot -> do
       after <- State.get
-      let exiled = concatMap (filter (`Set.member` GameState.exile after) . Foldable.toList . snd) moved
-      Monad.unless (null exiled) (State.modify' (bindObjectsSlot resolving slot (Seq.fromList exiled)))
+      let landed oid = fmap Object.zone (Game.lookupObject oid after) == Just (CounterDestination.zone destination)
+          arrived = concatMap (filter landed . Foldable.toList . snd) moved
+      Monad.unless (null arrived) (State.modify' (bindObjectsSlot resolving slot (Seq.fromList arrived)))
     -- CR 113.7: the PERMANENTS whose abilities the funnel countered, for Green
     -- Slime's "if a permanent's ability is countered this way, destroy that
     -- permanent". The funnel's answer walked to its sources, never the sweep's;
@@ -9865,7 +9907,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         Just n
           | n > 0 -> Monad.void (Event.putPlayerCounters (CounterCause.ByEffect controller) pid kind (Integer.toNaturalSaturating n))
         _ -> pure ()
-  Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters ref kind quantity) -> do
+  Effect.RemovePlayerCounters (RemovePlayerCounters.MkRemovePlayerCounters ref kind quantity mTally) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext gs controller source legal (slotBindings resolving gs)
@@ -9876,17 +9918,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           | n > 0 ->
               -- CR 122: GainPlayerCounters' mirror, through no funnel for
               -- Effect.RemoveCounters' reason. The floor is explicit, since
-              -- Natural subtraction would underflow.
-              State.modify'
-                ( \g ->
-                    g
-                      { GameState.players =
-                          Map.adjust
-                            (\p -> p {Player.counters = Map.adjust (\held -> held - min held (Integer.toNaturalSaturating n)) kind (Player.counters p)})
-                            pid
-                            (GameState.players g)
-                      }
-                )
+              -- Natural subtraction would underflow. CR 810.10b: off the team's
+              -- shared count, which every sharer holds (Game.counterSharers).
+              -- The tally is what this player lost, Leeches' "that much".
+              do
+                g <- State.get
+                let held = maybe 0 (Map.findWithDefault 0 kind . Player.counters) (Map.lookup pid (GameState.players g))
+                    lost = min held (Integer.toNaturalSaturating n)
+                    lose p = p {Player.counters = Map.adjust (\had -> had - min had lost) kind (Player.counters p)}
+                State.put g {GameState.players = List.foldl' (flip (Map.adjust lose)) (GameState.players g) (Game.counterSharers kind pid g)}
+                Monad.forM_ mTally $ \slot -> State.modify' (bindAmountSlot resolving source slot lost)
         _ -> pure ()
   -- CR 107.14: "you may pay any amount of {E}". The payer is the resolving
   -- controller (CR 109.5's "you"), the amount is theirs to name, and CR 118.3
@@ -10358,9 +10399,17 @@ proliferateOnce controller = do
     Monad.forM_ keptPermanents $ \oid ->
       Monad.forM_ (kindsOn oid) $ \kind -> Event.putCounters (CounterCause.ByEffect controller) oid kind 1
     -- CR 122.1: and player counters through their own funnel.
-    Monad.forM_ keptPlayers $ \pid ->
+    --
+    -- CR 701.34b: a kind a team shares (Game.counterSharers, Two-Headed Giant's
+    -- poison) gets one additional counter however many of its members were
+    -- chosen.
+    --
+    -- Not implemented: the proliferating player's choice of WHICH chosen
+    -- teammate gets that counter; the first in turn order does (#4795).
+    Monad.forM_ (zip [0 :: Int ..] keptPlayers) $ \(i, pid) ->
       Monad.forM_ (kindsFor pid) $ \kind ->
-        Monad.void (Event.putPlayerCounters (CounterCause.ByEffect controller) pid kind 1)
+        Monad.unless (any (\earlier -> List.elem pid (Game.counterSharers kind earlier gs)) (take i keptPlayers)) $
+          Monad.void (Event.putPlayerCounters (CounterCause.ByEffect controller) pid kind 1)
   -- "Whenever you proliferate" fires even when nothing was chosen (Tekuthal,
   -- Inquiry Dominus's ruling), so the event is recorded outside the guard.
   State.modify' (Event.recordEvent (GameEvent.Proliferated controller))

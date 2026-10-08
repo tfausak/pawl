@@ -808,9 +808,10 @@ lifelinkGainEventsSpec s registry =
 --
 -- It replaced Synthetic Communal Reckoning ("until end of turn, whenever one or
 -- more players gain life, you lose 3 life") once batched combat damage was a
--- TriggerCondition; see #2940. Synthetic Communal Relapse stays: CR
--- 603.7b's second sentence turns on an entry having NO stated duration, and
--- "this turn" is one (#2955).
+-- TriggerCondition; see #2940. CR 603.7b's second sentence turns on an entry
+-- having NO stated duration, which "this turn" is not; Dunbarrow Revivalist's
+-- boon is that durationless batch entry, in
+-- data/scenarios/card-trigger/cr-603-7b-two-goblins-entering-at-once-spend-the-boon-once.json.
 --
 -- The board: alice casts it for X in her precombat main, and the hasty Knights
 -- attack bob and connect in one combat damage step -- one Pawl.Types.EventGroup,

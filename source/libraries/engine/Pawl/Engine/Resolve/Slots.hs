@@ -78,6 +78,7 @@ import qualified Pawl.Types.CostBasis as CostBasis
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counter as Counter
+import qualified Pawl.Types.CounterDestination as CounterDestination
 import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.CounterR as CounterR
 import qualified Pawl.Types.CounterSubject as CounterSubject
@@ -194,6 +195,7 @@ import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
+import qualified Pawl.Types.RemovePlayerCounters as RemovePlayerCounters
 import qualified Pawl.Types.Repeat as Repeat
 import qualified Pawl.Types.RepeatIf as RepeatIf
 import qualified Pawl.Types.Replace as Replace
@@ -843,6 +845,7 @@ effectObjectRefs effect = case effect of
   Effect.Unsuspect ref -> [ref]
   Effect.SetHalfLocked {} -> []
   Effect.Evolve {} -> []
+  Effect.BecomeProtector {} -> []
   Effect.Mentor {} -> []
   Effect.Exploit -> []
   Effect.GiveGift -> []
@@ -1002,7 +1005,7 @@ effectPlayerRefs effect = case effect of
   Effect.MoveCounters {} -> []
   Effect.PutCountersFrom {} -> []
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters ref _ _) -> [ref]
-  Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters ref _ _) -> [ref]
+  Effect.RemovePlayerCounters removal -> [RemovePlayerCounters.player removal]
   Effect.PayAnyEnergy {} -> []
   Effect.ChooseNumber {} -> []
   Effect.Tap {} -> []
@@ -1057,6 +1060,7 @@ effectPlayerRefs effect = case effect of
   Effect.Unsuspect {} -> []
   Effect.SetHalfLocked {} -> []
   Effect.Evolve {} -> []
+  Effect.BecomeProtector {} -> []
   Effect.Mentor {} -> []
   Effect.Exploit -> []
   Effect.GiveGift -> []
@@ -1396,7 +1400,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- (quantitySlots above).
   Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> foldMap quantitySlots (MovedKinds.quantityOf kinds)
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantitySlots quantity
-  Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantitySlots quantity
+  Effect.RemovePlayerCounters removal -> quantitySlots (RemovePlayerCounters.quantity removal)
   -- The SlotName is a DEFINITION, not a read; it belongs to boundSlots below.
   Effect.PayAnyEnergy _ -> Map.empty
   Effect.ChooseNumber _ -> Map.empty
@@ -1466,6 +1470,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _ slot) -> oneSlot slot
   -- A READ, Designate's: the slot names where rule 702.100a's counter goes.
   Effect.Evolve slot -> oneSlot slot
+  Effect.BecomeProtector slot -> oneSlot slot
   Effect.Mentor slot -> oneSlot slot
   Effect.Exploit -> Map.empty
   Effect.GiveGift -> Map.empty
@@ -2126,7 +2131,7 @@ ownSlotsAreExhaustive effect = case effect of
   -- compiling (#2729).
   Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> all Quantity.slotsAreExhaustive (MovedKinds.quantityOf kinds)
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.slotsAreExhaustive quantity
-  Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.slotsAreExhaustive quantity
+  Effect.RemovePlayerCounters removal -> Quantity.slotsAreExhaustive (RemovePlayerCounters.quantity removal)
   Effect.PayAnyEnergy _ -> True
   Effect.ChooseNumber _ -> True
   Effect.Tap _ -> True
@@ -2193,6 +2198,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.Unsuspect _ -> True
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> True
   Effect.Evolve _ -> True
+  Effect.BecomeProtector _ -> True
   Effect.Mentor _ -> True
   Effect.Exploit -> True
   Effect.GiveGift -> True
@@ -2391,7 +2397,7 @@ readsX =
         Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count _ _ _) -> any Quantity.readsX (RemovalCount.quantityOf count)
         Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> any Quantity.readsX (MovedKinds.quantityOf kinds)
         Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
-        Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
+        Effect.RemovePlayerCounters removal -> Quantity.readsX (RemovePlayerCounters.quantity removal)
         -- CR 107.14's amount is asked for as the spell resolves, never CR
         -- 601.2b's announced X.
         Effect.PayAnyEnergy _ -> False
@@ -2436,6 +2442,7 @@ readsX =
         Effect.Unsuspect _ -> False
         Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> False
         Effect.Evolve _ -> False
+        Effect.BecomeProtector _ -> False
         Effect.Mentor _ -> False
         Effect.Exploit -> False
         Effect.GiveGift -> False
@@ -2641,7 +2648,7 @@ boundSlots effect = case effect of
   Effect.RedirectDamage {} -> Set.empty
   -- How many spells this countering ACTUALLY countered, for a "for each spell
   -- countered this way", and the permanents whose abilities were (CR 113.7).
-  Effect.Counter (Counter.MkCounter _ mSlot mSources mExiled) -> foldMap Set.singleton mSlot <> foldMap Set.singleton mSources <> foldMap Set.singleton mExiled
+  Effect.Counter (Counter.MkCounter _ mSlot mSources mInstead) -> foldMap Set.singleton mSlot <> foldMap Set.singleton mSources <> foldMap (foldMap Set.singleton . CounterDestination.slot) mInstead
   Effect.PutCounters {} -> Set.empty
   Effect.DistributeCounters {} -> Set.empty
   Effect.PutCountersFrom {} -> Set.empty
@@ -2652,7 +2659,7 @@ boundSlots effect = case effect of
   -- How many counters CR 122.5 ACTUALLY moved, for a "that much life".
   Effect.MoveCounters (MoveCounters.MkMoveCounters _ _ mSlot _) -> foldMap Set.singleton mSlot
   Effect.GainPlayerCounters {} -> Set.empty
-  Effect.RemovePlayerCounters {} -> Set.empty
+  Effect.RemovePlayerCounters removal -> foldMap Set.singleton (RemovePlayerCounters.tally removal)
   -- CR 107.14: how much {E} the payer paid, for a later effect of the same
   -- resolution to read as Quantity.InSlot.
   Effect.PayAnyEnergy slot -> Set.singleton slot
@@ -2699,6 +2706,7 @@ boundSlots effect = case effect of
   Effect.Unsuspect _ -> Set.empty
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> Set.empty
   Effect.Evolve _ -> Set.empty
+  Effect.BecomeProtector _ -> Set.empty
   Effect.Mentor _ -> Set.empty
   Effect.Exploit -> Set.empty
   Effect.GiveGift -> Set.empty

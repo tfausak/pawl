@@ -127,6 +127,7 @@ import qualified Pawl.Types.SubtypesAre as SubtypesAre
 import qualified Pawl.Types.Taking as Taking
 import qualified Pawl.Types.TappedIs as TappedIs
 import qualified Pawl.Types.TargetCount as TargetCount
+import qualified Pawl.Types.TeamId as TeamId
 import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Timed as Timed
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
@@ -261,7 +262,20 @@ stage registry board =
         (_, Nothing, _) -> pure (Left (Failure.MkUnknownActivePlayer (Board.active board)))
         (_, _, Left failure) -> pure (Left failure)
         (Nothing, Just active, Right monarch) -> do
-          let base = Setup.emptyGame (fmap snd seated)
+          let settings =
+                GameSettings.MkGameSettings
+                  { GameSettings.attackOption = Board.attackOption board,
+                    GameSettings.brawl = Board.brawl board,
+                    GameSettings.sharedTeamTurns = Board.sharedTeamTurns board,
+                    GameSettings.sharedTeamLife = Board.sharedTeamLife board,
+                    GameSettings.deployCreatures = Board.deployCreatures board,
+                    GameSettings.twoHeadedGiant = Board.twoHeadedGiant board,
+                    GameSettings.alternatingTeams = Board.alternatingTeams board,
+                    GameSettings.teams = Teams.MkTeams (Map.fromList [(pid, team) | (seat, pid) <- NonEmpty.toList seated, Just team <- [Seat.team seat]]),
+                    GameSettings.rangeOfInfluence = RangeOfInfluence.MkRangeOfInfluence (Map.fromList [(pid, range) | (seat, pid) <- NonEmpty.toList seated, Just range <- [Seat.range seat]]),
+                    GameSettings.emperors = Emperors.MkEmperors (Map.fromList [(team, pid) | (seat, pid) <- NonEmpty.toList seated, Seat.emperor seat, Just team <- [Seat.team seat]])
+                  }
+              base = Setup.gameWith settings (fmap snd seated)
               lives = Map.fromList (fmap (\(seat, pid) -> (pid, Seat.life seat)) (NonEmpty.toList seated))
               counters = Map.fromList (fmap (\(seat, pid) -> (pid, Seat.counters seat)) (NonEmpty.toList seated))
               positioned =
@@ -272,18 +286,7 @@ stage registry board =
                     GameState.phase = Board.phase board,
                     GameState.remaining = Seq.drop 1 (Seq.dropWhileL (/= Board.phase board) (Seq.fromList Turn.allPhases)),
                     GameState.players = Map.mapWithKey (\pid p -> p {Player.life = Map.findWithDefault (Player.life p) pid lives, Player.counters = Map.findWithDefault (Player.counters p) pid counters}) (GameState.players base),
-                    GameState.monarch = monarch,
-                    GameState.settings =
-                      (GameState.settings base)
-                        { GameSettings.attackOption = Board.attackOption board,
-                          GameSettings.brawl = Board.brawl board,
-                          GameSettings.sharedTeamTurns = Board.sharedTeamTurns board,
-                          GameSettings.sharedTeamLife = Board.sharedTeamLife board,
-                          GameSettings.deployCreatures = Board.deployCreatures board,
-                          GameSettings.teams = Teams.MkTeams (Map.fromList [(pid, team) | (seat, pid) <- NonEmpty.toList seated, Just team <- [Seat.team seat]]),
-                          GameSettings.rangeOfInfluence = RangeOfInfluence.MkRangeOfInfluence (Map.fromList [(pid, range) | (seat, pid) <- NonEmpty.toList seated, Just range <- [Seat.range seat]]),
-                          GameSettings.emperors = Emperors.MkEmperors (Map.fromList [(team, pid) | (seat, pid) <- NonEmpty.toList seated, Seat.emperor seat, Just team <- [Seat.team seat]])
-                        }
+                    GameState.monarch = monarch
                   }
           placed <- placeSeats registry (NonEmpty.toList seated) (Staged.MkStaged positioned ids Map.empty)
           pure (fmap (designateDefenders . settleStartingLife) (placed >>= attachAll (placementsOf board)))
@@ -1636,7 +1639,7 @@ renderView gs viewIs =
         View.Result -> case GameState.result gs of
           Nothing -> pure ReplyType.Null
           Just (Result.Won pid) -> fmap (\l -> ReplyType.Object [(Text.pack "won", ReplyType.Text (Label.unwrap l))]) (labelOf pid)
-          Just (Result.TeamWon team) -> pure (ReplyType.Object [(Text.pack "teamWon", ReplyType.Text (Text.pack (show team)))])
+          Just (Result.TeamWon team) -> pure (ReplyType.Object [(Text.pack "teamWon", ReplyType.Number (toInteger (TeamId.unwrap team)))])
           Just Result.Drawn -> pure (ReplyType.Text (Text.pack "Drawn"))
         View.ActivePlayer -> named (labelOf (GameState.activePlayer gs))
         View.Priority -> maybe (pure ReplyType.Null) (named . labelOf) (GameState.priority gs)

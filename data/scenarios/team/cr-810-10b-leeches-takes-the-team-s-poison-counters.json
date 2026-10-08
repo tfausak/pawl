@@ -1,0 +1,122 @@
+{
+  "description": "CR 810.10b Leeches on one teammate takes the team's poison counters",
+  "note": "A Two-Headed Giant game with alice and bob's team on three poison counters. Carol's Leeches targets bob, who loses all of them, and the team loses that many (CR 810.10b), so alice is on none too. Leeches deals bob that much damage. The control is the same team game without the variant, where alice keeps her own three.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1,
+        "counters": [
+          {
+            "key": {
+              "type": "Poison"
+            },
+            "value": 3
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "team": 1,
+        "counters": [
+          {
+            "key": {
+              "type": "Poison"
+            },
+            "value": 3
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "team": 2,
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "plains-1"
+          },
+          {
+            "card": "Plains",
+            "label": "plains-2"
+          },
+          {
+            "card": "Plains",
+            "label": "plains-3"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Leeches",
+            "label": "leeches"
+          }
+        ]
+      },
+      {
+        "name": "dave",
+        "team": 2
+      }
+    ],
+    "active": "carol",
+    "step": "PrecombatMain",
+    "sharedTeamTurns": true,
+    "twoHeadedGiant": true
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": {
+        "Cast": {
+          "object": "$leeches",
+          "targets": [
+            "$bob"
+          ],
+          "mana": [
+            "$plains-1",
+            "$plains-2",
+            "$plains-3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": "Pass"
+    }
+  ],
+  "final": [
+    {
+      "PlayerCounters": {
+        "player": "alice",
+        "kind": {
+          "type": "Poison"
+        },
+        "count": 0
+      }
+    },
+    {
+      "PlayerCounters": {
+        "player": "bob",
+        "kind": {
+          "type": "Poison"
+        },
+        "count": 0
+      }
+    },
+    {
+      "Life": {
+        "player": "bob",
+        "life": 17
+      }
+    },
+    {
+      "Life": {
+        "player": "alice",
+        "life": 20
+      }
+    }
+  ]
+}

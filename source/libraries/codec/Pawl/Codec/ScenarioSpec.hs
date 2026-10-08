@@ -33,7 +33,9 @@ spec s = Spec.describe s "Pawl.Codec.Scenario" $ do
                 Board.Type.brawl = False,
                 Board.Type.sharedTeamTurns = False,
                 Board.Type.sharedTeamLife = False,
-                Board.Type.deployCreatures = False
+                Board.Type.deployCreatures = False,
+                Board.Type.twoHeadedGiant = False,
+                Board.Type.alternatingTeams = False
               },
           Scenario.Type.timeline = Seq.empty,
           Scenario.Type.final = Seq.empty

@@ -537,7 +537,8 @@ data Prompt r where
   -- asked only when that controller is not the owner.
   ChooseCommandZoneOfferFirst :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt OptionalDecision.OptionalDecision
   -- | CR 401.2: which end of a library a card arrives at where the effect
-  -- leaves it open; the owner is asked (CR 400.3), in APNAP order. Never
+  -- leaves it open; the owner is asked (CR 400.3), in APNAP order, or the
+  -- countering spell's controller where it says "your choice" (Hinder). Never
   -- elided; a stated end (Pawl.Types.LibraryPlacement.Stated) is not asked.
   -- The Natural is how many cards stay above the upper option, which a Top
   -- answer picks: 0 for the top itself, 1 for "second from the top".
@@ -766,7 +767,9 @@ data Prompt r where
   -- current host excluded (CR 701.3b); the offer is the card's text, so CR
   -- 303.4j is left to the player. Elided at one candidate. The PlayerId is the
   -- resolving controller for one named destination (CR 608.2d) and the
-  -- subject's controller for several (CR 303.4d, CR 301.5c).
+  -- subject's controller for several (CR 303.4d, CR 301.5c). Also CR 608.2d:
+  -- which legal host a created Aura token enters attached to, among several
+  -- the effect names (Dunbarrow Revivalist's "one of them").
   ChooseAttachment :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 303.4k with CR 614.1e: whether an Aura turned face up exercises its
   -- printed "you may attach it"; never elided, declining leaving it to CR

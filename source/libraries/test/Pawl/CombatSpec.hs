@@ -41,6 +41,7 @@ import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
+import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AfterTurn as AfterTurn
@@ -60,6 +61,7 @@ import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KickerDecision as KickerDecision
@@ -1890,6 +1892,173 @@ perDefenderRestrictionSpec s registry = Spec.describe s "PerDefenderAttackRestri
         Spec.assertEqWith s "Jace is on the board with loyalty" (S.counterOf CounterKind.Loyalty jaceId board) 3
       _ -> Spec.assertFailure s "fixture should give alice a Galleon and bob a Jace"
 
+-- CR 508.5a / 802.3a: a restriction judged against the WHOLE declaration --
+-- "can't attack alone", and an unscoped "no more than N creatures can attack" --
+-- whose gate names the defending player. The restriction applies to attacking
+-- creatures, so the gate is read per creature, at the seat THAT creature is
+-- announced against. Scryfall o:"attack alone unless" and o:"can attack each
+-- combat unless", 2026-10-08, find only Pipsqueak, Rebel Strongarm, gated on
+-- itself, so the producers are Synthetic Tidal Palisade ({3} Artifact,
+-- "No more than one creature can attack each combat unless defending player
+-- controls an Island.") and Synthetic Tidal Sentry ({1} Artifact Creature --
+-- Construct 2/1, "This creature can't attack alone unless defending player
+-- controls an Island.").
+--
+-- bob, the FIRST defending player in turn order, holds the only Island, so the
+-- old reading -- the gate judged at that one seat -- lifted both restrictions for
+-- every announcement.
+perDefenderWholeRestrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+perDefenderWholeRestrictionSpec s registry = Spec.describe s "PerDefenderWholeRestriction" $ do
+  let declaring g =
+        g
+          { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+            GameState.combat = (GameState.combat g) {Combat.Type.defenders = [S.bob, S.carol]}
+          }
+  Spec.it s "CR 508.5a the bound counts only the creatures attacking a defender without an Island" $ do
+    palisade <- S.printingOf s registry "Synthetic Tidal Palisade"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    island <- S.printingOf s registry "Island"
+    let (gs, mine, _, _) = S.threePlayerCombat [palisade, bears, bears] [island] []
+        board = declaring gs
+    case mine of
+      [_, first, second] -> do
+        Spec.assertBool s (not (Combat.legalAttackDeclarationAs S.alice [(first, AttackTarget.OfPlayer S.carol), (second, AttackTarget.OfPlayer S.carol)] board)) "two attacking carol, who controls no Island, is over the bound"
+        Spec.assertBool s (Combat.legalAttackDeclarationAs S.alice [(first, AttackTarget.OfPlayer S.bob), (second, AttackTarget.OfPlayer S.bob)] board) "two attacking bob, who controls the Island, is not bound at all"
+        Spec.assertBool s (Combat.legalAttackDeclarationAs S.alice [(first, AttackTarget.OfPlayer S.bob), (second, AttackTarget.OfPlayer S.carol)] board) "one at each seat counts one against the bound"
+      _ -> Spec.assertFailure s "fixture should give alice a Palisade and two Bears"
+  Spec.it s "CR 508.5a can't attack alone binds only a creature announced at a defender without an Island" $ do
+    sentry <- S.printingOf s registry "Synthetic Tidal Sentry"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    island <- S.printingOf s registry "Island"
+    let (gs, mine, _, _) = S.threePlayerCombat [sentry, bears] [island] []
+        board = declaring gs
+    case mine of
+      [sentryId, bearsId] -> do
+        Spec.assertBool s (not (Combat.legalAttackDeclarationAs S.alice [(sentryId, AttackTarget.OfPlayer S.carol)] board)) "the Sentry alone may not attack carol, who controls no Island"
+        Spec.assertBool s (Combat.legalAttackDeclarationAs S.alice [(sentryId, AttackTarget.OfPlayer S.bob)] board) "and alone may attack bob, who does"
+        Spec.assertBool s (Combat.legalAttackDeclarationAs S.alice [(sentryId, AttackTarget.OfPlayer S.carol), (bearsId, AttackTarget.OfPlayer S.carol)] board) "with a companion it may attack carol"
+      _ -> Spec.assertFailure s "fixture should give alice a Sentry and a Bears"
+  Spec.it s "CR 508.1d the maximum sends both Berserkers at the defender the bound does not count" $ do
+    -- Berserkers of Blood Ridge attacks each combat if able. Both may attack,
+    -- at bob, so the maximum is two and one Berserker alone falls short of it --
+    -- which a search treating the gated bound as a bound on every seat would
+    -- call the maximum.
+    palisade <- S.printingOf s registry "Synthetic Tidal Palisade"
+    berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
+    island <- S.printingOf s registry "Island"
+    let (gs, mine, _, _) = S.threePlayerCombat [palisade, berserkers, berserkers] [island] []
+        board = declaring gs
+    case mine of
+      [_, first, second] -> do
+        Spec.assertBool s (not (Combat.legalAttackDeclarationAs S.alice [(first, AttackTarget.OfPlayer S.bob)] board)) "one Berserker alone obeys fewer requirements than the maximum"
+        Spec.assertBool s (Combat.legalAttackDeclarationAs S.alice [(first, AttackTarget.OfPlayer S.bob), (second, AttackTarget.OfPlayer S.carol)] board) "both attacking, one at each seat, obeys it"
+      _ -> Spec.assertFailure s "fixture should give alice a Palisade and two Berserkers"
+
+-- CR 508.5 / 805.10e: a pairwise blocking gate naming the defending player is
+-- read at the player the ATTACKER is attacking, not at the first defending player
+-- and not at the blocker's controller. Graxiplon ("can't be blocked unless
+-- defending player controls three or more creatures that share a creature type")
+-- is the producer; every board gives the attacked player three Hill Giants and
+-- the other defender at most one.
+defendingPlayerOfBlockGateSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+defendingPlayerOfBlockGateSpec s registry = Spec.describe s "DefendingPlayerOfBlockGate" $ do
+  -- Free for all, three seats: Graxiplon and a Goblin Piker attack carol, a
+  -- second Piker attacks bob (the first defending player, with no creature).
+  -- carol's Giant blocks the Piker, and General Jarkeld's switch
+  -- (Combat.switchBlockers, which its effect performs) moves it onto Graxiplon.
+  Spec.it s "CR 508.5 a switched blocker reads Graxiplon's gate at carol, whom it attacks" $ do
+    graxiplon <- S.printingOf s registry "Graxiplon"
+    piker <- S.printingOf s registry "Goblin Piker"
+    giant <- S.printingOf s registry "Hill Giant"
+    let (gs, mine, _, hers) = S.threePlayerCombat [graxiplon, piker, piker] [] [giant, giant, giant]
+    case (mine, hers) of
+      ([grax, atCarol, atBob], blocker : _) -> do
+        let board =
+              gs
+                { GameState.phase = Phase.Combat CombatStep.DeclareBlockers,
+                  GameState.combat =
+                    (GameState.combat gs)
+                      { Combat.Type.defenders = [S.bob, S.carol],
+                        Combat.Type.attackers = Map.fromList [(grax, AttackTarget.OfPlayer S.carol), (atCarol, AttackTarget.OfPlayer S.carol), (atBob, AttackTarget.OfPlayer S.bob)],
+                        Combat.Type.blockers = Map.singleton atCarol (Set.singleton blocker)
+                      }
+                }
+            switched = Combat.switchBlockers atCarol grax board
+        Spec.assertEqWith s "CR 508.5: the Giant now blocks Graxiplon" (Combat.blockersOf grax switched) (Set.singleton blocker)
+        Spec.assertEqWith s "and no longer the Piker" (Combat.blockersOf atCarol switched) Set.empty
+      _ -> Spec.assertFailure s "fixture should give alice three attackers and carol three Giants"
+  -- Two-Headed Giant's combat (CR 810.7, 805.10d): alice's Graxiplon attacks
+  -- dave, and his teammate carol -- first in APNAP order, holding one Giant --
+  -- blocks it. The gate is dave's, so with his three Giants the block is legal;
+  -- the pair differs only in dave's third Giant.
+  Spec.it s "CR 805.10e a teammate's block reads Graxiplon's gate at dave, whom it attacks" $ do
+    graxiplon <- S.printingOf s registry "Graxiplon"
+    giant <- S.printingOf s registry "Hill Giant"
+    let twoHeaded = S.inTeams [[S.alice, S.bob], [S.carol, S.dave]] S.fourPlayerGame
+        shared = twoHeaded {GameState.settings = (GameState.settings twoHeaded) {GameSettings.sharedTeamTurns = True}}
+        board daveGiants =
+          let (grax, g1) = S.addPermanent graxiplon S.alice shared
+              (blocker, g2) = S.addPermanent giant S.carol g1
+              g3 = withPermanents S.dave (replicate daveGiants giant) g2
+           in ( grax,
+                blocker,
+                g3
+                  { GameState.activePlayer = S.alice,
+                    GameState.phase = Phase.Combat CombatStep.DeclareBlockers,
+                    GameState.combat =
+                      (GameState.combat g3)
+                        { Combat.Type.defenders = [S.carol, S.dave],
+                          Combat.Type.attackers = Map.singleton grax (AttackTarget.OfPlayer S.dave)
+                        }
+                  }
+              )
+        legal daveGiants =
+          let (grax, blocker, gs) = board daveGiants
+           in Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton grax)) gs
+    Spec.assertBool s (legal 3) "CR 805.10e: dave controls three Giants, so carol's Giant may block"
+    Spec.assertBool s (not (legal 2)) "and with two it may not"
+
+-- CR 508.1d under two CROSSING gated bounds (CR 508.5a / 802.3a). Synthetic Tidal
+-- Palisade counts the attackers at a seat without an Island, Synthetic Ridge
+-- Palisade ("No more than one creature can attack each combat unless defending
+-- player controls a Mountain.") those at a seat without a Mountain. bob holds an
+-- Island, carol a Mountain, dave neither, so Tidal counts {carol, dave} and Ridge
+-- {bob, dave}: overlapping, neither inside the other.
+--
+-- Alluring Siren's resolved "attacks you if able" is stamped onto the store, one
+-- per Siren: carol's names alice's first Piker, dave's her second. Obeying both
+-- puts two announcements in Tidal's count, so the maximum is ONE. A search that
+-- nests one bound inside the other overstates it as two, which no declaration
+-- attains, and its witness then lets declining through.
+crossingAttackBoundsSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+crossingAttackBoundsSpec s registry = Spec.describe s "CrossingAttackBounds" $ do
+  Spec.it s "CR 508.1d one requirement is the maximum when the two bounds cross at dave" $ do
+    tidal <- S.printingOf s registry "Synthetic Tidal Palisade"
+    ridge <- S.printingOf s registry "Synthetic Ridge Palisade"
+    piker <- S.printingOf s registry "Goblin Piker"
+    siren <- S.printingOf s registry "Alluring Siren"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    let g0 = withPermanents S.alice [tidal, ridge] S.fourPlayerGame
+        (toCarol, g1) = S.addPermanent piker S.alice g0
+        (toDave, g2) = S.addPermanent piker S.alice g1
+        (carolSiren, g3) = S.addPermanent siren S.carol (withPermanents S.carol [mountain] (withPermanents S.bob [island] g2))
+        (daveSiren, g4) = S.addPermanent siren S.dave g3
+        lure sirenId pid lured g =
+          let (ts, g') = Game.freshTimestamp g
+              stored = ActiveAttackRequirement.MkActiveAttackRequirement sirenId pid ts Expiry.AtCleanup (RestrictedCreatures.Named lured) (AttackTarget.OfPlayer pid)
+           in g' {GameState.attackRequirements = stored : GameState.attackRequirements g'}
+        g5 = lure daveSiren S.dave toDave (lure carolSiren S.carol toCarol g4)
+        board =
+          g5
+            { GameState.activePlayer = S.alice,
+              GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+              GameState.combat = (GameState.combat g5) {Combat.Type.defenders = [S.bob, S.carol, S.dave]}
+            }
+    Spec.assertBool s (Combat.legalAttackDeclarationAs S.alice [(toDave, AttackTarget.OfPlayer S.dave)] board) "CR 508.1d: obeying dave's Siren alone obeys the maximum"
+    Spec.assertBool s (not (Combat.legalAttackDeclarationAs S.alice [(toDave, AttackTarget.OfPlayer S.dave), (toCarol, AttackTarget.OfPlayer S.carol)] board)) "CR 508.1c: obeying both puts two under Tidal's bound"
+    Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] board)) "and declining obeys fewer than the maximum"
+
 -- CR 612.1 reaching a combat restriction's GATE. Glacial Crasher ({4}{U}{U}
 -- Creature -- Elemental 5/5, "Trample. This creature can't attack unless there is
 -- a Mountain on the battlefield." -- checked against Scryfall, 2026-08-05) is the
@@ -2800,6 +2969,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   defendingPlayerRestrictionSpec s registry
   aimedAttackRestrictionSpec s registry
   perDefenderRestrictionSpec s registry
+  perDefenderWholeRestrictionSpec s registry
+  defendingPlayerOfBlockGateSpec s registry
+  crossingAttackBoundsSpec s registry
   textChangedCombatRestrictionSpec s registry
   textChangedCombatAffectedSpec s registry
   controlChangeSicknessSpec s registry

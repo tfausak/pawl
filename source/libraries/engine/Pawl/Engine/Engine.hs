@@ -149,14 +149,15 @@ runGamePure :: (forall r. Prompt r -> r) -> GameState -> Game a -> (a, GameState
 runGamePure answer = runGameAskedPure (answer . Asked.prompt)
 
 -- One entry point from matchup to played game: the player list is DERIVED from it,
--- so a matchup player without a Player record is unrepresentable.
-runMatch :: (Monad m) => (forall r. Prompt r -> m r) -> NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> m (Result, GameState)
-runMatch answer matchup =
-  runGame answer (Setup.emptyGame (fmap fst matchup)) (playFrom matchup)
+-- so a matchup player without a Player record is unrepresentable. CR 800.2: the
+-- options are settled before the game begins, so they are an argument here.
+runMatch :: (Monad m) => (forall r. Prompt r -> m r) -> GameSettings.GameSettings -> NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> m (Result, GameState)
+runMatch answer settings matchup =
+  runGame answer (Setup.gameWith settings (fmap fst matchup)) (playFrom matchup)
 
-runMatchPure :: (forall r. Prompt r -> r) -> NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> (Result, GameState)
-runMatchPure answer matchup =
-  runGamePure answer (Setup.emptyGame (fmap fst matchup)) (playFrom matchup)
+runMatchPure :: (forall r. Prompt r -> r) -> GameSettings.GameSettings -> NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> (Result, GameState)
+runMatchPure answer settings matchup =
+  runGamePure answer (Setup.gameWith settings (fmap fst matchup)) (playFrom matchup)
 
 -- The next entry of a cyclic order after 'pid', falling back to 'pid' when the
 -- order is empty or does not mention it.
@@ -453,16 +454,16 @@ discardToHandSize pid = do
         Event.simultaneously (Monad.mapM_ (Event.discard DiscardCause.Ordinary pid) toDiscard)
 
 -- CR 103.8a: in a two-player game the player who plays first skips the draw step
--- of their first turn; CR 103.8c and CR 800.7, in other multiplayer games nobody
--- does. CR 800.1 makes a multiplayer game one that BEGINS with more than two
--- players, and turnOrder is the permanent roster, so a three-player game down to
--- two survivors still does not skip.
---
--- Not implemented: CR 103.8b's same skip for a TEAM in Two-Headed Giant (#2849).
+-- of their first turn; CR 103.8b / 810.6, in Two-Headed Giant the team who plays
+-- first does, every member of it being an active player on that turn (CR
+-- 805.4a); CR 103.8c and CR 800.7, in other multiplayer games nobody does. CR
+-- 800.1 makes a multiplayer game one that BEGINS with more than two players, and
+-- turnOrder is the permanent roster, so a three-player game down to two
+-- survivors still does not skip.
 skipsDraw :: GameState -> Bool
 skipsDraw gs =
   GameState.turnNumber gs == 1
-    && length (GameState.turnOrder gs) <= 2
+    && (length (GameState.turnOrder gs) <= 2 || GameSettings.twoHeadedGiant (GameState.settings gs))
     && case GameState.turnOrder gs of
       starter : _ -> starter == GameState.activePlayer gs
       [] -> False
@@ -1041,7 +1042,7 @@ placeBorne srcId pending = do
           -- Inserted over the captured environment, whose thisAbility names the
           -- ability that armed a delayed trigger rather than the trigger itself.
           let placedSource = maybe (Projection.copiableCharacteristics srcId gs) LastKnown.copiable (Projection.lastKnownOf srcId gs)
-          State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setThisAbility abilId (Binding.setPlacedSourceCopy placedSource (Binding.setYou controller (Binding.setTriggerSource srcId (Map.unionWith Binding.mergeBinding (Binding.fromChoices chosen Nothing chosenModes) (PendingTrigger.bindings pending)))))}) abilId (GameState.objects g)})
+          State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setThisAbility abilId (Binding.setPlacedSourceCopy placedSource (Binding.setYou controller (Binding.setTriggerSource srcId (Map.unionWith Binding.mergeBinding (Target.stampDefendingPlayers srcId chosen g (Binding.fromChoices chosen Nothing chosenModes)) (PendingTrigger.bindings pending)))))}) abilId (GameState.objects g)})
           -- CR 601.2c through CR 603.3d: each chosen object became a target, which
           -- is what CR 702.21a's ward watches. Raised only on an announcement the
           -- joint check accepted, so a re-asked answer never made anything a

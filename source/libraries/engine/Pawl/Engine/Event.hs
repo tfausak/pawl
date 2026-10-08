@@ -358,9 +358,11 @@ combatDamagerAgainst victim gs logged = case LoggedEvent.event logged of
 -- The group is spent on exit whether or not the body recorded anything, so a
 -- bracket leaves a gap rather than leaking its group to the next event.
 --
--- Not bracketed: token creation and CR 508.1's attacker declaration (rule
--- 508.1f's taps aside), so the events each records are read as a sequence: a token minted partway through a
--- batch enters at a group of its own, which is what
+-- Not bracketed: CR 508.1's attacker declaration (rule 508.1f's taps aside), so
+-- the events it records are read as a sequence. Token creation is bracketed by
+-- the instruction that creates (Resolve's Create and CreateCopy arms), not by
+-- Event.createTokens, so a token minted partway through a batch by any other
+-- road enters at a group of its own, which is what
 -- Pawl.Engine.Event.Trigger's `arrivedOnBattlefieldLater` reads to keep it from
 -- witnessing the batch's earlier events. CR 510.2's combat damage IS: Pawl.Engine.Damage.dealWave
 -- brackets each combat damage step -- the damage and its CR 120.3 results, with
@@ -5222,9 +5224,12 @@ putPlayerCounters cause pid kind n = do
               -- shrinking scalings are what make it reachable here: half of one
               -- counter, rounded down, and one counter minus one, are replacements
               -- that remove the event.
+              --
+              -- CR 810.10: the counters happen to the player and land on their
+              -- team's shared count, which every sharer holds (Game.counterSharers).
               State.modify' $ \gs ->
                 let bump p = p {Player.counters = Map.insertWith (+) settledKind settledCount (Player.counters p)}
-                 in gs {GameState.players = Map.adjust bump target (GameState.players gs)}
+                 in gs {GameState.players = List.foldl' (flip (Map.adjust bump)) (GameState.players gs) (Game.counterSharers settledKind target gs)}
               pure settledCount
 
 -- CR 122.1: resolveCounters for a player recipient, and read the same way -- the
@@ -6058,9 +6063,19 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
         -- battlefield, that player puts it into its owner's graveyard." So a
         -- refusal FROM THE STACK moves the object on rather than leaving it where
         -- it was, and the two rules are told apart by `fromZone` alone -- a zone
-        -- read, never the resolving card's identity. Nothing but a resolving
-        -- permanent spell reaches this funnel from the stack asking for the
-        -- battlefield (Pawl.Engine.Stack's two branches).
+        -- read, never the resolving card's identity. Two roads reach this arm
+        -- from the stack: a resolving permanent spell (Pawl.Engine.Stack), and
+        -- the one below.
+        --
+        -- The other road here from the stack is a countered card some effect
+        -- puts onto the battlefield instead of into its owner's graveyard
+        -- (Desertion, Pawl.Types.CounterDestination). CR 608.3e speaks only of a
+        -- RESOLVING spell, so for that road the graveyard is CR 701.6a's: the
+        -- spell is countered and removed from the stack whatever, CR 614.6
+        -- ignores the replaced move's impossible instruction, and what remains
+        -- is the countering's own "put into its owner's graveyard".
+        -- The counterspell scenario "Desertion under Sealed Horizon still counters
+        -- the Bears into bob's graveyard" proves it.
         --
         -- Through the funnel again rather than by hand, because CR 608.3e's "puts
         -- it into its owner's graveyard" is an ordinary zone change: a
@@ -6068,11 +6083,11 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
         -- it. The recursion is one deep -- the second move's destination is the
         -- graveyard, and this guard asks only about the battlefield.
         --
-        -- Not implemented: the graveyard id this arm answers is the card's new
-        -- incarnation, and a caller that BINDS the result binds a graveyard object
-        -- where it asked for a battlefield one. Unreachable today -- both stack
-        -- callers void the result, and no card in data/cards/ moves a spell from
-        -- the stack to the battlefield (#2869).
+        -- The answer is the graveyard incarnation, the contract a CR 616.1
+        -- redirect already has: the ids name where the move LANDED, not where it
+        -- was asked to go. Pawl.Engine.Stack voids it; counterOne reads it as
+        -- "countered", which the spell was, and the Counter opcode binds only
+        -- what landed in its destination.
         Just settled
           | ZoneChange.to settled == Zone.Battlefield && EntryRestriction.prohibited oid fromZone gs ->
               if fromZone == Zone.Stack
@@ -6226,6 +6241,17 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                   { Object.source = Source.OfToken printingId,
                     Object.bindings = foldMap (\pc -> Binding.setCopy pc Map.empty) (Game.copyStampOf obj)
                   }
+              -- CR 400.7d and CR 107.3m: "the spell that became that permanent
+              -- AS IT RESOLVED". Only a permanent spell's own resolution
+              -- (Pawl.Engine.Stack, the one door passing CarryOver.Carried) makes
+              -- that move; a countered card some effect puts onto the
+              -- battlefield instead (Desertion) also leaves the stack for the
+              -- battlefield, but no spell became it as it resolved, and its
+              -- ruling (2004-10-04) has it put there "by the effect of Desertion
+              -- instead". Every look-back at the cast below is gated on this
+              -- rather than on the destination alone. The counterspell scenario
+              -- "Desertion takes an evoked Mulldrifter and keeps it" proves it.
+              resolvedOnto = carrying == CarryOver.Carried && dest == Zone.Battlefield
               arriving = case (Object.source obj, dest) of
                 (Source.OfSpellCopy printingId, Zone.Battlefield) -> becomesToken printingId
                 (Source.OfCardCopy printingId, Zone.Battlefield) | fromZone == Zone.Stack -> becomesToken printingId
@@ -6292,9 +6318,8 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                     --
                     -- Read here rather than passed in by Pawl.Engine.Stack,
                     -- because the funnel already holds the object that has the
-                    -- binding, and the rule is about any object that entered
-                    -- the battlefield as a resolving spell rather than about
-                    -- one caller's route.
+                    -- binding; `resolvedOnto` is what says the move was that
+                    -- spell's resolution.
                     --
                     -- BATTLEFIELD ONLY, the rule's own scope: a countered spell
                     -- on its way to a graveyard becomes a card, and CR 107.3g
@@ -6306,7 +6331,7 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                     -- behaviour: both readers are entry replacements, which ask
                     -- it of a permanent, so dropping the gate leaves the suite
                     -- green.
-                    Object.announcedX = if dest == Zone.Battlefield then Binding.amountOf Binding.variableX (Object.bindings obj) else Nothing,
+                    Object.announcedX = if resolvedOnto then Binding.amountOf Binding.variableX (Object.bindings obj) else Nothing,
                     -- CR 400.7d: "an ability of a permanent can reference
                     -- information about the spell that became that permanent as
                     -- it resolved, including WHAT COSTS WERE PAID to cast that
@@ -6325,13 +6350,13 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                     -- to a graveyard becomes a card, and rule 400.7d speaks only
                     -- about a permanent. Nothing else reads the record off an
                     -- object outside the stack.
-                    Object.paidCosts = if dest == Zone.Battlefield then Object.paidCosts obj else Map.empty,
+                    Object.paidCosts = if resolvedOnto then Object.paidCosts obj else Map.empty,
                     -- CR 400.7d again, for a cost record a payment BOUND rather
                     -- than a keyword declared: CR 701.59c's "if evidence was
                     -- collected" on Vitu-Ghazi Inspector's enters ability.
                     -- `paidCosts`' gate, for its reason.
                     Object.bindings =
-                      if dest == Zone.Battlefield
+                      if resolvedOnto
                         then Map.union (Binding.paidCostRecord (Object.bindings obj)) (Object.bindings arriving)
                         else Object.bindings arriving,
                     -- CR 702.103b: "these effects last until the SPELL OR THE
@@ -6344,7 +6369,7 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                     -- BATTLEFIELD ONLY, `paidCosts`' gate and for a reason the rule
                     -- states rather than implies: what a bestowed spell becomes
                     -- anywhere else is a card, and a card is no bestowed Aura.
-                    Object.bestowed = Object.bestowed obj && dest == Zone.Battlefield,
+                    Object.bestowed = Object.bestowed obj && resolvedOnto,
                     -- CR 718.4: "in every zone except the stack or the
                     -- battlefield ... a prototype card has only its normal
                     -- characteristics". This move is the stack-to-battlefield
@@ -6357,7 +6382,7 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                     -- kind of reason the rule states outright: a prototyped spell
                     -- countered on its way to a graveyard becomes a card, and a
                     -- card is in neither zone rule 718.4 excepts.
-                    Object.prototyped = Object.prototyped obj && dest == Zone.Battlefield,
+                    Object.prototyped = Object.prototyped obj && resolvedOnto,
                     -- CR 702.27a's record crosses NO move: the ability is spent
                     -- on the one destination it replaces, and only an instant or a
                     -- sorcery can carry buyback, so no permanent can reference it.
@@ -6372,7 +6397,7 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                     -- 702.150a is about a permanent entering, and a countered
                     -- spell on its way to a graveyard becomes a card no compleated
                     -- ability can be on.
-                    Object.phyrexianLifePaid = if dest == Zone.Battlefield then Object.phyrexianLifePaid obj else 0,
+                    Object.phyrexianLifePaid = if resolvedOnto then Object.phyrexianLifePaid obj else 0,
                     -- CR 400.7d a fourth time, and this is the clause the rule
                     -- names last: "what mana was spent to pay those costs". CR
                     -- 107.4h's third sentence is what references it, so Berg
@@ -6382,12 +6407,12 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                     -- BATTLEFIELD ONLY, `paidCosts`' gate and for its reason: rule
                     -- 400.7d speaks about a permanent, and a countered spell
                     -- becomes a card no such ability can be on.
-                    Object.manaSpent = if dest == Zone.Battlefield then Object.manaSpent obj else Mana.MkMana [],
+                    Object.manaSpent = if resolvedOnto then Object.manaSpent obj else Mana.MkMana [],
                     -- CR 400.7d a fifth time: which keyword's cost was paid, what
                     -- CR 702.74a's "if its evoke cost was paid" and CR 702.138b's
                     -- "escaped" ask of the permanent. BATTLEFIELD ONLY, `paidCosts`'
                     -- gate and for its reason.
-                    Object.castUsing = if dest == Zone.Battlefield then Object.castUsing obj else Nothing,
+                    Object.castUsing = if resolvedOnto then Object.castUsing obj else Nothing,
                     -- CR 400.7d a sixth time, and CR 702.174b is the ability that
                     -- references it: the opponent the caster chose to pay rule
                     -- 702.174a's gift cost, which "the chosen player" then names on
@@ -6401,7 +6426,7 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                     -- BATTLEFIELD ONLY, `paidCosts`' gate and for its reason: rule
                     -- 400.7d speaks about a permanent, and a countered gift spell
                     -- becomes a card whose enters trigger never fires.
-                    Object.chosenPlayer = if dest == Zone.Battlefield then Object.chosenPlayer obj else Nothing
+                    Object.chosenPlayer = if resolvedOnto then Object.chosenPlayer obj else Nothing
                   }
               -- CR 604.2's override, handed over as the permanent leaves the
               -- battlefield. lingeringHandover below is the whole of it; this
@@ -6766,6 +6791,11 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
               -- same-batch siblings, empty for every door but changeZoneEnteringIn
               -- (CR 614.12a; see applyReplacementsIn for why 614.12a and not
               -- 614.13a).
+              -- The refusal, beside the graveyard incarnation a refusal FROM THE
+              -- STACK leaves (CR 608.3e's and CR 303.4g's road, which the
+              -- entry-restriction arm above answers the same way): a countered
+              -- card Desertion would have put onto the battlefield is still
+              -- countered when its entry is refused here.
               refusal <-
                 if dest /= Zone.Battlefield
                   then pure Nothing
@@ -6803,8 +6833,8 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                     State.modify' (\g -> List.foldl' (storeEntryEffect newId) g defining)
                     Monad.mapM_ (uncurry (addEnteringCounters newId)) (Map.toAscList entering)
                     refusal <- runEntry batch newId
-                    case refusal of
-                      Nothing -> pure ()
+                    fallen <- case refusal of
+                      Nothing -> pure Seq.empty
                       -- CR 614.1a: EntryRewrite.SacrificeToEnter's "if you don't, put
                       -- it into its owner's graveyard", the entry unmade as CR
                       -- 712.13a's is below. A card that was already in the graveyard
@@ -6812,7 +6842,7 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                       Just EntryRefusal.Unpaid -> do
                         State.put unentered
                         State.modify' (\g -> g {GameState.refusedEntries = fmap (Set.insert oid) (GameState.refusedEntries g)})
-                        Monad.unless (fromZone == Zone.Graveyard) (Monad.void (changeZoneReturning oid Zone.Graveyard))
+                        if fromZone == Zone.Graveyard then pure Seq.empty else changeZoneReturning oid Zone.Graveyard
                       -- CR 303.4g: an Aura with nothing to enchant "remains in its
                       -- current zone, unless that zone is the stack", which puts it
                       -- into its owner's graveyard instead. Copy Enchantment that
@@ -6821,8 +6851,8 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                       -- no test drives another origin.
                       Just EntryRefusal.Unhosted -> do
                         State.put unentered
-                        Monad.when (fromZone == Zone.Stack) (Monad.void (changeZoneReturning oid Zone.Graveyard))
-                    pure refusal
+                        if fromZone == Zone.Stack then changeZoneReturning oid Zone.Graveyard else pure Seq.empty
+                    pure (fmap (\r -> (r, if fromZone == Zone.Stack then fallen else Seq.empty)) refusal)
               -- Read off the refusal and not off whether `newId` still names an
               -- object: the graveyard move above re-mints from the rolled-back
               -- counter, so the card arriving there can carry that same id.
@@ -6844,7 +6874,7 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
               if refused || (dest == Zone.Battlefield && instantFace)
                 then
                   if refused
-                    then pure Seq.empty
+                    then pure (foldMap snd refusal)
                     else do
                       State.put unentered
                       if fromZone == Zone.Stack then changeZoneReturning oid Zone.Graveyard else pure Seq.empty
@@ -6979,9 +7009,10 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                         Moved.otherArrivals = trailingIds,
                         -- One object left, `oid`: only a meld's entry departs more.
                         Moved.otherDepartures = Seq.empty,
-                        -- CR 608.2n's own move and no other: `resolving` is True only
-                        -- at changeZoneResolvingReturning's door.
-                        Moved.duringResolution = resolving
+                        -- A spell's own resolution move: CR 608.2n's, where `resolving`
+                        -- is True only at changeZoneResolvingReturning's door, and CR
+                        -- 608.3's onto the battlefield, Pawl.Engine.Stack's Carried.
+                        Moved.duringResolution = resolving || (carrying == CarryOver.Carried && dest == Zone.Battlefield)
                       }
                   -- CR 712.21's second clause: "two cards are put into the
                   -- appropriate zone". One event per card AFTER the leading one,
@@ -7490,7 +7521,7 @@ destroyIn asOf cause regenerability oids = simultaneously $ do
 -- 117.5 scan reads this event the controller can no longer be asked for exactly
 -- (see Pawl.Types.Countering).
 counter :: ObjectId -> PlayerId -> ObjectId -> Game ()
-counter source controller oid = Monad.void (counterOne Zone.Graveyard source controller oid)
+counter source controller oid = Monad.void (counterOne (pure (Zone.Graveyard, LibraryPosition.defaultValue)) source controller oid)
 
 -- counter over a whole batch, answering with the objects it ACTUALLY countered
 -- (CR 701.6a) -- which is emphatically not the batch it was handed: an id naming
@@ -7506,19 +7537,27 @@ counter source controller oid = Monad.void (counterOne Zone.Graveyard source con
 -- three time counters on it" wants the incarnation. An ability leaves no new
 -- object at all (CR 608.2n), so it has none.
 --
--- `zone` is where a countered SPELL goes: CR 701.6a's graveyard, or exile for
--- Delay's "exile it ... instead of putting it into its owner's graveyard".
+-- `destinationOf` is where each countered SPELL goes: CR 701.6a's graveyard, or
+-- the zone a Pawl.Types.CounterDestination names instead -- Delay's exile,
+-- Remand's hand, Memory Lapse's library top, Desertion's battlefield, which the
+-- card enters under `controller` (CR 110.2a's "under your control"). A Game
+-- action, run only once the gates have passed, so a destination whose end a
+-- player chooses (Hinder) asks only about a spell that is countered.
 --
 -- A second door rather than a return type on `counter`, the destroyReturning
 -- posture: only the Counter opcode's bound slots use the answer.
-counterReturning :: Zone.Zone -> ObjectId -> PlayerId -> [ObjectId] -> Game [(ObjectId, Seq.Seq ObjectId)]
-counterReturning zone source controller =
-  fmap Maybe.catMaybes . traverse (\oid -> fmap (fmap ((,) oid)) (counterOne zone source controller oid))
+counterReturning :: (ObjectId -> Game (Zone.Zone, LibraryPosition.LibraryPosition)) -> ObjectId -> PlayerId -> [ObjectId] -> Game [(ObjectId, Seq.Seq ObjectId)]
+counterReturning destinationOf source controller =
+  fmap Maybe.catMaybes . traverse (\oid -> fmap (fmap ((,) oid)) (counterOne (destinationOf oid) source controller oid))
 
 -- The shared body of both doors: counter ONE object, answering Nothing when it
 -- was not countered and the incarnations its move minted when it was.
-counterOne :: Zone.Zone -> ObjectId -> PlayerId -> ObjectId -> Game (Maybe (Seq.Seq ObjectId))
-counterOne zone source controller oid = do
+--
+-- A spell whose entry CR 101.2 refuses is still countered: the funnel's CR
+-- 608.3e-shaped arm puts it into its owner's graveyard and answers that
+-- incarnation, which is CR 701.6a's own ending.
+counterOne :: Game (Zone.Zone, LibraryPosition.LibraryPosition) -> ObjectId -> PlayerId -> ObjectId -> Game (Maybe (Seq.Seq ObjectId))
+counterOne destination source controller oid = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure Nothing
@@ -7551,7 +7590,8 @@ counterOne zone source controller oid = do
     Just _ -> case fmap Face.counterability (Game.faceOf oid gs) of
       Just Counterability.CantBeCountered -> pure Nothing
       _ -> do
-        moved <- changeZoneReturning oid zone
+        (zone, position) <- destination
+        moved <- changeZoneAttaching Nothing Set.empty oid zone position Nothing TapState.Untapped Map.empty (Just controller) Nothing Facing.FaceUp False CarryOver.NotCarried False Seq.empty
         if Seq.null moved
           then pure Nothing
           else do
@@ -7933,13 +7973,16 @@ sacrificeIn asOf victims = simultaneously $ do
 --
 -- `attached` is CR 303.4i's and CR 301.5e's "attached to", the same way round:
 -- the EntryRiders field names a slot, and the caller has already read it, so what
--- arrives here is the answer. THREE-VALUED, because rule 303.4i separates two
--- cases a bare Maybe would fuse -- Nothing where the effect said nothing about an
--- attachment (every other token in the pool), Just the recipient where it named
--- one, and Just Nothing for the rule's "an object ... that is undefined", which
--- Preston Garvey, Minuteman reaches when the seat announces zero targets for its
--- "up to one target land you control".
-createTokens :: PlayerId -> Card -> Maybe PC.ProjectedCharacteristics -> Natural -> TapState.TapState -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> Maybe (Maybe Recipient.Recipient) -> Game [ObjectId]
+-- arrives here is the answer. Nothing where the effect said nothing about an
+-- attachment (every other token in the pool), and otherwise the objects it
+-- named: one for Preston Garvey, Minuteman's target, several for Dunbarrow
+-- Revivalist's "one of them", and none for rule 303.4i's "an object ... that
+-- is undefined", which Preston Garvey reaches when the seat announces zero
+-- targets for its "up to one target land you control".
+--
+-- Not an event bracket of its own: the caller is the one CR 608.2f event, and
+-- under Event.together the entries are recorded after this returns anyway.
+createTokens :: PlayerId -> Card -> Maybe PC.ProjectedCharacteristics -> Natural -> TapState.TapState -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> Maybe [Recipient.Recipient] -> Game [ObjectId]
 createTokens controller card copy n tapped entering attached = do
   gs <- State.get
   if List.notElem controller (Game.stillPlaying gs)
@@ -8086,7 +8129,24 @@ createTokens controller card copy n tapped entering attached = do
           -- token's attachment -- living weapon and For Mirrodin! create the token and
           -- then attach the EQUIPMENT to it (Pawl.Engine.Keyword.attachToOwnToken) --
           -- so that arm is a regression fence rather than a proven road.
-          let hostFor tok = Monad.join attached >>= \destination -> Attach.attachmentFor tok destination minted
+          --
+          -- SEVERAL named is Dunbarrow Revivalist's "attached to one of them": CR
+          -- 608.2d offers only the hosts this token could legally enchant, so the
+          -- legality reading comes first and the creator picks among what is left,
+          -- through Attach.chooseHost (elided at one, filtered rather than trusted).
+          -- Asked here for the reason above: legality needs the token to exist.
+          hosts <- Monad.forM ids $ \tok -> case attached of
+            Nothing -> pure (tok, Nothing)
+            Just named -> do
+              let legalHosts = Maybe.mapMaybe (\destination -> Attach.attachmentFor tok destination minted) named
+              picked <- Attach.chooseHost controller tok (Maybe.mapMaybe Recipient.objectOf legalHosts)
+              pure
+                ( tok,
+                  case legalHosts of
+                    [only] -> Just only
+                    _ -> picked >>= \oid -> List.find ((== Just oid) . Recipient.objectOf) legalHosts
+                )
+          let hostFor tok = Monad.join (List.lookup tok hosts)
               unhostable tok = Maybe.isNothing (hostFor tok) && Set.member Subtype.Aura (Projection.subtypesOf tok minted)
           if any (\tok -> EntryRestriction.prohibited tok Zone.Battlefield minted) ids || (Maybe.isJust attached && any unhostable ids)
             then do
@@ -9117,6 +9177,7 @@ controllerTurnScoped cond = case cond of
   -- anybody's turn.
   TriggerCondition.SelfEnters -> False
   TriggerCondition.PermanentEnters _ -> False
+  TriggerCondition.PermanentsEnter _ -> False
   -- CR 709.5e restricts the special action to the taker's own turn, but CR
   -- 709.5f's keyword action and CR 709.5d's entry have no such restriction, and
   -- this classification is about the CONDITION rather than about how the

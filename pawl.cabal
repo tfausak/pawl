@@ -410,6 +410,10 @@ library codec
     Pawl.Codec.CounterabilitySpec
     Pawl.Codec.CounterChange
     Pawl.Codec.CounterChangeSpec
+    Pawl.Codec.CounterDestination
+    Pawl.Codec.CounterDestinationSpec
+    Pawl.Codec.CounteredEnd
+    Pawl.Codec.CounteredEndSpec
     Pawl.Codec.Countering
     Pawl.Codec.CounteringSpec
     Pawl.Codec.CounterKind
@@ -948,6 +952,8 @@ library codec
     Pawl.Codec.PhaseSelectorSpec
     Pawl.Codec.PhaseSpec
     Pawl.Codec.Pile
+    Pawl.Codec.PileDraw
+    Pawl.Codec.PileDrawSpec
     Pawl.Codec.PileSpec
     Pawl.Codec.Placement
     Pawl.Codec.PlacementSpec
@@ -1065,6 +1071,8 @@ library codec
     Pawl.Codec.RemoveCounters
     Pawl.Codec.RemoveCountersAmong
     Pawl.Codec.RemoveCountersSpec
+    Pawl.Codec.RemovePlayerCounters
+    Pawl.Codec.RemovePlayerCountersSpec
     Pawl.Codec.Repeat
     Pawl.Codec.RepeatIf
     Pawl.Codec.RepeatIfSpec
@@ -1372,6 +1380,7 @@ library engine
     Pawl.Engine.ActivationProhibition
     Pawl.Engine.ActivationRestriction
     Pawl.Engine.Airbend
+    Pawl.Engine.AlternatingTeams
     Pawl.Engine.Amass
     Pawl.Engine.Archenemy
     Pawl.Engine.Attach
@@ -1792,6 +1801,7 @@ library test
     Pawl.ActivationProhibitionSpec
     Pawl.AdventureSpec
     Pawl.AirbendSpec
+    Pawl.AlternatingTeamsSpec
     Pawl.ArchenemySpec
     Pawl.AttackKeywordTriggerSpec
     Pawl.AttractionSpec
@@ -2125,6 +2135,8 @@ library types
     Pawl.Types.Counterability
     Pawl.Types.CounterCause
     Pawl.Types.CounterChange
+    Pawl.Types.CounterDestination
+    Pawl.Types.CounteredEnd
     Pawl.Types.Countering
     Pawl.Types.CounterKind
     Pawl.Types.CounterKindFamily
@@ -2430,6 +2442,7 @@ library types
     Pawl.Types.PhaseSelector
     Pawl.Types.PhyrexianPayment
     Pawl.Types.Pile
+    Pawl.Types.PileDraw
     Pawl.Types.Placement
     Pawl.Types.PlanarDieFace
     Pawl.Types.PlanarDieRolled
@@ -2494,6 +2507,7 @@ library types
     Pawl.Types.RemovalCount
     Pawl.Types.RemoveCounters
     Pawl.Types.RemoveCountersAmong
+    Pawl.Types.RemovePlayerCounters
     Pawl.Types.Repeat
     Pawl.Types.RepeatIf
     Pawl.Types.Replace

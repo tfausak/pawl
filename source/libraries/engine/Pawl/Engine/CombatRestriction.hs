@@ -149,11 +149,9 @@ cantAttackDefender candidates players gs =
 -- gate about them (CR 508.5) is read at that seat rather than at the first
 -- defending player in turn order -- the caller has it in hand and hands it over.
 --
--- No board proves that seat: nothing in data/cards gates a BLOCKING restriction
--- on the defending player, Armored Galleon -- the pool's only card writing
--- Filter.ControlledByDefendingPlayer, and CardSpec's "CR 508.5 no card writes
--- ControlledByDefendingPlayer outside a combat restriction" is the lint -- being
--- an attacking one. A regression fence rather than a proven behaviour, and the
+-- No board proves that seat: Graxiplon's gate on being blocked is tested at two
+-- seats (Pawl.CombatSpec's CR 205.3m group), where the declaring defender is
+-- also the first one. A regression fence rather than a proven behaviour, and the
 -- mutation that swaps this seat for the old one leaves the suite green.
 cantBlock :: Maybe PlayerId -> [ObjectId] -> GameState -> Set ObjectId
 cantBlock defending candidates gs =
@@ -260,16 +258,27 @@ blockProhibited candidates gs =
 detained :: [ObjectId] -> GameState -> Set ObjectId
 detained candidates gs = Set.fromList (filter (`Detain.detained` gs) candidates)
 
--- CR 508.1c together with CR 506.5: which of `candidates` an effect in force
--- right now says can't be the ONLY creature declared as an attacker. Bonded
--- Construct.
+-- CR 508.1c together with CR 506.5: which (creature, defending player) pairs an
+-- effect in force right now says can't be the ONLY creature declared as an
+-- attacker, announced at that seat. Bonded Construct.
 --
--- The two above are answered ABOUT A CANDIDATE and this one is not, even though
--- all three come back as a set of ids: this set is the input to a whole
--- declaration's check (Pawl.Engine.Combat.attackDeclarationAllowed) rather than a
--- filter on the candidate list. See `restricted` below.
-cantAttackAlone :: [ObjectId] -> GameState -> Set ObjectId
-cantAttackAlone candidates gs = restricted attackingAlone (defendingSeat gs) candidates gs
+-- The two above are answered ABOUT A CANDIDATE and this one is not: this set is
+-- the input to a whole declaration's check
+-- (Pawl.Engine.Combat.attackDeclarationAllowed) rather than a filter on the
+-- candidate list. See `restricted` below.
+--
+-- Keyed by seat for CR 508.5a's reason: the restriction applies to an attacking
+-- creature, so a gate naming the defending player is read at the seat THAT
+-- creature is announced against, `cantAttackDefender`'s shape and its one
+-- gather. Pawl.CombatSpec's PerDefenderWholeRestriction group is the proof.
+cantAttackAlone :: [ObjectId] -> [PlayerId] -> GameState -> Set (ObjectId, PlayerId)
+cantAttackAlone candidates players gs =
+  let rows = gathered gs
+      forSeat player =
+        Set.map
+          (\oid -> (oid, player))
+          (restrictedIn (filter (not . lifted (Just player) gs) rows) attackingAlone candidates gs)
+   in Set.unions (fmap forSeat players)
 
 -- CR 508.1c through CR 802.3a: the bounds in force right now on how many
 -- creatures may be declared as attackers. That rule splits them in two and this
@@ -280,9 +289,12 @@ cantAttackAlone candidates gs = restricted attackingAlone (defendingSeat gs) can
 -- Nothing of the source survives into either half, which is the point:
 -- Pawl.Engine.Combat learns numbers and never learns which card produced them.
 data AttackLimits = MkAttackLimits
-  { -- | CR 802.3a's first sentence. Nothing when no unscoped bound is in force.
-    -- Silent Arbiter.
-    whole :: Maybe Natural,
+  { -- | CR 802.3a's first sentence, keyed by the defending players whose
+    -- announcements the bound counts (CR 508.5a: a gate naming the defending
+    -- player is read per attacking creature, at its seat). An ungated bound
+    -- counts every seat. Empty when no unscoped bound is in force. Silent
+    -- Arbiter; Synthetic Tidal Palisade for the gated reading.
+    whole :: Map.Map (Set PlayerId) Natural,
     -- | CR 802.3a's second sentence, keyed by the defending player the bound
     -- names. A seat absent from the map is unbounded. Crawlspace.
     perDefender :: Map.Map PlayerId Natural
@@ -304,10 +316,12 @@ data AttackLimits = MkAttackLimits
 -- players by their relation to the card printing it. A source whose controller
 -- cannot be found names nobody rather than everybody.
 --
--- The two halves read their gates at DIFFERENT seats, which is what makes this
--- one walk rather than two calls to `bounded`: a scoped row's gate is read at
--- the seat it names (`cantAttackPlayer`'s posture), where the unscoped row has
--- no seat to name and falls back on `defendingSeat`.
+-- Both halves read their gates per seat, which is what makes this one walk
+-- rather than two calls to `bounded`: a scoped row's gate is read at the seat it
+-- names (`cantAttackPlayer`'s posture), and an unscoped row's at every defending
+-- seat, the bound counting only the creatures announced at a seat where the gate
+-- fails. CR 508.5a is why: the bound applies to attacking creatures, so "defending
+-- player" is determined individually for each of them.
 --
 -- No CR 612.1 word swap, and none is owed on either half: the swap replaces one
 -- printed word with another, and what a bound prints beyond its gate is a number
@@ -328,9 +342,16 @@ attackLimit gs =
         _ -> Nothing
       tightest select = List.foldl' tighter Nothing . Maybe.mapMaybe select
       forSeat player = tightest (scopedAt player) (filter (not . lifted (Just player) gs) rows)
+      defenders = Defender.defendingPlayers gs
+      -- The seats whose announcements an unscoped row counts: those its gate
+      -- does not lift. Empty, and so no bound at all, when it lifts everywhere.
+      counted row = Set.fromList (filter (\player -> not (lifted (Just player) gs row)) defenders)
    in MkAttackLimits
-        { whole = tightest unscoped (filter (not . lifted (defendingSeat gs) gs) rows),
-          perDefender = Map.fromList (Maybe.mapMaybe (\player -> fmap ((,) player) (forSeat player)) (Defender.defendingPlayers gs))
+        { whole =
+            Map.fromListWith
+              min
+              (Maybe.mapMaybe (\row -> unscoped row >>= \n -> let seats = counted row in if Set.null seats then Nothing else Just (seats, n)) rows),
+          perDefender = Map.fromList (Maybe.mapMaybe (\player -> fmap ((,) player) (forSeat player)) defenders)
         }
 
 -- CR 509.1b, the blocking counterpart. Silent Arbiter's second sentence.
@@ -719,7 +740,7 @@ lifted defending gs (source, changes, restriction) = case gate restriction of
     Condition.holds
       (Projection.fullView gs)
       (SourceContext.sourceContext gs (Projection.controllerOf source gs) source)
-        { Filter.defendingPlayer = defending
+        { Filter.defendingPlayers = Maybe.maybeToList defending
         }
       gs
       source
@@ -730,19 +751,6 @@ lifted defending gs (source, changes, restriction) = case gate restriction of
 -- through this rather than through `gathered`.
 inForce :: Maybe PlayerId -> GameState -> [(ObjectId, [(Subtype.Subtype, Subtype.Subtype)], CombatRestriction.CombatRestriction)]
 inForce defending gs = filter (not . lifted defending gs) (gathered gs)
-
--- CR 508.5a's "one specific defending player" where the reader has no attack
--- target to derive one from -- the first defending player in turn order.
---
--- Not implemented: CR 802.3a's split for the restrictions judged against the
--- WHOLE declaration -- `cantAttackAlone`, and `attackLimit`'s unscoped half.
--- Those are facts about the declaration rather than about one announcement, so
--- there is no attack target to read a defending player off, and a gate on either
--- would be judged at this one seat. A bound that DOES name a seat reads its gate
--- there instead, `cantAttackPlayer`'s posture. Nothing in the pool gates any of
--- them (#2894).
-defendingSeat :: GameState -> Maybe PlayerId
-defendingSeat gs = Maybe.listToMaybe (Defender.defendingPlayers gs)
 
 -- The shared walk behind the SUBJECT-CARRYING questions above, over the
 -- restrictions `select` keeps.
@@ -840,7 +848,16 @@ namedSubjects source name gs =
                 (\candidate -> Projection.affectsOn pcs grants source candidate (if null changes then affected else Projection.rewriteAffected changes affected) gs)
                 candidates
         _ -> []
-   in concatMap fromRestriction (inForce (defendingSeat gs) gs)
+      -- CR 508.5a: a gate naming the defending player is read per seat, so a row
+      -- restricts its subjects when it is in force at ANY defending seat -- some
+      -- announcement it forbids. No defending player is `lifted`'s Nothing. No
+      -- card in data/cards both grants the ignore and gates on the defending
+      -- player, so no test observes the per-seat reading.
+      seats = case Defender.defendingPlayers gs of
+        [] -> [Nothing]
+        players -> fmap Just players
+      live row = any (\seat -> not (lifted seat gs row)) seats
+   in concatMap fromRestriction (filter live (gathered gs))
 
 -- The union of the six subject-naming selectors above -- what CR 116.2d's offer
 -- reads, where each declaration's reader takes one of them. The two BOUNDING
@@ -942,13 +959,18 @@ cantBeBlockedBy defending blockers attackers gs =
 -- CR 509.1b's pairwise restrictions from BOTH sides: every (blocker, attacker)
 -- pair `cantBeBlockedBy`, `cantBlockCreatures` or `storedEvasions` forbids. What
 -- Pawl.Engine.Combat reads.
-barredBlocks :: Maybe PlayerId -> [ObjectId] -> [ObjectId] -> GameState -> Set (ObjectId, ObjectId)
-barredBlocks defending blockers attackers gs =
-  Set.unions
-    [ cantBeBlockedBy defending blockers attackers gs,
-      cantBlockCreatures defending blockers attackers gs,
-      storedEvasions blockers attackers gs
-    ]
+--
+-- A gate naming the defending player is read per ATTACKER, at the player it is
+-- attacking (CR 508.5 / 805.10e), not at the blocker's controller: the two
+-- differ once a teammate's creature blocks under the shared team turns option
+-- (CR 805.10d), or once a block is switched. Pawl.CombatSpec's
+-- DefendingPlayerOfBlockGate group is the proof.
+barredBlocks :: [ObjectId] -> [ObjectId] -> GameState -> Set (ObjectId, ObjectId)
+barredBlocks blockers attackers gs =
+  let seatOf attacker = Defender.playerOfAttacker Projection.controllerWithLastKnown attacker gs
+      bySeat = Map.fromListWith (flip (<>)) (fmap (\attacker -> (seatOf attacker, [attacker])) attackers)
+      atSeat (seat, theirs) = Set.union (cantBeBlockedBy seat blockers theirs gs) (cantBlockCreatures seat blockers theirs gs)
+   in Set.unions (storedEvasions blockers attackers gs : fmap atSeat (Map.toList bySeat))
 
 -- CR 509.1b / 611.2c: every (blocker, attacker) pair a stored,
 -- resolution-generated "can't be blocked" forbids -- Veiling Oddity's

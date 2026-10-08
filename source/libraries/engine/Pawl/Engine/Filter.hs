@@ -2,6 +2,7 @@ module Pawl.Engine.Filter where
 
 import qualified Data.Functor.Const as Const
 import qualified Data.Functor.Identity as Identity
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
@@ -1091,14 +1092,16 @@ data Context = MkContext
     -- site that can set it True.
     boundUnannounced :: Bool,
     -- CR 508.5: the DEFENDING PLAYER for the source, for the one atom that asks
-    -- (ControlledByDefendingPlayer, CR 702.39a). Supplied by the caller for
+    -- (ControlledByDefendingPlayer, CR 702.39a). One player for an attacking
+    -- source; for a source with no attack to resolve it, CR 802.2a's every
+    -- defending player the controller could choose (Yare). Supplied by the caller for
     -- sourcePower's reason -- this module holds no game state and cannot read the
     -- combat record -- by Pawl.Engine.Target.admittedGiven for a target slot and
     -- by Pawl.Engine.CombatRestriction.inForce for a CR 508.1c gate.
     --
     -- LAZY like sourcePower, and load-bearingly so: filling it costs a
     -- control-grant walk, and no filter that omits the atom ever forces it.
-    defendingPlayer :: Maybe PlayerId.PlayerId,
+    defendingPlayers :: [PlayerId.PlayerId],
     -- The player the surrounding effect is CURRENTLY BEING APPLIED TO, for the
     -- two atoms that ask (ControlledByRecipient, OwnedByRecipient) --
     -- Biorhythm's "the number of creatures they control", Stronghold Discipline's "1 life for each creature
@@ -1627,7 +1630,7 @@ data Context = MkContext
 -- here owes both halves of the same pair: which way its unfilled read answers,
 -- and what holds a card to the positions that fill it.
 contextFor :: Teams.Teams -> Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceToughness = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, evaluated = Nothing, sourceEntrants = Set.empty, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColors = Set.empty, sourceChosenSubtype = Nothing, sourceLastExiled = Nothing}
+contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceToughness = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayers = [], recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, evaluated = Nothing, sourceEntrants = Set.empty, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColors = Set.empty, sourceChosenSubtype = Nothing, sourceLastExiled = Nothing}
 
 -- contextFor with a resolution's -- or a trigger's -- slot objects supplied; see
 -- slotObjects above for who supplies them.
@@ -1665,7 +1668,7 @@ slotOneObject slot context = case Set.toList (Map.findWithDefault Set.empty slot
 -- position is one CR 303.4b's atom may be written into, which is what
 -- Pawl.CardSpec's position lint enforces.
 contextComparingPower :: Teams.Teams -> Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Maybe Integer -> Context
-contextComparingPower t p s n o = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, sourceToughness = o, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, evaluated = Nothing, sourceEntrants = Set.empty, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColors = Set.empty, sourceChosenSubtype = Nothing, sourceLastExiled = Nothing}
+contextComparingPower t p s n o = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, sourceToughness = o, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayers = [], recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, evaluated = Nothing, sourceEntrants = Set.empty, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColors = Set.empty, sourceChosenSubtype = Nothing, sourceLastExiled = Nothing}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -1750,6 +1753,9 @@ matches context view predicate = case predicate of
   Filter.ManaValueLessThanSource -> case (manaValue view, sourceManaValue context) of
     (Just v, Just s) -> v < s
     _ -> False
+  Filter.ManaValueGreaterThanSource -> case (manaValue view, sourceManaValue context) of
+    (Just v, Just s) -> v > s
+    _ -> False
   -- CR 702.53a's "a card with the same mana value as the discarded card" and CR
   -- 702.71a's "the same mana value as this permanent", the arm above's
   -- comparison at equality, and False on an absent mana value at either end for
@@ -1826,12 +1832,12 @@ matches context view predicate = case predicate of
     _ -> False
   -- CR 508.5 / 702.39a: the candidate's controller IS the defending player, which
   -- the Context supplies because it is a fact about the combat record rather than
-  -- about the candidate. False unless both are readable, the posture
-  -- PowerLessThanSource takes: a candidate with no controller and a source with no
-  -- defending player each leave nothing to compare.
-  Filter.ControlledByDefendingPlayer -> case (controller view, defendingPlayer context) of
-    (Just c, Just d) -> c == d
-    _ -> False
+  -- about the candidate -- or, for a source with no attack, IS ONE of the
+  -- defending players (CR 802.2a, Yare). False with no controller or no defending
+  -- player, the posture PowerLessThanSource takes.
+  Filter.ControlledByDefendingPlayer -> case controller view of
+    Just c -> List.elem c (defendingPlayers context)
+    Nothing -> False
   -- CR 603.2's "that player controls". `bakeBound` below replaces the atom before
   -- either of CR 115's moments judges the slot; a COUNT is matched unbaked, so the
   -- atom reads the Context's slotPlayers there -- Mana Cache's "for each untapped
@@ -2395,6 +2401,7 @@ rewrite pairs predicate = case predicate of
   -- Untouched for the source-power atoms' reason above: the atom names a
   -- comparison, and CR 612.1 finds no word in it to swap.
   Filter.ManaValueLessThanSource -> predicate
+  Filter.ManaValueGreaterThanSource -> predicate
   Filter.ManaValueEqualToSource -> predicate
   Filter.ManaValueIsEven -> predicate
   Filter.ManaValueAtMostAmount -> predicate
@@ -3161,6 +3168,7 @@ bakeBound players predicate = case predicate of
   -- and this atom names no slot at all -- the source's mana value rides the
   -- Context.
   Filter.ManaValueLessThanSource -> predicate
+  Filter.ManaValueGreaterThanSource -> predicate
   Filter.ManaValueEqualToSource -> predicate
   Filter.ManaValueIsEven -> predicate
   Filter.ManaValueAtMostAmount -> predicate
@@ -3315,6 +3323,8 @@ manaValueThresholds predicate = case predicate of
   -- is the one filler of Context's sourceManaValue), and
   -- Pawl.FilterPositionLintSpec is what keeps a card from writing it anywhere.
   Filter.ManaValueLessThanSource -> []
+  -- The arm above's comparison one operator over, empty for its reason.
+  Filter.ManaValueGreaterThanSource -> []
   -- The arm above's comparison at equality (CR 702.53a, CR 702.71a), and empty
   -- for its reason: it names no literal, and its position is the same one.
   Filter.ManaValueEqualToSource -> []
@@ -3488,6 +3498,7 @@ statesAQuality predicate = case predicate of
   -- A quality like the literal bound's, the source-power atoms' answer: "a
   -- nonland card with mana value less than this spell's" describes the card.
   Filter.ManaValueLessThanSource -> True
+  Filter.ManaValueGreaterThanSource -> True
   -- A quality for the arm above's reason: "a card with the same mana value as
   -- the discarded card" (CR 702.53a) describes the card.
   Filter.ManaValueEqualToSource -> True

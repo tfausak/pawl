@@ -960,7 +960,9 @@ prohibitsCounters pid kind gs =
         PlayerEffect.AdditionalSurveilCards _ -> False
         PlayerEffect.CantGainLife -> False
         PlayerEffect.CantLoseLife -> False
-   in any (prohibits . snd) (applying pid gs)
+   in -- CR 810.10c: a teammate who can't get poison counters stops the team,
+      -- since the team shares them (Game.counterSharers).
+      any (\member -> any (prohibits . snd) (applying member gs)) (Game.counterSharers kind pid gs)
 
 -- CR 725 / 101.2: is `pid` forbidden from becoming the monarch? CR 725.4 asks the
 -- question in the rulebook's own words -- "the next player in turn order who can

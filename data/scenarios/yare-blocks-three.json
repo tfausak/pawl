@@ -1,0 +1,128 @@
+{
+  "description": "CR 509.1a Yare's creature blocks three attackers",
+  "note": "bob, the defending player, casts Yare on his Wall of Granite as alice's three Goblin Pikers attack: it gets +3/+0 and can block up to two additional creatures, so it blocks all three.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker 1",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "piker 2",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "piker 3",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Wall of Granite",
+            "label": "wall"
+          },
+          {
+            "card": "Plains",
+            "label": "bob plains 1"
+          },
+          {
+            "card": "Plains",
+            "label": "bob plains 2"
+          },
+          {
+            "card": "Plains",
+            "label": "bob plains 3"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Yare",
+            "label": "bob yare"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$piker 1",
+          "$piker 2",
+          "$piker 3"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "$bob yare",
+          "targets": [
+            "$wall"
+          ],
+          "mana": [
+            "$bob plains 1",
+            "$bob plains 2",
+            "$bob plains 3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
+        "Block": {
+          "$wall": [
+            "$piker 1",
+            "$piker 2",
+            "$piker 3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Blockers": {
+          "attacker": "$piker 3",
+          "blockers": [
+            "$wall"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$wall",
+          "power": 3,
+          "toughness": 7
+        }
+      }
+    }
+  ]
+}
