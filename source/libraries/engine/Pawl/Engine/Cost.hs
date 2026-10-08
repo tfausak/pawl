@@ -4265,14 +4265,28 @@ readsBoundSlot = any (\component -> targetComputed component || not (Set.null (S
 -- targetComputed component, whether a permanent is there and its mana value
 -- (fixComputed).
 --
+-- And what a target is to the MANA half, which CR 601.2g pays before 601.2h and
+-- whose sources' own costs claim objects jointly with the components
+-- (Mana.canPayCommittingGiven): a target's membership in every claim a mana
+-- source makes on an axis the components also claim, and, for a target that is
+-- itself such a source, its routes with itself written as "self". Blood Pet and
+-- Grizzly Bears are alike to Synthetic Spiteful Rite's sacrifice but not to the
+-- {B} it needs -- Pawl.CostSpec's "CR 601.2g a target the components cannot
+-- tell apart may still be the mana source". Two Treasures stay alike. Only the
+-- components' axes, because a target leaves no other claim's pool.
+--
 -- Claims read with nothing bound are what a target LEAVES when its criterion
 -- says "isn't a target". A criterion reading a slot any other way could tell
 -- interchangeable-looking targets apart, so the answer is Nothing and the caller
 -- falls back to every subset. No cost in data/cards/ reads a slot otherwise
 -- (grep of IsBound under additional and activation costs, 2026-10-08).
-aimingSignature :: PlayerId -> ObjectId -> GameState -> Cost Keyword.Type.Keyword -> Maybe (Recipient.Recipient -> [Integer])
+aimingSignature :: PlayerId -> ObjectId -> GameState -> Cost Keyword.Type.Keyword -> Maybe (Recipient.Recipient -> ([Integer], [(Activations.Activations, [(Bool, Maybe (Maybe Integer), Claim)], Mana.Type.Mana, ManaCost.ManaCost)]))
 aimingSignature pid oid gs cost
-  | not (all (all onlyExcludesTargets . criteriaOf) (Cost.components cost)) = Nothing
+  | not (all onlyExcludesTargets criteria) = Nothing
+  -- One excluded slot across the whole cost: aimingsBy fixes each class's
+  -- union over the slots and each slot's draw, which settles how many targets
+  -- one slot excludes, but not the overlap of two excluded slots beside a third.
+  | Set.size (Set.fromList (concatMap excludedSlots criteria)) > 1 || any ((> 1) . length . excludedSlots) criteria = Nothing
   | otherwise =
       let context = Filter.contextFor (Game.teams gs) (Just pid) (Just oid)
           wanted = Maybe.mapMaybe CostReduction.whichTargets (selfSentences pid oid gs)
@@ -4282,12 +4296,33 @@ aimingSignature pid oid gs cost
           self r = fmap (\w -> ofObject r (\o -> toInteger (fromEnum (Filter.matches context (Projection.viewOfObject o gs) w)))) wanted
           claimed r = concatMap (\c -> [ofObject r (toInteger . fromEnum . (`Set.member` Claim.Type.pool c)), maybe 0 (\t -> ofObject r (\o -> Map.findWithDefault 0 o (Threshold.amounts t))) (Claim.Type.threshold c)]) claims
           evidence r = if computed then [ofObject r (\o -> toInteger (fromEnum (Game.zoneOf o gs == Just Zone.Battlefield))), ofObject r (`evidenceValue` gs)] else []
-       in Just (\r -> fmap (toInteger . fromEnum) (PlayerEffect.targetQuestions pid gs r) <> self r <> claimed r <> evidence r)
+          axes = Set.fromList (fmap Claim.Type.axis claims)
+          capacity = Mana.supplyCapacity (midPayment (manaActivationsGiven (PlayerEffect.applying pid gs)))
+          pcs = Projection.projectAll gs
+          supplies =
+            if Set.null axes
+              then []
+              else [(source, supply) | source <- Mana.manaSourcesGiven Set.empty capacity (Projection.controlGrants gs) pcs pid gs, supply <- Mana.manaSuppliesGiven capacity pcs pid source gs]
+          relevant (activations, _, _) = filter ((`Set.member` axes) . Claim.Type.axis) (Activations.claims activations)
+          -- Every other source's claim pools: is the target in each.
+          pooled r = [ofObject r (\o -> toInteger (fromEnum (Set.member o (Claim.Type.pool c)))) | (source, supply) <- supplies, Recipient.objectOf r /= Just source, c <- relevant supply]
+          -- The target's own routes, itself written out of every pool.
+          selfless o c =
+            ( Set.member o (Claim.Type.pool c),
+              fmap (Map.lookup o . Threshold.amounts) (Claim.Type.threshold c),
+              c {Claim.Type.pool = Set.delete o (Claim.Type.pool c), Claim.Type.threshold = fmap (\t -> t {Threshold.amounts = Map.delete o (Threshold.amounts t)}) (Claim.Type.threshold c)}
+            )
+          routes r = case Recipient.objectOf r of
+            Nothing -> []
+            Just o -> [(activations {Activations.claims = []}, fmap (selfless o) (relevant supply), mana, cost') | (source, supply@(activations, mana, cost')) <- supplies, source == o, not (null (relevant supply))]
+       in Just (\r -> (fmap (toInteger . fromEnum) (PlayerEffect.targetQuestions pid gs r) <> self r <> claimed r <> evidence r <> pooled r, routes r))
+  where
+    criteria = concatMap criteriaOf (Cost.components cost)
 
 -- aimingSignature as the key Pawl.Engine.Target.aimingsBy classes targets by:
 -- the target itself where no signature can be given, so the search falls back
 -- to every subset.
-aimingKey :: PlayerId -> ObjectId -> GameState -> Cost Keyword.Type.Keyword -> Recipient.Recipient -> Either Recipient.Recipient [Integer]
+aimingKey :: PlayerId -> ObjectId -> GameState -> Cost Keyword.Type.Keyword -> Recipient.Recipient -> Either Recipient.Recipient ([Integer], [(Activations.Activations, [(Bool, Maybe (Maybe Integer), Claim)], Mana.Type.Mana, ManaCost.ManaCost)])
 aimingKey pid oid gs cost = maybe Left (Right .) (aimingSignature pid oid gs cost)
 
 -- What a recipient IS, for aimingsBy: a creature, a planeswalker and a permanent
@@ -4295,6 +4330,16 @@ aimingKey pid oid gs cost = maybe Left (Right .) (aimingSignature pid oid gs cos
 -- tags counts once, as PlayerEffect.perTargetCount counts it.
 aimedReferent :: Recipient.Recipient -> Recipient.Recipient
 aimedReferent r = maybe r Recipient.ToObject (Recipient.objectOf r)
+
+-- The slots a criterion excludes with a top-level Not (IsBound _).
+excludedSlots :: Filter.Type.Filter Keyword.Type.Keyword -> [SlotName.SlotName]
+excludedSlots criterion =
+  let excluded f = case f of
+        Filter.Type.Not (Filter.Type.IsBound name) -> [name]
+        _ -> []
+   in case criterion of
+        Filter.Type.And conjuncts -> concatMap excluded conjuncts
+        _ -> excluded criterion
 
 -- Does this criterion read a slot only as "isn't a target" -- a top-level
 -- Not (IsBound _), alone or as a conjunct beside slotless ones? aimingSignature's

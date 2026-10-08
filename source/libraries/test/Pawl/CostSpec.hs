@@ -588,6 +588,20 @@ spitefulSpec s registry =
           (_, pairedId, paired) = spitefulBoard S.addHandCard swamp giant piker rite 1
       Spec.assertBool s (not (any (S.isCastOf aloneId) (Action.legalActions S.alice alone))) "with the target the only creature no announcement pays, so the cast is not offered"
       Spec.assertBool s (any (S.isCastOf pairedId) (Action.legalActions S.alice paired)) "and one more creature makes some announcement pay, so it is"
+    -- CR 601.2g then 601.2h: the Rite targets Blood Pet ("Sacrifice this
+    -- creature: Add {B}"), the Pet is sacrificed for the {B}, and the Bears pay
+    -- the Rite's sacrifice. alice has no land, so this is the one legal cast, and
+    -- the Bears and the Pet are alike to the Rite's own sacrifice: the gate has to
+    -- tell them apart by what the Pet is to the mana half.
+    Spec.it s "CR 601.2g a target the components cannot tell apart may still be the mana source" $ do
+      bears <- S.printingOf s registry "Grizzly Bears"
+      pet <- S.printingOf s registry "Blood Pet"
+      rite <- S.printingOf s registry "Synthetic Spiteful Rite"
+      let (_, withBears) = S.addPermanent bears S.alice (Setup.emptyGame S.bothPlayers)
+          (_, withPet) = S.addPermanent pet S.alice withBears
+          (riteId, gs) = S.addHandCard rite S.alice withPet
+          board = gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+      Spec.assertBool s (any (S.isCastOf riteId) (Action.legalActions S.alice board)) "CR 601.2g aiming at the Pet pays, so the cast is offered"
     -- CR 602.2b sends an activation through the same steps, and
     -- Activatable.aimingSomewhere is the gate. The same pair of boards with the
     -- Altar on the battlefield in the Rite's place.
