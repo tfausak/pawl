@@ -87,17 +87,22 @@ site comment. Living in `startGameFromCards` means a subgame (CR 729.2 follows
 rule 103) and a Karn restart (CR 727.1) ante too; `subgameStateFrom` inherits
 `settings` already.
 
-**The action (CR 407.4).** `MoveToZone` to `Zone.Ante` is refused for an
-object whose owner is not the instruction's player, and a refused move did not
-happen, so Jeweled Bird's "If you do" reads it. Proving board: Jeweled Bird
-under Control Magic.
+**The action (CR 407.4).** A new `Effect.Ante` opcode carrying the anteing
+player, since `MoveToZone` names no player and the resolving controller is not
+the antee in Demonic Attorney, Rebirth or Amulet of Quoz; a lint bars
+`MoveToZone` into ante. The move is refused for an object the anteing player
+does not own, and a refused move did not happen, so Jeweled Bird's "If you do"
+reads it. Rebirth's "if a player does" is per player, so a seat whose ante is
+impossible (empty library) is not offered the choice. Proving board: Jeweled
+Bird under Confiscate.
 
 **Departure (CR 800.4n).** `Departure.objectsLeaveWith` excludes
-`Object.zone == Zone.Ante`.
+`Object.zone == Zone.Ante`. `Setup.funnelBack` must not take a departed
+player's surviving subgame ante card as evidence they are still present.
 
 **Outside the game (CR 407.3).** When `GameSettings.ante` is off, an ante
-card (a flag in its card JSON, never a scan of its
-Oracle text) is barred beside the CR 315.3 conspiracy
+card (`Face.anteOnly` in its card JSON, tied to its Oracle text by a corpus
+lint, never a scan at runtime) is barred beside the CR 315.3 conspiracy
 filter in `Event.eligible` and in `Companion.revealable`. Whatever the
 setting, `subgameStateFrom.asOutside` does not offer a main-game ante-zone
 card: CR 407.3 makes the nine the only cards that remove a card from ante, and
@@ -176,7 +181,7 @@ Gameplay-level, one concern each, in the spec module the implementer's
 - Unit 1: an ante game puts one card from each library into ante before opening
   hands, a non-ante game none; Contract from Below and Demonic Attorney ante the
   top card; Rebirth's decliner keeps their life total; Jeweled Bird under
-  Control Magic does not ante and does not draw; Amulet of Quoz's target who antes
+  Confiscate does not ante and does not draw; Amulet of Quoz's target who antes
   faces no flip; a departed player's ante card stays (CR 800.4n); Burning Wish cannot
   fetch an ante card outside an ante game, nor a main-game ante card from a
   Shahrazad subgame.
