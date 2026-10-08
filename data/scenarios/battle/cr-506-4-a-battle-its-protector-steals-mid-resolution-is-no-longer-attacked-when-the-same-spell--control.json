@@ -1,0 +1,168 @@
+{
+  "description": "CR 506.4 a battle its protector steals mid-resolution leaves combat at once, so the same spell's later \"attacking a battle you protect\" does not find its attacker (control: the spell takes bob's own Jace)",
+  "note": "The same board, but bob aims Synthetic Turncoat Oath at his own Jace Beleren. No controller changes, so the battle stays attacked and the spell's second sentence exiles alice's Goblin Piker.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Invasion of Dominaria",
+            "label": "invasion",
+            "protector": "bob",
+            "counters": [
+              {
+                "key": {
+                  "type": "Defense"
+                },
+                "value": 5
+              }
+            ]
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Jace Beleren",
+            "label": "jace",
+            "counters": [
+              {
+                "key": {
+                  "type": "Loyalty"
+                },
+                "value": 5
+              }
+            ]
+          },
+          {
+            "card": "Island",
+            "label": "i1"
+          },
+          {
+            "card": "Island",
+            "label": "i2"
+          },
+          {
+            "card": "Plains",
+            "label": "p1"
+          },
+          {
+            "card": "Plains",
+            "label": "p2"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Synthetic Turncoat Oath",
+            "label": "oath"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$piker"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "$piker",
+      "do": {
+        "ChooseAttackTarget": "$invasion"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Attackers": {
+          "attackers": {
+            "$piker": "$invasion"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "$oath",
+          "targets": [
+            "$jace"
+          ],
+          "mana": [
+            "$i1",
+            "$i2",
+            "$p1",
+            "$p2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Controller",
+          "object": "$invasion",
+          "is": "alice"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Goblin Piker",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Exile",
+          "card": "Goblin Piker",
+          "count": 1
+        }
+      }
+    }
+  ]
+}

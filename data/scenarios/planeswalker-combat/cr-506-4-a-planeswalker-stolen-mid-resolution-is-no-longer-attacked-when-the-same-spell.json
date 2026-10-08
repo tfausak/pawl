@@ -1,0 +1,200 @@
+{
+  "description": "CR 506.4 a planeswalker stolen by a spell leaves combat at once, so the same spell's later \"attacking a planeswalker you control\" does not find its attacker",
+  "note": "alice attacks bob's Jace Beleren with her Goblin Piker and, in the declare blockers step, casts Synthetic Turncoat Oath on Jace. Its control change removes Jace from combat (CR 506.4) before its second sentence reads the filter in the same resolution, ahead of any CR 117.5 sampling, so the Piker attacks nothing (CR 506.4c) and is not exiled. The --control file has bob cast the same spell on his own Jace: no controller changes, Jace stays attacked, and the Piker is exiled.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "ai1"
+          },
+          {
+            "card": "Island",
+            "label": "ai2"
+          },
+          {
+            "card": "Plains",
+            "label": "ap1"
+          },
+          {
+            "card": "Plains",
+            "label": "ap2"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Synthetic Turncoat Oath",
+            "label": "aoath"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Jace Beleren",
+            "label": "jace",
+            "counters": [
+              {
+                "key": {
+                  "type": "Loyalty"
+                },
+                "value": 5
+              }
+            ]
+          },
+          {
+            "card": "Island",
+            "label": "bi1"
+          },
+          {
+            "card": "Island",
+            "label": "bi2"
+          },
+          {
+            "card": "Plains",
+            "label": "bp1"
+          },
+          {
+            "card": "Plains",
+            "label": "bp2"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Synthetic Turncoat Oath",
+            "label": "boath"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$piker"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "$piker",
+      "do": {
+        "ChooseAttackTarget": "$jace"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Attackers": {
+          "attackers": {
+            "$piker": "$jace"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$aoath",
+          "targets": [
+            "$jace"
+          ],
+          "mana": [
+            "$ai1",
+            "$ai2",
+            "$ap1",
+            "$ap2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Goblin Piker",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Exile",
+          "card": "Goblin Piker",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Controller",
+          "object": "$jace",
+          "is": "alice"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Attackers": {
+          "attackers": {
+            "$piker": "$jace"
+          }
+        }
+      }
+    }
+  ]
+}
