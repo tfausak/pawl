@@ -1,0 +1,23 @@
+{
+  "description": "CR 705 Amulet of Quoz: the target declines to ante, alice wins the flip, and bob loses the game",
+  "board": {
+    "ante": true,
+    "active": "alice",
+    "step": "Upkeep",
+    "seats": [
+      { "name": "alice", "battlefield": [{ "card": "Amulet of Quoz", "label": "amulet" }], "library": [{ "card": "Mountain" }, { "card": "Mountain" }] },
+      { "name": "bob", "library": [{ "card": "Plains" }, { "card": "Mountain" }] }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "Answer": { "prompt": "CallCoin", "with": { "type": "Heads" } } } },
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "Answer": { "prompt": "FlipCoin", "with": { "type": "Heads" } } } },
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "Activate": { "object": "$amulet", "ability": 0, "targets": ["$bob"], "costOrder": [0, 1] } } },
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "Upkeep", "player": "bob", "do": { "ChooseOptional": { "type": "Declines" } } }
+  ],
+  "final": [
+    { "View": { "of": "Result", "is": { "won": "alice" } } },
+    { "Count": { "player": "bob", "zone": "Ante", "card": "Plains", "count": 0 } }
+  ]
+}
