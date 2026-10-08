@@ -1981,7 +1981,35 @@ variableActivationCostSpec s registry = Spec.describe s "VariableActivationCost"
     paid <- hubAtTwo False
     Spec.assertEqWith s "alice drew two" (S.handSize S.alice paid) 2
     Spec.assertEqWith s "spending both counters" (S.playerCounterOf PlayerCounterKind.Energy S.alice paid) 0
+
+  -- CR 118.3 and CR 601.2h over TWO energy components in one cost: Synthetic
+  -- Twin Capacitor's "{T}, Pay {E}, Pay X {E}" owes 1 + X counters, so three
+  -- bound X at 2. Weighing each component alone against the whole total would
+  -- admit X = 3, which the fixed {E} then leaves one short.
+  Spec.it s "CR 118.3 two energy components in one cost bound X by their sum" $ do
+    (capacitor, srcId, g1) <- capacitorBoard 3
+    let act = Activate.activateAbility S.alice srcId (theAbility capacitor)
+        bounds = State.execState (Engine.runGame (answerAtBound S.bob) g1 act) []
+        paid = snd (Engine.runGamePure (answerXAt 2 S.bob) g1 (act >> Stack.resolveTop))
+    Spec.assertEqWith s "three counters less the fixed {E} bound X at 2" bounds [2]
+    Spec.assertEqWith s "and X = 2 draws two" (S.handSize S.alice paid) 2
+    Spec.assertEqWith s "spending all three counters" (S.playerCounterOf PlayerCounterKind.Energy S.alice paid) 0
+  Spec.it s "CR 601.2h an X the two energy components cannot both cover is a no-op" $ do
+    (capacitor, srcId, g1) <- capacitorBoard 3
+    let after = snd (Engine.runGamePure (answerXAt 3 S.bob) g1 (Activate.activateAbility S.alice srcId (theAbility capacitor)))
+    Spec.assertEqWith s "CR 733.1 no counter spent" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 3
+    Spec.assertEqWith s "the Capacitor is untapped" (S.tappedCount S.alice after) 0
+    Spec.assertEqWith s "and nothing was left on the stack" (GameState.stack after) []
   where
+    -- alice with a settled Synthetic Twin Capacitor, `energy` energy counters
+    -- and a library to draw from, holding priority.
+    capacitorBoard energy = do
+      capacitor <- S.printingOf s registry "Synthetic Twin Capacitor"
+      mountain <- S.printingOf s registry "Mountain"
+      let (srcId, g0) = S.addPermanent capacitor S.alice (S.landsInPlay mountain 0)
+          g1 = List.foldl' (\gs _ -> snd (S.addLibraryCard mountain S.alice gs)) g0 [1 .. 6 :: Int]
+          g2 = S.addPlayerCounter PlayerCounterKind.Energy energy S.alice g1
+      pure (capacitor, srcId, g2 {GameState.priority = Just S.alice})
     -- sphinxBoard at two energy with an Aether Hub beside the lands, activated
     -- at X = 2 and resolved; `viaHub` is whether the window names the Hub
     -- wherever it is offered or never does.

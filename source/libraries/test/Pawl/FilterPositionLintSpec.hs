@@ -1837,24 +1837,25 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace manaValueEqualToAmountOffends . Printing.card) ps
     Spec.assertEqWith s "the atom sits only where the slot supplies the bound" (fmap (S.nameOf . Printing.card) offenders) []
-    -- NOT vacuous: Chthonian Nightmare, Tamiyo, Compleated Sage, Fear of Change
-    -- and Ornate Imitations are the pool's authors of the atom -- two slots, and
-    -- a reference pick at the top level and inside a ForEachNumber body -- and all
-    -- are ACCEPTED here rather than skipped.
+    -- NOT vacuous: Chthonian Nightmare, Tamiyo, Compleated Sage, Synthetic
+    -- Counted Verdict, Fear of Change and Ornate Imitations are the pool's authors
+    -- of the atom -- three slots, and a reference pick at the top level and inside
+    -- a ForEachNumber body -- and all are ACCEPTED here rather than skipped.
     nightmare <- S.printingOf s registry "Chthonian Nightmare"
     tamiyo <- S.printingOf s registry "Tamiyo, Compleated Sage"
     fear <- S.printingOf s registry "Fear of Change"
     ornate <- S.printingOf s registry "Ornate Imitations"
+    verdict <- S.printingOf s registry "Synthetic Counted Verdict"
     Spec.assertEqWith
       s
-      "the Nightmare's and Tamiyo's slots name their bound, and so do Fear of Change's and Ornate Imitations' reference picks"
-      (manaValueEqualToAmountCounts (S.combinedFace nightmare), manaValueEqualToAmountCounts (S.combinedFace tamiyo), manaValueEqualToAmountCounts (S.combinedFace fear), manaValueEqualToAmountCounts (S.combinedFace ornate))
-      ((1, 0), (1, 0), (1, 0), (1, 0))
+      "the Nightmare's, Tamiyo's and the Verdict's slots name their bound, and so do Fear of Change's and Ornate Imitations' reference picks"
+      (manaValueEqualToAmountCounts (S.combinedFace nightmare), manaValueEqualToAmountCounts (S.combinedFace tamiyo), manaValueEqualToAmountCounts (S.combinedFace verdict), manaValueEqualToAmountCounts (S.combinedFace fear), manaValueEqualToAmountCounts (S.combinedFace ornate))
+      ((1, 0), (1, 0), (1, 0), (1, 0), (1, 0))
     Spec.assertEqWith
       s
       "and they are the pool's only ones"
       (sum (fmap (uncurry (+) . manaValueEqualToAmountCounts . S.combinedFace) ps))
-      4
+      5
     -- The rejected side, the at-most lint's pair one operator over: the same atom
     -- buried under all three combinators, in a target slot that names no amount.
     piker <- S.printingOf s registry "Goblin Piker"

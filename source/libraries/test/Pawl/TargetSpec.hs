@@ -134,6 +134,8 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
@@ -313,6 +315,43 @@ aimingMeasured gauges victim gaugeTwo victimTwo p = case p of
       )
       asked
   _ -> S.identityAnswer p
+
+-- Synthetic Counted Verdict's board: `n` Typhoid Rats for alice, a Goblin Piker
+-- and a Hill Giant for bob, four Swamps, and the Verdict in alice's hand.
+verdictBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> (Printing.Printing -> [ObjectId.ObjectId] -> ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> ObjectId.ObjectId -> m a) -> m a
+verdictBoard s registry n k = do
+  swamp <- S.printingOf s registry "Swamp"
+  rats <- S.printingOf s registry "Typhoid Rats"
+  piker <- S.printingOf s registry "Goblin Piker"
+  giant <- S.printingOf s registry "Hill Giant"
+  verdict <- S.printingOf s registry "Synthetic Counted Verdict"
+  let addRat (ids, gs) _ = let (oid, gs') = S.addPermanent rats S.alice gs in (ids <> [oid], gs')
+      (ratIds, g1) = List.foldl' addRat ([], S.landsInPlay swamp 4) [1 .. n]
+      (pikerId, g2) = S.addPermanent piker S.bob g1
+      (giantId, g3) = S.addPermanent giant S.bob g2
+      (board, verdictId) = S.handOne verdict g3
+  k verdict ratIds pikerId giantId board verdictId
+
+-- Casts the Verdict and resolves it, announcing `gauges` for its gauge slot and
+-- `victim` for its victim slot, the offered sets FILTERED.
+castVerdict :: [ObjectId.ObjectId] -> ObjectId.ObjectId -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
+castVerdict gauges victim board verdictId =
+  let answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.AnnounceTargets _ _ _ asked -> Map.mapWithKey (\slot (count, _) -> if slot == SlotName.MkSlotName (Text.pack "gauge") then Natural.length gauges else TargetCount.least count) asked
+        Prompt.ChooseTargets _ _ _ asked ->
+          Map.mapWithKey
+            ( \slot (_, offered) ->
+                let wanted = if slot == SlotName.MkSlotName (Text.pack "gauge") then gauges else [victim]
+                 in Set.filter (maybe False (`elem` wanted) . Recipient.objectOf) offered
+            )
+            asked
+        _ -> S.identityAnswer p
+      cast = S.runPure answer board (S.cast S.alice verdictId)
+   in S.runPure answer cast Stack.resolveTop
+
+tapStateIn :: GameState.GameState -> ObjectId.ObjectId -> Maybe TapState.TapState
+tapStateIn gs oid = fmap Object.tapped (Game.lookupObject oid gs)
 
 -- CR 601.2c's whole announcement for Bioshift: `giverId` in the `from` slot and
 -- `takerId` in the `to` slot, aimingHammer's shape and FILTERED for its reason.
@@ -2018,15 +2057,64 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     -- standing too.
     Spec.assertEqWith s "the reversed cast left nothing on the stack" (length (GameState.stack castAtDear)) 0
     Spec.assertBool s (elem refrainId (Game.zoneMembers Zone.Hand S.alice castAtDear)) "and the spell is back in alice's hand"
-    -- The union posture, last and for the case above's reason: occurrence 1's
-    -- victim slot is still OFFERED the dearer creature at CR 601.2c, measured
-    -- against all three creatures its gauge slot could take, so the first
-    -- assertion is a joint-check rejection rather than a slot the rename emptied.
+    -- The widening, last and for the case above's reason: occurrence 1's victim
+    -- slot is still OFFERED the dearer creature at CR 601.2c, measured against
+    -- every announcement its "up to two" gauge slot could make on its own, so the
+    -- first assertion is a joint-check rejection rather than a slot the rename
+    -- emptied.
     Spec.assertEqWith
       s
-      "occurrence 1's victim slot is offered every creature, its own bound measured against the whole of what its gauge could take"
+      "occurrence 1's victim slot is offered every creature, its own bound measured against every announcement its gauge could make"
       (slotNamed "victim#1")
       (Set.fromList (fmap Recipient.ToCreature [gaugeA, gaugeB, gaugeC, victimId, dearId, cheapId]))
+
+  -- CR 601.2c's offer for a bound that COUNTS a sibling slot at EQUALITY: the
+  -- only binding of the gauge slot that admits a candidate may name some but not
+  -- all of the gauge's candidates, so neither the union nor any one candidate
+  -- finds it.
+  --
+  -- Synthetic Counted Verdict {3}{B} Sorcery
+  -- (data/cards/synthetic-counted-verdict.json): "Tap up to three target
+  -- creatures you control, then destroy target creature with mana value equal to
+  -- the number of those creatures." SYNTHETIC: Scryfall o:"mana value equal to
+  -- the number of" o:target, 2026-10-08, finds no bound counting a sibling target.
+  --
+  -- alice's four Typhoid Rats (mana value 1) are the gauge's candidates and bob's
+  -- Goblin Piker (mana value 2) the victim: against all four at once the bound is
+  -- 4, against each alone 1, and only two of them make it 2. bob's Hill Giant
+  -- (mana value 4) is what the union alone would admit, though no announcement of
+  -- at most three gauges can.
+  Spec.it s "CR 601.2c a bound counting a sibling slot is offered against every announcement that slot could make" $ do
+    verdictBoard s registry 4 $ \verdict rats piker giant board verdictId -> do
+      let slots = Modal.allTargetSlots (Face.spell (S.combinedFace verdict))
+          offered = Target.legalSets (Just S.alice) False Map.empty S.noSource slots board
+          victims = Map.findWithDefault Set.empty (SlotName.MkSlotName (Text.pack "victim")) offered
+          after = castVerdict (take 2 rats) piker board verdictId
+      Spec.assertBool s (notElem piker (Game.zoneMembers Zone.Battlefield S.bob after)) "tapping two Rats, the mana value 2 Piker is destroyed"
+      Spec.assertEqWith s "and exactly those two Rats are tapped" (fmap (tapStateIn after) rats) (fmap Just [TapState.Tapped, TapState.Tapped, TapState.Untapped, TapState.Untapped])
+      Spec.assertBool s (Set.member (Recipient.ToCreature piker) victims) "the victim slot is offered the Piker"
+      Spec.assertBool s (not (Set.member (Recipient.ToCreature giant) victims)) "and not the Hill Giant no announcement of three gauges reaches"
+  -- The same on a WIDE board, which is what keeps the subsets bounded: eighteen
+  -- Rats are 988 announcements of at most three, and the offer answers once per
+  -- distinct bound rather than once per announcement.
+  Spec.it s "CR 601.2c the sibling-count offer stays bounded on a wide board" $ do
+    verdictBoard s registry 18 $ \_ rats piker _ board verdictId -> do
+      let after = castVerdict (take 2 rats) piker board verdictId
+      Spec.assertBool s (notElem piker (Game.zoneMembers Zone.Battlefield S.bob after)) "tapping two of eighteen Rats, the Piker is destroyed"
+  -- Past Target.subsetBudget the bound is left open rather than enumerated: forty
+  -- Rats are 10701 announcements of at most three. The offer is wider -- the Hill
+  -- Giant no announcement reaches is in it -- and the joint check still judges
+  -- the cast exactly.
+  Spec.it s "CR 601.2c past the subset budget the sibling-count bound is left open, never narrowed" $ do
+    verdictBoard s registry 40 $ \verdict rats piker giant board verdictId -> do
+      let slots = Modal.allTargetSlots (Face.spell (S.combinedFace verdict))
+          offered = Target.legalSets (Just S.alice) False Map.empty S.noSource slots board
+          victims = Map.findWithDefault Set.empty (SlotName.MkSlotName (Text.pack "victim")) offered
+          after = castVerdict (take 2 rats) piker board verdictId
+          refused = castVerdict (take 2 rats) giant board verdictId
+      Spec.assertBool s (notElem piker (Game.zoneMembers Zone.Battlefield S.bob after)) "tapping two of forty Rats, the Piker is destroyed"
+      Spec.assertBool s (elem giant (Game.zoneMembers Zone.Battlefield S.bob refused)) "naming the Hill Giant against two Rats instead, it survives: the cast is refused"
+      Spec.assertBool s (Set.member (Recipient.ToCreature giant) victims) "the open offer includes the Hill Giant"
 
   -- CR 601.2c's sibling-slot reading in its POSITIVE form, where Fall of the
   -- Hammer above is the negative one: "another" excludes what a sibling slot
