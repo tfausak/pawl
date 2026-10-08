@@ -26,6 +26,7 @@ codec = Fields.object $ do
   deployCreatures <- Fields.defaulted "deployCreatures" False Common.boolean Board.deployCreatures
   twoHeadedGiant <- Fields.defaulted "twoHeadedGiant" False Common.boolean Board.twoHeadedGiant
   alternatingTeams <- Fields.defaulted "alternatingTeams" False Common.boolean Board.alternatingTeams
+  ante <- Fields.defaulted "ante" False Common.boolean Board.ante
   pure
     Board.MkBoard
       { Board.seats = seats,
@@ -39,5 +40,6 @@ codec = Fields.object $ do
         Board.sharedTeamLife = sharedTeamLife,
         Board.deployCreatures = deployCreatures,
         Board.twoHeadedGiant = twoHeadedGiant,
-        Board.alternatingTeams = alternatingTeams
+        Board.alternatingTeams = alternatingTeams,
+        Board.ante = ante
       }

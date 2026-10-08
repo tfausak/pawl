@@ -1,0 +1,112 @@
+{
+  "faces": [
+    {
+      "anteOnly": true,
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Rebirth",
+      "oracleText": "Remove this card from your deck before playing if you're not playing for ante.\nEach player may ante the top card of their library. If a player does, that player's life total becomes 20.",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "Ante",
+                    "value": {
+                      "player": {
+                        "type": "EachInSlot",
+                        "value": "thoseWhoMay"
+                      },
+                      "ref": {
+                        "type": "TopOfLibrary",
+                        "value": {
+                          "count": {
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          "player": {
+                            "type": "EachInSlot",
+                            "value": "thoseWhoMay"
+                          }
+                        }
+                      }
+                    }
+                  }
+                ],
+                "optionality": {
+                  "type": "Optional",
+                  "value": {
+                    "type": "EachPlayer"
+                  }
+                }
+              },
+              {
+                "effects": [
+                  {
+                    "type": "SetLifeTotal",
+                    "value": {
+                      "player": {
+                        "type": "EachInSlot",
+                        "value": "thoseWhoMay"
+                      },
+                      "quantity": {
+                        "type": "Literal",
+                        "value": 20
+                      }
+                    }
+                  }
+                ],
+                "ifTaken": {
+                  "type": "AnyTaken",
+                  "value": [
+                    0
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}

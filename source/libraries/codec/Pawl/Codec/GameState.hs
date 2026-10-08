@@ -124,6 +124,7 @@ codec resolve = Fields.object $ do
   phasedOut <- Fields.defaulted "phasedOut" Map.empty (Common.naturalMap ObjectId.codec PhasedOut.codec) GameState.phasedOut
   exile <- Fields.defaulted "exile" Set.empty (Common.set ObjectId.codec) GameState.exile
   command <- Fields.defaulted "command" Set.empty (Common.set ObjectId.codec) GameState.command
+  ante <- Fields.defaulted "ante" Set.empty (Common.set ObjectId.codec) GameState.ante
   attractionDecks <- Fields.defaulted "attractionDecks" Map.empty (Common.naturalMap PlayerId.codec (Common.seq ObjectId.codec)) GameState.attractionDecks
   planarDecks <- Fields.defaulted "planarDecks" Map.empty (Common.naturalMap PlayerId.codec (Common.seq ObjectId.codec)) GameState.planarDecks
   schemeDecks <- Fields.defaulted "schemeDecks" Map.empty (Common.naturalMap PlayerId.codec (Common.seq ObjectId.codec)) GameState.schemeDecks
@@ -238,6 +239,7 @@ codec resolve = Fields.object $ do
         GameState.phasedOut = phasedOut,
         GameState.exile = exile,
         GameState.command = command,
+        GameState.ante = ante,
         GameState.attractionDecks = attractionDecks,
         GameState.planarDecks = planarDecks,
         GameState.schemeDecks = schemeDecks,

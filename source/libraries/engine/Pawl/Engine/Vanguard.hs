@@ -31,7 +31,7 @@
 -- WHAT IS NOT IMPLEMENTED:
 --
 --   * CR 902.2's deck construction, as with every other format: pawl validates no
---     deck (#940), so a game where one player brought a vanguard and another did
+--     deck (#4458), so a game where one player brought a vanguard and another did
 --     not is playable here and is not a legal Vanguard game.
 module Pawl.Engine.Vanguard where
 
@@ -113,7 +113,7 @@ functionsFromCommandZone oid gs = case fmap Object.source (Game.lookupObject oid
 -- sits in the command zone all game.
 --
 -- The FIRST by id where a player somehow has two, which no legal Vanguard game
--- has (CR 902.1's "one face-up vanguard card"); pawl validates no deck (#940), so
+-- has (CR 902.1's "one face-up vanguard card"); pawl validates no deck (#4458), so
 -- the tie is broken rather than reported.
 vanguardOf :: PlayerId -> GameState -> Maybe ObjectId
 vanguardOf pid gs = List.find (\oid -> isVanguard oid gs) (Game.zoneMembers Zone.Command pid gs)

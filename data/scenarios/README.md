@@ -12,8 +12,8 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   `team` number (CR 808.1), a `range` of influence (CR 801.2a, default
   unlimited), `emperor` (CR 809.2), a `manaPool` of unrestricted mana one
   letter per unit (`"RRC"`, CR 106.4) and
-  `battlefield`, `hand`, `graveyard`, `library`, `exile` and `command` (CR
-  408.1) placements (a
+  `battlefield`, `hand`, `graveyard`, `library`, `exile`, `command` (CR
+  408.1) and `ante` (CR 407) placements (a
   library top card first; an exiled card face up and linked to nothing). A
   placement names its `card` and may give a `label`, `tapped`, `ready` (CR
   302.6), `damage`, `counters`, `token` (CR 111.1, battlefield only), a
@@ -27,8 +27,8 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   CR 507.1's choice among every opponent; `brawl` (CR 903.12a),
   `sharedTeamTurns` (CR 805.1), `sharedTeamLife` (CR 810.4, which wants every
   teammate's `life` equal), `deployCreatures` (CR 804.2), `twoHeadedGiant`
-  (CR 810, which wants every teammate's poison `counters` equal) and
-  `alternatingTeams` (CR 811) are off unless given. Setup is a
+  (CR 810, which wants every teammate's poison `counters` equal),
+  `alternatingTeams` (CR 811) and `ante` (CR 407.1) are off unless given. Setup is a
   state, not a history: nothing placed triggers anything.
 - **Note.** An optional `note` says in prose what the scenario rules out and
   why its board is built the way it is. It is free text: nothing reads it, and

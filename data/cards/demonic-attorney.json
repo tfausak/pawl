@@ -1,0 +1,72 @@
+{
+  "faces": [
+    {
+      "anteOnly": true,
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Demonic Attorney",
+      "oracleText": "Remove this card from your deck before playing if you're not playing for ante.\nEach player antes the top card of their library.",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "Ante",
+                    "value": {
+                      "player": {
+                        "type": "EachPlayer"
+                      },
+                      "ref": {
+                        "type": "TopOfLibrary",
+                        "value": {
+                          "count": {
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          "player": {
+                            "type": "EachPlayer"
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}

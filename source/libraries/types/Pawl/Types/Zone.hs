@@ -12,4 +12,6 @@ data Zone
     -- across players (not per-player), like Battlefield and Exile. Emblems (CR
     -- 114) are its first resident.
     Command
+  | -- | CR 400.1 / 400.2 / 407: the ante zone, shared and public, like exile.
+    Ante
   deriving (Bounded, Enum, Eq, Ord, Show)

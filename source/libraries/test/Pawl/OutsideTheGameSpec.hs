@@ -33,6 +33,7 @@
 -- does.
 module Pawl.OutsideTheGameSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -64,6 +65,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LeftTheGame as LeftTheGame
 import qualified Pawl.Types.LifeChange as LifeChange
@@ -1070,6 +1072,60 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
     Spec.assertEqWith s "CR 315.3 the conspiracy did not reach her hand" (printingsIn Zone.Hand S.alice after) []
     Spec.assertEqWith s "CR 400.11b and it is still in the pool" (Map.size (poolOf S.alice after)) 1
     Spec.assertEqWith s "CR 614.6 the draw was still replaced" (length (Game.zoneMembers Zone.Library S.alice after)) 2
+  -- CR 407.3: "when not playing for ante ... these cards can't be brought into
+  -- the game from outside the game". Contract from Below is a sorcery, so
+  -- Burning Wish's filter admits it; the pair differs only in the setting.
+  Spec.it s "CR 407.3 Burning Wish cannot bring in an ante card when not playing for ante" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    wish <- S.printingOf s registry "Burning Wish"
+    contract <- S.printingOf s registry "Contract from Below"
+    let (gs, wishId) = wishBoard mountain wish [(contract, 1)]
+        forAnte = gs {GameState.settings = (GameState.settings gs) {GameSettings.ante = True}}
+    Spec.assertEqWith s "CR 407.3 not playing for ante, her hand gets nothing" (printingsIn Zone.Hand S.alice (resolveWish exercising wishId gs)) []
+    Spec.assertEqWith s "playing for ante, the same wish brings it in" (printingsIn Zone.Hand S.alice (resolveWish exercising wishId forAnte)) [contract]
+  -- CR 407.3 / 729.4: only the nine ante cards remove a card from the ante, and
+  -- a subgame wish is not one of them. alice's main-game ante holds a Sign in
+  -- Blood; inside a Shahrazad subgame, Burning Wish asks for it in vain. The
+  -- game is played for ante, so the subgame antes one card from each library
+  -- too: each library holds one Mountain more than the CR 729.4a case's, and
+  -- the subgame's random ante is pinned away from the Burning Wish.
+  Spec.it s "CR 407.3/729.4 gameplay: a subgame's Burning Wish cannot take a main-game ante card" $ do
+    plains <- S.printingOf s registry "Plains"
+    mountain <- S.printingOf s registry "Mountain"
+    shahrazad <- S.printingOf s registry "Shahrazad"
+    burningWish <- S.printingOf s registry "Burning Wish"
+    signInBlood <- S.printingOf s registry "Sign in Blood"
+    let g0 = Setup.gameWith GameSettings.plain {GameSettings.ante = True} S.bothPlayers
+        (signId, g1) = S.addObjectIn Zone.Ante signInBlood S.alice g0
+        g2 = S.landsFor plains S.alice 2 g1
+        (wishLibraryId, g3) = S.addLibraryCard burningWish S.alice g2
+        g4 = stockLibrary mountain 10 S.bob (stockLibrary mountain 9 S.alice g3)
+        (_shahrazadId, g5) = S.addHandCard shahrazad S.alice g4
+        before = g5 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+        wanted candidate = case candidate of
+          OutsideCard.InAnotherGame oid -> oid == signId
+          OutsideCard.InPool _ -> False
+        -- Records whether the Sign in Blood was ever on offer, and asks for it.
+        recordOffers :: Prompt.Prompt r -> State.State Bool r
+        recordOffers p = case p of
+          Prompt.ChooseOptional {} -> pure OptionalDecision.Exercises
+          Prompt.ChooseFromOutsideTheGame _ _ offered _ _ -> do
+            State.modify' (\seen -> seen || any wanted (NonEmpty.toList offered))
+            pure [Maybe.fromMaybe (NonEmpty.head offered) (List.find wanted (NonEmpty.toList offered))]
+          Prompt.RandomFirstPlayer _ -> pure S.alice
+          -- CR 407.2 in the subgame: never ante the wish.
+          Prompt.RandomObject offered -> pure (Maybe.fromMaybe (NonEmpty.head offered) (List.find (/= wishLibraryId) (NonEmpty.toList offered)))
+          _ -> pure (S.castAnswer p)
+        ((_, after), offeredSign) = State.runState (Engine.runGame recordOffers before Engine.priorityLoop) False
+    Spec.assertEqWith s "CR 407.3 the main-game ante card was never offered" offeredSign False
+    Spec.assertEqWith s "CR 407.3 and it is still in alice's main-game ante" (Set.member signId (GameState.ante after), fmap Object.zone (Game.lookupObject signId after)) (True, Just Zone.Ante)
+    Spec.assertEqWith s "CR 729.1a the subgame did not decide the main game, so nobody decked out" (GameState.result after) Nothing
+  Spec.it s "CR 407.3/729.4 a main-game ante card is not outside the subgame; the same card in exile is" $ do
+    sign <- S.printingOf s registry "Sign in Blood"
+    let parent = Setup.gameWith GameSettings.plain {GameSettings.ante = True} S.bothPlayers
+        outsideOf zone = let (oid, placed) = S.addObjectIn zone sign S.alice parent in Map.member oid (GameState.outsideObjects (Setup.subgameStateFrom S.alice placed))
+    Spec.assertEqWith s "CR 407.3 the ante card is not outside the subgame" (outsideOf Zone.Ante) False
+    Spec.assertEqWith s "CR 729.4 the same card in exile is" (outsideOf Zone.Exile) True
   -- CR 400.11b: a destination that is not the hand. The Raven's Warning
   -- ({1}{W}{U} Enchantment -- Saga; name, cost, type line and Oracle text checked
   -- against api.scryfall.com 2026-09-16, paper printing `khm`) is the only

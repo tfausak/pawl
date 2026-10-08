@@ -271,6 +271,7 @@ stage registry board =
                     GameSettings.deployCreatures = Board.deployCreatures board,
                     GameSettings.twoHeadedGiant = Board.twoHeadedGiant board,
                     GameSettings.alternatingTeams = Board.alternatingTeams board,
+                    GameSettings.ante = Board.ante board,
                     GameSettings.teams = Teams.MkTeams (Map.fromList [(pid, team) | (seat, pid) <- NonEmpty.toList seated, Just team <- [Seat.team seat]]),
                     GameSettings.rangeOfInfluence = RangeOfInfluence.MkRangeOfInfluence (Map.fromList [(pid, range) | (seat, pid) <- NonEmpty.toList seated, Just range <- [Seat.range seat]]),
                     GameSettings.emperors = Emperors.MkEmperors (Map.fromList [(team, pid) | (seat, pid) <- NonEmpty.toList seated, Seat.emperor seat, Just team <- [Seat.team seat]])
@@ -341,7 +342,8 @@ zonesOf seat =
     (Zone.Graveyard, Seat.graveyard seat),
     (Zone.Library, Seat.library seat),
     (Zone.Exile, Seat.exile seat),
-    (Zone.Command, Seat.command seat)
+    (Zone.Command, Seat.command seat),
+    (Zone.Ante, Seat.ante seat)
   ]
 
 boardFailure :: Map.Map Label.Label PlayerId.PlayerId -> Board.Board -> Maybe Failure.ScenarioFailure

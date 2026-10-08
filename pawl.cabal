@@ -160,6 +160,7 @@ library codec
     Pawl.Codec.Amass
     Pawl.Codec.Answer
     Pawl.Codec.AnswerSpec
+    Pawl.Codec.Ante
     Pawl.Codec.AnyNumberDiscard
     Pawl.Codec.AnyNumberDiscardSpec
     Pawl.Codec.AnyNumberMatching
@@ -1384,6 +1385,7 @@ library engine
     Pawl.Engine.Airbend
     Pawl.Engine.AlternatingTeams
     Pawl.Engine.Amass
+    Pawl.Engine.Ante
     Pawl.Engine.Archenemy
     Pawl.Engine.Attach
     Pawl.Engine.AttachRestriction
@@ -1804,6 +1806,7 @@ library test
     Pawl.AdventureSpec
     Pawl.AirbendSpec
     Pawl.AlternatingTeamsSpec
+    Pawl.AnteSpec
     Pawl.ArchenemySpec
     Pawl.AttackKeywordTriggerSpec
     Pawl.AttractionSpec
@@ -1995,6 +1998,7 @@ library types
     Pawl.Types.AlternativeCost
     Pawl.Types.Amass
     Pawl.Types.Answer
+    Pawl.Types.Ante
     Pawl.Types.AnyNumberDiscard
     Pawl.Types.AnyNumberMatching
     Pawl.Types.AppliedReduction

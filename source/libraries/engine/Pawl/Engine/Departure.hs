@@ -275,7 +275,9 @@ continuesAfterDeparture gs = length (GameState.turnOrder gs) > 2
 --     a departing player's exiled card takes its pile membership with it.
 objectsLeaveWith :: PlayerId -> GameState -> GameState
 objectsLeaveWith pid gs =
-  let owned = Map.keys (Map.filter (\obj -> Object.owner obj == pid) (GameState.objects gs))
+  let -- CR 800.4n: objects the player owns in the ante do not leave the game,
+      -- an exception to CR 800.4a.
+      owned = Map.keys (Map.filter (\obj -> Object.owner obj == pid && Object.zone obj /= Zone.Ante) (GameState.objects gs))
       leave :: GameState -> ObjectId -> GameState
       leave g oid =
         let g1 = Game.removeFromZones pid oid g
@@ -307,7 +309,8 @@ objectsLeaveWith pid gs =
       -- already been removed from. Event.changeZoneInBatch's `asOf` is the same
       -- reading for the same reason.
       --
-      -- Filed for every object the player owned, in every zone, exactly as the
+      -- Filed for every object the player owned, in every zone but the ante
+      -- (CR 800.4n, `owned` above), exactly as the
       -- zone-change funnel files for every move -- the reader decides which ones
       -- it has a question about.
       filed oid = case Map.lookup oid (GameState.objects gs) of

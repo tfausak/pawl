@@ -1,0 +1,22 @@
+{
+  "description": "CR 608.2d Amulet of Quoz: a target with an empty library cannot ante, so is not asked, and alice flips and loses",
+  "note": "No ChooseOptional is scheduled for bob: asking him would fail the scenario. The flip lands against alice's call, so the Result names the side the clause chain picked.",
+  "board": {
+    "ante": true,
+    "active": "alice",
+    "step": "Upkeep",
+    "seats": [
+      { "name": "alice", "battlefield": [{ "card": "Amulet of Quoz", "label": "amulet" }], "library": [{ "card": "Mountain" }, { "card": "Mountain" }] },
+      { "name": "bob" }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "Answer": { "prompt": "CallCoin", "with": { "type": "Heads" } } } },
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "Answer": { "prompt": "FlipCoin", "with": { "type": "Tails" } } } },
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "Activate": { "object": "$amulet", "ability": 0, "targets": ["$bob"], "costOrder": [0, 1] } } },
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": "Pass" }
+  ],
+  "final": [
+    { "View": { "of": "Result", "is": { "won": "bob" } } }
+  ]
+}

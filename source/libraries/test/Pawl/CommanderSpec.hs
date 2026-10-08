@@ -471,7 +471,7 @@ partnerSpec s registry = Spec.describe s "Partner" $ do
     Spec.assertEqWith s "she is designated both" (fmap (List.sort . commanderPrintingsOf gs) (Map.lookup S.alice (GameState.players gs))) (Just (List.sort [rograkh, akiri]))
   -- The negative, on the same fixture with ONE printing swapped: Shimatsu has no
   -- partner, so CR 702.124h admits neither designation and the deck starts no
-  -- commander at all. Pawl has no channel to refuse a deck (#940), and this is
+  -- commander at all. Pawl has no channel to refuse a deck (#4458), and this is
   -- what it does instead.
   Spec.it s "CR 702.124h a second commander without partner is refused" $ do
     mountain <- S.printingOf s registry "Mountain"

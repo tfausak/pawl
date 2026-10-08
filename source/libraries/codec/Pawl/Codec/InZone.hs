@@ -24,6 +24,7 @@ shared zone = case zone of
   Zone.Stack -> True
   Zone.Exile -> True
   Zone.Command -> True
+  Zone.Ante -> True
 
 -- | The invariant Pawl.Types.InZone states, enforced HERE, this being where a
 -- scope enters the engine at all: a shared zone is undivided, so "one player's

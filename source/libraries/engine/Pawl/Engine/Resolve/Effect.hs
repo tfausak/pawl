@@ -112,6 +112,7 @@ import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.AimedAt as AimedAt
 import qualified Pawl.Types.AimedPlayers as AimedPlayers
 import qualified Pawl.Types.Amass as Amass.Type
+import qualified Pawl.Types.Ante as Ante
 import qualified Pawl.Types.AnyNumberDiscard as AnyNumberDiscard
 import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
@@ -3502,6 +3503,17 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.Vote {} -> False
   Effect.TakeExtraTurn {} -> False
   Effect.ShuffleIntoLibrary {} -> False
+  -- CR 608.2d / 407.4: the instruction names anteing players and not one named
+  -- object is theirs to ante -- Amulet of Quoz's target with an empty library.
+  -- An instruction naming no player is never impossible (an unbound
+  -- `thoseWhoMay` before the "may" is asked).
+  Effect.Ante (Ante.MkAnte player ref _) ->
+    let anteing = playerRefPlayers legal controller gs player
+        named = objectRefObjects legal resolving controller source gs ref
+        theirs oid = case Game.lookupObject oid gs of
+          Just obj -> List.elem (Object.owner obj) anteing
+          Nothing -> False
+     in not (null anteing) && not (any theirs named)
   Effect.Shuffle {} -> False
   Effect.OfferCast {} -> False
   Effect.OfferNamedCopy {} -> False
@@ -5629,6 +5641,26 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- APNAP (CR 608.2f), which is what makes the ORDER of the Prompt.Shuffle calls
     -- a fact about the rules rather than about PlayerId's Ord.
     Monad.forM_ (filter (`Set.member` owners) (Game.apnapOrder gs)) Event.shuffleLibrary
+  -- CR 407.4: "the owner of an object is the only player who can ante that
+  -- object". Each named object one of the named players owns moves to the
+  -- ante, all of them as one event (CR 608.2f); any other is left where it is,
+  -- and a move that names nobody writes nothing, so CR 608.2c's "If you do"
+  -- reads it as not having happened. The pure sweep, the read effectIsImpossible's
+  -- Ante arm makes, so the offer and the instruction name the same objects.
+  Effect.Ante (Ante.MkAnte player ref mSlot) -> do
+    gs <- State.get
+    let named = objectRefObjects legal resolving controller source gs ref
+    let anteing = playerRefPlayers legal controller gs player
+        theirs oid = case Game.lookupObject oid gs of
+          Just obj -> List.elem (Object.owner obj) anteing
+          Nothing -> False
+        targets = filter theirs (ListUtils.nubOrd named)
+    Monad.unless (null targets) $ do
+      arrivals <- Event.changeZonesTogether (fmap (\target -> (target, Zone.Ante)) targets)
+      Monad.forM_ mSlot $ \slot -> case concatMap Foldable.toList arrivals of
+        [] -> pure ()
+        [only] -> State.modify' (bindSlot resolving slot only)
+        several -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList several))
   -- CR 701.24a alone: randomize the named libraries so no player knows their
   -- order. Nothing moves, so there is no changeZone call and no CR 616.1
   -- opportunity -- the cards a "then shuffle" follows are still the objects they

@@ -21,6 +21,7 @@ import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Amass as Amass
+import qualified Pawl.Types.Ante as Ante
 import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachAll as AttachAll
@@ -1188,6 +1189,14 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
             }
       )
       " {\"type\":\"ShuffleIntoLibrary\",\"value\":{\"library\":{\"type\":\"InSlot\",\"value\":\"player\"},\"refs\":[{\"type\":\"InSlot\",\"value\":\"cards\"}]}} "
+  -- CR 407.4: the anteing player, the objects, and the slot binding them.
+  Spec.it s "Ante" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Ante (Ante.MkAnte (PlayerRef.Relative PlayerRelation.You) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))) (Just (SlotName.MkSlotName (Text.pack "bird")))))
+      " {\"type\":\"Ante\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"ref\":{\"type\":\"InSlot\",\"value\":\"self\"},\"slot\":\"bird\"}} "
   -- CR 701.24a on its own: the arm above with no ref at all, so the payload is a
   -- bare PlayerRef. Undercity's "then shuffle" is what writes it.
   Spec.it s "Shuffle" $

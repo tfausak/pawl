@@ -30,7 +30,7 @@ data GameSettings = MkGameSettings
     --
     -- Not implemented: CR 903.12b, CR 903.12d and CR 903.12e, which are deck
     -- construction (the card pool, the 60-card deck, the basic-land exception).
-    -- Pawl enforces no deck legality at all (#940), so a Brawl deck is unchecked
+    -- Pawl enforces no deck legality at all (#4458), so a Brawl deck is unchecked
     -- exactly as a Commander deck is.
     brawl :: Bool,
     -- | CR 806.2b: which of the three attack options this game uses, if any.
@@ -104,7 +104,11 @@ data GameSettings = MkGameSettings
     -- filters whatever the attack option above allows (CR 811.2b).
     -- Pawl.Engine.AlternatingTeams.setUp writes it with teams (CR 811.1) over a
     -- seating it checks (CR 811.3).
-    alternatingTeams :: Bool
+    alternatingTeams :: Bool,
+    -- | CR 407.1: whether this game is played for ante. Off by default
+    -- ('plain'); read by Pawl.Engine.Setup's CR 407.2 step and
+    -- Pawl.Engine.Ante.barred (CR 407.3).
+    ante :: Bool
   }
   deriving (Eq, Ord, Show)
 
@@ -126,5 +130,6 @@ plain =
       deployCreatures = False,
       emperors = Emperors.none,
       twoHeadedGiant = False,
-      alternatingTeams = False
+      alternatingTeams = False,
+      ante = False
     }

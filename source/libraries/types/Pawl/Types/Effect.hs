@@ -4,6 +4,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Pawl.Types.ActivateManaAbilities as ActivateManaAbilities
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Amass as Amass
+import qualified Pawl.Types.Ante as Ante
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachBound as AttachBound
@@ -797,6 +798,8 @@ data Effect card ability
     -- ShuffleIntoLibrary.library names the library where the card's words do not
     -- derive it.
     ShuffleIntoLibrary ShuffleIntoLibrary.ShuffleIntoLibrary
+  | -- | CR 407.4: ante the objects the payload names, each by its owner.
+    Ante Ante.Ante
   | -- | CR 701.24a on its own: the libraries the PlayerRef names are randomized,
     -- and nothing moves. A second arm rather than an empty ref on the one above,
     -- which would send cards through the CR 400.7 funnel.

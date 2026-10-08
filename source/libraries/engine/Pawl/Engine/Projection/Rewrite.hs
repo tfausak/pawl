@@ -28,6 +28,7 @@ import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.Amass as Amass
+import qualified Pawl.Types.Ante as Ante
 import qualified Pawl.Types.AnyNumberDiscard as AnyNumberDiscard
 import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
@@ -987,6 +988,8 @@ rewriteEffect pairs effect = case effect of
   -- PlayerRef and the skips no word rule 612 can swap.
   Effect.TakeExtraTurn x -> Effect.TakeExtraTurn x {TakeExtraTurn.count = rewriteQuantity pairs (TakeExtraTurn.count x)}
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named refs) -> Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named (fmap (rewriteObjectRef pairs) refs))
+  -- ShuffleIntoLibrary's descent: the ref's filters are card text.
+  Effect.Ante (Ante.MkAnte player ref mSlot) -> Effect.Ante (Ante.MkAnte player (rewriteObjectRef pairs ref) mSlot)
   -- No ObjectRef to rewrite: the opcode names a library and no objects.
   Effect.Shuffle {} -> effect
   -- THREE places, and all three descend. A Filter the ObjectRef carries is card

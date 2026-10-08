@@ -33,6 +33,7 @@ import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.AimedAt as AimedAt
 import qualified Pawl.Types.AimedPlayers as AimedPlayers
 import qualified Pawl.Types.Amass as Amass.Type
+import qualified Pawl.Types.Ante as Ante
 import qualified Pawl.Types.AnyNumberDiscard as AnyNumberDiscard
 import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
 import qualified Pawl.Types.AsCopy as AsCopy
@@ -893,6 +894,7 @@ effectObjectRefs effect = case effect of
   Effect.Vote {} -> []
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ refs) -> NonEmpty.toList refs
+  Effect.Ante (Ante.MkAnte _ ref _) -> [ref]
   Effect.Shuffle {} -> []
   Effect.OfferCast (OfferCast.MkOfferCast ref _ _ _ _ _ _ _ _) -> [ref]
   Effect.OfferNamedCopy {} -> []
@@ -1112,6 +1114,7 @@ effectPlayerRefs effect = case effect of
   Effect.Vote (Vote.MkVote starter _) -> [starter]
   Effect.TakeExtraTurn takeExtraTurn -> [TakeExtraTurn.player takeExtraTurn]
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named _) -> Maybe.maybeToList named
+  Effect.Ante (Ante.MkAnte player _ _) -> [player]
   Effect.Shuffle ref -> [ref]
   Effect.OfferCast (OfferCast.MkOfferCast _ caster _ _ _ _ _ _ _) -> [caster]
   Effect.OfferNamedCopy {} -> []
@@ -1517,6 +1520,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- The slots the turn count reads (Ral Zarek's tally of heads).
   Effect.TakeExtraTurn takeExtraTurn -> quantitySlots (TakeExtraTurn.count takeExtraTurn)
   Effect.ShuffleIntoLibrary {} -> Map.empty
+  Effect.Ante {} -> Map.empty
   -- The arm above's library read, reported at the head; nothing is shuffled into
   -- it, so there is no ref beside it either.
   Effect.Shuffle {} -> Map.empty
@@ -2227,6 +2231,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.FlipCoin flipCoin -> Quantity.slotsAreExhaustive (FlipCoin.count flipCoin)
   Effect.TakeExtraTurn takeExtraTurn -> Quantity.slotsAreExhaustive (TakeExtraTurn.count takeExtraTurn)
   Effect.ShuffleIntoLibrary {} -> True
+  Effect.Ante {} -> True
   Effect.Shuffle {} -> True
   Effect.OfferCast {} -> True
   Effect.OfferNamedCopy {} -> True
@@ -2475,6 +2480,7 @@ readsX =
         -- The number of turns is an ordinary Quantity too.
         Effect.TakeExtraTurn takeExtraTurn -> Quantity.readsX (TakeExtraTurn.count takeExtraTurn)
         Effect.ShuffleIntoLibrary {} -> False
+        Effect.Ante {} -> False
         Effect.Shuffle {} -> False
         Effect.OfferCast offer -> any Quantity.readsX (repetitionQuantities (OfferCast.repetition offer))
         Effect.OfferNamedCopy {} -> False
@@ -2498,6 +2504,8 @@ boundSlots :: Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Car
 boundSlots effect = case effect of
   -- CR 400.7: the incarnation minted at the destination.
   Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ _ mSlot _ _ _) -> foldMap Set.singleton mSlot
+  -- MoveToZone's reason: the anted incarnations (CR 400.7).
+  Effect.Ante (Ante.MkAnte _ _ mSlot) -> foldMap Set.singleton mSlot
   -- The tokens this Create minted, for CR 603.7c's delayed trigger to name.
   Effect.Create (Create.MkCreate _ _ _ mSlot _) -> foldMap Set.singleton mSlot
   -- Create's reason: the conjured cards, for CR 603.7c.

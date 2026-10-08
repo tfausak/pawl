@@ -1,0 +1,22 @@
+{
+  "description": "CR 407.4 Amulet of Quoz: the target opponent antes, so nobody flips and nobody loses",
+  "note": "No coin answer is scheduled, so a flip would fail the scenario as an unscheduled prompt; the Result check is the gameplay one.",
+  "board": {
+    "ante": true,
+    "active": "alice",
+    "step": "Upkeep",
+    "seats": [
+      { "name": "alice", "battlefield": [{ "card": "Amulet of Quoz", "label": "amulet" }], "library": [{ "card": "Mountain" }, { "card": "Mountain" }] },
+      { "name": "bob", "library": [{ "card": "Plains" }, { "card": "Mountain" }] }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "Activate": { "object": "$amulet", "ability": 0, "targets": ["$bob"], "costOrder": [0, 1] } } },
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "Upkeep", "player": "bob", "do": { "ChooseOptional": { "type": "Exercises" } } }
+  ],
+  "final": [
+    { "View": { "of": "Result", "is": null } },
+    { "Count": { "player": "bob", "zone": "Ante", "card": "Plains", "count": 1 } }
+  ]
+}
