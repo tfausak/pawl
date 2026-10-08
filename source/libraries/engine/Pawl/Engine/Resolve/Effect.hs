@@ -7600,7 +7600,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       Just ability ->
         -- CR 603.7d-f: the controller is the player who controlled the spell or
         -- ability AS IT RESOLVED, baked in now.
-        let captured = maybe Map.empty Object.bindings (Game.lookupObject resolving gs)
+        --
+        -- Binding.announcedTargets is left behind: it serves CR 601.2h's payment,
+        -- and a copy given new targets (CR 707.10c) still carries the old group.
+        -- A FENCE: no board in the suite arms a delayed ability off a retargeted copy.
+        let captured = maybe Map.empty (Map.delete Binding.announcedTargets . Object.bindings) (Game.lookupObject resolving gs)
          in -- CR 603.7a's other end: the BOUNDARY, not a turn number, for one
             -- printed "on your next turn". Which turn that names is settled as
             -- that turn begins (Event.settleOnsets). CR 603.7b's stated duration:
