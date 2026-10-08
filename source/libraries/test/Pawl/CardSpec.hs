@@ -4815,6 +4815,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.PowerAtLeastAmountInSlot _ -> []
   Filter.Type.ManaValueAtMost _ -> []
   Filter.Type.ManaValueLessThanSource -> []
+  Filter.Type.ManaValueGreaterThanSource -> []
   Filter.Type.ManaValueEqualToSource -> []
   Filter.Type.ManaValueIsEven -> []
   Filter.Type.ManaValueAtMostAmount -> []

@@ -3668,6 +3668,7 @@ filterReads f = case f of
   -- CR 202.3 reads the printed mana cost, which no Modification writes.
   Filter.Type.ManaValueAtMost _ -> Set.empty
   Filter.Type.ManaValueLessThanSource -> Set.empty
+  Filter.Type.ManaValueGreaterThanSource -> Set.empty
   Filter.Type.ManaValueEqualToSource -> Set.empty
   Filter.Type.ManaValueIsEven -> Set.empty
   Filter.Type.ManaValueAtMostAmount -> Set.empty
@@ -3846,6 +3847,7 @@ filterReadsPeers f = case f of
   -- The SOURCE's mana value arrives on the Context, PowerLessThanSource's answer
   -- above: no projection of a second object is read.
   Filter.Type.ManaValueLessThanSource -> False
+  Filter.Type.ManaValueGreaterThanSource -> False
   Filter.Type.ManaValueEqualToSource -> False
   Filter.Type.ManaValueIsEven -> False
   Filter.Type.ManaValueAtMostAmount -> False
@@ -5642,11 +5644,30 @@ mintingGrantInForce mints = keywordGrantInForce (not . null . mints . Set.single
 -- disjuncts replacementsAffecting's gate asks, for a gate that must decide
 -- whether to project a card off the battlefield without projecting it.
 keywordGrantInForce :: (Keyword -> Bool) -> GameState -> Bool
-keywordGrantInForce p gs =
-  let writes = grantsKeywordWhere p
-   in any (any (any writes . StaticAbility.modifications) . (`staticAbilitiesOf` gs)) (Set.toList (GameState.battlefield gs))
-        || storedWrites writes gs
-        || elsewhereGrants writes gs
+keywordGrantInForce p = grantInForce (grantsKeywordWhere p)
+
+-- Does anything write a modification satisfying `writes`? keywordGrantInForce's
+-- three grantor disjuncts, for any modification.
+grantInForce :: (Modification -> Bool) -> GameState -> Bool
+grantInForce writes gs =
+  any (any (any writes . StaticAbility.modifications) . (`staticAbilitiesOf` gs)) (Set.toList (GameState.battlefield gs))
+    || storedWrites writes gs
+    || elsewhereGrants writes gs
+
+-- CR 113.6k / 613.1f: does anything grant a keyword the roster `mints` answers
+-- for (mintingGrantInForce), or a TRIGGERED ability outright? The gate
+-- Pawl.Engine.Event.Trigger's graveyard and exile scans take, in one walk,
+-- before projecting a card whose ability face carries no trigger functioning
+-- there -- Kami of Mourning's perpetual grant to a card in a graveyard is the
+-- second disjunct's producer. A classification of the granted ability's KIND
+-- (CR 113.3), never of what it does.
+mintingOrTriggeredGrantInForce :: (Set Keyword -> [a]) -> GameState -> Bool
+mintingOrTriggeredGrantInForce mints =
+  grantInForce
+    ( \m -> case m of
+        Modification.GainAbility (GrantedAbility.Triggered _) -> True
+        _ -> grantsKeywordWhere (not . null . mints . Set.singleton) m
+    )
 
 -- CR 611.2a: does any STORED continuous effect write a modification satisfying
 -- `p`? gatherGiven's `stored` arm, and a disjunct of each of the two

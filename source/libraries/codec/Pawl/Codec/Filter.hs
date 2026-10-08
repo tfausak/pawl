@@ -68,6 +68,7 @@ codec keywordCodec =
       Arm.nullary "ControlledByRecipient" Filter.ControlledByRecipient,
       Arm.payload "ManaValueAtMost" Common.integer Filter.ManaValueAtMost (\x -> case x of Filter.ManaValueAtMost y -> Just y; _ -> Nothing),
       Arm.nullary "ManaValueLessThanSource" Filter.ManaValueLessThanSource,
+      Arm.nullary "ManaValueGreaterThanSource" Filter.ManaValueGreaterThanSource,
       Arm.nullary "ManaValueEqualToSource" Filter.ManaValueEqualToSource,
       Arm.nullary "SharesColorWithSource" Filter.SharesColorWithSource,
       Arm.nullary "ManaValueIsEven" Filter.ManaValueIsEven,
@@ -205,6 +206,7 @@ tagOf x = case x of
   Filter.ControlledByRecipient {} -> "ControlledByRecipient"
   Filter.ManaValueAtMost {} -> "ManaValueAtMost"
   Filter.ManaValueLessThanSource {} -> "ManaValueLessThanSource"
+  Filter.ManaValueGreaterThanSource {} -> "ManaValueGreaterThanSource"
   Filter.ManaValueEqualToSource {} -> "ManaValueEqualToSource"
   Filter.SharesColorWithSource {} -> "SharesColorWithSource"
   Filter.ManaValueIsEven {} -> "ManaValueIsEven"

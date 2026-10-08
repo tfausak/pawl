@@ -1750,6 +1750,9 @@ matches context view predicate = case predicate of
   Filter.ManaValueLessThanSource -> case (manaValue view, sourceManaValue context) of
     (Just v, Just s) -> v < s
     _ -> False
+  Filter.ManaValueGreaterThanSource -> case (manaValue view, sourceManaValue context) of
+    (Just v, Just s) -> v > s
+    _ -> False
   -- CR 702.53a's "a card with the same mana value as the discarded card" and CR
   -- 702.71a's "the same mana value as this permanent", the arm above's
   -- comparison at equality, and False on an absent mana value at either end for
@@ -2395,6 +2398,7 @@ rewrite pairs predicate = case predicate of
   -- Untouched for the source-power atoms' reason above: the atom names a
   -- comparison, and CR 612.1 finds no word in it to swap.
   Filter.ManaValueLessThanSource -> predicate
+  Filter.ManaValueGreaterThanSource -> predicate
   Filter.ManaValueEqualToSource -> predicate
   Filter.ManaValueIsEven -> predicate
   Filter.ManaValueAtMostAmount -> predicate
@@ -3161,6 +3165,7 @@ bakeBound players predicate = case predicate of
   -- and this atom names no slot at all -- the source's mana value rides the
   -- Context.
   Filter.ManaValueLessThanSource -> predicate
+  Filter.ManaValueGreaterThanSource -> predicate
   Filter.ManaValueEqualToSource -> predicate
   Filter.ManaValueIsEven -> predicate
   Filter.ManaValueAtMostAmount -> predicate
@@ -3315,6 +3320,8 @@ manaValueThresholds predicate = case predicate of
   -- is the one filler of Context's sourceManaValue), and
   -- Pawl.FilterPositionLintSpec is what keeps a card from writing it anywhere.
   Filter.ManaValueLessThanSource -> []
+  -- The arm above's comparison one operator over, empty for its reason.
+  Filter.ManaValueGreaterThanSource -> []
   -- The arm above's comparison at equality (CR 702.53a, CR 702.71a), and empty
   -- for its reason: it names no literal, and its position is the same one.
   Filter.ManaValueEqualToSource -> []
@@ -3488,6 +3495,7 @@ statesAQuality predicate = case predicate of
   -- A quality like the literal bound's, the source-power atoms' answer: "a
   -- nonland card with mana value less than this spell's" describes the card.
   Filter.ManaValueLessThanSource -> True
+  Filter.ManaValueGreaterThanSource -> True
   -- A quality for the arm above's reason: "a card with the same mana value as
   -- the discarded card" (CR 702.53a) describes the card.
   Filter.ManaValueEqualToSource -> True

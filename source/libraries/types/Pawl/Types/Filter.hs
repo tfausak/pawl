@@ -111,6 +111,10 @@ data Filter keyword
     -- reading one characteristic over -- read off Pawl.Engine.Filter.Context's
     -- sourceManaValue, and vacuously False where either mana value is absent.
     ManaValueLessThanSource
+  | -- | CR 202.3: the object's mana value is strictly greater than the source's
+    -- -- Kami of Mourning's "a creature you control with greater mana value than
+    -- this card"; vacuously False where either mana value is absent.
+    ManaValueGreaterThanSource
   | -- | CR 202.3 compared against the SOURCE for EQUALITY rather than order: the
     -- object's mana value is the same as the mana value of the object the
     -- evaluation comes from (CR 702.53a's transmute, CR 702.71a's transfigure).

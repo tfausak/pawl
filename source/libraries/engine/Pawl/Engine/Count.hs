@@ -342,6 +342,7 @@ bakePerspective viewOf context gs candidate predicate =
         Filter.Type.PowerAtLeastAmountInSlot _ -> predicate
         Filter.Type.ManaValueAtMost _ -> predicate
         Filter.Type.ManaValueLessThanSource -> predicate
+        Filter.Type.ManaValueGreaterThanSource -> predicate
         Filter.Type.ManaValueEqualToSource -> predicate
         Filter.Type.ManaValueIsEven -> predicate
         Filter.Type.ManaValueAtMostAmount -> predicate
