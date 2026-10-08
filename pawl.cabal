@@ -412,6 +412,8 @@ library codec
     Pawl.Codec.CounterChangeSpec
     Pawl.Codec.CounterDestination
     Pawl.Codec.CounterDestinationSpec
+    Pawl.Codec.CounteredEnd
+    Pawl.Codec.CounteredEndSpec
     Pawl.Codec.Countering
     Pawl.Codec.CounteringSpec
     Pawl.Codec.CounterKind
@@ -2132,6 +2134,7 @@ library types
     Pawl.Types.CounterCause
     Pawl.Types.CounterChange
     Pawl.Types.CounterDestination
+    Pawl.Types.CounteredEnd
     Pawl.Types.Countering
     Pawl.Types.CounterKind
     Pawl.Types.CounterKindFamily

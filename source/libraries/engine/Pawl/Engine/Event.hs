@@ -7519,7 +7519,7 @@ destroyIn asOf cause regenerability oids = simultaneously $ do
 -- 117.5 scan reads this event the controller can no longer be asked for exactly
 -- (see Pawl.Types.Countering).
 counter :: ObjectId -> PlayerId -> ObjectId -> Game ()
-counter source controller oid = Monad.void (counterOne (Zone.Graveyard, LibraryPosition.defaultValue) source controller oid)
+counter source controller oid = Monad.void (counterOne (pure (Zone.Graveyard, LibraryPosition.defaultValue)) source controller oid)
 
 -- counter over a whole batch, answering with the objects it ACTUALLY countered
 -- (CR 701.6a) -- which is emphatically not the batch it was handed: an id naming
@@ -7538,11 +7538,13 @@ counter source controller oid = Monad.void (counterOne (Zone.Graveyard, LibraryP
 -- `destinationOf` is where each countered SPELL goes: CR 701.6a's graveyard, or
 -- the zone a Pawl.Types.CounterDestination names instead -- Delay's exile,
 -- Remand's hand, Memory Lapse's library top, Desertion's battlefield, which the
--- card enters under `controller` (CR 110.2a's "under your control").
+-- card enters under `controller` (CR 110.2a's "under your control"). A Game
+-- action, run only once the gates have passed, so a destination whose end a
+-- player chooses (Hinder) asks only about a spell that is countered.
 --
 -- A second door rather than a return type on `counter`, the destroyReturning
 -- posture: only the Counter opcode's bound slots use the answer.
-counterReturning :: (ObjectId -> (Zone.Zone, LibraryPosition.LibraryPosition)) -> ObjectId -> PlayerId -> [ObjectId] -> Game [(ObjectId, Seq.Seq ObjectId)]
+counterReturning :: (ObjectId -> Game (Zone.Zone, LibraryPosition.LibraryPosition)) -> ObjectId -> PlayerId -> [ObjectId] -> Game [(ObjectId, Seq.Seq ObjectId)]
 counterReturning destinationOf source controller =
   fmap Maybe.catMaybes . traverse (\oid -> fmap (fmap ((,) oid)) (counterOne (destinationOf oid) source controller oid))
 
@@ -7552,8 +7554,8 @@ counterReturning destinationOf source controller =
 -- A spell whose entry CR 101.2 refuses is still countered: the funnel's CR
 -- 608.3e-shaped arm puts it into its owner's graveyard and answers that
 -- incarnation, which is CR 701.6a's own ending.
-counterOne :: (Zone.Zone, LibraryPosition.LibraryPosition) -> ObjectId -> PlayerId -> ObjectId -> Game (Maybe (Seq.Seq ObjectId))
-counterOne (zone, position) source controller oid = do
+counterOne :: Game (Zone.Zone, LibraryPosition.LibraryPosition) -> ObjectId -> PlayerId -> ObjectId -> Game (Maybe (Seq.Seq ObjectId))
+counterOne destination source controller oid = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure Nothing
@@ -7586,6 +7588,7 @@ counterOne (zone, position) source controller oid = do
     Just _ -> case fmap Face.counterability (Game.faceOf oid gs) of
       Just Counterability.CantBeCountered -> pure Nothing
       _ -> do
+        (zone, position) <- destination
         moved <- changeZoneAttaching Nothing Set.empty oid zone position Nothing TapState.Untapped Map.empty (Just controller) Nothing Facing.FaceUp False CarryOver.NotCarried False Seq.empty
         if Seq.null moved
           then pure Nothing

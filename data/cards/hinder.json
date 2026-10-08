@@ -14,10 +14,19 @@
               "type": "Blue"
             }
           }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
         }
       ],
-      "name": "Memory Lapse",
-      "oracleText": "Counter target spell. If that spell is countered this way, put it on top of its owner's library instead of into that player's graveyard.",
+      "name": "Hinder",
+      "oracleText": "Counter target spell. If that spell is countered this way, put that card on your choice of the top or bottom of its owner's library instead of into that player's graveyard.",
       "spell": {
         "modes": [
           {
@@ -29,10 +38,7 @@
                     "value": {
                       "instead": {
                         "position": {
-                          "type": "Stated",
-                          "value": {
-                            "type": "Top"
-                          }
+                          "type": "CounteringPlayerChooses"
                         },
                         "zone": {
                           "type": "Library"

@@ -6,6 +6,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterDestination as CounterDestination
+import qualified Pawl.Types.CounteredEnd as CounteredEnd
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -45,6 +46,6 @@ spec s = Spec.describe s "Pawl.Codec.Counter" $ do
     Common.assertCodec
       s
       Counter.codec
-      (Counter.MkCounter (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) Nothing Nothing (Just (CounterDestination.MkCounterDestination Zone.Exile LibraryPosition.Bottom Nothing (Just (SlotName.MkSlotName (Text.pack "delayed"))))))
+      (Counter.MkCounter (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) Nothing Nothing (Just (CounterDestination.MkCounterDestination Zone.Exile (CounteredEnd.Stated LibraryPosition.Bottom) Nothing (Just (SlotName.MkSlotName (Text.pack "delayed"))))))
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"spell\"},\"instead\":{\"zone\":{\"type\":\"Exile\"},\"slot\":\"delayed\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Counter.codec
