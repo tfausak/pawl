@@ -5645,13 +5645,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- object". Each named object one of the named players owns moves to the
   -- ante, all of them as one event (CR 608.2f); any other is left where it is,
   -- and a move that names nobody writes nothing, so CR 608.2c's "If you do"
-  -- reads it as not having happened. InSlot reads through fromAmongMembers,
-  -- the MoveToZone gather's read, so the reserved `self` slot names the source.
+  -- reads it as not having happened. The pure sweep, the read effectIsImpossible's
+  -- Ante arm makes, so the offer and the instruction name the same objects.
   Effect.Ante (Ante.MkAnte player ref mSlot) -> do
-    named <- case ref of
-      ObjectRef.InSlot slot -> fromAmongMembers legal resolving chosen slot
-      _ -> State.gets (\gs -> objectRefObjects legal resolving controller source gs ref)
     gs <- State.get
+    let named = objectRefObjects legal resolving controller source gs ref
     let anteing = playerRefPlayers legal controller gs player
         theirs oid = case Game.lookupObject oid gs of
           Just obj -> List.elem (Object.owner obj) anteing

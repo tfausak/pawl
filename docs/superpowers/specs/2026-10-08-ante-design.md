@@ -27,7 +27,7 @@ Three units, landed in order, this spec committed with the first:
 Out:
 
 - CR 407.3's deck half (no ante card in a non-ante deck or sideboard) is deck
-  validation, which pawl does not do at all (#940); related to #884.
+  validation, which pawl does not do at all (#4458); related to #884.
 - A team win's payout (CR 810.8a makes the team win; CR 407.2 names one
   winner). Elided with an issue; the follow-up is a prompt letting the winning
   team assign each card.

@@ -30,7 +30,7 @@ data GameSettings = MkGameSettings
     --
     -- Not implemented: CR 903.12b, CR 903.12d and CR 903.12e, which are deck
     -- construction (the card pool, the 60-card deck, the basic-land exception).
-    -- Pawl enforces no deck legality at all (#940), so a Brawl deck is unchecked
+    -- Pawl enforces no deck legality at all (#4458), so a Brawl deck is unchecked
     -- exactly as a Commander deck is.
     brawl :: Bool,
     -- | CR 806.2b: which of the three attack options this game uses, if any.

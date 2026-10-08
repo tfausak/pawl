@@ -20,9 +20,9 @@
 -- WHAT IS NOT IMPLEMENTED:
 --
 --   * CR 903.4's colour identity and CR 903.5's singleton deck construction
---     (#940) -- both are deck-legality rules, and pawl validates no deck.
+--     (#4458) -- both are deck-legality rules, and pawl validates no deck.
 --   * CR 903.12b, CR 903.12d and CR 903.12e's Brawl deck construction, and CR
---     903.13's Commander Draft -- deck-building rules, like rule 903.5's (#940).
+--     903.13's Commander Draft -- deck-building rules, like rule 903.5's (#4458).
 module Pawl.Engine.Commander where
 
 import qualified Control.Monad as Monad
@@ -101,7 +101,7 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- 903.3a) would still be refused.
 --
 -- Empty is also what an ILLEGAL pair gets, which is the closest pawl can come to
--- rejecting the deck: nothing validates a deck (#940) and Pawl.Engine.Setup has
+-- rejecting the deck: nothing validates a deck (#4458) and Pawl.Engine.Setup has
 -- no channel to refuse one, so a pair rule 702.124 does not allow designates
 -- neither card and starts no commander in the command zone.
 --
@@ -143,7 +143,7 @@ designations settings deck =
 --
 -- Brawl adds a planeswalker card to those three, which is the whole of CR
 -- 903.12c's difference from rule 903.3 and the reason this takes the settings. Pawl
--- validates no deck (#940), so a card this refuses is designated as nothing and
+-- validates no deck (#4458), so a card this refuses is designated as nothing and
 -- starts nowhere, which is `designations`' posture for every illegal deck.
 --
 -- Clauses (b) and (c) are REGRESSION FENCES and not proved: no legendary Vehicle
