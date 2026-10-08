@@ -2711,15 +2711,16 @@ escapeBoards s registry = do
 -- Dust's "Whenever this creature blocks a creature, that creature can't attack
 -- during its controller's next turn" (Oracle checked against Scryfall
 -- 2026-09-21), the pool's only printing of such a duration. The row lands in
--- GameState.attackProhibitions under Expiry.DuringTurnOfControllerOf, pinned to
--- DuringTurnOf as its controller's turn begins, and
+-- GameState.attackProhibitions under Expiry.DuringTurnOfControllerOf, and
 -- Pawl.Engine.CombatRestriction.liveAttackProhibitions is the gate that keeps it
--- inert until that turn.
+-- inert until a later turn whose active player controls the creature.
 --
--- The window is observable only because a CONTROL CHANGE can put the creature in
--- a combat the window does not cover: Act of Treason's steal lasts only bob's
--- turn, which begins with alice in control, so alice's turn comes first. Act of Treason is what makes
--- that combat happen, and it is the whole reason bob has three Mountains.
+-- "Its controller" is read when that turn comes, not when the Wall blocked
+-- (Gideon, Battle-Forged's 2015-06-22 ruling: a creature that changes
+-- controllers before its chance to attack is bound during its new controller's
+-- next turn). So Act of Treason on bob's turn 2 makes that turn the window:
+-- the stolen, hasty Giant has its chance to attack there. Act of Treason is
+-- the whole reason bob has three Mountains.
 --
 -- THE PAIR: the same attacker, the same declaration and the same block on every
 -- board here, differing only in WHICH wall blocked -- Wall of Dust, or Wall of
@@ -2728,22 +2729,21 @@ escapeBoards s registry = do
 -- creature that was never offered.
 windowAttackRestrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 windowAttackRestrictionSpec s registry = Spec.describe s "WindowAttackRestriction" $ do
-  Spec.it s "CR 611.2a the window names alice's next turn, so bob attacks with the creature on his" $ do
+  Spec.it s "CR 611.2a the window follows the Giant to bob, so it cannot attack on his turn" $ do
     (giant, treason, blocked) <- wallBoard s registry "Wall of Dust"
     (openGiant, openTreason, control) <- wallBoard s registry "Wall of Stone"
     let bobsTurn = stealing treason giant (handoffUntapping blocked)
         openTurn = stealing openTreason openGiant (handoffUntapping control)
     Spec.assertEqWith s "the block stored one row, over the creature the Wall blocked" (fmap ActiveAttackProhibition.affected (GameState.attackProhibitions blocked)) [RestrictedCreatures.Named giant]
     Spec.assertEqWith s "and the pair stored none" (GameState.attackProhibitions control) []
-    -- Not swept, just not begun -- which is the whole claim.
     Spec.assertEqWith s "the row is still stored on bob's turn" (length (GameState.attackProhibitions bobsTurn)) 1
     Spec.assertEqWith s "bob controls the Giant and is active" (Projection.controllerOf giant bobsTurn, GameState.activePlayer bobsTurn) (Just S.bob, S.bob)
-    Spec.assertBool s (Combat.legalAttackDeclarationAs S.bob [(giant, AttackTarget.OfPlayer S.alice)] (declaringAt S.alice bobsTurn)) "CR 611.2a: bob's turn is not the turn the window names, so the Giant may attack"
+    Spec.assertBool s (not (Combat.legalAttackDeclarationAs S.bob [(giant, AttackTarget.OfPlayer S.alice)] (declaringAt S.alice bobsTurn))) "CR 611.2a: bob now controls the Giant on his turn, so the Giant may not attack"
     Spec.assertBool s (Combat.legalAttackDeclarationAs S.bob [(openGiant, AttackTarget.OfPlayer S.alice)] (declaringAt S.alice openTurn)) "as the pair's Giant does"
     -- Ordered LAST so a card that printed the end-only duration reddens the
     -- declaration above rather than being absorbed here: the seat is left open
-    -- on the blocked creature (CR 108.4 / 110.2, pinned as its controller's turn
-    -- begins) and 1 is the turn the block happened on.
+    -- on the blocked creature (CR 108.4 / 110.2, read when a later turn comes)
+    -- and 1 is the turn the block happened on.
     Spec.assertEqWith s "under a window naming the Giant's controller's turn after turn 1" (fmap ActiveAttackProhibition.expiry (GameState.attackProhibitions blocked)) [Expiry.DuringTurnOfControllerOf (AfterObjectTurn.MkAfterObjectTurn giant 1)]
   Spec.it s "CR 611.2a and cannot attack once that turn has begun" $ do
     (giant, _, blocked) <- wallBoard s registry "Wall of Dust"

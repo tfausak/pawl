@@ -1,6 +1,6 @@
 {
   "description": "CR 611.2a Wall of Dust's \"can't attack during its controller's next turn\" follows the attacker to its new controller",
-  "note": "Bob's Wall of Dust blocks alice's Hill Giant on turn 1. On turn 2 bob takes the giant with Control Magic, so its controller's next turn is bob's turn 4, not alice's turn 3: the giant cannot attack on turn 4 (his Grizzly Bears keep the declaration a real prompt), and can on turn 6 once that window has closed.",
+  "note": "Bob's Wall of Dust blocks alice's Hill Giant on turn 1. On turn 2 bob takes the giant with Control Magic, and the giant, summoning sick for him that turn, has no chance to attack until his turn 4 (Gideon, Battle-Forged ruling 2015-06-22), so that is its controller's next turn, not alice's turn 3: the giant cannot attack on turn 4 (his Grizzly Bears keep the declaration a real prompt), and can on turn 6 once that window has closed.",
   "board": {
     "active": "alice",
     "step": "BeginningOfCombat",

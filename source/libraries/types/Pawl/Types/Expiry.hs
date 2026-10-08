@@ -75,10 +75,10 @@ data Expiry
     -- stored.
     DuringTurnOf AfterTurn.AfterTurn
   | -- | CR 611.2a: DuringTurnOf with its seat not yet known -- "during its
-    -- controller's next turn", read as that object's controller at the
-    -- beginning of each later turn. Pawl.Engine.Expiry.dropAtTurnOf pins it to
-    -- DuringTurnOf at the first turn that begins under its controller; until
-    -- then it is inert. Wall of Dust is the producer.
+    -- controller's next turn", open on any later turn while that object's
+    -- current controller is active, and pinned to DuringTurnOf once such a turn's
+    -- declare attackers step ends (Pawl.Engine.Expiry.pinAfterDeclareAttackers).
+    -- Wall of Dust and Gideon, Battle-Forged are the producers.
     DuringTurnOfControllerOf AfterObjectTurn.AfterObjectTurn
   | -- | CR 611.2a / 500.7: Duration.DuringThatExtraTurn, stored as the
     -- ExtraTurn.createdAt of the turn it names. A window like DuringTurnOf

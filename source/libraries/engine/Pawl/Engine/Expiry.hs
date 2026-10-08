@@ -41,6 +41,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as View
+import qualified Pawl.Engine.Summoning as Summoning
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Types.ActiveActivationProhibition as ActiveActivationProhibition
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
@@ -55,6 +56,7 @@ import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
 import qualified Pawl.Types.ActiveUntapProhibition as ActiveUntapProhibition
 import qualified Pawl.Types.AfterObjectTurn as AfterObjectTurn
 import qualified Pawl.Types.AfterTurn as AfterTurn
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.Designation as Designation
@@ -71,6 +73,7 @@ import qualified Pawl.Types.IgnoredAbility as IgnoredAbility
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PaidExpiry as PaidExpiry
+import qualified Pawl.Types.Phase as Phase
 import Pawl.Types.PhaseSelector (PhaseSelector)
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import Pawl.Types.PlayerId (PlayerId)
@@ -134,8 +137,9 @@ arm targets controller source duration gs = case duration of
   -- too -- a window that cannot begin stores nothing.
   --
   -- A ControllerOfBound naming an object still in the game is NOT sampled: its
-  -- seat is left open and pinned by dropAtTurnOf as a turn of its controller
-  -- begins, so a control change before then moves the window (CR 611.2a).
+  -- seat is read live and pinned once its controller's declare attackers step
+  -- has passed (pinAfterDeclareAttackers), so a control change before then
+  -- moves the window (CR 611.2a).
   Duration.DuringNextTurnOf ref -> case ref of
     PlayerRef.ControllerOfBound slot
       | Just oid <- Map.lookup slot targets >>= Binding.onlyOne >>= Recipient.objectOf,
@@ -317,8 +321,11 @@ begun gs expiry = case expiry of
   Expiry.DuringTurnOf afterTurn ->
     Turn.isActive gs (AfterTurn.player afterTurn)
       && GameState.turnNumber gs > AfterTurn.turn afterTurn
-  -- Not yet pinned to a seat, so no turn of its controller has begun.
-  Expiry.DuringTurnOfControllerOf _ -> False
+  -- Read live until pinned: open on a later turn while whoever controls the
+  -- object now is active.
+  Expiry.DuringTurnOfControllerOf afterObjectTurn ->
+    GameState.turnNumber gs > AfterObjectTurn.turn afterObjectTurn
+      && maybe False (Turn.isActive gs) (View.controllerOf (AfterObjectTurn.object afterObjectTurn) gs)
   -- CR 500.7: open exactly while the extra turn it names is the one under way.
   Expiry.DuringExtraTurn stamp -> GameState.extraTurnUnderWay gs == Just stamp
   Expiry.AtCleanup -> True
@@ -653,7 +660,7 @@ dropAtTurnOf pid gs =
         -- still in the game keeps it, and this is the very moment `begun` starts
         -- answering True for the turn it names.
         Expiry.DuringTurnOf afterTurn -> not (departed && AfterTurn.player afterTurn == pid)
-        -- Pinned below rather than ended here.
+        -- Pinned by dropAtEndOf rather than ended here.
         Expiry.DuringTurnOfControllerOf _ -> True
         -- Named by a turn rather than a seat, so no seat's handoff ends it; an
         -- extra turn CR 800.4k spent unbegun is dropAtCleanup's to end.
@@ -681,44 +688,50 @@ dropAtTurnOf pid gs =
       keepEvasion active = survives (ActiveEvasion.expiry active)
       keepDelayed = maybe True survives . DelayedTrigger.expiry
       keepIgnored = survives . IgnoredAbility.expiry
-   in pinAtTurnOf
-        pid
-        gs
-          { GameState.continuousEffects = filter keepEffect (GameState.continuousEffects gs),
-            GameState.copyEffects = filter keepCopy (GameState.copyEffects gs),
-            GameState.replacements = filter keepReplacement (GameState.replacements gs),
-            GameState.playerEffects = filter keepPlayerEffect (GameState.playerEffects gs),
-            GameState.blockRequirements = filter keepBlockRequirement (GameState.blockRequirements gs),
-            GameState.attackRequirements = filter keepAttackRequirement (GameState.attackRequirements gs),
-            GameState.unregeneratables = filter keepUnregeneratable (GameState.unregeneratables gs),
-            GameState.blockProhibitions = filter keepBlockProhibition (GameState.blockProhibitions gs),
-            GameState.attackProhibitions = filter keepAttackProhibition (GameState.attackProhibitions gs),
-            GameState.activationProhibitions = filter keepActivationProhibition (GameState.activationProhibitions gs),
-            GameState.untapProhibitions = filter keepUntapProhibition (GameState.untapProhibitions gs),
-            GameState.evasions = filter keepEvasion (GameState.evasions gs),
-            GameState.ignoredAbilities = filter keepIgnored (GameState.ignoredAbilities gs),
-            GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs),
-            GameState.objects = clearedGoads pid (clearedDetentions pid (clearedPermissions (survives . ExilePlayPermission.expiry) gs))
-          }
+   in gs
+        { GameState.continuousEffects = filter keepEffect (GameState.continuousEffects gs),
+          GameState.copyEffects = filter keepCopy (GameState.copyEffects gs),
+          GameState.replacements = filter keepReplacement (GameState.replacements gs),
+          GameState.playerEffects = filter keepPlayerEffect (GameState.playerEffects gs),
+          GameState.blockRequirements = filter keepBlockRequirement (GameState.blockRequirements gs),
+          GameState.attackRequirements = filter keepAttackRequirement (GameState.attackRequirements gs),
+          GameState.unregeneratables = filter keepUnregeneratable (GameState.unregeneratables gs),
+          GameState.blockProhibitions = filter keepBlockProhibition (GameState.blockProhibitions gs),
+          GameState.attackProhibitions = filter keepAttackProhibition (GameState.attackProhibitions gs),
+          GameState.activationProhibitions = filter keepActivationProhibition (GameState.activationProhibitions gs),
+          GameState.untapProhibitions = filter keepUntapProhibition (GameState.untapProhibitions gs),
+          GameState.evasions = filter keepEvasion (GameState.evasions gs),
+          GameState.ignoredAbilities = filter keepIgnored (GameState.ignoredAbilities gs),
+          GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs),
+          GameState.objects = clearedGoads pid (clearedDetentions pid (clearedPermissions (survives . ExilePlayPermission.expiry) gs))
+        }
 
--- CR 611.2a: "during its controller's next turn" pinned to a seat as a turn
--- begins -- the first turn after the duration began whose player controls the
--- object then. From here the row is an ordinary DuringTurnOf, so `begun` opens
--- it for this turn and dropAtCleanup ends it at this turn's cleanup; a control
--- change before now moves the window, one after it does not (Gideon,
--- Battle-Forged's 2015-06-22 ruling). Not pinned to a departed seat, whose turn
--- does not begin.
+-- CR 611.2a: "during its controller's next turn" pinned to a seat once the
+-- creature has had its chance to attack: as a declare attackers step ends on a
+-- later turn whose active player controls the object, and it could have been
+-- declared as far as CR 302.6 goes (a creature that came under their control
+-- this turn without haste had no chance). From here the row is an
+-- ordinary DuringTurnOf, so it lasts the rest of this turn (an extra combat
+-- included) and dropAtCleanup ends it. A control change before then moves the
+-- window, one after does not (Gideon, Battle-Forged's 2015-06-22 ruling); a
+-- turn with no combat phase gave no chance, so the row stays unpinned.
 --
 -- data/scenarios/combat/cr-611-2a-wall-of-dust-follows-the-attacker-to-its-new-controller.json
--- proves it.
-pinAtTurnOf :: PlayerId -> GameState -> GameState
-pinAtTurnOf pid gs =
+-- and cr-611-2a-gideon-s-requirement-follows-a-creature-handed-over-before-combat.json
+-- prove it.
+pinAfterDeclareAttackers :: GameState -> GameState
+pinAfterDeclareAttackers gs =
   let pin expiry = case expiry of
         Expiry.DuringTurnOfControllerOf afterObjectTurn
-          | List.elem pid (Game.stillPlaying gs),
-            View.controllerOf (AfterObjectTurn.object afterObjectTurn) gs == Just pid ->
+          | GameState.turnNumber gs > AfterObjectTurn.turn afterObjectTurn,
+            Just pid <- View.controllerOf (AfterObjectTurn.object afterObjectTurn) gs,
+            Turn.isActive gs pid,
+            hadTheChance pid (AfterObjectTurn.object afterObjectTurn) ->
               Expiry.DuringTurnOf (AfterTurn.MkAfterTurn pid (AfterObjectTurn.turn afterObjectTurn))
         _ -> expiry
+      -- The chance to attack: a permanent (CR 506.3, so not phased out, CR
+      -- 702.26b) that summoning sickness did not keep home (CR 302.6 / 702.10b).
+      hadTheChance pid oid = Set.member oid (GameState.battlefield gs) && Summoning.settledOrHasty pid oid gs
    in mapExpiries pin gs
 
 -- Every stored expiry rewritten in place, over every carrier sourcedExpiries
@@ -781,7 +794,7 @@ dropAtEndOf ending gs =
         Expiry.WhenPaid _ -> True
         -- No step or phase ending is a use.
         Expiry.WhenUsed -> True
-   in keepSurvivors survives gs
+   in (if ending == PhaseSelector.Step (Phase.Combat CombatStep.DeclareAttackers) then pinAfterDeclareAttackers else id) (keepSurvivors survives gs)
 
 -- CR 503 / 611.2a: "until the beginning of your next upkeep" ends as that
 -- upkeep step begins. Engine.runStepThatBegan calls this for every active
