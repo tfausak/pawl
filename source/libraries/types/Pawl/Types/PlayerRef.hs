@@ -1,6 +1,7 @@
 module Pawl.Types.PlayerRef where
 
 import qualified Pawl.Types.AttackingPlayers as AttackingPlayers
+import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.SlotName as SlotName
@@ -152,6 +153,10 @@ data PlayerRef
     -- slot naming no object, naming several, or naming one the projection cannot
     -- describe leaves the count unanswered rather than aimed at some other seat.
     ControllerOfBound SlotName.SlotName
+  | -- | ControllerOfBound's BAKED half, and runtime-only: the controller of one
+    -- particular object, read at each check (CR 611.2b, 108.4). Written by
+    -- Pawl.Engine.Quantity.bakePlayerRef; no card may write it.
+    ControllerOfObject ObjectId.ObjectId
   | -- | CR 108.3: the OWNER of the object a slot names -- The Deck of Many
     -- Things' 20 band, "its owner loses the game", where the slot holds the
     -- reanimated creature.
@@ -162,6 +167,9 @@ data PlayerRef
     -- a stolen or borrowed permanent, which is exactly the case a printed
     -- "its owner" is written to reach past.
     OwnerOfBound SlotName.SlotName
+  | -- | OwnerOfBound's BAKED half, and runtime-only: the owner of one particular
+    -- object (CR 611.2b, 108.3). ControllerOfObject's posture; no card may write it.
+    OwnerOfObject ObjectId.ObjectId
   | -- | CR 614.1c / CR 702.174b: the player the object a slot names CHOSE --
     -- "the chosen player" of the gift ability Pawl.Engine.Keyword mints, read off
     -- the permanent CR 113.7a's source slot holds.

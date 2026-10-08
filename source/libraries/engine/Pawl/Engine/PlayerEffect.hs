@@ -2195,6 +2195,9 @@ zoneOwners pid ref gs = case ref of
   PlayerRef.Candidate -> []
   PlayerRef.ControllerOfBound _ -> []
   PlayerRef.OwnerOfBound _ -> []
+  -- The two arms above, baked, and read the same way.
+  PlayerRef.ControllerOfObject _ -> []
+  PlayerRef.OwnerOfObject _ -> []
   PlayerRef.ChosenPlayerOfBound _ -> []
   PlayerRef.Attacking _ -> []
 

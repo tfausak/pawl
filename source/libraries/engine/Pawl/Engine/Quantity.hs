@@ -150,6 +150,9 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- CR 108.3's owner, the arm above's route: Count.playersFor reads the
         -- slot's owner off the same injected view.
         PlayerRef.OwnerOfBound _ -> Count.playersFor viewOf context gs ref
+        -- The two arms above, baked, by the same route.
+        PlayerRef.ControllerOfObject _ -> Count.playersFor viewOf context gs ref
+        PlayerRef.OwnerOfObject _ -> Count.playersFor viewOf context gs ref
         -- The arm above's route: Count.playersFor reads the slot the same way.
         PlayerRef.ChosenPlayerOfBound _ -> Count.playersFor viewOf context gs ref
         PlayerRef.EachPlayer -> Count.playersFor viewOf context gs ref
@@ -1417,20 +1420,25 @@ playerRefIsSlotless ref = case ref of
   PlayerRef.ControllerOfBound _ -> False
   -- The arm above's answer, one field over: the object is named by a slot.
   PlayerRef.OwnerOfBound _ -> False
+  -- Specific's answer: the baked halves name their object outright.
+  PlayerRef.ControllerOfObject _ -> True
+  PlayerRef.OwnerOfObject _ -> True
   -- The arm above's answer: the object is named by a slot.
   PlayerRef.ChosenPlayerOfBound _ -> False
   -- InSlot's answer again: the player attacked is named by a slot.
   PlayerRef.Attacking _ -> False
 
 -- CR 611.2b: replace every PlayerRef.InSlot this quantity names with the baked
--- PlayerRef.Specific arm, off the players the resolution's bindings name. What
+-- PlayerRef.Specific arm, off the players the resolution's bindings name, and
+-- every ControllerOfBound or OwnerOfBound with its baked object arm, off the
+-- objects they name. What
 -- makes a "for as long as" condition that says "that player" answerable AFTER
 -- its resolution: Pawl.Engine.Expiry.arm bakes as the duration begins, so the
 -- stored condition names a seat rather than a slot on an object whose bindings
 -- the sweep cannot reach. Pawl.Engine.Filter.bakeBound is the same move for a
 -- target slot's atoms, and carries the argument for baking over threading.
 --
--- The atom is LEFT STANDING when the environment names no player for the slot,
+-- The atom is LEFT STANDING when the environment names no player (or object) for the slot,
 -- which is bakeBound's posture there too: Count.playersFor then answers Nothing
 -- for it, Condition.holds collapses that to False, and CR 611.2b's duration
 -- never starts -- rather than starting on a reference nothing can resolve.
@@ -1438,15 +1446,15 @@ playerRefIsSlotless ref = case ref of
 -- Exhaustive, QuantitySlot.slots' posture: a new arm carrying a PlayerRef must
 -- fail to compile here rather than silently keep an unbaked one -- which is what
 -- Pawl.Engine.QuantitySlot.mapPlayerRefs is, and this is one instance of it.
-bakeBound :: Map.Map SlotName PlayerId.PlayerId -> Quantity -> Quantity
-bakeBound players =
+bakeBound :: Map.Map SlotName PlayerId.PlayerId -> Map.Map SlotName ObjectId -> Quantity -> Quantity
+bakeBound players objects =
   QuantitySlot.mapPlayerRefs
-    (bakePlayerRef players)
+    (bakePlayerRef players objects)
     -- Both halves: the Scope says whose zone or which players, and an
     -- Aggregation.Greatest's per-member quantity may hide a reference of its own.
     -- Terminating for evaluate's reason -- a Greatest's payload is a strictly
     -- smaller subterm.
-    (\c -> (QuantitySlot.mapCount (bakeBound players) c) {Count.Type.scope = QuantitySlot.mapScope (bakePlayerRef players) (Count.Type.scope c)})
+    (\c -> (QuantitySlot.mapCount (bakeBound players objects) c) {Count.Type.scope = QuantitySlot.mapScope (bakePlayerRef players objects) (Count.Type.scope c)})
 
 -- The player a per-player instruction is CURRENTLY applying to, substituted for
 -- Pawl.Types.PlayerRef.Candidate -- Shahrazad's "each player who doesn't win the
@@ -1486,14 +1494,16 @@ forCandidate pid =
         PlayerRef.Specific _ -> ref
         PlayerRef.ControllerOfBound _ -> ref
         PlayerRef.OwnerOfBound _ -> ref
+        PlayerRef.ControllerOfObject _ -> ref
+        PlayerRef.OwnerOfObject _ -> ref
         PlayerRef.ChosenPlayerOfBound _ -> ref
         PlayerRef.Attacking _ -> ref
    in QuantitySlot.mapPlayerRefs substitute (\c -> c {Count.Type.scope = QuantitySlot.mapScope substitute (Count.Type.scope c)})
 
 -- One reference, baked. The whole of the substitution: every arm above funnels
 -- through this, so what a slot means is stated once.
-bakePlayerRef :: Map.Map SlotName PlayerId.PlayerId -> PlayerRef.PlayerRef -> PlayerRef.PlayerRef
-bakePlayerRef players ref = case ref of
+bakePlayerRef :: Map.Map SlotName PlayerId.PlayerId -> Map.Map SlotName ObjectId -> PlayerRef.PlayerRef -> PlayerRef.PlayerRef
+bakePlayerRef players objects ref = case ref of
   PlayerRef.InSlot slot -> maybe ref PlayerRef.Specific (Map.lookup slot players)
   -- LEFT STANDING, EachPlayerExcept's posture below and for its reason: this
   -- names a SET and PlayerRef.Specific names one seat, so there is nothing to
@@ -1501,11 +1511,11 @@ bakePlayerRef players ref = case ref of
   -- the reference answers Nothing baked or not.
   PlayerRef.EachInSlot _ -> ref
   PlayerRef.EachPlayer -> ref
-  -- LEFT STANDING, ControllerOfBound's posture below, and here there is nothing
-  -- to bake TO: PlayerRef.Specific names one seat and this names the rest of the
-  -- table. It costs nothing either way, since every scalar this function
-  -- traverses reads exactly one player (see the LifeTotal arm above) and so
-  -- answers Nothing for this reference baked or not.
+  -- LEFT STANDING, as there is nothing to bake TO: PlayerRef.Specific names one
+  -- seat and this names the rest of the table. It costs nothing either way,
+  -- since every scalar this function traverses reads exactly one player (see
+  -- the LifeTotal arm above) and so answers Nothing for this reference baked or
+  -- not.
   PlayerRef.EachPlayerExcept _ -> ref
   -- LEFT STANDING, the arm above's posture and for its reason.
   PlayerRef.EachOpponentExcept _ -> ref
@@ -1516,23 +1526,20 @@ bakePlayerRef players ref = case ref of
   -- it the same way. What baking fixes is a reference to the RESOLUTION's
   -- bindings, which this is not.
   PlayerRef.Candidate -> ref
-  -- LEFT STANDING, the posture Pawl.Engine.Filter.bakeBound takes for a slot its
-  -- map cannot answer: this map holds the PLAYERS a resolution's slots name (CR
-  -- 603.2), and this reference names a slot holding an OBJECT, whose controller
-  -- only a projection gives. A stored CR 611.2b duration reading it therefore
-  -- goes unanswered and ends, which is Pawl.Engine.Condition.holds' stated
-  -- collapse; no card in the pool stores one (#3058).
-  PlayerRef.ControllerOfBound _ -> ref
-  -- LEFT STANDING for the arm above's reason, one field over: this reference
-  -- names CR 108.3's owner of a slot's OBJECT, which no map of the resolution's
-  -- own bound PLAYERS can answer either.
-  PlayerRef.OwnerOfBound _ -> ref
-  -- LEFT STANDING for the arm above's reason: this map holds the PLAYERS a
-  -- resolution's slots name, and this reference names a slot holding an OBJECT.
+  -- CR 611.2b / 108.4: baked to the OBJECT the slot names rather than to a seat,
+  -- since control can change while the stored condition is checked: the
+  -- reference keeps asking who controls that object now. LEFT STANDING where the
+  -- slot names no one object, InSlot's posture above.
+  PlayerRef.ControllerOfBound slot -> maybe ref PlayerRef.ControllerOfObject (Map.lookup slot objects)
+  -- CR 108.3's owner, the arm above's bake one word over.
+  PlayerRef.OwnerOfBound slot -> maybe ref PlayerRef.OwnerOfObject (Map.lookup slot objects)
+  PlayerRef.ControllerOfObject _ -> ref
+  PlayerRef.OwnerOfObject _ -> ref
+  -- LEFT STANDING: not implemented, a stored condition reading the player an
+  -- object chose, which goes unanswered and ends (#4833).
   PlayerRef.ChosenPlayerOfBound _ -> ref
-  -- LEFT STANDING for ControllerOfBound's reason, plus one of its own: the slot
-  -- this names holds a PLAYER, but what the reference reads is the live combat
-  -- record, which no baking can fix in place.
+  -- LEFT STANDING: the slot this names holds a PLAYER, but what the reference
+  -- reads is the live combat record, which no baking can fix in place.
   PlayerRef.Attacking _ -> ref
 
 -- Does this quantity read CR 601.2b's announced X? Since #14 retired X's

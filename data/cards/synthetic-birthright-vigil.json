@@ -1,0 +1,92 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Synthetic Birthright Vigil",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "ModifyTarget",
+                    "value": {
+                      "duration": {
+                        "type": "ForAsLongAs",
+                        "value": {
+                          "type": "Compares",
+                          "value": {
+                            "comparison": {
+                              "type": "AtMost"
+                            },
+                            "measured": {
+                              "type": "LifeTotal",
+                              "value": {
+                                "type": "OwnerOfBound",
+                                "value": "target"
+                              }
+                            },
+                            "threshold": {
+                              "type": "Literal",
+                              "value": 10
+                            }
+                          }
+                        }
+                      },
+                      "modification": {
+                        "type": "ModifyPowerToughness",
+                        "value": {
+                          "power": {
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          "toughness": {
+                            "type": "Literal",
+                            "value": 3
+                          }
+                        }
+                      },
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "targetSlots": {
+              "target": {
+                "pool": {
+                  "type": "Creatures"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}

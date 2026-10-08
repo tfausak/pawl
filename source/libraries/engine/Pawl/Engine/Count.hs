@@ -699,6 +699,13 @@ playersFor viewOf context gs ref =
         -- or one the view cannot describe.
         PlayerRef.OwnerOfBound slot ->
           fmap pure (Filter.slotOneObject slot context >>= viewOf >>= Filter.owner)
+        -- CR 611.2b: the two arms above, BAKED -- the object named outright, so
+        -- a stored duration asks who controls or owns it NOW, off the same view.
+        -- Unanswered once the view cannot describe it.
+        -- data/scenarios/cr-611-2b-a-stored-duration-reads-its-target-s-controller-and-owner-after-resolution.json
+        -- proves both.
+        PlayerRef.ControllerOfObject oid -> fmap pure (viewOf oid >>= Filter.controller)
+        PlayerRef.OwnerOfObject oid -> fmap pure (viewOf oid >>= Filter.owner)
         -- CR 614.1c / CR 702.174b: the player the object a slot names chose, read
         -- off Object.chosenPlayer rather than off the view -- a choice is a
         -- record, not a characteristic (CR 707.2), so no projection answers it.

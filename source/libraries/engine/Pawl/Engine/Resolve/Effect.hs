@@ -5739,7 +5739,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                         ExilePlayPermission.alternativeCost = alternativeCost,
                         -- BAKED, Expiry.arm's ForAsLongAs reason: the permission
                         -- outlives this resolution's slots.
-                        ExilePlayPermission.condition = fmap (Condition.bakeBound (Binding.playersIn legal)) condition,
+                        ExilePlayPermission.condition = fmap (Condition.bakeBound legal) condition,
                         -- CR 715.3d's "other effects that allow a player to cast
                         -- it": a card said this, not rule 715.3d, so the Adventure
                         -- exclusion does not reach it.
@@ -7975,7 +7975,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- Pawl.Engine.Condition.bakeBound is the precedent, and its posture
           -- for a slot naming nobody: the reference is left standing and reads
           -- as naming nobody, rather than falling back to some other seat.
-          withPlayers = PlayerEffect.mapPlayerRefs (Quantity.bakePlayerRef (Binding.playersIn legal)) playerEffect
+          withPlayers = PlayerEffect.mapPlayerRefs (Quantity.bakePlayerRef (Binding.playersIn legal) (Binding.objectsIn legal)) playerEffect
           -- CR 601.2c / 608.2b again, one payload over: a DamagePattern's
           -- `boundRecipient` names the slot this resolution filled, and the
           -- recipient it named is written into `whichRecipient` here --

@@ -2045,6 +2045,10 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           PlayerRef.ControllerOfBound _ -> True
           -- One seat -- the arm above's answer, one word over.
           PlayerRef.OwnerOfBound _ -> True
+          -- One seat each -- the two arms above, baked; unreachable from card
+          -- data, Specific's answer.
+          PlayerRef.ControllerOfObject _ -> True
+          PlayerRef.OwnerOfObject _ -> True
           -- One seat -- the arm above's answer, one record over.
           PlayerRef.ChosenPlayerOfBound _ -> True
           -- A SET -- Relative Opponent's answer, and for its reason: CR 508.6 is

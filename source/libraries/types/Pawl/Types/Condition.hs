@@ -28,9 +28,11 @@ import qualified Pawl.Types.DuringPhase as DuringPhase
 -- A Count's Scope may name a slot (PlayerRef.InSlot), and this Condition may be
 -- stored into a Pawl.Types.Expiry.While for a "for as long as" duration. Such a
 -- reference outlives its slot binding, so Pawl.Engine.Condition.bakeBound
--- substitutes the seat for the slot as the duration begins; Pawl.ExpirySpec's
--- Garland, Royal Kidnapper group is what proves the stored condition still
--- answers once the resolution that stored it is over.
+-- substitutes the seat (or, for an object's controller or owner, the object)
+-- for the slot as the duration begins; Pawl.ExpirySpec's Garland, Royal
+-- Kidnapper group is what proves the stored condition still answers once the
+-- resolution that stored it is over, and the Synthetic Borrowed Vigil scenario
+-- under data/scenarios/ proves the object half.
 data Condition
   = -- | One comparison, whose three parts are Pawl.Types.Compares -- see there
     -- for why both sides are a full Quantity.
