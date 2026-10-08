@@ -537,7 +537,8 @@ data Prompt r where
   -- asked only when that controller is not the owner.
   ChooseCommandZoneOfferFirst :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt OptionalDecision.OptionalDecision
   -- | CR 401.2: which end of a library a card arrives at where the effect
-  -- leaves it open; the owner is asked (CR 400.3), in APNAP order. Never
+  -- leaves it open; the owner is asked (CR 400.3), in APNAP order, or the
+  -- countering spell's controller where it says "your choice" (Hinder). Never
   -- elided; a stated end (Pawl.Types.LibraryPlacement.Stated) is not asked.
   -- The Natural is how many cards stay above the upper option, which a Top
   -- answer picks: 0 for the top itself, 1 for "second from the top".

@@ -176,6 +176,7 @@ import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterDestination as CounterDestination
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterSpread as CounterSpread
+import qualified Pawl.Types.CounteredEnd as CounteredEnd
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.DamageDirection as DamageDirection
@@ -8750,9 +8751,20 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           Just (Source.OfCard _) -> True
           _ -> False
         applies destination oid = isCard oid && maybe True (\only -> maybe False (\view -> Filter.matches context view only) (viewOf oid)) (CounterDestination.only destination)
+        -- Hinder's "your choice of the top or bottom": the countering spell's
+        -- controller is asked (CR 401.2's end), and only once the funnel has
+        -- passed the can't-be-countered gates, so a spell that is not
+        -- countered asks nobody.
         destinationOf oid = case mInstead of
-          Just destination | applies destination oid -> (CounterDestination.zone destination, CounterDestination.position destination)
-          _ -> (Zone.Graveyard, LibraryPosition.defaultValue)
+          Just destination | applies destination oid -> case CounterDestination.position destination of
+            CounteredEnd.Stated position -> pure (CounterDestination.zone destination, position)
+            CounteredEnd.CounteringPlayerChooses
+              | CounterDestination.zone destination == Zone.Library -> do
+                  g <- State.get
+                  position <- Game.choose (Prompt.ChooseLibraryEnd (Decide.deciderFor controller g) controller oid 0)
+                  pure (Zone.Library, position)
+              | otherwise -> pure (CounterDestination.zone destination, LibraryPosition.defaultValue)
+          _ -> pure (Zone.Graveyard, LibraryPosition.defaultValue)
     moved <- Event.counterReturning destinationOf source controller named
     let countered = fmap fst moved
     -- CR 701.6a's "countered this way" is what the funnel COUNTERED, never what
