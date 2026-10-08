@@ -401,6 +401,9 @@ playerRefSlots ref = case ref of
   -- Read at arity MANY, which is the whole of what parts it from the arm above.
   PlayerRef.EachInSlot slot -> Map.singleton slot SlotArity.Many
   PlayerRef.Specific _ -> Map.empty
+  -- Specific's answer: the baked object is named outright.
+  PlayerRef.ControllerOfObject _ -> Map.empty
+  PlayerRef.OwnerOfObject _ -> Map.empty
   PlayerRef.Candidate -> Map.empty
   -- Read at arity one: a slot naming several objects names no one controller.
   PlayerRef.ControllerOfBound slot -> Map.singleton slot SlotArity.One
@@ -2835,6 +2838,10 @@ playerRefPlayers legal controller gs ref =
             Just oid -> Maybe.maybeToList (Projection.ownerWithLastKnown oid gs)
             Nothing -> []
           Nothing -> []
+        -- The two arms above, baked: the same last-known reads, off the object
+        -- named outright.
+        PlayerRef.ControllerOfObject oid -> Maybe.maybeToList (Projection.controllerWithLastKnown oid gs)
+        PlayerRef.OwnerOfObject oid -> Maybe.maybeToList (Projection.ownerWithLastKnown oid gs)
         -- CR 614.1c / CR 702.174b: the player that object CHOSE -- "the chosen
         -- player" of the gift ability Pawl.Engine.Keyword mints, read off CR
         -- 113.7a's source slot. The arm above's read one record over, through

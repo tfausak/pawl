@@ -155,7 +155,7 @@ arm targets controller source duration gs = case duration of
   -- ability, never start at all, since the same unresolvable reference is read
   -- one line below.
   Duration.ForAsLongAs cond ->
-    let baked = Condition.bakeBound (Binding.playersIn targets) cond
+    let baked = Condition.bakeBound targets cond
      in if Condition.holds (Projection.fullView gs) (Filter.contextFor (Game.teams gs) (Just controller) (Just source)) gs source baked
           then Just (Expiry.While (While.MkWhile controller baked))
           else Nothing
@@ -222,6 +222,8 @@ seatOf targets controller source gs ref = case ref of
   PlayerRef.EachInSlot _ -> counted
   PlayerRef.Specific _ -> counted
   PlayerRef.OwnerOfBound _ -> counted
+  PlayerRef.ControllerOfObject _ -> counted
+  PlayerRef.OwnerOfObject _ -> counted
   PlayerRef.ChosenPlayerOfBound _ -> counted
   PlayerRef.Attacking _ -> counted
   where

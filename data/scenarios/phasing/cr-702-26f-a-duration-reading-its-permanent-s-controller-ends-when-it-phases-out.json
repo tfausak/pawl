@@ -1,0 +1,71 @@
+{
+  "description": "CR 702.26f / 611.2b a for-as-long-as duration reading its permanent's controller ends when that permanent phases out, and stays ended after it phases in",
+  "note": "Synthetic Borrowed Vigil pumps bob's bears while bob, their controller, is at 8. Reality Ripple then phases them out: a phased-out permanent has no controller to read (CR 702.26b), so the duration ends. They phase in at bob's untap step under bob, still at 8, and must stay 2/2: an ended duration does not resume.",
+  "board": {
+    "active": "alice",
+    "turn": 1,
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Plains", "label": "p1" },
+          { "card": "Plains", "label": "p2" },
+          { "card": "Island", "label": "i1" },
+          { "card": "Island", "label": "i2" }
+        ],
+        "hand": [
+          { "card": "Synthetic Borrowed Vigil", "label": "borrowed" },
+          { "card": "Reality Ripple", "label": "ripple" }
+        ],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      },
+      {
+        "name": "bob",
+        "life": 8,
+        "battlefield": [{ "card": "Grizzly Bears", "label": "bears" }],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": { "Cast": { "object": "$borrowed", "targets": ["$bears"], "mana": ["$p1", "$p2", null] } }
+    },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": { "PowerToughness": { "object": "$bears", "power": 4, "toughness": 4 } }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": { "Cast": { "object": "$ripple", "targets": ["$bears"], "mana": ["$i1", "$i2"] } }
+    },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Grizzly Bears", "count": 0 } }
+    },
+    {
+      "turn": 2,
+      "step": "Upkeep",
+      "player": "bob",
+      "check": { "PowerToughness": { "object": "$bears", "power": 2, "toughness": 2 } }
+    },
+    {
+      "turn": 2,
+      "step": "Upkeep",
+      "player": "bob",
+      "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Grizzly Bears", "count": 1 } }
+    }
+  ]
+}

@@ -7,6 +7,7 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AttackingPlayers as AttackingPlayers
+import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -62,6 +63,18 @@ spec s = Spec.describe s "Pawl.Codec.PlayerRef" $ do
       PlayerRef.codec
       (PlayerRef.OwnerOfBound (SlotName.MkSlotName (Text.pack "permanent")))
       " {\"type\":\"OwnerOfBound\",\"value\":\"permanent\"} "
+  Spec.it s "ControllerOfObject" $
+    Common.assertCodec
+      s
+      PlayerRef.codec
+      (PlayerRef.ControllerOfObject (ObjectId.MkObjectId 7))
+      " {\"type\":\"ControllerOfObject\",\"value\":7} "
+  Spec.it s "OwnerOfObject" $
+    Common.assertCodec
+      s
+      PlayerRef.codec
+      (PlayerRef.OwnerOfObject (ObjectId.MkObjectId 7))
+      " {\"type\":\"OwnerOfObject\",\"value\":7} "
   -- CR 614.1c / CR 702.174b: ControllerOfBound's shape one record over.
   Spec.it s "ChosenPlayerOfBound" $
     Common.assertCodec

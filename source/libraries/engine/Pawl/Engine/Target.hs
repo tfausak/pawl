@@ -2287,18 +2287,21 @@ bakeSlots players = fmap (bakeSlot players)
 -- Quantity.LifeGainedThisTurn against a PlayerRef.Relative, which baking leaves
 -- alone, or Quantity.InSlot, which carries no PlayerRef at all -- so no board
 -- today tells the two readings apart.
+--
+-- No object map: only the player half is baked here, as the Filter beside it
+-- is, so a ControllerOfBound or OwnerOfBound stays a read of the slot.
 bakeSlot :: Map SlotName PlayerId -> TargetSlot -> TargetSlot
 bakeSlot players slot =
   slot
     { TargetSlot.filter = fmap (Filter.bakeBound players) (TargetSlot.filter slot),
-      TargetSlot.amount = fmap (Quantity.bakeBound players) (TargetSlot.amount slot),
+      TargetSlot.amount = fmap (Quantity.bakeBound players Map.empty) (TargetSlot.amount slot),
       -- CR 601.2c's count reads a Quantity of its own, so it is baked beside the
       -- bound for that field's reason. A REGRESSION FENCE rather than a proved
       -- behaviour: no committed count holds a PlayerRef.InSlot -- Mogis's
       -- Marauder's devotion names a PlayerRef.Relative, which baking leaves
       -- alone, and Rumbling Crescendo's verse counters name no PlayerRef at all
       -- -- so no board today tells the two readings apart.
-      TargetSlot.count = SlotCount.mapQuantity (Quantity.bakeBound players) (TargetSlot.count slot)
+      TargetSlot.count = SlotCount.mapQuantity (Quantity.bakeBound players Map.empty) (TargetSlot.count slot)
     }
 
 -- CR 601.2c's "for each opponent, ... up to one target ... that player controls"

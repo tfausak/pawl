@@ -2205,6 +2205,8 @@ playerRefNames asking x = case x of
   PlayerRef.Candidate -> False
   PlayerRef.ControllerOfBound slotName -> slotNames asking slotName
   PlayerRef.OwnerOfBound slotName -> slotNames asking slotName
+  PlayerRef.ControllerOfObject objectId -> objectId == object asking
+  PlayerRef.OwnerOfObject objectId -> objectId == object asking
   PlayerRef.ChosenPlayerOfBound slotName -> slotNames asking slotName
   PlayerRef.Attacking attackingPlayers -> attackingPlayersNames asking attackingPlayers
 

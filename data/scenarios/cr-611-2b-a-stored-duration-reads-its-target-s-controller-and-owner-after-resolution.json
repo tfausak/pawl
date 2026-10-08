@@ -1,0 +1,89 @@
+{
+  "description": "CR 611.2b / 108.3 / 108.4: a stored \"for as long as\" condition naming its target's controller or owner keeps reading that object after the spell resolves, against whoever controls it now",
+  "note": "Synthetic Borrowed Vigil (+2/+2, its controller at 10 or less life) and Synthetic Birthright Vigil (+1/+3, its owner at 10 or less life) both target bob's bears while bob is at 8 and alice at 20. Both pumps surviving their resolution proves the condition still answers once the slot is gone. Act of Treason then hands the bears to alice: the controller reading now asks alice's 20 and ends, the owner reading still asks bob's 8 and stays. Distinct pump sizes say which one ended; the next turn's check, with the bears back under bob, proves the ended one does not restart.",
+  "board": {
+    "active": "alice",
+    "turn": 1,
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Plains", "label": "p1" },
+          { "card": "Plains", "label": "p2" },
+          { "card": "Plains", "label": "p3" },
+          { "card": "Plains", "label": "p4" },
+          { "card": "Mountain", "label": "m1" },
+          { "card": "Mountain", "label": "m2" },
+          { "card": "Mountain", "label": "m3" }
+        ],
+        "hand": [
+          { "card": "Synthetic Borrowed Vigil", "label": "borrowed" },
+          { "card": "Synthetic Birthright Vigil", "label": "birthright" },
+          { "card": "Act of Treason", "label": "treason" }
+        ],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      },
+      {
+        "name": "bob",
+        "life": 8,
+        "battlefield": [{ "card": "Grizzly Bears", "label": "bears" }],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": { "Cast": { "object": "$borrowed", "targets": ["$bears"], "mana": ["$p1", "$p2", null]} }
+    },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": { "Cast": { "object": "$birthright", "targets": ["$bears"], "mana": ["$p3", "$p4", null]} }
+    },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": { "PowerToughness": { "object": "$bears", "power": 5, "toughness": 7 } }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": { "Cast": { "object": "$treason", "targets": ["$bears"], "mana": ["$m1", "$m2", "$m3"]} }
+    },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": { "View": { "of": "Controller", "object": "$bears", "is": "alice" } }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": { "PowerToughness": { "object": "$bears", "power": 3, "toughness": 5 } }
+    },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": [] } },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": { "View": { "of": "Controller", "object": "$bears", "is": "bob" } }
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": { "PowerToughness": { "object": "$bears", "power": 3, "toughness": 5 } }
+    }
+  ]
+}

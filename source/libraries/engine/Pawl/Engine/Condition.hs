@@ -32,6 +32,7 @@ module Pawl.Engine.Condition where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import Data.Set (Set)
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Count as Count
@@ -48,6 +49,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
+import Pawl.Types.Recipient (Recipient)
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TurnScope as TurnScope
@@ -115,22 +117,26 @@ inheritedX condition oid gs = case condition of
     Map.singleton Binding.variableX (Maybe.fromMaybe 0 (Object.announcedX =<< Game.lookupObject oid gs))
   _ -> Map.empty
 
--- CR 611.2b: the condition with every PlayerRef.InSlot inside it baked to the
--- seat the resolution's bindings name (Quantity.bakeBound, which carries the
--- argument). Applied by Pawl.Engine.Expiry.arm as a "for as long as" duration
--- begins, and by nothing else: a condition a STATIC ability states (CR 604.2) is
--- re-derived every projection with no resolution behind it, and an intervening
--- "if" (CR 603.4) is read while the bindings are still reachable.
-bakeBound :: Map.Map SlotName PlayerId -> Condition.Type.Condition -> Condition.Type.Condition
-bakeBound players condition = case condition of
+-- CR 611.2b: the condition with every slot-reading PlayerRef inside it baked to
+-- the seat or object the resolution's chosen recipients name (Quantity.bakeBound,
+-- which carries the argument). Applied where a stored condition outlives its
+-- resolution -- Pawl.Engine.Expiry.arm as a "for as long as" duration begins, and
+-- a granted play permission's condition -- and nowhere else: a condition a STATIC
+-- ability states (CR 604.2) is re-derived every projection with no resolution
+-- behind it, and an intervening "if" (CR 603.4) is read while the bindings are
+-- still reachable.
+bakeBound :: Map.Map SlotName (Set Recipient) -> Condition.Type.Condition -> Condition.Type.Condition
+bakeBound targets condition = case condition of
   Condition.Type.Compares c ->
-    Condition.Type.Compares
-      c
-        { Compares.measured = Quantity.bakeBound players (Compares.measured c),
-          Compares.threshold = Quantity.bakeBound players (Compares.threshold c)
-        }
-  Condition.Type.Any conditions -> Condition.Type.Any (fmap (bakeBound players) conditions)
-  Condition.Type.All conditions -> Condition.Type.All (fmap (bakeBound players) conditions)
+    let players = Binding.playersIn targets
+        objects = Binding.objectsIn targets
+     in Condition.Type.Compares
+          c
+            { Compares.measured = Quantity.bakeBound players objects (Compares.measured c),
+              Compares.threshold = Quantity.bakeBound players objects (Compares.threshold c)
+            }
+  Condition.Type.Any conditions -> Condition.Type.Any (fmap (bakeBound targets) conditions)
+  Condition.Type.All conditions -> Condition.Type.All (fmap (bakeBound targets) conditions)
   Condition.Type.During _ -> condition
 
 -- The condition read for ONE affected player: every PlayerRef.Candidate inside

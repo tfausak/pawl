@@ -5771,7 +5771,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                         ExilePlayPermission.alternativeCost = alternativeCost,
                         -- BAKED, Expiry.arm's ForAsLongAs reason: the permission
                         -- outlives this resolution's slots.
-                        ExilePlayPermission.condition = fmap (Condition.bakeBound (Binding.playersIn legal)) condition,
+                        ExilePlayPermission.condition = fmap (Condition.bakeBound legal) condition,
                         -- CR 715.3d's "other effects that allow a player to cast
                         -- it": a card said this, not rule 715.3d, so the Adventure
                         -- exclusion does not reach it.
@@ -8007,7 +8007,20 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- Pawl.Engine.Condition.bakeBound is the precedent, and its posture
           -- for a slot naming nobody: the reference is left standing and reads
           -- as naming nobody, rather than falling back to some other seat.
-          withPlayers = PlayerEffect.mapPlayerRefs (Quantity.bakePlayerRef (Binding.playersIn legal)) playerEffect
+          --
+          -- An object's controller or owner is fixed NOW, as the seat it names
+          -- at resolution (through playerRefPlayers' CR 608.2h last-known
+          -- read), not baked to the object: only a CR 611.2b condition is
+          -- re-checked later. A regression fence: no card in data/cards/ puts
+          -- either reference in a player effect.
+          atResolution ref = case ref of
+            PlayerRef.ControllerOfBound _ -> seatNow ref
+            PlayerRef.OwnerOfBound _ -> seatNow ref
+            _ -> Quantity.bakePlayerRef (Binding.playersIn legal) Map.empty ref
+          seatNow ref = case playerRefPlayers legal controller gs ref of
+            [pid] -> PlayerRef.Specific pid
+            _ -> ref
+          withPlayers = PlayerEffect.mapPlayerRefs atResolution playerEffect
           -- CR 601.2c / 608.2b again, one payload over: a DamagePattern's
           -- `boundRecipient` names the slot this resolution filled, and the
           -- recipient it named is written into `whichRecipient` here --

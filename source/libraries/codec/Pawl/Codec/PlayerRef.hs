@@ -1,6 +1,7 @@
 module Pawl.Codec.PlayerRef where
 
 import qualified Pawl.Codec.AttackingPlayers as AttackingPlayers
+import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.PlayerRelation as PlayerRelation
 import qualified Pawl.Codec.SlotName as SlotName
@@ -39,6 +40,10 @@ codec =
       -- Deck of Many Things names the owner of a creature its 20 band
       -- reanimated.
       Arm.payload "OwnerOfBound" SlotName.codec PlayerRef.OwnerOfBound (\x -> case x of PlayerRef.OwnerOfBound y -> Just y; _ -> Nothing),
+      -- The two arms above, baked: decodable for Specific's reason, and swept
+      -- out of card data beside it.
+      Arm.payload "ControllerOfObject" ObjectId.codec PlayerRef.ControllerOfObject (\x -> case x of PlayerRef.ControllerOfObject y -> Just y; _ -> Nothing),
+      Arm.payload "OwnerOfObject" ObjectId.codec PlayerRef.OwnerOfObject (\x -> case x of PlayerRef.OwnerOfObject y -> Just y; _ -> Nothing),
       Arm.payload "ChosenPlayerOfBound" SlotName.codec PlayerRef.ChosenPlayerOfBound (\x -> case x of PlayerRef.ChosenPlayerOfBound y -> Just y; _ -> Nothing),
       -- CR 508.6's set, which a card writes: Curse of Vitality names "each
       -- opponent attacking that player".
@@ -57,5 +62,7 @@ tagOf x = case x of
   PlayerRef.Candidate {} -> "Candidate"
   PlayerRef.ControllerOfBound {} -> "ControllerOfBound"
   PlayerRef.OwnerOfBound {} -> "OwnerOfBound"
+  PlayerRef.ControllerOfObject {} -> "ControllerOfObject"
+  PlayerRef.OwnerOfObject {} -> "OwnerOfObject"
   PlayerRef.ChosenPlayerOfBound {} -> "ChosenPlayerOfBound"
   PlayerRef.Attacking {} -> "Attacking"
