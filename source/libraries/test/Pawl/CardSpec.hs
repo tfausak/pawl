@@ -397,6 +397,7 @@ vanillaFace name typeLine =
       Face.vanguard = Nothing,
       Face.canBeYourCommander = False,
       Face.claimsStartingPlayer = False,
+      Face.anteOnly = False,
       Face.keywords = Map.empty,
       Face.colorIndicator = Set.empty,
       Face.staticAbilities = [],
@@ -6580,7 +6581,7 @@ activatedAbilityFilters ability =
 --
 -- The remaining fields hold none: `name`, `manaCost`, `typeLine`, `loyalty`,
 -- `defense`, `vanguard`, `canBeYourCommander`, `claimsStartingPlayer`,
--- `colorIndicator`, `counterability`, `castingPermissions` and
+-- `anteOnly`, `colorIndicator`, `counterability`, `castingPermissions` and
 -- `castingRestrictions`. That is checkable rather than asserted: none of the
 -- types those fields reach imports Pawl.Types.Filter, which
 -- `grep -rl 'import qualified Pawl.Types.Filter' source/libraries/types/` over
@@ -7183,6 +7184,21 @@ lintSpec s registry = Spec.describe s "Lint" $ do
               then Just (path <> ": prints fuse and cannot be fused")
               else Nothing
     Spec.assertEqWith s "every card with fuse fuses" (Maybe.mapMaybe offends loaded) []
+  -- CR 407.3: a card is ante-only exactly when it prints the ante reminder.
+  -- The engine reads the flag and never the text; this pins the two together.
+  Spec.it s "CR 407.3 a card is ante-only exactly when it prints the ante reminder" $ do
+    root <- Registry.defaultRoot
+    loaded <- Registry.loadRoot root
+    Spec.assertBool s (not (null loaded)) "the corpus is not empty"
+    let reminder = Text.pack "playing for ante"
+        offends (path, result) = case result of
+          Left reason -> Just (path <> ": " <> Text.unpack reason)
+          Right card ->
+            let faces = Foldable.toList (Card.Type.faces card)
+                prints = any (maybe False (Text.isInfixOf reminder) . Face.oracleText) faces
+                flagged = any Face.anteOnly faces
+             in if prints == flagged then Nothing else Just (path <> ": prints the ante reminder " <> show prints <> " but anteOnly is " <> show flagged)
+    Spec.assertEqWith s "every ante card is flagged, and only those" (Maybe.mapMaybe offends loaded) []
   -- The other direction: the sweep above SLUGIFIES the stem before comparing
   -- it to Registry.filedAs, so a committed Wax-Wane.json would still pass it --
   -- Slug.fromText normalizes rather than validates, folding case away before

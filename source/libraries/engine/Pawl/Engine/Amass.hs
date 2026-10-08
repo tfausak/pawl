@@ -93,6 +93,7 @@ armyToken subtype =
               Face.vanguard = Nothing,
               Face.canBeYourCommander = False,
               Face.claimsStartingPlayer = False,
+              Face.anteOnly = False,
               Face.keywords = Map.empty,
               Face.colorIndicator = Set.singleton Color.Black,
               Face.characteristicPT = Nothing,
