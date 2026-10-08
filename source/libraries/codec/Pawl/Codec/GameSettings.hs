@@ -29,6 +29,7 @@ codec = Fields.object $ do
   rangeOfInfluence <- Fields.required "rangeOfInfluence" RangeOfInfluence.codec GameSettings.rangeOfInfluence
   deployCreatures <- Fields.required "deployCreatures" Common.boolean GameSettings.deployCreatures
   emperors <- Fields.required "emperors" Emperors.codec GameSettings.emperors
+  twoHeadedGiant <- Fields.required "twoHeadedGiant" Common.boolean GameSettings.twoHeadedGiant
   pure
     GameSettings.MkGameSettings
       { GameSettings.brawl = brawl,
@@ -38,5 +39,6 @@ codec = Fields.object $ do
         GameSettings.sharedTeamLife = sharedTeamLife,
         GameSettings.rangeOfInfluence = rangeOfInfluence,
         GameSettings.deployCreatures = deployCreatures,
-        GameSettings.emperors = emperors
+        GameSettings.emperors = emperors,
+        GameSettings.twoHeadedGiant = twoHeadedGiant
       }

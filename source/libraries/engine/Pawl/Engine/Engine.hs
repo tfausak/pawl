@@ -454,16 +454,16 @@ discardToHandSize pid = do
         Event.simultaneously (Monad.mapM_ (Event.discard DiscardCause.Ordinary pid) toDiscard)
 
 -- CR 103.8a: in a two-player game the player who plays first skips the draw step
--- of their first turn; CR 103.8c and CR 800.7, in other multiplayer games nobody
--- does. CR 800.1 makes a multiplayer game one that BEGINS with more than two
--- players, and turnOrder is the permanent roster, so a three-player game down to
--- two survivors still does not skip.
---
--- Not implemented: CR 103.8b's same skip for a TEAM in Two-Headed Giant (#2849).
+-- of their first turn; CR 103.8b / 810.6, in Two-Headed Giant the team who plays
+-- first does, every member of it being an active player on that turn (CR
+-- 805.4a); CR 103.8c and CR 800.7, in other multiplayer games nobody does. CR
+-- 800.1 makes a multiplayer game one that BEGINS with more than two players, and
+-- turnOrder is the permanent roster, so a three-player game down to two
+-- survivors still does not skip.
 skipsDraw :: GameState -> Bool
 skipsDraw gs =
   GameState.turnNumber gs == 1
-    && length (GameState.turnOrder gs) <= 2
+    && (length (GameState.turnOrder gs) <= 2 || GameSettings.twoHeadedGiant (GameState.settings gs))
     && case GameState.turnOrder gs of
       starter : _ -> starter == GameState.activePlayer gs
       [] -> False

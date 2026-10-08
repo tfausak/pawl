@@ -90,7 +90,16 @@ data GameSettings = MkGameSettings
     -- | CR 809.2: each team's emperor. Emperors.none by default ('plain');
     -- Pawl.Engine.Emperor.setUp writes it with the rest of CR 809.3's options,
     -- and Pawl.Engine.Departure reads it for CR 809.5b and 809.5c.
-    emperors :: Emperors.Emperors
+    emperors :: Emperors.Emperors,
+    -- | CR 810: whether this is a Two-Headed Giant game. Read through
+    -- Pawl.Engine.Engine.skipsDraw for CR 810.6's skipped first draw. The
+    -- variant's other options are their own fields: a caller sets teams (CR
+    -- 810.1), sharedTeamTurns (CR 810.2) and sharedTeamLife (CR 810.4) beside
+    -- it.
+    --
+    -- Not implemented: CR 810.8a's team win and loss (#4495), and CR 810.10's
+    -- shared poison counters (#4494).
+    twoHeadedGiant :: Bool
   }
   deriving (Eq, Ord, Show)
 
@@ -110,5 +119,6 @@ plain =
       sharedTeamLife = False,
       rangeOfInfluence = RangeOfInfluence.unlimited,
       deployCreatures = False,
-      emperors = Emperors.none
+      emperors = Emperors.none,
+      twoHeadedGiant = False
     }
