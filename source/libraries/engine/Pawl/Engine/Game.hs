@@ -2852,6 +2852,32 @@ diedChange event = do
   change <- movedChange event
   if ZoneChange.from change == Zone.Battlefield && ZoneChange.to change == Zone.Graveyard then Just change else Nothing
 
+-- CR 400.7's link read back for a card that says "from anywhere" (Tempest
+-- Efreet, Timmerian Fiends): the object this id is now, following each logged
+-- zone change from the id that left to the id that arrived. Nothing once the
+-- trail reaches an id that is gone with no successor: the card left the game.
+-- The log is this turn's (GameState.events), which is enough, since the stack
+-- empties before any turn ends.
+--
+-- Not implemented: following a card out of a move with several arrivals, a
+-- merged permanent leaving the battlefield (#4837).
+currentIncarnation :: ObjectId -> GameState -> Maybe ObjectId
+currentIncarnation oid gs
+  | Map.member oid (GameState.objects gs) = Just oid
+  | otherwise = case successorOf oid gs of
+      Just next -> currentIncarnation next gs
+      Nothing -> Nothing
+
+-- The one id a logged single-arrival move turned this id into.
+successorOf :: ObjectId -> GameState -> Maybe ObjectId
+successorOf oid gs =
+  Maybe.listToMaybe
+    [ arrival
+    | LoggedEvent.MkLoggedEvent _ (GameEvent.Moved m) <- Foldable.toList (GameState.events gs),
+      ZoneChange.departed (Moved.change m) == oid,
+      [arrival] <- [Foldable.toList (Moved.arrivals m)]
+    ]
+
 -- CR 400.7's zone change itself, whatever its ends -- the exhaustive case the two
 -- readers above share, so a new GameEvent constructor is classified once rather
 -- than in each of them.

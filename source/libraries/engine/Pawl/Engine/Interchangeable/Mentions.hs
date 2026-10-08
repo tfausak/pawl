@@ -2066,6 +2066,7 @@ objectRefNames asking x = case x of
   ObjectRef.ChosenPermanent chosenPermanent -> chosenPermanentNames asking chosenPermanent
   ObjectRef.SourceAndChosenPermanent filter_ -> filterNames asking filter_
   ObjectRef.AttachedToBound attachedToBound -> attachedToBoundNames asking attachedToBound
+  ObjectRef.FromAnywhere slotName -> slotNames asking slotName
 
 offerCastNames :: Asking -> OfferCast.OfferCast -> Bool
 offerCastNames asking x = case x of

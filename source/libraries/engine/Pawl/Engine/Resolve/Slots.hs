@@ -457,6 +457,8 @@ zoneScopeSlots scope = case scope of
 objectRefSlots :: ObjectRef -> Map.Map SlotName SlotArity
 objectRefSlots ref = joinTwo (joinSlots (fmap playerRefSlots (objectRefPlayerRefs ref))) $ case ref of
   ObjectRef.InSlot slot -> Map.singleton slot SlotArity.Many
+  -- InSlot's read of the slot, never a target (CR 115.10a).
+  ObjectRef.FromAnywhere slot -> Map.singleton slot SlotArity.Many
   ObjectRef.EachMatching _ -> Map.empty
   -- The sweeping arms that DO name a slot are this one and EachCardInHand below:
   -- CR 400.1's per-player zones leave "whose" to be said, and Angel of Finality
@@ -606,6 +608,7 @@ objectRefQuantities ref = case ref of
   ObjectRef.ChosenPermanent _ -> []
   ObjectRef.SourceAndChosenPermanent _ -> []
   ObjectRef.AttachedToBound _ -> []
+  ObjectRef.FromAnywhere _ -> []
 
 -- Every PlayerRef nested in one ObjectRef -- effectPlayerRefs' other half, and
 -- the seat a per-player walk counts against. objectRefSlots takes its player
@@ -666,6 +669,7 @@ objectRefPlayerRefs ref = case ref of
   -- and CR 608.2c's resolving controller is the only seat that picks it.
   ObjectRef.SourceAndChosenPermanent _ -> []
   ObjectRef.AttachedToBound _ -> []
+  ObjectRef.FromAnywhere _ -> []
 
 -- The refs a CR 707.10 answer names: rule 707.10d's candidates, and nothing for
 -- the other two, neither of which describes anything.
@@ -2998,6 +3002,9 @@ objectRefObjects legal resolving controller source gs ref = case ref of
           | otherwise = maybe Set.empty LastKnown.attached (Projection.lastKnownOf host gs)
         attached = foldMap attachedTo hosts
      in filter (`Set.member` attached) (battlefieldMatching legal resolving controller source gs filter_)
+  -- CR 400.7's link read back: each object the slot holds, followed through
+  -- this turn's logged zone changes to the object it is now.
+  ObjectRef.FromAnywhere slot -> Maybe.mapMaybe (\oid -> Game.currentIncarnation oid gs) (objectRefObjects legal resolving controller source gs (ObjectRef.InSlot slot))
   -- EachMatching's sweep with CR 109.2's battlefield default switched off by the
   -- card's own words (CR 109.2a), over CR 400.1's per-player zone. Whose
   -- graveyards is zoneScopePlayers below -- either the perspective's own

@@ -1175,6 +1175,7 @@ rewriteObjectRef pairs ref = case ref of
   ObjectRef.AnyNumberMatching (AnyNumberMatching.MkAnyNumberMatching f n) -> ObjectRef.AnyNumberMatching (AnyNumberMatching.MkAnyNumberMatching (Filter.rewrite pairs f) (fmap (rewriteQuantity pairs) n))
   ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent f w) -> ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent (Filter.rewrite pairs f) w)
   ObjectRef.AttachedToBound (AttachedToBound.MkAttachedToBound slot f) -> ObjectRef.AttachedToBound (AttachedToBound.MkAttachedToBound slot (Filter.rewrite pairs f))
+  ObjectRef.FromAnywhere slot -> ObjectRef.FromAnywhere slot
   ObjectRef.SourceAndChosenPermanent f -> ObjectRef.SourceAndChosenPermanent (Filter.rewrite pairs f)
 
 -- CR 612.1 through CR 707.10d's description of the copies' candidates, which is

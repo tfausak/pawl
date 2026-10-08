@@ -1125,6 +1125,8 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.SourceAndChosenPermanent _ -> []
   -- A read, so the sweep answers it.
   ObjectRef.AttachedToBound _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
+  -- A read, so the sweep answers it.
+  ObjectRef.FromAnywhere _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
 
 -- The order for a per-object batch -- CR 608.2f's, and CR 701.44d's, which say
 -- the same thing about the PRIMARY key: APNAP first, reading a player recipient
@@ -3202,6 +3204,7 @@ clauseIsImpossible resolving source controller legal gs clause =
       definedBefore = List.scanl (\defined effect -> Set.union defined (boundSlots effect)) Set.empty effects
       readsOnly defined ref = case ref of
         ObjectRef.InSlot slot -> Set.member slot defined
+        ObjectRef.FromAnywhere slot -> Set.member slot defined
         _ -> False
       dependent defined effect =
         let refs = effectObjectRefs effect
@@ -5451,6 +5454,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 pure (counterpart <> battlefieldMatching legal resolving controller source gs Filter.Type.IsSource)
               -- Swept once from the PRE-MOVE state, EachMatching's reason.
               ObjectRef.AttachedToBound _ -> do
+                gs <- State.get
+                pure (objectRefObjects legal resolving controller source gs ref)
+              -- A read of the slot's object where it is now, swept once from
+              -- the PRE-MOVE state, EachMatching's reason.
+              ObjectRef.FromAnywhere _ -> do
                 gs <- State.get
                 pure (objectRefObjects legal resolving controller source gs ref)
             -- CR 608.2h: a depth's amount is read once, off the pre-move board.

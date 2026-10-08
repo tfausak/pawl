@@ -4037,6 +4037,7 @@ objectRefFilters ref = case ref of
   ObjectRef.SourceAndChosenPermanent f -> unframed [f]
   -- Rhuk's "all Equipment attached to that creature".
   ObjectRef.AttachedToBound (AttachedToBound.MkAttachedToBound _ f) -> unframed [f]
+  ObjectRef.FromAnywhere _ -> []
 
 -- The Filter a Count folds over (CR 608.2h). Delegated to the *Counts family
 -- above rather than re-walked: those traversals are already the project's answer

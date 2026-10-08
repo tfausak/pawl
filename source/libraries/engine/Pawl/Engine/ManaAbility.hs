@@ -1040,3 +1040,5 @@ refReachesLibrary ref = case ref of
   ObjectRef.SourceAndChosenPermanent _ -> False
   -- The battlefield again: what is attached to a permanent is a permanent.
   ObjectRef.AttachedToBound _ -> False
+  -- TRUE: the object followed may be in a library by now.
+  ObjectRef.FromAnywhere _ -> True

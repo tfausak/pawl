@@ -443,6 +443,9 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       ObjectRef.codec
       (ObjectRef.AttachedToBound (AttachedToBound.MkAttachedToBound (SlotName.MkSlotName (Text.pack "target")) (Filter.HasSubtype Subtype.Equipment)))
       " {\"type\":\"AttachedToBound\",\"value\":{\"slot\":\"target\",\"filter\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Equipment\"}}}} "
+  -- CR 400.7: the slot whose object is followed, a bare string.
+  Spec.it s "FromAnywhere" $
+    Common.assertCodec s ObjectRef.codec (ObjectRef.FromAnywhere (SlotName.MkSlotName (Text.pack "self"))) " {\"type\":\"FromAnywhere\",\"value\":\"self\"} "
   -- Guards against a decoder that read every payload as one arm. The arms are
   -- all objects, so only the tag separates them, and a duplicated tag would
   -- collapse two of these. The two graveyard arms are the pair it really
