@@ -401,6 +401,11 @@ eventBindingsOver board gs bearerBecame becameInGraveyard bearer you cond event 
   -- presence depend on the entrant, which eventBindingSlots cannot express.
   (TriggerCondition.PermanentEnters _, GameEvent.Moved (Moved.MkMoved zc _ _ _ _)) ->
     Binding.setBecame (ZoneChange.object zc) Map.empty
+  -- Its batch reading stamps the same entrant as a one-member GROUP, so
+  -- batchBindings' append joins the whole entry event's entrants under one
+  -- slot (CR 603.2c) where a recipient would keep only the first.
+  (TriggerCondition.PermanentsEnter _, GameEvent.Moved (Moved.MkMoved zc _ _ _ _)) ->
+    Binding.setBecameGroup (Seq.singleton (ZoneChange.object zc)) Map.empty
   -- CR 708.7's "that creature": the permanent that was turned face up, which Pine
   -- Walker untaps. The bearer is a bystander here -- CR 113.7a's source slot names
   -- the WATCHER, and on Pine Walker's own board the two are different permanents --
@@ -1347,6 +1352,11 @@ eventBindingSlots cond = case cond of
   -- "Whenever a [type] enters" has no such luck.
   TriggerCondition.SelfEnters -> Set.empty
   TriggerCondition.PermanentEnters _ -> Set.singleton Binding.became
+  -- The batch's entrants, every member's `became` joined as a GROUP by
+  -- batchBindings: Dunbarrow Revivalist's boon attaches its Role to "one of
+  -- them", which a choice among the group reads. Guaranteed given a match, the
+  -- PermanentEnters arm's reason.
+  TriggerCondition.PermanentsEnter _ -> Set.singleton Binding.became
   -- CR 603.2b's step beginning names no OBJECT -- but it names the active player,
   -- and the active player is not what CR 109.5's `you` means, so "that player"
   -- needs a slot of its own. Shizuko, Caller of Autumn is the reader.

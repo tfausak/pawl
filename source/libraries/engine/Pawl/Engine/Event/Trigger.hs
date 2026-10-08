@@ -665,6 +665,7 @@ looksBack condition = case condition of
   -- permanents on the battlefield (including the newcomers)" AFTER the event.
   TriggerCondition.SelfEnters -> False
   TriggerCondition.PermanentEnters _ -> False
+  TriggerCondition.PermanentsEnter _ -> False
   -- Turn structure, the stack, damage, life, counters and the rest: none names a
   -- zone change at all, so CR 603.10a's list cannot reach them.
   TriggerCondition.StepBegins {} -> False
@@ -921,6 +922,9 @@ batchScoped condition = case condition of
   TriggerCondition.SelfCrewsVehicle -> False
   TriggerCondition.SelfEnters -> False
   TriggerCondition.PermanentEnters _ -> False
+  -- The batch reading of the arm above: CR 603.2c's "one or more" is one
+  -- occurrence for the whole entry event (Dunbarrow Revivalist's boon).
+  TriggerCondition.PermanentsEnter _ -> True
   TriggerCondition.StepBegins {} -> False
   TriggerCondition.StateIs _ -> False
   TriggerCondition.SelfDealsCombatDamageToPlayer _ -> False
@@ -2742,6 +2746,7 @@ zonesTriggeredFrom cond =
         -- battlefield when it fires.
         TriggerCondition.SelfEnters -> battlefield
         TriggerCondition.PermanentEnters _ -> battlefield
+        TriggerCondition.PermanentsEnter _ -> battlefield
         TriggerCondition.StepBegins {} -> battlefield
         -- CR 709.5c makes an unlocked designation something a permanent ON THE
         -- BATTLEFIELD has, so this condition cannot trigger from a graveyard at all.
@@ -3222,6 +3227,7 @@ stateTriggers gs
             -- CR 603.6a is an EVENT trigger, matched against the log; nothing
             -- about it is a CR 603.8 state.
             TriggerCondition.PermanentEnters _ -> False
+            TriggerCondition.PermanentsEnter _ -> False
             TriggerCondition.StepBegins {} -> False
             TriggerCondition.SelfDealsCombatDamageToPlayer _ -> False
             TriggerCondition.SelfDealsCombatDamageToPlayerOrBattle -> False

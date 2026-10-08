@@ -2637,6 +2637,7 @@ triggerConditionNames :: Asking -> TriggerCondition.TriggerCondition -> Bool
 triggerConditionNames asking x = case x of
   TriggerCondition.SelfEnters -> False
   TriggerCondition.PermanentEnters filter_ -> filterNames asking filter_
+  TriggerCondition.PermanentsEnter filter_ -> filterNames asking filter_
   TriggerCondition.StepBegins _stepBegins -> False
   TriggerCondition.StateIs condition -> conditionNames asking condition
   TriggerCondition.SelfDealsCombatDamageToPlayer _playerRelation -> False

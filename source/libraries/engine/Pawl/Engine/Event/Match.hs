@@ -5861,6 +5861,9 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- is deliberate, not a missing dedup: the arm and the dedup are two halves of one
   -- rule, and matchesTrigger alone is not the whole of it.
   TriggerCondition.PermanentsDie f -> matchesTriggerGiven bindings board gs bearer you (TriggerCondition.PermanentDies f) event
+  -- CR 603.2c's batch reading of PermanentEnters, delegated for PermanentsDie's
+  -- reason: which entries this condition admits is the singular arm's answer.
+  TriggerCondition.PermanentsEnter f -> matchesTriggerGiven bindings board gs bearer you (TriggerCondition.PermanentEnters f) event
   -- CR 603.2c's batch reading of PermanentDealsCombatDamageToPlayer (Pia Nalaar,
   -- Chief Mechanic's "whenever ONE OR MORE artifact creatures you control deal
   -- combat damage to a player"), delegated for PermanentsDie's reason: which

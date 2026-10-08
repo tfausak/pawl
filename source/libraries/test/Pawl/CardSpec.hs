@@ -1040,6 +1040,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 603.6a's Filter is a predicate over the entering permanent, and a
   -- Filter holds no Count (Pawl.Types.Filter's atoms are all characteristics).
   TriggerCondition.PermanentEnters _ -> []
+  TriggerCondition.PermanentsEnter _ -> []
   TriggerCondition.CardPutIntoGraveyard _ -> []
   TriggerCondition.PermanentDies _ -> []
   TriggerCondition.PermanentsDie _ -> []
@@ -4283,6 +4284,7 @@ staticAbilityFilters ability =
 triggerConditionFilters :: TriggerCondition.TriggerCondition -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PermanentEnters f -> unframed [f]
+  TriggerCondition.PermanentsEnter f -> unframed [f]
   -- CR 709.5h names a half by name; nothing about the door is a Filter.
   TriggerCondition.SelfHalfUnlocked _ -> []
   -- CR 709.5i names a PlayerRelation; nothing about it is a Filter.
@@ -4589,6 +4591,7 @@ triggerConditionSlots :: TriggerCondition.TriggerCondition -> [SlotName.SlotName
 triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.SelfEnters -> []
   TriggerCondition.PermanentEnters _ -> []
+  TriggerCondition.PermanentsEnter _ -> []
   TriggerCondition.StepBegins _ -> []
   -- CR 603.8's state trigger holds a Condition, which is a pair of Quantities
   -- and Filters -- no SlotName of its own.

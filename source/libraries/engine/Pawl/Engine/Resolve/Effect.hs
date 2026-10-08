@@ -6963,22 +6963,34 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- rule 303.4i's undefined object, which Preston Garvey, Minuteman reaches at
     -- zero targets -- and Just the recipient otherwise.
     --
-    -- A HOST AND NOT SEVERAL: every printing of this sentence attaches to one
-    -- object, and a slot answering with more is the undefined case too rather than
-    -- a silent first-of-list.
+    -- A slot naming SEVERAL is CR 608.2d's choice: Dunbarrow Revivalist's boon
+    -- creates its Role "attached to one of them", the batch its trigger bound,
+    -- and the controller picks one still on the battlefield -- asked at two or
+    -- more, chosenPermanentOf's posture, the answer filtered rather than
+    -- trusted. None left there is the undefined case above.
     mAttached <- case EntryRiders.attachedTo entry of
       Nothing -> pure Nothing
       Just slot -> do
         named <- fromAmongMembers legal resolving chosen slot
-        pure . Just $ case named of
-          [host] -> Just (Recipient.ToObject host)
-          _ -> Nothing
+        fmap (Just . fmap Recipient.ToObject) $ case named of
+          [host] -> pure (Just host)
+          _ -> case filter (`Set.member` GameState.battlefield gs) named of
+            [] -> pure Nothing
+            [only] -> pure (Just only)
+            first : second : more -> do
+              let offered = first NonEmpty.:| (second : more)
+              answer <- Game.choose (Prompt.ChoosePermanent (Decide.deciderFor controller gs) controller source offered)
+              pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
     -- CR 508.4's rider, read ONCE ahead of the minting loop for mBlocked's
     -- reason.
     let mAttack = entryAttack legal resolving entry gs
     -- PER CREATOR, every amount off the same pre-effect `gs` (CR 608.2f), so one
     -- seat's tokens cannot change how many the next seat gets.
-    minted <- fmap concat . Monad.forM creators $ \creating ->
+    --
+    -- And ONE event across the seats, CR 608.2f's simultaneity widening
+    -- Event.createTokens' own group. Kept because the rule states it: no board
+    -- in the suite has two seats create beside a batch-scoped entry trigger.
+    minted <- Event.simultaneously . fmap concat . Monad.forM creators $ \creating ->
       case evaluateForRecipient viewOf context gs resolving source creating quantity of
         Just n
           | n > 0 -> do

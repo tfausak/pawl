@@ -1875,6 +1875,7 @@ rewriteTriggerCondition :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Tri
 rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.StateIs c -> TriggerCondition.StateIs (rewriteCondition pairs c)
   TriggerCondition.PermanentEnters f -> TriggerCondition.PermanentEnters (Filter.rewrite pairs f)
+  TriggerCondition.PermanentsEnter f -> TriggerCondition.PermanentsEnter (Filter.rewrite pairs f)
   TriggerCondition.CardPutIntoGraveyard p -> TriggerCondition.CardPutIntoGraveyard p {CardPutIntoGraveyard.filter = Filter.rewrite pairs (CardPutIntoGraveyard.filter p)}
   TriggerCondition.PermanentDies f -> TriggerCondition.PermanentDies (Filter.rewrite pairs f)
   TriggerCondition.PermanentsDie f -> TriggerCondition.PermanentsDie (Filter.rewrite pairs f)

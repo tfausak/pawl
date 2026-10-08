@@ -194,15 +194,16 @@ import qualified Pawl.Types.TapState as TapState
 -- onto the battlefield attached to" -- the object the EFFECT names as the
 -- entering permanent's host, where CR 303.4f would otherwise have the controller
 -- choose one. Preston Garvey, Minuteman's "create a green Aura enchantment token
--- named Settlement attached to up to one target land you control" is the pool's
+-- named Settlement attached to up to one target land you control" is one
 -- producer, and its "up to one" is why the rule's undefined case is reachable at
 -- all: a seat that announces zero targets leaves the slot naming nothing.
 --
--- A SLOT NAME, EntryBlock.Specified's shape and for its reason: every printing
--- of this sentence names its host with the word "target", and CR 608.2b has already
--- judged that slot by the time the effect is applied. So the effect has answered
--- the question and the engine never asks -- which is the difference from CR
--- 303.4f, whose whole content is that the effect did NOT name one.
+-- A SLOT NAME, EntryBlock.Specified's shape: a targeted slot (Preston Garvey)
+-- CR 608.2b has already judged, so the effect has answered the question and the
+-- engine never asks -- which is the difference from CR 303.4f, whose whole
+-- content is that the effect did NOT name one. A slot naming several is
+-- Dunbarrow Revivalist's "attached to one of them", where the effect names the
+-- group and CR 608.2d has its controller pick one.
 --
 -- Read by the CREATE alone (Pawl.Engine.Resolve's Create arm and
 -- Event.createTokens), which Pawl.EffectLintSpec fences: no MoveToZone in the

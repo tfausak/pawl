@@ -7977,8 +7977,13 @@ sacrificeIn asOf victims = simultaneously $ do
 -- one, and Just Nothing for the rule's "an object ... that is undefined", which
 -- Preston Garvey, Minuteman reaches when the seat announces zero targets for its
 -- "up to one target land you control".
+--
+-- One event for the whole creation (CR 603.6a's "each time an event puts one or
+-- more permanents onto the battlefield"), so its entries share an EventGroup:
+-- data/scenarios/card-trigger/cr-603-7b-two-goblins-entering-at-once-spend-the-boon-once.json
+-- proves it with Dragon Fodder under Dunbarrow Revivalist's batch-scoped boon.
 createTokens :: PlayerId -> Card -> Maybe PC.ProjectedCharacteristics -> Natural -> TapState.TapState -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> Maybe (Maybe Recipient.Recipient) -> Game [ObjectId]
-createTokens controller card copy n tapped entering attached = do
+createTokens controller card copy n tapped entering attached = simultaneously $ do
   gs <- State.get
   if List.notElem controller (Game.stillPlaying gs)
     then pure []
@@ -9155,6 +9160,7 @@ controllerTurnScoped cond = case cond of
   -- anybody's turn.
   TriggerCondition.SelfEnters -> False
   TriggerCondition.PermanentEnters _ -> False
+  TriggerCondition.PermanentsEnter _ -> False
   -- CR 709.5e restricts the special action to the taker's own turn, but CR
   -- 709.5f's keyword action and CR 709.5d's entry have no such restriction, and
   -- this classification is about the CONDITION rather than about how the

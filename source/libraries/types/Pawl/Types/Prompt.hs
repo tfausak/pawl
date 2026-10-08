@@ -720,7 +720,9 @@ data Prompt r where
   -- impossible (CR 101.3). Not ChooseTargets (CR 115.1, CR 115.10a). Also CR
   -- 509.4: which attacker a creature entering blocking blocks, the ObjectId
   -- then being that creature. Also CR 701.3a: the one destination a group of
-  -- attachments moves to (Pawl.Types.Effect's AttachAll).
+  -- attachments moves to (Pawl.Types.Effect's AttachAll). Also CR 608.2d: which
+  -- of a slot's several objects a created Aura token is attached to (Dunbarrow
+  -- Revivalist's "attached to one of them").
   ChoosePermanent :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 702.122a: which untapped permanents are tapped to crew, the Natural a
   -- power threshold rather than a size (Pawl.Engine.Cost validates the sum).

@@ -1,6 +1,6 @@
 {
-  "description": "CR 603.7b a fourth seat in the batch is still not a question",
-  "note": "The same line with four seats: one Relapse trigger and no question (an unscheduled prompt would fail the run), alice at 21 and dave, like bob and carol, at 24.",
+  "description": "CR 702.166a a bargained Revivalist returns a creature card",
+  "note": "Alice bargains away Memnite, so the Revivalist's enters trigger also returns Grizzly Bears from her graveyard to her hand.",
   "board": {
     "seats": [
       {
@@ -17,32 +17,28 @@
             "ready": true
           },
           {
-            "card": "Forest",
-            "label": "f",
-            "ready": true
-          },
-          {
-            "card": "Plains",
-            "label": "p",
-            "ready": true
-          },
-          {
-            "card": "Mountain",
-            "label": "m",
-            "ready": true
+            "card": "Memnite",
+            "label": "memnite"
           }
         ],
         "hand": [
           {
-            "card": "Synthetic Communal Relapse",
-            "label": "relapse"
-          },
+            "card": "Dunbarrow Revivalist",
+            "label": "rev"
+          }
+        ],
+        "graveyard": [
           {
-            "card": "Centaur Peacemaker",
-            "label": "peacemaker"
+            "card": "Grizzly Bears"
           }
         ],
         "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
           {
             "card": "Island"
           },
@@ -59,23 +55,7 @@
           },
           {
             "card": "Island"
-          }
-        ]
-      },
-      {
-        "name": "carol",
-        "library": [
-          {
-            "card": "Island"
           },
-          {
-            "card": "Island"
-          }
-        ]
-      },
-      {
-        "name": "dave",
-        "library": [
           {
             "card": "Island"
           },
@@ -94,15 +74,31 @@
       "step": "PrecombatMain",
       "player": "alice",
       "do": {
+        "Answer": {
+          "prompt": "ChooseKicker",
+          "with": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
         "Cast": {
-          "object": "$relapse",
+          "object": "$rev",
           "mana": [
             "$s1",
-            "$s2",
-            null
+            "$s2"
           ]
         }
       }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
     },
     {
       "turn": 1,
@@ -115,59 +111,11 @@
       "step": "PrecombatMain",
       "player": "alice",
       "do": {
-        "Cast": {
-          "object": "$peacemaker",
-          "mana": [
-            "$m",
-            "$f",
-            "$p"
-          ]
+        "Answer": {
+          "prompt": "ChooseCardInGraveyard",
+          "with": "Grizzly Bears"
         }
       }
-    },
-    {
-      "turn": 1,
-      "step": "PrecombatMain",
-      "player": "alice",
-      "do": "Pass"
-    },
-    {
-      "turn": 1,
-      "step": "PrecombatMain",
-      "player": "alice",
-      "check": {
-        "View": {
-          "of": "Stack",
-          "is": [
-            "trigger of Centaur Peacemaker"
-          ]
-        }
-      }
-    },
-    {
-      "turn": 1,
-      "step": "PrecombatMain",
-      "player": "alice",
-      "do": "Pass"
-    },
-    {
-      "turn": 1,
-      "step": "PrecombatMain",
-      "player": "alice",
-      "check": {
-        "View": {
-          "of": "Stack",
-          "is": [
-            "trigger of Synthetic Communal Relapse"
-          ]
-        }
-      }
-    },
-    {
-      "turn": 1,
-      "step": "PrecombatMain",
-      "player": "alice",
-      "do": "Pass"
     },
     {
       "turn": 1,
@@ -185,9 +133,11 @@
       "step": "PrecombatMain",
       "player": "alice",
       "check": {
-        "Life": {
+        "Count": {
           "player": "alice",
-          "life": 21
+          "zone": "Hand",
+          "card": "Grizzly Bears",
+          "count": 1
         }
       }
     },
@@ -196,9 +146,11 @@
       "step": "PrecombatMain",
       "player": "alice",
       "check": {
-        "Life": {
-          "player": "bob",
-          "life": 24
+        "Count": {
+          "player": "alice",
+          "zone": "Graveyard",
+          "card": "Grizzly Bears",
+          "count": 0
         }
       }
     },
@@ -207,20 +159,11 @@
       "step": "PrecombatMain",
       "player": "alice",
       "check": {
-        "Life": {
-          "player": "carol",
-          "life": 24
-        }
-      }
-    },
-    {
-      "turn": 1,
-      "step": "PrecombatMain",
-      "player": "alice",
-      "check": {
-        "Life": {
-          "player": "dave",
-          "life": 24
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Memnite",
+          "count": 0
         }
       }
     }
