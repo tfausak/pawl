@@ -603,23 +603,23 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       (TriggerCondition.PermanentsReturnedToHand (Filter.Not (Filter.HasCardType CardType.Creature)))
       " {\"type\":\"PermanentsReturnedToHand\",\"value\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
   -- CR 603.10a's third family, whose payload is a record rather than a bare
-  -- Filter: Kishla Skimmer's "your graveyard" is the Filter and its "during your
+  -- Filter: Kishla Skimmer's "your graveyard" is `whose` and its "during your
   -- turn" is the TurnScope beside it.
   Spec.it s "CardLeavesZone round-trips with its Filter, TurnScope and zone" $
     Common.assertCodec
       s
       TriggerCondition.codec
-      (TriggerCondition.CardLeavesZone (CardLeavesZone.MkCardLeavesZone (Filter.OwnedBy PlayerRelation.You) TurnScope.ControllersTurn Zone.Graveyard Nothing))
-      " {\"type\":\"CardLeavesZone\",\"value\":{\"filter\":{\"type\":\"OwnedBy\",\"value\":{\"type\":\"You\"}},\"scope\":{\"type\":\"ControllersTurn\"},\"from\":{\"type\":\"Graveyard\"}}} "
+      (TriggerCondition.CardLeavesZone (CardLeavesZone.MkCardLeavesZone (Filter.Not Filter.IsToken) TurnScope.ControllersTurn Zone.Graveyard Nothing (Just PlayerRelation.You)))
+      " {\"type\":\"CardLeavesZone\",\"value\":{\"filter\":{\"type\":\"Not\",\"value\":{\"type\":\"IsToken\"}},\"scope\":{\"type\":\"ControllersTurn\"},\"from\":{\"type\":\"Graveyard\"},\"whose\":{\"type\":\"You\"}}} "
   -- CR 603.2c's batch reading of the family above, carrying the same record:
-  -- Spirit Mascot's "your graveyard" is the Filter and its silence about turns is
+  -- Spirit Mascot's "your graveyard" is `whose` and its silence about turns is
   -- the EachTurn beside it.
   Spec.it s "CardsLeaveZone round-trips with its Filter, TurnScope and zones" $
     Common.assertCodec
       s
       TriggerCondition.codec
-      (TriggerCondition.CardsLeaveZone (CardLeavesZone.MkCardLeavesZone (Filter.OwnedBy PlayerRelation.You) TurnScope.EachTurn Zone.Graveyard (Just Zone.Exile)))
-      " {\"type\":\"CardsLeaveZone\",\"value\":{\"filter\":{\"type\":\"OwnedBy\",\"value\":{\"type\":\"You\"}},\"scope\":{\"type\":\"EachTurn\"},\"from\":{\"type\":\"Graveyard\"},\"to\":{\"type\":\"Exile\"}}} "
+      (TriggerCondition.CardsLeaveZone (CardLeavesZone.MkCardLeavesZone (Filter.Not Filter.IsToken) TurnScope.EachTurn Zone.Graveyard (Just Zone.Exile) (Just PlayerRelation.You)))
+      " {\"type\":\"CardsLeaveZone\",\"value\":{\"filter\":{\"type\":\"Not\",\"value\":{\"type\":\"IsToken\"}},\"scope\":{\"type\":\"EachTurn\"},\"from\":{\"type\":\"Graveyard\"},\"to\":{\"type\":\"Exile\"},\"whose\":{\"type\":\"You\"}}} "
   -- The arrival-side twin: Dutiful Knowledge Seeker's "cards" put into a library
   -- from anywhere, so no origin zone is written.
   Spec.it s "CardsPutIntoZone round-trips with its Filter and destination" $

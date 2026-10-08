@@ -1526,6 +1526,8 @@ applyCrossings finalSub parent =
                 -- this is the last moment it exists.
                 (Object.controlClock obj)
                 (Object.zone obj)
+                -- CR 400.1: the pile it left, `filed`'s board as above.
+                (Game.pileHolderOf oid g)
             )
       -- One crossing: file, delete, then record. The event LAST, so that
       -- Event.recordEvent's CR 603.10 sample is of the board immediately after

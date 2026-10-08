@@ -50,21 +50,10 @@
             "type": "CardsLeaveZone",
             "value": {
               "filter": {
-                "type": "And",
-                "value": [
-                  {
-                    "type": "OwnedBy",
-                    "value": {
-                      "type": "You"
-                    }
-                  },
-                  {
-                    "type": "Not",
-                    "value": {
-                      "type": "IsToken"
-                    }
-                  }
-                ]
+                "type": "Not",
+                "value": {
+                  "type": "IsToken"
+                }
               },
               "from": {
                 "type": "Graveyard"
@@ -74,6 +63,9 @@
               },
               "to": {
                 "type": "Exile"
+              },
+              "whose": {
+                "type": "You"
               }
             }
           },

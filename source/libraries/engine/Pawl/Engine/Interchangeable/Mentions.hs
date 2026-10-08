@@ -755,7 +755,7 @@ cantBlockCreaturesNames asking x = case x of
 
 cardLeavesZoneNames :: Asking -> CardLeavesZone.CardLeavesZone -> Bool
 cardLeavesZoneNames asking x = case x of
-  CardLeavesZone.MkCardLeavesZone filter_ _scope _from _to -> filterNames asking filter_
+  CardLeavesZone.MkCardLeavesZone filter_ _scope _from _to _whose -> filterNames asking filter_
 
 cardPutIntoGraveyardNames :: Asking -> CardPutIntoGraveyard.CardPutIntoGraveyard -> Bool
 cardPutIntoGraveyardNames asking x = case x of

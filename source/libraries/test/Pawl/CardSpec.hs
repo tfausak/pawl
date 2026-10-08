@@ -7261,6 +7261,30 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                       then Just (path <> ": antes or changes an owner without printing the CR 407.3 reminder")
                       else Nothing
     Spec.assertEqWith s "every ante is an ante card's Effect.Ante" (Maybe.mapMaybe offends loaded) []
+  -- CR 400.1: "your graveyard" in a card-leaves trigger is the pile the card
+  -- left (CardLeavesZone.whose), never an OwnedBy on the card -- an owner and
+  -- the pile disagree between an ownership change and its move (CR 407.3).
+  -- An OwnedBy beside `whose` is an arrival read ("into your hand").
+  Spec.it s "CR 400.1 a card-leaves trigger names whose pile through whose, never OwnedBy alone" $ do
+    root <- Registry.defaultRoot
+    loaded <- Registry.loadRoot root
+    Spec.assertBool s (not (null loaded)) "the corpus is not empty"
+    let piles = [Zone.Library, Zone.Hand, Zone.Graveyard]
+        ownedByConjunct f = case f of
+          Filter.Type.OwnedBy _ -> True
+          Filter.Type.And fs -> any ownedByConjunct fs
+          _ -> False
+        oldStyle p = List.elem (CardLeavesZone.from p) piles && Maybe.isNothing (CardLeavesZone.whose p) && ownedByConjunct (CardLeavesZone.filter p)
+        offendingCondition condition = case condition of
+          TriggerCondition.CardLeavesZone p -> oldStyle p
+          TriggerCondition.CardsLeaveZone p -> oldStyle p
+          _ -> False
+        offends (path, result) = case result of
+          Left reason -> Just (path <> ": " <> Text.unpack reason)
+          Right card ->
+            let conditions = concatMap (fmap TriggeredAbility.condition . Face.triggeredAbilities) (Card.Type.faces card)
+             in if any offendingCondition conditions then Just (path <> ": reads 'your' pile as OwnedBy; use whose") else Nothing
+    Spec.assertEqWith s "every card-leaves 'your' is whose" (Maybe.mapMaybe offends loaded) []
   -- The other direction: the sweep above SLUGIFIES the stem before comparing
   -- it to Registry.filedAs, so a committed Wax-Wane.json would still pass it --
   -- Slug.fromText normalizes rather than validates, folding case away before

@@ -2852,9 +2852,9 @@ playerRefPlayers legal controller gs ref =
           Nothing -> []
         -- CR 108.3: the OWNER of the object the slot names, ControllerOfBound's
         -- arm one word over -- The Deck of Many Things' 20 band, "its owner
-        -- loses the game", read off the reanimated creature's slot. An owner
-        -- never moves (CR 110.2), but the object CR 400.7 replaced still has to
-        -- answer, so this takes the same CR 608.2h last-known road.
+        -- loses the game", read off the reanimated creature's slot. No
+        -- projection moves an owner (CR 110.2), but the object CR 400.7 replaced
+        -- still has to answer, so this takes the same CR 608.2h last-known road.
         PlayerRef.OwnerOfBound slot -> case legalOne slot legal of
           Just recipient -> case Recipient.objectOf recipient of
             Just oid -> Maybe.maybeToList (Projection.ownerWithLastKnown oid gs)

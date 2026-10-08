@@ -1,0 +1,111 @@
+{
+  "description": "CR 400.1 Tempest Efreet leaves alice's graveyard for bob's on bob's turn, so bob's Kishla Skimmer, whose graveyard it never left, does not trigger",
+  "note": "bob owns the Efreet as it leaves alice's graveyard; an owner reading of 'your graveyard' would draw bob the Island.",
+  "board": {
+    "ante": true,
+    "active": "bob",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Tempest Efreet",
+            "label": "efreet",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Mountain"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Kishla Skimmer"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Lightning Bolt"
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Mountain"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$efreet",
+          "ability": 0,
+          "targets": [
+            "$bob"
+          ],
+          "costOrder": [
+            0,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "ChooseToPay": {
+          "decision": {
+            "type": "Declines"
+          }
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Hand",
+        "card": "Island",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Graveyard",
+        "card": "Tempest Efreet",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Lightning Bolt",
+        "count": 1
+      }
+    }
+  ]
+}

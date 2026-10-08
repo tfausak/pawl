@@ -45,9 +45,10 @@ data LastKnown = MkLastKnown
     -- Magic was controlled by the thief right up to the moment it died, and
     -- CR 603.3a hands that player its trigger.
     controller :: !PlayerId.PlayerId,
-    -- | CR 108.3: who OWNED it, which CR 110.2 never moves -- so unlike
-    -- `controller` this is the same player the live object carried, filed because
-    -- the object it was read off no longer exists.
+    -- | CR 108.3: who OWNED it as it ceased. No projection moves an owner --
+    -- only CR 407.3's ante cards write one, through Game.setOwner -- so unlike
+    -- `controller` this is the player the live object carried, filed because the
+    -- object it was read off no longer exists.
     --
     -- CR 400.3's reader is what wants it: "your graveyard" names the copy a
     -- card's owner has, so an intervening "if" asking where a permanent came from
@@ -204,6 +205,9 @@ data LastKnown = MkLastKnown
     -- | CR 400.1: the zone it was in as it ceased, so a reader can tell a
     -- permanent's record (CR 109.2) from a card's or a spell's -- CR 804.2's
     -- ability is a permanent's alone (Pawl.Engine.Projection.View).
-    zone :: !Zone.Zone
+    zone :: !Zone.Zone,
+    -- | CR 400.1: whose library, hand or graveyard held it as it ceased --
+    -- Nothing off those zones. CardLeavesZone's `whose` reads it.
+    pile :: !(Maybe PlayerId.PlayerId)
   }
   deriving (Eq, Ord, Show)

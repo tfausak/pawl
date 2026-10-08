@@ -5074,7 +5074,9 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- is the graveyard incarnation (`ZoneChange.departed`), which only
   -- eventTriggers' look-back offers. ANY of Moved.departures, CardLeavesZone's
   -- reason. CR 400.3 puts a card only in its owner's graveyard, so "your" is
-  -- no further test.
+  -- no further test. Not so between an ownership change and the move that
+  -- follows it (CR 407.3), where the card in that graveyard is the ante card
+  -- itself (Tempest Efreet, Timmerian Fiends), and neither prints this trigger.
   TriggerCondition.SelfLeavesGraveyard -> case event of
     GameEvent.Moved m ->
       ZoneChange.from (Moved.change m) == Zone.Graveyard
@@ -7238,10 +7240,9 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.CardArrived _ -> False
   -- PermanentReturnedToHand's match with the zone pinned on the DEPARTURE side
   -- instead -- the origin is the zone the condition names, and the destination is
-  -- the one it names or, where it names none, wherever the card went. CR 400.3
-  -- files a card in its owner's graveyard, so "your graveyard" is an OwnedBy
-  -- conjunct of the Filter rather than a zone this arm could name
-  -- (Pawl.Types.Zone names no player).
+  -- the one it names or, where it names none, wherever the card went. Whose zone
+  -- it left is CardLeavesZone.whose, read off the pile CR 608.2h recorded
+  -- (Event.Binding.admitsDeparture).
   --
   -- ANY of Moved.departures admits, not only ZoneChange.departed: a meld's entry
   -- is one event naming every card that left exile (CR 701.42a, CR 712.14c).

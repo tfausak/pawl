@@ -354,6 +354,9 @@ objectsLeaveWith pid gs =
                 -- this is the last moment it exists.
                 (Object.controlClock obj)
                 (Object.zone obj)
+                -- CR 400.1: the pile it left, read off the board it left, as the
+                -- rest of this record is.
+                (Game.pileHolderOf oid gs)
             )
       -- CR 603.6c's second trigger event: "when a phased-in permanent leaves the
       -- game because its owner leaves the game". Only those, which is CR 702.26k
