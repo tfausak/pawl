@@ -594,6 +594,8 @@ playersFor viewOf context gs ref =
   let -- CR 801.11: information from within the perspective's range only. An
       -- unframed evaluation has no controller to measure from, and cuts nothing.
       everyone = maybe (Game.stillPlaying gs) (`Game.reachableBy` gs) (Filter.perspective context)
+      -- CR 702.26b: a baked object that is phased out names nothing.
+      unlessPhasedOut oid = if Map.member oid (GameState.phasedOut gs) then Nothing else Just oid
    in case ref of
         PlayerRef.EachPlayer -> Just everyone
         -- EachPlayer minus every player the slot names (CR 104.2c's winning team
@@ -701,11 +703,15 @@ playersFor viewOf context gs ref =
           fmap pure (Filter.slotOneObject slot context >>= viewOf >>= Filter.owner)
         -- CR 611.2b: the two arms above, BAKED -- the object named outright, so
         -- a stored duration asks who controls or owns it NOW, off the same view.
-        -- Unanswered once the view cannot describe it.
+        -- Unanswered once the view cannot describe it, and while the object is
+        -- phased out, which CR 702.26b treats as not existing -- so CR 702.26f's
+        -- duration tracking it ends. Not a battlefield test: the object may be
+        -- a card in exile. Proved by
         -- data/scenarios/cr-611-2b-a-stored-duration-reads-its-target-s-controller-and-owner-after-resolution.json
-        -- proves both.
-        PlayerRef.ControllerOfObject oid -> fmap pure (viewOf oid >>= Filter.controller)
-        PlayerRef.OwnerOfObject oid -> fmap pure (viewOf oid >>= Filter.owner)
+        -- and, for phasing,
+        -- data/scenarios/phasing/cr-702-26f-a-duration-reading-its-permanent-s-controller-ends-when-it-phases-out.json.
+        PlayerRef.ControllerOfObject oid -> fmap pure (unlessPhasedOut oid >>= viewOf >>= Filter.controller)
+        PlayerRef.OwnerOfObject oid -> fmap pure (unlessPhasedOut oid >>= viewOf >>= Filter.owner)
         -- CR 614.1c / CR 702.174b: the player the object a slot names chose, read
         -- off Object.chosenPlayer rather than off the view -- a choice is a
         -- record, not a characteristic (CR 707.2), so no projection answers it.

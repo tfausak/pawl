@@ -18,11 +18,12 @@
 -- battlefield -- the projection, targeting, the state-based actions, combat,
 -- cost payment, the trigger gatherer -- gets rule 702.26b's answer without
 -- knowing phasing exists. Only the rules on the far side of the "except" name
--- the new field, and Pawl.Types.GameState.phasedOut enumerates all of them: this
--- module, CR 702.26k's leaves-the-game clause in
+-- the new field (Pawl.Types.GameState.phasedOut), and they are: this module,
+-- CR 702.26k's leaves-the-game clause in
 -- Pawl.Engine.Game.removeFromZones, CR 702.26e's resolution-time freeze in
 -- Pawl.Engine.Resolve.Effect.frozenAffected, CR 702.26n's reschedule below,
--- and CR 514.2's damage sweep -- which is on that list by rule and not by code, since
+-- CR 702.26f's baked-object read in Pawl.Engine.Count.playersFor, and CR
+-- 514.2's damage sweep -- which is on that list by rule and not by code, since
 -- Pawl.Engine.Damage.removeAllDamage clears every object rather than every
 -- permanent and so covers a phased-out one without naming it.
 --
@@ -63,11 +64,16 @@
 -- clause is vacuous for a phased-out permanent, which no battlefield walk finds.
 --
 -- CR 702.26f, one of the two continuous-effect consequences of being gone, needs
--- nothing here: a "for as long as" duration (CR 611.2b) is a Condition counting
--- the battlefield, so phaseOut's Set.delete below is what ends it, and
+-- nothing here. A "for as long as" duration (CR 611.2b) counting the
+-- battlefield ends by phaseOut's Set.delete below; one reading a baked object's
+-- controller or owner (PlayerRef.ControllerOfObject / OwnerOfObject) ends
+-- because Pawl.Engine.Count.playersFor answers nothing for a phased-out object,
+-- which puts that reader on the far side of the "except" too.
 -- Pawl.Engine.Expiry.sweepConditional DELETES rather than suspends, which is
--- rule 702.26f's second sentence. Pawl.PhasingSpec's "CR 702.26f a
--- for-as-long-as duration ends when its permanent phases out" is the proof.
+-- rule 702.26f's second sentence. The scenarios
+-- data/scenarios/phasing/cr-702-26f-a-for-as-long-as-duration-ends-when-its-permanent-phases-out.json
+-- and cr-702-26f-a-duration-reading-its-permanent-s-controller-ends-when-it-phases-out.json
+-- beside it are the proof.
 --
 -- CR 702.26e, the other: a resolving effect's frozen set (CR 611.2c) names an
 -- object by id, which a group slot like `self` reaches whether or not it is
