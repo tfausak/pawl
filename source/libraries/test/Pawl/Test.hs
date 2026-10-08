@@ -9,6 +9,7 @@ import qualified Pawl.ActivationProhibitionSpec
 import qualified Pawl.AdventureSpec
 import qualified Pawl.AirbendSpec
 import qualified Pawl.AlternatingTeamsSpec
+import qualified Pawl.AnteSpec
 import qualified Pawl.ArchenemySpec
 import qualified Pawl.AttackKeywordTriggerSpec
 import qualified Pawl.AttractionSpec
@@ -1494,6 +1495,7 @@ spec s registry = do
   Pawl.ConditionSpec.spec s registry
   Pawl.ConjureSpec.spec s registry
   Pawl.ConspiracySpec.spec s registry
+  Pawl.AnteSpec.spec s registry
   Pawl.CopySpec.spec s registry
   Pawl.CopySpec.copySpellSpec s registry
   Pawl.CopySpec.stirCopySpec s registry

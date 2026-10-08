@@ -1,0 +1,106 @@
+{-# LANGUAGE GADTs #-}
+
+-- Covers CR 407's ante: Pawl.Engine.Setup's CR 407.2 step, Effect.Ante's CR
+-- 407.4 owner check (Pawl.Engine.Resolve.Effect), CR 800.4n in
+-- Pawl.Engine.Departure, and Pawl.Engine.Ante's CR 407.3 bar.
+module Pawl.AnteSpec where
+
+import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Registry as Registry
+import qualified Pawl.Spec as Spec
+import qualified Pawl.Support as S
+import qualified Pawl.Types.Deck as Deck
+import qualified Pawl.Types.GameSettings as GameSettings
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.MulliganDecision as MulliganDecision
+import qualified Pawl.Types.Object as Object
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Zone as Zone
+
+anteGame :: GameSettings.GameSettings
+anteGame = GameSettings.plain {GameSettings.ante = True}
+
+-- Keeps every hand and records each CR 407.2 draw's candidates, answering with
+-- the LAST candidate, pinned by position.
+anteDraws :: Prompt.Prompt r -> State.State [[ObjectId.ObjectId]] r
+anteDraws p = case p of
+  Prompt.RandomObject candidates -> do
+    State.modify' (NonEmpty.toList candidates :)
+    pure (NonEmpty.last candidates)
+  Prompt.DeclareMulligan {} -> pure MulliganDecision.Keep
+  _ -> pure (S.identityAnswer p)
+
+-- The whole of Setup.newGame over this matchup under these settings, with what
+-- anteDraws was asked, in order.
+startedWith :: GameSettings.GameSettings -> NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck) -> (GameState.GameState, [[ObjectId.ObjectId]])
+startedWith settings matchup =
+  let ((_, gs), asked) = State.runState (Engine.runGame anteDraws (Setup.gameWith settings (fmap fst matchup)) (Setup.newGame S.performer matchup)) []
+   in (gs, reverse asked)
+
+anteOf :: PlayerId.PlayerId -> GameState.GameState -> [ObjectId.ObjectId]
+anteOf = Game.zoneMembers Zone.Ante
+
+ownedBy :: PlayerId.PlayerId -> GameState.GameState -> Int
+ownedBy pid gs = Map.size (Map.filter (\obj -> Object.owner obj == pid) (GameState.objects gs))
+
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+spec s registry = Spec.describe s "Ante" $ do
+  -- CR 407.2: one random card from each deck, after the starting player is
+  -- determined and before any draw. Ten cards a deck, so a draw asked AFTER the
+  -- opening hands would offer three candidates where this one offers ten.
+  Spec.it s "CR 407.2 an ante game antes one card from each library before the opening hands" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    let deck = Deck.fromCards (Map.singleton mountain 10)
+        matchup = (S.alice, deck) NonEmpty.:| [(S.bob, deck)]
+        (anted, asked) = startedWith anteGame matchup
+        (plain, plainAsked) = startedWith GameSettings.plain matchup
+    Spec.assertEqWith s "CR 407.2 each player has one card in the ante" (fmap (\pid -> length (anteOf pid anted)) [S.alice, S.bob]) [1, 1]
+    Spec.assertEqWith s "CR 407.2 drawn from the whole library, before any draw" (fmap length asked) [10, 10]
+    Spec.assertEqWith s "CR 103.5 and the opening hands are still seven" (fmap (\pid -> S.handSize pid anted) [S.alice, S.bob]) [7, 7]
+    Spec.assertEqWith s "CR 407.1 a game not played for ante antes nothing" (GameState.ante plain, plainAsked) (Set.empty, [])
+  -- An empty library antes nothing and asks nothing; a lone card is not a draw.
+  Spec.it s "CR 407.2 an empty library antes nothing and a one-card library is not asked" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    let matchup = (S.alice, Deck.fromCards (Map.singleton mountain 1)) NonEmpty.:| [(S.bob, Deck.fromCards Map.empty)]
+        (anted, asked) = startedWith anteGame matchup
+    Spec.assertEqWith s "CR 407.2 alice's one card is in the ante, bob has none" (length (anteOf S.alice anted), length (anteOf S.bob anted)) (1, 0)
+    Spec.assertEqWith s "and nobody was asked to draw at random" asked []
+  -- Three seats, each library a different size so each draw's candidates name
+  -- whose library they came from.
+  Spec.it s "CR 407.2 three seats each ante one card of their own, in turn order" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    let deckOf n = Deck.fromCards (Map.singleton mountain n)
+        matchup = (S.alice, deckOf 10) NonEmpty.:| [(S.bob, deckOf 11), (S.carol, deckOf 12)]
+        (anted, asked) = startedWith anteGame matchup
+    Spec.assertEqWith s "CR 407.2 each seat's own card is in the ante" (fmap (\pid -> length (anteOf pid anted)) [S.alice, S.bob, S.carol]) [1, 1, 1]
+    Spec.assertEqWith s "drawn from each seat's own library, in turn order" (fmap length asked) [10, 11, 12]
+  -- CR 727.2 rebuilds every card, the anted ones among them, so the restart's
+  -- own CR 407.2 step must not see the old ante. Twenty cards a deck: the old
+  -- ante card is rebuilt below the eight the restart antes and draws, so a stale
+  -- id would still name a library card at the end.
+  Spec.it s "CR 727.2/407.2 a restart returns the ante to the libraries and antes one card each again" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    let deck = Deck.fromCards (Map.singleton mountain 20)
+        (anted, _) = startedWith anteGame ((S.alice, deck) NonEmpty.:| [(S.bob, deck)])
+        restarted = S.runPure S.identityAnswer anted (Setup.restartGame S.performer Set.empty S.alice)
+        inAnte oid = fmap Object.zone (Game.lookupObject oid restarted) == Just Zone.Ante
+    Spec.assertEqWith s "CR 407.2 two cards in the ante again, each really there" (Set.size (GameState.ante restarted), all inAnte (Set.toList (GameState.ante restarted))) (2, True)
+    Spec.assertEqWith s "CR 727.2 and nobody's cards went missing" (ownedBy S.alice restarted, ownedBy S.bob restarted) (20, 20)
+  -- CR 729.2 moves the main-game libraries, and a seat whose library is empty
+  -- brings nothing to ante.
+  Spec.it s "CR 729.2/407.2 a subgame seat with no library antes nothing" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    let parent0 = Setup.gameWith anteGame S.bothPlayers
+        parent = snd (S.addLibraryCard mountain S.alice (snd (S.addLibraryCard mountain S.alice parent0)))
+        sub0 = Setup.subgameStateFrom S.alice parent
+        sub = S.runPure S.identityAnswer sub0 (Setup.startGameFromCards S.performer Set.empty)
+    Spec.assertEqWith s "CR 729.2 the subgame starts with no ante of its own" (GameState.ante sub0) Set.empty
+    Spec.assertEqWith s "CR 407.2 alice antes one of her two cards, bob nothing" (length (anteOf S.alice sub), length (anteOf S.bob sub)) (1, 0)

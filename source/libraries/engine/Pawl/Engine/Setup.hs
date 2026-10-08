@@ -608,6 +608,8 @@ newGame perform matchup = do
   -- rule 103.2b makes one player's reveal depend on another's, so the order is not
   -- observable today.
   Monad.forM_ seated Companion.reveal
+  -- CR 407.2: after CR 103.1 and before CR 103.5's draws.
+  anteFromLibraries seated
   Mulligan.openingHands perform seated
   -- CR 103.7: in a Planechase game the starting player sets the starting plane,
   -- after every opening hand is kept (CR 901.5).
@@ -812,12 +814,37 @@ startGameFromCards perform exemptions = do
   -- CR 103.2b, newGame's reveal round: CR 727.1 and CR 729.2 each start a new
   -- game following rule 103, so the reveal is put to every player again.
   Monad.forM_ seated Companion.reveal
+  -- CR 407.2 again: CR 727.1 and CR 729.2 each start a new game following
+  -- rule 103.
+  anteFromLibraries seated
   Mulligan.openingHands perform seated
   -- CR 103.7, newGame's step: the new game's starting player sets a starting
   -- plane after the opening hands.
   starting <- State.gets GameState.activePlayer
   planechase <- State.gets Planechase.isPlanechase
   Monad.when planechase (Planechase.setStartingPlane starting)
+
+-- CR 407.2: when playing for ante, each player in turn order puts one random
+-- card from their library into the ante, through the zone-change funnel. Run
+-- after CR 103.1's starting player is settled and before CR 103.5's draws. An
+-- empty library antes nothing, and a lone card is not a draw. Randomness and
+-- not a choice, so Prompt.RandomObject, filtered rather than trusted.
+--
+-- Not implemented: CR 407.2 takes the card from the deck before it is
+-- shuffled, and this takes it from the shuffled library (#4824).
+anteFromLibraries :: [PlayerId] -> Game ()
+anteFromLibraries seated = do
+  playing <- State.gets (GameSettings.ante . GameState.settings)
+  let anteOne pid = do
+        gs <- State.get
+        case Game.zoneMembers Zone.Library pid gs of
+          [] -> pure ()
+          [only] -> Event.changeZone only Zone.Ante
+          first : rest -> do
+            let offered = first NonEmpty.:| rest
+            answer <- Game.ask (Prompt.RandomObject offered)
+            Event.changeZone (if List.elem answer (NonEmpty.toList offered) then answer else first) Zone.Ante
+  Monad.when playing (Monad.forM_ seated anteOne)
 
 -- CR 103.1c: rotate the turn order to begin with the player whose command zone
 -- holds a card naming them the starting player, superseding CR 103.1's

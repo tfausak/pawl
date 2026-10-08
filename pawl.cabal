@@ -1802,6 +1802,7 @@ library test
     Pawl.AdventureSpec
     Pawl.AirbendSpec
     Pawl.AlternatingTeamsSpec
+    Pawl.AnteSpec
     Pawl.ArchenemySpec
     Pawl.AttackKeywordTriggerSpec
     Pawl.AttractionSpec
