@@ -505,9 +505,9 @@ slotContext pcs perspective unannounced bindings source amount gs =
             Filter.sourceLastExiled = Nothing
           }
       evaluated = amount >>= Quantity.evaluate (Projection.fullView gs) base gs source
-   in -- CR 202.3 / 601.2c: the slot's own computed mana-value bound, evaluated
-      -- against the context above and handed to Filter.ManaValueAtMostAmount and
-      -- Filter.ManaValueEqualToAmount.
+   in -- CR 202.3 / 601.2c: the slot's own computed bound, evaluated
+      -- against the context above and handed to Filter.ManaValueAtMostAmount,
+      -- Filter.ManaValueEqualToAmount and Filter.PowerAtMostAmount.
       -- THIS is the one site that fills it, sourcePower's and slotNames' sibling
       -- in that respect and for the same reason: the atom lives in a target
       -- slot's Filter, and this is where one is matched -- at both of CR 115's
@@ -1357,7 +1357,8 @@ legalSets perspective unannounced seed source slots gs =
 --
 -- Ordinary cards pay nothing: `dependent` is empty for every slot map secondPass
 -- reports nothing for, so the second pass is a Map.filter over a map with at
--- most a handful of keys.
+-- most a handful of keys. A slot whose BOUND names a sibling pays one more
+-- answer per candidate of that sibling (`rebound` below).
 legalSetsGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Bool -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> GameState -> Map SlotName (Set Recipient)
 legalSetsGiven pcs grants pools perspective unannounced seed source slots gs =
   let answer bindings slot = legalRecipientsGiven pcs grants pools perspective unannounced bindings source slot gs
@@ -1366,7 +1367,28 @@ legalSetsGiven pcs grants pools perspective unannounced seed source slots gs =
       -- answers. Map.union is left-biased, so a target slot's own answer wins over
       -- a seed entry that happened to share its name.
       independent = fmap (answer seed) slots
-      dependent = fmap (answer (Map.union (fmap Binding.toRecipients independent) seed)) (Map.filter (secondPass (Map.keysSet slots)) slots)
+      widened = Map.union (fmap Binding.toRecipients independent) seed
+      declared = Map.keysSet slots
+      -- A bound naming a sibling is answered once per way of binding each sibling
+      -- it names: to the whole union, where a monotone fold (Scope.OverBound)
+      -- under an at-most atom is widest, or to any ONE of its candidates, the only
+      -- binding a read of one object (Quantity.AgainstSlot, through
+      -- Binding.onlyOne) answers at all. Spawnbroker's `theirs` slot is the
+      -- latter: against the union of every creature its caster controls it reads
+      -- no power, and would be offered nothing.
+      --
+      -- Not implemented: a binding of the sibling to some but not all of its
+      -- candidates, which a fold under an equality atom can need (#4827).
+      rebound slot =
+        let options sibling =
+              fmap
+                ((,) sibling)
+                ( Map.findWithDefault (Binding.toRecipients Set.empty) sibling widened
+                    : fmap (Binding.toRecipients . Set.singleton) (Set.toList (Map.findWithDefault Set.empty sibling independent))
+                )
+            assignments = traverse options (Set.toList (boundSiblings declared slot))
+         in Set.unions (fmap (\assigned -> answer (Map.union (Map.fromList assigned) widened) slot) assignments)
+      dependent = fmap rebound (Map.filter (secondPass declared) slots)
    in -- Map.union is left-biased, so the second pass wins wherever it answered.
       Map.union dependent independent
 
@@ -1378,7 +1400,8 @@ legalSetsGiven pcs grants pools perspective unannounced seed source slots gs =
 -- -- so ManaValueAtMostAmount and ManaValueEqualToAmount narrow to the mana value
 -- -- 0 candidates or to none,
 -- and the first pass would offer such a slot an empty set. Re-answering it
--- against the union is the widening every other dependent slot gets, and
+-- against the union, and against each one candidate (legalSetsGiven's
+-- `rebound`), is the widening every other dependent slot gets, and
 -- jointlyJudged below is where the announcement is narrowed back.
 --
 -- The FILTER's dependency is deliberately not here -- see jointlyJudged, whose
@@ -1398,9 +1421,6 @@ boundNamesSibling declared = not . Set.null . boundSiblings declared
 -- is the reading half of the rename CR 700.2d applies to the same field
 -- (Pawl.Engine.Modal.instanceScope), so a bound this reports is a bound that
 -- follows its mode's occurrence.
---
--- Not implemented: a Quantity.AgainstSlot bound, which this reports and the offer
--- then cannot answer against the plural union the second pass hands it (#2967).
 boundSiblings :: Set SlotName -> TargetSlot -> Set SlotName
 boundSiblings declared slot =
   Set.intersection declared (foldMap QuantitySlot.allSlots (Maybe.maybeToList (TargetSlot.amount slot) <> Maybe.maybeToList (SlotCount.quantity (TargetSlot.count slot))))

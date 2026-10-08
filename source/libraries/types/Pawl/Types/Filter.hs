@@ -138,6 +138,10 @@ data Filter keyword
     -- reference pick (Pawl.Types.FromReference's @amount@). Vacuously False where
     -- either number is absent.
     ManaValueEqualToAmount
+  | -- | CR 208.1 against the same computed bound: the object's power is <= the
+    -- amount the enclosing target slot names -- Spawnbroker's "power less than or
+    -- equal to that creature's power". Vacuously False where either is absent.
+    PowerAtMostAmount
   | ControlledBy PlayerRelation.PlayerRelation -- CR 109.5 / 102.2: controller relates thus to the perspective.
   | -- | CR 508.5: the candidate's controller is the DEFENDING PLAYER for the
     -- object the evaluation comes from (CR 702.39a's provoke), or, for a source

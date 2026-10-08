@@ -165,6 +165,7 @@ import qualified Pawl.Codec.ControlClockSpec
 import qualified Pawl.Codec.ControlDurationSpec
 import qualified Pawl.Codec.ControlPlayerSpec
 import qualified Pawl.Codec.ControlSidesSpec
+import qualified Pawl.Codec.ControlSlotsSpec
 import qualified Pawl.Codec.ControllerBecomesTargetSpec
 import qualified Pawl.Codec.ControllerRelationSpec
 import qualified Pawl.Codec.ConvokingSpec
@@ -1004,6 +1005,7 @@ spec s registry = do
   Pawl.Codec.ControlClockSpec.spec s
   Pawl.Codec.ControlPlayerSpec.spec s
   Pawl.Codec.ControlSidesSpec.spec s
+  Pawl.Codec.ControlSlotsSpec.spec s
   Pawl.Codec.ControllerBecomesTargetSpec.spec s
   Pawl.Codec.ControllerRelationSpec.spec s
   Pawl.Codec.CopyExceptionSpec.spec s

@@ -251,6 +251,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.ManaValueIsEven -> 0
   Filter.Type.ManaValueAtMostAmount -> 0
   Filter.Type.ManaValueEqualToAmount -> 0
+  Filter.Type.PowerAtMostAmount -> 0
   Filter.Type.ControlledBy _ -> 0
   -- Zero for ControlledBy's reason: CR 108.3's owner atom carries a
   -- PlayerRelation, which holds no Filter for a card author to reach.
@@ -1882,6 +1883,26 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
             }
     Spec.assertEqWith s "a planted atom in a reference pick naming no amount is an offence" (manaValueEqualToAmountCounts (conjuring Nothing)) (0, 1)
     Spec.assertEqWith s "and one naming an amount is not" (manaValueEqualToAmountCounts (conjuring (Just (Quantity.Type.Literal 4)))) (1, 0)
+  -- The same claim for the POWER bound, a distinct tag the two sweeps above
+  -- never see.
+  Spec.it s "CR 208.1 no card asks PowerAtMostAmount outside a slot that names an amount" $ do
+    ps <- S.allPrintings s
+    let counts = amountedCounts (Text.pack "PowerAtMostAmount")
+        offenders = filter (anyFace ((/= 0) . snd . counts) . Printing.card) ps
+    Spec.assertEqWith s "the atom sits only where the slot supplies the bound" (fmap (S.nameOf . Printing.card) offenders) []
+    -- NOT vacuous: Spawnbroker's `theirs` slot is accepted rather than skipped.
+    spawnbroker <- S.printingOf s registry "Spawnbroker"
+    Spec.assertEqWith s "Spawnbroker's slot names its bound" (counts (S.combinedFace spawnbroker)) (1, 0)
+    piker <- S.printingOf s registry "Goblin Piker"
+    let planted amount =
+          (S.combinedFace piker)
+            { Face.spell =
+                Modal.MkModal
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (amount (TargetSlot.required Pool.Creatures (Just Filter.Type.PowerAtMostAmount))))))
+                  (ModeSelection.ChooseExactly 1)
+            }
+    Spec.assertEqWith s "a planted atom in an amountless slot is an offence" (counts (planted id)) (0, 1)
+    Spec.assertEqWith s "and the same atom in a slot that names one is not" (counts (planted (TargetSlot.withAmount (Quantity.Type.Literal 2)))) (1, 0)
   -- CR 303.4b's Filter.IsHostOfSource is CR 709.4a's atom one axis over again:
   -- answerable only where Filter.Context.sourceAttachedTo is filled, which is the
   -- positions `hostFramed` admits. See hostOfSourceOffends for the two offences.

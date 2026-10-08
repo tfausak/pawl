@@ -1,5 +1,6 @@
 module Pawl.Codec.ControlSides where
 
+import qualified Pawl.Codec.ControlSlots as ControlSlots
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -10,10 +11,12 @@ codec =
   Arm.tagged
     tagOf
     [ Arm.payload "BetweenTargets" SlotName.codec ControlSides.BetweenTargets (\x -> case x of ControlSides.BetweenTargets y -> Just y; _ -> Nothing),
-      Arm.payload "WithSource" SlotName.codec ControlSides.WithSource (\x -> case x of ControlSides.WithSource y -> Just y; _ -> Nothing)
+      Arm.payload "WithSource" SlotName.codec ControlSides.WithSource (\x -> case x of ControlSides.WithSource y -> Just y; _ -> Nothing),
+      Arm.payload "BetweenSlots" ControlSlots.codec ControlSides.BetweenSlots (\x -> case x of ControlSides.BetweenSlots y -> Just y; _ -> Nothing)
     ]
 
 tagOf :: ControlSides.ControlSides -> String
 tagOf x = case x of
   ControlSides.BetweenTargets {} -> "BetweenTargets"
   ControlSides.WithSource {} -> "WithSource"
+  ControlSides.BetweenSlots {} -> "BetweenSlots"

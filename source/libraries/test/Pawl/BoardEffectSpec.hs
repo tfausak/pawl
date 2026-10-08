@@ -2968,6 +2968,57 @@ switcherooSpec s registry = Spec.describe s "Switcheroo" $ do
     Spec.assertBool s (alicePiker `notElem` Combat.legalAttackers S.alice after) "CR 302.6 alice can no longer attack with the Piker she gave away"
     Spec.assertBool s (bobEvangel `notElem` Combat.legalAttackers S.alice after) "CR 302.6 nor with the Evangel she just took"
 
+-- Spawnbroker {2}{U} 1/1 (Magic Origins; Oracle checked against Scryfall
+-- 2026-10-08): "When this creature enters, you may exchange control of target
+-- creature you control and target creature with power less than or equal to that
+-- creature's power an opponent controls." CR 701.12b between two SLOTS, the
+-- second's CR 208.1 bound read off the one creature the first names.
+--
+-- alice controls the Spawnbroker (power 1), a Goblin Piker (2) and a Bog Wraith
+-- (3), so the `yours` slot's candidates are plural and the `theirs` slot can only
+-- be offered bob's Wraith by measuring each of them alone: against all three at
+-- once the bound reads no power (Binding.onlyOne), the offer is empty, and
+-- placement removes the trigger as though no legal choice existed. bob's
+-- Typhoid Rats keep the `theirs` choice a real one. The two runs differ in
+-- exactly one thing, which creature fills `yours`.
+spawnbrokerRun :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, GameState.GameState)
+spawnbrokerRun s registry measuredByWraith = do
+  spawnbroker <- S.printingOf s registry "Spawnbroker"
+  piker <- S.printingOf s registry "Goblin Piker"
+  wraith <- S.printingOf s registry "Bog Wraith"
+  rats <- S.printingOf s registry "Typhoid Rats"
+  let (alicePiker, g1) = S.addPermanent piker S.alice S.threePlayerGame
+      (aliceWraith, g2) = S.addPermanent wraith S.alice g1
+      (bobWraith, g3) = S.addPermanent wraith S.bob g2
+      (_, g4) = S.addPermanent rats S.bob g3
+      (_, entered) = S.entersWithTrigger spawnbroker S.alice g4
+      yours = if measuredByWraith then aliceWraith else alicePiker
+      wanted = [yours, bobWraith]
+      answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, offered) -> Set.filter (maybe False (`elem` wanted) . Recipient.objectOf) offered) sets
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        _ -> S.identityAnswer p
+      placed = S.runPure answer entered Engine.placePendingTriggers
+  pure (alicePiker, aliceWraith, bobWraith, placed, S.runPure answer placed Stack.resolveTop)
+
+spawnbrokerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+spawnbrokerSpec s registry = Spec.describe s "Spawnbroker" $ do
+  Spec.it s "CR 601.2c a bound read off one sibling target is offered against each candidate alone" $ do
+    (alicePiker, aliceWraith, bobWraith, measuredPlaced, measured) <- spawnbrokerRun s registry True
+    (_, _, _, refusedPlaced, refused) <- spawnbrokerRun s registry False
+    Spec.assertEqWith s "alice controls bob's Wraith, whose power 3 her own Wraith's power admits" (Projection.controllerOf bobWraith measured) (Just S.alice)
+    Spec.assertEqWith s "and bob controls alice's Wraith" (Projection.controllerOf aliceWraith measured) (Just S.bob)
+    -- CR 601.2c's joint check, the other run: measured against the power 2
+    -- Piker, bob's Wraith is not a legal target, so the announcement is refused
+    -- at placement rather than put on the stack to fail at CR 608.2b. Legal
+    -- choices exist, so this is not CR 603.3d: the decider repeats the refused
+    -- answer and Engine.placeBorne's `attempt` gives up and ceases the trigger.
+    Spec.assertEqWith s "measured against her Piker instead, the trigger never reaches the stack" (length (GameState.stack refusedPlaced)) 0
+    Spec.assertEqWith s "where measured against her Wraith it did" (length (GameState.stack measuredPlaced)) 1
+    Spec.assertEqWith s "and bob keeps his Wraith" (Projection.controllerOf bobWraith refused) (Just S.bob)
+    Spec.assertEqWith s "and alice her Piker" (Projection.controllerOf alicePiker refused) (Just S.alice)
+
 -- Avarice Totem ({1} Artifact, "{5}: Exchange control of this artifact and
 -- target nonland permanent.") against CR 701.12b's OTHER printed shape: one side
 -- is CR 113.7's source object rather than a second target.
@@ -3094,6 +3145,7 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   godEternalBontuSpec s registry
   switcherooSpec s registry
+  spawnbrokerSpec s registry
   avariceTotemSpec s registry
   plummetSpec s registry
   corrosiveGaleSpec s registry

@@ -49,7 +49,8 @@ data TargetSlot = MkTargetSlot
     -- card with mana value X or less ... where X is the amount of life you gained
     -- this turn". Filter.ManaValueAtMostAmount and Filter.ManaValueEqualToAmount
     -- are the atoms that read it -- the second at equality, Chthonian Nightmare's
-    -- "with mana value X" -- and
+    -- "with mana value X" -- and Filter.PowerAtMostAmount compares a candidate's
+    -- POWER against it instead (Spawnbroker).
     -- Pawl.Engine.Target.slotContext is where it is evaluated and handed over.
     --
     -- HERE rather than in the Filter arm, which is where it belongs on the face of
