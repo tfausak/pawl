@@ -612,13 +612,12 @@ Instead: allow a small set of hand-written, compiled-in cards alongside the load
 Finish one ring before broadening to the next. Within a ring, rank work by **downstream leverage** (see silver border below): a capability that forces a decision paying off elsewhere comes before a leaf.
 
 1. **Basic Magic** — the rules and features regular paper cards need.
-2. **Paper extras** — multiplayer and variants (Commander, Planechase, Archenemy, Two-Headed Giant), shortcuts (CR 732), dexterity, ante, and un-set mechanics (stickers, Contraptions).
+2. **Paper extras** — multiplayer and variants (Commander, Planechase, Archenemy, Two-Headed Giant), shortcuts (CR 732), ante, and un-set mechanics (stickers, Contraptions).
 3. **Digital-only** — Alchemy: perpetual, seek, conjure, boons, covercast, intensity. The CR defines none of these, so there is no rules ground truth: derive behaviour from the cards' own text, their official rulings (Tenacious Pup's defines a one-time boon), and Arena's published descriptions, and say so where it lands.
 4. **Non-engine** — deck building and format legality, clients, tooling.
 
 Ring-2 notes that still hold:
 
-- **Dexterity** — Chaos Orb, Falling Star, Chaos Confetti. One prompt constructor (`DexterityCheck :: PlayerId -> Prompt Bool`); the engine can't tell whether a human, an RNG, a bot or a hand flipping cardboard answers it, and the outcome lands in the `DecisionLog`, so replay and determinization keep working. A leaf.
 - **Contraptions** — two extra zones (Contraption deck, scrapyard), a battlefield subzone (three sprockets), a wrapping CRANK! counter, one turn-based action at upkeep. They share a substrate with **Attractions (rule 717)** — separate deck, junkyard, scheduled triggers, "roll to visit" — so Attractions bring Contraptions nearly free. Rule 701.45a notes Unstable cards and mechanics aren't in the rules; derive them from the cards, as for Alchemy. Steamflogger Boss's Contraption clause is a replacement effect that can never fire without them.
 
 **Out of scope — no data, or no ground truth:**
@@ -626,6 +625,7 @@ Ring-2 notes that still hold:
 - **Art-content matters** — cards caring about what is *depicted*. No dataset has this, and it's arguably subjective, so even manual annotation has no ground truth.
 - **Cards that track what people are/do/have/say** — the Unglued/Unhinged social cards
 - **People from outside the game** — Kindslaver, Subcontract
+- **Dexterity** — Chaos Orb, Falling Star, and the un-set cards that are flipped, thrown, dropped or balanced. The outcome happens on the table, not in the game: the CR has no rule for it, and the engine can neither compute nor check the answer, since any subset of the battlefield is a possible landing. Alchemy and Contraptions are also outside the CR, but their state is game state derived from card text.
 
 **Declined, with a known price — draft matters** (the Conspiracy cards). A draft is not a game and cannot be built on this engine: no zones, no stack, no priority. Cards that *affect the draft* (Cogwork Librarian, Agent of Acquisitions, Lore Seeker) need a second VM — its own closed half and opcode vocabulary — which is ring-4 work at the earliest. Cards that merely *note something during the draft and use it in the game* (Aether Searcher, Animus of Predation) need only a per-card annotation on decklist entries, the same discipline as `Printing` (§2.8).
 
@@ -648,7 +648,7 @@ Sorting rule: **do the un-cards whose difficulty is shared with black border.**
 
 These aren't flexes — they're canaries wearing funny hats, and they're *sharper* than their black-border twins because un-sets are deliberately designed to attack the rules. A free adversarial test suite written by the people who wrote the rules.
 
-The criterion is **downstream leverage**, not border color — border color is only a proxy, and it breaks on dexterity (Chaos Orb and Falling Star are black border). Ask instead: *does implementing this force a decision that pays off elsewhere?* Little Girl forces the numeric tower and hands you Tarmogoyf. Chaos Orb forces one prompt constructor that nothing else will ever use. It's a leaf: it waits behind its ring's leverage work.
+The criterion is **downstream leverage**, not border color — border color is only a proxy, and it breaks both ways (Chaos Orb is black border and out of scope). Ask instead: *does implementing this force a decision that pays off elsewhere?* Little Girl forces the numeric tower and hands you Tarmogoyf.
 
 ### Reclaimed from XMage's list
 
