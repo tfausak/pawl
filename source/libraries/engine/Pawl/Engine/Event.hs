@@ -358,9 +358,11 @@ combatDamagerAgainst victim gs logged = case LoggedEvent.event logged of
 -- The group is spent on exit whether or not the body recorded anything, so a
 -- bracket leaves a gap rather than leaking its group to the next event.
 --
--- Not bracketed: token creation and CR 508.1's attacker declaration (rule
--- 508.1f's taps aside), so the events each records are read as a sequence: a token minted partway through a
--- batch enters at a group of its own, which is what
+-- Not bracketed: CR 508.1's attacker declaration (rule 508.1f's taps aside), so
+-- the events it records are read as a sequence. Token creation is bracketed by
+-- the instruction that creates (Resolve's Create and CreateCopy arms), not by
+-- Event.createTokens, so a token minted partway through a batch by any other
+-- road enters at a group of its own, which is what
 -- Pawl.Engine.Event.Trigger's `arrivedOnBattlefieldLater` reads to keep it from
 -- witnessing the batch's earlier events. CR 510.2's combat damage IS: Pawl.Engine.Damage.dealWave
 -- brackets each combat damage step -- the damage and its CR 120.3 results, with
@@ -7971,19 +7973,17 @@ sacrificeIn asOf victims = simultaneously $ do
 --
 -- `attached` is CR 303.4i's and CR 301.5e's "attached to", the same way round:
 -- the EntryRiders field names a slot, and the caller has already read it, so what
--- arrives here is the answer. THREE-VALUED, because rule 303.4i separates two
--- cases a bare Maybe would fuse -- Nothing where the effect said nothing about an
--- attachment (every other token in the pool), Just the recipient where it named
--- one, and Just Nothing for the rule's "an object ... that is undefined", which
--- Preston Garvey, Minuteman reaches when the seat announces zero targets for its
--- "up to one target land you control".
+-- arrives here is the answer. Nothing where the effect said nothing about an
+-- attachment (every other token in the pool), and otherwise the objects it
+-- named: one for Preston Garvey, Minuteman's target, several for Dunbarrow
+-- Revivalist's "one of them", and none for rule 303.4i's "an object ... that
+-- is undefined", which Preston Garvey reaches when the seat announces zero
+-- targets for its "up to one target land you control".
 --
--- One event for the whole creation (CR 603.6a's "each time an event puts one or
--- more permanents onto the battlefield"), so its entries share an EventGroup:
--- data/scenarios/card-trigger/cr-603-7b-two-goblins-entering-at-once-spend-the-boon-once.json
--- proves it with Dragon Fodder under Dunbarrow Revivalist's batch-scoped boon.
-createTokens :: PlayerId -> Card -> Maybe PC.ProjectedCharacteristics -> Natural -> TapState.TapState -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> Maybe (Maybe Recipient.Recipient) -> Game [ObjectId]
-createTokens controller card copy n tapped entering attached = simultaneously $ do
+-- Not an event bracket of its own: the caller is the one CR 608.2f event, and
+-- under Event.together the entries are recorded after this returns anyway.
+createTokens :: PlayerId -> Card -> Maybe PC.ProjectedCharacteristics -> Natural -> TapState.TapState -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> Maybe [Recipient.Recipient] -> Game [ObjectId]
+createTokens controller card copy n tapped entering attached = do
   gs <- State.get
   if List.notElem controller (Game.stillPlaying gs)
     then pure []
@@ -8129,7 +8129,24 @@ createTokens controller card copy n tapped entering attached = simultaneously $ 
           -- token's attachment -- living weapon and For Mirrodin! create the token and
           -- then attach the EQUIPMENT to it (Pawl.Engine.Keyword.attachToOwnToken) --
           -- so that arm is a regression fence rather than a proven road.
-          let hostFor tok = Monad.join attached >>= \destination -> Attach.attachmentFor tok destination minted
+          --
+          -- SEVERAL named is Dunbarrow Revivalist's "attached to one of them": CR
+          -- 608.2d offers only the hosts this token could legally enchant, so the
+          -- legality reading comes first and the creator picks among what is left,
+          -- through Attach.chooseHost (elided at one, filtered rather than trusted).
+          -- Asked here for the reason above: legality needs the token to exist.
+          hosts <- Monad.forM ids $ \tok -> case attached of
+            Nothing -> pure (tok, Nothing)
+            Just named -> do
+              let legalHosts = Maybe.mapMaybe (\destination -> Attach.attachmentFor tok destination minted) named
+              picked <- Attach.chooseHost controller tok (Maybe.mapMaybe Recipient.objectOf legalHosts)
+              pure
+                ( tok,
+                  case legalHosts of
+                    [only] -> Just only
+                    _ -> picked >>= \oid -> List.find ((== Just oid) . Recipient.objectOf) legalHosts
+                )
+          let hostFor tok = Monad.join (List.lookup tok hosts)
               unhostable tok = Maybe.isNothing (hostFor tok) && Set.member Subtype.Aura (Projection.subtypesOf tok minted)
           if any (\tok -> EntryRestriction.prohibited tok Zone.Battlefield minted) ids || (Maybe.isJust attached && any unhostable ids)
             then do

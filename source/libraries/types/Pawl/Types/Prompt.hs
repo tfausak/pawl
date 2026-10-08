@@ -720,9 +720,7 @@ data Prompt r where
   -- impossible (CR 101.3). Not ChooseTargets (CR 115.1, CR 115.10a). Also CR
   -- 509.4: which attacker a creature entering blocking blocks, the ObjectId
   -- then being that creature. Also CR 701.3a: the one destination a group of
-  -- attachments moves to (Pawl.Types.Effect's AttachAll). Also CR 608.2d: which
-  -- of a slot's several objects a created Aura token is attached to (Dunbarrow
-  -- Revivalist's "attached to one of them").
+  -- attachments moves to (Pawl.Types.Effect's AttachAll).
   ChoosePermanent :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 702.122a: which untapped permanents are tapped to crew, the Natural a
   -- power threshold rather than a size (Pawl.Engine.Cost validates the sum).
@@ -769,7 +767,9 @@ data Prompt r where
   -- current host excluded (CR 701.3b); the offer is the card's text, so CR
   -- 303.4j is left to the player. Elided at one candidate. The PlayerId is the
   -- resolving controller for one named destination (CR 608.2d) and the
-  -- subject's controller for several (CR 303.4d, CR 301.5c).
+  -- subject's controller for several (CR 303.4d, CR 301.5c). Also CR 608.2d:
+  -- which legal host a created Aura token enters attached to, among several
+  -- the effect names (Dunbarrow Revivalist's "one of them").
   ChooseAttachment :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 303.4k with CR 614.1e: whether an Aura turned face up exercises its
   -- printed "you may attach it"; never elided, declining leaving it to CR

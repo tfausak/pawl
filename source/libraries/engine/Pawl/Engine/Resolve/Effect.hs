@@ -6957,39 +6957,24 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           [attacker] -> Just (Combat.SpecifiedAttacker attacker)
           _ -> Nothing
     -- CR 303.4i's "attached to", read ONCE ahead of the minting loop for
-    -- mBlocked's reason and through the same reader. THREE-VALUED for
-    -- Event.createTokens, whose own note says why: Nothing where the effect named
-    -- no host at all, Just Nothing where it named a slot that names nothing --
-    -- rule 303.4i's undefined object, which Preston Garvey, Minuteman reaches at
-    -- zero targets -- and Just the recipient otherwise.
-    --
-    -- A slot naming SEVERAL is CR 608.2d's choice: Dunbarrow Revivalist's boon
-    -- creates its Role "attached to one of them", the batch its trigger bound,
-    -- and the controller picks one still on the battlefield -- asked at two or
-    -- more, chosenPermanentOf's posture, the answer filtered rather than
-    -- trusted. None left there is the undefined case above.
+    -- mBlocked's reason and through the same reader: Nothing where the effect
+    -- named no host, and otherwise every object the slot names -- none for rule
+    -- 303.4i's undefined object (Preston Garvey, Minuteman at zero targets),
+    -- several for Dunbarrow Revivalist's "one of them", whose CR 608.2d choice
+    -- among the legal hosts Event.createTokens makes once the token exists.
     mAttached <- case EntryRiders.attachedTo entry of
       Nothing -> pure Nothing
-      Just slot -> do
-        named <- fromAmongMembers legal resolving chosen slot
-        fmap (Just . fmap Recipient.ToObject) $ case named of
-          [host] -> pure (Just host)
-          _ -> case filter (`Set.member` GameState.battlefield gs) named of
-            [] -> pure Nothing
-            [only] -> pure (Just only)
-            first : second : more -> do
-              let offered = first NonEmpty.:| (second : more)
-              answer <- Game.choose (Prompt.ChoosePermanent (Decide.deciderFor controller gs) controller source offered)
-              pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
+      Just slot -> Just . fmap Recipient.ToObject <$> fromAmongMembers legal resolving chosen slot
     -- CR 508.4's rider, read ONCE ahead of the minting loop for mBlocked's
     -- reason.
     let mAttack = entryAttack legal resolving entry gs
     -- PER CREATOR, every amount off the same pre-effect `gs` (CR 608.2f), so one
     -- seat's tokens cannot change how many the next seat gets.
     --
-    -- And ONE event across the seats, CR 608.2f's simultaneity widening
-    -- Event.createTokens' own group. Kept because the rule states it: no board
-    -- in the suite has two seats create beside a batch-scoped entry trigger.
+    --
+    -- ONE event for every token and seat (CR 603.6a, CR 608.2f), so a
+    -- batch-scoped "one or more creatures enter" fires once for the lot:
+    -- data/scenarios/card-trigger/cr-603-7b-two-goblins-entering-at-once-spend-the-boon-once.json.
     minted <- Event.simultaneously . fmap concat . Monad.forM creators $ \creating ->
       case evaluateForRecipient viewOf context gs resolving source creating quantity of
         Just n
@@ -7185,7 +7170,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- Event.together orders them all as one CR 613.7m batch -- a
             -- regression fence, since no card in data/cards/ conjures a duplicate
             -- of two or more objects onto the battlefield.
-            ConjureDestination.Battlefield entry -> Event.together $ case cards of
+            ConjureDestination.Battlefield entry -> Event.simultaneously . Event.together $ case cards of
               ConjureCards.Written written -> pickWritten written >>= onto entry n
               ConjureCards.Duplicate ref -> concat <$> Monad.mapM (onto entry n) (duplicatesOf ref)
               ConjureCards.Reference from -> referencePickers from 1 >>= fmap concat . Monad.mapM (\p -> p >>= fmap concat . Monad.mapM (onto entry n) . Maybe.maybeToList)
@@ -7232,7 +7217,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         | n > 0 ->
             -- CR 613.7m over copies of SEVERAL sources, which enter together:
             -- one batch across every createTokens call (Event.together).
-            Event.together . fmap concat . Monad.forM sources $ \src ->
+            Event.simultaneously . Event.together . fmap concat . Monad.forM sources $ \src ->
               fmap concat . Monad.forM (Maybe.maybeToList (Game.cardOfWithLastKnown src gs)) $ \card -> do
                 -- CR 707.2 copies no counters, so what the token arrives with
                 -- is what the EFFECT said and nothing the original carried --

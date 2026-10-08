@@ -1,6 +1,6 @@
 {
-  "description": "CR 603.7b two Goblins entering at once spend the boon once",
-  "note": "Dunbarrow Revivalist's one-time boon is a durationless delayed trigger on a batch condition. Dragon Fodder's two Goblins enter in one event, so the boon fires once with no question which entry caused it (an unscheduled prompt would fail the run); its own effect asks which Goblin gets the one Wicked Role. Grizzly Bears entering afterwards finds the boon spent.",
+  "description": "CR 608.2d Progenitus is no host, so the Role goes on the Bears unasked",
+  "note": "Rise of the Dark Realms returns Progenitus and Grizzly Bears together, so the armed boon fires once for both. Progenitus's protection from everything leaves the Bears the only legal host, so alice is asked nothing (an unscheduled prompt would fail the run) and the Role is not lost.",
   "board": {
     "seats": [
       {
@@ -17,23 +17,48 @@
             "ready": true
           },
           {
-            "card": "Mountain",
-            "label": "m1",
+            "card": "Swamp",
+            "label": "s3",
             "ready": true
           },
           {
-            "card": "Mountain",
-            "label": "m2",
+            "card": "Swamp",
+            "label": "s4",
             "ready": true
           },
           {
-            "card": "Forest",
-            "label": "f1",
+            "card": "Swamp",
+            "label": "b1",
             "ready": true
           },
           {
-            "card": "Forest",
-            "label": "f2",
+            "card": "Swamp",
+            "label": "b2",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "b3",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "b4",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "b5",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "b6",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "b7",
             "ready": true
           }
         ],
@@ -43,12 +68,16 @@
             "label": "rev"
           },
           {
-            "card": "Dragon Fodder",
-            "label": "fodder"
+            "card": "Rise of the Dark Realms",
+            "label": "rise"
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Progenitus"
           },
           {
-            "card": "Grizzly Bears",
-            "label": "bears"
+            "card": "Grizzly Bears"
           }
         ],
         "library": [
@@ -113,19 +142,6 @@
       "turn": 1,
       "step": "PrecombatMain",
       "player": "alice",
-      "check": {
-        "View": {
-          "of": "Stack",
-          "is": [
-            "trigger of Dunbarrow Revivalist"
-          ]
-        }
-      }
-    },
-    {
-      "turn": 1,
-      "step": "PrecombatMain",
-      "player": "alice",
       "do": "Pass"
     },
     {
@@ -145,11 +161,17 @@
       "player": "alice",
       "do": {
         "Cast": {
-          "object": "$fodder",
+          "object": "$rise",
           "mana": [
-            "$m1",
-            "$m2",
-            null
+            "$s3",
+            "$s4",
+            "$b1",
+            "$b2",
+            "$b3",
+            "$b4",
+            "$b5",
+            "$b6",
+            "$b7"
           ]
         }
       }
@@ -166,22 +188,9 @@
       "player": "alice",
       "do": {
         "OrderTimestamps": [
-          "Goblin Token",
-          "Goblin Token#2"
+          "Progenitus",
+          "Grizzly Bears"
         ]
-      }
-    },
-    {
-      "turn": 1,
-      "step": "PrecombatMain",
-      "player": "alice",
-      "check": {
-        "Count": {
-          "player": "alice",
-          "zone": "Battlefield",
-          "card": "Goblin Token",
-          "count": 2
-        }
       }
     },
     {
@@ -202,17 +211,6 @@
       "step": "PrecombatMain",
       "player": "alice",
       "do": "Pass"
-    },
-    {
-      "turn": 1,
-      "step": "PrecombatMain",
-      "player": "alice",
-      "do": {
-        "Answer": {
-          "prompt": "ChooseAttachment",
-          "with": "Goblin Token#2"
-        }
-      }
     },
     {
       "turn": 1,
@@ -233,75 +231,7 @@
         "View": {
           "of": "AttachedTo",
           "object": "Wicked",
-          "is": "Goblin Token#2"
-        }
-      }
-    },
-    {
-      "turn": 1,
-      "step": "PrecombatMain",
-      "player": "alice",
-      "check": {
-        "PowerToughness": {
-          "object": "Goblin Token#2",
-          "power": 2,
-          "toughness": 2
-        }
-      }
-    },
-    {
-      "turn": 1,
-      "step": "PrecombatMain",
-      "player": "alice",
-      "check": {
-        "PowerToughness": {
-          "object": "Goblin Token",
-          "power": 1,
-          "toughness": 1
-        }
-      }
-    },
-    {
-      "turn": 1,
-      "step": "PrecombatMain",
-      "player": "alice",
-      "do": {
-        "Cast": {
-          "object": "$bears",
-          "mana": [
-            "$f1",
-            "$f2"
-          ]
-        }
-      }
-    },
-    {
-      "turn": 1,
-      "step": "PrecombatMain",
-      "player": "alice",
-      "do": "Pass"
-    },
-    {
-      "turn": 1,
-      "step": "PrecombatMain",
-      "player": "alice",
-      "check": {
-        "View": {
-          "of": "Stack",
-          "is": []
-        }
-      }
-    },
-    {
-      "turn": 1,
-      "step": "PrecombatMain",
-      "player": "alice",
-      "check": {
-        "Count": {
-          "player": "alice",
-          "zone": "Battlefield",
-          "card": "Wicked",
-          "count": 1
+          "is": "Grizzly Bears"
         }
       }
     },
@@ -312,8 +242,8 @@
       "check": {
         "PowerToughness": {
           "object": "Grizzly Bears",
-          "power": 2,
-          "toughness": 2
+          "power": 3,
+          "toughness": 3
         }
       }
     }
