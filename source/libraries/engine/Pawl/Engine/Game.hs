@@ -2258,6 +2258,16 @@ lifeSharers :: PlayerId -> GameState -> [PlayerId]
 lifeSharers pid gs =
   pid : [other | GameSettings.sharedTeamLife (GameState.settings gs), other <- Map.keys (GameState.players gs), Teams.sameTeam (teams gs) pid other]
 
+-- CR 810.10: the players whose counters of this kind are this player's -- the
+-- player, and in Two-Headed Giant every teammate (CR 102.3) for poison, which the
+-- team shares. Every sharer's Player.counters holds the team's count, lifeSharers'
+-- posture, so a read of any member's poison is CR 810.10a's read of the team's
+-- and CR 810.10d's "poisoned" with no reader rerouted. Never CR 904.13c's
+-- Archenemy Commander, whose teams share life but not poison.
+counterSharers :: PlayerCounterKind.PlayerCounterKind -> PlayerId -> GameState -> [PlayerId]
+counterSharers kind pid gs =
+  pid : [other | kind == PlayerCounterKind.Poison, GameSettings.twoHeadedGiant (GameState.settings gs), other <- Map.keys (GameState.players gs), Teams.sameTeam (teams gs) pid other]
+
 -- CR 119.3 / 810.9: move this player's life total by this much. The life
 -- event happens to the player and its result to their team's shared total,
 -- which is every sharer's Player.life (lifeSharers), so a read of any member's

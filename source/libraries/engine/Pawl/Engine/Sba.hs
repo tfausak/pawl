@@ -28,6 +28,7 @@ import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Speed as Speed
 import qualified Pawl.Engine.Target as Target
+import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
@@ -60,6 +61,7 @@ import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.TargetSlot as TargetSlot
+import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 704.5a (life <= 0), CR 704.5b (drawing from an empty library), CR 704.5c
@@ -68,9 +70,9 @@ import qualified Pawl.Types.Zone as Zone
 --
 -- CR 704.6a / 810.8c: a team at 0 or less life is every member at 0 or less,
 -- Game.adjustLife keeping a shared total on each member, so CR 704.5a takes the
--- whole team at once. Poison stays per player, which is CR 904.13c's reading.
---
--- Not implemented: CR 704.6b's shared poison threshold (#4494).
+-- whole team at once. Poison is shared only in Two-Headed Giant (CR 810.10,
+-- 904.13c), where Game.counterSharers keeps the team's count on each member,
+-- so CR 704.6b's team at fifteen is every member at fifteen (poisonThreshold).
 --
 -- Rule 704.6c's disjunct is delegated to Pawl.Engine.Commander, the way CR
 -- 704.5aa's is to Pawl.Engine.Speed: this module owns WHEN a state-based action
@@ -82,9 +84,22 @@ losesNow gs pid = case Map.lookup pid (GameState.players gs) of
     Player.status player == Status.Playing
       && ( Player.life player <= 0
              || Set.member pid (GameState.drewFromEmpty gs)
-             || Map.findWithDefault 0 PlayerCounterKind.Poison (Player.counters player) >= 10
+             || Map.findWithDefault 0 PlayerCounterKind.Poison (Player.counters player) >= poisonThreshold gs pid
              || Commander.lethalDamage pid gs
          )
+
+-- CR 704.5c: ten poison counters; CR 704.6b / 810.8d in Two-Headed Giant, where
+-- CR 704.5c is ignored, a team's fifteen, and CR 810.11 five more for each
+-- member beyond the second.
+poisonThreshold :: GameState -> PlayerId -> Natural
+poisonThreshold gs pid =
+  let teams = Teams.unwrap (Game.teams gs)
+   in case Map.lookup pid teams of
+        Just team
+          | GameSettings.twoHeadedGiant (GameState.settings gs) ->
+              let members = length (filter (== team) (Map.elems teams))
+               in 15 + 5 * Int.toNaturalSaturating (members - 2)
+        _ -> 10
 
 -- CR 704.5h: a creature with toughness > 0 dealt damage by a deathtouch source
 -- since the last SBA check is destroyed. "Deathtouch source" is read from the

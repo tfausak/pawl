@@ -1,0 +1,123 @@
+{
+  "description": "CR 701.34b proliferating both teammates gives the team one poison counter",
+  "note": "A Two-Headed Giant game with alice and bob's team on one poison counter. Carol's Steady Progress chooses both of them, and since the team shares its poison only one of them is given another (CR 701.34b), so the team is on two, not three. The control is the same team game without the variant, where each gets one.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1,
+        "counters": [
+          {
+            "key": {
+              "type": "Poison"
+            },
+            "value": 1
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "team": 1,
+        "counters": [
+          {
+            "key": {
+              "type": "Poison"
+            },
+            "value": 1
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "team": 2,
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island-1"
+          },
+          {
+            "card": "Island",
+            "label": "island-2"
+          },
+          {
+            "card": "Island",
+            "label": "island-3"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Steady Progress",
+            "label": "progress"
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "dave",
+        "team": 2
+      }
+    ],
+    "active": "carol",
+    "step": "PrecombatMain",
+    "sharedTeamTurns": true,
+    "twoHeadedGiant": true
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": {
+        "Cast": {
+          "object": "$progress",
+          "mana": [
+            "$island-1",
+            "$island-2",
+            "$island-3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseProliferate",
+          "with": [
+            [],
+            [
+              "alice",
+              "bob"
+            ]
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "PlayerCounters": {
+        "player": "alice",
+        "kind": {
+          "type": "Poison"
+        },
+        "count": 2
+      }
+    },
+    {
+      "PlayerCounters": {
+        "player": "bob",
+        "kind": {
+          "type": "Poison"
+        },
+        "count": 2
+      }
+    }
+  ]
+}

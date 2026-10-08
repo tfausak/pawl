@@ -9876,16 +9876,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           | n > 0 ->
               -- CR 122: GainPlayerCounters' mirror, through no funnel for
               -- Effect.RemoveCounters' reason. The floor is explicit, since
-              -- Natural subtraction would underflow.
+              -- Natural subtraction would underflow. CR 810.10b: off the team's
+              -- shared count, which every sharer holds (Game.counterSharers);
+              -- no card in data/cards/ removes poison, so no test observes that
+              -- (gap #4796).
               State.modify'
                 ( \g ->
-                    g
-                      { GameState.players =
-                          Map.adjust
-                            (\p -> p {Player.counters = Map.adjust (\held -> held - min held (Integer.toNaturalSaturating n)) kind (Player.counters p)})
-                            pid
-                            (GameState.players g)
-                      }
+                    let lose p = p {Player.counters = Map.adjust (\held -> held - min held (Integer.toNaturalSaturating n)) kind (Player.counters p)}
+                     in g {GameState.players = List.foldl' (flip (Map.adjust lose)) (GameState.players g) (Game.counterSharers kind pid g)}
                 )
         _ -> pure ()
   -- CR 107.14: "you may pay any amount of {E}". The payer is the resolving
@@ -10358,9 +10356,17 @@ proliferateOnce controller = do
     Monad.forM_ keptPermanents $ \oid ->
       Monad.forM_ (kindsOn oid) $ \kind -> Event.putCounters (CounterCause.ByEffect controller) oid kind 1
     -- CR 122.1: and player counters through their own funnel.
-    Monad.forM_ keptPlayers $ \pid ->
+    --
+    -- CR 701.34b: a kind a team shares (Game.counterSharers, Two-Headed Giant's
+    -- poison) gets one additional counter however many of its members were
+    -- chosen.
+    --
+    -- Not implemented: the proliferating player's choice of WHICH chosen
+    -- teammate gets that counter; the first in turn order does (#4795).
+    Monad.forM_ (zip [0 :: Int ..] keptPlayers) $ \(i, pid) ->
       Monad.forM_ (kindsFor pid) $ \kind ->
-        Monad.void (Event.putPlayerCounters (CounterCause.ByEffect controller) pid kind 1)
+        Monad.unless (any (\earlier -> List.elem pid (Game.counterSharers kind earlier gs)) (take i keptPlayers)) $
+          Monad.void (Event.putPlayerCounters (CounterCause.ByEffect controller) pid kind 1)
   -- "Whenever you proliferate" fires even when nothing was chosen (Tekuthal,
   -- Inquiry Dominus's ruling), so the event is recorded outside the guard.
   State.modify' (Event.recordEvent (GameEvent.Proliferated controller))
