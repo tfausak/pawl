@@ -269,6 +269,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.TargetsPlayer _ -> 0
   Filter.Type.IsPlayer _ -> 0
   Filter.Type.IsBound _ -> 0
+  Filter.Type.IsTarget -> 0
   Filter.Type.SameNameAsBound _ -> 0
   Filter.Type.SameNameAsSource -> 0
   Filter.Type.SameOwnerAsSource -> 0
@@ -451,6 +452,41 @@ triggerConditionAtoms tag value = case value of
   Value.Null _ -> 0
   Value.Boolean _ -> 0
   Value.Number _ -> 0
+
+-- The CR 601.2c announced-target tag, spelled once.
+isTargetTag :: Text.Text
+isTargetTag = Text.pack "IsTarget"
+
+-- How many Filter.IsTarget atoms sit OUTSIDE a cost an announcement pays, the
+-- only positions Binding.announcedTargets is stamped for: a spell's additional
+-- costs, an activated ability's cost (an object with a "cost" beside a "modal"),
+-- and the components an AddSpellCost or AddActivationCost adds. Anywhere else --
+-- a triggered ability above all, which is never stamped -- the atom is a silent
+-- False, isBoundOffends' offence one atom over. Counted off the encoding, so a
+-- grant nested inside an effect is reached too.
+isTargetStrays :: Value.Value -> Int
+isTargetStrays value = case value of
+  Value.Object o ->
+    let pairs = Object.unwrap o
+        nameOf p = String.unwrap (Pair.name p)
+        has k = any ((== Text.pack k) . nameOf) pairs
+        activated = has "cost" && has "modal" && not (has "condition")
+        adding = any (\p -> nameOf p == Text.pack "type" && elem (Pair.value p) (fmap (Value.String . String.MkString . Text.pack) ["AddSpellCost", "AddActivationCost"])) pairs
+        paid p =
+          elem (nameOf p) (fmap Text.pack ["additionalCosts", "additionalCostChoices"])
+            || (activated && nameOf p == Text.pack "cost")
+            || (adding && nameOf p == Text.pack "value")
+        here = fromEnum (any (\p -> nameOf p == Text.pack "type" && Pair.value p == Value.String (String.MkString isTargetTag)) pairs)
+     in here + sum [isTargetStrays (Pair.value p) | p <- pairs, not (paid p)]
+  Value.Array a -> sum (fmap isTargetStrays (Array.unwrap a))
+  Value.String _ -> 0
+  Value.Null _ -> 0
+  Value.Boolean _ -> 0
+  Value.Number _ -> 0
+
+-- Does this face ask IsTarget where no announcement stamps the targets?
+isTargetOffends :: Face.Face Card.Type.Card -> Bool
+isTargetOffends = (/= 0) . isTargetStrays . Codec.encode (Face.Codec.codec Card.codec)
 
 -- The CR 202.3 computed-bound tag, spelled once.
 manaValueAtMostAmountTag :: Text.Text
@@ -2014,6 +2050,20 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
   -- an object, and unanswerable in the one card-authored position whose
   -- candidates are not objects in the game -- CR 400.11c's wish filter, matched
   -- against a printed face. See isBoundOffends for the two offences.
+  -- CR 601.2c: Filter.IsTarget reads the targets a cast or an activation
+  -- stamped, so it is answerable in the cost that announcement pays and a
+  -- silent False elsewhere (isTargetStrays).
+  Spec.it s "CR 601.2c no card asks IsTarget outside a cost an announcement pays" $ do
+    ps <- S.allPrintings s
+    Spec.assertEqWith s "no card asks IsTarget where nothing stamps the targets" (fmap (S.nameOf . Printing.card) (filter (anyFace isTargetOffends . Printing.card) ps)) []
+    edict <- S.printingOf s registry "Synthetic Spiteful Edict"
+    rite <- S.printingOf s registry "Synthetic Spiteful Rite"
+    altar <- S.printingOf s registry "Synthetic Spiteful Altar"
+    let atoms = jsonAtoms isTargetTag . Codec.encode (Face.Codec.codec Card.codec) . S.combinedFace
+    Spec.assertEqWith s "and the added, additional and activation costs that ask it are accepted" (fmap atoms [edict, rite, altar], fmap (isTargetOffends . S.combinedFace) [edict, rite, altar]) ([1, 1, 1], [False, False, False])
+    piker <- S.printingOf s registry "Goblin Piker"
+    let planted = (S.combinedFace piker) {Face.spell = Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching (Filter.Type.Not Filter.Type.IsTarget)) Regenerability.Regenerable Nothing Nothing Nothing))))) Map.empty)) (ModeSelection.ChooseExactly 1)}
+    Spec.assertBool s (isTargetOffends planted) "the same atom in an effect's filter is an offence"
   Spec.it s "CR 400.11c no card asks IsBound in a wish's filter" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace isBoundOffends . Printing.card) ps

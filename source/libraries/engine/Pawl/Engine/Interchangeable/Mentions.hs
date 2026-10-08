@@ -18,6 +18,7 @@
 module Pawl.Engine.Interchangeable.Mentions where
 
 import qualified Data.Map.Strict as Map
+import qualified Pawl.Engine.Binding as Binding.Engine
 import qualified Pawl.Types.AbilityAddsMana as AbilityAddsMana
 import qualified Pawl.Types.ActivateManaAbilities as ActivateManaAbilities
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
@@ -452,6 +453,7 @@ filterNames asking criterion = case criterion of
   Filter.TargetsMatching nested -> filterNames asking nested
   Filter.TargetsPlayer _relation -> False
   Filter.IsBound slot -> slotNames asking slot
+  Filter.IsTarget -> slotNames asking Binding.Engine.announcedTargets
   Filter.SameNameAsBound slot -> slotNames asking slot
   Filter.SameNameAsSource -> False
   Filter.SameOwnerAsSource -> False

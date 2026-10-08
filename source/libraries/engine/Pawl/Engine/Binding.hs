@@ -897,6 +897,31 @@ castSpell = SlotName.MkSlotName (Text.pack "thatSpell")
 thisAbility :: SlotName
 thisAbility = SlotName.MkSlotName (Text.pack "thisAbility")
 
+-- CR 601.2c: the reserved slot under which a spell's or an activated ability's
+-- targets are bound AGAIN, all slots as one group, so a cost another permanent
+-- adds can ask "is this a target of that spell" without knowing the spell's slot
+-- names (Filter.IsTarget). A GROUP rather than a target binding, so nothing that
+-- counts or re-validates targets sees them twice. Stamped by
+-- Pawl.Engine.Cast.castProposed and Pawl.Engine.Activate.activateAbility as the
+-- targets are recorded, and handed to a payability gate's aiming the same way
+-- (withAnnouncedTargets). Not stamped for a triggered ability, which has no CR
+-- 601.2h payment for a cost to read it in.
+announcedTargets :: SlotName
+announcedTargets = SlotName.MkSlotName (Text.pack "announcedTargets")
+
+-- Bind every object a slot map names under announcedTargets.
+setAnnouncedTargets :: Map SlotName (Set Recipient) -> Map SlotName Binding -> Map SlotName Binding
+setAnnouncedTargets chosen =
+  let objects = Set.fromList (concatMap (Maybe.mapMaybe Recipient.objectOf . Set.toList) (Map.elems chosen))
+   in if Set.null objects then id else Map.insert announcedTargets (toObjects (Seq.fromList (Set.toAscList objects)))
+
+-- A gate's aiming with announcedTargets added, the shape Cost.announcedSlots
+-- reads off a stamped object.
+withAnnouncedTargets :: Map SlotName (Set ObjectId) -> Map SlotName (Set ObjectId)
+withAnnouncedTargets aiming =
+  let objects = Set.unions (Map.elems aiming)
+   in if Set.null objects then aiming else Map.insert announcedTargets objects aiming
+
 -- CR 601.2c: the reserved slot under which the SPELL OR ABILITY THAT DID THE
 -- TARGETING is bound -- rule 702.21a's "that spell or ability", which ward
 -- counters and whose controller ward offers the cost to. Stamped by
