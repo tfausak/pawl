@@ -60,6 +60,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KickerDecision as KickerDecision
@@ -132,7 +133,7 @@ sicknessSpec s registry = Spec.describe s "Sickness" $ do
 castGameState :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m GameState.GameState
 castGameState s registry = do
   matchup <- S.redRed (S.printingOf s registry)
-  pure (snd (Engine.runMatchPure S.castAnswer matchup))
+  pure (snd (Engine.runMatchPure S.castAnswer GameSettings.plain matchup))
 
 castEngineSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 castEngineSpec s registry = Spec.describe s "CastEngine" $ do

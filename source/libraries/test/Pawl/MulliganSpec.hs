@@ -60,15 +60,15 @@ poolToLibrary pid gs =
           GameState.library = Map.insert pid (Seq.fromList mine) (GameState.library gs)
         }
 
--- CR 903.12a: turn the Brawl option on. The seat count is untouched, so a board
--- run through this and the same board without it differ in exactly one thing.
-brawling :: GameState.GameState -> GameState.GameState
-brawling gs = gs {GameState.settings = (GameState.settings gs) {GameSettings.brawl = True}}
-
 -- n Mountains in each player's library, nothing elsewhere.
 libraryGame :: Printing.Printing -> Int -> GameState.GameState
-libraryGame mountain n =
-  let g0 = Setup.emptyGame S.bothPlayers
+libraryGame = libraryGameWith GameSettings.plain
+
+-- libraryGame, started with these options. CR 903.12a's Brawl option and the
+-- same board without it differ in exactly one thing: the seat count is fixed.
+libraryGameWith :: GameSettings.GameSettings -> Printing.Printing -> Int -> GameState.GameState
+libraryGameWith settings mountain n =
+  let g0 = Setup.gameWith settings S.bothPlayers
       addMany pid g = List.foldl' (\h _ -> snd (S.addPermanent mountain pid h)) g (replicate n ())
    in poolToLibrary S.bob (poolToLibrary S.alice (addMany S.bob (addMany S.alice g0)))
 
@@ -927,8 +927,8 @@ spec s registry =
       -- by the option alone. Every leg is the same two-seat board with the same
       -- twenty Mountains; the only difference is GameState.settings.
       mountain <- S.printingOf s registry "Mountain"
-      let once = run (mulliganUpTo 1) (brawling (libraryGame mountain 20))
-          twice = run (mulliganUpTo 2) (brawling (libraryGame mountain 20))
+      let once = run (mulliganUpTo 1) (libraryGameWith GameSettings.plain {GameSettings.brawl = True} mountain 20)
+          twice = run (mulliganUpTo 2) (libraryGameWith GameSettings.plain {GameSettings.brawl = True} mountain 20)
           ordinary = run (mulliganUpTo 1) (libraryGame mountain 20)
       Spec.assertEqWith s "alice's free first mulligan keeps all seven" (S.handSize S.alice once) 7
       Spec.assertEqWith s "bob's too" (S.handSize S.bob once) 7
@@ -943,7 +943,7 @@ spec s registry =
       -- Brawl leg gets one more, 7,6,5,4,3,2,1,0.
       mountain <- S.printingOf s registry "Mountain"
       let asksIn gs0 = snd (State.runState (Engine.runGame recordAlwaysMulligan gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])) [])
-          brawl = asksIn (brawling (libraryGame mountain 20))
+          brawl = asksIn (libraryGameWith GameSettings.plain {GameSettings.brawl = True} mountain 20)
           ordinary = asksIn (libraryGame mountain 20)
       Spec.assertEqWith s "two-seat Brawl: alice may take eight mulligans" (length (filter (== S.alice) brawl)) 8
       Spec.assertEqWith s "two seats outside Brawl: seven" (length (filter (== S.alice) ordinary)) 7

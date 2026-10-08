@@ -26,6 +26,7 @@ import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.Result as Result
@@ -81,7 +82,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Engine" $ do
   -- irrelevant anyway, so there is nothing for a seed to vary.
   Spec.it s "CR 704.5b/104.2a a three-seat lands-only game needs TWO deck-outs to find a winner" $ do
     matchup <- S.threePlayerLandsOnly (S.printingOf s registry)
-    let final = snd (Engine.runMatchPure S.castAnswer matchup)
+    let final = snd (Engine.runMatchPure S.castAnswer GameSettings.plain matchup)
         decked = GameState.drewFromEmpty final
     Spec.assertEqWith s "CR 704.5b exactly two players drew from an empty library" (Set.size decked) 2
     case GameState.result final of
@@ -102,7 +103,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Engine" $ do
   -- delete the loser's eight cards and this is what would catch it.
   Spec.it s "CR 800.1 a two-seat lands-only game ends on the FIRST deck-out, and keeps both decks" $ do
     matchup <- S.landsOnly (S.printingOf s registry)
-    let final = snd (Engine.runMatchPure S.castAnswer matchup)
+    let final = snd (Engine.runMatchPure S.castAnswer GameSettings.plain matchup)
         decked = GameState.drewFromEmpty final
     Spec.assertEqWith s "CR 704.5b exactly one player drew from an empty library" (Set.size decked) 1
     case GameState.result final of
@@ -121,8 +122,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Engine" $ do
   -- case would still pass if DeclareAttackers were ignored outright.
   Spec.it s "a game driven through combat terminates, and combat actually happened" $ do
     matchup <- S.shortGreenBlack (S.printingOf s registry)
-    let fought = snd (Engine.runMatchPure S.fightAnswer matchup)
-        control = snd (Engine.runMatchPure S.castAnswer matchup)
+    let fought = snd (Engine.runMatchPure S.fightAnswer GameSettings.plain matchup)
+        control = snd (Engine.runMatchPure S.castAnswer GameSettings.plain matchup)
     Spec.assertBool s (Maybe.isJust (GameState.result fought)) "the fought game reaches a result"
     Spec.assertBool s (Maybe.isJust (GameState.result control)) "and so does its no-combat control"
     -- CR 510.2 deals the combat damage and CR 704.5g destroys what it was
