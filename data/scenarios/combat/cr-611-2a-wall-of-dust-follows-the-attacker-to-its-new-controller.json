@@ -1,0 +1,55 @@
+{
+  "description": "CR 611.2a Wall of Dust's \"can't attack during its controller's next turn\" follows the attacker to its new controller",
+  "note": "Bob's Wall of Dust blocks alice's Hill Giant on turn 1. On turn 2 bob takes the giant with Control Magic, so its controller's next turn is bob's turn 4, not alice's turn 3: the giant cannot attack on turn 4 (his Grizzly Bears keep the declaration a real prompt), and can on turn 6 once that window has closed.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Hill Giant", "label": "giant", "ready": true }],
+        "library": [{ "card": "Island" }, { "card": "Island" }, { "card": "Island" }, { "card": "Island" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Wall of Dust", "label": "wall", "ready": true },
+          { "card": "Grizzly Bears", "label": "bears", "ready": true },
+          { "card": "Island", "label": "i1" },
+          { "card": "Island", "label": "i2" },
+          { "card": "Island", "label": "i3" },
+          { "card": "Island", "label": "i4" }
+        ],
+        "hand": [{ "card": "Control Magic", "label": "magic" }],
+        "library": [{ "card": "Island" }, { "card": "Island" }, { "card": "Island" }, { "card": "Island" }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$giant"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$wall": ["$giant"] } } },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": { "Cast": { "object": "$magic", "targets": ["$giant"], "mana": ["$i1", "$i2", "$i3", "$i4"] } }
+    },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "do": "Pass" },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": { "View": { "of": "Controller", "object": "$giant", "is": "bob" } }
+    },
+    { "turn": 2, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": [] } },
+    { "turn": 4, "step": "DeclareAttackers", "player": "bob", "refuse": { "Attack": ["$giant"] } },
+    { "turn": 4, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": [] } },
+    { "turn": 6, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["$giant"] } },
+    {
+      "turn": 6,
+      "step": "DeclareAttackers",
+      "player": "bob",
+      "check": { "Attackers": { "attackers": { "$giant": "$alice" } } }
+    }
+  ]
+}

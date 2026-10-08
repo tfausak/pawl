@@ -31,6 +31,7 @@ import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
+import qualified Pawl.Types.AfterObjectTurn as AfterObjectTurn
 import qualified Pawl.Types.AgainstLastCardExiledWith as AgainstLastCardExiledWith
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
@@ -1512,6 +1513,7 @@ expiryNames asking x = case x of
   Expiry.AtUpkeepOf _playerId -> False
   Expiry.AtEndOfTurnOf _afterTurn -> False
   Expiry.DuringTurnOf _afterTurn -> False
+  Expiry.DuringTurnOfControllerOf afterObjectTurn -> AfterObjectTurn.object afterObjectTurn == object asking
   Expiry.DuringExtraTurn _timestamp -> False
   Expiry.AtEndOf _phaseSelector -> False
   Expiry.AtEndOfCombatOn _afterTurn -> False

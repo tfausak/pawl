@@ -44,7 +44,7 @@ import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.Affected as Affected
-import qualified Pawl.Types.AfterTurn as AfterTurn
+import qualified Pawl.Types.AfterObjectTurn as AfterObjectTurn
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
@@ -2711,13 +2711,14 @@ escapeBoards s registry = do
 -- Dust's "Whenever this creature blocks a creature, that creature can't attack
 -- during its controller's next turn" (Oracle checked against Scryfall
 -- 2026-09-21), the pool's only printing of such a duration. The row lands in
--- GameState.attackProhibitions under Expiry.DuringTurnOf and
+-- GameState.attackProhibitions under Expiry.DuringTurnOfControllerOf, pinned to
+-- DuringTurnOf as its controller's turn begins, and
 -- Pawl.Engine.CombatRestriction.liveAttackProhibitions is the gate that keeps it
 -- inert until that turn.
 --
 -- The window is observable only because a CONTROL CHANGE can put the creature in
--- a combat the window does not cover: its controller is sampled as the block
--- happens, and another player's turn comes first. Act of Treason is what makes
+-- a combat the window does not cover: Act of Treason's steal lasts only bob's
+-- turn, which begins with alice in control, so alice's turn comes first. Act of Treason is what makes
 -- that combat happen, and it is the whole reason bob has three Mountains.
 --
 -- THE PAIR: the same attacker, the same declaration and the same block on every
@@ -2740,10 +2741,10 @@ windowAttackRestrictionSpec s registry = Spec.describe s "WindowAttackRestrictio
     Spec.assertBool s (Combat.legalAttackDeclarationAs S.bob [(giant, AttackTarget.OfPlayer S.alice)] (declaringAt S.alice bobsTurn)) "CR 611.2a: bob's turn is not the turn the window names, so the Giant may attack"
     Spec.assertBool s (Combat.legalAttackDeclarationAs S.bob [(openGiant, AttackTarget.OfPlayer S.alice)] (declaringAt S.alice openTurn)) "as the pair's Giant does"
     -- Ordered LAST so a card that printed the end-only duration reddens the
-    -- declaration above rather than being absorbed here: alice is the sampled
-    -- seat (CR 108.4 / 110.2, through the blocked creature) and 1 is the turn
-    -- the block happened on.
-    Spec.assertEqWith s "under a window naming alice's turn after turn 1" (fmap ActiveAttackProhibition.expiry (GameState.attackProhibitions blocked)) [Expiry.DuringTurnOf (AfterTurn.MkAfterTurn S.alice 1)]
+    -- declaration above rather than being absorbed here: the seat is left open
+    -- on the blocked creature (CR 108.4 / 110.2, pinned as its controller's turn
+    -- begins) and 1 is the turn the block happened on.
+    Spec.assertEqWith s "under a window naming the Giant's controller's turn after turn 1" (fmap ActiveAttackProhibition.expiry (GameState.attackProhibitions blocked)) [Expiry.DuringTurnOfControllerOf (AfterObjectTurn.MkAfterObjectTurn giant 1)]
   Spec.it s "CR 611.2a and cannot attack once that turn has begun" $ do
     (giant, _, blocked) <- wallBoard s registry "Wall of Dust"
     (openGiant, _, control) <- wallBoard s registry "Wall of Stone"

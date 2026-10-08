@@ -40,6 +40,7 @@ import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as View
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Types.ActiveActivationProhibition as ActiveActivationProhibition
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
@@ -52,6 +53,7 @@ import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
 import qualified Pawl.Types.ActiveUntapProhibition as ActiveUntapProhibition
+import qualified Pawl.Types.AfterObjectTurn as AfterObjectTurn
 import qualified Pawl.Types.AfterTurn as AfterTurn
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
@@ -131,12 +133,18 @@ arm targets controller source duration gs = case duration of
   -- reasons, and Nothing where the reference names nobody for that arm's reason
   -- too -- a window that cannot begin stores nothing.
   --
-  -- Not implemented: a ControllerOfBound seat following its object to a new
-  -- controller before the window opens (#4696).
-  Duration.DuringNextTurnOf ref ->
-    fmap
-      (\pid -> Expiry.DuringTurnOf (AfterTurn.MkAfterTurn pid (GameState.turnNumber gs)))
-      (seatOf targets controller source gs ref)
+  -- A ControllerOfBound naming an object still in the game is NOT sampled: its
+  -- seat is left open and pinned by dropAtTurnOf as a turn of its controller
+  -- begins, so a control change before then moves the window (CR 611.2a).
+  Duration.DuringNextTurnOf ref -> case ref of
+    PlayerRef.ControllerOfBound slot
+      | Just oid <- Map.lookup slot targets >>= Binding.onlyOne >>= Recipient.objectOf,
+        Maybe.isJust (Game.lookupObject oid gs) ->
+          Just (Expiry.DuringTurnOfControllerOf (AfterObjectTurn.MkAfterObjectTurn oid (GameState.turnNumber gs)))
+    _ ->
+      fmap
+        (\pid -> Expiry.DuringTurnOf (AfterTurn.MkAfterTurn pid (GameState.turnNumber gs)))
+        (seatOf targets controller source gs ref)
   -- CR 611.2a: the arm above's window with the seat taken from CR 109.5's "you",
   -- as UntilYourNextTurn takes it. Never Nothing -- a controller is always a
   -- seat, so this window always begins.
@@ -282,6 +290,7 @@ follows expiry = case expiry of
   Expiry.AtUpkeepOf _ -> False
   Expiry.AtEndOfTurnOf _ -> False
   Expiry.DuringTurnOf _ -> False
+  Expiry.DuringTurnOfControllerOf _ -> False
   Expiry.DuringExtraTurn _ -> False
   Expiry.AtEndOf _ -> False
   Expiry.AtEndOfCombatOn _ -> False
@@ -308,6 +317,8 @@ begun gs expiry = case expiry of
   Expiry.DuringTurnOf afterTurn ->
     Turn.isActive gs (AfterTurn.player afterTurn)
       && GameState.turnNumber gs > AfterTurn.turn afterTurn
+  -- Not yet pinned to a seat, so no turn of its controller has begun.
+  Expiry.DuringTurnOfControllerOf _ -> False
   -- CR 500.7: open exactly while the extra turn it names is the one under way.
   Expiry.DuringExtraTurn stamp -> GameState.extraTurnUnderWay gs == Just stamp
   Expiry.AtCleanup -> True
@@ -374,6 +385,10 @@ dropAtCleanup gs =
         Expiry.DuringTurnOf afterTurn ->
           not (Turn.isActive gs (AfterTurn.player afterTurn))
             || GameState.turnNumber gs <= AfterTurn.turn afterTurn
+        -- Unpinned, so its window has not come: kept while the object exists
+        -- to have a controller, and dropped as hygiene once it does not.
+        Expiry.DuringTurnOfControllerOf afterObjectTurn ->
+          Maybe.isJust (Game.lookupObject (AfterObjectTurn.object afterObjectTurn) gs)
         -- CR 611.2a / 500.7: kept while the turn it names is still pending, so
         -- the cleanup that ends that turn -- it was popped as it began -- ends
         -- it, and so does the first cleanup after CR 800.4k spent it unbegun.
@@ -457,6 +472,7 @@ sweepConditional = do
         Expiry.AtUpkeepOf _ -> True
         Expiry.AtEndOfTurnOf _ -> True
         Expiry.DuringTurnOf _ -> True
+        Expiry.DuringTurnOfControllerOf _ -> True
         Expiry.DuringExtraTurn _ -> True
         Expiry.AtEndOf _ -> True
         Expiry.AtEndOfCombatOn _ -> True
@@ -637,6 +653,8 @@ dropAtTurnOf pid gs =
         -- still in the game keeps it, and this is the very moment `begun` starts
         -- answering True for the turn it names.
         Expiry.DuringTurnOf afterTurn -> not (departed && AfterTurn.player afterTurn == pid)
+        -- Pinned below rather than ended here.
+        Expiry.DuringTurnOfControllerOf _ -> True
         -- Named by a turn rather than a seat, so no seat's handoff ends it; an
         -- extra turn CR 800.4k spent unbegun is dropAtCleanup's to end.
         Expiry.DuringExtraTurn _ -> True
@@ -663,23 +681,67 @@ dropAtTurnOf pid gs =
       keepEvasion active = survives (ActiveEvasion.expiry active)
       keepDelayed = maybe True survives . DelayedTrigger.expiry
       keepIgnored = survives . IgnoredAbility.expiry
-   in gs
-        { GameState.continuousEffects = filter keepEffect (GameState.continuousEffects gs),
-          GameState.copyEffects = filter keepCopy (GameState.copyEffects gs),
-          GameState.replacements = filter keepReplacement (GameState.replacements gs),
-          GameState.playerEffects = filter keepPlayerEffect (GameState.playerEffects gs),
-          GameState.blockRequirements = filter keepBlockRequirement (GameState.blockRequirements gs),
-          GameState.attackRequirements = filter keepAttackRequirement (GameState.attackRequirements gs),
-          GameState.unregeneratables = filter keepUnregeneratable (GameState.unregeneratables gs),
-          GameState.blockProhibitions = filter keepBlockProhibition (GameState.blockProhibitions gs),
-          GameState.attackProhibitions = filter keepAttackProhibition (GameState.attackProhibitions gs),
-          GameState.activationProhibitions = filter keepActivationProhibition (GameState.activationProhibitions gs),
-          GameState.untapProhibitions = filter keepUntapProhibition (GameState.untapProhibitions gs),
-          GameState.evasions = filter keepEvasion (GameState.evasions gs),
-          GameState.ignoredAbilities = filter keepIgnored (GameState.ignoredAbilities gs),
-          GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs),
-          GameState.objects = clearedGoads pid (clearedDetentions pid (clearedPermissions (survives . ExilePlayPermission.expiry) gs))
-        }
+   in pinAtTurnOf
+        pid
+        gs
+          { GameState.continuousEffects = filter keepEffect (GameState.continuousEffects gs),
+            GameState.copyEffects = filter keepCopy (GameState.copyEffects gs),
+            GameState.replacements = filter keepReplacement (GameState.replacements gs),
+            GameState.playerEffects = filter keepPlayerEffect (GameState.playerEffects gs),
+            GameState.blockRequirements = filter keepBlockRequirement (GameState.blockRequirements gs),
+            GameState.attackRequirements = filter keepAttackRequirement (GameState.attackRequirements gs),
+            GameState.unregeneratables = filter keepUnregeneratable (GameState.unregeneratables gs),
+            GameState.blockProhibitions = filter keepBlockProhibition (GameState.blockProhibitions gs),
+            GameState.attackProhibitions = filter keepAttackProhibition (GameState.attackProhibitions gs),
+            GameState.activationProhibitions = filter keepActivationProhibition (GameState.activationProhibitions gs),
+            GameState.untapProhibitions = filter keepUntapProhibition (GameState.untapProhibitions gs),
+            GameState.evasions = filter keepEvasion (GameState.evasions gs),
+            GameState.ignoredAbilities = filter keepIgnored (GameState.ignoredAbilities gs),
+            GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs),
+            GameState.objects = clearedGoads pid (clearedDetentions pid (clearedPermissions (survives . ExilePlayPermission.expiry) gs))
+          }
+
+-- CR 611.2a: "during its controller's next turn" pinned to a seat as a turn
+-- begins -- the first turn after the duration began whose player controls the
+-- object then. From here the row is an ordinary DuringTurnOf, so `begun` opens
+-- it for this turn and dropAtCleanup ends it at this turn's cleanup; a control
+-- change before now moves the window, one after it does not (Gideon,
+-- Battle-Forged's 2015-06-22 ruling). Not pinned to a departed seat, whose turn
+-- does not begin.
+--
+-- data/scenarios/combat/cr-611-2a-wall-of-dust-follows-the-attacker-to-its-new-controller.json
+-- proves it.
+pinAtTurnOf :: PlayerId -> GameState -> GameState
+pinAtTurnOf pid gs =
+  let pin expiry = case expiry of
+        Expiry.DuringTurnOfControllerOf afterObjectTurn
+          | List.elem pid (Game.stillPlaying gs),
+            View.controllerOf (AfterObjectTurn.object afterObjectTurn) gs == Just pid ->
+              Expiry.DuringTurnOf (AfterTurn.MkAfterTurn pid (AfterObjectTurn.turn afterObjectTurn))
+        _ -> expiry
+   in mapExpiries pin gs
+
+-- Every stored expiry rewritten in place, over every carrier sourcedExpiries
+-- reads.
+mapExpiries :: (Expiry -> Expiry) -> GameState -> GameState
+mapExpiries f gs =
+  gs
+    { GameState.continuousEffects = fmap (\x -> x {ContinuousEffect.expiry = f (ContinuousEffect.expiry x)}) (GameState.continuousEffects gs),
+      GameState.copyEffects = fmap (\x -> x {ActiveCopy.expiry = f (ActiveCopy.expiry x)}) (GameState.copyEffects gs),
+      GameState.replacements = fmap (\x -> x {ActiveReplacement.expiry = f (ActiveReplacement.expiry x)}) (GameState.replacements gs),
+      GameState.playerEffects = fmap (\x -> x {ActivePlayerEffect.expiry = f (ActivePlayerEffect.expiry x)}) (GameState.playerEffects gs),
+      GameState.blockRequirements = fmap (\x -> x {ActiveBlockRequirement.expiry = f (ActiveBlockRequirement.expiry x)}) (GameState.blockRequirements gs),
+      GameState.attackRequirements = fmap (\x -> x {ActiveAttackRequirement.expiry = f (ActiveAttackRequirement.expiry x)}) (GameState.attackRequirements gs),
+      GameState.unregeneratables = fmap (\x -> x {ActiveUnregeneratable.expiry = f (ActiveUnregeneratable.expiry x)}) (GameState.unregeneratables gs),
+      GameState.blockProhibitions = fmap (\x -> x {ActiveBlockProhibition.expiry = f (ActiveBlockProhibition.expiry x)}) (GameState.blockProhibitions gs),
+      GameState.attackProhibitions = fmap (\x -> x {ActiveAttackProhibition.expiry = f (ActiveAttackProhibition.expiry x)}) (GameState.attackProhibitions gs),
+      GameState.activationProhibitions = fmap (\x -> x {ActiveActivationProhibition.expiry = f (ActiveActivationProhibition.expiry x)}) (GameState.activationProhibitions gs),
+      GameState.untapProhibitions = fmap (\x -> x {ActiveUntapProhibition.expiry = f (ActiveUntapProhibition.expiry x)}) (GameState.untapProhibitions gs),
+      GameState.evasions = fmap (\x -> x {ActiveEvasion.expiry = f (ActiveEvasion.expiry x)}) (GameState.evasions gs),
+      GameState.ignoredAbilities = fmap (\x -> x {IgnoredAbility.expiry = f (IgnoredAbility.expiry x)}) (GameState.ignoredAbilities gs),
+      GameState.delayedTriggers = fmap (\x -> x {DelayedTrigger.expiry = fmap f (DelayedTrigger.expiry x)}) (GameState.delayedTriggers gs),
+      GameState.objects = fmap (\o -> o {Object.playableFromExile = fmap (\p -> p {ExilePlayPermission.expiry = f (ExilePlayPermission.expiry p)}) (Object.playableFromExile o)}) (GameState.objects gs)
+    }
 
 -- CR 500.5's first clause: effects lasting until the end of a step or phase
 -- expire as it ends. The window that is ending is passed in, because only the
@@ -713,6 +775,7 @@ dropAtEndOf ending gs =
         Expiry.AtUpkeepOf _ -> True
         Expiry.AtEndOfTurnOf _ -> True
         Expiry.DuringTurnOf _ -> True
+        Expiry.DuringTurnOfControllerOf _ -> True
         Expiry.DuringExtraTurn _ -> True
         -- CR 116.2c: no window of the turn ends it.
         Expiry.WhenPaid _ -> True
@@ -737,6 +800,7 @@ dropAtUpkeepOf pid =
     Expiry.AtTurnOf _ -> True
     Expiry.AtEndOfTurnOf _ -> True
     Expiry.DuringTurnOf _ -> True
+    Expiry.DuringTurnOfControllerOf _ -> True
     Expiry.DuringExtraTurn _ -> True
     Expiry.AtEndOf _ -> True
     Expiry.AtEndOfCombatOn _ -> True
@@ -802,6 +866,7 @@ paidExpiries gs =
         Expiry.AtUpkeepOf _ -> []
         Expiry.AtEndOfTurnOf _ -> []
         Expiry.DuringTurnOf _ -> []
+        Expiry.DuringTurnOfControllerOf _ -> []
         Expiry.DuringExtraTurn _ -> []
         Expiry.AtEndOf _ -> []
         Expiry.AtEndOfCombatOn _ -> []
@@ -852,6 +917,7 @@ dropWhenPaidBy oid gs =
         Expiry.AtUpkeepOf _ -> True
         Expiry.AtEndOfTurnOf _ -> True
         Expiry.DuringTurnOf _ -> True
+        Expiry.DuringTurnOfControllerOf _ -> True
         Expiry.DuringExtraTurn _ -> True
         Expiry.AtEndOf _ -> True
         Expiry.AtEndOfCombatOn _ -> True
@@ -906,6 +972,7 @@ expiresWhenUsed expiry = case expiry of
   Expiry.AtUpkeepOf _ -> False
   Expiry.AtEndOfTurnOf _ -> False
   Expiry.DuringTurnOf _ -> False
+  Expiry.DuringTurnOfControllerOf _ -> False
   Expiry.DuringExtraTurn _ -> False
   Expiry.AtEndOf _ -> False
   Expiry.AtEndOfCombatOn _ -> False

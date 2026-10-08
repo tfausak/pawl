@@ -1,5 +1,6 @@
 module Pawl.Types.Expiry where
 
+import qualified Pawl.Types.AfterObjectTurn as AfterObjectTurn
 import qualified Pawl.Types.AfterTurn as AfterTurn
 import qualified Pawl.Types.PaidExpiry as PaidExpiry
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
@@ -73,6 +74,12 @@ data Expiry
     -- player control), and a row stored on one would apply from the moment it is
     -- stored.
     DuringTurnOf AfterTurn.AfterTurn
+  | -- | CR 611.2a: DuringTurnOf with its seat not yet known -- "during its
+    -- controller's next turn", read as that object's controller at the
+    -- beginning of each later turn. Pawl.Engine.Expiry.dropAtTurnOf pins it to
+    -- DuringTurnOf at the first turn that begins under its controller; until
+    -- then it is inert. Wall of Dust is the producer.
+    DuringTurnOfControllerOf AfterObjectTurn.AfterObjectTurn
   | -- | CR 611.2a / 500.7: Duration.DuringThatExtraTurn, stored as the
     -- ExtraTurn.createdAt of the turn it names. A window like DuringTurnOf
     -- above, inert until that turn is under way (Pawl.Engine.Expiry.begun), and
