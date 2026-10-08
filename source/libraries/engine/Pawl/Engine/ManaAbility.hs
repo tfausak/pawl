@@ -29,6 +29,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.Ante as Ante
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Types.Conjure as Conjure
@@ -470,6 +471,7 @@ manaProduced effect = case effect of
   Effect.FlipCoin {} -> Nothing
   Effect.TakeExtraTurn {} -> Nothing
   Effect.ShuffleIntoLibrary {} -> Nothing
+  Effect.Ante {} -> Nothing
   Effect.Shuffle {} -> Nothing
   Effect.OfferCast {} -> Nothing
   Effect.OfferNamedCopy {} -> Nothing
@@ -661,6 +663,7 @@ playerChoice effect = case effect of
   Effect.FlipCoin {} -> Nothing
   Effect.TakeExtraTurn {} -> Nothing
   Effect.ShuffleIntoLibrary {} -> Nothing
+  Effect.Ante {} -> Nothing
   Effect.Shuffle {} -> Nothing
   Effect.OfferCast {} -> Nothing
   Effect.OfferNamedCopy {} -> Nothing
@@ -713,6 +716,8 @@ movesLibraryCard effect = case effect of
   Effect.Search {} -> True
   -- Both halves of its name: cards go INTO a library.
   Effect.ShuffleIntoLibrary {} -> True
+  -- CR 407.4: never INTO a library; out of one where the ref reaches it.
+  Effect.Ante (Ante.MkAnte _ ref _) -> refReachesLibrary ref
   -- CR 701.24a randomises a library WITHIN itself, which is Scry's and Fateseal's
   -- answer above: no card crosses the zone's boundary in either direction.
   Effect.Shuffle {} -> False

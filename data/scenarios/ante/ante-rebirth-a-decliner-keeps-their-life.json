@@ -1,0 +1,30 @@
+{
+  "description": "CR 407.4 Rebirth: the player who antes goes to 20, the one who declines keeps their life",
+  "board": {
+    "ante": true,
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "life": 5,
+        "battlefield": [{ "card": "Forest", "label": "f1" }, { "card": "Forest", "label": "f2" }, { "card": "Forest", "label": "f3" }, { "card": "Forest", "label": "f4" }, { "card": "Forest", "label": "f5" }, { "card": "Forest", "label": "f6" }],
+        "hand": [{ "card": "Rebirth", "label": "rebirth" }],
+        "library": [{ "card": "Island" }, { "card": "Mountain" }]
+      },
+      { "name": "bob", "life": 6, "library": [{ "card": "Plains" }, { "card": "Mountain" }] }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$rebirth", "mana": ["$f1", "$f2", "$f3", "$f4", "$f5", "$f6"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseOptional": { "type": "Exercises" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseOptional": { "type": "Declines" } } }
+  ],
+  "final": [
+    { "Life": { "player": "bob", "life": 6 } },
+    { "Life": { "player": "alice", "life": 20 } },
+    { "Count": { "player": "alice", "zone": "Ante", "card": "Island", "count": 1 } },
+    { "Count": { "player": "bob", "zone": "Ante", "card": "Plains", "count": 0 } }
+  ]
+}

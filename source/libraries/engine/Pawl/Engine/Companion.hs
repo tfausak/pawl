@@ -22,6 +22,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Pawl.Engine.Ante as Ante
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
@@ -127,7 +128,13 @@ revealable pid gs =
   let pool = maybe Map.empty Player.outsideTheGame (Map.lookup pid (GameState.players gs))
       admits printingId = case conditionOf printingId gs of
         Nothing -> False
-        Just predicate -> fulfilled predicate pid gs
+        Just predicate -> not (barredPrinting printingId) && fulfilled predicate pid gs
+      -- CR 407.3. A regression fence: no companion prints the ante reminder
+      -- (Scryfall o:"playing for ante" o:companion, 2026-10-08, no hit; a
+      -- companion printing it would refute this).
+      barredPrinting printingId = case Game.cardOfPrinting printingId gs of
+        Nothing -> False
+        Just card -> Ante.barred (GameState.settings gs) (Game.resolveFaceFor Nothing card)
       fromPool = fmap (OutsideCard.InPool . fst) (filter (\(printingId, n) -> n > 0 && admits printingId) (Map.toAscList pool))
       admitsOuter entry =
         OutsideObject.owner entry == pid

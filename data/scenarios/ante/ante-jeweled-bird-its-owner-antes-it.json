@@ -1,0 +1,28 @@
+{
+  "description": "CR 407.4 Jeweled Bird's owner antes it, sends her other ante card to her graveyard, and draws",
+  "note": "The pair's other half differs only in the Bird's owner. bob's ante card stays: 'cards you own'.",
+  "board": {
+    "ante": true,
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Jeweled Bird", "label": "bird" }, { "card": "Confiscate", "attached": "bird" }],
+        "ante": [{ "card": "Goblin Piker" }],
+        "library": [{ "card": "Island" }, { "card": "Mountain" }]
+      },
+      { "name": "bob", "ante": [{ "card": "Hill Giant" }], "library": [{ "card": "Mountain" }] }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "$bird", "ability": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" }
+  ],
+  "final": [
+    { "Count": { "player": "alice", "zone": "Ante", "card": "Jeweled Bird", "count": 1 } },
+    { "Count": { "player": "alice", "zone": "Graveyard", "card": "Goblin Piker", "count": 1 } },
+    { "Count": { "player": "alice", "zone": "Hand", "card": "Island", "count": 1 } },
+    { "Count": { "player": "bob", "zone": "Ante", "card": "Hill Giant", "count": 1 } }
+  ]
+}

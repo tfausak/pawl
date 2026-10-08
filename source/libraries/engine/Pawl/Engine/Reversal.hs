@@ -56,6 +56,7 @@ withoutAnnouncement before entry closed = do
   phasedOut <- mapOf GameState.phasedOut
   exile <- setOf GameState.exile
   command <- setOf GameState.command
+  ante <- setOf GameState.ante
   attractionDecks <- libraries GameState.attractionDecks
   planarDecks <- libraries GameState.planarDecks
   schemeDecks <- libraries GameState.schemeDecks
@@ -177,6 +178,7 @@ withoutAnnouncement before entry closed = do
         GameState.phasedOut = phasedOut,
         GameState.exile = exile,
         GameState.command = command,
+        GameState.ante = ante,
         GameState.attractionDecks = attractionDecks,
         GameState.planarDecks = planarDecks,
         GameState.schemeDecks = schemeDecks,

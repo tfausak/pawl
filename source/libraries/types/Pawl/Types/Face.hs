@@ -136,6 +136,11 @@ data Face card = MkFace
     -- apply in. Read off the face of a card in its owner's command zone, where
     -- CR 315.3 keeps a conspiracy.
     claimsStartingPlayer :: Bool,
+    -- | CR 407.3: whether this card prints "Remove this card from your deck
+    -- before playing if you're not playing for ante". A printed flag for
+    -- claimsStartingPlayer's reason: its reader (Pawl.Engine.Ante.barred) runs
+    -- on a card outside the game, where no object exists.
+    anteOnly :: Bool,
     -- | CR 702, counted. A card can print the same keyword twice -- Apex
     -- Devastator's "Cascade, cascade, cascade, cascade" -- and CR 702.85c makes
     -- each instance trigger separately, so the count is printed text rather than

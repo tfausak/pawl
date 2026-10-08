@@ -223,6 +223,7 @@ gameWith settings order =
           GameState.phasedOut = mempty,
           GameState.exile = mempty,
           GameState.command = mempty,
+          GameState.ante = mempty,
           GameState.attractionDecks = Map.empty,
           GameState.planarDecks = Map.empty,
           GameState.schemeDecks = Map.empty,
@@ -607,6 +608,8 @@ newGame perform matchup = do
   -- rule 103.2b makes one player's reveal depend on another's, so the order is not
   -- observable today.
   Monad.forM_ seated Companion.reveal
+  -- CR 407.2: after CR 103.1 and before CR 103.5's draws.
+  anteFromLibraries seated
   Mulligan.openingHands perform seated
   -- CR 103.7: in a Planechase game the starting player sets the starting plane,
   -- after every opening hand is kept (CR 901.5).
@@ -665,7 +668,8 @@ splitComponents next objects =
 -- `owners` is the still-playing seats in seating order: CR 727.1 / 729.2
 -- rebuild the game for the players who are in it, and CR 103.5's declaration
 -- round goes around the table in turn order. A departed player's cards are not
--- here to skip -- CR 800.4a took them out of the game with them.
+-- here to skip -- CR 800.4a took them out of the game with them -- except their
+-- ante cards, which CR 800.4n keeps and `strandedAnte` leaves in the ante.
 --
 -- `exempt` is CR 727.5's set: "effects may exempt certain cards from the
 -- procedure that restarts the game. These cards are not in their owner's deck as
@@ -738,7 +742,7 @@ startGameFromCards perform exemptions = do
       --
       -- Every one of them, where `commanderOf` takes one per player: CR 902.1's
       -- one card per player is a deck-construction rule pawl does not enforce
-      -- (#940), and rule 313.2 is stated of each vanguard card rather than of the
+      -- (#4458), and rule 313.2 is stated of each vanguard card rather than of the
       -- one the player designated, so there is nothing here to choose between.
       vanguardIds = Map.keysSet (Map.filterWithKey (\oid _ -> Vanguard.isVanguard oid gs) rebuilt)
       -- CR 315.3: "if a conspiracy card would leave the command zone, it remains
@@ -758,7 +762,11 @@ startGameFromCards perform exemptions = do
       planarCards = fmap toCommandCard (Map.filterWithKey (\oid _ -> Plane.isPlanarCard oid gs) (Map.withoutKeys rebuilt inCommandIds))
       schemeCards = fmap toCommandCard (Map.filterWithKey (\oid _ -> Scheme.isScheme oid gs) (Map.withoutKeys rebuilt inCommandIds))
       supplementary = Set.unions [Map.keysSet attractionCards, Map.keysSet planarCards, Map.keysSet schemeCards]
-      cards = fmap toLibraryCard (Map.withoutKeys rebuilt (Set.union inCommandIds supplementary))
+      -- CR 800.4n / 727.2: a departed player's ante card stayed in the game,
+      -- and its owner has no library in the new one, so it begins the new game
+      -- in the ante.
+      strandedAnte = fmap (\obj -> (Object.newIncarnation obj) {Object.zone = Zone.Ante}) (Map.filter (\obj -> Object.zone obj == Zone.Ante && notElem (Object.owner obj) owners) rebuilt)
+      cards = fmap toLibraryCard (Map.withoutKeys rebuilt (Set.unions [inCommandIds, supplementary, Map.keysSet strandedAnte]))
       ownedIn pool pid = Seq.fromList (Map.keys (Map.filter (\obj -> Object.owner obj == pid) pool))
       libraryOf = ownedIn cards
       attractionDeckOf = ownedIn attractionCards
@@ -783,7 +791,7 @@ startGameFromCards perform exemptions = do
   State.put
     gs
       { GameState.players = Map.mapWithKey withStartingDeck (GameState.players gs),
-        GameState.objects = Map.unions [Map.restrictKeys (GameState.objects gs) exempt, cards, commandZoneCards, attractionCards, planarCards, schemeCards],
+        GameState.objects = Map.unions [Map.restrictKeys (GameState.objects gs) exempt, cards, commandZoneCards, attractionCards, planarCards, schemeCards, strandedAnte],
         GameState.library = Map.fromList (fmap (\pid -> (pid, libraryOf pid)) owners),
         GameState.attractionDecks = Map.filter (not . Seq.null) (Map.fromList (fmap (\pid -> (pid, attractionDeckOf pid)) owners)),
         GameState.planarDecks = decksOf (GameState.planarDecks gs) planarCards,
@@ -794,6 +802,9 @@ startGameFromCards perform exemptions = do
         GameState.phasedOut = mempty,
         GameState.exile = exempt,
         GameState.command = inCommandIds,
+        -- CR 727.2 / 729.2: every card is rebuilt above, a seated player's ante
+        -- card among the library cards, so no other old ante id survives.
+        GameState.ante = Map.keysSet strandedAnte,
         GameState.stack = []
       }
   Monad.forM_ owners Event.shuffleLibrary
@@ -808,12 +819,37 @@ startGameFromCards perform exemptions = do
   -- CR 103.2b, newGame's reveal round: CR 727.1 and CR 729.2 each start a new
   -- game following rule 103, so the reveal is put to every player again.
   Monad.forM_ seated Companion.reveal
+  -- CR 407.2 again: CR 727.1 and CR 729.2 each start a new game following
+  -- rule 103.
+  anteFromLibraries seated
   Mulligan.openingHands perform seated
   -- CR 103.7, newGame's step: the new game's starting player sets a starting
   -- plane after the opening hands.
   starting <- State.gets GameState.activePlayer
   planechase <- State.gets Planechase.isPlanechase
   Monad.when planechase (Planechase.setStartingPlane starting)
+
+-- CR 407.2: when playing for ante, each player in turn order puts one random
+-- card from their library into the ante, through the zone-change funnel. Run
+-- after CR 103.1's starting player is settled and before CR 103.5's draws. An
+-- empty library antes nothing, and a lone card is not a draw. Randomness and
+-- not a choice, so Prompt.RandomObject, filtered rather than trusted.
+--
+-- Not implemented: CR 407.2 takes the card from the deck before it is
+-- shuffled, and this takes it from the shuffled library (#4824).
+anteFromLibraries :: [PlayerId] -> Game ()
+anteFromLibraries seated = do
+  playing <- State.gets (GameSettings.ante . GameState.settings)
+  let anteOne pid = do
+        gs <- State.get
+        case Game.zoneMembers Zone.Library pid gs of
+          [] -> pure ()
+          [only] -> Event.changeZone only Zone.Ante
+          first : rest -> do
+            let offered = first NonEmpty.:| rest
+            answer <- Game.ask (Prompt.RandomObject offered)
+            Event.changeZone (if List.elem answer (NonEmpty.toList offered) then answer else first) Zone.Ante
+  Monad.when playing (Monad.forM_ seated anteOne)
 
 -- CR 103.1c: rotate the turn order to begin with the player whose command zone
 -- holds a card naming them the starting player, superseding CR 103.1's
@@ -1195,9 +1231,13 @@ subgameStateFrom starter parent =
       -- what makes that resumption read the slots the resolution had filled,
       -- proved by Pawl.OutsideTheGameSpec's "a wish that takes the resolving
       -- Shahrazad itself still finishes resolving with the winner it bound".
+      --
+      -- CR 407.3: the nine ante cards are the only ones that remove a card from
+      -- the ante, and a subgame's road out of the main game is not one of them,
+      -- so a main-game ante card is not offered as outside the subgame.
       outside =
         Map.union
-          (Map.mapMaybe asOutside (Map.withoutKeys (GameState.objects parent) (Set.unions [libIds, cmdIds, suppIds])))
+          (Map.mapMaybe asOutside (Map.withoutKeys (GameState.objects parent) (Set.unions [libIds, cmdIds, suppIds, GameState.ante parent])))
           (GameState.outsideObjects parent)
       -- CR 110.5's face-up/face-down status rides along with the printing, and
       -- is the one thing about the parent's object that does. It is not an
@@ -1255,6 +1295,9 @@ subgameStateFrom starter parent =
           -- CR 729.2c, above. startGameFromCards keeps them here rather than
           -- funnelling them into a library, which is CR 903.6 for the subgame.
           GameState.command = cmdIds,
+          -- CR 729.2: a subgame's zones are new, and no main-game ante card is
+          -- among CR 729.2a-c's movers.
+          GameState.ante = mempty,
           GameState.stack = [],
           GameState.manaPool = Map.empty,
           GameState.combat = Combat.emptyCombat,
@@ -1600,7 +1643,8 @@ applyCrossings finalSub parent =
 -- objectsLeaveWith never fires there, so their cards are still in `finalSub`
 -- and `returned` has them. Owner is invariant across a card's life, so an
 -- absent owner also implies this `oid` is missing -- no separate id check is
--- needed.
+-- needed. CR 800.4n's ante cards are the exception, which is why both
+-- `ownersPresentInSub` and `returned` skip them.
 funnelBack :: GameState -> GameState -> GameState
 funnelBack finalSub parent =
   let -- CR 729.5 / CR 712.21, the same split startGameFromCards performs, in a
@@ -1640,7 +1684,6 @@ funnelBack finalSub parent =
       subAttractions = Map.filterWithKey (\oid obj -> isCard obj && Game.astrotoriumBack oid finalSub) (Map.withoutKeys subObjects subCmdIds)
       subPlanar = Map.filterWithKey (\oid obj -> isCard obj && Plane.isPlanarCard oid finalSub) subObjects
       subSchemes = Map.filterWithKey (\oid obj -> isCard obj && Scheme.isScheme oid finalSub) subObjects
-      returned = fmap toLibraryCard (Map.filter isCard (Map.withoutKeys subObjects (Set.unions [subCmdIds, Map.keysSet subAttractions, Map.keysSet subPlanar, Map.keysSet subSchemes])))
       backFromSub =
         fmap
           toCommandCard
@@ -1658,11 +1701,23 @@ funnelBack finalSub parent =
       oldCmdIds = Set.filter (\oid -> Commander.isCommander oid parent || Vanguard.isVanguard oid parent) (GameState.command parent)
       oldSuppIds = supplementaryDeckIds parent
       movedIds = Set.unions [oldLibIds, oldCmdIds, oldSuppIds]
-      ownersPresentInSub = Set.fromList (fmap Object.owner (Map.elems subObjects))
+      -- CR 800.4n: a departed owner's ante cards stay in the subgame, so they
+      -- are not evidence the owner is still in it.
+      ownersPresentInSub = Set.fromList (fmap Object.owner (filter (\obj -> Object.zone obj /= Zone.Ante) (Map.elems subObjects)))
       removedByDeparture oid = case Map.lookup oid (GameState.objects parent) of
         Nothing -> False
         Just obj -> Set.notMember (Object.owner obj) ownersPresentInSub
       recoveredIds = Set.filter removedByDeparture movedIds
+      -- `recovered` rebuilds a departed owner's whole main-game library, the
+      -- original of a card they anted in the subgame among it, so that owner's
+      -- subgame objects -- only CR 800.4n's ante cards survive objectsLeaveWith
+      -- -- are not returned a second time.
+      --
+      -- Not implemented: telling an ante card that came from that library from
+      -- one that entered the subgame from outside it, which CR 729.5 would
+      -- return and this drops (#4829).
+      departedOwners = Set.fromList (Maybe.mapMaybe (\oid -> fmap Object.owner (Map.lookup oid (GameState.objects parent))) (Set.toList recoveredIds))
+      returned = fmap toLibraryCard (Map.filter (\obj -> isCard obj && Set.notMember (Object.owner obj) departedOwners) (Map.withoutKeys subObjects (Set.unions [subCmdIds, Map.keysSet subAttractions, Map.keysSet subPlanar, Map.keysSet subSchemes])))
       recovered = fmap toLibraryCard (Map.restrictKeys (GameState.objects parent) (Set.difference recoveredIds (Set.union oldCmdIds oldSuppIds)))
       -- A supplementary deck whose owner departed inside the subgame goes back
       -- to being their deck, the commander's reason below.
@@ -1715,7 +1770,9 @@ funnelBack finalSub parent =
       -- objectsLeaveWith deleted the subgame's, so nothing represents it in
       -- either game. That is the two rules read together rather than an oversight
       -- -- CR 729.4a took it out of the main game and CR 800.4a took it out of
-      -- the subgame -- and Pawl.SetupSpec pins it. CR 729.5's funnel offers no
+      -- the subgame -- and Pawl.SetupSpec pins it. CR 800.4n's ante cards are
+      -- the exception: they stay in the subgame, see `departedOwners` (#4829).
+      -- For every other card, CR 729.5's funnel offers no
       -- third answer: it takes "cards they own that are in the subgame", and
       -- CR 800.4a removed this one before the subgame ended, so the rule's
       -- Example never reaches it. Nor is the card lost -- CR 400.11 makes

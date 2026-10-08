@@ -32,7 +32,8 @@ spec s = Spec.describe s "Pawl.Codec.Board" $ do
           Board.Type.sharedTeamLife = False,
           Board.Type.deployCreatures = False,
           Board.Type.twoHeadedGiant = False,
-          Board.Type.alternatingTeams = False
+          Board.Type.alternatingTeams = False,
+          Board.Type.ante = False
         }
       " {\"seats\":[{\"name\":\"alice\"},{\"name\":\"bob\"}],\"active\":\"alice\",\"step\":\"DeclareAttackers\"} "
   Spec.it s "a monarch" $
@@ -51,7 +52,8 @@ spec s = Spec.describe s "Pawl.Codec.Board" $ do
           Board.Type.sharedTeamLife = False,
           Board.Type.deployCreatures = False,
           Board.Type.twoHeadedGiant = False,
-          Board.Type.alternatingTeams = False
+          Board.Type.alternatingTeams = False,
+          Board.Type.ante = False
         }
       " {\"seats\":[{\"name\":\"alice\"},{\"name\":\"bob\"}],\"active\":\"alice\",\"step\":\"PrecombatMain\",\"monarch\":\"bob\"} "
   Spec.it s "an attack option, and none" $ do
@@ -70,7 +72,8 @@ spec s = Spec.describe s "Pawl.Codec.Board" $ do
           Board.Type.sharedTeamLife = False,
           Board.Type.deployCreatures = False,
           Board.Type.twoHeadedGiant = False,
-          Board.Type.alternatingTeams = False
+          Board.Type.alternatingTeams = False,
+          Board.Type.ante = False
         }
       " {\"seats\":[{\"name\":\"alice\"},{\"name\":\"bob\"}],\"active\":\"alice\",\"step\":\"PrecombatMain\",\"attackOption\":\"Leftward\"} "
     Common.assertCodec
@@ -88,7 +91,8 @@ spec s = Spec.describe s "Pawl.Codec.Board" $ do
           Board.Type.sharedTeamLife = False,
           Board.Type.deployCreatures = False,
           Board.Type.twoHeadedGiant = False,
-          Board.Type.alternatingTeams = False
+          Board.Type.alternatingTeams = False,
+          Board.Type.ante = False
         }
       " {\"seats\":[{\"name\":\"alice\"},{\"name\":\"bob\"}],\"active\":\"alice\",\"step\":\"PrecombatMain\",\"attackOption\":null} "
   Spec.it s "game-wide options" $
@@ -107,7 +111,8 @@ spec s = Spec.describe s "Pawl.Codec.Board" $ do
           Board.Type.sharedTeamLife = True,
           Board.Type.deployCreatures = True,
           Board.Type.twoHeadedGiant = True,
-          Board.Type.alternatingTeams = False
+          Board.Type.alternatingTeams = False,
+          Board.Type.ante = False
         }
       " {\"seats\":[{\"name\":\"alice\"},{\"name\":\"bob\"}],\"active\":\"alice\",\"step\":\"PrecombatMain\",\"brawl\":true,\"sharedTeamTurns\":true,\"sharedTeamLife\":true,\"deployCreatures\":true,\"twoHeadedGiant\":true} "
   Spec.it s "a later turn" $
@@ -126,7 +131,8 @@ spec s = Spec.describe s "Pawl.Codec.Board" $ do
           Board.Type.sharedTeamLife = False,
           Board.Type.deployCreatures = False,
           Board.Type.twoHeadedGiant = False,
-          Board.Type.alternatingTeams = False
+          Board.Type.alternatingTeams = False,
+          Board.Type.ante = False
         }
       " {\"seats\":[{\"name\":\"alice\"},{\"name\":\"bob\"}],\"active\":\"bob\",\"turn\":2,\"step\":\"PrecombatMain\"} "
   Spec.it s "has a schema" $
@@ -147,5 +153,6 @@ seat name =
       Seat.Type.graveyard = Seq.empty,
       Seat.Type.library = Seq.empty,
       Seat.Type.exile = Seq.empty,
-      Seat.Type.command = Seq.empty
+      Seat.Type.command = Seq.empty,
+      Seat.Type.ante = Seq.empty
     }

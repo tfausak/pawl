@@ -31,6 +31,7 @@ codec = Fields.object $ do
   emperors <- Fields.required "emperors" Emperors.codec GameSettings.emperors
   twoHeadedGiant <- Fields.required "twoHeadedGiant" Common.boolean GameSettings.twoHeadedGiant
   alternatingTeams <- Fields.required "alternatingTeams" Common.boolean GameSettings.alternatingTeams
+  ante <- Fields.required "ante" Common.boolean GameSettings.ante
   pure
     GameSettings.MkGameSettings
       { GameSettings.brawl = brawl,
@@ -42,5 +43,6 @@ codec = Fields.object $ do
         GameSettings.deployCreatures = deployCreatures,
         GameSettings.emperors = emperors,
         GameSettings.twoHeadedGiant = twoHeadedGiant,
-        GameSettings.alternatingTeams = alternatingTeams
+        GameSettings.alternatingTeams = alternatingTeams,
+        GameSettings.ante = ante
       }

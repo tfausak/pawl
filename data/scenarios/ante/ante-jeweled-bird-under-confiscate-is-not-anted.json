@@ -1,0 +1,33 @@
+{
+  "description": "CR 407.4 alice controls bob's Jeweled Bird through Confiscate and cannot ante it, so she neither clears her ante nor draws",
+  "note": "The pair's other half differs only in the Bird's owner. The Bird still taps for its cost; only the ante is refused, and the 'If you do' clause with it.",
+  "board": {
+    "ante": true,
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Confiscate", "attached": "bird" }],
+        "ante": [{ "card": "Goblin Piker" }],
+        "library": [{ "card": "Island" }, { "card": "Mountain" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Jeweled Bird", "label": "bird" }],
+        "ante": [{ "card": "Hill Giant" }],
+        "library": [{ "card": "Mountain" }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "$bird", "ability": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" }
+  ],
+  "final": [
+    { "Count": { "player": "bob", "zone": "Ante", "card": "Jeweled Bird", "count": 0 } },
+    { "Count": { "player": "alice", "zone": "Battlefield", "card": "Jeweled Bird", "count": 1 } },
+    { "Count": { "player": "alice", "zone": "Ante", "card": "Goblin Piker", "count": 1 } },
+    { "Count": { "player": "alice", "zone": "Hand", "card": "Island", "count": 0 } }
+  ]
+}

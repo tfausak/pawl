@@ -39,9 +39,10 @@ spec s = Spec.describe s "Pawl.Codec.Seat" $ do
           Seat.Type.graveyard = Seq.singleton (card "Goblin Piker"),
           Seat.Type.library = Seq.singleton (card "Island"),
           Seat.Type.exile = Seq.singleton (card "Bad Moon"),
-          Seat.Type.command = Seq.singleton (card "Shimatsu the Bloodcloaked")
+          Seat.Type.command = Seq.singleton (card "Shimatsu the Bloodcloaked"),
+          Seat.Type.ante = Seq.singleton (card "Contract from Below")
         }
-      " {\"name\":\"alice\",\"life\":7,\"counters\":[{\"key\":{\"type\":\"Energy\"},\"value\":3}],\"team\":1,\"range\":2,\"emperor\":true,\"manaPool\":\"RC\",\"battlefield\":[{\"card\":\"Mountain\"}],\"hand\":[{\"card\":\"Lightning Bolt\"}],\"graveyard\":[{\"card\":\"Goblin Piker\"}],\"library\":[{\"card\":\"Island\"}],\"exile\":[{\"card\":\"Bad Moon\"}],\"command\":[{\"card\":\"Shimatsu the Bloodcloaked\"}]} "
+      " {\"name\":\"alice\",\"life\":7,\"counters\":[{\"key\":{\"type\":\"Energy\"},\"value\":3}],\"team\":1,\"range\":2,\"emperor\":true,\"manaPool\":\"RC\",\"battlefield\":[{\"card\":\"Mountain\"}],\"hand\":[{\"card\":\"Lightning Bolt\"}],\"graveyard\":[{\"card\":\"Goblin Piker\"}],\"library\":[{\"card\":\"Island\"}],\"exile\":[{\"card\":\"Bad Moon\"}],\"command\":[{\"card\":\"Shimatsu the Bloodcloaked\"}],\"ante\":[{\"card\":\"Contract from Below\"}]} "
   Spec.it s "an unknown mana symbol is refused" $
     Spec.assertBool
       s
@@ -65,7 +66,8 @@ empty name =
       Seat.Type.graveyard = Seq.empty,
       Seat.Type.library = Seq.empty,
       Seat.Type.exile = Seq.empty,
-      Seat.Type.command = Seq.empty
+      Seat.Type.command = Seq.empty,
+      Seat.Type.ante = Seq.empty
     }
 
 card :: String -> Placement.Type.Placement

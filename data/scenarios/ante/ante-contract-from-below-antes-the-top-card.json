@@ -1,0 +1,30 @@
+{
+  "description": "CR 407.4 Contract from Below discards her hand, antes the top card of her library, then draws seven",
+  "note": "The top card is the one Island, so the ante count names which card was anted; bob's ante stays empty, and the two discards are distinct printings.",
+  "board": {
+    "ante": true,
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Swamp", "label": "swamp" }],
+        "hand": [{ "card": "Contract from Below", "label": "contract" }, { "card": "Lightning Bolt" }, { "card": "Goblin Piker" }],
+        "library": [{ "card": "Island" }, { "card": "Mountain" }, { "card": "Mountain" }, { "card": "Mountain" }, { "card": "Mountain" }, { "card": "Mountain" }, { "card": "Mountain" }, { "card": "Mountain" }, { "card": "Mountain" }]
+      },
+      { "name": "bob", "library": [{ "card": "Mountain" }, { "card": "Mountain" }] }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$contract", "mana": ["$swamp"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" }
+  ],
+  "final": [
+    { "Count": { "player": "alice", "zone": "Ante", "card": "Island", "count": 1 } },
+    { "Count": { "player": "alice", "zone": "Hand", "card": "Mountain", "count": 7 } },
+    { "Count": { "player": "alice", "zone": "Graveyard", "card": "Lightning Bolt", "count": 1 } },
+    { "Count": { "player": "alice", "zone": "Graveyard", "card": "Goblin Piker", "count": 1 } },
+    { "Count": { "player": "alice", "zone": "Graveyard", "card": "Contract from Below", "count": 1 } },
+    { "Count": { "player": "bob", "zone": "Ante", "card": "Mountain", "count": 0 } }
+  ]
+}

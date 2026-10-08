@@ -31,6 +31,8 @@ data Board = MkBoard
     -- | CR 810: whether the game is Two-Headed Giant.
     twoHeadedGiant :: Bool,
     -- | CR 811: whether the game is Alternating Teams.
-    alternatingTeams :: Bool
+    alternatingTeams :: Bool,
+    -- | CR 407.1: whether the scenario's game is played for ante.
+    ante :: Bool
   }
   deriving (Eq, Ord, Show)

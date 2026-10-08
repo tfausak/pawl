@@ -7,7 +7,7 @@ module Pawl.Types.LibraryPosition where
 --
 -- Its own type rather than a pair of Zone constructors: a Zone is a zone (CR
 -- 400.1), and only a library has ends -- a `Zone.LibraryTop` would make every
--- exhaustive case over the seven zones answer a question about libraries twice.
+-- exhaustive case over the zones answer a question about libraries twice.
 --
 -- Two-valued, and STAYS two-valued: "the object's owner chooses which end"
 -- (Aetherspouts) is Pawl.Types.LibraryPlacement's job, so that every consumer of

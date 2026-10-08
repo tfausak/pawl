@@ -141,6 +141,7 @@ baseFace =
       Face.vanguard = Nothing,
       Face.canBeYourCommander = False,
       Face.claimsStartingPlayer = False,
+      Face.anteOnly = False,
       Face.keywords = Map.empty,
       Face.staticAbilities = [],
       Face.spell = minimalModal,
@@ -200,6 +201,7 @@ minimalFace =
       Face.vanguard = Nothing,
       Face.canBeYourCommander = False,
       Face.claimsStartingPlayer = False,
+      Face.anteOnly = False,
       Face.keywords = Map.empty,
       Face.colorIndicator = Set.empty,
       Face.characteristicPT = Nothing,
@@ -728,6 +730,11 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
   Spec.it s "MkFace, CR 103.1c's starting-player claim" $ do
     v <- Common.assertJson s " {\"name\":\"Power Play\",\"typeLine\":{\"types\":[{\"type\":\"Conspiracy\"}]},\"claimsStartingPlayer\":true} "
     Spec.assertEq s (Face.claimsStartingPlayer <$> decodeFace v) (Right True)
+  -- CR 407.3: the printed "Remove this card from your deck before playing if
+  -- you're not playing for ante", carried as a flag.
+  Spec.it s "an ante card decodes its flag" $ do
+    v <- Common.assertJson s " {\"name\":\"Contract from Below\",\"typeLine\":{\"types\":[{\"type\":\"Sorcery\"}]},\"anteOnly\":true} "
+    Spec.assertEq s (Face.anteOnly <$> decodeFace v) (Right True)
   -- Alchemy's starting intensity, for the vanguard's reason.
   Spec.it s "MkFace, a starting intensity" $ do
     v <- Common.assertJson s " {\"name\":\"Static Discharge\",\"typeLine\":{\"types\":[{\"type\":\"Sorcery\"}]},\"startingIntensity\":3} "

@@ -49,6 +49,7 @@ import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Amass as Amass
+import qualified Pawl.Types.Ante as Ante
 import qualified Pawl.Types.AnyNumberDiscard as AnyNumberDiscard
 import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
 import qualified Pawl.Types.AttachAll as AttachAll
@@ -422,6 +423,7 @@ ownQuantities effect = case effect of
   Effect.FlipCoin flipCoin -> [FlipCoin.count flipCoin]
   Effect.TakeExtraTurn takeExtraTurn -> [TakeExtraTurn.count takeExtraTurn]
   Effect.ShuffleIntoLibrary {} -> []
+  Effect.Ante {} -> []
   Effect.Shuffle {} -> []
   Effect.OfferNamedCopy {} -> []
   Effect.OfferNotedCopy {} -> []
@@ -1577,6 +1579,7 @@ effectObjectRefs effect =
         Effect.FlipCoin {} -> []
         Effect.TakeExtraTurn {} -> []
         Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ refs) -> read_ (NonEmpty.toList refs)
+        Effect.Ante (Ante.MkAnte _ ref _) -> read_ [ref]
         -- No ObjectRef at all: the opcode names a library.
         Effect.Shuffle {} -> []
         -- Nor here: the opcode names cards by name.

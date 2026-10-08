@@ -182,6 +182,8 @@ codec cardCodec = Fields.objectWith modeCostsInRange $ do
   -- CR 103.1c: False is the absence of a card stating its controller is the
   -- starting player.
   claimsStartingPlayer <- Fields.defaulted "claimsStartingPlayer" False Common.boolean Face.claimsStartingPlayer
+  -- CR 407.3: False is the absence of the ante reminder.
+  anteOnly <- Fields.defaulted "anteOnly" False Common.boolean Face.anteOnly
   pure
     Face.MkFace
       { Face.name = name,
@@ -235,5 +237,6 @@ codec cardCodec = Fields.objectWith modeCostsInRange $ do
         Face.specialActions = specialActions,
         Face.counterability = counterability,
         Face.canBeYourCommander = canBeYourCommander,
-        Face.claimsStartingPlayer = claimsStartingPlayer
+        Face.claimsStartingPlayer = claimsStartingPlayer,
+        Face.anteOnly = anteOnly
       }
