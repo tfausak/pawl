@@ -1253,12 +1253,12 @@ eventTriggers events gs =
       -- `Pawl.LeavesTriggerSpec.ivoryGargoyleSpec` proves a mutation dropping the
       -- exception empties this event's own candidate list.
       --
-      -- The delayed map is the HOST's own face while `abilitiesOf` is the
-      -- PROJECTED list, so an ability granted by another object that arms a
-      -- delayed trigger the GRANTOR declared resolves to no name here and takes
-      -- CR 113.6's battlefield default. Nothing in data/cards/ grants an ability
-      -- that arms one; Pawl.Engine.Activatable.abilitiesForGiven carries the same
-      -- pairing and the same note.
+      -- Not implemented: a delayed trigger declared by the GRANTOR of a granted
+      -- ability. The delayed map is the HOST's own face while `abilitiesOf` is
+      -- the PROJECTED list, so such a name resolves to nothing here and takes CR
+      -- 113.6's battlefield default, as it does at resolution (#3661).
+      -- Pawl.Engine.Activatable.abilitiesForGiven carries the same pairing and
+      -- the same note.
       battlefieldAbilitiesOf oid pc = Maybe.mapMaybe (functionsIn (PC.subtypes pc) (Game.delayedAbilitiesOf oid gs) Zone.Battlefield) (abilitiesOf pc)
       -- CR 603.10's first sentence, per EVENT GROUP: the permanents that existed
       -- immediately after the event, with the abilities and the CR 603.3a
