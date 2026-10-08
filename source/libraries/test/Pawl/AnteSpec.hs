@@ -12,6 +12,7 @@ import qualified Data.Set as Set
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -22,6 +23,9 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Zone as Zone
@@ -45,6 +49,14 @@ startedWith :: GameSettings.GameSettings -> NonEmpty.NonEmpty (PlayerId.PlayerId
 startedWith settings matchup =
   let ((_, gs), asked) = State.runState (Engine.runGame anteDraws (Setup.gameWith settings (fmap fst matchup)) (Setup.newGame S.performer matchup)) []
    in (gs, reverse asked)
+
+-- Takes every "may" and records who was asked, in order (CR 603.5).
+acceptingAll :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+acceptingAll p = case p of
+  Prompt.ChooseOptional _ pid _ _ _ _ -> do
+    State.modify' (pid :)
+    pure OptionalDecision.Exercises
+  _ -> pure (S.castAnswer p)
 
 anteOf :: PlayerId.PlayerId -> GameState.GameState -> [ObjectId.ObjectId]
 anteOf = Game.zoneMembers Zone.Ante
@@ -137,3 +149,29 @@ spec s registry = Spec.describe s "Ante" $ do
         left = S.departs Departure.Type.Conceded S.bob g1
         restarted = S.runPure S.identityAnswer left (Setup.restartGame S.performer Set.empty S.alice)
     Spec.assertEqWith s "CR 727.2 bob's ante card is still in the ante" (GameState.ante restarted, fmap Object.zone (Game.lookupObject bobsAnte restarted)) (Set.singleton bobsAnte, Just Zone.Ante)
+  -- CR 608.2d: "the player can't choose an option that's ... impossible". carol
+  -- has no library, so she cannot ante, is not asked, and does not go to 20.
+  -- Distinct starting lives so a wrong 20 cannot hide.
+  Spec.it s "CR 608.2d Rebirth does not ask a seat with an empty library, and its life stays" $ do
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    rebirth <- S.printingOf s registry "Rebirth"
+    let g0 = S.landsFor forest S.alice 6 (Setup.gameWith anteGame S.threePlayers)
+        g1 = snd (S.addLibraryCard mountain S.alice (snd (S.addLibraryCard mountain S.alice g0)))
+        g2 = snd (S.addLibraryCard mountain S.bob (snd (S.addLibraryCard mountain S.bob g1)))
+        (rebirthId, g3) = S.addHandCard rebirth S.alice g2
+        lives = Map.fromList [(S.alice, 5 :: Integer), (S.bob, 6), (S.carol, 7)]
+        before =
+          g3
+            { GameState.players = Map.mapWithKey (\pid p -> p {Player.life = Map.findWithDefault (Player.life p) pid lives}) (GameState.players g3),
+              GameState.activePlayer = S.alice,
+              GameState.phase = Phase.PrecombatMain,
+              GameState.priority = Just S.alice
+            }
+        run = do
+          S.cast S.alice rebirthId
+          Stack.resolveTop
+        (((), after), asked) = State.runState (Engine.runGame acceptingAll before run) []
+    Spec.assertEqWith s "CR 608.2d carol keeps her 7 life" (S.lifeOf S.carol after) (Just 7)
+    Spec.assertEqWith s "CR 407.4 alice and bob anted, and went to 20" (S.lifeOf S.alice after, S.lifeOf S.bob after, length (anteOf S.alice after), length (anteOf S.bob after)) (Just 20, Just 20, 1, 1)
+    Spec.assertEqWith s "CR 608.2d carol was never asked" (reverse asked) [S.alice, S.bob]

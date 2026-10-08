@@ -1286,7 +1286,10 @@ villainousPass resolving controller idx legal orElse limbs performLimb acc0 = do
 -- card" on an empty hand binds its `you` slot and is not inert, and offering it
 -- handed the controller the free card its "If you do" hangs on -- Pawl.ResolveSpec's
 -- "CR 608.2d Tweeze's discard is not offered with an empty hand" proves it.
--- Declined silently, so recordTaken stays False and the draw is skipped.
+-- Declined silently, so recordTaken stays False and the draw is skipped. The
+-- second gate is asked again per seat, with `thoseWhoMay` holding that seat
+-- alone, so a seat that cannot carry the clause out is not asked;
+-- Pawl.AnteSpec's Rebirth case proves it.
 exercises :: ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Set SlotName -> Map.Map SlotName (Set Recipient) -> Maybe (Set PlayerId) -> Set PlayerId -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game Bool
 exercises resolving source controller idx cIdx bound legal announced committed clause = do
   impossible <- State.gets (\gs -> clauseIsImpossible resolving source controller legal gs clause)
@@ -1296,6 +1299,12 @@ exercises resolving source controller idx cIdx bound legal announced committed c
       | impossible || clauseIsInert (Set.insert Binding.mayPlayers bound) legal clause -> pure False
       | otherwise -> do
           gs <- State.get
+          let -- CR 608.2d, per seat: a seat for whom this clause, read with that
+              -- seat alone as its accepter, would do nothing is not asked. A
+              -- committed seat has already answered.
+              able pid =
+                Set.member pid committed
+                  || not (clauseIsImpossible resolving source controller (Map.insert Binding.mayPlayers (Set.singleton (Recipient.ToPlayer pid)) legal) gs clause)
           -- CR 101.4b: each seat is told the answers the seats before it gave.
           answers <-
             Monad.foldM
@@ -1308,7 +1317,7 @@ exercises resolving source controller idx cIdx bound legal announced committed c
                   pure (made Seq.|> (pid, decision))
               )
               Seq.empty
-              (announcedOnly announced (apnapPlayersOf asker legal controller gs))
+              (filter able (announcedOnly announced (apnapPlayersOf asker legal controller gs)))
           let accepted = Set.fromList [pid | (pid, OptionalDecision.Exercises) <- Foldable.toList answers]
           State.modify' (bindPlayersSlot resolving Binding.mayPlayers accepted)
           pure (not (Set.null accepted))
