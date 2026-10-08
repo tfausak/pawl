@@ -767,7 +767,9 @@ data Prompt r where
   -- current host excluded (CR 701.3b); the offer is the card's text, so CR
   -- 303.4j is left to the player. Elided at one candidate. The PlayerId is the
   -- resolving controller for one named destination (CR 608.2d) and the
-  -- subject's controller for several (CR 303.4d, CR 301.5c).
+  -- subject's controller for several (CR 303.4d, CR 301.5c). Also CR 608.2d:
+  -- which legal host a created Aura token enters attached to, among several
+  -- the effect names (Dunbarrow Revivalist's "one of them").
   ChooseAttachment :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 303.4k with CR 614.1e: whether an Aura turned face up exercises its
   -- printed "you may attach it"; never elided, declining leaving it to CR

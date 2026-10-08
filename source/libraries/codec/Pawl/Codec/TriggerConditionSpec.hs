@@ -75,6 +75,13 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PermanentEnters (Filter.And [Filter.HasCardType CardType.Creature, Filter.Not Filter.IsSource]))
       " {\"type\":\"PermanentEnters\",\"value\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"Not\",\"value\":{\"type\":\"IsSource\"}}]}} "
+  -- CR 603.2c: the batch reading is its own tag, PermanentsDie's reason.
+  Spec.it s "PermanentsEnter round-trips with its Filter" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PermanentsEnter (Filter.And [Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.You]))
+      " {\"type\":\"PermanentsEnter\",\"value\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}]}} "
   -- CR 603.2b.
   Spec.it s "StepBegins round-trips" $
     Common.assertCodec
