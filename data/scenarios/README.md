@@ -106,8 +106,8 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   `Stack` included; the controller's, for the battlefield), `Damage`, `Tapped`, `Counters` (of
   one kind on an object), `Types` (an object's card types, all of them),
   `Attackers` (every attacker and what it attacks), `Blockers` (an attacker's
-  blockers, `null` when unblocked), `Defenders` (the defending players, in
-  order), `Monarch` (`null` for nobody), `PowerToughness` (an object's
+  blockers, `null` when unblocked), `Defenders` (the defending players who
+  may be attacked, in order), `Monarch` (`null` for nobody), `PowerToughness` (an object's
   projected `power` and `toughness`) and `PlayerCounters` (how many of one
   `kind` a `player` has), `Subtypes` (an object's projected subtypes, all of
   them, as bare names) and `Keywords` (how many instances of one `keyword` an

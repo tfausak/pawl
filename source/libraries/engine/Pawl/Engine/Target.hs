@@ -345,8 +345,14 @@ slotContext pcs perspective unannounced bindings source amount gs =
             Filter.boundUnannounced = False,
             -- CR 508.5, asked of the SOURCE: rule 702.39a's clause is on an
             -- attacking creature, and `source` is the object CR 113.7 says the
-            -- ability came from.
-            Filter.defendingPlayer = Defender.defendingPlayerOf Projection.controllerWithLastKnown source gs,
+            -- ability came from. A source that never attacked -- Yare, a spell
+            -- -- has no creature to resolve it by, so CR 802.2a's controller
+            -- chooses among every defending player, and choosing the target
+            -- is that choice: its controller is the one chosen. CR 601.2
+            -- announces no such choice, so it is made wherever the reference
+            -- is read, CR 608.2b's re-check included: the target stays legal
+            -- while any defending player controls it.
+            Filter.defendingPlayers = maybe (Defender.designatedPlayers gs) pure (Defender.defendingPlayerOf Projection.controllerWithLastKnown source gs),
             -- Nothing: a target slot is judged before the effect names anyone, so
             -- there is no recipient it could have reached yet. CR 119.5's atom
             -- lives in an effect's QUANTITY, which is evaluated later and

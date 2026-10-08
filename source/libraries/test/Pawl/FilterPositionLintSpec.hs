@@ -2607,10 +2607,10 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
             }
     Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
   -- CR 508.5's atom is answerable only where the CONTEXT supplies a defending
-  -- player, and exactly two callers fill Filter.Context.defendingPlayer:
+  -- player, and exactly two callers fill Filter.Context.defendingPlayers:
   -- Pawl.Engine.Target.admittedGiven for a target slot (CR 702.39a's provoke,
-  -- Sensational Spider-Man) and Pawl.Engine.CombatRestriction.inForce for a CR
-  -- 508.1c gate (Armored Galleon). It is Nothing everywhere else, so the atom in
+  -- Sensational Spider-Man, Yare) and Pawl.Engine.CombatRestriction.inForce for a
+  -- CR 508.1c gate (Armored Galleon). It is empty everywhere else, so the atom in
   -- any OTHER position -- a static ability's affected set, a search filter, a
   -- triggered ability's condition -- would be a silent False. This is the lint
   -- that keeps that true: what it sweeps is the atom outside a combat

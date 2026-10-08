@@ -29,7 +29,9 @@ import Pawl.Types.PlayerId (PlayerId)
 -- players arrive here rather than at each reader. Exactly Pawl.Types.Combat's
 -- defenders field: the beginning of combat step settles the whole group, one
 -- player under CR 507.1 and every opponent under CR 802.2, so nothing is left
--- for this function to derive.
+-- for this function to derive. Only those who may be attacked: CR 811.4's
+-- barred defending players are designatedPlayers' below, since every combat
+-- rule reading this list asks who can be attacked, blocks, or is attacked.
 --
 -- A LIST and not one player, because CR 802.2a denies that several defending
 -- players can be folded into one: a reader wanting "a defending player" wants
@@ -37,6 +39,14 @@ import Pawl.Types.PlayerId (PlayerId)
 -- attacking (playerOf below), never the whole group.
 defendingPlayers :: GameState -> [PlayerId]
 defendingPlayers = Combat.defenders . GameState.combat
+
+-- CR 802.2: EVERY defending player, the ones CR 811.4 bars attacks on
+-- (Pawl.Types.Combat's barred) included. defendingPlayers above is the
+-- attackable part, which every combat rule reads; this is for CR 802.2a's
+-- "defending player" with no attacking creature to resolve it, which the
+-- controller chooses from the whole group (Yare). Not in APNAP order.
+designatedPlayers :: GameState -> [PlayerId]
+designatedPlayers gs = defendingPlayers gs <> Combat.barred (GameState.combat gs)
 
 -- CR 508.5 / CR 802.2a: the defending player an attacking creature's ability
 -- refers to -- "the player that creature is attacking, the controller of the

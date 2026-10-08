@@ -85,7 +85,8 @@ emptyCombat =
       Combat.attackingNothing = Set.empty,
       Combat.blockingNothing = Set.empty,
       Combat.removedDefending = Map.empty,
-      Combat.defenders = []
+      Combat.defenders = [],
+      Combat.barred = []
     }
 
 -- CR 511.3: as the end of combat step ends, everything is removed from combat.
@@ -164,11 +165,9 @@ skipEmptyCombat gs =
 -- which under CR 805.6 regroups the seats by team.
 attackableOpponents :: GameState -> [PlayerId]
 attackableOpponents gs =
-  let playing = Game.stillPlaying gs
-      active = GameState.activePlayer gs
-      seats = Game.turnOrderFrom active gs
-      others = drop 1 seats
-      opponents = filter (\pid -> Game.areOpponents gs active pid && List.elem pid playing && Game.inRangeOf active pid gs) seats
+  let active = GameState.activePlayer gs
+      others = drop 1 (Game.turnOrderFrom active gs)
+      opponents = opponentsInRange gs
       seatedAt neighbour = filter (\pid -> Just pid == neighbour) opponents
       beside = filter (\pid -> List.elem pid (Game.neighbours active gs))
       allowed = case GameSettings.attackOption (GameState.settings gs) of
@@ -189,10 +188,18 @@ attackableOpponents gs =
       -- next to" is read as CR 809.3c's identical phrase is, over
       -- Game.neighbours.
       --
-      -- Not implemented: CR 802.2 designating the opponents CR 811.4 cuts as
-      -- defending players all the same, since this list is also who is
-      -- designated (#4800).
+      -- The opponents it cuts are still CR 802.2's defending players;
+      -- designateDefenders files them as Combat.barred.
       if GameSettings.alternatingTeams (GameState.settings gs) then beside allowed else allowed
+
+-- CR 802.2 / 801.3: the active player's opponents still playing and within
+-- their range of influence, in APNAP order -- attackableOpponents before any
+-- attack option or CR 811.4 cuts it, and under CR 802.2 the defending players.
+opponentsInRange :: GameState -> [PlayerId]
+opponentsInRange gs =
+  let playing = Game.stillPlaying gs
+      active = GameState.activePlayer gs
+   in filter (\pid -> Game.areOpponents gs active pid && List.elem pid playing && Game.inRangeOf active pid gs) (Game.turnOrderFrom active gs)
 
 -- CR 508.1b: what the active player may announce a chosen creature is attacking,
 -- for ONE defending player -- which player, planeswalker or battle. CR 506.2's
@@ -1852,11 +1859,19 @@ designateDefenders = do
   -- Engine.runTurnBasedActions calls this WITHOUT its own membership test, so
   -- this is the only site that decides who is asked; a direct caller -- a spec,
   -- or a second combat phase spliced by an effect -- gets the same answer.
-  Monad.forM_ (Game.ruleChooser gs pid) $ \chooser ->
-    case NonEmpty.nonEmpty (attackableOpponents gs) of
+  Monad.forM_ (Game.ruleChooser gs pid) $ \chooser -> do
+    let settings = GameState.settings gs
+        attackable = attackableOpponents gs
+    -- CR 802.2 / 811.4: every opponent is a defending player, the ones no
+    -- creature may attack included -- filed apart from the rest, and even when
+    -- nobody can be attacked at all. Pawl.Engine.Defender.designatedPlayers
+    -- reads them.
+    let barred = filter (`List.notElem` attackable) (opponentsInRange gs)
+    Monad.when (GameSettings.attackOption settings == Just AttackOption.MultiplePlayers && not (GameSettings.sharedTeamTurns settings)) $
+      State.modify' (\g -> g {GameState.combat = (GameState.combat g) {Combat.barred = barred}})
+    case NonEmpty.nonEmpty attackable of
       Nothing -> pure ()
       Just candidates -> do
-        let settings = GameState.settings gs
         chosen <-
           -- CR 805.10a: under the shared team turns option the nonactive team
           -- is the defending team, every one of its players defending.

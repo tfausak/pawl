@@ -32,7 +32,8 @@ empty =
       Combat.attackingNothing = Set.empty,
       Combat.blockingNothing = Set.empty,
       Combat.removedDefending = Map.empty,
-      Combat.defenders = []
+      Combat.defenders = [],
+      Combat.barred = []
     }
 
 -- | 'empty' on the wire, spelled once. Every field but `struckFirst` is
@@ -86,7 +87,9 @@ spec s = Spec.describe s "Pawl.Codec.Combat" $ do
           Combat.blockingNothing = Set.singleton (ObjectId.MkObjectId 21),
           -- CR 508.5, keyed by a creature that has LEFT combat, so distinct again.
           Combat.removedDefending = Map.singleton (ObjectId.MkObjectId 19) (PlayerId.MkPlayerId 20),
-          Combat.defenders = [PlayerId.MkPlayerId 10]
+          Combat.defenders = [PlayerId.MkPlayerId 10],
+          -- CR 802.2 / 811.4, a seat distinct from every defender's.
+          Combat.barred = [PlayerId.MkPlayerId 22]
         }
       ( " {\"attackers\":{\"1\":{\"type\":\"OfPlayer\",\"value\":2}}"
           <> ",\"blockers\":{\"3\":[4]}"
@@ -102,7 +105,7 @@ spec s = Spec.describe s "Pawl.Codec.Combat" $ do
           <> ",\"blockersDeclared\":true,\"attackingNothing\":[13]"
           <> ",\"blockingNothing\":[21]"
           <> ",\"removedDefending\":{\"19\":20}"
-          <> ",\"defenders\":[10]} "
+          <> ",\"defenders\":[10],\"barred\":[22]} "
       )
   -- CR 510.4's two ABSENT-looking states, which are not the same state. Nothing
   -- means the first combat damage step has not happened; the empty set means it

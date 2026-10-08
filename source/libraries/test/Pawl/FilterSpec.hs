@@ -470,7 +470,7 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
   -- player 0 and OWNED by player 1, so a reading that consulted the wrong field
   -- would not agree with either arm below.
   Spec.describe s "ControlledByDefendingPlayer" $ do
-    let defended n = self {Filter.defendingPlayer = Just (PlayerId.MkPlayerId n)}
+    let defended n = self {Filter.defendingPlayers = [PlayerId.MkPlayerId n]}
     Spec.it s "holds only for the defending player's creature" $ do
       Spec.assertBool s (Filter.matches (defended 0) blackCreature Filter.Type.ControlledByDefendingPlayer) "controller is the defender"
       Spec.assertBool s (not (Filter.matches (defended 1) blackCreature Filter.Type.ControlledByDefendingPlayer)) "owner is not the controller"
