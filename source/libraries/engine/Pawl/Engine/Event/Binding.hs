@@ -33,10 +33,12 @@ import Pawl.Types.Binding (Binding)
 import qualified Pawl.Types.Binding as Binding.Type
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.Crewing as Crewing
 import qualified Pawl.Types.DamageEvent as DamageEvent
+import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePrevented as DamagePrevented
 import qualified Pawl.Types.Discarded as Discarded
 import qualified Pawl.Types.Exploited as Exploited
@@ -82,8 +84,8 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- Separate from `matchesTrigger` rather than folded into a `Maybe bindings`
 -- return, the two having different customers: a DELAYED ability matches several
 -- events at once and carries the environment captured when it was armed (CR
--- 603.7c). The parallel for a sourceless inherent ability is
--- Monarch.inherentMatch, which has no bearer to scope a shared matcher to.
+-- 603.7c). A sourceless inherent ability (Event.Trigger.inherentTriggers)
+-- gets the same call, with an id naming no object as its bearer.
 --
 -- THE SECOND AND THIRD ARGUMENTS ARE NOT READ OFF THE EVENT, and are the two
 -- data here that are not. Both come off the same CR 117.5 batch, which
@@ -245,6 +247,20 @@ eventBindingsOver board gs bearerBecame becameInGraveyard bearer you cond event 
     let damager = DamageEvent.source ev
         damaged = if PermanentsDealCombatDamageToPlayer.oneOrMorePlayers p then Nothing else Recipient.playerOf (DamageEvent.target ev)
      in maybe id Binding.setTriggerPlayer damaged (maybe id Binding.setDamagersController (Filter.controller =<< postEventView board gs damager) Map.empty)
+  -- CR 725.2's "its controller becomes the monarch": the damaging creature,
+  -- under the reserved trigger-source slot Effect.BecomeMonarch's
+  -- ControllerOfSource reads. The abilities have no source (CR 725.2), and no
+  -- card bears this condition, so Engine.placeBorne's restamp of that slot never
+  -- meets it.
+  (TriggerCondition.CreatureDealtCombatDamageToMonarch, GameEvent.DamageDealt ev) -> Binding.setTriggerSource (DamageEvent.source ev) Map.empty
+  -- CR 726.2's "the controller of those creatures": the damager under the slot
+  -- Effect.TakeTheInitiative's ControllerOfSource reads, the monarch arm's
+  -- reason, and its controller off the event's sample, which `batchPartition`
+  -- splits the batch by. batchBindings keeps the FIRST member's trigger source,
+  -- so the first damaging creature stands for the occurrence.
+  (TriggerCondition.CreaturesDealtCombatDamageToInitiative, GameEvent.DamageDealt ev) ->
+    let damager = DamageEvent.source ev
+     in maybe id Binding.setDamagersController (Filter.controller =<< postEventView board gs damager) (Binding.setTriggerSource damager Map.empty)
   -- CR 400.7e: a zone-change trigger can find the new object the card became in
   -- the zone it moved to, if that zone is public. CR 603.6c and CR 603.6e say it
   -- from the other side.
@@ -1101,8 +1117,8 @@ eventBindingsOver board gs bearerBecame becameInGraveyard bearer you cond event 
 -- damaged player. The controller because each printing in data/cards/ names
 -- it -- "you control", "an opponent controls" -- and Norn's Decree's "one or
 -- more creatures AN OPPONENT controls" is one occurrence per opponent whose
--- creatures connected, CR 726.2's "a player controls" grouped the same way by
--- Pawl.Engine.Initiative.inherentPending. The damaged player because CR
+-- creatures connected, CR 726.2's "a player controls" grouped the same way
+-- below. The damaged player because CR
 -- 506.2a and CR 508.1b let one CR 510.2 step damage several players, and "to
 -- a player" is one occurrence per player hit: Feline Sovereign's "that player
 -- controls" and The Raven's Warning's "that player's hand" name one seat.
@@ -1117,6 +1133,9 @@ eventBindingsOver board gs bearerBecame becameInGraveyard bearer you cond event 
 batchPartition :: TriggerCondition -> Map.Map SlotName.SlotName Binding -> Seq.Seq PlayerId
 batchPartition cond bindings = case cond of
   TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> seat Binding.damagersController <> seat Binding.triggerPlayer
+  -- CR 726.2's "one or more creatures A PLAYER controls": one occurrence per
+  -- damagers' controller. The damaged player is the holder, one seat already.
+  TriggerCondition.CreaturesDealtCombatDamageToInitiative -> seat Binding.damagersController
   -- The branch that matched is the one that stamped, eventBindings' AnyOf arm's
   -- reading.
   TriggerCondition.AnyOf conditions -> Maybe.fromMaybe Seq.empty (List.find (not . Seq.null) (fmap (`batchPartition` bindings) conditions))
@@ -1153,6 +1172,30 @@ postEventView :: Map.Map ObjectId (BattlefieldCandidate.BattlefieldCandidate PC.
 postEventView board gs oid = case Map.lookup oid board of
   Just candidate -> Just (Projection.sampledView oid candidate gs)
   Nothing -> Projection.viewWithLastKnown oid gs oid
+
+-- CR 725.2 / CR 726.2: the creature that dealt this event's COMBAT damage to
+-- `victim`, paired with who controlled it. Nothing for any other event, and
+-- Nothing for a source that was not a creature then.
+--
+-- Read off `board`, the event's CR 603.10 sample (Event.Trigger.battlefieldAt),
+-- and never last known information: the damager is judged as it stood
+-- immediately after the damage, and the CR 704.5g destruction that kills a
+-- trampler its blocker traded with is a LATER event, which changeZone answers
+-- with a fresh id. Proved by Pawl.InitiativeSpec's "CR 726.2 a trampler that
+-- trades with its blocker still hands the initiative over".
+--
+-- Both halves come from the ONE sample, so "was it a creature?" and "whose was
+-- it?" cannot be answered about two different boards.
+combatDamagerOn :: Map.Map ObjectId (BattlefieldCandidate.BattlefieldCandidate PC.ProjectedCharacteristics) -> PlayerId -> GameEvent -> Maybe (ObjectId, PlayerId)
+combatDamagerOn board victim event = case event of
+  GameEvent.DamageDealt ev
+    | DamageEvent.kind ev == DamageKind.Combat && DamageEvent.target ev == Recipient.ToPlayer victim ->
+        case Map.lookup (DamageEvent.source ev) board of
+          Just candidate
+            | Set.member CardType.Creature (PC.cardTypes (BattlefieldCandidate.characteristics candidate)) ->
+                Just (DamageEvent.source ev, BattlefieldCandidate.controller candidate)
+          _ -> Nothing
+  _ -> Nothing
 
 -- The cards a Moved event took out of the condition's zone that its filter
 -- admits, read off CR 608.2h's last known information: by the time CR 603.10
@@ -1428,11 +1471,13 @@ eventBindingSlots cond = case cond of
   TriggerCondition.PermanentsDealCombatDamageToPlayer p
     | PermanentsDealCombatDamageToPlayer.oneOrMorePlayers p -> Set.singleton Binding.damagersController
     | otherwise -> Set.fromList [Binding.damagersController, Binding.triggerPlayer]
-  -- CR 725.2's inherent ability is borne by no card, and its bindings come from
-  -- Monarch.inherentMatch rather than eventBindings -- so a card declaring this
-  -- condition would honestly get nothing from the event.
-  TriggerCondition.CreatureDealtCombatDamageToMonarch -> Set.empty
-  TriggerCondition.CreaturesDealtCombatDamageToInitiative -> Set.empty
+  -- CR 725.2's damaging creature, and CR 726.2's with its controller beside it:
+  -- both unconditional given a match, which admits only a creature in the
+  -- event's sample, whose view always carries its controller.
+  TriggerCondition.CreatureDealtCombatDamageToMonarch -> Set.singleton Binding.triggerSource
+  TriggerCondition.CreaturesDealtCombatDamageToInitiative -> Set.fromList [Binding.triggerSource, Binding.damagersController]
+  -- CR 726.2's taker is the ability's controller, whom Binding.setYou already
+  -- names.
   TriggerCondition.PlayerTookInitiative -> Set.empty
   -- CR 702.179d's ability is borne by no card either, and binds nothing at all --
   -- "your speed" is the controller's, whom Binding.setYou already names.

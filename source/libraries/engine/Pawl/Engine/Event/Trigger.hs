@@ -951,16 +951,19 @@ batchScoped condition = case condition of
   -- (Event.Binding's batchPartition) -- where the arm above is CR 603.2c's
   -- second sentence and fires once per damager.
   TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> True
+  -- CR 725.2 prints "whenever A CREATURE deals combat damage to the monarch",
+  -- CR 603.2c's second sentence: one trigger per damaging creature.
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
   -- CR 726.2's own "one or more creatures a player controls deal combat
-  -- damage", the True beside PermanentsDealCombatDamageToPlayer's. Unreached
-  -- through this classifier, which serves the gatherer that walks bearers:
-  -- Pawl.Engine.Initiative.inherentPending does the grouping itself for a
-  -- condition no card can bear. A take is one occurrence per taker, so the arm
-  -- below is False.
+  -- damage", the True beside PermanentsDealCombatDamageToPlayer's, split per
+  -- damagers' controller by batchPartition. A take is one occurrence per
+  -- taker, so the arm below is False.
   TriggerCondition.CreaturesDealtCombatDamageToInitiative -> True
   TriggerCondition.PlayerTookInitiative -> False
-  TriggerCondition.OpponentLostLifeDuringYourTurn -> False
+  -- CR 702.179d's "one or more opponents lose life": a group of simultaneous
+  -- losses is one trigger event. Its "only once each turn" is a separate
+  -- rider, spent by Event.withinTriggerLimit.
+  TriggerCondition.OpponentLostLifeDuringYourTurn -> True
   TriggerCondition.SelfCycled -> False
   TriggerCondition.SelfRevealedForMiracle -> False
   TriggerCondition.SelfDiscarded -> False
@@ -2346,43 +2349,82 @@ eventTriggers events gs =
       -- in the hand, which no other source reads.
       candidates onBattlefield event later same graveyard = Map.toAscList (Map.unions [onBattlefield, leftBattlefield event, later, same, cycledCard event, spellCast event, revealedInHand event, graveyard, inCommand, Map.unionWith (\(c, a) (_, b) -> (c, a <> b)) inExile (exiledForMadness event)])
       scanOne board later same graveyard event = concatMap (forOne board event) (candidates (onBattlefieldOf board) event later same graveyard)
-      -- CR 603.2c's FIRST sentence, applied to ONE event group: a batch-scoped
-      -- condition's trigger event is the whole group, which occurs once however
-      -- many of the group's members matched, where a per-occurrence condition
-      -- triggers once per member (the rule's second sentence and its own Example,
-      -- the sweeper that fires a "whenever A land is put into a graveyard" ability
-      -- once per land).
-      --
-      -- The FIRST match keeps its place rather than the last, which keeps the
-      -- canonical order below intact: this drops later duplicates and reorders
-      -- nothing, so a batch trigger sits exactly where its earliest matching event
-      -- would have put it. Its BINDINGS are every duplicate's, joined by
-      -- batchBindings, since the trigger event is the whole group -- Rakshasa
-      -- Vizier's "that many" counts every card the group moved.
-      --
-      -- Per GROUP and never per scan: several groups can share one CR 117.5 scan
-      -- (GameState.scannedThrough is not bumped until the scan ends), and CR 704.3
-      -- makes each state-based-action pass its own single event.
-      -- Pawl.ZoneTriggerSpec's "CR 704.3 two death groups in one trigger scan are
-      -- two trigger events" is what tells the two readings apart.
-      oncePerBatch entries =
-        let joined = Map.fromListWith (flip (<>)) [(batch, [PendingTrigger.bindings trigger]) | (Just batch, trigger) <- entries]
-            joinedFor batch trigger = case Map.lookup batch joined of
-              Just (first : rest) -> trigger {PendingTrigger.bindings = batchBindings (first NonEmpty.:| rest)}
-              _ -> trigger
-            go seen remaining = case remaining of
-              [] -> []
-              (k, trigger) : rest -> case k of
-                Nothing -> trigger : go seen rest
-                Just batch
-                  | Set.member batch seen -> go seen rest
-                  | otherwise -> joinedFor batch trigger : go (Set.insert batch seen) rest
-         in go Set.empty entries
       -- The battlefield reading is per GROUP and so is hoisted out of the block:
       -- every event in one group happened at the same time, so they share it. A
       -- group with no events cannot occur, which `eventGroups` states in the type.
       scanBlock block later same graveyard = oncePerBatch (concatMap (scanOne (battlefieldAt (LoggedEvent.group (NonEmpty.head block)) gs) later same graveyard . LoggedEvent.event) block)
    in concat (List.zipWith4 scanBlock groups laterGroups sameGroup graveyardAt)
+
+-- CR 603.2c's FIRST sentence, applied to ONE event group's matches: a
+-- batch-scoped condition's trigger event is the whole group, which occurs once
+-- however many of the group's members matched, where a per-occurrence condition
+-- triggers once per member (the rule's second sentence and its own Example, the
+-- sweeper that fires a "whenever A land is put into a graveyard" ability once
+-- per land). Each entry carries its batch key, Nothing for a per-occurrence
+-- match; the key names the ability and `batchPartition`'s seats.
+--
+-- The FIRST match keeps its place rather than the last, which keeps the
+-- canonical order intact: this drops later duplicates and reorders nothing, so
+-- a batch trigger sits exactly where its earliest matching event would have put
+-- it. Its BINDINGS are every duplicate's, joined by batchBindings, since the
+-- trigger event is the whole group -- Rakshasa Vizier's "that many" counts every
+-- card the group moved.
+--
+-- Per GROUP and never per scan: several groups can share one CR 117.5 scan
+-- (GameState.scannedThrough is not bumped until the scan ends), and CR 704.3
+-- makes each state-based-action pass its own single event.
+-- Pawl.ZoneTriggerSpec's "CR 704.3 two death groups in one trigger scan are two
+-- trigger events" is what tells the two readings apart. Shared by
+-- eventTriggers and inherentTriggers.
+oncePerBatch :: (Ord k) => [(Maybe k, PendingTrigger)] -> [PendingTrigger]
+oncePerBatch entries =
+  let joined = Map.fromListWith (flip (<>)) [(batch, [PendingTrigger.bindings trigger]) | (Just batch, trigger) <- entries]
+      joinedFor batch trigger = case Map.lookup batch joined of
+        Just (first : rest) -> trigger {PendingTrigger.bindings = batchBindings (first NonEmpty.:| rest)}
+        _ -> trigger
+      go seen remaining = case remaining of
+        [] -> []
+        (k, trigger) : rest -> case k of
+          Nothing -> trigger : go seen rest
+          Just batch
+            | Set.member batch seen -> go seen rest
+            | otherwise -> joinedFor batch trigger : go (Set.insert batch seen) rest
+   in go Set.empty entries
+
+-- CR 725.2, 726.2, 702.179d and 728.1: the rulebook's inherent triggered
+-- abilities, each paired with the player who controls it, matched against a
+-- batch of events the way eventTriggers matches an object's: the same matcher
+-- (matchesTriggerGiven), the same CR 603.2c batching (batchScoped,
+-- batchPartition, oncePerBatch), and the same CR 603.4 check (interveningHolds).
+--
+-- Only where the abilities come from differs. Each rule says its ability "has
+-- no source", so the scan that walks zones for bearers has nowhere to find
+-- them; each designation's module names who holds which (Monarch.abilities,
+-- Initiative.abilities, Speed.abilities, Rad.abilities), and that player is the
+-- "you" the matcher reads -- CR 725.2's monarch, CR 726.2's holder or taker, CR
+-- 702.179d's player with speed, CR 728.1's active player. With no bearer, the
+-- matcher is handed an id naming no object (GameState.nextObjectId), so a
+-- self-scoped condition could never match; none of these is one.
+--
+-- CR 801.7 asks for the range of influence of the SOURCE's controller, which
+-- these lack; CR 801.11 is the rule that reaches them -- an ability "doesn't
+-- see objects or events outside its controller's range of influence".
+--
+-- Ability outer, then groups, then events: each controller's own triggers come
+-- out in the order of the abilities' list, which the CR 603.3b ordering prompt
+-- indexes into.
+inherentTriggers :: [(PlayerId, TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card))] -> [LoggedEvent.LoggedEvent] -> GameState -> [PendingTrigger]
+inherentTriggers held events gs =
+  let none = GameState.nextObjectId gs
+      forHeld (you, ability) = concatMap (scanBlock you ability) (eventGroups events)
+      scanBlock you ability block =
+        let board = battlefieldAt (LoggedEvent.group (NonEmpty.head block)) gs
+            cond = TriggeredAbility.condition ability
+            fires event = matchesTriggerGiven Map.empty board gs none you cond event && eventWithinRange board gs you event
+            pend event = PendingTrigger.MkPendingTrigger TriggerSource.Sourceless you ability (eventBindingsOver board gs Nothing Map.empty none you cond event) Nothing (Just event) 1
+            key trigger = if batchScoped cond then Just (batchPartition cond (PendingTrigger.bindings trigger)) else Nothing
+         in oncePerBatch [(key trigger, trigger) | event <- fmap LoggedEvent.event (NonEmpty.toList block), fires event, let trigger = pend event]
+   in concatMap (filter (interveningHolds gs) . forHeld) held
 
 -- CR 113.6m, read off a TRIGGERED ability: "an ability whose cost or effect
 -- specifies that it moves the object it's on out of a particular zone functions
@@ -3759,18 +3801,9 @@ delayedPending grouped gs =
 -- because "doesn't trigger" must be indistinguishable from "no ability existed",
 -- including to the CR 117.5 settle loop's re-run flag.
 --
--- A SOURCELESS pending trigger never reaches this -- gatherTriggers and
--- delayedPending are the only callers, and all three gatherers hang their
--- triggers on an object, the inherent ones being merged in afterwards by
--- Pawl.Engine.Engine. The arm answers True
--- rather than failing because an inherent ability's own gatherer owns CR 603.4:
--- rule 725.2's pair has no intervening "if" at all, and CR 702.179d's does,
--- checked inside Pawl.Engine.Speed.inherentPending. EVERY such gatherer owns its
--- own check -- Pawl.Engine.Monarch, Pawl.Engine.Initiative, Pawl.Engine.Speed and
--- Pawl.Engine.Rad each have one, and a further one would too; there is no subject
--- object to hand this function, so routing one here
--- would mean giving Condition.holds the ability object Pawl.Engine.Stack's CR
--- 608.2a re-check uses, which does not exist until placement.
+-- A SOURCELESS pending trigger (inherentTriggers) is asked too: CR 702.179d's
+-- "if your speed is less than 4" and CR 728.1's "if that player has one or more
+-- rad counters" are intervening clauses like any printed one.
 --
 -- CR 608.2h supplies the view rather than fullView, which for a look-back trigger
 -- is the difference between reading the clause and reading nothing: CR 603.10a
@@ -3801,20 +3834,25 @@ delayedPending grouped gs =
 -- proved behaviour -- the proved one is Stack's re-check.
 interveningHolds :: GameState -> PendingTrigger -> Bool
 interveningHolds gs pending =
-  case (TriggeredAbility.intervening (PendingTrigger.ability pending), PendingTrigger.source pending) of
-    (Nothing, _) -> True
-    (Just _, TriggerSource.Sourceless) -> True
-    (Just cond, TriggerSource.OfObject oid) ->
-      Condition.holds
-        (Projection.viewWithLastKnownAnywhere gs)
-        -- The SOURCE's frame, slots beside it: Ray of Frost's "if enchanted
-        -- creature is red" asks the source's CR 303.4b host and Tablet of the
-        -- Guilds' "the chosen colors" its CR 607.2d choices. Stack's CR 608.2a
-        -- re-check builds the same record so the two checks cannot disagree.
-        ((SourceContext.sourceContext gs (Just (PendingTrigger.controller pending)) oid) {Filter.slotObjects = Binding.slotObjects (PendingTrigger.bindings pending), Filter.slotPlayers = Binding.slotPlayers (PendingTrigger.bindings pending), Filter.boundAmounts = Condition.inheritedX (TriggeredAbility.condition (PendingTrigger.ability pending)) oid gs})
-        gs
-        oid
-        cond
+  let -- An inherent ability has no source, so an id naming no object stands in
+      -- for one, as the ability object itself does at Stack's re-check: either
+      -- way the subject has no characteristics, and the clause reads a player.
+      oid = case PendingTrigger.source pending of
+        TriggerSource.OfObject bearer -> bearer
+        TriggerSource.Sourceless -> GameState.nextObjectId gs
+   in case TriggeredAbility.intervening (PendingTrigger.ability pending) of
+        Nothing -> True
+        Just cond ->
+          Condition.holds
+            (Projection.viewWithLastKnownAnywhere gs)
+            -- The SOURCE's frame, slots beside it: Ray of Frost's "if enchanted
+            -- creature is red" asks the source's CR 303.4b host and Tablet of the
+            -- Guilds' "the chosen colors" its CR 607.2d choices. Stack's CR 608.2a
+            -- re-check builds the same record so the two checks cannot disagree.
+            ((SourceContext.sourceContext gs (Just (PendingTrigger.controller pending)) oid) {Filter.slotObjects = Binding.slotObjects (PendingTrigger.bindings pending), Filter.slotPlayers = Binding.slotPlayers (PendingTrigger.bindings pending), Filter.boundAmounts = Condition.inheritedX (TriggeredAbility.condition (PendingTrigger.ability pending)) oid gs})
+            gs
+            oid
+            cond
 
 -- CR 801.16: the players a triggered ability's placement names as in a loop
 -- beside its controller -- the controllers of the continuous effects it

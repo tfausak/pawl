@@ -25,23 +25,19 @@
 -- replacement narrows by. Pawl.RadSpec's Strong group proves it.
 module Pawl.Engine.Rad where
 
-import qualified Data.List as List
 import qualified Data.Map.Strict as Map
-import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Turn as Turn
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardType as CardType
-import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Filter as Filter
-import Pawl.Types.GameEvent (GameEvent)
-import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -50,12 +46,6 @@ import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
-import qualified Pawl.Types.Modal as Modal
-import qualified Pawl.Types.Mode as Mode
-import qualified Pawl.Types.ModeSelection as ModeSelection
-import qualified Pawl.Types.Optionality as Optionality
-import Pawl.Types.PendingTrigger (PendingTrigger)
-import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -66,11 +56,9 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.RemovePlayerCounters as RemovePlayerCounters
 import qualified Pawl.Types.SlotName as SlotName
-import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerLimit as TriggerLimit
-import qualified Pawl.Types.TriggerSource as TriggerSource
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
@@ -126,7 +114,7 @@ hasRadCounters =
 -- instructions in order, which is what makes the binding readable at all.
 --
 -- The intervening "if" is REAL, as CR 702.179d's is: CR 603.4 checks it when the
--- trigger event occurs (inherentPending below) and CR 608.2a again on resolution
+-- trigger event occurs (Event.interveningHolds) and CR 608.2a again on resolution
 -- (Pawl.Engine.Stack's OfInherentTrigger arm). Both halves matter here in a way
 -- they do not for speed -- this ability REMOVES the counters it fires on, so a
 -- second instance that somehow waited behind the first must find none and do
@@ -144,82 +132,53 @@ ability =
       -- phase" -- the rule quantifies over turns, not over the players of one.
       TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins Phase.PrecombatMain Nothing TurnScope.ControllersTurn),
       TriggeredAbility.modal =
-        Modal.MkModal
-          ( Seq.singleton
-              ( Mode.MkMode
-                  ( Seq.singleton . Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing . Seq.fromList $
-                      [ -- "that player mills a number of cards equal to the
-                        -- number of rad counters they have", counting the
-                        -- nonland cards it milled.
-                        Effect.Mill
-                          ( Mill.MkMill
-                              (PlayerRef.Relative PlayerRelation.You)
-                              (Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad))
-                              (Just (MillTally.MkMillTally {MillTally.slot = milledSlot, MillTally.filter = nonland}))
-                              -- CR 701.17c's slot: rule 728.1 looks back at how MANY
-                              -- cards were milled, never at which.
-                              Nothing
-                          ),
-                        -- "for each nonland card milled this way, that player
-                        -- loses 1 life" -- one life per card, which is the count
-                        -- itself.
-                        --
-                        -- CR 728.1a's cause, the one field of this ability that no
-                        -- card could have written: rule 728.1a makes "life loss
-                        -- from radiation" mean a loss this very ability caused, so
-                        -- the loss says so and Pawl.Engine.Replacement.applies
-                        -- narrows by it.
-                        Effect.LoseLife
-                          ( LifeLoss.MkLifeLoss
-                              (PlayerRef.Relative PlayerRelation.You)
-                              (Quantity.InSlot milledSlot)
-                              LifeLossCause.ByRadiation
-                              Nothing
-                          ),
-                        -- "and removes one rad counter from themselves",
-                        -- likewise once per card.
-                        Effect.RemovePlayerCounters (RemovePlayerCounters.MkRemovePlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad (Quantity.InSlot milledSlot) Nothing)
-                      ]
-                  )
-                  Map.empty
-              )
-          )
-          (ModeSelection.ChooseExactly 1),
+        Modal.single . Seq.fromList $
+          [ -- "that player mills a number of cards equal to the
+            -- number of rad counters they have", counting the
+            -- nonland cards it milled.
+            Effect.Mill
+              ( Mill.MkMill
+                  (PlayerRef.Relative PlayerRelation.You)
+                  (Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad))
+                  (Just (MillTally.MkMillTally {MillTally.slot = milledSlot, MillTally.filter = nonland}))
+                  -- CR 701.17c's slot: rule 728.1 looks back at how MANY
+                  -- cards were milled, never at which.
+                  Nothing
+              ),
+            -- "for each nonland card milled this way, that player
+            -- loses 1 life" -- one life per card, which is the count
+            -- itself.
+            --
+            -- CR 728.1a's cause, the one field of this ability that no
+            -- card could have written: rule 728.1a makes "life loss
+            -- from radiation" mean a loss this very ability caused, so
+            -- the loss says so and Pawl.Engine.Replacement.applies
+            -- narrows by it.
+            Effect.LoseLife
+              ( LifeLoss.MkLifeLoss
+                  (PlayerRef.Relative PlayerRelation.You)
+                  (Quantity.InSlot milledSlot)
+                  LifeLossCause.ByRadiation
+                  Nothing
+              ),
+            -- "and removes one rad counter from themselves",
+            -- likewise once per card.
+            Effect.RemovePlayerCounters (RemovePlayerCounters.MkRemovePlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad (Quantity.InSlot milledSlot) Nothing)
+          ],
       TriggeredAbility.intervening = Just hasRadCounters,
       TriggeredAbility.name = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
     }
 
--- | CR 728.1: the inherent trigger this batch of events fires, if any, as an
--- ordinary PendingTrigger whose source is TriggerSource.Sourceless -- what lets
--- Engine.placePendingTriggers merge it into the one batch CR 603.3b orders, and
--- Pawl.Engine.Monarch.placeInherent put it on the stack.
+-- | CR 728.1: the ability, paired with each active player, for
+-- Pawl.Engine.Event.Trigger.inherentTriggers -- "controlled by the active
+-- player". Under the shared team turns option each member of the active team
+-- has a precombat main phase, so each has the ability (CR 805.4d).
 --
--- AT MOST ONE PER ACTIVE PLAYER. A precombat main phase begins once (CR
--- 505.1a), and the ability belongs to the player whose phase it is.
---
--- Only an ACTIVE player's, which is that same rule and not a shortcut: no other
--- player has a precombat main phase on this turn, so rule 728.1's "that player"
--- can be nobody else. An opponent's rad counters wait for their own turn. Under
--- the shared team turns option each member of the active team has one, so each
--- triggers (CR 805.4d).
-inherentPending :: [GameEvent] -> GameState -> [PendingTrigger]
-inherentPending events gs = concatMap (pendingFor events gs) (Turn.activePlayers gs)
-
-pendingFor :: [GameEvent] -> GameState -> PlayerId -> [PendingTrigger]
-pendingFor events gs you =
-  let -- A PARTIAL case with a wildcard, Pawl.Engine.Speed.inherentPending's
-      -- posture: this matcher answers about one event shape, and a new GameEvent
-      -- constructor is not an event rule 728.1 names.
-      precombatMainBegan event = case event of
-        GameEvent.StepBegan (StepBegan.MkStepBegan Phase.PrecombatMain active) -> Turn.sharesTurn gs active you
-        _ -> False
-      -- CR 603.4: the intervening "if" is checked here, as the event occurs. A
-      -- player with no rad counters does not trigger at all, which is the
-      -- difference between this and an ability that triggers and then does
-      -- nothing -- observable, since a trigger going on the stack is a thing
-      -- other players may respond to.
-      irradiated = Maybe.maybe False (>= 1) (radCountersOf you gs)
-   in if irradiated && List.any precombatMainBegan events
-        then [PendingTrigger.MkPendingTrigger TriggerSource.Sourceless you ability Map.empty Nothing Nothing 1]
-        else []
+-- "That player" is the controller: ControllersTurn admits only the controller's
+-- own phase (CR 505.1a gives a turn exactly one), and CR 603.4's "if that player
+-- has one or more rad counters" is Event.interveningHolds' check. A player with
+-- no rad counters does not trigger at all, which is observable: a trigger going
+-- on the stack is a thing other players may respond to.
+abilities :: GameState -> [(PlayerId, TriggeredAbility Card (GrantedAbility.GrantedAbility Card))]
+abilities gs = fmap (\pid -> (pid, ability)) (Turn.activePlayers gs)

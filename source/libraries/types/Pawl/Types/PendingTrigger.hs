@@ -13,9 +13,9 @@ import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 
 -- | CR 603.3: an ability that has TRIGGERED but is not yet on the stack. Gathered
--- by Pawl.Engine.Event (and, for the sourceless ones, by Pawl.Engine.Monarch for
--- CR 725.2's pair and Pawl.Engine.Speed for CR 702.179d's) at the CR 117.5
--- boundary, ordered and placed by Pawl.Engine.Engine.
+-- by Pawl.Engine.Event (the sourceless ones by
+-- Pawl.Engine.Event.Trigger.inherentTriggers) at the CR 117.5 boundary, ordered
+-- and placed by Pawl.Engine.Engine.
 --
 -- `source` is what the ability hangs on -- the object it belongs to (CR 113.7),
 -- or nothing at all for an inherent ability the rulebook rather than a card
@@ -43,10 +43,9 @@ data PendingTrigger = MkPendingTrigger
     createdAt :: Maybe Timestamp.Timestamp,
     -- | CR 603.2's trigger event, and Nothing where the gatherer names none --
     -- a state trigger (CR 603.8) and a reflexive one (CR 603.12), which have no
-    -- event at all, and the inherent gathers that answer over a whole batch
-    -- (Pawl.Engine.Speed, Pawl.Engine.Rad) rather than per event. None of those
-    -- can be a mana ability, CR 605.1b's middle clause naming events an
-    -- inherent ability the rulebook states never watches. Read by
+    -- event at all. Neither can be a mana ability, nor can an inherent
+    -- ability, CR 605.1b's middle clause naming events an inherent ability the
+    -- rulebook states never watches. Read by
     -- Pawl.Engine.ManaAbility.isTriggeredManaAbility, CR 605.5a asking what
     -- added the mana rather than only what the ability watches.
     firedBy :: Maybe GameEvent.GameEvent,

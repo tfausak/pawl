@@ -41,6 +41,8 @@ import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Event.Trigger as Trigger
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
@@ -53,8 +55,10 @@ import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
@@ -452,6 +456,24 @@ increaseSpec s registry = Spec.describe s "Increase" $ do
         twice = castResolveSettle atBob S.alice secondSpell withAnother
     Spec.assertEqWith s "bob lost four life over the two castings" (S.lifeOf S.bob twice) (fmap (subtract 4) (S.lifeOf S.bob gs0))
     Spec.assertEqWith s "but alice's speed rose only once" (speedOf S.alice twice) (Just (Just 2))
+  -- CR 603.2c's "one or more opponents lose life", through the shared matcher
+  -- (Event.Trigger.inherentTriggers): two losses in ONE group -- one combat
+  -- damage step -- are one trigger event, and a later group in the same scan is
+  -- another. The rider then spends one of the two, so speed rises once. The
+  -- gather is read directly because the rider masks the batching at gameplay
+  -- level.
+  Spec.it s "CR 603.2c two losses in one group are one trigger event, a later group another, and the rider keeps one" $ do
+    let logged =
+          S.withGroupedEvents
+            [ [GameEvent.LifeLost (LifeChange.MkLifeChange S.bob 2), GameEvent.LifeLost (LifeChange.MkLifeChange S.bob 1)],
+              [GameEvent.LifeLost (LifeChange.MkLifeChange S.bob 3)]
+            ]
+            (atSpeed 1 S.alice (Setup.emptyGame S.bothPlayers))
+        after = resolveTrigger S.identityAnswer logged
+    Spec.assertEqWith s "alice is the active player" (GameState.activePlayer logged) S.alice
+    Spec.assertEqWith s "CR 702.179d alice's speed rose once" (speedOf S.alice after) (Just (Just 2))
+    Spec.assertEqWith s "one sourceless trigger was spent" (inherentTriggersSpent after) [S.alice]
+    Spec.assertEqWith s "the gather fired once per group, not once per loss" (fmap PendingTrigger.controller (Trigger.inherentTriggers (Speed.abilities logged) (Event.unscannedGrouped logged) logged)) [S.alice, S.alice]
   -- CR 702.179d's intervening "if your speed is less than 4", at CR 603.4's
   -- gather-time check: a player already at max speed does not trigger, so speed
   -- stops at 4 rather than climbing past it. CR 702.179e is why 4 is the number.

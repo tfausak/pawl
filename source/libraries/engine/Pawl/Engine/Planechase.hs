@@ -30,11 +30,11 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Plane as Plane
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
 import Pawl.Types.Card (Card)
-import qualified Pawl.Types.Clause as Clause
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Effect as Effect
@@ -50,12 +50,8 @@ import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
-import qualified Pawl.Types.Modal as Modal
-import qualified Pawl.Types.Mode as Mode
-import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
-import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import Pawl.Types.PendingTrigger (PendingTrigger)
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
@@ -243,8 +239,7 @@ roll perform pid = do
 
 -- | CR 901.8: the planeswalking ability, "Whenever you roll the Planeswalker
 -- symbol on the planar die, planeswalk." It has no source and its roller
--- controls it, so it is gathered here as a TriggerSource.Sourceless entry, the
--- Pawl.Engine.Rad.inherentPending posture.
+-- controls it, so it is gathered here as a TriggerSource.Sourceless entry.
 inherentPending :: [GameEvent] -> GameState -> [PendingTrigger]
 inherentPending events _ =
   let rolledPlaneswalker event = case event of
@@ -258,10 +253,7 @@ planeswalkingAbility :: TriggeredAbility Card (GrantedAbility.GrantedAbility Car
 planeswalkingAbility =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.PlayerRollsDice PlayerRelation.You,
-      TriggeredAbility.modal =
-        Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton Effect.Planeswalk))) Map.empty))
-          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.modal = Modal.single (Seq.singleton Effect.Planeswalk),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.name = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
