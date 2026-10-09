@@ -34,10 +34,12 @@ import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Zone as Zone
 
@@ -131,6 +133,18 @@ spec s registry = Spec.describe s "Pawl.Engine.Planechase" $ do
     Spec.assertEqWith s "and Academy is on the bottom of the planar deck" (fmap (\oid -> fmap Face.name (Game.faceOf oid walked)) (Planechase.deckOf S.alice walked)) [Just (CardName.MkCardName (Text.pack "Academy at Tolaria West"))]
     Spec.assertBool s (all (\oid -> Maybe.isNothing (Game.lookupObject oid walked)) academyBefore) "CR 311.6 as a new object"
     Spec.assertEqWith s "a blank face leaves Academy face up" (names blank) [Just (CardName.MkCardName (Text.pack "Academy at Tolaria West"))]
+
+  -- CR 901.8: "controlled by the player whose planar die roll caused it to
+  -- trigger", and with no source. Three seats, bob active and rolling, so a
+  -- gather that gave every player the trigger, or gave it to the first seat,
+  -- answers differently.
+  Spec.it s "CR 901.8 the planeswalking ability is the roller's alone, with no source" $ do
+    board <- seatedPlanarBoard s registry S.bob [(S.alice, ["Academy at Tolaria West"]), (S.bob, ["Tazeem", "Academy at Tolaria West"]), (S.carol, ["Tazeem"])]
+    let placed = S.runPure (rolling 6) (inMain S.bob board) (Planechase.roll S.manaPerformer S.bob >> Engine.placePendingTriggers)
+        walker oid = case fmap Object.source (Game.lookupObject oid placed) of
+          Just (Source.OfInherentTrigger inherent) -> Just (InherentTriggerSource.controller inherent)
+          _ -> Nothing
+    Spec.assertEqWith s "one sourceless planeswalking ability, bob's" (fmap walker (GameState.stack placed)) [Just S.bob]
 
   -- CR 901.10 / 311.5 / 800.4p: bob, the active player, concedes in his main
   -- phase while his Academy is the face-up plane. It leaves the game with him,

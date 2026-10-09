@@ -121,7 +121,7 @@ hasRadCounters =
 -- nothing.
 --
 -- Single mode, no targets, mandatory: rule 728.1 fixes the whole text and
--- chooses nothing, which is what lets Monarch.placeInherent put it on the stack
+-- chooses nothing, which is what lets Engine.placeSourceless put it on the stack
 -- unprompted.
 ability :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 ability =

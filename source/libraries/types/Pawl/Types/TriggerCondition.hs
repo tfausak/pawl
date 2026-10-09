@@ -593,6 +593,10 @@ data TriggerCondition
   | -- | CR 311.7: "whenever chaos ensues", a plane's chaos ability, against a
     -- GameEvent.PlanarDieRolled showing the chaos symbol (CR 901.9b).
     ChaosEnsues
+  | -- | CR 901.8: "whenever you roll the Planeswalker symbol on the planar die",
+    -- the planeswalking ability's condition, against a GameEvent.PlanarDieRolled
+    -- showing that face (CR 901.9c).
+    PlayerRollsPlaneswalker PlayerRelation.PlayerRelation
   | -- | CR 701.32 / 904.9: "When you set this scheme in motion", against a
     -- GameEvent.SchemeSetInMotion naming the ability's own scheme.
     SetInMotion

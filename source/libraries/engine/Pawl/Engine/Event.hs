@@ -9276,6 +9276,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.PlayerRollsResult _ -> False
   TriggerCondition.Visit -> False
   TriggerCondition.ChaosEnsues -> False
+  TriggerCondition.PlayerRollsPlaneswalker _ -> False
   TriggerCondition.SetInMotion -> False
   TriggerCondition.PlayerOpensAttraction _ -> False
   TriggerCondition.PlayerClaimsPrize _ -> False

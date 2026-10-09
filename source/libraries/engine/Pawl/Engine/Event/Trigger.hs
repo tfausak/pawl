@@ -517,6 +517,7 @@ looksBack condition = case condition of
   TriggerCondition.PlayerRollsResult _ -> False
   TriggerCondition.Visit -> False
   TriggerCondition.ChaosEnsues -> False
+  TriggerCondition.PlayerRollsPlaneswalker _ -> False
   TriggerCondition.SetInMotion -> False
   TriggerCondition.PlayerOpensAttraction _ -> False
   TriggerCondition.PlayerClaimsPrize _ -> False
@@ -849,6 +850,7 @@ batchScoped condition = case condition of
   TriggerCondition.PlayerRollsResult _ -> False
   TriggerCondition.Visit -> False
   TriggerCondition.ChaosEnsues -> False
+  TriggerCondition.PlayerRollsPlaneswalker _ -> False
   TriggerCondition.SetInMotion -> False
   TriggerCondition.PlayerOpensAttraction _ -> False
   TriggerCondition.PlayerClaimsPrize _ -> False
@@ -1134,6 +1136,15 @@ stepTriggerPlayers gs you cond event ability = case (cond, event) of
   (TriggerCondition.AnyOf conditions, _) -> Maybe.listToMaybe (Maybe.mapMaybe (\c -> stepTriggerPlayers gs you c event ability) conditions)
   _ -> Nothing
 
+-- CR 805.4d: the trigger once per player whose step this is, each naming its own
+-- "that player" (Binding.triggerPlayer), where stepTriggerPlayers says the
+-- ability reads that player; the trigger alone otherwise. Shared by
+-- eventTriggers and inherentTriggers.
+stepCopies :: GameState -> PlayerId -> TriggerCondition -> GameEvent -> TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card) -> PendingTrigger -> [PendingTrigger]
+stepCopies gs you cond event ability one =
+  let for player = one {PendingTrigger.bindings = Binding.setTriggerPlayer player (PendingTrigger.bindings one)}
+   in maybe [one] (fmap for) (stepTriggerPlayers gs you cond event ability)
+
 -- CR 603.2c's second sentence for a per-counter removal: "whenever a [kind]
 -- counter is removed from this" triggers once for each counter one removal took
 -- off the bearer (Protean Hydra's ruling). Nothing for every other pair, which
@@ -1162,10 +1173,9 @@ countersRemovedOccurrences bearer cond event = case (cond, event) of
 -- just became cast is offered from the STACK for the same rule, the card a player
 -- revealed as they drew it is offered from their HAND for it too, and an EMBLEM is
 -- offered from the command zone under CR 114.4. The rest of the command zone is
--- unscanned: the only other thing it holds is a dungeon card, whose room
--- abilities CR 309.4c mints rather than prints, leaving this scan nothing on a
--- face to read.
--- Pawl.Engine.Dungeon.roomPending gathers those.
+-- unscanned here: a dungeon card's room abilities are minted by CR 309.4c
+-- rather than printed, leaving this scan nothing on a face to read, and
+-- inherentTriggers gathers them.
 --
 -- Two holes are left in the BATTLEFIELD half of that reading, and last known
 -- information fills both. A permanent that left WITHIN its own group is missing
@@ -2323,12 +2333,9 @@ eventTriggers events gs =
             -- paid for the spell it was, so the bearer's record rides on every
             -- ability it triggers (Binding.paidCostRecord).
             pend (cond, ab) = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (Map.union (Binding.paidCostRecord bindings) (eventBindingsOver board gs (Map.lookup oid becameInGraveyard) becameInGraveyard oid ctrl cond event)) Nothing (Just event) (copiesIn (fmap snd abilities) ab)
-            -- CR 805.4d: one trigger per player whose step this is, each naming
-            -- its own "that player", where the ability reads that player.
+            -- CR 805.4d: one trigger per player whose step this is (stepCopies).
             pends (cond, ab) =
-              let one = pend (cond, ab)
-                  for player = one {PendingTrigger.bindings = Binding.setTriggerPlayer player (PendingTrigger.bindings one)}
-                  perPlayer = maybe [one] (fmap for) (stepTriggerPlayers gs ctrl cond event ab)
+              let perPlayer = stepCopies gs ctrl cond event ab (pend (cond, ab))
                in maybe perPlayer (\n -> concat (List.genericReplicate n perPlayer)) (countersRemovedOccurrences oid cond event)
             -- CR 603.2c's key, for `oncePerBatch` below: which ability of which
             -- bearer this pending trigger came from, or Nothing when the condition
@@ -2414,39 +2421,48 @@ oncePerBatch entries =
             | otherwise -> joinedFor batch trigger : go (Set.insert batch seen) rest
    in go Set.empty entries
 
--- CR 725.2, 726.2, 702.179d and 728.1: the rulebook's inherent triggered
--- abilities, each paired with the player who controls it, matched against a
--- batch of events the way eventTriggers matches an object's: the same matcher
--- (matchesTriggerGiven), the same CR 603.2c batching (batchScoped,
--- batchPartition, oncePerBatch), and the same CR 603.4 check (interveningHolds).
+-- CR 725.2, 726.2, 702.179d, 728.1, 901.8 and 309.4c: the triggered abilities
+-- the rulebook rather than a card writes out, each with what it hangs on and the
+-- player who controls it, matched against a batch of events the way
+-- eventTriggers matches an object's: the same matcher (matchesTriggerGiven), the
+-- same CR 603.2c batching (batchScoped, batchPartition, oncePerBatch), the same
+-- CR 805.4d per-player copies (stepCopies) and the same CR 603.4 check
+-- (interveningHolds). No such ability reads "that player" yet, so stepCopies is
+-- a regression fence here.
 --
--- Only where the abilities come from differs. Each rule says its ability "has
--- no source", so the scan that walks zones for bearers has nowhere to find
--- them; each designation's module names who holds which (Monarch.abilities,
--- Initiative.abilities, Speed.abilities, Rad.abilities), and that player is the
--- "you" the matcher reads -- CR 725.2's monarch, CR 726.2's holder or taker, CR
--- 702.179d's player with speed, CR 728.1's active player. With no bearer, the
--- matcher is handed an id naming no object (GameState.nextObjectId), so a
--- self-scoped condition could never match; none of these is one.
+-- Only where the abilities come from differs. The designations' and the planar
+-- die's each "has no source" (TriggerSource.Sourceless), so the scan that walks
+-- zones for bearers has nowhere to find them; each module names who holds which
+-- (Monarch.abilities, Initiative.abilities, Speed.abilities, Rad.abilities,
+-- Planechase.abilities), and that player is the "you" the matcher reads. With no
+-- bearer, the matcher is handed an id naming no object (GameState.nextObjectId),
+-- so a self-scoped condition could never match; none of these is one. A room
+-- ability (Dungeon.abilities) does have a source, the dungeon card, which that
+-- scan never offers: it is minted rather than printed, so there is nothing on a
+-- face to read. Its bearer is the card, which is what CR 309.4c's "this room"
+-- is matched against.
 --
 -- CR 801.7 asks for the range of influence of the SOURCE's controller, which
--- these lack; CR 801.11 is the rule that reaches them -- an ability "doesn't
--- see objects or events outside its controller's range of influence".
+-- the sourceless ones lack; CR 801.11 is the rule that reaches them -- an
+-- ability "doesn't see objects or events outside its controller's range of
+-- influence".
 --
 -- Ability outer, then groups, then events: each controller's own triggers come
 -- out in the order of the abilities' list, which the CR 603.3b ordering prompt
 -- indexes into.
-inherentTriggers :: [(PlayerId, TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card))] -> [LoggedEvent.LoggedEvent] -> GameState -> [PendingTrigger]
+inherentTriggers :: [(TriggerSource.TriggerSource, PlayerId, TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card))] -> [LoggedEvent.LoggedEvent] -> GameState -> [PendingTrigger]
 inherentTriggers held events gs =
-  let none = GameState.nextObjectId gs
-      forHeld (you, ability) = concatMap (scanBlock you ability) (eventGroups events)
-      scanBlock you ability block =
+  let forHeld (source, you, ability) = concatMap (scanBlock source you ability) (eventGroups events)
+      scanBlock source you ability block =
         let board = battlefieldAt (LoggedEvent.group (NonEmpty.head block)) gs
+            bearer = case source of
+              TriggerSource.OfObject oid -> oid
+              TriggerSource.Sourceless -> GameState.nextObjectId gs
             cond = TriggeredAbility.condition ability
-            fires event = matchesTriggerGiven Map.empty board gs none you cond event && eventWithinRange board gs you event
-            pend event = PendingTrigger.MkPendingTrigger TriggerSource.Sourceless you ability (eventBindingsOver board gs Nothing Map.empty none you cond event) Nothing (Just event) 1
+            fires event = matchesTriggerGiven Map.empty board gs bearer you cond event && eventWithinRange board gs you event
+            pend event = PendingTrigger.MkPendingTrigger source you ability (eventBindingsOver board gs Nothing Map.empty bearer you cond event) Nothing (Just event) 1
             key trigger = if batchScoped cond then Just (batchPartition cond (PendingTrigger.bindings trigger)) else Nothing
-         in oncePerBatch [(key trigger, trigger) | event <- fmap LoggedEvent.event (NonEmpty.toList block), fires event, let trigger = pend event]
+         in oncePerBatch [(key trigger, trigger) | event <- fmap LoggedEvent.event (NonEmpty.toList block), fires event, trigger <- stepCopies gs you cond event ability (pend event)]
    in concatMap (filter (interveningHolds gs) . forHeld) held
 
 -- CR 113.6m, read off a TRIGGERED ability: "an ability whose cost or effect
@@ -2733,7 +2749,7 @@ zonesTriggeredFrom cond =
         -- CR 309.4c: "as long as a dungeon card is in the command zone, its abilities
         -- may trigger". The honest answer, and inert: eventTriggers' command-zone source
         -- is CR 114.4's and takes emblems alone, so nothing consults this arm --
-        -- Pawl.Engine.Dungeon.roomPending is what gathers a room ability.
+        -- inherentTriggers gathers a room ability off Dungeon.abilities.
         TriggerCondition.RoomEntered _ -> Set.singleton Zone.Command
         -- CR 113.6's default for the three whose watcher is an ordinary permanent:
         -- Matoya, Archon Elder and Wildgrowth Walker are creatures, and neither the
@@ -2775,6 +2791,7 @@ zonesTriggeredFrom cond =
         -- about rolling a die is a condition that cannot trigger from the
         -- battlefield.
         TriggerCondition.PlayerRollsDice _ -> battlefield
+        TriggerCondition.PlayerRollsPlaneswalker _ -> battlefield
         TriggerCondition.PlayerRollsResult _ -> battlefield
         -- CR 311.7 / 901.7: a chaos ability triggers from the face-up plane.
         TriggerCondition.ChaosEnsues -> Set.singleton Zone.Command
@@ -3272,6 +3289,7 @@ stateTriggers gs
             TriggerCondition.PlayerRollsResult _ -> False
             TriggerCondition.Visit -> False
             TriggerCondition.ChaosEnsues -> False
+            TriggerCondition.PlayerRollsPlaneswalker _ -> False
             TriggerCondition.SetInMotion -> False
             TriggerCondition.PlayerOpensAttraction _ -> False
             TriggerCondition.PlayerClaimsPrize _ -> False

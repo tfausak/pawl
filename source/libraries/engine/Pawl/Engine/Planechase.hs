@@ -23,7 +23,6 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
-import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
@@ -39,7 +38,6 @@ import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Effect as Effect
 import Pawl.Types.Game (Game)
-import Pawl.Types.GameEvent (GameEvent)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -53,8 +51,6 @@ import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
-import Pawl.Types.PendingTrigger (PendingTrigger)
-import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.PlanarDieFace as PlanarDieFace
 import qualified Pawl.Types.PlanarDieRolled as PlanarDieRolled
 import Pawl.Types.PlayerId (PlayerId)
@@ -63,7 +59,6 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerLimit as TriggerLimit
-import qualified Pawl.Types.TriggerSource as TriggerSource
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 
@@ -222,7 +217,7 @@ faceOf n = case n of
 
 -- | CR 116.2i / 901.9: pay, then roll the planar die. The roll records
 -- DiceRolled (CR 901.9d) and PlanarDieRolled, which is what CR 311.7's chaos
--- abilities and CR 901.8's planeswalking ability trigger on (inherentPending).
+-- abilities and CR 901.8's planeswalking ability trigger on.
 -- A payment that fails restores the state, Pawl.Engine.Companion.take's
 -- posture, and nothing is rolled.
 roll :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> Game ()
@@ -236,22 +231,19 @@ roll perform pid = do
       State.modify' (Event.recordEvent (GameEvent.DiceRolled pid))
       State.modify' (Event.recordEvent (GameEvent.PlanarDieRolled (PlanarDieRolled.MkPlanarDieRolled pid (faceOf rolled))))
 
--- | CR 901.8: the planeswalking ability, "Whenever you roll the Planeswalker
--- symbol on the planar die, planeswalk." It has no source and its roller
--- controls it, so it is gathered here as a TriggerSource.Sourceless entry.
-inherentPending :: [GameEvent] -> GameState -> [PendingTrigger]
-inherentPending events _ =
-  let rolledPlaneswalker event = case event of
-        GameEvent.PlanarDieRolled r | PlanarDieRolled.face r == PlanarDieFace.Planeswalker -> Just (PlanarDieRolled.roller r)
-        _ -> Nothing
-   in fmap (\pid -> PendingTrigger.MkPendingTrigger TriggerSource.Sourceless pid planeswalkingAbility Map.empty Nothing Nothing 1) (Maybe.mapMaybe rolledPlaneswalker events)
+-- | CR 901.8: the planeswalking ability, paired with each player, for
+-- Pawl.Engine.Event.Trigger.inherentTriggers. Planechase games have it; it "has
+-- no source and is controlled by the player whose planar die roll caused it to
+-- trigger", which is each player holding it with themselves as its "you".
+abilities :: GameState -> [(PlayerId, TriggeredAbility Card (GrantedAbility.GrantedAbility Card))]
+abilities gs = if isPlanechase gs then fmap (\pid -> (pid, planeswalkingAbility)) (Map.keys (GameState.players gs)) else []
 
--- | CR 901.8's text. The condition is never matched -- inherentPending gathers
--- the ability off the event -- and PlayerRollsDice is the nearest description.
+-- | CR 901.8's text: "Whenever you roll the Planeswalker symbol on the planar
+-- die, planeswalk."
 planeswalkingAbility :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 planeswalkingAbility =
   TriggeredAbility.MkTriggeredAbility
-    { TriggeredAbility.condition = TriggerCondition.PlayerRollsDice PlayerRelation.You,
+    { TriggeredAbility.condition = TriggerCondition.PlayerRollsPlaneswalker PlayerRelation.You,
       TriggeredAbility.modal = Modal.single (Seq.singleton Effect.Planeswalk),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.name = Nothing,

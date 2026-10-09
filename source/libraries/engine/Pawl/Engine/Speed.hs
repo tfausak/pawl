@@ -128,7 +128,7 @@ startEngines pid gs =
 -- waited on the stack while something else did.
 --
 -- Single mode, no targets, forced (CR 603.3's "you" is the ability's controller
--- and nothing is chosen), which is what lets Monarch.placeInherent put it on the
+-- and nothing is chosen), which is what lets Engine.placeSourceless put it on the
 -- stack unprompted.
 increaseAbility :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 increaseAbility =

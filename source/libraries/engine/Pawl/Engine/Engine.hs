@@ -94,12 +94,14 @@ import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LoopTrail as LoopTrail
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.Modal as Modal.Type
 import qualified Pawl.Types.Mode as Mode
+import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -614,28 +616,21 @@ advanceSagas pid = do
 placePendingTriggers :: Game Bool
 placePendingTriggers = do
   gs <- State.get
-  let evs = Event.unscannedEvents gs
-      -- The same events with their CR 608.2f groups still on them, which every
-      -- gatherer below but the last two reads: a group's CR 603.10 sample is
-      -- the board as it stood immediately after the group's events.
+  let -- The unscanned events with their CR 608.2f groups still on them, which
+      -- every gatherer below reads: a group's CR 603.10 sample is the board as
+      -- it stood immediately after the group's events.
       logged = Event.unscannedGrouped gs
-      -- CR 725.2, 726.2, 702.179d and 728.1: the rulebook's inherent triggers
-      -- hang on no object, so Event.gatherTriggers -- which asks each object
-      -- what it triggers -- has nowhere to find them. Gathered apart through
-      -- the same matcher, from the SAME snapshot and before the watermark bump,
-      -- then merged into the one batch below: placing them after the ordered
-      -- batch would make them resolve first, by the engine's choice rather than
-      -- the player's.
-      inherent = Trigger.inherentTriggers (Monarch.abilities gs <> Initiative.abilities gs <> Speed.abilities gs <> Rad.abilities gs) logged gs
-      -- CR 901.8's planeswalking ability, another inherent one with no source,
-      -- gathered for the same reason.
-      planeswalking = Planechase.inherentPending evs gs
-      -- CR 309.4c's room abilities, gathered separately because
-      -- Event.gatherTriggers reads the command zone for CR 113.6p's list -- an
-      -- emblem and a vanguard card -- and a dungeon card is on neither. Unlike the
-      -- sourceless gatherers above these DO have a source, so they carry
-      -- TriggerSource.OfObject and go through placeBorne.
-      entered = Dungeon.roomPending evs gs
+      -- CR 725.2, 726.2, 702.179d, 728.1 and 901.8: the rulebook's inherent
+      -- triggers hang on no object, and CR 309.4c's room abilities hang on a
+      -- dungeon card Event.gatherTriggers does not offer -- that scan reads the
+      -- command zone for CR 113.6p's list, an emblem and a vanguard card. So
+      -- Event.gatherTriggers, which asks each object what it triggers, has
+      -- nowhere to find any of them. Gathered apart through the same matcher,
+      -- from the SAME snapshot and before the watermark bump, then merged into
+      -- the one batch below: placing them after the ordered batch would make
+      -- them resolve first, by the engine's choice rather than the player's.
+      sourceless = Monarch.abilities gs <> Initiative.abilities gs <> Speed.abilities gs <> Rad.abilities gs <> Planechase.abilities gs
+      inherent = Trigger.inherentTriggers (fmap (\(pid, ability) -> (TriggerSource.Sourceless, pid, ability)) sourceless <> Dungeon.abilities gs) logged gs
   -- The CR 603.10a look-back in Event.eventTriggers, over the same grouped
   -- snapshot inherentTriggers took.
   -- Not in the `let` because it can ASK -- CR 603.7b's second sentence is a
@@ -671,7 +666,7 @@ placePendingTriggers = do
   -- CR 605.5a: the EVENT that fired it decides too, so a trigger watching mana
   -- added by an ability that resolved (Caged Sun off Crumbling Vestige) is no
   -- mana ability and is placed here like any other.
-  gathered <- reactions (filter (\p -> not (ManaAbility.isTriggeredManaAbility (PendingTrigger.firedBy p) (PendingTrigger.ability p))) pending <> inherent <> planeswalking <> entered)
+  gathered <- reactions (filter (\p -> not (ManaAbility.isTriggeredManaAbility (PendingTrigger.firedBy p) (PendingTrigger.ability p))) pending <> inherent)
   -- CR 603.3b's two sentences, run one after the other rather than ordered
   -- together and placed at the end: the rule's first sentence PUTS its abilities
   -- on the stack before its second is reached, which is observable both in the
@@ -789,10 +784,101 @@ placeOne pending = do
   let shapers = if GameSettings.rangeOfInfluence (GameState.settings gs) == RangeOfInfluence.unlimited then [] else Trigger.loopShapers pending gs
   State.put (foldr Game.involve gs (PendingTrigger.controller pending : shapers))
   case PendingTrigger.source pending of
-    -- Monarch.placeInherent names no rule of its own: it is the generic sourceless
-    -- placement, which rule 702.179d's ability rides too.
-    TriggerSource.Sourceless -> Monarch.placeInherent pending
+    TriggerSource.Sourceless -> placeSourceless pending
     TriggerSource.OfObject srcId -> placeBorne srcId pending
+
+-- Put one sourceless triggered ability on the stack: placeOne's arm for EVERY
+-- TriggerSource.Sourceless entry -- CR 725.2's, 726.2's, 702.179d's, 728.1's and
+-- 901.8's abilities, which the rulebook writes out and no object bears.
+--
+-- Single mode, no targets, so the mode is selected outright with no prompt --
+-- licensed by each such rule fixing its ability's full text, not by anything
+-- general about sourceless triggers. An inherent ability with a real choice in
+-- it would have to prompt here. The chosen modes ride under the reserved
+-- chosenModes slot, which Stack.resolveTop's OfInherentTrigger arm reads.
+placeSourceless :: PendingTrigger.PendingTrigger -> Game ()
+placeSourceless pending = do
+  gs <- State.get
+  let controller = PendingTrigger.controller pending
+      ability = PendingTrigger.ability pending
+      provided = PendingTrigger.bindings pending
+      (abilId, gs1) = Game.freshObjectId gs
+      (ts, gs2) = Game.freshTimestamp gs1
+      modeCount = Seq.length (Modal.Type.modes (TriggeredAbility.modal ability))
+      -- take, not [0 .. modeCount - 1]: a ModeIndex counts in Natural, and
+      -- Natural subtraction underflows when there are no modes at all.
+      allModes = Seq.fromList (fmap ModeIndex.MkModeIndex (take modeCount [0 ..]))
+      bindings = Binding.setYou controller (Map.union provided (Binding.fromChoices Map.empty Nothing allModes))
+      obj =
+        Object.MkObject
+          { Object.owner = controller,
+            Object.identity = Nothing,
+            Object.enteredUnder = Nothing,
+            Object.source =
+              Source.OfInherentTrigger
+                InherentTriggerSource.MkInherentTriggerSource
+                  { InherentTriggerSource.controller = controller,
+                    InherentTriggerSource.ability = ability
+                  },
+            Object.zone = Zone.Stack,
+            Object.tapped = TapState.Untapped,
+            Object.facing = Facing.FaceUp,
+            Object.flipped = False,
+            Object.exiledFaceDown = False,
+            Object.exileLookers = Set.empty,
+            Object.damage = 0,
+            Object.sickness = Sickness.Settled controller,
+            Object.controlClock = Map.empty,
+            Object.bindings = bindings,
+            Object.counters = Map.empty,
+            Object.counterTimestamps = Map.empty,
+            Object.attachedTo = Nothing,
+            Object.chosenColors = Set.empty,
+            Object.chosenSubtype = Nothing,
+            Object.chosenNames = Set.empty,
+            Object.chosenPlayer = Nothing,
+            Object.timestamp = ts,
+            Object.face = Nothing,
+            Object.turnedOverAt = Nothing,
+            Object.worldSince = Nothing,
+            Object.playableFromExile = Nothing,
+            Object.plotted = Nothing,
+            Object.foretold = Nothing,
+            Object.foretellCostReduction = Nothing,
+            Object.warped = Nothing,
+            Object.preparedCopyOf = Nothing,
+            Object.ringBearerFor = Nothing,
+            Object.stickers = Seq.empty,
+            Object.duplicate = Nothing,
+            Object.paired = Nothing,
+            Object.protector = Nothing,
+            Object.ventureRoom = Nothing,
+            Object.classLevel = Nothing,
+            Object.unlockedHalves = Set.empty,
+            Object.designations = Set.empty,
+            Object.designationValues = Map.empty,
+            Object.storedResults = Map.empty,
+            Object.paidCosts = Map.empty,
+            Object.tributePaid = False,
+            Object.bestowed = False,
+            Object.mutating = False,
+            Object.prototyped = False,
+            Object.boughtBack = False,
+            Object.unannounced = False,
+            Object.spliced = Seq.empty,
+            Object.phyrexianLifePaid = 0,
+            Object.manaSpent = Mana.MkMana [],
+            Object.announcedX = Nothing,
+            Object.castFrom = Nothing,
+            Object.castUsing = Nothing,
+            Object.castGrant = Nothing,
+            Object.detainedUntil = Set.empty,
+            Object.goadedBy = Set.empty,
+            Object.doesNotUntapFor = 0,
+            Object.exertedBy = Set.empty,
+            Object.activatedOnce = Map.empty
+          }
+  State.put (Game.putOnStack abilId gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2)})
 
 -- Put one object-borne triggered ability on the stack as a fresh OfTrigger
 -- object, choosing its mode(s) and their targets as it is placed (CR 603.3d).

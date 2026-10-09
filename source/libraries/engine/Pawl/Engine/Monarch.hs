@@ -3,11 +3,8 @@ module Pawl.Engine.Monarch where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
-import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
-import qualified Data.Set as Set
-import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Modal as Modal
@@ -16,21 +13,13 @@ import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
-import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
-import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
-import qualified Pawl.Types.Mana as Mana
-import qualified Pawl.Types.Modal as Modal
-import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
-import qualified Pawl.Types.Object as Object
-import Pawl.Types.PendingTrigger (PendingTrigger)
-import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.Phase as Phase
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -38,17 +27,13 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.ReturnEnding as ReturnEnding
 import qualified Pawl.Types.ReturnWatch as ReturnWatch
-import qualified Pawl.Types.Sickness as Sickness
-import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.StepBegins as StepBegins
-import qualified Pawl.Types.TapState as TapState
 import Pawl.Types.TriggerCondition (TriggerCondition)
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
-import qualified Pawl.Types.Zone as Zone
 
 -- An inherent triggered ability of one effect (Modal.single), with no
 -- intervening "if" and no rider: the shape of CR 725.2's two abilities, CR
@@ -98,101 +83,6 @@ abilities :: GameState -> [(PlayerId, TriggeredAbility Card (GrantedAbility.Gran
 abilities gs = case GameState.monarch gs of
   Nothing -> []
   Just monarch -> [(monarch, endStepDraw), (monarch, crownSteal)]
-
--- Mint a sourceless inherent trigger onto the stack: the Engine.placeOne arm
--- for EVERY TriggerSource.Sourceless entry, called once CR 603.3b has fixed the
--- batch's order. Named for the monarch only because rule 725.2 was the first
--- rulebook-stated ability to need it; CR 702.179d's speed increase rides it
--- unchanged, and nothing here reads GameState.monarch.
---
--- Single mode, no targets, so the mode is selected outright with no prompt --
--- licensed by each such rule fixing its ability's full text, not by anything
--- general about sourceless triggers. An inherent ability with a real choice in
--- it would have to prompt here. The chosen modes ride under the reserved
--- chosenModes slot, which Stack.resolveTop's OfInherentTrigger arm reads.
-placeInherent :: PendingTrigger -> Game ()
-placeInherent pending = do
-  gs <- State.get
-  let controller = PendingTrigger.controller pending
-      ability = PendingTrigger.ability pending
-      provided = PendingTrigger.bindings pending
-      (abilId, gs1) = Game.freshObjectId gs
-      (ts, gs2) = Game.freshTimestamp gs1
-      modeCount = Seq.length (Modal.modes (TriggeredAbility.modal ability))
-      -- take, not [0 .. modeCount - 1]: a ModeIndex counts in Natural, and
-      -- Natural subtraction underflows when there are no modes at all.
-      allModes = Seq.fromList (fmap ModeIndex.MkModeIndex (take modeCount [0 ..]))
-      bindings = Binding.setYou controller (Map.union provided (Binding.fromChoices Map.empty Nothing allModes))
-      obj =
-        Object.MkObject
-          { Object.owner = controller,
-            Object.identity = Nothing,
-            Object.enteredUnder = Nothing,
-            Object.source =
-              Source.OfInherentTrigger
-                InherentTriggerSource.MkInherentTriggerSource
-                  { InherentTriggerSource.controller = controller,
-                    InherentTriggerSource.ability = ability
-                  },
-            Object.zone = Zone.Stack,
-            Object.tapped = TapState.Untapped,
-            Object.facing = Facing.FaceUp,
-            Object.flipped = False,
-            Object.exiledFaceDown = False,
-            Object.exileLookers = Set.empty,
-            Object.damage = 0,
-            Object.sickness = Sickness.Settled controller,
-            Object.controlClock = Map.empty,
-            Object.bindings = bindings,
-            Object.counters = Map.empty,
-            Object.counterTimestamps = Map.empty,
-            Object.attachedTo = Nothing,
-            Object.chosenColors = Set.empty,
-            Object.chosenSubtype = Nothing,
-            Object.chosenNames = Set.empty,
-            Object.chosenPlayer = Nothing,
-            Object.timestamp = ts,
-            Object.face = Nothing,
-            Object.turnedOverAt = Nothing,
-            Object.worldSince = Nothing,
-            Object.playableFromExile = Nothing,
-            Object.plotted = Nothing,
-            Object.foretold = Nothing,
-            Object.foretellCostReduction = Nothing,
-            Object.warped = Nothing,
-            Object.preparedCopyOf = Nothing,
-            Object.ringBearerFor = Nothing,
-            Object.stickers = Seq.empty,
-            Object.duplicate = Nothing,
-            Object.paired = Nothing,
-            Object.protector = Nothing,
-            Object.ventureRoom = Nothing,
-            Object.classLevel = Nothing,
-            Object.unlockedHalves = Set.empty,
-            Object.designations = Set.empty,
-            Object.designationValues = Map.empty,
-            Object.storedResults = Map.empty,
-            Object.paidCosts = Map.empty,
-            Object.tributePaid = False,
-            Object.bestowed = False,
-            Object.mutating = False,
-            Object.prototyped = False,
-            Object.boughtBack = False,
-            Object.unannounced = False,
-            Object.spliced = Seq.empty,
-            Object.phyrexianLifePaid = 0,
-            Object.manaSpent = Mana.MkMana [],
-            Object.announcedX = Nothing,
-            Object.castFrom = Nothing,
-            Object.castUsing = Nothing,
-            Object.castGrant = Nothing,
-            Object.detainedUntil = Set.empty,
-            Object.goadedBy = Set.empty,
-            Object.doesNotUntapFor = 0,
-            Object.exertedBy = Set.empty,
-            Object.activatedOnce = Map.empty
-          }
-  State.put (Game.putOnStack abilId gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2)})
 
 -- CR 725.1 / CR 725.3: crown a player. The ONE writer of GameState.monarch once
 -- a game is under way (Pawl.Engine.Setup only ever initialises it to Nothing, and
