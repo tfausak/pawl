@@ -7,15 +7,19 @@
 -- TriggerCondition.PlacesSticker.
 module Pawl.StickerSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Extra.Natural as Natural
@@ -26,11 +30,15 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.StickerSheets as StickerSheets
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilitySticker as AbilitySticker
+import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ModeIndex as ModeIndex
+import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PowerToughnessSticker as PowerToughnessSticker
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.StickerSheet as StickerSheet
@@ -59,6 +67,28 @@ ticketLine :: Text.Text -> (Natural, Text.Text)
 ticketLine line =
   let (cost, rest) = Text.breakOn (Text.pack " \8212 ") line
    in (Natural.length (drop 1 (Text.splitOn (Text.pack "{TK}") cost)), Text.drop 3 rest)
+
+-- Keeps every hand and records each CR 103.2d draw's candidates, answering
+-- with the LAST, pinned by position.
+sheetDraws :: Prompt.Prompt r -> State.State [[Natural]] r
+sheetDraws p = case p of
+  Prompt.RandomStickerSheet slots -> do
+    State.modify' (NonEmpty.toList slots :)
+    pure (NonEmpty.last slots)
+  Prompt.DeclareMulligan {} -> pure MulliganDecision.Keep
+  _ -> pure (S.identityAnswer p)
+
+-- Setup.newGame over this matchup, with what sheetDraws was asked, in order.
+startedWith :: NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck) -> (GameState.GameState, [[Natural]])
+startedWith matchup =
+  let ((_, gs), asked) = State.runState (Engine.runGame sheetDraws (Setup.gameWith GameSettings.plain (fmap fst matchup)) (Setup.newGame S.performer matchup)) []
+   in (gs, reverse asked)
+
+chosenOf :: PlayerId.PlayerId -> GameState.GameState -> Set.Set Natural
+chosenOf pid gs = foldMap Player.chosenStickerSheets (Map.lookup pid (GameState.players gs))
+
+withSheetsDeck :: [StickerSheet.StickerSheet] -> Deck.Deck -> Deck.Deck
+withSheetsDeck sheets deck = deck {Deck.stickerSheets = Seq.fromList sheets}
 
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Sticker" $ do
@@ -119,3 +149,19 @@ spec s registry = Spec.describe s "Sticker" $ do
                   [] -> Nothing
                   failed -> Just (path <> ": " <> show failed)
     Spec.assertEqWith s "every sheet agrees with its text" (Maybe.mapMaybe offends loaded) []
+  Spec.it s "CR 103.2d four sheets: three are drawn at random, one at a time" $ do
+    sheets <- committedSheets
+    mountain <- S.printingOf s registry "Mountain"
+    let plain = Deck.fromCards (Map.singleton mountain 10)
+        (gs, asked) = startedWith ((S.alice, withSheetsDeck sheets plain) NonEmpty.:| [(S.bob, plain)])
+    Spec.assertEqWith s "the four committed sheets load" (length sheets) 4
+    Spec.assertEqWith s "CR 103.2d three of the four sheets are chosen" (chosenOf S.alice gs) (Set.fromList [1, 2, 3])
+    Spec.assertEqWith s "each drawn from those not yet drawn" asked [[0, 1, 2, 3], [0, 1, 2], [0, 1]]
+    Spec.assertEqWith s "and bob, who brought none, plays without stickers" (chosenOf S.bob gs) Set.empty
+  Spec.it s "CR 103.2d/123.2b three sheets are all kept, unasked" $ do
+    sheets <- committedSheets
+    mountain <- S.printingOf s registry "Mountain"
+    let plain = Deck.fromCards (Map.singleton mountain 10)
+        (gs, asked) = startedWith ((S.alice, withSheetsDeck (take 3 sheets) plain) NonEmpty.:| [(S.bob, plain)])
+    Spec.assertEqWith s "CR 123.2b all three are chosen" (chosenOf S.alice gs) (Set.fromList [0, 1, 2])
+    Spec.assertEqWith s "and nothing was drawn at random" asked []

@@ -386,6 +386,8 @@ data Response
     -- deck fulfills and rule 309.2a a dungeon card, and a transcript of one must
     -- not satisfy the other.
     ChoseCompanion (Maybe OutsideCard.OutsideCard)
+  | -- | CR 103.2d: the sheet position randomness drew.
+    SelectedStickerSheetAtRandom Natural.Natural
   | -- | CR 400.11c \/ 729.4: the cards a player chose to bring in from outside the
     -- game -- either CR 103.2a's sideboard pool or, from inside a subgame, CR
     -- 729.4's main game. Pawl.Types.OutsideCard's header comment gives the full

@@ -196,6 +196,10 @@ gameWith settings order =
               -- CR 400.11a: a player's sideboard is outside the game, and which
               -- cards they set aside is their deck's business -- createDeck below.
               Player.outsideTheGame = Map.empty,
+              -- CR 123.2: which sheets a player brought is their deck's
+              -- business -- createDeck below.
+              Player.stickerSheets = Seq.empty,
+              Player.chosenStickerSheets = Set.empty,
               -- CR 309.7: nobody has completed a dungeon in a game that has not
               -- started, there having been no venture to remove one from it.
               Player.completedDungeons = 0,
@@ -467,7 +471,7 @@ createDeck pid deck = do
           -- reason and no object is minted for it either. CR 400.11c is what
           -- keeps anything else from reaching these until a card brings one in.
           let total = startingLifeOf (GameState.settings gs) (length (GameState.turnOrder gs)) pid (Deck.commander deck) (Vanguard.lifeModifierOf pid gs + (if Map.null (Deck.schemes deck) then 0 else Archenemy.lifeBonus))
-           in Map.adjust (\p -> p {Player.life = total, Player.startingLife = total, Player.dungeons = Set.fromList dungeonIds, Player.outsideTheGame = Map.fromList sideboardIds}) pid (GameState.players gs)
+           in Map.adjust (\p -> p {Player.life = total, Player.startingLife = total, Player.dungeons = Set.fromList dungeonIds, Player.outsideTheGame = Map.fromList sideboardIds, Player.stickerSheets = Deck.stickerSheets deck}) pid (GameState.players gs)
       }
   -- CR 717.2: the Attraction deck begins in the command zone, and is neither in
   -- the library nor, below, in the starting deck.
@@ -610,6 +614,8 @@ newGame perform matchup = do
   -- rule 103.2b makes one player's reveal depend on another's, so the order is not
   -- observable today.
   Monad.forM_ seated Companion.reveal
+  -- CR 103.2d, after CR 103.2b's reveal.
+  drawStickerSheets seated
   -- CR 407.2: after CR 103.1 and before CR 103.5's draws.
   anteFromLibraries seated
   Mulligan.openingHands perform seated
@@ -821,6 +827,9 @@ startGameFromCards perform exemptions = do
   -- CR 103.2b, newGame's reveal round: CR 727.1 and CR 729.2 each start a new
   -- game following rule 103, so the reveal is put to every player again.
   Monad.forM_ seated Companion.reveal
+  -- CR 103.2d again: CR 727.1 and CR 729.2 each start a new game following
+  -- rule 103.
+  drawStickerSheets seated
   -- CR 407.2 again: CR 727.1 and CR 729.2 each start a new game following
   -- rule 103.
   anteFromLibraries seated
@@ -852,6 +861,33 @@ anteFromLibraries seated = do
             answer <- Game.ask (Prompt.RandomObject offered)
             Event.changeZone (if List.elem answer (NonEmpty.toList offered) then answer else first) Zone.Ante
   Monad.when playing (Monad.forM_ seated anteOne)
+
+-- CR 103.2d / 123.2: each player who brought more than three sticker sheets
+-- has three drawn at random; three or fewer are all chosen, which is exact for
+-- CR 123.2b's limited three. Randomness, so Prompt.RandomStickerSheet, one draw
+-- at a time over the undrawn positions, filtered rather than trusted. None
+-- brought means none chosen: that player plays without stickers.
+--
+-- Not implemented: CR 123.2a's at least ten unique sheets, which is deck
+-- validation (#N1). Not implemented: a ruling on whether a Shahrazad subgame
+-- (CR 729.2) plays with sticker sheets; this draws again there (#N2).
+drawStickerSheets :: [PlayerId] -> Game ()
+drawStickerSheets seated = Monad.forM_ seated $ \pid -> do
+  gs <- State.get
+  let brought = foldMap Player.stickerSheets (Map.lookup pid (GameState.players gs))
+      slots = zipWith const [0 :: Natural ..] (Foldable.toList brought)
+      drawThree n remaining chosen = case remaining of
+        first : rest | n > (0 :: Int) -> do
+          picked <-
+            if null rest
+              then pure first
+              else do
+                answer <- Game.ask (Prompt.RandomStickerSheet (first NonEmpty.:| rest))
+                pure (if List.elem answer remaining then answer else first)
+          drawThree (n - 1) (List.delete picked remaining) (Set.insert picked chosen)
+        _ -> pure chosen
+  chosen <- if length slots <= 3 then pure (Set.fromList slots) else drawThree 3 slots Set.empty
+  State.modify' (\g -> g {GameState.players = Map.adjust (\p -> p {Player.chosenStickerSheets = chosen}) pid (GameState.players g)})
 
 -- CR 103.1c: rotate the turn order to begin with the player whose command zone
 -- holds a card naming them the starting player, superseding CR 103.1's
@@ -980,7 +1016,10 @@ resetPlayers settings seats lifeModifier players =
               -- CR 103.2b: nobody has revealed a companion in the new game yet.
               -- startGameFromCards records its starting deck and puts the reveal
               -- round again.
-              Player.companion = Nothing
+              Player.companion = Nothing,
+              -- CR 103.2d: the new game draws again. Player.stickerSheets is
+              -- NOT reset, for Player.dungeons' reason.
+              Player.chosenStickerSheets = Set.empty
             }
         Status.Departed _ -> player
    in Map.mapWithKey reset players

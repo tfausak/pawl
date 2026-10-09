@@ -1284,6 +1284,12 @@ combatReplaySpec s =
           -- CR 309.2a again: with nothing recorded, the head is what the engine
           -- would have entered.
           Spec.assertEqWith s "a short transcript enters the first offered" (Replay.defaultAnswer p) a
+        -- CR 103.2d: the sheet randomness drew is part of the transcript.
+        Spec.it s "RandomStickerSheet round-trips through the transcript" $ do
+          let p = Prompt.RandomStickerSheet (0 NonEmpty.:| [3])
+          Spec.assertEqWith s "drawing the second round trips" (Replay.decode p (Replay.encode p 3)) (Just 3)
+          Spec.assertEqWith s "drawing the first round trips" (Replay.decode p (Replay.encode p 0)) (Just 0)
+          Spec.assertEqWith s "a short transcript draws the first offered" (Replay.defaultAnswer p) 0
         -- CR 103.2b: whether a player revealed a companion before the game began,
         -- and which, is a decision, so it has to survive a transcript like any
         -- other.

@@ -26,6 +26,7 @@ deciderOf prompt = case prompt of
   Prompt.Shuffle {} -> Nothing
   Prompt.RandomFirstPlayer {} -> Nothing
   Prompt.RandomObject {} -> Nothing
+  Prompt.RandomStickerSheet {} -> Nothing
   Prompt.RandomPlayer {} -> Nothing
   Prompt.RandomCard {} -> Nothing
   Prompt.ChooseConjuredCard decider _ _ -> Just (Decider.unwrap decider)
@@ -194,6 +195,7 @@ kindOf prompt = Text.pack $ case prompt of
   Prompt.Shuffle {} -> "Shuffle"
   Prompt.RandomFirstPlayer {} -> "RandomFirstPlayer"
   Prompt.RandomObject {} -> "RandomObject"
+  Prompt.RandomStickerSheet {} -> "RandomStickerSheet"
   Prompt.RandomPlayer {} -> "RandomPlayer"
   Prompt.RandomCard {} -> "RandomCard"
   Prompt.ChooseConjuredCard {} -> "ChooseConjuredCard"

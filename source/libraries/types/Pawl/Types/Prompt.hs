@@ -90,6 +90,9 @@ data Prompt r where
   -- Neither Decider nor PlayerId: randomness is not a choice, and CR 701.24a
   -- makes who it is asked of unobservable; the caller filters the answer back.
   RandomObject :: NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
+  -- | CR 103.2d: which of these sheet positions randomness draws next.
+  -- RandomObject's reasons for carrying neither Decider nor PlayerId.
+  RandomStickerSheet :: NonEmpty.NonEmpty Natural.Natural -> Prompt Natural.Natural
   -- | Which card randomness named out of a printed spellbook
   -- (Pawl.Types.Conjure's card list) or the reference cards a conjure's filter
   -- admits (Prompt.ReferenceCards). RandomObject's shape and its reasons for

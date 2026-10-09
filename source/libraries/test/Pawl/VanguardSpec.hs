@@ -14,6 +14,7 @@ module Pawl.VanguardSpec where
 
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
@@ -62,7 +63,8 @@ deckOf mountain vanguard =
       Deck.conspiracies = Map.empty,
       Deck.attractions = Map.empty,
       Deck.planes = Set.empty,
-      Deck.schemes = Map.empty
+      Deck.schemes = Map.empty,
+      Deck.stickerSheets = Seq.empty
     }
 
 -- Alice brings `vanguard`, bob brings none. Bob's deck is built too, so his

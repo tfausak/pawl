@@ -53,6 +53,7 @@ encode p answer = case p of
   Prompt.Shuffle _ -> Response.Shuffled answer
   Prompt.RandomFirstPlayer _ -> Response.DeterminedFirstPlayer answer
   Prompt.RandomObject _ -> Response.SelectedAtRandom answer
+  Prompt.RandomStickerSheet _ -> Response.SelectedStickerSheetAtRandom answer
   Prompt.RandomCard _ -> Response.SelectedCardAtRandom answer
   Prompt.ChooseConjuredCard {} -> Response.ChoseConjuredCard answer
   Prompt.RandomPlayer _ -> Response.SelectedPlayerAtRandom answer
@@ -232,6 +233,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.RandomObject _ -> case response of
     Response.SelectedAtRandom oid -> Just oid
+    _ -> Nothing
+  Prompt.RandomStickerSheet _ -> case response of
+    Response.SelectedStickerSheetAtRandom n -> Just n
     _ -> Nothing
   Prompt.RandomCard _ -> case response of
     Response.SelectedCardAtRandom name -> Just name
@@ -734,6 +738,9 @@ defaultAnswer p = case p of
   -- answerer, or it proves nothing about an engine that reveals the first card
   -- unasked (Pawl.ResolveSpec's "RandomReveal" pair).
   Prompt.RandomObject candidates -> NonEmpty.head candidates
+  -- The head of the offer is always an undrawn sheet, and FIXED for the reason
+  -- RandomObject gives above.
+  Prompt.RandomStickerSheet slots -> NonEmpty.head slots
   -- The head of the offer is always one of the offered players, and FIXED for
   -- the reason RandomObject gives just above.
   Prompt.RandomPlayer candidates -> NonEmpty.head candidates

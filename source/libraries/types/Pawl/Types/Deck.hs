@@ -1,9 +1,11 @@
 module Pawl.Types.Deck where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.StickerSheet as StickerSheet
 
 -- | A deck: the multiset of printings a player's library is built from, plus the
 -- things a player brings alongside it -- CR 903.3's commander designation, CR
@@ -109,7 +111,11 @@ data Deck = MkDeck
     planes :: Set.Set Printing.Printing,
     -- | CR 904.3: the scheme deck. A multiset: CR 904.3 allows two cards of a
     -- name.
-    schemes :: Map.Map Printing.Printing Natural.Natural
+    schemes :: Map.Map Printing.Printing Natural.Natural,
+    -- | CR 123.2: the sticker sheets this player brings. A Seq, not a Set:
+    -- CR 123.2b lets a limited player bring two of one sheet, and CR 123.3a
+    -- keeps their stickers apart.
+    stickerSheets :: Seq.Seq StickerSheet.StickerSheet
   }
   deriving (Eq, Ord, Show)
 
@@ -118,4 +124,4 @@ data Deck = MkDeck
 -- every game nobody ventures in, every game nobody wishes in, and every game
 -- outside Conspiracy Draft.
 fromCards :: Map.Map Printing.Printing Natural.Natural -> Deck
-fromCards m = MkDeck {cards = m, commander = Set.empty, vanguard = Nothing, dungeons = Set.empty, sideboard = Map.empty, conspiracies = Map.empty, attractions = Map.empty, planes = Set.empty, schemes = Map.empty}
+fromCards m = MkDeck {cards = m, commander = Set.empty, vanguard = Nothing, dungeons = Set.empty, sideboard = Map.empty, conspiracies = Map.empty, attractions = Map.empty, planes = Set.empty, schemes = Map.empty, stickerSheets = Seq.empty}

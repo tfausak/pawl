@@ -285,6 +285,7 @@ shapeOf prompt = case prompt of
   Prompt.Shuffle {} -> list object
   Prompt.RandomFirstPlayer {} -> player
   Prompt.RandomObject {} -> object
+  Prompt.RandomStickerSheet {} -> natural
   Prompt.RandomCard {} -> viaCodec Codec.CardName.codec
   Prompt.ChooseConjuredCard {} -> viaCodec Codec.CardName.codec
   Prompt.RandomDepth {} -> natural
