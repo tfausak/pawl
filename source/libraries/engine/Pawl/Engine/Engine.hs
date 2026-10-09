@@ -886,6 +886,10 @@ placeBorne srcId pending = do
                     -- and Nothing for every other trigger. The one thing on the
                     -- stack that tells the two apart (CR 701.27f).
                     TriggeredAbilitySource.createdAt = PendingTrigger.createdAt pending,
+                    -- CR 113.7a's frozen declarations. Not implemented: freezing
+                    -- them as the ability triggers; they are read here, at
+                    -- placement, so a copy effect applied in between changes them
+                    -- (#4846).
                     TriggeredAbilitySource.delayed = Projection.delayedSnapshotOf srcId gs
                   },
             Object.zone = Zone.Stack,
