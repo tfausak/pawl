@@ -37,7 +37,7 @@
                             "hands": {
                               "type": "Scoped",
                               "value": {
-                                "type": "EachPlayer"
+                                "type": "AnyPlayer"
                               }
                             }
                           }
@@ -52,7 +52,7 @@
                             "graveyards": {
                               "type": "Scoped",
                               "value": {
-                                "type": "EachPlayer"
+                                "type": "AnyPlayer"
                               }
                             }
                           }

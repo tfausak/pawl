@@ -66,7 +66,7 @@
                   "type": "Graveyard"
                 },
                 "whoseObject": {
-                  "type": "Opponents"
+                  "type": "Opponent"
                 }
               }
             }

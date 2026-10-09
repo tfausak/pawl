@@ -154,6 +154,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerEffect as PlayerEffect.Type
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -715,7 +716,7 @@ thaliaSpec s registry =
       Spec.assertEqWith s "taxed: two lands tapped" (S.tappedCount S.alice paid) 2
       Spec.assertEqWith s "untaxed: one land tapped" (S.tappedCount S.alice paidU) 1
 
-    -- The EachPlayer scope: Thalia's controller is taxed (every assertion
+    -- The AnyPlayer scope: Thalia's controller is taxed (every assertion
     -- above is alice's own spell) and so is her opponent.
     Spec.it s "CR 611.1 the opponent is taxed too" $ do
       mountain <- S.printingOf s registry "Mountain"
@@ -2399,7 +2400,7 @@ storedConditional piker =
         addPlayerEffectAt
           srcId
           (Expiry.Type.While (While.MkWhile S.alice S.youControlSource))
-          (AffectedPlayers.Scoped PlayerScope.Opponents)
+          (AffectedPlayers.Scoped (PlayerScope.Related PlayerRelation.Opponent))
           PlayerEffect.Type.CantCastSpells
           S.alice
           withSrc
@@ -2418,7 +2419,7 @@ storedSpec s registry =
         silenced =
           S.addPlayerEffect
             Expiry.Type.AtCleanup
-            (AffectedPlayers.Scoped PlayerScope.Opponents)
+            (AffectedPlayers.Scoped (PlayerScope.Related PlayerRelation.Opponent))
             PlayerEffect.Type.CantCastSpells
             S.alice
             base
@@ -2436,7 +2437,7 @@ storedSpec s registry =
             Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId VariableChoice.Announced after)) "and bob may cast again"
 
     Spec.it s "CR 514.2 the cleanup sweep keeps a Never player effect" $
-      let forever = S.addPlayerEffect Expiry.Type.Never (AffectedPlayers.Scoped PlayerScope.Opponents) PlayerEffect.Type.CantCastSpells S.alice base
+      let forever = S.addPlayerEffect Expiry.Type.Never (AffectedPlayers.Scoped (PlayerScope.Related PlayerRelation.Opponent)) PlayerEffect.Type.CantCastSpells S.alice base
        in Spec.assertEqWith s "survives" (length (GameState.playerEffects (Expiry.dropAtCleanup forever))) 1
 
     -- THE DISCRIMINATING SHAPE: two entries, keyed to the two different
@@ -2445,8 +2446,8 @@ storedSpec s registry =
     -- single-entry version of this test; here it would wrongly drop
     -- bob's still-live entry too.
     Spec.it s "CR 611.2a the handoff sweep drops only the entry keyed to the player whose turn began" $
-      let forBob = S.addPlayerEffect (Expiry.Type.AtTurnOf S.bob) (AffectedPlayers.Scoped PlayerScope.Opponents) PlayerEffect.Type.CantCastSpells S.alice base
-          armed = S.addPlayerEffect (Expiry.Type.AtTurnOf S.alice) (AffectedPlayers.Scoped PlayerScope.Opponents) PlayerEffect.Type.CantCastSpells S.alice forBob
+      let forBob = S.addPlayerEffect (Expiry.Type.AtTurnOf S.bob) (AffectedPlayers.Scoped (PlayerScope.Related PlayerRelation.Opponent)) PlayerEffect.Type.CantCastSpells S.alice base
+          armed = S.addPlayerEffect (Expiry.Type.AtTurnOf S.alice) (AffectedPlayers.Scoped (PlayerScope.Related PlayerRelation.Opponent)) PlayerEffect.Type.CantCastSpells S.alice forBob
           bobsTurn = S.runPure S.identityAnswer armed Engine.handoffTurn
        in do
             Spec.assertEqWith s "bob is active" (GameState.activePlayer bobsTurn) S.bob
@@ -2611,7 +2612,7 @@ cindermawSpec s registry =
       Spec.assertEqWith s "no life gain event happened" (lifeGainsOf after) []
       Spec.assertEqWith s "and the spell really resolved, out of alice's hand" (S.handSize S.alice after) 0
 
-    -- The printed scope is "PLAYERS", CR 613.11's EachPlayer, and the controller
+    -- The printed scope is "PLAYERS", CR 613.11's AnyPlayer, and the controller
     -- is one of them: the same board with the Cindermaw on ALICE's side answers
     -- the same way, where an Opponents reading would let her gain her 6.
     Spec.it s "CR 613.11 the Cindermaw's controller can't gain either" $ do

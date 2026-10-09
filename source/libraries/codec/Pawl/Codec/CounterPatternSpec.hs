@@ -12,6 +12,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.CounterSubject as CounterSubject
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.CounterPattern" $ do
@@ -24,11 +25,11 @@ spec s = Spec.describe s "Pawl.Codec.CounterPattern" $ do
       CounterPattern.MkCounterPattern
         { CounterPattern.whichKind = Just CounterKind.PlusOnePlusOne,
           CounterPattern.subject = CounterSubject.ByAnything,
-          CounterPattern.whose = ControllerRelation.Yours,
+          CounterPattern.whose = ControllerRelation.Related PlayerRelation.You,
           CounterPattern.onWhat = Filter.HasCardType CardType.Creature,
           CounterPattern.onWho = Nothing
         }
-      " {\"whichKind\":{\"type\":\"PlusOnePlusOne\"},\"subject\":{\"type\":\"ByAnything\"},\"whose\":{\"type\":\"Yours\"},\"onWhat\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
+      " {\"whichKind\":{\"type\":\"PlusOnePlusOne\"},\"subject\":{\"type\":\"ByAnything\"},\"whose\":{\"type\":\"You\"},\"onWhat\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
   -- whichKind = Nothing means ANY kind, never "no kind", and the trivial filter
   -- matches every permanent. An omitted key is what that Nothing means.
   Spec.it s "Doubling Season (any kind, the trivial filter)" $
@@ -38,12 +39,12 @@ spec s = Spec.describe s "Pawl.Codec.CounterPattern" $ do
       CounterPattern.MkCounterPattern
         { CounterPattern.whichKind = Nothing,
           CounterPattern.subject = CounterSubject.ByEffect,
-          CounterPattern.whose = ControllerRelation.Yours,
+          CounterPattern.whose = ControllerRelation.Related PlayerRelation.You,
           CounterPattern.onWhat = Filter.And [],
           CounterPattern.onWho = Nothing
         }
-      " {\"subject\":{\"type\":\"ByEffect\"},\"whose\":{\"type\":\"Yours\"},\"onWhat\":{\"type\":\"And\",\"value\":[]}} "
-  -- CR 109.5: whichKind's Nothing and whose's Anyones are both what a pattern
+      " {\"subject\":{\"type\":\"ByEffect\"},\"whose\":{\"type\":\"You\"},\"onWhat\":{\"type\":\"And\",\"value\":[]}} "
+  -- CR 109.5: whichKind's Nothing and whose's Related AnyPlayer are both what a pattern
   -- that says nothing means, so only the two required keys survive.
   Spec.it s "an all-default value omits every optional key" $
     Common.assertCodec
@@ -52,7 +53,7 @@ spec s = Spec.describe s "Pawl.Codec.CounterPattern" $ do
       CounterPattern.MkCounterPattern
         { CounterPattern.whichKind = Nothing,
           CounterPattern.subject = CounterSubject.ByAnything,
-          CounterPattern.whose = ControllerRelation.Anyones,
+          CounterPattern.whose = ControllerRelation.Related PlayerRelation.AnyPlayer,
           CounterPattern.onWhat = Filter.And [],
           CounterPattern.onWho = Nothing
         }
@@ -65,12 +66,12 @@ spec s = Spec.describe s "Pawl.Codec.CounterPattern" $ do
       CounterPattern.codec
       CounterPattern.MkCounterPattern
         { CounterPattern.whichKind = Nothing,
-          CounterPattern.subject = CounterSubject.ByPlayer ControllerRelation.Opponents,
-          CounterPattern.whose = ControllerRelation.Anyones,
+          CounterPattern.subject = CounterSubject.ByPlayer (ControllerRelation.Related PlayerRelation.Opponent),
+          CounterPattern.whose = ControllerRelation.Related PlayerRelation.AnyPlayer,
           CounterPattern.onWhat = Filter.And [],
-          CounterPattern.onWho = Just ControllerRelation.Anyones
+          CounterPattern.onWho = Just (ControllerRelation.Related PlayerRelation.AnyPlayer)
         }
-      " {\"subject\":{\"type\":\"ByPlayer\",\"value\":{\"type\":\"Opponents\"}},\"onWhat\":{\"type\":\"And\",\"value\":[]},\"onWho\":{\"type\":\"Anyones\"}} "
+      " {\"subject\":{\"type\":\"ByPlayer\",\"value\":{\"type\":\"Opponent\"}},\"onWhat\":{\"type\":\"And\",\"value\":[]},\"onWho\":{\"type\":\"AnyPlayer\"}} "
   -- The breaking format change, made to prove itself: `subject` is required, so
   -- the pre-#1232 wire shape -- the same object with the key absent -- does not
   -- decode to a defaulted subject, it does not decode at all.

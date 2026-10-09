@@ -93,6 +93,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
@@ -3485,7 +3486,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
       s
       "one redirect replacement"
       (fmap snd (Projection.replacementsOf Zone.Battlefield rip gs))
-      [ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR (ZoneChangePattern.MkZoneChangePattern (Just Zone.Graveyard) ControllerRelation.Anyones (Filter.Type.And []) Nothing False) Zone.Exile False False LibraryPosition.defaultValue False)]
+      [ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR (ZoneChangePattern.MkZoneChangePattern (Just Zone.Graveyard) (ControllerRelation.Related PlayerRelation.AnyPlayer) (Filter.Type.And []) Nothing False) Zone.Exile False False LibraryPosition.defaultValue False)]
 
   Spec.it s "a vanilla creature projects no replacements" $ do
     pikerPrinting <- S.printingOf s registry "Goblin Piker"

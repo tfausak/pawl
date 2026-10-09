@@ -38,7 +38,7 @@
                         "type": "ChoosePlayerAtRandom",
                         "value": {
                           "scope": {
-                            "type": "EachPlayer"
+                            "type": "AnyPlayer"
                           },
                           "slot": "chosen"
                         }

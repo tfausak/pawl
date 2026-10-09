@@ -24,16 +24,16 @@
             "type": "CantSearchLibraries",
             "value": {
               "cause": {
-                "type": "EachPlayer"
+                "type": "AnyPlayer"
               },
               "library": {
-                "type": "EachPlayer"
+                "type": "AnyPlayer"
               }
             }
           },
           "name": "search ban",
           "scope": {
-            "type": "EachPlayer"
+            "type": "AnyPlayer"
           }
         }
       ],

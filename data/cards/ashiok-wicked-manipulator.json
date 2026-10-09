@@ -358,7 +358,7 @@
                   "type": "ByPayment"
                 },
                 "whose": {
-                  "type": "Yours"
+                  "type": "You"
                 }
               },
               "rewrite": {

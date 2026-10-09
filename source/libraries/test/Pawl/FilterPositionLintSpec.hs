@@ -2179,7 +2179,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         -- announcement could answer in any engine.
         ignoring = base {Face.specialActions = [SpecialAction.IgnoreThisUntilEndOfTurn (AbilityName.MkAbilityName (Text.pack "the prohibition")) sacrificeCost]}
         -- CR 116.2c: the same special action, as the price of ending an effect.
-        ending = base {Face.spell = spellOf [Effect.AffectPlayers (AffectPlayers.MkAffectPlayers (Duration.UntilPaid sacrificeCost) (AffectedPlayers.Scoped PlayerScope.You) PlayerEffect.CantCastSpells)]}
+        ending = base {Face.spell = spellOf [Effect.AffectPlayers (AffectPlayers.MkAffectPlayers (Duration.UntilPaid sacrificeCost) (AffectedPlayers.Scoped (PlayerScope.Related PlayerRelation.You)) PlayerEffect.CantCastSpells)]}
         -- CR 508.1h and CR 509.1d: a declaration announces no target.
         attacking = base {Face.attackCosts = [AttackCost.MkAttackCost (Affected.Matching (Filter.Type.HasCardType CardType.Creature)) (PerCreature.Fixed sacrificeCost) AttackCostScope.Controller]}
         blocking = base {Face.blockCosts = [BlockCost.MkBlockCost (Affected.Matching (Filter.Type.HasCardType CardType.Creature)) (PerCreature.Fixed sacrificeCost) Nothing]}
@@ -2233,7 +2233,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         scaling kind onWhat =
           [ PrintedReplacement.MkPrintedReplacement
               Nothing
-              (ReplacementEffect.CounterR (CounterR.MkCounterR (CounterPattern.MkCounterPattern (Just kind) CounterSubject.ByAnything ControllerRelation.Yours onWhat Nothing) (Scaling.AddMore 1)))
+              (ReplacementEffect.CounterR (CounterR.MkCounterR (CounterPattern.MkCounterPattern (Just kind) CounterSubject.ByAnything (ControllerRelation.Related PlayerRelation.You) onWhat Nothing) (Scaling.AddMore 1)))
               Set.empty
               Nothing
           ]
@@ -2377,7 +2377,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
             ("its per-counter reading", holds (triggerConditionFilters (TriggerCondition.SelfCounterRemoved (SelfCountersRemoved.MkSelfCountersRemoved kind Zone.Battlefield)))),
             ("CR 603.2c's per-permanent placement", holds (triggerConditionFilters (TriggerCondition.PermanentGetsCounters (CounterPlacement.MkCounterPlacement kind (Filter.Type.HasCardType CardType.Creature))))),
             ("CR 603.2c's batch placement", holds (triggerConditionFilters (TriggerCondition.PermanentsGetCounters (CounterPlacement.MkCounterPlacement kind (Filter.Type.HasCardType CardType.Creature))))),
-            ("CR 614.1's scaling pattern", holds (replacementEffectFilters (ReplacementEffect.CounterR (CounterR.MkCounterR (CounterPattern.MkCounterPattern (Just kind) CounterSubject.ByAnything ControllerRelation.Yours (Filter.Type.HasCardType CardType.Creature) Nothing) (Scaling.AddMore 1))))),
+            ("CR 614.1's scaling pattern", holds (replacementEffectFilters (ReplacementEffect.CounterR (CounterR.MkCounterR (CounterPattern.MkCounterPattern (Just kind) CounterSubject.ByAnything (ControllerRelation.Related PlayerRelation.You) (Filter.Type.HasCardType CardType.Creature) Nothing) (Scaling.AddMore 1))))),
             ("CR 614.1c's as-enters sacrifice", holds (entryRewriteFilters (EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber (Filter.Type.HasCardType CardType.Creature) (Just kind) one)))),
             -- Its MULTIPLIER, a road of its own: the field is a Quantity, so the
             -- kind rides in a number here rather than in the row's own `kind`,
@@ -2921,7 +2921,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
             ( "CR 613.11's spell-cost modifier",
               base
                 { Face.playerAbilities =
-                    [PlayerStaticAbility.MkPlayerStaticAbility {PlayerStaticAbility.scope = PlayerScope.You, PlayerStaticAbility.condition = Nothing, PlayerStaticAbility.name = Nothing, PlayerStaticAbility.effect = PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost buried 1 Nothing)}]
+                    [PlayerStaticAbility.MkPlayerStaticAbility {PlayerStaticAbility.scope = PlayerScope.Related PlayerRelation.You, PlayerStaticAbility.condition = Nothing, PlayerStaticAbility.name = Nothing, PlayerStaticAbility.effect = PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost buried 1 Nothing)}]
                 }
             ),
             ( "CR 508.1c's combat restriction",
@@ -2969,7 +2969,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                 { Face.replacementEffects =
                     [ PrintedReplacement.MkPrintedReplacement
                         Nothing
-                        (ReplacementEffect.CounterR (CounterR.MkCounterR (CounterPattern.MkCounterPattern Nothing CounterSubject.ByAnything ControllerRelation.Yours buried Nothing) (Scaling.AddMore 1)))
+                        (ReplacementEffect.CounterR (CounterR.MkCounterR (CounterPattern.MkCounterPattern Nothing CounterSubject.ByAnything (ControllerRelation.Related PlayerRelation.You) buried Nothing) (Scaling.AddMore 1)))
                         Set.empty
                         Nothing
                     ]

@@ -650,6 +650,8 @@ playersFor viewOf context gs ref =
             PlayerRelation.Opponent -> Just (filter (PlayerRelation.holds (Game.teams gs) relation you) everyone)
             -- CR 102.3's other players on your team, the same predicate.
             PlayerRelation.Teammate -> Just (filter (PlayerRelation.holds (Game.teams gs) relation you) everyone)
+            -- CR 102.4's you and your teammates, the same predicate.
+            PlayerRelation.YourTeam -> Just (filter (PlayerRelation.holds (Game.teams gs) relation you) everyone)
             -- CR 102.1's whole table, the perspective included -- which is
             -- EachPlayer above, arrived at from the other side. Answered off
             -- `everyone` rather than by consing `you` onto the Opponent set, so a

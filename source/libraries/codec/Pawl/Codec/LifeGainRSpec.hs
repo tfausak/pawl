@@ -6,6 +6,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.LifeGainR as LifeGainR
 import qualified Pawl.Types.LifeGainRewrite as LifeGainRewrite
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Scaling as Scaling
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -16,8 +17,8 @@ spec s = Spec.describe s "Pawl.Codec.LifeGainR" $ do
       s
       LifeGainR.codec
       ( LifeGainR.MkLifeGainR
-          ControllerRelation.Yours
+          (ControllerRelation.Related PlayerRelation.You)
           (LifeGainRewrite.Scaled (Scaling.Multiply 2))
       )
-      " {\"whose\":{\"type\":\"Yours\"},\"rewrite\":{\"type\":\"Scaled\",\"value\":{\"type\":\"Multiply\",\"value\":2}}} "
+      " {\"whose\":{\"type\":\"You\"},\"rewrite\":{\"type\":\"Scaled\",\"value\":{\"type\":\"Multiply\",\"value\":2}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s LifeGainR.codec

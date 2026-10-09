@@ -1071,9 +1071,9 @@ abilityRecipients gs = Set.fromList (fmap Recipient.ToObject (filter (\oid -> Ga
 --
 --   * Scoped is PlayerEffect.playersInScope's, rather than a second reading of
 --     CR 109.5 written here: that function folds the one membership test, which
---     is where PlayerScope.Opponents' CR 806.1 argument lives. Nothing -> no
+--     is where PlayerScope.Related Opponent's CR 806.1 argument lives. Nothing -> no
 --     players is its report of an absent perspective -- the vacuous posture every
---     player-referencing Filter atom takes. PlayerScope.EachPlayer never reaches
+--     player-referencing Filter atom takes. PlayerScope.Related AnyPlayer never reaches
 --     it: "a graveyard" names the whole table with no perspective to lack.
 --
 --   * InSlot is the PLAYER recipients another slot of the same announcement

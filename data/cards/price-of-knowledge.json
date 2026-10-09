@@ -24,7 +24,7 @@
             "type": "NoMaximumHandSize"
           },
           "scope": {
-            "type": "EachPlayer"
+            "type": "AnyPlayer"
           }
         }
       ],

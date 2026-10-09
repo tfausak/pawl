@@ -6,6 +6,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.DrawCountR as DrawCountR
 import qualified Pawl.Types.DrawCountRewrite as DrawCountRewrite
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.DrawCountR" $ do
@@ -14,6 +15,6 @@ spec s = Spec.describe s "Pawl.Codec.DrawCountR" $ do
     Common.assertCodec
       s
       DrawCountR.codec
-      (DrawCountR.MkDrawCountR ControllerRelation.Opponents 2 DrawCountRewrite.EachDrawOne)
-      " {\"whose\":{\"type\":\"Opponents\"},\"atLeast\":2,\"rewrite\":{\"type\":\"EachDrawOne\"}} "
+      (DrawCountR.MkDrawCountR (ControllerRelation.Related PlayerRelation.Opponent) 2 DrawCountRewrite.EachDrawOne)
+      " {\"whose\":{\"type\":\"Opponent\"},\"atLeast\":2,\"rewrite\":{\"type\":\"EachDrawOne\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s DrawCountR.codec

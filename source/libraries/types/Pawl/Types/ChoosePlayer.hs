@@ -7,8 +7,8 @@ import qualified Pawl.Types.SlotName as SlotName
 -- players a resolving effect offers, and where the answer is bound.
 --
 -- The SCOPE is what separates Skullwinder's "choose an opponent"
--- (PlayerScope.Opponents) from Stadium Vendors' "choose a player"
--- (PlayerScope.EachPlayer, which includes the chooser). It is resolved through
+-- (PlayerScope.Related Opponent) from Stadium Vendors' "choose a player"
+-- (PlayerScope.Related AnyPlayer, which includes the chooser). It is resolved through
 -- Pawl.Engine.PlayerEffect.playersInScope, the one fold every player-set read
 -- shares, against CR 109.5's "you" -- the resolving controller.
 data ChoosePlayer = MkChoosePlayer

@@ -772,7 +772,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
   -- (ControllerRelation.EnchantedPlayers, judged by Replacement.relationHolds),
   -- as the whole card: cast at bob, then one card of each seat's headed for its
   -- owner's graveyard. THREE seats, because two cannot part the relation from
-  -- its siblings: alice controls the Wheel, so Yours would take her card, and
+  -- its siblings: alice controls the Wheel, so Related You would take her card, and
   -- carol is her opponent, so Opponents would take carol's. Bob's library is
   -- stocked so the bottom is a position; the reveal (CR 701.20a) is asserted off
   -- the log, and is bob's, who holds the card.

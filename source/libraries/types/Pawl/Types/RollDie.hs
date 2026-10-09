@@ -2,6 +2,7 @@ module Pawl.Types.RollDie where
 
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.DiceReading as DiceReading
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
@@ -69,7 +70,7 @@ import qualified Pawl.Types.SlotName as SlotName
 -- ability" already says (Djinni Windseer, Pawl.DiceSpec).
 --
 -- `roller` is CR 706.1's player the instruction is aimed at: You for every
--- printing but Chaos Dragon's "each player rolls a d20", which is EachPlayer.
+-- printing but Chaos Dragon's "each player rolls a d20", which is AnyPlayer.
 -- Each roller throws in APNAP order (CR 101.4) and is the player CR 706.2b's
 -- pick and CR 706.4's choice belong to. Where several roll, `slot` binds the
 -- highest result any of them used, and `other` is held by Pawl.CardSpec's lint
@@ -111,4 +112,4 @@ defaultReading = DiceReading.ChooseOne
 -- | What an instruction rolled by its controller writes (CR 109.5), and the
 -- value the codec elides.
 defaultRoller :: PlayerScope.PlayerScope
-defaultRoller = PlayerScope.You
+defaultRoller = PlayerScope.Related PlayerRelation.You

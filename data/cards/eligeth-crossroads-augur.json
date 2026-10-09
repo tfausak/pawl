@@ -48,7 +48,7 @@
                 "type": "DrawInstead"
               },
               "whose": {
-                "type": "Yours"
+                "type": "You"
               }
             }
           }

@@ -1506,7 +1506,7 @@ unearth cost =
                   ( ZoneChangeR.MkZoneChangeR
                       ZoneChangePattern.MkZoneChangePattern
                         { ZoneChangePattern.whenDestination = Nothing,
-                          ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
+                          ZoneChangePattern.whoseObject = ControllerRelation.Related PlayerRelation.AnyPlayer,
                           ZoneChangePattern.whatObject = Filter.IsBound unearthSlot,
                           ZoneChangePattern.whenDiscarded = Nothing,
                           ZoneChangePattern.duringResolution = False
@@ -4080,7 +4080,7 @@ castFromGraveyardExile =
     ( ZoneChangeR.MkZoneChangeR
         ZoneChangePattern.MkZoneChangePattern
           { ZoneChangePattern.whenDestination = Nothing,
-            ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
+            ZoneChangePattern.whoseObject = ControllerRelation.Related PlayerRelation.AnyPlayer,
             ZoneChangePattern.whatObject = Filter.IsSource,
             ZoneChangePattern.whenDiscarded = Nothing,
             ZoneChangePattern.duringResolution = False
@@ -4129,14 +4129,14 @@ handReplacementsOf keywords = [madnessDiscardExile | not (null (madnessCosts key
 --
 -- A wildcard rather than an exhaustive case, `madnessCosts` above's reason.
 --
--- ControllerRelation.Yours is rule 702.52a's "you": the card is in a graveyard,
+-- ControllerRelation.Related You is rule 702.52a's "you": the card is in a graveyard,
 -- where CR 108.4 gives it no controller and CR 108.4a substitutes its owner, and
 -- Pawl.Engine.Replacement.applies reads the relation off the candidate's
 -- controller, which for a graveyard card is that owner.
 graveyardReplacementsOf :: Set Keyword -> [ReplacementEffect Card (GrantedAbility.GrantedAbility Card) (Effect.Effect Card (GrantedAbility.GrantedAbility Card))]
 graveyardReplacementsOf keywords =
   let rowFor keyword = case keyword of
-        Keyword.Dredge n -> Just (ReplacementEffect.DrawR (DrawR.MkDrawR ControllerRelation.Yours (DrawRewrite.Dredge n)))
+        Keyword.Dredge n -> Just (ReplacementEffect.DrawR (DrawR.MkDrawR (ControllerRelation.Related PlayerRelation.You) (DrawRewrite.Dredge n)))
         _ -> Nothing
    in Maybe.mapMaybe rowFor (Set.toAscList keywords)
 
@@ -4174,7 +4174,7 @@ madnessDiscardExile =
     ( ZoneChangeR.MkZoneChangeR
         ZoneChangePattern.MkZoneChangePattern
           { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
-            ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
+            ZoneChangePattern.whoseObject = ControllerRelation.Related PlayerRelation.AnyPlayer,
             ZoneChangePattern.whatObject = Filter.IsSource,
             ZoneChangePattern.whenDiscarded = Nothing,
             ZoneChangePattern.duringResolution = False
@@ -8243,7 +8243,7 @@ soulshift :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Car
 soulshift n =
   let slot =
         TargetSlot.required
-          (Pool.CardsInGraveyard (ZoneScope.Scoped PlayerScope.You))
+          (Pool.CardsInGraveyard (ZoneScope.Scoped (PlayerScope.Related PlayerRelation.You)))
           (Just (Filter.And [Filter.HasSubtype Subtype.Spirit, Filter.ManaValueAtMost (toInteger n)]))
       back =
         Effect.MoveToZone
@@ -8830,7 +8830,7 @@ demonstrate =
           Optionality.Mandatory
           Nothing
           ( Seq.fromList
-              [ Effect.ChoosePlayer (ChoosePlayer.MkChoosePlayer PlayerScope.Opponents demonstrateOpponent),
+              [ Effect.ChoosePlayer (ChoosePlayer.MkChoosePlayer (PlayerScope.Related PlayerRelation.Opponent) demonstrateOpponent),
                 copyBy (PlayerRef.InSlot demonstrateOpponent)
               ]
           )

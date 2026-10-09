@@ -84,6 +84,7 @@ import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
@@ -1084,7 +1085,7 @@ untilEndOfCombatSpec s registry = Spec.describe s "UntilEndOfCombat" $ do
               floated = S.runPure S.identityAnswer gs1 (S.tapForMana mtn)
            in S.addPlayerEffect
                 expiry
-                (AffectedPlayers.Scoped PlayerScope.EachPlayer)
+                (AffectedPlayers.Scoped (PlayerScope.Related PlayerRelation.AnyPlayer))
                 (PlayerEffect.DontLoseUnspentMana ManaFilter.Any)
                 S.alice
                 floated

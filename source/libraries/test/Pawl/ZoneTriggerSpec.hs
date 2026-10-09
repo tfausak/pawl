@@ -2713,7 +2713,7 @@ everyTriggerCondition =
 --   * Shimatsu the Bloodcloaked -- a Spirit, mana value 4. Drops out on rule
 --     702.46a's "N or less", which here is 3.
 --   * bob's own Disowned Ancestor -- a Spirit of mana value 1 in the WRONG
---     graveyard (CR 400.1), which is what makes PlayerScope.You load-bearing.
+--     graveyard (CR 400.1), which is what makes PlayerScope.Related You load-bearing.
 --
 -- leaving alice's Disowned Ancestor ({B} Creature -- Spirit Warrior) as the only
 -- legal target. The dead Kami's own graveyard incarnation is a Spirit too and is

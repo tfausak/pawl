@@ -6,6 +6,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.LifeLossPattern as LifeLossPattern
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.LifeLossPattern" $ do
@@ -15,11 +16,11 @@ spec s = Spec.describe s "Pawl.Codec.LifeLossPattern" $ do
       s
       LifeLossPattern.codec
       LifeLossPattern.MkLifeLossPattern
-        { LifeLossPattern.whose = ControllerRelation.Yours,
+        { LifeLossPattern.whose = ControllerRelation.Related PlayerRelation.You,
           LifeLossPattern.whichCause = Just LifeLossCause.ByDamage
         }
-      " {\"whose\":{\"type\":\"Yours\"},\"whichCause\":{\"type\":\"ByDamage\"}} "
-  -- CR 109.5: Anyones is what a pattern that says nothing about the controller
+      " {\"whose\":{\"type\":\"You\"},\"whichCause\":{\"type\":\"ByDamage\"}} "
+  -- CR 109.5: Related AnyPlayer is what a pattern that says nothing about the controller
   -- means, and Nothing what one that says nothing about the cause does, so both
   -- keys are omitted.
   Spec.it s "an all-default value omits every optional key" $
@@ -27,7 +28,7 @@ spec s = Spec.describe s "Pawl.Codec.LifeLossPattern" $ do
       s
       LifeLossPattern.codec
       LifeLossPattern.MkLifeLossPattern
-        { LifeLossPattern.whose = ControllerRelation.Anyones,
+        { LifeLossPattern.whose = ControllerRelation.Related PlayerRelation.AnyPlayer,
           LifeLossPattern.whichCause = Nothing
         }
       " {} "

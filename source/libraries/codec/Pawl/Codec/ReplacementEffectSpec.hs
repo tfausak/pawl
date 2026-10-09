@@ -85,7 +85,7 @@ spec s =
                     ZoneChangePattern.MkZoneChangePattern
                       { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
                         ZoneChangePattern.whatObject = Filter.And [],
-                        ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
+                        ZoneChangePattern.whoseObject = ControllerRelation.Related PlayerRelation.AnyPlayer,
                         ZoneChangePattern.whenDiscarded = Nothing,
                         ZoneChangePattern.duringResolution = False
                       }
@@ -108,7 +108,7 @@ spec s =
                     ZoneChangePattern.MkZoneChangePattern
                       { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
                         ZoneChangePattern.whatObject = Filter.And [],
-                        ZoneChangePattern.whoseObject = ControllerRelation.Opponents,
+                        ZoneChangePattern.whoseObject = ControllerRelation.Related PlayerRelation.Opponent,
                         ZoneChangePattern.whenDiscarded = Nothing,
                         ZoneChangePattern.duringResolution = False
                       }
@@ -119,7 +119,7 @@ spec s =
                     False
                 )
             )
-            " {\"type\":\"ZoneChangeR\",\"value\":{\"matching\":{\"whenDestination\":{\"type\":\"Graveyard\"},\"whoseObject\":{\"type\":\"Opponents\"}},\"destination\":{\"type\":\"Exile\"}}} "
+            " {\"type\":\"ZoneChangeR\",\"value\":{\"matching\":{\"whenDestination\":{\"type\":\"Graveyard\"},\"whoseObject\":{\"type\":\"Opponent\"}},\"destination\":{\"type\":\"Exile\"}}} "
         -- CR 614.1c: EntryR's pattern is a bare Filter, and "as this permanent
         -- enters" is Filter.IsSource. AsCopy pins the exception-free rewrite beside it.
         Spec.it s "EntryR (Clone, IsSource + AsCopy)" $
@@ -200,13 +200,13 @@ spec s =
             ( ReplacementEffect.LifeLossR
                 ( LifeLossR.MkLifeLossR
                     LifeLossPattern.MkLifeLossPattern
-                      { LifeLossPattern.whose = ControllerRelation.Yours,
+                      { LifeLossPattern.whose = ControllerRelation.Related PlayerRelation.You,
                         LifeLossPattern.whichCause = Just LifeLossCause.ByDamage
                       }
                     (LifeLossRewrite.LeaveAtLeast 1)
                 )
             )
-            " {\"type\":\"LifeLossR\",\"value\":{\"matching\":{\"whose\":{\"type\":\"Yours\"},\"whichCause\":{\"type\":\"ByDamage\"}},\"rewrite\":{\"type\":\"LeaveAtLeast\",\"value\":1}}} "
+            " {\"type\":\"LifeLossR\",\"value\":{\"matching\":{\"whose\":{\"type\":\"You\"},\"whichCause\":{\"type\":\"ByDamage\"}},\"rewrite\":{\"type\":\"LeaveAtLeast\",\"value\":1}}} "
         -- CR 614.1a / 119.10: Boon Reflection, the LifeGainR producer.
         Spec.it s "LifeGainR (Boon Reflection)" $
           Common.assertCodec
@@ -214,67 +214,67 @@ spec s =
             codec
             ( ReplacementEffect.LifeGainR
                 ( LifeGainR.MkLifeGainR
-                    ControllerRelation.Yours
+                    (ControllerRelation.Related PlayerRelation.You)
                     (LifeGainRewrite.Scaled (Scaling.Multiply 2))
                 )
             )
-            " {\"type\":\"LifeGainR\",\"value\":{\"whose\":{\"type\":\"Yours\"},\"rewrite\":{\"type\":\"Scaled\",\"value\":{\"type\":\"Multiply\",\"value\":2}}}} "
+            " {\"type\":\"LifeGainR\",\"value\":{\"whose\":{\"type\":\"You\"},\"rewrite\":{\"type\":\"Scaled\",\"value\":{\"type\":\"Multiply\",\"value\":2}}}} "
         -- CR 614.11 / 121.6: Words of Worship, the GainLife DrawR producer.
         Spec.it s "DrawR (Words of Worship)" $
           Common.assertCodec
             s
             codec
-            (ReplacementEffect.DrawR (DrawR.MkDrawR ControllerRelation.Yours (DrawRewrite.GainLife 5)))
-            " {\"type\":\"DrawR\",\"value\":{\"whose\":{\"type\":\"Yours\"},\"rewrite\":{\"type\":\"GainLife\",\"value\":5}}} "
+            (ReplacementEffect.DrawR (DrawR.MkDrawR (ControllerRelation.Related PlayerRelation.You) (DrawRewrite.GainLife 5)))
+            " {\"type\":\"DrawR\",\"value\":{\"whose\":{\"type\":\"You\"},\"rewrite\":{\"type\":\"GainLife\",\"value\":5}}} "
         -- CR 121.2a: Alms Collector, the one DrawCountR producer.
         Spec.it s "DrawCountR (Alms Collector)" $
           Common.assertCodec
             s
             codec
-            (ReplacementEffect.DrawCountR (DrawCountR.MkDrawCountR ControllerRelation.Opponents 2 DrawCountRewrite.EachDrawOne))
-            " {\"type\":\"DrawCountR\",\"value\":{\"whose\":{\"type\":\"Opponents\"},\"atLeast\":2,\"rewrite\":{\"type\":\"EachDrawOne\"}}} "
+            (ReplacementEffect.DrawCountR (DrawCountR.MkDrawCountR (ControllerRelation.Related PlayerRelation.Opponent) 2 DrawCountRewrite.EachDrawOne))
+            " {\"type\":\"DrawCountR\",\"value\":{\"whose\":{\"type\":\"Opponent\"},\"atLeast\":2,\"rewrite\":{\"type\":\"EachDrawOne\"}}} "
         -- CR 701.17a: Bruvac the Grandiloquent, the one MillCountR producer.
         Spec.it s "MillCountR (Bruvac the Grandiloquent)" $
           Common.assertCodec
             s
             codec
-            (ReplacementEffect.MillCountR (MillCountR.MkMillCountR ControllerRelation.Opponents (MillCountRewrite.Scaled (Scaling.Multiply 2))))
-            " {\"type\":\"MillCountR\",\"value\":{\"whose\":{\"type\":\"Opponents\"},\"rewrite\":{\"type\":\"Scaled\",\"value\":{\"type\":\"Multiply\",\"value\":2}}}} "
+            (ReplacementEffect.MillCountR (MillCountR.MkMillCountR (ControllerRelation.Related PlayerRelation.Opponent) (MillCountRewrite.Scaled (Scaling.Multiply 2))))
+            " {\"type\":\"MillCountR\",\"value\":{\"whose\":{\"type\":\"Opponent\"},\"rewrite\":{\"type\":\"Scaled\",\"value\":{\"type\":\"Multiply\",\"value\":2}}}} "
         -- CR 705.1: Krark's Thumb, the one CoinFlipR producer.
         Spec.it s "CoinFlipR (Krark's Thumb)" $
           Common.assertCodec
             s
             codec
-            (ReplacementEffect.CoinFlipR (CoinFlipR.MkCoinFlipR ControllerRelation.Yours CoinFlipRewrite.Doubled))
-            " {\"type\":\"CoinFlipR\",\"value\":{\"whose\":{\"type\":\"Yours\"},\"rewrite\":{\"type\":\"Doubled\"}}} "
+            (ReplacementEffect.CoinFlipR (CoinFlipR.MkCoinFlipR (ControllerRelation.Related PlayerRelation.You) CoinFlipRewrite.Doubled))
+            " {\"type\":\"CoinFlipR\",\"value\":{\"whose\":{\"type\":\"You\"},\"rewrite\":{\"type\":\"Doubled\"}}} "
         -- CR 706.6: Pixie Guide, the one DieRollR producer.
         Spec.it s "DieRollR (Pixie Guide)" $
           Common.assertCodec
             s
             codec
-            (ReplacementEffect.DieRollR (DieRollR.MkDieRollR ControllerRelation.Yours DieRollRewrite.ExtraIgnoringLowest))
-            " {\"type\":\"DieRollR\",\"value\":{\"whose\":{\"type\":\"Yours\"},\"rewrite\":{\"type\":\"ExtraIgnoringLowest\"}}} "
+            (ReplacementEffect.DieRollR (DieRollR.MkDieRollR (ControllerRelation.Related PlayerRelation.You) DieRollRewrite.ExtraIgnoringLowest))
+            " {\"type\":\"DieRollR\",\"value\":{\"whose\":{\"type\":\"You\"},\"rewrite\":{\"type\":\"ExtraIgnoringLowest\"}}} "
         -- CR 701.34a: Tekuthal, Inquiry Dominus.
         Spec.it s "ProliferateR (Tekuthal, Inquiry Dominus)" $
           Common.assertCodec
             s
             codec
-            (ReplacementEffect.ProliferateR (ProliferateR.MkProliferateR ControllerRelation.Yours ProliferateRewrite.Doubled))
-            " {\"type\":\"ProliferateR\",\"value\":{\"whose\":{\"type\":\"Yours\"},\"rewrite\":{\"type\":\"Doubled\"}}} "
+            (ReplacementEffect.ProliferateR (ProliferateR.MkProliferateR (ControllerRelation.Related PlayerRelation.You) ProliferateRewrite.Doubled))
+            " {\"type\":\"ProliferateR\",\"value\":{\"whose\":{\"type\":\"You\"},\"rewrite\":{\"type\":\"Doubled\"}}} "
         -- CR 701.22a: Eligeth, Crossroads Augur.
         Spec.it s "ScryR (Eligeth, Crossroads Augur)" $
           Common.assertCodec
             s
             codec
-            (ReplacementEffect.ScryR (ScryR.MkScryR ControllerRelation.Yours ScryRewrite.DrawInstead))
-            " {\"type\":\"ScryR\",\"value\":{\"whose\":{\"type\":\"Yours\"},\"rewrite\":{\"type\":\"DrawInstead\"}}} "
+            (ReplacementEffect.ScryR (ScryR.MkScryR (ControllerRelation.Related PlayerRelation.You) ScryRewrite.DrawInstead))
+            " {\"type\":\"ScryR\",\"value\":{\"whose\":{\"type\":\"You\"},\"rewrite\":{\"type\":\"DrawInstead\"}}} "
         -- CR 701.55c: The Valeyard.
         Spec.it s "VillainousChoiceR (The Valeyard)" $
           Common.assertCodec
             s
             codec
-            (ReplacementEffect.VillainousChoiceR (VillainousChoiceR.MkVillainousChoiceR ControllerRelation.Opponents VillainousChoiceRewrite.AdditionalTime))
-            " {\"type\":\"VillainousChoiceR\",\"value\":{\"whose\":{\"type\":\"Opponents\"},\"rewrite\":{\"type\":\"AdditionalTime\"}}} "
+            (ReplacementEffect.VillainousChoiceR (VillainousChoiceR.MkVillainousChoiceR (ControllerRelation.Related PlayerRelation.Opponent) VillainousChoiceRewrite.AdditionalTime))
+            " {\"type\":\"VillainousChoiceR\",\"value\":{\"whose\":{\"type\":\"Opponent\"},\"rewrite\":{\"type\":\"AdditionalTime\"}}} "
         -- A fixed kind, a real filter, and CR 614.16's AddMore.
         Spec.it s "CounterR (Hardened Scales)" $
           Common.assertCodec
@@ -285,14 +285,14 @@ spec s =
                     CounterPattern.MkCounterPattern
                       { CounterPattern.whichKind = Just CounterKind.PlusOnePlusOne,
                         CounterPattern.subject = CounterSubject.ByAnything,
-                        CounterPattern.whose = ControllerRelation.Yours,
+                        CounterPattern.whose = ControllerRelation.Related PlayerRelation.You,
                         CounterPattern.onWhat = Filter.HasCardType CardType.Creature,
                         CounterPattern.onWho = Nothing
                       }
                     (Scaling.AddMore 1)
                 )
             )
-            " {\"type\":\"CounterR\",\"value\":{\"matching\":{\"whichKind\":{\"type\":\"PlusOnePlusOne\"},\"subject\":{\"type\":\"ByAnything\"},\"whose\":{\"type\":\"Yours\"},\"onWhat\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"scaling\":{\"type\":\"AddMore\",\"value\":1}}} "
+            " {\"type\":\"CounterR\",\"value\":{\"matching\":{\"whichKind\":{\"type\":\"PlusOnePlusOne\"},\"subject\":{\"type\":\"ByAnything\"},\"whose\":{\"type\":\"You\"},\"onWhat\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"scaling\":{\"type\":\"AddMore\",\"value\":1}}} "
         -- whichKind = Nothing means any kind, never "no kind", and the trivial filter
         -- matches every permanent. An absent whichKind key is what that Nothing
         -- means.
@@ -305,21 +305,21 @@ spec s =
                     CounterPattern.MkCounterPattern
                       { CounterPattern.whichKind = Nothing,
                         CounterPattern.subject = CounterSubject.ByEffect,
-                        CounterPattern.whose = ControllerRelation.Yours,
+                        CounterPattern.whose = ControllerRelation.Related PlayerRelation.You,
                         CounterPattern.onWhat = Filter.And [],
                         CounterPattern.onWho = Nothing
                       }
                     (Scaling.Multiply 2)
                 )
             )
-            " {\"type\":\"CounterR\",\"value\":{\"matching\":{\"subject\":{\"type\":\"ByEffect\"},\"whose\":{\"type\":\"Yours\"},\"onWhat\":{\"type\":\"And\",\"value\":[]}},\"scaling\":{\"type\":\"Multiply\",\"value\":2}}} "
+            " {\"type\":\"CounterR\",\"value\":{\"matching\":{\"subject\":{\"type\":\"ByEffect\"},\"whose\":{\"type\":\"You\"},\"onWhat\":{\"type\":\"And\",\"value\":[]}},\"scaling\":{\"type\":\"Multiply\",\"value\":2}}} "
         -- Pattern and scaling are both DATA, so both have to survive the trip.
         Spec.it s "TokenR (Doubling Season, tokens)" $
           Common.assertCodec
             s
             codec
-            (ReplacementEffect.TokenR (TokenR.MkTokenR TokenPattern.MkTokenPattern {TokenPattern.whose = ControllerRelation.Yours, TokenPattern.whatToken = Filter.And []} (Just (Scaling.Multiply 2)) Nothing))
-            " {\"type\":\"TokenR\",\"value\":{\"matching\":{\"whose\":{\"type\":\"Yours\"}},\"scaling\":{\"type\":\"Multiply\",\"value\":2}}} "
+            (ReplacementEffect.TokenR (TokenR.MkTokenR TokenPattern.MkTokenPattern {TokenPattern.whose = ControllerRelation.Related PlayerRelation.You, TokenPattern.whatToken = Filter.And []} (Just (Scaling.Multiply 2)) Nothing))
+            " {\"type\":\"TokenR\",\"value\":{\"matching\":{\"whose\":{\"type\":\"You\"}},\"scaling\":{\"type\":\"Multiply\",\"value\":2}}} "
         -- CR 614.1b: a skip carries a pattern and no rewrite, so the payload is the
         -- pattern itself rather than the usual two-element array. whosePhase =
         -- Nothing is the shape a card actually writes.

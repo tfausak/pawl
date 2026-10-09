@@ -56,7 +56,7 @@
                   "type": "ByRadiation"
                 },
                 "whose": {
-                  "type": "Yours"
+                  "type": "You"
                 }
               },
               "rewrite": {

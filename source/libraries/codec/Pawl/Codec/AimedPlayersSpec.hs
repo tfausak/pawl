@@ -6,6 +6,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AimedPlayers as AimedPlayers
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.SlotName as SlotName
 
@@ -15,7 +16,7 @@ spec s = Spec.describe s "Pawl.Codec.AimedPlayers" $ do
     Common.assertCodec
       s
       AimedPlayers.codec
-      (AimedPlayers.Scoped PlayerScope.You)
+      (AimedPlayers.Scoped (PlayerScope.Related PlayerRelation.You))
       " {\"type\":\"Scoped\",\"value\":{\"type\":\"You\"}} "
   Spec.it s "EachInSlot" $
     Common.assertCodec

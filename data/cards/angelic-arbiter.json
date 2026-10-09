@@ -56,7 +56,7 @@
             "type": "CantAttackWithCreatures"
           },
           "scope": {
-            "type": "Opponents"
+            "type": "Opponent"
           }
         },
         {
@@ -82,7 +82,7 @@
             "type": "CantCastSpells"
           },
           "scope": {
-            "type": "Opponents"
+            "type": "Opponent"
           }
         }
       ],

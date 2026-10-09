@@ -86,6 +86,7 @@ import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
@@ -5233,7 +5234,7 @@ finalityOf oid gs =
                 { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
                   -- CR 122.1h says nothing about whose graveyard, and CR 400.3
                   -- makes it the owner's whoever controlled the permanent.
-                  ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
+                  ZoneChangePattern.whoseObject = ControllerRelation.Related PlayerRelation.AnyPlayer,
                   ZoneChangePattern.whatObject = Filter.Type.IsSource,
                   ZoneChangePattern.whenDiscarded = Nothing,
                   ZoneChangePattern.duringResolution = False

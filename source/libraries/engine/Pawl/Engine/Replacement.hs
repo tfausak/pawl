@@ -327,7 +327,7 @@ collect sources floating =
       -- instead.
       --
       -- CR 109.5's "you" is the CARRIER's controller, not the protected player --
-      -- the two differ the moment a scope wider than PlayerScope.You appears --
+      -- the two differ the moment a scope wider than PlayerScope.Related You appears --
       -- and Absolute Virtue's Filter.OfRelatedPlayer reads it, as
       -- PlayerEffect.protectedFromGiven's targeting and Aura bars do. Runed
       -- Halo's Filter.HasChosenName and The Stasis Coffin's empty conjunction
@@ -525,10 +525,9 @@ numberInstances =
 -- (CR 614.12). That filter needs the batch, which is the loop's parameter rather
 -- than this one's.
 --
--- `applies` reads the pre-batch board too, not just `collect`: both ask about
--- the SOURCE's controller for CR 109.5's "you" (matchesController,
--- matchesZoneOwner, the TokenR arm), and a source the batch has already removed
--- has no controller, so the two have to agree on which board that is.
+-- `applies` reads the pre-batch board too, not just `collect`: `collect` derives
+-- a permanent row's CR 109.5 "you" off it, and a source the batch has already
+-- removed has no controller, so the two have to agree on which board that is.
 applicable :: Maybe GameState -> GameState -> ProposedEvent -> [ReplacementCandidate]
 applicable asOf gs event =
   let sources = Maybe.fromMaybe gs asOf
@@ -745,7 +744,7 @@ matchesPrinted viewOf gs event candidate =
           maybe True (== ZoneChange.to zc) (ZoneChangePattern.whenDestination pat)
             && maybe True ((== discarded) . Just) (ZoneChangePattern.whenDiscarded pat)
             && (resolving || not (ZoneChangePattern.duringResolution pat))
-            && matchesZoneOwner gs src (ReplacementCandidate.controller candidate) (ZoneChangePattern.whoseObject pat) (ZoneChange.object zc)
+            && matchesZoneOwner gs candidate (ZoneChangePattern.whoseObject pat) (ZoneChange.object zc)
             && matchesFiltered viewOf gs candidate (ZoneChangePattern.whatObject pat) (ZoneChange.object zc)
         -- CR 615.1: which events the pattern admits (see matchesDamagePattern),
         -- plus the one fact about the ROW rather than the event -- a shield
@@ -769,8 +768,8 @@ matchesPrinted viewOf gs event candidate =
           -- Our own encoding convention, not a rule: `whichKind = Nothing` means
           -- any kind, never no kind.
           maybe True (== kind) (CounterPattern.whichKind pat)
-            && matchesPutter gs src (CounterPattern.subject pat) cause
-            && matchesController gs src (CounterPattern.whose pat) oid
+            && matchesPutter gs candidate (CounterPattern.subject pat) cause
+            && matchesController gs candidate (CounterPattern.whose pat) oid
             && matchesPermanent viewOf gs Nothing Map.empty Nothing (CounterPattern.onWhat pat) oid
         -- CR 122.1 / 614.1: the same pattern against a PLAYER recipient. A
         -- pattern naming a kind admits none of these: `whichKind` is the object
@@ -779,8 +778,8 @@ matchesPrinted viewOf gs event candidate =
         -- counter without saying so.
         (ReplacementEffect.CounterR (CounterR.MkCounterR pat _), ProposedEvent.WouldPutPlayerCounters cause pid _ _) ->
           Maybe.isNothing (CounterPattern.whichKind pat)
-            && matchesPutter gs src (CounterPattern.subject pat) cause
-            && maybe False (\rel -> matchesPlayer gs src rel pid) (CounterPattern.onWho pat)
+            && matchesPutter gs candidate (CounterPattern.subject pat) cause
+            && maybe False (\rel -> matchesPlayer gs candidate rel pid) (CounterPattern.onWho pat)
         -- CR 614.16 at the ENTRY level: the counters this permanent is entering
         -- with are a placement this row may scale, and CR 616.1 orders it against
         -- every other row modifying the same entry. What it scales is the PENDING
@@ -796,17 +795,17 @@ matchesPrinted viewOf gs event candidate =
             Nothing -> False
             Just putter ->
               not (Map.null (matchingEnteringCounters gs pat oid))
-                && matchesPutter gs src (CounterPattern.subject pat) (CounterCause.ByEffect putter)
-                && matchesController gs src (CounterPattern.whose pat) oid
+                && matchesPutter gs candidate (CounterPattern.subject pat) (CounterCause.ByEffect putter)
+                && matchesController gs candidate (CounterPattern.whose pat) oid
                 && matchesPermanent viewOf gs Nothing Map.empty Nothing (CounterPattern.onWhat pat) oid
         -- CR 109.5: "under YOUR control" -- the tokens' controller against the
-        -- effect source's controller. CR 102.2's Opponents has no producer today.
+        -- candidate's "you". No producer today names an opponent here.
         --
         -- And WHAT is being created (Queen Allenal of Ruadach's "creature
         -- tokens"): "one or more" is ANY lot matching, each judged as its token
         -- would exist (CR 614.12) since none is minted yet.
         (ReplacementEffect.TokenR (TokenR.MkTokenR pat _ _), ProposedEvent.WouldCreateTokens pid lots) ->
-          matchesPlayer gs src (TokenPattern.whose pat) pid
+          matchesPlayer gs candidate (TokenPattern.whose pat) pid
             && any (matchesTokenLot (Count.deployIn gs Zone.Battlefield) (candidateContext gs candidate) (TokenPattern.whatToken pat) pid) lots
         -- CR 614.1b / 500.11: a skip intercepts a step or phase BEGINNING, and
         -- names exactly which one -- and, for a player-scoped skip, whose.
@@ -890,19 +889,15 @@ matchesPrinted viewOf gs event candidate =
         -- choice, is never spent under CR 614.5, and prompts nobody.
         (ReplacementEffect.LifeLossR (LifeLossR.MkLifeLossR pat rewrite), ProposedEvent.WouldLoseLife cause pid n) ->
           maybe True (== cause) (LifeLossPattern.whichCause pat)
-            && matchesPlayer gs src (LifeLossPattern.whose pat) pid
+            && matchesPlayer gs candidate (LifeLossPattern.whose pat) pid
             && breaches gs (ReplacementCandidate.controller candidate) rewrite pid n
         -- CR 614.1a / 119.10: whose life total the row watches (CR 109.5's
         -- "your"), and whether the rewrite would actually resize the gain. That
         -- second conjunct is LifeLossR's third above, and for its reason: a gain
         -- the row would leave alone never reaches CR 616.1's choice and is never
         -- spent under CR 614.5.
-        --
-        -- Read off the SOURCE, the LifeLossR arm's posture rather than DrawR's:
-        -- every gain producer is a permanent's static ability, whose CR 109.5
-        -- "you" is its controller as projected now.
         (ReplacementEffect.LifeGainR (LifeGainR.MkLifeGainR whose rewrite), ProposedEvent.WouldGainLife pid n) ->
-          matchesPlayer gs src whose pid
+          matchesPlayer gs candidate whose pid
             && resizes rewrite n
         -- CR 121.6 / 614.11: whose card draws the row watches (CR 109.5's "you",
         -- or Plagiarize's target player, baked by CR 601.2c's resolution).
@@ -913,75 +908,57 @@ matchesPrinted viewOf gs event candidate =
         -- empty, which is why `stocked` answers True for every rewrite but
         -- dredge.
         --
-        -- Read off the CANDIDATE, the ZoneChangeR arm's posture and not the
-        -- src-derived arms below it: every producer but dredge installs a FLOATING
-        -- row from a resolution, so the "you" was baked when it resolved and
-        -- survives the source leaving the battlefield or changing hands -- which
-        -- Ring of Ma'rûf's own cost makes it do. See matchesCandidatePlayer (#2662).
+        -- Every producer but dredge installs a FLOATING row, whose "you" was baked
+        -- when it resolved and survives the source leaving the battlefield --
+        -- which Ring of Ma'rûf's own cost makes it do; see relationHolds and #2662.
         (ReplacementEffect.DrawR pat, ProposedEvent.WouldDraw pid) ->
-          matchesCandidatePlayer gs src (ReplacementCandidate.controller candidate) (DrawR.whose pat) pid
+          matchesPlayer gs candidate (DrawR.whose pat) pid
             && stocked gs (DrawR.rewrite pat) pid
         -- CR 121.2a: whose draw INSTRUCTIONS the row watches (CR 109.5's "you"),
         -- and the number it names. Alms Collector's "two or more" is a condition on
         -- the event rather than a rewrite that changes nothing, LifeLossR's third
         -- conjunct above: an instruction naming one card never reaches CR 616.1's
         -- choice and is never spent under CR 614.5.
-        --
-        -- Read off the SOURCE, the LifeLossR arm's posture rather than DrawR's: the
-        -- only producer is a permanent's static ability, whose CR 109.5 "you" is
-        -- its controller as projected now.
         (ReplacementEffect.DrawCountR pat, ProposedEvent.WouldDrawCards pid n) ->
           n >= DrawCountR.atLeast pat
-            && matchesPlayer gs src (DrawCountR.whose pat) pid
+            && matchesPlayer gs candidate (DrawCountR.whose pat) pid
         -- CR 701.17a / 614.1a: Bruvac the Grandiloquent watches the mill
         -- INSTRUCTION and who it names. No threshold conjunct where DrawCountR has
         -- one: rule 701.17a's "one or more" is met by every instruction that mills
         -- at all, since `millFrom` raises this event only for a positive count.
-        --
-        -- Read off the SOURCE, the DrawCountR arm's posture and for its reason:
-        -- the only producer is a permanent's static ability, whose CR 109.5 "an
-        -- opponent" is measured against its controller as projected now.
         (ReplacementEffect.MillCountR pat, ProposedEvent.WouldMillCards pid _) ->
-          matchesPlayer gs src (MillCountR.whose pat) pid
+          matchesPlayer gs candidate (MillCountR.whose pat) pid
         -- CR 705.1 / 614.1a: whose coin flips the row watches (CR 109.5's "you"),
         -- which is the whole of the pattern -- rule 705.2's last sentence leaves
         -- the flipper the only seat a flip involves, and rule 705.1's flip has no
         -- source, no amount and no destination to narrow by. No `admits` beside
         -- it either: every arm of Pawl.Types.CoinFlipRewrite changes the count of
         -- coins, so there is no board on which the rewrite would change nothing.
-        --
-        -- Read off the SOURCE, the LifeGainR arm's posture rather than DrawR's:
-        -- the only producer is a permanent's static ability, whose CR 109.5 "you"
-        -- is its controller as projected now.
         (ReplacementEffect.CoinFlipR (CoinFlipR.MkCoinFlipR whose _), ProposedEvent.WouldFlipCoin pid _) ->
-          matchesPlayer gs src whose pid
+          matchesPlayer gs candidate whose pid
         -- CR 706.1 / 614.1a: whose die rolls the row watches (CR 109.5's "you"),
         -- the CoinFlipR arm above and for its reason -- an instruction to roll
         -- concerns the roller and nobody else, and every printing of the sentence
         -- says "one or more dice" with no dN and no count to narrow by. No
         -- `admits` beside it: DieRollRewrite's one arm always adds a die, so there
         -- is no board on which the rewrite would change nothing.
-        --
-        -- Read off the SOURCE, the CoinFlipR arm's posture: every producer is a
-        -- permanent's static ability, whose CR 109.5 "you" is its controller as
-        -- projected now.
         (ReplacementEffect.DieRollR (DieRollR.MkDieRollR whose _), ProposedEvent.WouldRollDice roll) ->
-          matchesPlayer gs src whose (DiceRoll.roller roll)
+          matchesPlayer gs candidate whose (DiceRoll.roller roll)
         -- CR 701.34a / 614.1a: whose proliferates the row watches (CR 109.5's
         -- "you"), the CoinFlipR arm's posture and for its reason. No `admits`:
         -- ProliferateRewrite.Doubled always changes the count.
         (ReplacementEffect.ProliferateR (ProliferateR.MkProliferateR whose _), ProposedEvent.WouldProliferate pid _) ->
-          matchesPlayer gs src whose pid
+          matchesPlayer gs candidate whose pid
         -- CR 701.22a / 614.1a: whose scries the row watches (CR 109.5's "you"),
         -- the ProliferateR arm's posture. No `admits`: both rewrites change the
         -- event, and CR 701.22b's scry 0 is never proposed.
         (ReplacementEffect.ScryR (ScryR.MkScryR whose _), ProposedEvent.WouldScry pid _) ->
-          matchesPlayer gs src whose pid
+          matchesPlayer gs candidate whose pid
         -- CR 701.55c / 614.1a: whose villainous choices the row watches -- The
         -- Valeyard's "an opponent" -- the ProliferateR arm's posture. No `admits`:
         -- VillainousChoiceRewrite.AdditionalTime always changes the count.
         (ReplacementEffect.VillainousChoiceR (VillainousChoiceR.MkVillainousChoiceR whose _), ProposedEvent.WouldFaceVillainousChoice pid _) ->
-          matchesPlayer gs src whose pid
+          matchesPlayer gs candidate whose pid
         -- Every row below falls through to False because an arm ABOVE already
         -- matches every event of that class: a row below fires only for a
         -- MISMATCHED class, where False is the correct answer rather than a
@@ -1016,7 +993,7 @@ matchesPrinted viewOf gs event candidate =
 -- total to less than 1, so Worship's effect is not applied."
 --
 -- `you` is CR 109.5's, the APPLYING row's controller, which is a different seat
--- from `pid` for any pattern but LifeLossPattern's Yours. Nothing where the row
+-- from `pid` for any pattern but LifeLossPattern's Related You. Nothing where the row
 -- has no controller: an ability whose "you" names nobody states no condition it
 -- can meet.
 --
@@ -1033,7 +1010,7 @@ matchesPrinted viewOf gs event candidate =
 -- The COUNT of the milling player's library, `breaches`'s
 -- ExileFromTopOfYourLibrary arm and for its reason. The player asked is the one
 -- the EVENT named, which is who rule 702.52a mills; the row reaches this only
--- once ControllerRelation.Yours has made that seat the card's own owner.
+-- once ControllerRelation.Related You has made that seat the card's own owner.
 stocked :: GameState -> DrawRewrite.DrawRewrite -> PlayerId -> Bool
 stocked gs rewrite pid = case rewrite of
   DrawRewrite.Dredge n -> Natural.length (Game.zoneMembers Zone.Library pid gs) >= n
@@ -1341,8 +1318,8 @@ jointlyPayable _ [] = True
 jointlyPayable used ((n, pool) : rest) =
   any (\chosen -> jointlyPayable (used <> Set.fromList chosen) rest) (subsetsOf n (filter (`Set.notMember` used) pool))
 
-matchesPutter :: GameState -> ObjectId -> CounterSubject.CounterSubject -> CounterCause.CounterCause -> Bool
-matchesPutter gs src subject cause = case (subject, cause) of
+matchesPutter :: GameState -> ReplacementCandidate -> CounterSubject.CounterSubject -> CounterCause.CounterCause -> Bool
+matchesPutter gs candidate subject cause = case (subject, cause) of
   (CounterSubject.ByEffect, CounterCause.ByEffect _) -> True
   (CounterSubject.ByEffect, CounterCause.ByPayment _) -> False
   (CounterSubject.ByEffect, CounterCause.ByRule _) -> False
@@ -1350,78 +1327,62 @@ matchesPutter gs src subject cause = case (subject, cause) of
   -- rather than collapsed through CounterCause.putter: a player clause asks WHO,
   -- and every cause names a player, but a fourth cause must be read against rule
   -- 614.16 above before it is answered here.
-  (CounterSubject.ByPlayer rel, CounterCause.ByEffect pid) -> matchesPlayer gs src rel pid
-  (CounterSubject.ByPlayer rel, CounterCause.ByPayment pid) -> matchesPlayer gs src rel pid
-  (CounterSubject.ByPlayer rel, CounterCause.ByRule pid) -> matchesPlayer gs src rel pid
+  (CounterSubject.ByPlayer rel, CounterCause.ByEffect pid) -> matchesPlayer gs candidate rel pid
+  (CounterSubject.ByPlayer rel, CounterCause.ByPayment pid) -> matchesPlayer gs candidate rel pid
+  (CounterSubject.ByPlayer rel, CounterCause.ByRule pid) -> matchesPlayer gs candidate rel pid
   -- Written out for the same reason, and answering True for a reason of its own:
   -- the clause narrows by nothing, not by "any player".
   (CounterSubject.ByAnything, CounterCause.ByEffect _) -> True
   (CounterSubject.ByAnything, CounterCause.ByPayment _) -> True
   (CounterSubject.ByAnything, CounterCause.ByRule _) -> True
 
--- CR 614.1: the ONE judgement of a ControllerRelation. The four readers below
--- each extract the two players their rule names -- CR 109.5's "you" as their
--- segment supplies it, and the event's player, an object's controller or an
--- object's owner -- and ask nothing else, so a new constructor is one arm here
--- that `-Werror` names rather than four it does not (see #2854, where the
--- Opponents arm shipped as `/=` in one reader and CR 102.3 in the other three).
+-- CR 614.1: the ONE judgement of a ControllerRelation. The readers below each
+-- extract the player their rule names -- the event's player, an object's
+-- controller or an object's owner -- and ask nothing else, so a new constructor
+-- is one arm here that `-Werror` names rather than several it does not (see
+-- #2854, where the Opponents arm shipped as `/=` in one reader and CR 102.3 in
+-- the other three). The Related arm is Pawl.Types.PlayerRelation.holdsFor, the
+-- same judge a filter, a trigger condition and a player effect go through.
 --
--- Nothing matches nothing, on either side: an effect with no controller states
--- no relation it could satisfy and has no opponents, and an unknown player is
--- nobody's. Two absences are NOT a match. CR 108.4a's owner fallback is
--- Projection.controllerOf's already -- an object that exists always has a
--- controller there -- so `theirs` is Nothing only for an id naming no object,
--- which no proposed event carries; matchesController's old `controllerOf oid ==
--- controllerOf src` matched two absences on no board.
+-- CR 109.5's "you" is the CANDIDATE's (ReplacementCandidate.controller), for
+-- every reader alike: a permanent's row derives it from its source's controller
+-- live, while a FLOATING row baked one at installation because CR 608.2n has
+-- already moved its source to another zone as a new object (CR 400.7). Reading
+-- the source instead unscopes such a row the moment the source leaves the
+-- battlefield, and hands it to its owner on the way; see #2662.
+--
+-- Nothing matches nothing, on either side, for every relation but AnyPlayer: an
+-- effect with no controller states no relation it could satisfy and has no
+-- opponents, and an unknown player is nobody's. CR 108.4a's owner fallback is
+-- Projection.controllerOf's already, so `theirs` is Nothing only for an id
+-- naming no object, which no proposed event carries.
 --
 -- CR 303.4b's enchanted player is read off the SOURCE's attachment rather than
 -- supplied, because every reader has the source in hand and no segment bakes
 -- one: a floating row's source has left the battlefield, so it enchants nobody
 -- and the arm admits nothing.
-relationHolds :: GameState -> ObjectId -> Maybe PlayerId -> ControllerRelation -> Maybe PlayerId -> Bool
-relationHolds gs src you rel theirs =
-  let both f a b = Maybe.fromMaybe False (f <$> a <*> b)
-   in case rel of
-        ControllerRelation.Anyones -> True
-        ControllerRelation.Yours -> both (==) you theirs
-        ControllerRelation.Opponents -> both (Game.areOpponents gs) you theirs
-        ControllerRelation.EnchantedPlayers -> both (==) (Projection.enchantedPlayerOf src gs) theirs
-        -- An InSlot the install never baked names nobody: a printed row has no
-        -- resolution whose slots it could read.
-        ControllerRelation.InSlot _ -> False
-        ControllerRelation.Among players -> maybe False (`Set.member` players) theirs
+relationHolds :: GameState -> ReplacementCandidate -> ControllerRelation -> Maybe PlayerId -> Bool
+relationHolds gs candidate rel theirs = case rel of
+  ControllerRelation.Related relation -> PlayerRelation.holdsFor (Game.teams gs) relation (ReplacementCandidate.controller candidate) theirs
+  ControllerRelation.EnchantedPlayers -> Maybe.isJust theirs && Projection.enchantedPlayerOf (ReplacementCandidate.source candidate) gs == theirs
+  -- An InSlot the install never baked names nobody: a printed row has no
+  -- resolution whose slots it could read.
+  ControllerRelation.InSlot _ -> False
+  ControllerRelation.Among players -> maybe False (`Set.member` players) theirs
 
--- CR 109.5 / 614.1: does this PLAYER satisfy a pattern's relation, read against
--- the controller of the effect's SOURCE?
---
--- matchesController's sibling for the players a pattern names outright rather
--- than through an object -- the token's controller (CR 111.2), the player putting
--- counters (CR 122.6a) and the player receiving them (CR 122.1).
-matchesPlayer :: GameState -> ObjectId -> ControllerRelation -> PlayerId -> Bool
-matchesPlayer gs src rel pid = relationHolds gs src (Projection.controllerOf src gs) rel (Just pid)
+-- CR 109.5 / 614.1: does this PLAYER satisfy a pattern's relation? The players a
+-- pattern names outright rather than through an object -- the token's
+-- controller (CR 111.2), the player putting counters (CR 122.6a) and the player
+-- receiving them (CR 122.1), the drawer, the loser of life.
+matchesPlayer :: GameState -> ReplacementCandidate -> ControllerRelation -> PlayerId -> Bool
+matchesPlayer gs candidate rel pid = relationHolds gs candidate rel (Just pid)
 
--- matchesPlayer's twin for a row whose "you" is the CANDIDATE's rather than a
--- fresh projection of its source -- the shape matchesZoneOwner already takes, and
--- for the argument written out there: a permanent's row derives its controller
--- live, while a FLOATING row baked one at installation because CR 608.2n has
--- already moved its source to another zone as a new object (CR 400.7). Reading
--- the source live instead unscopes such a row the moment the source leaves the
--- battlefield, and hands it to the new controller on a control change.
---
--- The arms still on matchesPlayer -- CounterR, TokenR, LifeLossR, LifeGainR -- are
--- equivalent to this today and are left alone: every producer of theirs is a
--- permanent's static ability, whose source is on the battlefield whenever the row
--- is consulted. DrawR is the first ControllerRelation pattern whose producer
--- installs a floating row, which is where the two readings come apart (#2662).
-matchesCandidatePlayer :: GameState -> ObjectId -> Maybe PlayerId -> ControllerRelation -> PlayerId -> Bool
-matchesCandidatePlayer gs src you rel pid = relationHolds gs src you rel (Just pid)
-
--- CR 109.5 / 614.1: does `oid` satisfy this pattern's controller relation, read
--- against the controller of the effect's SOURCE? Controller-based, unlike
--- matchesZoneOwner below. CR 102.2: no producer today for Opponents -- a counter
--- or token pattern scoped to an opponent's permanents.
-matchesController :: GameState -> ObjectId -> ControllerRelation -> ObjectId -> Bool
-matchesController gs src rel oid = relationHolds gs src (Projection.controllerOf src gs) rel (Projection.controllerOf oid gs)
+-- CR 109.5 / 614.1: does `oid` satisfy this pattern's controller relation?
+-- Controller-based, unlike matchesZoneOwner below. Pawl.TeamSpec's "CR 102.4 a
+-- your-team replacement reaches a teammate's permanent and not an opponent's"
+-- proves the Related arm through this reader.
+matchesController :: GameState -> ReplacementCandidate -> ControllerRelation -> ObjectId -> Bool
+matchesController gs candidate rel oid = relationHolds gs candidate rel (Projection.controllerOf oid gs)
 
 -- CR 614.1 / 615.1: is this DAMAGE coming from a source the pattern admits?
 -- Matched through Pawl.Engine.Filter, against the PROJECTED view of the damage's
@@ -1533,11 +1494,11 @@ matchesPrintedRecipient viewOf context de pat = case (DamagePattern.whatRecipien
 -- "You" is the CONTEXT's perspective, which for a floating row is the controller
 -- baked when the row was installed (candidateContext) rather than a controller
 -- re-derived from a source the resolution has already left behind. A context with
--- no perspective has no "you" and admits no player, matchesPlayer's posture.
+-- no perspective is judged as relationHolds judges a candidate with no "you".
 matchesRecipientPlayer :: Filter.Context -> DamageEvent.DamageEvent -> PlayerRelation.PlayerRelation -> Bool
 matchesRecipientPlayer context de relation = case Recipient.playerOf (DamageEvent.target de) of
   Nothing -> False
-  Just pid -> maybe False (\you -> PlayerRelation.holds (Filter.teams context) relation you pid) (Filter.perspective context)
+  Just pid -> PlayerRelation.holdsFor (Filter.teams context) relation (Filter.perspective context) (Just pid)
 
 -- CR 615.1: does the damage's RECIPIENT have the qualities the pattern's PRINTED
 -- clause names -- Stormwild Capridor's "if noncombat damage would be dealt to
@@ -1590,8 +1551,8 @@ matchesDamageRecipient viewOf context de filter_ = case Recipient.objectOf (Dama
 -- CR 303.4b's enchanted player is Wheel of Sun and Moon's, and
 -- Pawl.ZoneChangeSpec's "Wheel of Sun and Moon reroutes only the enchanted
 -- player's cards" is the proof.
-matchesZoneOwner :: GameState -> ObjectId -> Maybe PlayerId -> ControllerRelation -> ObjectId -> Bool
-matchesZoneOwner gs src you rel oid = relationHolds gs src you rel (fmap Object.owner (Game.lookupObject oid gs))
+matchesZoneOwner :: GameState -> ReplacementCandidate -> ControllerRelation -> ObjectId -> Bool
+matchesZoneOwner gs candidate rel oid = relationHolds gs candidate rel (fmap Object.owner (Game.lookupObject oid gs))
 
 -- Which permanents a pattern admits, matched through Pawl.Engine.Filter over the
 -- PROJECTED view: creature-ness (CR 205.2b / 300.2 / 613.1d, so an Opalescence'd
@@ -2191,7 +2152,7 @@ readsApplier re = case re of
   -- two share is reading the candidate's own `controller` to apply.
   --
   -- A FENCE rather than a proved behaviour, and provably so: the only printing
-  -- with this rewrite pairs it with LifeLossPattern's Yours, so two such rows
+  -- with this rewrite pairs it with LifeLossPattern's Related You, so two such rows
   -- match one loss only if their two controllers are the same seat -- which CR
   -- 704.5j's legend rule does not leave standing. No board can put the two
   -- answers apart, and False would still be the wrong classification.
@@ -3099,7 +3060,7 @@ printedDestination gs context filter_ =
 --
 -- A DISJUNCTION over the standing effects, for CR 101.2's reason and the shape
 -- every prohibition takes: one applicable "can't" is enough and nothing outvotes
--- it. `any` rather than a count because EachPlayer puts one effect on the list
+-- it. `any` rather than a count because AnyPlayer puts one effect on the list
 -- once per seat.
 --
 -- Delegated to Pawl.Engine.PlayerEffect, which owns the CR 613.10/613.11 axis
@@ -4249,7 +4210,7 @@ installSpellMoveRow destination shuffling spellId caster gs =
                         -- replaces, so the pattern does too -- and a row that
                         -- named none would re-fire on its own output.
                         ZoneChangePattern.whenDestination = Just Zone.Graveyard,
-                        ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
+                        ZoneChangePattern.whoseObject = ControllerRelation.Related PlayerRelation.AnyPlayer,
                         -- Each says "this spell", so the row is scoped to the
                         -- object it was minted for -- castFromGraveyardExile's
                         -- Filter.IsSource, and for its reason.

@@ -70,7 +70,7 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
     Common.assertCodec
       s
       CombatRestriction.codec
-      (CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer Affected.Attached PlayerScope.You (Set.singleton AttackTargetKind.OfPlaneswalker) Nothing Nothing))
+      (CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer Affected.Attached (PlayerScope.Related PlayerRelation.You) (Set.singleton AttackTargetKind.OfPlaneswalker) Nothing Nothing))
       " {\"type\":\"CantAttackPlayer\",\"value\":{\"affected\":{\"type\":\"Attached\"},\"defenders\":{\"type\":\"You\"},\"kinds\":[{\"type\":\"OfPlaneswalker\"}]}} "
   -- CR 508.1c together with CR 506.5, the SET-SHAPED arm: the same payload as
   -- the two above, so the tag is the only thing that tells a reader this one is
@@ -107,7 +107,7 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
     Common.assertCodec
       s
       CombatRestriction.codec
-      (CombatRestriction.CantAttackMoreThan (AttackLimitUnless.MkAttackLimitUnless 3 (Just PlayerScope.You) Nothing))
+      (CombatRestriction.CantAttackMoreThan (AttackLimitUnless.MkAttackLimitUnless 3 (Just (PlayerScope.Related PlayerRelation.You)) Nothing))
       " {\"type\":\"CantAttackMoreThan\",\"value\":{\"limit\":3,\"defenders\":{\"type\":\"You\"}}} "
   -- CR 508.1c's second clause: the gated form.
   Spec.it s "CantAttack carries its condition" $

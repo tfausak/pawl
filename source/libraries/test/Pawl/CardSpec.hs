@@ -725,7 +725,7 @@ playerRefPositions :: [(String, Effect.Effect () (), [PlayerRef.PlayerRef])]
 playerRefPositions =
   let one = Quantity.Type.Literal 1
       playerQuantity stem = PlayerQuantity.MkPlayerQuantity (plantedPlayer stem) one
-      affecting effect = Effect.AffectPlayers (AffectPlayers.MkAffectPlayers Duration.UntilEndOfTurn (AffectedPlayers.Scoped PlayerScope.You) effect)
+      affecting effect = Effect.AffectPlayers (AffectPlayers.MkAffectPlayers Duration.UntilEndOfTurn (AffectedPlayers.Scoped (PlayerScope.Related PlayerRelation.You)) effect)
    in [ ("add-mana", Effect.AddMana (ManaAddition.MkManaAddition (plantedPlayer "am") ManaProduction.AnyColor (Quantity.Type.Literal 1) ManaRetention.Ordinary Nothing Nothing Nothing), [plantedPlayer "am"]),
         ("firebend", Effect.Firebend (ManaAddition.MkManaAddition (plantedPlayer "fb") ManaProduction.AnyColor (Quantity.Type.Literal 1) ManaRetention.Ordinary Nothing Nothing Nothing), [plantedPlayer "fb"]),
         ("search", Effect.Search (Search.MkSearch (plantedPlayer "se-searcher") (plantedPlayer "se-owner") Set.empty False Nothing (Filter.Type.And []) False SearchDestination.Battlefield Nothing Nothing Set.empty False), [plantedPlayer "se-searcher", plantedPlayer "se-owner"]),
@@ -6993,7 +6993,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           _ -> False
         offends effect = case effect of
           Effect.RollDie rollDie ->
-            (Maybe.isJust (RollDie.other rollDie) && (RollDie.count rollDie /= Quantity.Type.Literal 2 || RollDie.reading rollDie == DiceReading.Total || RollDie.roller rollDie /= PlayerScope.You))
+            (Maybe.isJust (RollDie.other rollDie) && (RollDie.count rollDie /= Quantity.Type.Literal 2 || RollDie.reading rollDie == DiceReading.Total || RollDie.roller rollDie /= PlayerScope.Related PlayerRelation.You))
               || (RollDie.reading rollDie == DiceReading.Both && Maybe.isNothing (RollDie.other rollDie))
           _ -> False
         offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps

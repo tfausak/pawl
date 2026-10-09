@@ -5,6 +5,7 @@ import qualified Pawl.Codec.ChoosePlayerAtRandom as ChoosePlayerAtRandom
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ChoosePlayerAtRandom as ChoosePlayerAtRandom
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.SlotName as SlotName
 
@@ -17,19 +18,19 @@ spec s = Spec.describe s "Pawl.Codec.ChoosePlayerAtRandom" $ do
       s
       ChoosePlayerAtRandom.codec
       ( ChoosePlayerAtRandom.MkChoosePlayerAtRandom
-          { ChoosePlayerAtRandom.scope = PlayerScope.Opponents,
+          { ChoosePlayerAtRandom.scope = PlayerScope.Related PlayerRelation.Opponent,
             ChoosePlayerAtRandom.slot = SlotName.MkSlotName (Text.pack "opponent")
           }
       )
-      " {\"scope\":{\"type\":\"Opponents\"},\"slot\":\"opponent\"} "
+      " {\"scope\":{\"type\":\"Opponent\"},\"slot\":\"opponent\"} "
   Spec.it s "MkChoosePlayerAtRandom, a player (Strax, Sontaran Nurse)" $
     Common.assertCodec
       s
       ChoosePlayerAtRandom.codec
       ( ChoosePlayerAtRandom.MkChoosePlayerAtRandom
-          { ChoosePlayerAtRandom.scope = PlayerScope.EachPlayer,
+          { ChoosePlayerAtRandom.scope = PlayerScope.Related PlayerRelation.AnyPlayer,
             ChoosePlayerAtRandom.slot = SlotName.MkSlotName (Text.pack "chosen")
           }
       )
-      " {\"scope\":{\"type\":\"EachPlayer\"},\"slot\":\"chosen\"} "
+      " {\"scope\":{\"type\":\"AnyPlayer\"},\"slot\":\"chosen\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ChoosePlayerAtRandom.codec

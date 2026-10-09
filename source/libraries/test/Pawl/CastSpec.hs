@@ -712,7 +712,7 @@ blazeSpec s registry = Spec.describe s "Blaze" $ do
     Spec.assertEqWith s "and it is the object CR 601.2c was asked about" asked (GameState.stack after)
     Spec.assertBool s (notElem oid asked) "which is the CR 400.7 incarnation, not the card in hand"
   -- The bound is measured at CR 601.2f's TOTAL, not on the printed cost:
-  -- Thalia's "noncreature spells cost {1} more" (EachPlayer-scoped, so her own
+  -- Thalia's "noncreature spells cost {1} more" (AnyPlayer-scoped, so her own
   -- controller pays it too) eats one of the four Mountains, and the board that
   -- admitted X=3 above admits only X=2.
   Spec.it s "CR 601.2f a cost increase lowers the ChooseX bound" $ do
@@ -2372,7 +2372,7 @@ fugitiveDoctorSpec s registry = Spec.describe s "FugitiveDoctor" $ do
 -- below would be vacuous.
 --
 -- The second clause is transcribed as well (PlayerEffect.CantBeCountered under
--- PlayerScope.EachPlayer, Spider-Punk's shape), so pawl's Lier is not weaker
+-- PlayerScope.Related AnyPlayer, Spider-Punk's shape), so pawl's Lier is not weaker
 -- than the printed card; the last case holds it to that scope.
 lierBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (GameState.GameState, ObjectId.ObjectId)
 lierBoard s registry withLier = do
@@ -2464,7 +2464,7 @@ lierSpec s registry = Spec.describe s "Lier" $ do
     Spec.assertEqWith s "and CR 702.34a exiled the card" (boltsIn Zone.Exile after) 1
     Spec.assertEqWith s "rather than returning it to the graveyard" (boltsIn Zone.Graveyard after) 0
   -- Lier's other clause, which is Spider-Punk's sentence and takes its scope:
-  -- "spells can't be countered" has no possessive, so PlayerScope.EachPlayer
+  -- "spells can't be countered" has no possessive, so PlayerScope.Related AnyPlayer
   -- rather than CR 109.5's You. Here to hold LIER's transcription to that
   -- reading -- the machinery is already proved by CR 701.6a's group below --
   -- since a You arm would leave an opponent's spells counterable and pawl's
@@ -4342,7 +4342,7 @@ legendarySpellSpec s registry = Spec.describe s "LegendarySpell" $ do
     Spec.assertBool s (not (S.castable S.alice oid board)) "not castable"
     Spec.assertBool s (not (any (S.isCastOf oid) (Action.legalActions S.alice board))) "and not offered"
   -- "unless THAT PLAYER controls": an opponent's legendary creature is no
-  -- help. Bob's Thalia still taxes alice (her ability is EachPlayer-scoped), so
+  -- help. Bob's Thalia still taxes alice (her ability is AnyPlayer-scoped), so
   -- this board is the positive one's cost exactly -- {5}{W} against six Plains
   -- -- and CR 205.4e is the only thing left to fail.
   Spec.it s "CR 205.4e an opponent's legendary creature does not satisfy it" $ do

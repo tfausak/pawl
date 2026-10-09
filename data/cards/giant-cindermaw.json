@@ -29,7 +29,7 @@
             "type": "CantGainLife"
           },
           "scope": {
-            "type": "EachPlayer"
+            "type": "AnyPlayer"
           }
         }
       ],

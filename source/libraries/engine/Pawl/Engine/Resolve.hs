@@ -77,6 +77,7 @@ import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.ProposedEvent as ProposedEvent
@@ -531,7 +532,7 @@ applyEpic oid controller = do
                 ActivePlayerEffect.choices = SourceContext.choicesOf oid g,
                 ActivePlayerEffect.timestamp = ts,
                 ActivePlayerEffect.expiry = Expiry.Type.Never,
-                ActivePlayerEffect.scope = AffectedPlayers.Scoped PlayerScope.You,
+                ActivePlayerEffect.scope = AffectedPlayers.Scoped (PlayerScope.Related PlayerRelation.You),
                 ActivePlayerEffect.effect = PlayerEffect.CantCastSpells
               }
        in g1 {GameState.playerEffects = active : GameState.playerEffects g1}

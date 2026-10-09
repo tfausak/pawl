@@ -14,6 +14,7 @@ import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 
@@ -33,7 +34,7 @@ defaultWhenDestination = Nothing
 -- "anyone's" is the unrestricted reading, so it is what a pattern that says
 -- nothing means.
 defaultWhoseObject :: ControllerRelation.ControllerRelation
-defaultWhoseObject = ControllerRelation.Anyones
+defaultWhoseObject = ControllerRelation.Related PlayerRelation.AnyPlayer
 
 -- | Every move is admitted unless the card says it watches a discard, so no
 -- cause is what a pattern that says nothing means.

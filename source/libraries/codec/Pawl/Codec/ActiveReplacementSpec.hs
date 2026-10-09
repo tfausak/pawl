@@ -18,6 +18,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PreventionRider as PreventionRider
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
@@ -39,7 +40,7 @@ effect =
         ZoneChangePattern.MkZoneChangePattern
           { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
             ZoneChangePattern.whatObject = Filter.And [],
-            ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
+            ZoneChangePattern.whoseObject = ControllerRelation.Related PlayerRelation.AnyPlayer,
             ZoneChangePattern.whenDiscarded = Nothing,
             ZoneChangePattern.duringResolution = False
           }

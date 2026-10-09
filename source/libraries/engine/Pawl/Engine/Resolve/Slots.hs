@@ -1815,9 +1815,7 @@ replacementRowSlots re =
 relationSlots :: ControllerRelation.ControllerRelation -> Map.Map SlotName SlotArity
 relationSlots rel = case rel of
   ControllerRelation.InSlot slot -> Map.singleton slot SlotArity.Many
-  ControllerRelation.Yours -> Map.empty
-  ControllerRelation.Anyones -> Map.empty
-  ControllerRelation.Opponents -> Map.empty
+  ControllerRelation.Related _ -> Map.empty
   ControllerRelation.EnchantedPlayers -> Map.empty
   ControllerRelation.Among _ -> Map.empty
 
@@ -2818,6 +2816,7 @@ playerRefPlayers legal controller gs ref =
         PlayerRef.Relative PlayerRelation.You -> [controller]
         PlayerRef.Relative PlayerRelation.Opponent -> filter (PlayerRelation.holds (Game.teams gs) PlayerRelation.Opponent controller) everyone
         PlayerRef.Relative PlayerRelation.Teammate -> filter (PlayerRelation.holds (Game.teams gs) PlayerRelation.Teammate controller) everyone
+        PlayerRef.Relative PlayerRelation.YourTeam -> filter (PlayerRelation.holds (Game.teams gs) PlayerRelation.YourTeam controller) everyone
         -- CR 102.1's whole table, off the roster rather than by consing the controller
         -- onto the Opponent set, so a departed seat stays out.
         PlayerRef.Relative PlayerRelation.AnyPlayer -> everyone

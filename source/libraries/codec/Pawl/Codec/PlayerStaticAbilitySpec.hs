@@ -20,12 +20,12 @@ spec s = Spec.describe s "Pawl.Codec.PlayerStaticAbility" $ do
       s
       PlayerStaticAbility.codec
       PlayerStaticAbility.MkPlayerStaticAbility
-        { PlayerStaticAbility.scope = PlayerScope.EachPlayer,
+        { PlayerStaticAbility.scope = PlayerScope.Related PlayerRelation.AnyPlayer,
           PlayerStaticAbility.condition = Nothing,
           PlayerStaticAbility.name = Nothing,
           PlayerStaticAbility.effect = PlayerEffect.CantCastMoreThan 1
         }
-      " {\"scope\":{\"type\":\"EachPlayer\"},\"effect\":{\"type\":\"CantCastMoreThan\",\"value\":1}} "
+      " {\"scope\":{\"type\":\"AnyPlayer\"},\"effect\":{\"type\":\"CantCastMoreThan\",\"value\":1}} "
   -- The CR 604.2 clause round-trips as its own key, and the case above proves the
   -- absent key still decodes -- so a decoder that dropped the field would keep
   -- that one green and fail here.
@@ -34,10 +34,10 @@ spec s = Spec.describe s "Pawl.Codec.PlayerStaticAbility" $ do
       s
       PlayerStaticAbility.codec
       PlayerStaticAbility.MkPlayerStaticAbility
-        { PlayerStaticAbility.scope = PlayerScope.EachPlayer,
+        { PlayerStaticAbility.scope = PlayerScope.Related PlayerRelation.AnyPlayer,
           PlayerStaticAbility.condition = Just (Condition.Compares (Compares.MkCompares (Quantity.IsActivePlayer (PlayerRef.Relative PlayerRelation.You)) Comparison.Exactly (Quantity.Literal 1))),
           PlayerStaticAbility.name = Nothing,
           PlayerStaticAbility.effect = PlayerEffect.CantCastMoreThan 1
         }
-      " {\"scope\":{\"type\":\"EachPlayer\"},\"condition\":{\"type\":\"Compares\",\"value\":{\"measured\":{\"type\":\"IsActivePlayer\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}},\"comparison\":{\"type\":\"Exactly\"},\"threshold\":{\"type\":\"Literal\",\"value\":1}}},\"effect\":{\"type\":\"CantCastMoreThan\",\"value\":1}} "
+      " {\"scope\":{\"type\":\"AnyPlayer\"},\"condition\":{\"type\":\"Compares\",\"value\":{\"measured\":{\"type\":\"IsActivePlayer\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}},\"comparison\":{\"type\":\"Exactly\"},\"threshold\":{\"type\":\"Literal\",\"value\":1}}},\"effect\":{\"type\":\"CantCastMoreThan\",\"value\":1}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s PlayerStaticAbility.codec

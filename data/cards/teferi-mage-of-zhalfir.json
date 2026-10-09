@@ -47,7 +47,7 @@
             "type": "CastOnlyAtSorcerySpeed"
           },
           "scope": {
-            "type": "Opponents"
+            "type": "Opponent"
           }
         }
       ],

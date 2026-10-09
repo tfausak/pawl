@@ -8,6 +8,7 @@ import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.LifeLossPattern as LifeLossPattern
 import qualified Pawl.Types.LifeLossR as LifeLossR
 import qualified Pawl.Types.LifeLossRewrite as LifeLossRewrite
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.LifeLossR" $ do
@@ -18,10 +19,10 @@ spec s = Spec.describe s "Pawl.Codec.LifeLossR" $ do
       LifeLossR.codec
       ( LifeLossR.MkLifeLossR
           LifeLossPattern.MkLifeLossPattern
-            { LifeLossPattern.whose = ControllerRelation.Yours,
+            { LifeLossPattern.whose = ControllerRelation.Related PlayerRelation.You,
               LifeLossPattern.whichCause = Just LifeLossCause.ByDamage
             }
           (LifeLossRewrite.LeaveAtLeast 1)
       )
-      " {\"matching\":{\"whose\":{\"type\":\"Yours\"},\"whichCause\":{\"type\":\"ByDamage\"}},\"rewrite\":{\"type\":\"LeaveAtLeast\",\"value\":1}} "
+      " {\"matching\":{\"whose\":{\"type\":\"You\"},\"whichCause\":{\"type\":\"ByDamage\"}},\"rewrite\":{\"type\":\"LeaveAtLeast\",\"value\":1}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s LifeLossR.codec

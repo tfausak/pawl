@@ -8,6 +8,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
@@ -25,7 +26,7 @@ spec s = Spec.describe s "Pawl.Codec.ChosenCardInGraveyard" $ do
       ChosenCardInGraveyard.codec
       ( ChosenCardInGraveyard.MkChosenCardInGraveyard
           { ChosenCardInGraveyard.chooser = Chooser.TheController,
-            ChosenCardInGraveyard.players = ZoneScope.Scoped PlayerScope.You,
+            ChosenCardInGraveyard.players = ZoneScope.Scoped (PlayerScope.Related PlayerRelation.You),
             ChosenCardInGraveyard.filter = Filter.HasCardType CardType.Creature,
             ChosenCardInGraveyard.count = Quantity.Literal 1
           }
@@ -55,10 +56,10 @@ spec s = Spec.describe s "Pawl.Codec.ChosenCardInGraveyard" $ do
       ChosenCardInGraveyard.codec
       ( ChosenCardInGraveyard.MkChosenCardInGraveyard
           { ChosenCardInGraveyard.chooser = Chooser.EachInScope,
-            ChosenCardInGraveyard.players = ZoneScope.Scoped PlayerScope.EachPlayer,
+            ChosenCardInGraveyard.players = ZoneScope.Scoped (PlayerScope.Related PlayerRelation.AnyPlayer),
             ChosenCardInGraveyard.filter = Filter.HasCardType CardType.Land,
             ChosenCardInGraveyard.count = Quantity.Literal 2
           }
       )
-      " {\"chooser\":{\"type\":\"EachInScope\"},\"players\":{\"type\":\"Scoped\",\"value\":{\"type\":\"EachPlayer\"}},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}},\"count\":{\"type\":\"Literal\",\"value\":2}} "
+      " {\"chooser\":{\"type\":\"EachInScope\"},\"players\":{\"type\":\"Scoped\",\"value\":{\"type\":\"AnyPlayer\"}},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}},\"count\":{\"type\":\"Literal\",\"value\":2}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ChosenCardInGraveyard.codec

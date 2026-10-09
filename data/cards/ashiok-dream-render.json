@@ -48,7 +48,7 @@
                               "graveyards": {
                                 "type": "Scoped",
                                 "value": {
-                                  "type": "Opponents"
+                                  "type": "Opponent"
                                 }
                               }
                             }
@@ -133,7 +133,7 @@
             }
           },
           "scope": {
-            "type": "Opponents"
+            "type": "Opponent"
           }
         }
       ],

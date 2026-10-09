@@ -8,7 +8,7 @@ import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.CantSearchLibraries as CantSearchLibraries
 
 -- | A bare object keyed by the record's field names. Neither field defaults: an
--- unqualified prohibition writes EachPlayer twice, so the card states which
+-- unqualified prohibition writes AnyPlayer twice, so the card states which
 -- libraries and which causes it reaches rather than inheriting them.
 codec :: Codec.Codec CantSearchLibraries.CantSearchLibraries
 codec = Fields.object $ do

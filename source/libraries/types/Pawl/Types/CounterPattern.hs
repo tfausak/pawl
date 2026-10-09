@@ -38,7 +38,7 @@ data CounterPattern = MkCounterPattern
     onWhat :: Filter.Filter Keyword.Keyword,
     -- | CR 122.1: which PLAYERS receive them, or Nothing for a pattern that
     -- reaches permanents only (Doubling Season -- "a permanent you control"
-    -- cannot be a player). Vorinclex's "or player" is Just Anyones.
+    -- cannot be a player). Vorinclex's "or player" is Just Related AnyPlayer.
     --
     -- A relation rather than a Filter, because no printing narrows the receiving
     -- player by anything but CR 109.5's "you" and "an opponent"; and it does not

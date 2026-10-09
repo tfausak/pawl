@@ -8,6 +8,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.SlotName as SlotName
 
@@ -17,8 +18,8 @@ spec s = Spec.describe s "Pawl.Codec.AffectedPlayers" $ do
     Common.assertCodec
       s
       (AffectedPlayers.codec SlotName.codec)
-      (AffectedPlayers.Scoped PlayerScope.Opponents)
-      " {\"type\":\"Scoped\",\"value\":{\"type\":\"Opponents\"}} "
+      (AffectedPlayers.Scoped (PlayerScope.Related PlayerRelation.Opponent))
+      " {\"type\":\"Scoped\",\"value\":{\"type\":\"Opponent\"}} "
   Spec.it s "Named" $
     Common.assertCodec
       s
