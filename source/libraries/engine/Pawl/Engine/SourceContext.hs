@@ -6,7 +6,7 @@
 --
 -- Not the source's power, toughness, mana value, colours or names: those are
 -- projected characteristics, and this module sits below Pawl.Engine.Projection,
--- whose layer fold builds its own contexts here (CR 613.8). Each stays with the
+-- whose layer fold (CR 613) builds its own contexts here. Each stays with the
 -- caller that reads it (see Filter.Context.sourcePower).
 module Pawl.Engine.SourceContext where
 

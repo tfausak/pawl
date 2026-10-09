@@ -379,7 +379,7 @@ sourceFramed framing = case framing of
   -- be attached to anything.
   StoredPlayerEffectFramed -> False
   -- Pawl.Engine.Mana.admitsUnder frames its context by no source: the mana's
-  -- source may be gone by the time it is spent (CR 106.6a).
+  -- source may be gone by the time it is spent (CR 106.6).
   ManaRestrictionFramed -> False
   -- Conservative, KeywordFramed's posture: refusing the atom only narrows what
   -- a card may write. A keyword's own Filter is matched against an aiming
