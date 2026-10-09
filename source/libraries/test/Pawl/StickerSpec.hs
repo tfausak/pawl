@@ -7,20 +7,33 @@
 -- TriggerCondition.PlacesSticker.
 module Pawl.StickerSpec where
 
+import qualified Data.Foldable as Foldable
+import qualified Data.List as List
+import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
+import qualified Data.Text as Text
+import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Extra.Natural as Natural
+import qualified Pawl.Oracle as Oracle
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Slug as Slug
 import qualified Pawl.Spec as Spec
+import qualified Pawl.StickerSheets as StickerSheets
 import qualified Pawl.Support as S
+import qualified Pawl.Types.AbilitySticker as AbilitySticker
 import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.PowerToughnessSticker as PowerToughnessSticker
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.StickerSheet as StickerSheet
 
 -- Alice active with priority in her precombat main phase.
 mainPhaseForAlice :: GameState.GameState -> GameState.GameState
@@ -31,6 +44,21 @@ secondMode :: Prompt.Prompt r -> r
 secondMode p = case p of
   Prompt.ChooseModes {} -> Seq.singleton (ModeIndex.MkModeIndex 1)
   _ -> S.identityAnswer p
+
+-- The four committed sheets, in this order; fewer if one is missing, which
+-- each case's first assertion catches.
+committedSheets :: IO [StickerSheet.StickerSheet]
+committedSheets = do
+  root <- StickerSheets.defaultRoot
+  loaded <- StickerSheets.loadRoot root
+  let byName = Map.fromList [(StickerSheet.name sheet, sheet) | (_, Right sheet) <- loaded]
+  pure (Maybe.mapMaybe (\n -> Map.lookup (Text.pack n) byName) ["Night Brushwagg Ringmaster", "Slimy Burrito Illusion", "Contortionist Otter Storm", "Ancestral Hot Dog Minotaur"])
+
+-- One Oracle line, "{TK}{TK} — rest", as its ticket count and its rest.
+ticketLine :: Text.Text -> (Natural, Text.Text)
+ticketLine line =
+  let (cost, rest) = Text.breakOn (Text.pack " \8212 ") line
+   in (Natural.length (drop 1 (Text.splitOn (Text.pack "{TK}") cost)), Text.drop 3 rest)
 
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Sticker" $ do
@@ -59,3 +87,35 @@ spec s registry = Spec.describe s "Sticker" $ do
           [_, doubling] -> S.runPure secondMode board (Activate.activateAbility S.alice ampId doubling >> Stack.resolveTop)
           _ -> board
     Spec.assertEqWith s "CR 701.10e alice has six ticket counters" (S.playerCounterOf PlayerCounterKind.Ticket S.alice after) 6
+  -- CR 123.2: a sheet is three name, three art, two ability and two P/T
+  -- stickers, and each structured field says what MTGJSON's text says.
+  Spec.it s "CR 123.2 every sticker sheet says what its Oracle text says" $ do
+    root <- StickerSheets.defaultRoot
+    loaded <- StickerSheets.loadRoot root
+    Spec.assertBool s (length loaded >= 4) "at least four sheets are committed"
+    let offends (path, result) = case result of
+          Left reason -> Just (path <> ": " <> Text.unpack reason)
+          Right sheet ->
+            let lines_ = foldMap Text.lines (StickerSheet.oracleText sheet)
+                abilityLines = fmap ticketLine (take 2 lines_)
+                ptLines = fmap ticketLine (drop 2 lines_)
+                abilityStickers = Foldable.toList (StickerSheet.abilities sheet)
+                ptStickers = Foldable.toList (StickerSheet.powerToughness sheet)
+                ptText p = Text.pack (show (PowerToughnessSticker.power p) <> "/" <> show (PowerToughnessSticker.toughness p))
+                keywordsAgree a (_, rest) =
+                  let printed = [Oracle.printed k | k <- Map.keys (AbilitySticker.keywords a)]
+                   in not (null (AbilitySticker.abilities a)) || any Maybe.isNothing printed || List.sort (Oracle.normalise rest) == List.sort (fmap Text.toLower (Maybe.catMaybes printed))
+                checks =
+                  [ ("file named for the sheet", Slug.unwrap (Slug.fromText (StickerSheet.name sheet)) <> Text.pack ".json" == Text.pack (reverse (takeWhile (/= '/') (reverse path)))),
+                    ("names join to the name", Text.unwords (Foldable.toList (StickerSheet.names sheet)) == StickerSheet.name sheet),
+                    ("three name, three art, two ability, two P/T stickers", (length (StickerSheet.names sheet), StickerSheet.art sheet, length abilityStickers, length ptStickers) == (3, 3, 2, 2)),
+                    ("four Oracle lines", length lines_ == 4),
+                    ("ability ticket costs", fmap AbilitySticker.tickets abilityStickers == fmap fst abilityLines),
+                    ("P/T ticket costs", fmap PowerToughnessSticker.tickets ptStickers == fmap fst ptLines),
+                    ("P/T values", fmap ptText ptStickers == fmap snd ptLines),
+                    ("keyword stickers", and (zipWith keywordsAgree abilityStickers abilityLines))
+                  ]
+             in case [what | (what, False) <- checks] of
+                  [] -> Nothing
+                  failed -> Just (path <> ": " <> show failed)
+    Spec.assertEqWith s "every sheet agrees with its text" (Maybe.mapMaybe offends loaded) []

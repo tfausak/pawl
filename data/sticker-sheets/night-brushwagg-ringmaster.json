@@ -1,0 +1,41 @@
+{
+  "abilities": [
+    {
+      "keywords": [
+        {
+          "type": "Menace"
+        }
+      ],
+      "tickets": 2
+    },
+    {
+      "keywords": [
+        {
+          "type": "Persist"
+        }
+      ],
+      "tickets": 3
+    }
+  ],
+  "art": 3,
+  "name": "Night Brushwagg Ringmaster",
+  "names": [
+    "Night",
+    "Brushwagg",
+    "Ringmaster"
+  ],
+  "number": 3,
+  "oracleText": "{TK}{TK} — Menace\n{TK}{TK}{TK} — Persist (When this permanent dies, if it had no -1/-1 counters on it, return it to the battlefield under its owner's control with a -1/-1 counter on it.)\n{TK}{TK} — 2/3\n{TK}{TK}{TK}{TK}{TK}{TK} — 10/10",
+  "powerToughness": [
+    {
+      "power": 2,
+      "tickets": 2,
+      "toughness": 3
+    },
+    {
+      "power": 10,
+      "tickets": 6,
+      "toughness": 10
+    }
+  ]
+}

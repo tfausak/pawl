@@ -15,6 +15,7 @@ data-dir: data
 data-files:
   cards/*.json
   scenarios/**/*.json
+  sticker-sheets/*.json
 
 extra-doc-files:
   CHANGELOG.md
@@ -1734,6 +1735,7 @@ library registry
     Pawl.Ingest
     Pawl.Oracle
     Pawl.Registry
+    Pawl.StickerSheets
 
 -- Scenarios: a board, a timeline of decisions and checks, and the runner that
 -- plays one against the engine. The boundary through which anything other than
