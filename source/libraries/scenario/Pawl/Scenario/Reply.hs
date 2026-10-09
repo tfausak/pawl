@@ -338,6 +338,7 @@ shapeOf prompt = case prompt of
   Prompt.ChooseCardsFromAmong {} -> setOf object
   Prompt.ChooseDungeon {} -> viaCodec Codec.PrintingId.codec
   Prompt.ChooseSticker {} -> viaCodec Codec.StickerRef.codec
+  Prompt.ChooseNamePosition {} -> natural
   Prompt.ChooseCompanion {} -> maybeOf (viaCodec Codec.OutsideCard.codec)
   Prompt.ChooseFromOutsideTheGame {} -> unsupported (Text.pack "outside cards")
   Prompt.ChooseRoom {} -> wrapped RoomIndex.MkRoomIndex RoomIndex.unwrap

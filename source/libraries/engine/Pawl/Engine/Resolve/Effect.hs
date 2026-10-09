@@ -62,6 +62,7 @@ import qualified Pawl.Engine.ManifestDread as ManifestDread
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Monarch as Monarch
 import qualified Pawl.Engine.MoveDuration as MoveDuration
+import qualified Pawl.Engine.NameWords as NameWords
 import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.Planechase as Planechase
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
@@ -376,6 +377,8 @@ import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.SpellWasCopied as SpellWasCopied
 import qualified Pawl.Types.SpendTrigger as SpendTrigger
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
+import qualified Pawl.Types.StickerKind as StickerKind
+import qualified Pawl.Types.StickerRef as StickerRef
 import qualified Pawl.Types.StoredResult as StoredResult
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
@@ -5751,6 +5754,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- the placer does not own takes nothing; a regression fence, since the one
   -- producer's own filter already says "you own". Placing nothing writes
   -- nothing, so happenedBetween reads it as not having happened.
+  -- CR 123.6b: the object's controller places a name sticker's word
+  -- (namePosition).
   Effect.PutSticker (PutSticker.MkPutSticker player ref kinds) -> do
     named <- case ref of
       ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent filter_ chooser) -> chosenPermanentOf legal resolving controller source filter_ chooser
@@ -5759,13 +5764,21 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     Monad.forM_ placers $ \placer -> Monad.forM_ (ListUtils.nubOrd named) $ \oid -> do
       gs <- State.get
       let owned = fmap Object.owner (Game.lookupObject oid gs) == Just placer
+          place picked = do
+            -- CR 123.6b: a name sticker's position is chosen as it is placed.
+            position <- case StickerRef.kind picked of
+              StickerKind.Name -> fmap Just (namePosition oid)
+              StickerKind.Ability -> pure Nothing
+              StickerKind.PowerToughness -> pure Nothing
+              StickerKind.Art -> pure Nothing
+            State.modify' (Sticker.put placer oid picked position)
       Monad.when owned $ case Sticker.available placer kinds gs of
         [] -> pure ()
-        [only] -> State.modify' (Sticker.put placer oid only Nothing)
+        [only] -> place only
         first : rest -> do
           let offered = first NonEmpty.:| rest
           answer <- Game.choose (Prompt.ChooseSticker (Decide.deciderFor placer gs) placer oid offered)
-          State.modify' (Sticker.put placer oid (if List.elem answer offered then answer else first) Nothing)
+          place (if List.elem answer offered then answer else first)
   -- CR 701.24a alone: randomize the named libraries so no player knows their
   -- order. Nothing moves, so there is no changeZone call and no CR 616.1
   -- opportunity -- the cards a "then shuffle" follows are still the objects they
@@ -11287,6 +11300,23 @@ activateWhileRolling runSubgame pid oid ability = do
       Foldable.for_ (Modal.forcedSelection every (Modal.Type.selection modal)) $ \selection ->
         Monad.mapM_ (applyEffectWith runSubgame oid oid pid bound bound) (Modal.modesEffects selection modal)
       pure True
+
+-- CR 123.6b: the object's CONTROLLER, or its owner for a card with none (CR
+-- 108.4a), chooses where the word goes: the start, or after any number of the
+-- words now in its name, the longest name's where it has several (#N2). An
+-- object whose names hold no word has one position and is not asked.
+namePosition :: ObjectId -> Game Natural
+namePosition oid = do
+  gs <- State.get
+  let most = List.foldl' max 0 (fmap NameWords.wordCount (Set.toList (Projection.namesOf oid gs)))
+      chooser = case Projection.controllerOf oid gs of
+        Just pid -> Just pid
+        Nothing -> fmap Object.owner (Game.lookupObject oid gs)
+  case chooser of
+    Just pid | most > 0 -> do
+      answer <- Game.choose (Prompt.ChooseNamePosition (Decide.deciderFor pid gs) pid oid (0 NonEmpty.:| [1 .. most]))
+      pure (if answer <= most then answer else 0)
+    _ -> pure 0
 
 -- CR 603.7c: bind `target` into `slot` of `holder`'s binding environment, so a
 -- delayed ability armed later in the SAME resolution can name the object.

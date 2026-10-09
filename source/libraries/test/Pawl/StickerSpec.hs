@@ -39,6 +39,7 @@ import qualified Pawl.Types.AbilitySticker as AbilitySticker
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Deck as Deck
+import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameSettings as GameSettings
@@ -190,6 +191,52 @@ pyrodancerEnters pyrodancer onto gs0 =
   let (pyro, entered) = S.entersWithTrigger pyrodancer S.alice gs0
       ((_, after), offers) = State.runState (Engine.runGame (placing onto) entered drain) (MkOffers [] [] 0)
    in (pyro, after, offers)
+
+-- What name placements asked, oldest first: each position prompt's chooser and
+-- positions, and each ChooseCardFromAmong's size.
+data Asked
+  = Positioned PlayerId.PlayerId [Natural]
+  | LookedAt Int
+  deriving (Eq, Show)
+
+-- How a placement is answered: the permanent, the sticker, the position, and
+-- which recipients a target slot takes first.
+data Naming = MkNaming
+  { namingOnto :: Maybe ObjectId.ObjectId,
+    namingSticker :: StickerRef.StickerRef,
+    namingPosition :: Natural,
+    namingPrefers :: Recipient.Recipient -> Bool
+  }
+
+placingAt :: Maybe ObjectId.ObjectId -> StickerRef.StickerRef -> Natural -> Naming
+placingAt onto ref k = MkNaming {namingOnto = onto, namingSticker = ref, namingPosition = k, namingPrefers = const False}
+
+naming :: Naming -> Prompt.Prompt r -> State.State [Asked] r
+naming how p = case p of
+  Prompt.ChooseOptional {} -> pure OptionalDecision.Exercises
+  Prompt.ChoosePermanent _ _ _ offered ->
+    pure
+      ( case namingOnto how of
+          Just oid | List.elem oid offered -> oid
+          _ -> NonEmpty.head offered
+      )
+  Prompt.ChooseSticker _ _ _ offered -> pure (if List.elem (namingSticker how) offered then namingSticker how else NonEmpty.head offered)
+  Prompt.ChooseNamePosition _ chooser _ offered -> do
+    State.modify' (Positioned chooser (NonEmpty.toList offered) :)
+    pure (namingPosition how)
+  Prompt.ChooseCardFromAmong _ _ _ candidates -> do
+    State.modify' (LookedAt (length candidates) :)
+    pure (NonEmpty.head candidates)
+  Prompt.ChooseTargets _ _ _ offers -> pure (S.preferring (namingPrefers how) offers)
+  _ -> pure (S.identityAnswer p)
+
+-- `card` enters under alice with its enters event; all it triggers resolves
+-- under `how`.
+entersNaming :: Printing.Printing -> Naming -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState, [Asked])
+entersNaming card how gs0 =
+  let (oid, entered) = S.entersWithTrigger card S.alice gs0
+      ((_, after), asked) = State.runState (Engine.runGame (naming how) entered drain) []
+   in (oid, after, reverse asked)
 
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Sticker" $ do
@@ -514,3 +561,61 @@ spec s registry = Spec.describe s "Sticker" $ do
         copied = S.runPure (namingTarget seekerId) g3 (S.cast S.alice weaveId >> Stack.resolveTop)
     Spec.assertEqWith s "CR 123.6c as a copy of Seeker of the Way it is Seeker of the Otter Way" (nameTexts betraysId copied) [Text.pack "Seeker of the Otter Way"]
     Spec.assertEqWith s "before, It That Betrays Otter" (nameTexts betraysId stickered) [Text.pack "It That Betrays Otter"]
+  -- Review Focus 3. alice owns the Bears and bob controls them.
+  Spec.it s "CR 123.6b the controller, not the placer, chooses where the word goes" $ do
+    sheets <- committedSheets
+    baaallerina <- S.printingOf s registry "Baaallerina"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    let (bearsId, g1) = S.addPermanent bears S.alice (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))
+        (_, after, asked) = entersNaming baaallerina (placingAt (Just bearsId) otter 1) (S.giveControl bearsId S.bob g1)
+    Spec.assertEqWith s "CR 123.6b bob, who controls the Bears, chooses among three positions" asked [Positioned S.bob [0, 1, 2]]
+    Spec.assertEqWith s "and they are Grizzly Otter Bears" (nameTexts bearsId after) [Text.pack "Grizzly Otter Bears"]
+  -- Review Focus 3's other half. CR 708.2's face-down state written straight
+  -- on, FaceDownSpec's posture; bob turns it up with Break Open.
+  Spec.it s "CR 708.2/123.6b a face-down permanent is named Night, and face up Night Ainok Tracker" $ do
+    sheets <- committedSheets
+    baaallerina <- S.printingOf s registry "Baaallerina"
+    tracker <- S.printingOf s registry "Ainok Tracker"
+    breakOpen <- S.printingOf s registry "Break Open"
+    mountain <- S.printingOf s registry "Mountain"
+    let (trackerId, g1) = S.addPermanent tracker S.alice (S.landsFor mountain S.bob 2 (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)))
+        hidden = g1 {GameState.objects = Map.adjust (\o -> o {Object.facing = Facing.faceDown FaceDownReason.TurnedFaceDown}) trackerId (GameState.objects g1)}
+        (_, named, asked) = entersNaming baaallerina (placingAt (Just trackerId) night 0) hidden
+        (breakId, g2) = S.addHandCard breakOpen S.bob named
+        revealed = S.runPure (namingTarget trackerId) (g2 {GameState.priority = Just S.bob}) (S.cast S.bob breakId >> Stack.resolveTop)
+    Spec.assertEqWith s "CR 123.6b the face-down Tracker is named Night" (nameTexts trackerId named) [Text.pack "Night"]
+    Spec.assertEqWith s "CR 123.6c face up it is Night Ainok Tracker" (nameTexts trackerId revealed) [Text.pack "Night Ainok Tracker"]
+    Spec.assertEqWith s "CR 123.6b a nameless object has one position, so nobody was asked" asked []
+  Spec.it s "CR 123.6 Baaallerina's ability targets only a creature with a name sticker" $ do
+    sheets <- committedSheets
+    baaallerina <- S.printingOf s registry "Baaallerina"
+    piker <- S.printingOf s registry "Goblin Piker"
+    island <- S.printingOf s registry "Island"
+    let (marked, g1) = S.addPermanent piker S.alice (S.landsFor island S.alice 3 (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)))
+        (plainPiker, g2) = S.addPermanent piker S.alice g1
+        (baaId, g3, _) = entersNaming baaallerina (placingAt (Just marked) night 0) g2
+        board = mainPhaseForAlice g3
+        recording :: Prompt.Prompt r -> State.State [ObjectId.ObjectId] r
+        recording p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> do
+            State.put (concatMap (Maybe.mapMaybe Recipient.objectOf . Set.toList . snd) (Map.elems sets))
+            pure (namingTarget marked p)
+          _ -> pure (S.identityAnswer p)
+        ((_, after), offered) = case Activatable.abilitiesFor baaId board of
+          [ability] -> State.runState (Engine.runGame recording board (Activate.activateAbility S.alice baaId ability >> Stack.resolveTop)) []
+          _ -> (((), board), [])
+    Spec.assertEqWith s "CR 115.1 only the Piker with a name sticker is offered" offered [marked]
+    Spec.assertEqWith s "it gains flying, the other Piker does not" (Projection.hasKeyword Keyword.Flying marked after, Projection.hasKeyword Keyword.Flying plainPiker after) (True, False)
+  Spec.it s "CR 123.6 whole card: Sword-Swallowing Seraph names a Piker and puts a +1/+1 counter on it" $ do
+    sheets <- committedSheets
+    seraph <- S.printingOf s registry "Sword-Swallowing Seraph"
+    piker <- S.printingOf s registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    let (pikerId, g1) = S.addPermanent piker S.alice (S.landsFor plains S.alice 2 (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)))
+        (seraphId, g2, _) = entersNaming seraph (placingAt (Just pikerId) night 0) g1
+        board = mainPhaseForAlice g2
+        after = case Activatable.abilitiesFor seraphId board of
+          [ability] -> S.runPure (namingTarget pikerId) board (Activate.activateAbility S.alice seraphId ability >> Stack.resolveTop)
+          _ -> board
+    Spec.assertEqWith s "CR 123.6 the Piker with a name sticker has a +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne pikerId after) 1
+    Spec.assertEqWith s "it is Night Goblin Piker" (nameTexts pikerId g2) [Text.pack "Night Goblin Piker"]
