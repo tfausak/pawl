@@ -525,6 +525,8 @@ filterNames asking criterion = case criterion of
   Filter.HasDesignation _designation -> False
   Filter.HasCounters _kind -> False
   Filter.HasCountersOfAnyKind -> False
+  Filter.HasSticker _kind -> False
+  Filter.Stickered -> False
   Filter.HasNonManaActivatedAbility -> False
   Filter.HasActivatedAbility -> False
   Filter.IsInZone _zone -> False

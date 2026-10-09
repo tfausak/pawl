@@ -5,6 +5,7 @@ import qualified Data.Functor.Identity as Identity
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Binding as Binding
@@ -50,6 +51,7 @@ import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Splice as Splice
+import qualified Pawl.Types.StickerKind as StickerKind
 import qualified Pawl.Types.StoredResult as StoredResult
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -594,6 +596,9 @@ data View = MkView
     -- CARD shape is the exception and reads the object that ARRIVED, whose
     -- counters CR 122.2 has already emptied.
     counters :: Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural.Natural,
+    -- | CR 123.1 / 123.4: the kinds of the stickers on the candidate, one per
+    -- sticker. Off the object: CR 123.1 keeps stickers out of the copiable values.
+    stickerKinds :: Seq.Seq StickerKind.StickerKind,
     -- CR 701.54a-b: which player this candidate is the Ring-bearer FOR, or Nothing
     -- for the overwhelming majority of permanents, which carry no such
     -- designation. Read straight off Object.ringBearerFor -- CR 701.54b makes it a
@@ -934,6 +939,8 @@ playerView pid =
       -- Player.counters, read by Quantity.PlayerCounters. This field is the
       -- OBJECT half, so a player view has none of it.
       counters = Map.empty,
+      -- CR 123.1: a sticker is on an object, and CR 109.1 makes a player none.
+      stickerKinds = Seq.empty,
       -- CR 701.54b: Ring-bearer is a designation A PERMANENT can have, and a
       -- player is not one -- the same shape CR 725.1's monarch has with the two
       -- sides swapped.
@@ -2316,6 +2323,10 @@ matches context view predicate = case predicate of
   -- leaving it at zero -- so that half is a regression fence rather than a
   -- behaviour a board can show. Pawl.FilterSpec's own case says so at the site.
   Filter.HasCountersOfAnyKind -> any (> 0) (Map.elems (counters view))
+  -- CR 123.6-123.9: read off the object, never a projection (CR 123.1).
+  Filter.HasSticker kind -> elem kind (stickerKinds view)
+  -- CR 123.4.
+  Filter.Stickered -> not (null (stickerKinds view))
   Filter.And fs -> all (matches context view) fs
   Filter.Or fs -> any (matches context view) fs
   Filter.Not f -> not (matches context view f)
@@ -2521,6 +2532,8 @@ rewrite pairs predicate = case predicate of
   -- kind-agnostic atom names none -- there is no CounterKind here to carry a
   -- subtype word through the swap.
   Filter.HasCountersOfAnyKind -> predicate
+  Filter.HasSticker _ -> predicate
+  Filter.Stickered -> predicate
 
 -- CR 612.1's word swap inside a COUNTER KIND. Rewritten THROUGH the kind: CR
 -- 122.1b's keyword counter carries a keyword, and rule 612.1 reaches a word
@@ -3272,6 +3285,8 @@ bakeBound players predicate = case predicate of
   Filter.HasDesignation _ -> predicate
   Filter.HasCounters _ -> predicate
   Filter.HasCountersOfAnyKind -> predicate
+  Filter.HasSticker _ -> predicate
+  Filter.Stickered -> predicate
   Filter.HasNonManaActivatedAbility -> predicate
   Filter.HasActivatedAbility -> predicate
   Filter.IsInZone _ -> predicate
@@ -3451,6 +3466,8 @@ manaValueThresholds predicate = case predicate of
   Filter.HasDesignation _ -> []
   Filter.HasCounters _ -> []
   Filter.HasCountersOfAnyKind -> []
+  Filter.HasSticker _ -> []
+  Filter.Stickered -> []
   Filter.HasNonManaActivatedAbility -> []
   Filter.HasActivatedAbility -> []
   Filter.IsInZone _ -> []
@@ -3643,6 +3660,8 @@ statesAQuality predicate = case predicate of
   Filter.HasDesignation _ -> True
   Filter.HasCounters _ -> True
   Filter.HasCountersOfAnyKind -> True
+  Filter.HasSticker _ -> True
+  Filter.Stickered -> True
   Filter.HasNonManaActivatedAbility -> True
   Filter.HasActivatedAbility -> True
   -- CR 400.1 states a quality like any other atom here: a search whose predicate
@@ -3780,6 +3799,8 @@ readsSourcePower predicate = case predicate of
   Filter.HasDesignation _ -> False
   Filter.HasCounters _ -> False
   Filter.HasCountersOfAnyKind -> False
+  Filter.HasSticker _ -> False
+  Filter.Stickered -> False
   Filter.HasNonManaActivatedAbility -> False
   Filter.HasActivatedAbility -> False
   Filter.IsInZone _ -> False

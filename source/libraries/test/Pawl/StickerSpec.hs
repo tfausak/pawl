@@ -21,6 +21,7 @@ import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Sticker as Sticker
@@ -35,6 +36,7 @@ import qualified Pawl.Types.AbilitySticker as AbilitySticker
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.Object as Object
@@ -119,6 +121,12 @@ namingTarget oid p = case p of
 
 stickersIn :: Zone.Zone -> GameState.GameState -> [(Seq.Seq StickerPlacement.StickerPlacement, Timestamp.Timestamp)]
 stickersIn zone gs = [(Object.stickers obj, Object.timestamp obj) | oid <- Game.zoneMembers zone S.alice gs, Just obj <- [Game.lookupObject oid gs]]
+
+-- Answers ChooseCopyTarget with `oid`.
+copying :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+copying oid p = case p of
+  Prompt.ChooseCopyTarget {} -> Just oid
+  _ -> S.identityAnswer p
 
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Sticker" $ do
@@ -233,3 +241,37 @@ spec s registry = Spec.describe s "Sticker" $ do
     Spec.assertEqWith s "the Piker was stickered before the restart" (stickeredObjects stickered) [pikerId]
     Spec.assertEqWith s "CR 727.2 no object is stickered after it" (stickeredObjects restarted) []
     Spec.assertEqWith s "CR 103.2d the restart drew three sheets again" (reverse asked) [[0, 1, 2, 3], [0, 1, 2], [0, 1]]
+  -- Three readings of one board: no sticker, a sticker, and the stickered
+  -- Piker bounced (CR 123.4: not sticky).
+  Spec.it s "CR 123.4 Croakid Amphibonaut flies beside a stickered permanent and stops when the sticker leaves" $ do
+    sheets <- committedSheets
+    croakid <- S.printingOf s registry "Croakid Amphibonaut"
+    piker <- S.printingOf s registry "Goblin Piker"
+    unsummon <- S.printingOf s registry "Unsummon"
+    island <- S.printingOf s registry "Island"
+    let base = withSheets (take 1 sheets) (S.landsFor island S.bob 1 (Setup.gameWith GameSettings.plain S.bothPlayers))
+        (croakidId, g1) = S.addPermanent croakid S.alice base
+        (pikerId, unstickered) = S.addPermanent piker S.alice g1
+        stickered = stickerOn pikerId unstickered
+        (unsummonId, g2) = S.addHandCard unsummon S.bob stickered
+        bounced = S.runPure (namingTarget pikerId) (g2 {GameState.priority = Just S.bob}) (S.cast S.bob unsummonId >> Stack.resolveTop)
+        flies = Projection.hasKeyword Keyword.Flying croakidId
+    Spec.assertEqWith s "CR 123.4 flying with no sticker, with one, and after the bounce" (flies unstickered, flies stickered, flies bounced) (False, True, False)
+  -- Review Focus 5. The Clone copies the stickered Piker; then the Piker
+  -- leaves. A Clone that copied the sticker would keep Croakid flying.
+  Spec.it s "CR 123.1 a Clone of a stickered permanent is not stickered" $ do
+    sheets <- committedSheets
+    croakid <- S.printingOf s registry "Croakid Amphibonaut"
+    piker <- S.printingOf s registry "Goblin Piker"
+    clone <- S.printingOf s registry "Clone"
+    unsummon <- S.printingOf s registry "Unsummon"
+    island <- S.printingOf s registry "Island"
+    let base = withSheets (take 1 sheets) (S.landsFor island S.bob 1 (Setup.gameWith GameSettings.plain S.bothPlayers))
+        (croakidId, g1) = S.addPermanent croakid S.alice base
+        (pikerId, g2) = S.addPermanent piker S.alice g1
+        (_, staged) = S.spellOnStack clone S.alice (stickerOn pikerId g2)
+        cloned = S.settleSba (S.runPure (copying pikerId) staged Stack.resolveTop)
+        (unsummonId, g3) = S.addHandCard unsummon S.bob cloned
+        bounced = S.runPure (namingTarget pikerId) (g3 {GameState.priority = Just S.bob}) (S.cast S.bob unsummonId >> Stack.resolveTop)
+    Spec.assertEqWith s "CR 123.1 with the stickered Piker gone, its Clone does not keep Croakid flying" (Projection.hasKeyword Keyword.Flying croakidId bounced) False
+    Spec.assertEqWith s "the Clone is on the battlefield beside Croakid" (length (filter (\oid -> Set.notMember oid (GameState.battlefield base)) (Game.zoneMembers Zone.Battlefield S.alice bounced))) 2

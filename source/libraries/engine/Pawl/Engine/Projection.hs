@@ -3714,6 +3714,9 @@ filterReads f = case f of
   -- CR 122.1 again, and reading nothing for the atom above's reason: CR 109.3's
   -- list of characteristics has no counters in it, whichever kind is asked about.
   Filter.Type.HasCountersOfAnyKind -> Set.empty
+  -- CR 109.3's characteristics hold no stickers.
+  Filter.Type.HasSticker _ -> Set.empty
+  Filter.Type.Stickered -> Set.empty
   -- CR 202.3 reads the printed mana cost, which no Modification writes.
   Filter.Type.ManaValueAtMost _ -> Set.empty
   Filter.Type.ManaValueLessThanSource -> Set.empty
@@ -3895,6 +3898,8 @@ filterReadsPeers f = case f of
   Filter.Type.HasDesignation _ -> False
   Filter.Type.HasCounters _ -> False
   Filter.Type.HasCountersOfAnyKind -> False
+  Filter.Type.HasSticker _ -> False
+  Filter.Type.Stickered -> False
   Filter.Type.ManaValueAtMost _ -> False
   -- The SOURCE's mana value arrives on the Context, PowerLessThanSource's answer
   -- above: no projection of a second object is read.

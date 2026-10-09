@@ -2519,6 +2519,7 @@ stubView table oid =
                 -- for a card outside the game rather than a permanent.
                 Filter.transformed = False,
                 Filter.counters = Map.empty,
+                Filter.stickerKinds = Seq.empty,
                 Filter.ringBearerFor = Nothing,
                 Filter.paired = Nothing,
                 Filter.designations = Set.empty,

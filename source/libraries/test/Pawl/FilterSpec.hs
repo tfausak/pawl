@@ -2,6 +2,7 @@
 module Pawl.FilterSpec where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Filter as Filter
@@ -106,6 +107,7 @@ blackCreature =
       Filter.exiledFaceDown = False,
       Filter.transformed = False,
       Filter.counters = Map.empty,
+      Filter.stickerKinds = Seq.empty,
       Filter.ringBearerFor = Nothing,
       Filter.paired = Nothing,
       Filter.designations = Set.empty,
@@ -186,6 +188,7 @@ devoidBigCreature =
       Filter.exiledFaceDown = False,
       Filter.transformed = False,
       Filter.counters = Map.empty,
+      Filter.stickerKinds = Seq.empty,
       Filter.ringBearerFor = Nothing,
       Filter.paired = Nothing,
       Filter.designations = Set.empty,

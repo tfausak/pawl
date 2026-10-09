@@ -5047,6 +5047,8 @@ filterSlotsReadSingly predicate = case predicate of
   -- the keyword atom above is.
   Filter.Type.HasCounters _ -> []
   Filter.Type.HasCountersOfAnyKind -> []
+  Filter.Type.HasSticker _ -> []
+  Filter.Type.Stickered -> []
   Filter.Type.HasNonManaActivatedAbility -> []
   Filter.Type.HasActivatedAbility -> []
   Filter.Type.IsInZone _ -> []

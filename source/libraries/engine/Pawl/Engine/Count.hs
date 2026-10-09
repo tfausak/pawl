@@ -14,6 +14,7 @@ import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Binding as Binding
@@ -455,6 +456,8 @@ bakePerspective viewOf context gs candidate predicate =
         Filter.Type.HasDesignation _ -> predicate
         Filter.Type.HasCounters _ -> predicate
         Filter.Type.HasCountersOfAnyKind -> predicate
+        Filter.Type.HasSticker _ -> predicate
+        Filter.Type.Stickered -> predicate
         Filter.Type.HasNonManaActivatedAbility -> predicate
         Filter.Type.HasActivatedAbility -> predicate
         Filter.Type.IsInZone _ -> predicate
@@ -1280,6 +1283,8 @@ viewOfSnapshot deploy mController mOwner isToken counters snapshot =
       -- "greatest number of counters among creatures that died this turn"
       -- (Pawl.CountSpec) is what reads it.
       Filter.counters = counters,
+      -- CR 123.1: a snapshot records no sticker, `designations`' posture.
+      Filter.stickerKinds = Seq.empty,
       -- CR 701.54b: a designation, which a ProjectedCharacteristics does not carry
       -- and never could -- CR 109.3's characteristic list has no room for one. So a
       -- past event records none, and no CR 608.2h record holds one for the arm to
