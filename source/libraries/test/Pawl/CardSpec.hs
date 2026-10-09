@@ -3211,6 +3211,60 @@ tokenNameOffends token
       Just word -> Right word
       Nothing -> fmap (Text.pack . fst) (Common.asTagged (Codec.encode Subtype.codec subtype))
 
+-- CR 702.16h's "protection from each [characteristic]", which a card file writes
+-- expanded, one Keyword.Protection per quality, and so carries no mark of: the
+-- cards printing it, hand-kept for namedTokens' reason. Each must name every
+-- quality of the domain.
+protectionFromEach :: Set.Set CardName.CardName
+protectionFromEach = Set.fromList (fmap (CardName.MkCardName . Text.pack) ["Iridescent Angel", "Spectra Ward"])
+
+-- CR 702.16g's "protection from [A] and from [B]": the cards printing a list,
+-- which any subset of the domain satisfies.
+protectionListed :: Set.Set CardName.CardName
+protectionListed = Set.fromList (fmap (CardName.MkCardName . Text.pack) ["Paladin en-Vec"])
+
+-- The qualities of each protection group a face prints: its own keywords, each
+-- static ability's grants, and every grant its resolution effects make.
+protectionGroups :: Face.Face Card.Type.Card -> [[Filter.Type.Filter Keyword.Keyword]]
+protectionGroups face =
+  qualities (Map.keys (Face.keywords face))
+    : qualities (concatMap grantedBy (cardResolutionEffects face))
+    : fmap (qualities . Maybe.mapMaybe granted . NonEmpty.toList . StaticAbility.modifications) (Face.staticAbilities face)
+  where
+    qualities keywords = [Protection.quality protection | Keyword.Protection protection <- keywords]
+    granted modification = case modification of
+      Modification.GainKeyword keyword -> Just keyword
+      _ -> Nothing
+    grantedBy effect = case effect of
+      Effect.ModifyTarget modifyTarget -> Maybe.maybeToList (granted (ModifyTarget.modification modifyTarget))
+      _ -> []
+
+-- Each fixed domain of CR 702.16h a group names two or more qualities of --
+-- CR 105.1's colours, CR 205.2a's card types -- and whether it names them all.
+protectionDomains :: [Filter.Type.Filter Keyword.Keyword] -> [(String, Bool)]
+protectionDomains qualities =
+  Maybe.catMaybes
+    [ domain "color" [color | Filter.Type.HasColor color <- qualities],
+      domain "card type" [cardType | Filter.Type.HasCardType cardType <- qualities]
+    ]
+  where
+    domain :: (Bounded a, Enum a, Ord a) => String -> [a] -> Maybe (String, Bool)
+    domain label named =
+      let size = Set.size (Set.fromList named)
+       in if size < 2 then Nothing else Just (label, size == length (universe named))
+    universe :: (Bounded a, Enum a) => [a] -> [a]
+    universe _ = [minBound .. maxBound]
+
+-- What a face owes CR 702.16g and 702.16h: a group from one domain is
+-- classified, and a "from each" group is the whole domain.
+protectionOffences :: Face.Face Card.Type.Card -> [String]
+protectionOffences face = concatMap judge (concatMap protectionDomains (protectionGroups face))
+  where
+    judge (label, complete)
+      | Set.member (Face.name face) protectionFromEach = ["protection from each " <> label <> " misses one" | not complete]
+      | Set.member (Face.name face) protectionListed = []
+      | otherwise = ["protection from two or more of one " <> label <> " is in neither protectionFromEach nor protectionListed"]
+
 -- Every Filter a keyword carries: CR 702.29e's typecycling predicate, CR
 -- 702.14c's landwalk criterion, plus the components of any Cost a keyword names
 -- (CR 702.29a cycling, 702.34a flashback, 702.42a entwine), since
@@ -7771,6 +7825,42 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         Spec.assertBool s (not (tokenNameOffends token)) "the legendary token passes"
         Spec.assertBool s (tokenNameOffends mundane) "and the same face without Legendary does not"
       other -> Spec.assertFailure s ("expected exactly one Create, got " <> show (length other))
+  Spec.it s "CR 702.16h every protection from each domain names the whole domain" $ do
+    ps <- S.allPrintings s
+    let faces = concatMap (overFaces withMinted . Printing.card) ps
+        grouped = Set.fromList [Face.name face | face <- faces, not (all (null . protectionDomains) (protectionGroups face))]
+    Spec.assertEqWith s "no protection group is misclassified" [(Face.name face, offence) | face <- faces, offence <- protectionOffences face] []
+    Spec.assertEqWith s "no card is classified both ways" (Set.intersection protectionFromEach protectionListed) Set.empty
+    Spec.assertEqWith s "every classified card prints such a group" (Set.difference (Set.union protectionFromEach protectionListed) grouped) Set.empty
+  -- The rejecting direction, one limb of protectionGroups each: Iridescent
+  -- Angel's face keywords, Spectra Ward's static grants, and Paladin en-Vec's
+  -- listed pair once it is no longer listed.
+  Spec.it s "CR 702.16h the lint catches a missing colour and an unclassified list" $ do
+    angel <- S.combinedFace <$> S.printingOf s registry "Iridescent Angel"
+    ward <- S.combinedFace <$> S.printingOf s registry "Spectra Ward"
+    paladin <- S.combinedFace <$> S.printingOf s registry "Paladin en-Vec"
+    let isGreen keyword = case keyword of
+          Keyword.Protection protection -> Protection.quality protection == Filter.Type.HasColor Color.Green
+          _ -> False
+        keepModification modification = case modification of
+          Modification.GainKeyword keyword -> not (isGreen keyword)
+          _ -> True
+        withoutGreen ability =
+          let modifications = StaticAbility.modifications ability
+           in ability {StaticAbility.modifications = Maybe.fromMaybe modifications (NonEmpty.nonEmpty (NonEmpty.filter keepModification modifications))}
+    Spec.assertEqWith s "Iridescent Angel passes" (protectionOffences angel) []
+    Spec.assertBool s (not (null (protectionOffences angel {Face.keywords = Map.filterWithKey (\keyword _ -> not (isGreen keyword)) (Face.keywords angel)}))) "and without green does not"
+    Spec.assertEqWith s "Spectra Ward passes" (protectionOffences ward) []
+    Spec.assertBool s (not (null (protectionOffences ward {Face.staticAbilities = fmap withoutGreen (Face.staticAbilities ward)}))) "and granting no green does not"
+    Spec.assertEqWith s "Paladin en-Vec passes" (protectionOffences paladin) []
+    Spec.assertBool s (not (null (protectionOffences paladin {Face.name = CardName.MkCardName (Text.pack "Unlisted Paladin")}))) "and unlisted does not"
+  -- The third limb, and the card-type domain: no pool card grants either, so a
+  -- hand-built instant granting two card-type protections until end of turn.
+  Spec.it s "CR 702.16h the lint reads a resolution effect's grants of card-type protection" $ do
+    let grant cardType = Effect.ModifyTarget (ModifyTarget.MkModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword (Keyword.Protection (Protection.MkProtection (Filter.Type.HasCardType cardType) Nothing))) (plantedRef "mt") Nothing)
+        spell = (vanillaFace "Unlisted Ward" instantLine) {Face.spell = Modal.MkModal (Seq.singleton (lintMode [grant CardType.Artifact, grant CardType.Creature] [])) (ModeSelection.ChooseExactly 1)}
+    Spec.assertBool s (not (null (protectionOffences spell))) "an unclassified pair of card-type grants is caught"
+    Spec.assertEqWith s "while one alone is not a group" (protectionOffences spell {Face.spell = Modal.MkModal (Seq.singleton (lintMode [grant CardType.Artifact] [])) (ModeSelection.ChooseExactly 1)}) []
   -- The countdown shield's rider, the same limb one opcode over: Test of Faith
   -- hangs CR 615.5's counters off a PreventNextDamage where Inkshield hangs its
   -- tokens off a PreventAllDamage. No lint fires on a PutCounters, so this is
