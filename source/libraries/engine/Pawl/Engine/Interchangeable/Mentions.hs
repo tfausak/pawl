@@ -1345,7 +1345,6 @@ effectNames asking onCard onAbility x = case x of
   Effect.Exploit -> False
   Effect.GiveGift -> False
   Effect.ItBecomes _daytime -> False
-  Effect.ExileUntilMonarch slotName -> slotNames asking slotName
   Effect.ExileHaunting exileHaunting -> exileHauntingNames asking exileHaunting
   Effect.PlaySubgame slotName -> slotNames asking slotName
   Effect.ChoosePlayer choosePlayer -> choosePlayerNames asking choosePlayer

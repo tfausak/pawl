@@ -2199,6 +2199,7 @@ eventTriggers events gs =
           _ -> Map.empty
         GameEvent.Revealed (Revealed.MkRevealed _ _ RevealCause.Ordinary _) -> Map.empty
         GameEvent.Revealed (Revealed.MkRevealed _ _ RevealCause.LeavingFaceDown _) -> Map.empty
+        GameEvent.Revealed (Revealed.MkRevealed _ _ RevealCause.FaceDownSpell _) -> Map.empty
         GameEvent.Discarded {} -> Map.empty
         GameEvent.Drew {} -> Map.empty
         GameEvent.Moved {} -> Map.empty

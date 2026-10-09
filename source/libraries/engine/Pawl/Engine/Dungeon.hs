@@ -364,13 +364,10 @@ remove oid gs = case Game.lookupObject oid gs of
             { Player.completedDungeons = Player.completedDungeons p + 1,
               Player.completedDungeonNames = maybe id Set.insert name (Player.completedDungeonNames p)
             }
-        stripped = Game.removeFromZones oid gs
+        stripped = Game.deleteObject oid gs
      in Event.recordEvent
           (GameEvent.DungeonCompleted owner)
-          stripped
-            { GameState.objects = Map.delete oid (GameState.objects stripped),
-              GameState.players = Map.adjust completed owner (GameState.players stripped)
-            }
+          stripped {GameState.players = Map.adjust completed owner (GameState.players stripped)}
 
 -- CR 701.49b: move the marker along one arrow out of the room it is on.
 --

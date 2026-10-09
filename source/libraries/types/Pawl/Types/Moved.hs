@@ -51,7 +51,7 @@ data Moved = MkMoved
     -- Pawl.Engine.Event.changeZoneResolvingReturning and Pawl.Engine.Stack's
     -- CarryOver.Carried move; read by
     -- TriggerCondition.SelfPutIntoGraveyardDuringResolution and by CR 400.7d's
-    -- look-backs at the cast (Quantity.WasCastFrom, Projection.View's
+    -- look-backs at the cast (Quantity.WasCastFrom, Count's
     -- becamePermanents).
     duringResolution :: Bool
   }

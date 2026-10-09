@@ -940,7 +940,7 @@ placeBorne srcId pending = do
             Object.exertedBy = Set.empty,
             Object.activatedOnce = Map.empty
           }
-  State.put gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2), GameState.stack = abilId : GameState.stack gs2}
+  State.put (Game.putOnStack abilId gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2)})
   if not (Modal.selectionPossible legal selection)
     then -- CR 603.3c: no selection satisfies the instruction.
       State.modify' (Game.cease abilId)
@@ -1690,6 +1690,8 @@ beginTurn extra pid gs =
             -- Cleared here and never at cleanup -- cleanup is still part of
             -- this turn, and CR 514.1's discard is itself an event of it.
             GameState.events = Seq.empty,
+            -- Its watermarks, which no stack object outlives a turn to read.
+            GameState.stackedIn = Map.empty,
             -- CR 121.1's per-turn draw tally, cleared for EVERY player: a player
             -- draws on turns that are not theirs, so "each turn" is the whole map.
             GameState.drawsThisTurn = Map.empty,

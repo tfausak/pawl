@@ -90,6 +90,8 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.ReturnEnding as ReturnEnding
+import qualified Pawl.Types.ReturnWatch as ReturnWatch
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TapState as TapState
@@ -662,10 +664,10 @@ monarchSpec s registry = Spec.describe s "Monarch" $ do
         afterSteal = monarchResolveAll (monarchSettle (Monarch.crown S.bob heldExiled))
     Spec.assertEqWith s "alice is monarch on ETB" (GameState.monarch afterEtb) (Just S.alice)
     Spec.assertEqWith s "victim is exiled" (length (filter (== victim) (Set.toList (GameState.battlefield afterEtb)))) 0
-    Spec.assertBool s (not (Map.null (GameState.exiledUntilMonarch afterEtb))) "victim registered for return"
-    Spec.assertBool s (not (Map.null (GameState.exiledUntilMonarch heldExiled))) "still exiled while alice stays monarch"
+    Spec.assertBool s (not (Map.null (GameState.movedUntil afterEtb))) "victim registered for return"
+    Spec.assertBool s (not (Map.null (GameState.movedUntil heldExiled))) "still exiled while alice stays monarch"
     Spec.assertEqWith s "a creature is back on the battlefield once bob is monarch" (length (Game.zoneMembers Zone.Battlefield S.bob afterSteal)) 1
-    Spec.assertEqWith s "return cleared the exile register" (Map.null (GameState.exiledUntilMonarch afterSteal)) True
+    Spec.assertEqWith s "return cleared the exile register" (Map.null (GameState.movedUntil afterSteal)) True
   Spec.it s "M5.6c gate: the monarch holding a Palace Jailer exile leaves, CR 725.4 crowns the active player, and the prisoner comes home" $ do
     -- Alice, bob, carol. Alice's Palace Jailer has entered: alice is the
     -- monarch and bob's Piker is exiled under the CR 725 watch. Carol is the
@@ -695,20 +697,20 @@ monarchSpec s registry = Spec.describe s "Monarch" $ do
         gone = S.departs Departure.Type.Conceded S.alice afterEtb
         settled = monarchSettle gone
     Spec.assertEqWith s "alice is the monarch on ETB" (GameState.monarch afterEtb) (Just S.alice)
-    Spec.assertEqWith s "bob's creature is exiled under the watch, keyed to alice and undischarged" (Map.elems (GameState.exiledUntilMonarch afterEtb)) [MonarchWatch.MkMonarchWatch {MonarchWatch.controller = S.alice, MonarchWatch.due = Nothing}]
+    Spec.assertEqWith s "bob's creature is exiled under the watch, keyed to alice and undischarged" (fmap ReturnWatch.ending (Map.elems (GameState.movedUntil afterEtb))) [ReturnEnding.OpponentCrowned MonarchWatch.MkMonarchWatch {MonarchWatch.controller = S.alice, MonarchWatch.due = Nothing}]
     Spec.assertEqWith s "the original is off the battlefield" (length (filter (== victim) (Set.toList (GameState.battlefield afterEtb)))) 0
     -- CR 800.4a: alice's own object leaves; bob's exiled card does not.
     Spec.assertEqWith s "Palace Jailer left the game with alice" (Game.lookupObject jailer gone) Nothing
     -- CR 725.4's crowning goes through Monarch.crown like any other, so the
     -- watch is marked as carol takes the crown, before this settle returns it.
-    Spec.assertEqWith s "but the watch survived her departure, still keyed to her and now marked by carol's crowning" (fmap (\watch -> (MonarchWatch.controller watch, Maybe.isJust (MonarchWatch.due watch))) (Map.elems (GameState.exiledUntilMonarch gone))) [(S.alice, True)]
+    Spec.assertEqWith s "but the watch survived her departure, still keyed to her and now marked by carol's crowning" [(MonarchWatch.controller watch, Maybe.isJust (MonarchWatch.due watch)) | ReturnEnding.OpponentCrowned watch <- fmap ReturnWatch.ending (Map.elems (GameState.movedUntil gone))] [(S.alice, True)]
     -- CR 725.4, first sentence.
     Spec.assertEqWith s "carol, the active player, is the monarch" (GameState.monarch gone) (Just S.carol)
     -- CR 800.4i: carol is in departed alice's frozen opponent set, so the
     -- watch fires at the next settle (CR 704.3 fixes that as the coarsest
     -- moment anything can observe it).
     Spec.assertEqWith s "the prisoner is back on bob's side of the table" (length (Game.zoneMembers Zone.Battlefield S.bob settled)) 1
-    Spec.assertEqWith s "and the watch is cleared" (Map.null (GameState.exiledUntilMonarch settled)) True
+    Spec.assertEqWith s "and the watch is cleared" (Map.null (GameState.movedUntil settled)) True
     Spec.assertEqWith s "CR 104.2a: two survivors, so the game continues" (GameState.result settled) Nothing
 
 -- Take the LOWEST-numbered legal recipient of every slot. Garland's two

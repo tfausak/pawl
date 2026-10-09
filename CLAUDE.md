@@ -307,7 +307,10 @@ to agents as written. What it doesn't say:
     `Pawl.Engine.Filter`'s `View` must be filled in EVERY builder ---
     `Pawl.Engine.Projection.View`'s `viewOfCard`, `viewOfCharacteristics` and
     `copiableCharacteristics`, and `Pawl.Engine.Count`'s `viewOfSnapshot`.
-    Filling one compiles clean and the rest silently answer the old value.
+    Filling one compiles clean and the rest silently answer the old value. A
+    `View` field read by id off the turn's log or a LastKnown field is
+    `Count.lastKnownView`'s too: it updates `viewOfSnapshot`'s record, so a
+    departed object silently answers the snapshot's blank.
 
     A DELETED TEST's orphaned helpers compile clean too: the spec modules under
     `source/libraries/test/` carry no export list, so `-Wunused-top-binds`
