@@ -55,7 +55,7 @@ spec s = Spec.describe s "Pawl.Codec.AttackCost" $ do
           ( PerCreature.Counted
               ( Quantity.Count
                   ( Count.MkCount
-                      (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
+                      (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer)))
                       (Filter.And [Filter.HasCardType CardType.Enchantment, Filter.ControlledBy PlayerRelation.You])
                       Aggregation.Members
                   )
@@ -63,7 +63,7 @@ spec s = Spec.describe s "Pawl.Codec.AttackCost" $ do
           )
           AttackCostScope.ControllerAndPlaneswalkers
       )
-      " {\"perAttacker\":{\"type\":\"Counted\",\"value\":{\"type\":\"Count\",\"value\":{\"aggregation\":{\"type\":\"Members\"},\"filter\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Enchantment\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}]},\"scope\":{\"type\":\"InZone\",\"value\":{\"player\":{\"type\":\"EachPlayer\"},\"zone\":{\"type\":\"Battlefield\"}}}}}},\"scope\":{\"type\":\"ControllerAndPlaneswalkers\"},\"subject\":{\"type\":\"Matching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+      " {\"perAttacker\":{\"type\":\"Counted\",\"value\":{\"type\":\"Count\",\"value\":{\"aggregation\":{\"type\":\"Members\"},\"filter\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Enchantment\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}]},\"scope\":{\"type\":\"InZone\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"AnyPlayer\"}},\"zone\":{\"type\":\"Battlefield\"}}}}}},\"scope\":{\"type\":\"ControllerAndPlaneswalkers\"},\"subject\":{\"type\":\"Matching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
   -- Exalted Dragon's half: a share with no mana and a component, which is CR
   -- 508.1h's list past "paying mana". The subject is the Dragon itself.
   Spec.it s "MkAttackCost with a non-mana share" $

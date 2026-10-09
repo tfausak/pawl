@@ -1218,7 +1218,7 @@ blastShape src ts =
 -- Every element earns its place against a different wrong reading of "the number
 -- of creature cards in all graveyards":
 --
---   * bob's graveyard is stocked, so Scope.EachPlayer and Scope.Relative You
+--   * bob's graveyard is stocked, so Relative AnyPlayer and Relative You
 --     disagree. Without it the two readings produce the same number.
 --   * alice's graveyard holds a LAND card too, so HasCardType Creature is not
 --     vacuous. Without it, dropping the filter changes nothing.

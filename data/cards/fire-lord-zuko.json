@@ -135,7 +135,10 @@
                     "type": "EnteredFrom",
                     "value": {
                       "player": {
-                        "type": "EachPlayer"
+                        "type": "Relative",
+                        "value": {
+                          "type": "AnyPlayer"
+                        }
                       },
                       "zone": {
                         "type": "Exile"

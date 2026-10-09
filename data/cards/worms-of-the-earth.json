@@ -109,7 +109,10 @@
                   {
                     "orElse": {
                       "chooser": {
-                        "type": "EachPlayer"
+                        "type": "Relative",
+                        "value": {
+                          "type": "AnyPlayer"
+                        }
                       },
                       "sibling": 1
                     },
@@ -135,7 +138,10 @@
                         "mana": []
                       },
                       "payer": {
-                        "type": "EachPlayer"
+                        "type": "Relative",
+                        "value": {
+                          "type": "AnyPlayer"
+                        }
                       }
                     }
                   },
@@ -162,12 +168,18 @@
                     "optionality": {
                       "type": "Optional",
                       "value": {
-                        "type": "EachPlayer"
+                        "type": "Relative",
+                        "value": {
+                          "type": "AnyPlayer"
+                        }
                       }
                     },
                     "orElse": {
                       "chooser": {
-                        "type": "EachPlayer"
+                        "type": "Relative",
+                        "value": {
+                          "type": "AnyPlayer"
+                        }
                       },
                       "sibling": 0
                     }

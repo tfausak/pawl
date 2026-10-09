@@ -660,7 +660,7 @@ spec s registry = Spec.describe s "Room" $ do
   -- THREE SEATS carry the whole weight of "each opponent": on two seats "each
   -- opponent", "an opponent" and "each player" all coincide. alice's life total
   -- is asserted in both directions below, and it is the single assertion that
-  -- separates CR 109.5's Opponent from EachPlayer.
+  -- separates CR 109.5's Opponent from Relative AnyPlayer.
   --
   -- The shape is a negative sandwiched between two positives on ONE board:
   --

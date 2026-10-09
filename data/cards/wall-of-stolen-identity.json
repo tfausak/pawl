@@ -100,7 +100,10 @@
                                     "type": "InZone",
                                     "value": {
                                       "player": {
-                                        "type": "EachPlayer"
+                                        "type": "Relative",
+                                        "value": {
+                                          "type": "AnyPlayer"
+                                        }
                                       },
                                       "zone": {
                                         "type": "Battlefield"

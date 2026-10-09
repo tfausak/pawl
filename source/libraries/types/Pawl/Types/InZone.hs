@@ -9,7 +9,7 @@ import qualified Pawl.Types.Zone as Zone
 -- Pawl.Codec.InZone's: a library, a hand and a graveyard are each one player's,
 -- so any reference names a copy of one, while the other zones are shared by all
 -- players and have no per-player copy to name -- their reference can only be
--- PlayerRef.EachPlayer. The flat shape is kept, and the check made at the
+-- @PlayerRef.Relative AnyPlayer@. The flat shape is kept, and the check made at the
 -- decoder, because splitting the type would not close it either: a shared/
 -- per-player split could still say "the shared hand".
 data InZone = MkInZone

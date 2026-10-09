@@ -44,7 +44,10 @@
                         "value": 1
                       },
                       "searcher": {
-                        "type": "EachPlayer"
+                        "type": "Relative",
+                        "value": {
+                          "type": "AnyPlayer"
+                        }
                       }
                     }
                   }

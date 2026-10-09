@@ -25,6 +25,6 @@ spec s = Spec.describe s "Pawl.Codec.ManaCount" $ do
     Common.assertCodec
       s
       ManaCount.codec
-      (ManaCount.MkManaCount PlayerRef.EachPlayer ManaFilter.Any)
-      " {\"player\":{\"type\":\"EachPlayer\"},\"filter\":{\"type\":\"Any\"}} "
+      (ManaCount.MkManaCount (PlayerRef.Relative PlayerRelation.AnyPlayer) ManaFilter.Any)
+      " {\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"AnyPlayer\"}},\"filter\":{\"type\":\"Any\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ManaCount.codec

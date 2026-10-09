@@ -115,7 +115,10 @@
                     "type": "ShuffleIntoLibrary",
                     "value": {
                       "library": {
-                        "type": "EachPlayer"
+                        "type": "Relative",
+                        "value": {
+                          "type": "AnyPlayer"
+                        }
                       },
                       "refs": [
                         {
@@ -151,7 +154,10 @@
                     "type": "Draw",
                     "value": {
                       "player": {
-                        "type": "EachPlayer"
+                        "type": "Relative",
+                        "value": {
+                          "type": "AnyPlayer"
+                        }
                       },
                       "quantity": {
                         "type": "Literal",

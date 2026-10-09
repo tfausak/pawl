@@ -18,13 +18,13 @@ decodes = Either.isRight . (\t -> Common.parse (Text.pack t) >>= Codec.decode In
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.InZone" $ do
-  -- CR 400.1: the battlefield is shared, so EachPlayer is what most counts say.
+  -- CR 400.1: the battlefield is shared, so Relative AnyPlayer is what most counts say.
   Spec.it s "MkInZone, both keys" $
     Common.assertCodec
       s
       InZone.codec
-      (InZone.MkInZone {InZone.zone = Zone.Battlefield, InZone.player = PlayerRef.EachPlayer})
-      " {\"zone\":{\"type\":\"Battlefield\"},\"player\":{\"type\":\"EachPlayer\"}} "
+      (InZone.MkInZone {InZone.zone = Zone.Battlefield, InZone.player = PlayerRef.Relative PlayerRelation.AnyPlayer})
+      " {\"zone\":{\"type\":\"Battlefield\"},\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"AnyPlayer\"}}} "
   -- CR 400.1's per-player half: a graveyard is one player's, so every reference
   -- naming players is a question that zone can answer.
   Spec.it s "a per-player zone takes any reference" $

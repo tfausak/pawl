@@ -106,7 +106,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
         count =
           Quantity.Type.Count
             ( Count.Type.MkCount
-                (Scope.InZone (InZone.MkInZone Zone.Graveyard PlayerRef.EachPlayer))
+                (Scope.InZone (InZone.MkInZone Zone.Graveyard (PlayerRef.Relative PlayerRelation.AnyPlayer)))
                 (Filter.Type.And [])
                 Aggregation.DistinctCardTypes
             )
@@ -977,7 +977,7 @@ removeFromBattlefield oid gs =
 -- difference that is the whole reason it earns a case of its own: "ANY player
 -- controls" drops the ControlledBy conjunct. Kird Ape's clause is CR 109.5's
 -- "you" and Knight of Grace's names no player at all, so the Count's filter is
--- bare and its InZone scope (CR 400.1's shared battlefield, with EachPlayer) does
+-- bare and its InZone scope (CR 400.1's shared battlefield, with Relative AnyPlayer) does
 -- all the sweeping.
 knightOfGraceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 knightOfGraceSpec s registry = Spec.describe s "Knight of Grace" $ do
@@ -1132,7 +1132,7 @@ omnathSpec s registry = Spec.describe s "Omnath, Locus of Mana" $ do
   -- controller. THE FALSIFIER for reading the affected object's controller (or
   -- no perspective at all): Omnath is the affected object here as well as the
   -- source, so the two coincide -- what separates them is BOB's pool, which a
-  -- PlayerRef.EachPlayer fold would add in.
+  -- PlayerRef.Relative AnyPlayer fold would add in.
   --
   -- This is the first static ability in the pool whose modification carries a
   -- player-scoped quantity, so it is also the first test of

@@ -35,8 +35,8 @@ spec s = Spec.describe s "Pawl.Codec.OrElse" $ do
       s
       toJson
       fromJson
-      (OrElse.MkOrElse (ClauseIndex.MkClauseIndex 0) PlayerRef.EachPlayer False)
-      " {\"sibling\":0,\"chooser\":{\"type\":\"EachPlayer\"}} "
+      (OrElse.MkOrElse (ClauseIndex.MkClauseIndex 0) (PlayerRef.Relative PlayerRelation.AnyPlayer) False)
+      " {\"sibling\":0,\"chooser\":{\"type\":\"Relative\",\"value\":{\"type\":\"AnyPlayer\"}}} "
   Spec.it s "CR 701.55a a villainous choice writes the flag" $
     Common.assertJsonCodec
       s

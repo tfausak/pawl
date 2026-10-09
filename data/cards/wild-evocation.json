@@ -89,7 +89,10 @@
                               "type": "InZone",
                               "value": {
                                 "player": {
-                                  "type": "EachPlayer"
+                                  "type": "Relative",
+                                  "value": {
+                                    "type": "AnyPlayer"
+                                  }
                                 },
                                 "zone": {
                                   "type": "Hand"
@@ -151,7 +154,10 @@
                               "type": "InZone",
                               "value": {
                                 "player": {
-                                  "type": "EachPlayer"
+                                  "type": "Relative",
+                                  "value": {
+                                    "type": "AnyPlayer"
+                                  }
                                 },
                                 "zone": {
                                   "type": "Hand"

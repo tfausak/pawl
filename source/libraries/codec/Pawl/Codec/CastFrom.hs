@@ -14,7 +14,7 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 --
 -- CR 109.5's "you" is the default because every printed clause of this family
 -- either names it (Archfiend's Vessel, Breathless Knight) or is agentless, and
--- an agentless clause says @EachPlayer@ out loud rather than eliding it. The
+-- an agentless clause says @Relative AnyPlayer@ out loud rather than eliding it. The
 -- ZONE is required: nothing about "was cast" implies a zone to have been cast
 -- from.
 codec :: Codec.Codec CastFrom.CastFrom

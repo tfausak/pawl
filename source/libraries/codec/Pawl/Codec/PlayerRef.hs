@@ -16,8 +16,7 @@ codec :: Codec.Codec PlayerRef.PlayerRef
 codec =
   Arm.tagged
     tagOf
-    [ Arm.nullary "EachPlayer" PlayerRef.EachPlayer,
-      -- The table minus one seat, which a card writes: Shahrazad's "each player
+    [ -- The table minus one seat, which a card writes: Shahrazad's "each player
       -- who doesn't win the subgame".
       Arm.payload "EachPlayerExcept" SlotName.codec PlayerRef.EachPlayerExcept (\x -> case x of PlayerRef.EachPlayerExcept y -> Just y; _ -> Nothing),
       Arm.payload "EachOpponentExcept" SlotName.codec PlayerRef.EachOpponentExcept (\x -> case x of PlayerRef.EachOpponentExcept y -> Just y; _ -> Nothing),
@@ -52,7 +51,6 @@ codec =
 
 tagOf :: PlayerRef.PlayerRef -> String
 tagOf x = case x of
-  PlayerRef.EachPlayer {} -> "EachPlayer"
   PlayerRef.EachPlayerExcept {} -> "EachPlayerExcept"
   PlayerRef.EachOpponentExcept {} -> "EachOpponentExcept"
   PlayerRef.Relative {} -> "Relative"

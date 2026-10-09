@@ -57,6 +57,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Printing as Printing.Type
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -287,7 +288,7 @@ noZombiesOnBattlefield =
     ( Compares.MkCompares
         ( Quantity.Count
             ( Count.Type.MkCount
-                (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
+                (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer)))
                 (Filter.Type.HasSubtype Subtype.Zombie)
                 Aggregation.Members
             )

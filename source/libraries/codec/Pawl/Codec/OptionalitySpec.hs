@@ -30,8 +30,8 @@ spec s = Spec.describe s "Pawl.Codec.Optionality" $ do
     Common.assertCodec
       s
       Optionality.codec
-      (Optionality.Optional PlayerRef.EachPlayer)
-      " {\"type\":\"Optional\",\"value\":{\"type\":\"EachPlayer\"}} "
+      (Optionality.Optional (PlayerRef.Relative PlayerRelation.AnyPlayer))
+      " {\"type\":\"Optional\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"AnyPlayer\"}}} "
   -- Any other reference round trips too -- the payload is a whole PlayerRef and
   -- not an enum of the two producers.
   Spec.it s "Optional, asker named by a slot" $

@@ -28,11 +28,11 @@ spec s = Spec.describe s "Pawl.Codec.Count" $ do
       s
       (Count.codec Common.integer)
       ( Count.MkCount
-          (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
+          (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer)))
           (Filter.And [Filter.HasSubtype Subtype.Swamp, Filter.ControlledBy PlayerRelation.You])
           Aggregation.Members
       )
-      " {\"scope\":{\"type\":\"InZone\",\"value\":{\"zone\":{\"type\":\"Battlefield\"},\"player\":{\"type\":\"EachPlayer\"}}},\"filter\":{\"type\":\"And\",\"value\":[{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Swamp\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}]},\"aggregation\":{\"type\":\"Members\"}} "
+      " {\"scope\":{\"type\":\"InZone\",\"value\":{\"zone\":{\"type\":\"Battlefield\"},\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"AnyPlayer\"}}}},\"filter\":{\"type\":\"And\",\"value\":[{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Swamp\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}]},\"aggregation\":{\"type\":\"Members\"}} "
   -- CR 608.2i's look-back-in-time domain.
   Spec.it s "MkCount, scoped to the event history" $
     Common.assertCodec

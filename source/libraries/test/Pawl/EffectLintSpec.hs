@@ -2039,7 +2039,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
         namesOneSeat player = case player of
           PlayerRef.Relative PlayerRelation.You -> True
           PlayerRef.Relative PlayerRelation.Opponent -> False
-          -- The whole table -- EachPlayer's answer, which this relation is.
+          -- The whole table -- Relative AnyPlayer's answer, which this relation is.
           PlayerRef.Relative PlayerRelation.AnyPlayer -> False
           -- CR 102.3's teammates, of whom a team of three has two.
           PlayerRef.Relative PlayerRelation.Teammate -> False
@@ -2048,8 +2048,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           PlayerRef.InSlot _ -> True
           -- A SET -- the arm above's plural, and the whole of what parts them.
           PlayerRef.EachInSlot _ -> False
-          PlayerRef.EachPlayer -> False
-          -- The whole table but one seat -- EachPlayer's answer, and for its
+          -- The whole table but one seat -- Relative AnyPlayer's answer, and for its
           -- reason.
           PlayerRef.EachPlayerExcept _ -> False
           -- The opponents but one seat -- the arm above's answer, for its reason.

@@ -59,7 +59,7 @@ spec s = Spec.describe s "Pawl.Codec.BlockPermission" $ do
           ( Just
               ( Quantity.Count
                   Count.MkCount
-                    { Count.scope = Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer),
+                    { Count.scope = Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer)),
                       Count.filter = Filter.And [Filter.HasSubtype Subtype.Equipment, Filter.IsAttachedToSource],
                       Count.aggregation = Aggregation.Members
                     }
@@ -67,5 +67,5 @@ spec s = Spec.describe s "Pawl.Codec.BlockPermission" $ do
           )
           Nothing
       )
-      " {\"affected\":{\"type\":\"Matching\",\"value\":{\"type\":\"IsSource\"}},\"additional\":{\"type\":\"Count\",\"value\":{\"aggregation\":{\"type\":\"Members\"},\"filter\":{\"type\":\"And\",\"value\":[{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Equipment\"}},{\"type\":\"IsAttachedToSource\"}]},\"scope\":{\"type\":\"InZone\",\"value\":{\"zone\":{\"type\":\"Battlefield\"},\"player\":{\"type\":\"EachPlayer\"}}}}}} "
+      " {\"affected\":{\"type\":\"Matching\",\"value\":{\"type\":\"IsSource\"}},\"additional\":{\"type\":\"Count\",\"value\":{\"aggregation\":{\"type\":\"Members\"},\"filter\":{\"type\":\"And\",\"value\":[{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Equipment\"}},{\"type\":\"IsAttachedToSource\"}]},\"scope\":{\"type\":\"InZone\",\"value\":{\"zone\":{\"type\":\"Battlefield\"},\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"AnyPlayer\"}}}}}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s BlockPermission.codec

@@ -96,7 +96,7 @@ spec s = Spec.describe s "Pawl.Codec.CastFromZone" $ do
       s
       CastFromZone.codec
       ( CastFromZone.MkCastFromZone
-          { CastFromZone.from = InZone.MkInZone {InZone.zone = Zone.Exile, InZone.player = PlayerRef.EachPlayer},
+          { CastFromZone.from = InZone.MkInZone {InZone.zone = Zone.Exile, InZone.player = PlayerRef.Relative PlayerRelation.AnyPlayer},
             CastFromZone.matching = Filter.HasCardType CardType.Creature,
             CastFromZone.limit = PermissionLimit.Unlimited,
             CastFromZone.verb = PermissionVerb.Cast,
@@ -105,7 +105,7 @@ spec s = Spec.describe s "Pawl.Codec.CastFromZone" $ do
             CastFromZone.additionalCosts = [CostComponent.RemoveCounters (CountersFromPermanents.MkCountersFromPermanents 3 WhichCounters.OfAnyKind (Filter.And [Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.You]) CounterSpread.FromAmong)]
           }
       )
-      " {\"from\":{\"zone\":{\"type\":\"Exile\"},\"player\":{\"type\":\"EachPlayer\"}},\"matching\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"pool\":{\"type\":\"CardsExiledWithSource\"},\"additionalCosts\":[{\"type\":\"RemoveCounters\",\"value\":{\"count\":3,\"kind\":{\"type\":\"OfAnyKind\"},\"spread\":{\"type\":\"FromAmong\"},\"whichPermanent\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}]}}}]} "
+      " {\"from\":{\"zone\":{\"type\":\"Exile\"},\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"AnyPlayer\"}}},\"matching\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"pool\":{\"type\":\"CardsExiledWithSource\"},\"additionalCosts\":[{\"type\":\"RemoveCounters\",\"value\":{\"count\":3,\"kind\":{\"type\":\"OfAnyKind\"},\"spread\":{\"type\":\"FromAmong\"},\"whichPermanent\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}]}}}]} "
   -- Urianger Augurelt's Play Arcanum: cards exiled with the source, played this
   -- turn, and a spell cast this way costs {2} less (CR 601.2f).
   Spec.it s "a reduction" $
@@ -113,7 +113,7 @@ spec s = Spec.describe s "Pawl.Codec.CastFromZone" $ do
       s
       CastFromZone.codec
       ( CastFromZone.MkCastFromZone
-          { CastFromZone.from = InZone.MkInZone {InZone.zone = Zone.Exile, InZone.player = PlayerRef.EachPlayer},
+          { CastFromZone.from = InZone.MkInZone {InZone.zone = Zone.Exile, InZone.player = PlayerRef.Relative PlayerRelation.AnyPlayer},
             CastFromZone.matching = Filter.And [],
             CastFromZone.limit = PermissionLimit.Unlimited,
             CastFromZone.verb = PermissionVerb.Play,
@@ -122,5 +122,5 @@ spec s = Spec.describe s "Pawl.Codec.CastFromZone" $ do
             CastFromZone.reduction = 2
           }
       )
-      " {\"from\":{\"zone\":{\"type\":\"Exile\"},\"player\":{\"type\":\"EachPlayer\"}},\"matching\":{\"type\":\"And\",\"value\":[]},\"verb\":{\"type\":\"Play\"},\"pool\":{\"type\":\"CardsExiledWithSource\"},\"reduction\":2} "
+      " {\"from\":{\"zone\":{\"type\":\"Exile\"},\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"AnyPlayer\"}}},\"matching\":{\"type\":\"And\",\"value\":[]},\"verb\":{\"type\":\"Play\"},\"pool\":{\"type\":\"CardsExiledWithSource\"},\"reduction\":2} "
   Spec.it s "has a schema" $ Common.assertHasSchema s CastFromZone.codec

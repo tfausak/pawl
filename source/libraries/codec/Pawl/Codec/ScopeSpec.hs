@@ -19,8 +19,8 @@ spec s = Spec.describe s "Pawl.Codec.Scope" $ do
     Common.assertCodec
       s
       Scope.codec
-      (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
-      " {\"type\":\"InZone\",\"value\":{\"zone\":{\"type\":\"Battlefield\"},\"player\":{\"type\":\"EachPlayer\"}}} "
+      (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer)))
+      " {\"type\":\"InZone\",\"value\":{\"zone\":{\"type\":\"Battlefield\"},\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"AnyPlayer\"}}}} "
   -- CR 608.2i's look-back-in-time domain.
   Spec.it s "InHistory" $
     Common.assertCodec
