@@ -720,7 +720,7 @@ beholdNames asking x = case x of
 
 bindingNames :: Asking -> Binding.Binding -> Bool
 bindingNames asking x = case x of
-  Binding.MkBinding targets _amount _modes copy objects -> any (any (recipientNames asking)) targets || any (projectedCharacteristicsNames asking) copy || any (elem (object asking)) objects
+  Binding.MkBinding targets _amount _modes copy objects _sticker -> any (any (recipientNames asking)) targets || any (projectedCharacteristicsNames asking) copy || any (elem (object asking)) objects
 
 blightNames :: Asking -> Blight.Blight -> Bool
 blightNames asking x = case x of
@@ -2319,6 +2319,7 @@ quantityNames asking x = case x of
   Quantity.InSlot slotName -> slotNames asking slotName
   Quantity.WasBound slotName -> slotNames asking slotName
   Quantity.BoundCount slotName -> slotNames asking slotName
+  Quantity.UniqueVowelsOnSticker slotName -> slotNames asking slotName
   Quantity.Star -> False
   Quantity.Plus plus -> plusNames asking (quantityNames asking) plus
   Quantity.Halved halved -> halvedNames asking (quantityNames asking) halved
@@ -2572,7 +2573,7 @@ anteNames asking x = case x of
 
 putStickerNames :: Asking -> PutSticker.PutSticker -> Bool
 putStickerNames asking x = case x of
-  PutSticker.MkPutSticker player ref _kinds -> playerRefNames asking player || objectRefNames asking ref
+  PutSticker.MkPutSticker player ref _kinds bound -> playerRefNames asking player || objectRefNames asking ref || any (slotNames asking) bound
 
 shuffleIntoLibraryNames :: Asking -> ShuffleIntoLibrary.ShuffleIntoLibrary -> Bool
 shuffleIntoLibraryNames asking x = case x of

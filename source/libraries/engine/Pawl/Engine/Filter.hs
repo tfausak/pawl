@@ -52,6 +52,7 @@ import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Splice as Splice
 import qualified Pawl.Types.StickerKind as StickerKind
+import qualified Pawl.Types.StickerRef as StickerRef
 import qualified Pawl.Types.StoredResult as StoredResult
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -1387,6 +1388,10 @@ data Context = MkContext
     -- each reader of each field here picks its own vacuous direction, and
     -- slotControllers above is the one that picks the widening one.
     boundAmounts :: Map.Map SlotName.SlotName Natural.Natural,
+    -- | CR 123.6e's "that sticker": the sticker an earlier instruction bound at
+    -- each slot. Empty in contextFor; filled by Resolve.Slots.effectContext and
+    -- Target.slotContext.
+    slotStickers :: Map.Map SlotName.SlotName StickerRef.StickerRef,
     -- CR 303.4b's "enchanted": WHICH object the SOURCE is attached to, for the one
     -- atom that compares a candidate against it (IsHostOfSource). The id and not a
     -- view, because the answer is one reading of the source and the same for every
@@ -1613,7 +1618,7 @@ data Context = MkContext
 -- here owes both halves of the same pair: which way its unfilled read answers,
 -- and what holds a card to the positions that fill it.
 contextFor :: Teams.Teams -> Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceToughness = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayers = [], recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, evaluated = Nothing, sourceEntrants = Set.empty, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColors = Set.empty, sourceChosenSubtype = Nothing, sourceLastExiled = Nothing}
+contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceToughness = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayers = [], recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, slotStickers = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, evaluated = Nothing, sourceEntrants = Set.empty, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColors = Set.empty, sourceChosenSubtype = Nothing, sourceLastExiled = Nothing}
 
 -- contextFor with a resolution's -- or a trigger's -- slot objects supplied; see
 -- slotObjects above for who supplies them.

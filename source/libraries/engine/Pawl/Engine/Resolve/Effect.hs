@@ -3532,7 +3532,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   -- CR 608.2d / 123.3: no placer has an available sticker of an allowed kind
   -- and a named object they own. The ChosenPermanent read is the candidate set
   -- chosenPermanentOf offers, the pure sweep answering nothing for it.
-  Effect.PutSticker (PutSticker.MkPutSticker player ref kinds) ->
+  Effect.PutSticker (PutSticker.MkPutSticker player ref kinds _) ->
     let placers = playerRefPlayers legal controller gs player
         named = case ref of
           ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent filter_ _) -> battlefieldMatching legal resolving controller source gs filter_
@@ -5756,7 +5756,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- nothing, so happenedBetween reads it as not having happened.
   -- CR 123.6b: the object's controller places a name sticker's word
   -- (namePosition).
-  Effect.PutSticker (PutSticker.MkPutSticker player ref kinds) -> do
+  Effect.PutSticker (PutSticker.MkPutSticker player ref kinds bound) -> do
     named <- case ref of
       ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent filter_ chooser) -> chosenPermanentOf legal resolving controller source filter_ chooser
       _ -> fmap (\gs -> objectRefObjects legal resolving controller source gs ref) State.get
@@ -5772,6 +5772,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               StickerKind.PowerToughness -> pure Nothing
               StickerKind.Art -> pure Nothing
             State.modify' (Sticker.put placer oid picked position)
+            Monad.forM_ bound (\slot -> State.modify' (bindStickerSlot resolving slot picked))
       Monad.when owned $ case Sticker.available placer kinds gs of
         [] -> pure ()
         [only] -> place only
@@ -11317,6 +11318,12 @@ namePosition oid = do
       answer <- Game.choose (Prompt.ChooseNamePosition (Decide.deciderFor pid gs) pid oid (0 NonEmpty.:| [1 .. most]))
       pure (if answer <= most then answer else 0)
     _ -> pure 0
+
+-- CR 123.6e's "that sticker": bind the placed sticker under @slot@, on
+-- bindSlot's holder. Written only when a sticker was placed, so
+-- happenedBetween needs no copy-across.
+bindStickerSlot :: ObjectId -> SlotName -> StickerRef.StickerRef -> GameState -> GameState
+bindStickerSlot holder slot ref = overHolderBindings holder (Map.insert slot (Binding.toSticker ref))
 
 -- CR 603.7c: bind `target` into `slot` of `holder`'s binding environment, so a
 -- delayed ability armed later in the SAME resolution can name the object.

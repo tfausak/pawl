@@ -102,6 +102,7 @@ overSlots f quantity =
         -- one with them.
         Quantity.WasBound slot -> fmap Quantity.WasBound (f slot)
         Quantity.BoundCount slot -> fmap Quantity.BoundCount (f slot)
+        Quantity.UniqueVowelsOnSticker slot -> fmap Quantity.UniqueVowelsOnSticker (f slot)
         Quantity.Star -> pure quantity
         Quantity.Plus (Plus.MkPlus a b) -> fmap Quantity.Plus (Plus.MkPlus <$> recur a <*> recur b)
         -- Composition, as Plus is: the rounding names no slot and the payload may name
@@ -319,6 +320,7 @@ nestedRefs quantity = case quantity of
   -- and it hides no nested reference.
   Quantity.WasBound _ -> Set.empty
   Quantity.BoundCount _ -> Set.empty
+  Quantity.UniqueVowelsOnSticker _ -> Set.empty
   Quantity.Star -> Set.empty
   Quantity.Plus (Plus.MkPlus a b) -> Set.union (nestedRefs a) (nestedRefs b)
   -- Plus' answer: the rounding hides no reference, so what the payload hides is
@@ -434,6 +436,7 @@ nestedCounts quantity = case quantity of
   -- no Count either.
   Quantity.WasBound _ -> []
   Quantity.BoundCount _ -> []
+  Quantity.UniqueVowelsOnSticker _ -> []
   Quantity.Star -> []
   Quantity.Plus (Plus.MkPlus a b) -> nestedCounts a <> nestedCounts b
   -- Plus' descent: CR 107.1a's rounding holds no Count, and the payload it halves
@@ -693,6 +696,7 @@ mapPlayerRefs f intoCount quantity =
         Quantity.InSlot _ -> quantity
         Quantity.WasBound _ -> quantity
         Quantity.BoundCount _ -> quantity
+        Quantity.UniqueVowelsOnSticker _ -> quantity
         Quantity.Star -> quantity
         Quantity.ObjectCounters _ -> quantity
         Quantity.ObjectCountersOfAnyKind -> quantity

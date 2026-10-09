@@ -174,7 +174,8 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
                   Binding.amount = Nothing,
                   Binding.modes = Nothing,
                   Binding.copy = Nothing,
-                  Binding.objects = Nothing
+                  Binding.objects = Nothing,
+                  Binding.sticker = Nothing
                 },
           Object.counters =
             Map.fromList

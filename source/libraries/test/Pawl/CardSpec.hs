@@ -693,7 +693,7 @@ objectRefPositions =
         ("unsuspect", Effect.Unsuspect (plantedRef "us"), [plantedRef "us"]),
         ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary Nothing (NonEmpty.singleton (plantedRef "sl"))), [plantedRef "sl"]),
         ("ante", Effect.Ante (Ante.MkAnte (PlayerRef.Relative PlayerRelation.You) (plantedRef "an") Nothing), [plantedRef "an"]),
-        ("put-sticker", Effect.PutSticker (PutSticker.MkPutSticker (PlayerRef.Relative PlayerRelation.You) (plantedRef "ps") (Set.singleton StickerKind.Art)), [plantedRef "ps"]),
+        ("put-sticker", Effect.PutSticker (PutSticker.MkPutSticker (PlayerRef.Relative PlayerRelation.You) (plantedRef "ps") (Set.singleton StickerKind.Art) Nothing), [plantedRef "ps"]),
         ("set-owner", Effect.SetOwner (SetOwner.MkSetOwner (PlayerRef.Relative PlayerRelation.You) (plantedRef "so")), [plantedRef "so"]),
         ("exchange-ownership", Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership (plantedRef "eo") (plantedRef "ep")), [plantedRef "eo", plantedRef "ep"]),
         ("exchange-top", Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary (plantedRef "et") (PlayerRef.Relative PlayerRelation.You)), [plantedRef "et"]),
@@ -753,7 +753,7 @@ playerRefPositions =
         ("take-extra-turn", Effect.TakeExtraTurn TakeExtraTurn.MkTakeExtraTurn {TakeExtraTurn.player = plantedPlayer "te", TakeExtraTurn.skips = Set.empty, TakeExtraTurn.count = Quantity.Type.Literal 1}, [plantedPlayer "te"]),
         ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary (Just (plantedPlayer "si")) (NonEmpty.singleton (plantedRef "si"))), [plantedPlayer "si"]),
         ("ante", Effect.Ante (Ante.MkAnte (plantedPlayer "ap") (plantedRef "ap") Nothing), [plantedPlayer "ap"]),
-        ("put-sticker", Effect.PutSticker (PutSticker.MkPutSticker (plantedPlayer "pp") (plantedRef "pp") (Set.singleton StickerKind.Art)), [plantedPlayer "pp"]),
+        ("put-sticker", Effect.PutSticker (PutSticker.MkPutSticker (plantedPlayer "pp") (plantedRef "pp") (Set.singleton StickerKind.Art) Nothing), [plantedPlayer "pp"]),
         ("set-owner", Effect.SetOwner (SetOwner.MkSetOwner (plantedPlayer "sp") (plantedRef "sp")), [plantedPlayer "sp"]),
         ("exchange-top", Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary (plantedRef "ep") (plantedPlayer "ep")), [plantedPlayer "ep"]),
         ("shuffle", Effect.Shuffle (plantedPlayer "sh"), [plantedPlayer "sh"]),
@@ -4167,6 +4167,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.InSlot _ -> []
   Quantity.Type.WasBound _ -> []
   Quantity.Type.BoundCount _ -> []
+  Quantity.Type.UniqueVowelsOnSticker _ -> []
   Quantity.Type.Star -> []
   Quantity.Type.Plus (Plus.MkPlus a b) -> quantityKindFilters a <> quantityKindFilters b
   Quantity.Type.Halved (Halved.MkHalved _ inner) -> quantityKindFilters inner
@@ -6320,7 +6321,7 @@ effectFilters effect = case effect of
   Effect.TakeExtraTurn takeExtraTurn -> frame Unframed (quantityFilters (TakeExtraTurn.count takeExtraTurn))
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ refs) -> frame SourceHostFramed (foldMap objectRefFilters refs)
   Effect.Ante (Ante.MkAnte _ ref _) -> frame SourceHostFramed (objectRefFilters ref)
-  Effect.PutSticker (PutSticker.MkPutSticker _ ref _) -> frame SourceHostFramed (objectRefFilters ref)
+  Effect.PutSticker (PutSticker.MkPutSticker _ ref _ _) -> frame SourceHostFramed (objectRefFilters ref)
   Effect.SetOwner (SetOwner.MkSetOwner _ ref) -> frame SourceHostFramed (objectRefFilters ref)
   Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership one other) -> frame SourceHostFramed (objectRefFilters one <> objectRefFilters other)
   Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary ref _) -> frame SourceHostFramed (objectRefFilters ref)

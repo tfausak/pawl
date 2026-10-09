@@ -463,6 +463,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.InSlot _ -> False
   Quantity.Type.WasBound _ -> False
   Quantity.Type.BoundCount _ -> False
+  Quantity.Type.UniqueVowelsOnSticker _ -> False
   Quantity.Type.Halved {} -> False
   Quantity.Type.Times {} -> False
   Quantity.Type.Negate {} -> False
@@ -1587,7 +1588,7 @@ effectObjectRefs effect =
         Effect.TakeExtraTurn {} -> []
         Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ refs) -> read_ (NonEmpty.toList refs)
         Effect.Ante (Ante.MkAnte _ ref _) -> read_ [ref]
-        Effect.PutSticker (PutSticker.MkPutSticker _ ref _) -> [(AsksChosenPermanent, ref)]
+        Effect.PutSticker (PutSticker.MkPutSticker _ ref _ _) -> [(AsksChosenPermanent, ref)]
         Effect.SetOwner (SetOwner.MkSetOwner _ ref) -> read_ [ref]
         Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership one other) -> read_ [one, other]
         Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary ref _) -> read_ [ref]

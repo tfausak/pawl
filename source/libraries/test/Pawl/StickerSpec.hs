@@ -619,3 +619,44 @@ spec s registry = Spec.describe s "Sticker" $ do
           _ -> board
     Spec.assertEqWith s "CR 123.6 the Piker with a name sticker has a +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne pikerId after) 1
     Spec.assertEqWith s "it is Night Goblin Piker" (nameTexts pikerId g2) [Text.pack "Night Goblin Piker"]
+  -- Review Focus 5: case. Three Islands to look at.
+  Spec.it s "CR 123.6e Otter has two unique vowels, its O capital: Wizards of the _____ looks at two cards" $ do
+    sheets <- committedSheets
+    wizards <- S.printingOf s registry "Wizards of the _____"
+    island <- S.printingOf s registry "Island"
+    let (_, l1) = S.addLibraryCard island S.alice (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))
+        (_, l2) = S.addLibraryCard island S.alice l1
+        (_, l3) = S.addLibraryCard island S.alice l2
+        (wizardsId, after, asked) = entersNaming wizards (placingAt Nothing otter 3) l3
+    Spec.assertEqWith s "CR 123.6e it looked at two cards, after three positions past three words" asked [Positioned S.alice [0, 1, 2, 3], LookedAt 2]
+    Spec.assertEqWith s "CR 123.6a it is Wizards of the Otter _____" (nameTexts wizardsId after) [Text.pack "Wizards of the Otter _____"]
+  -- Review Focus 5: Y, and the binding read by a "when you do" ability's
+  -- target count (CR 603.12). Pikers are 2/1, so -1/-1 kills.
+  Spec.it s "CR 123.6e Slimy has two unique vowels, Y one of them: Wolf in _____ Clothing kills two of bob's Pikers" $ do
+    sheets <- committedSheets
+    wolf <- S.printingOf s registry "Wolf in _____ Clothing"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (p1, g1) = S.addPermanent piker S.bob (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))
+        (p2, g2) = S.addPermanent piker S.bob g1
+        (p3, g3) = S.addPermanent piker S.bob g2
+        bobs r = case Recipient.objectOf r of
+          Just oid -> List.elem oid [p1, p2, p3]
+          Nothing -> False
+        (_, after, _) = entersNaming wolf ((placingAt Nothing slimy 0) {namingPrefers = bobs}) g3
+    Spec.assertEqWith s "CR 123.6e two of bob's Pikers died" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 2
+  -- Review Focus 4. Two boards differing in the position alone.
+  Spec.it s "CR 123.6a Wolf in _____ Clothing offers four positions, and the word goes before a following blank" $ do
+    sheets <- committedSheets
+    wolf <- S.printingOf s registry "Wolf in _____ Clothing"
+    let base = withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)
+        (twoId, afterTwo, asked) = entersNaming wolf (placingAt Nothing otter 2) base
+        (threeId, afterThree, _) = entersNaming wolf (placingAt Nothing otter 3) base
+    Spec.assertEqWith s "CR 123.6a after two words it is Wolf in Otter _____ Clothing; after three, Wolf in _____ Clothing Otter" (nameTexts twoId afterTwo, nameTexts threeId afterThree) ([Text.pack "Wolf in Otter _____ Clothing"], [Text.pack "Wolf in _____ Clothing Otter"])
+    Spec.assertEqWith s "CR 123.6a the blank is not a word: four positions" asked [Positioned S.alice [0, 1, 2, 3]]
+  Spec.it s "CR 123.6a _____-o-saurus is one word: two positions, and Otter puts two counters on it" $ do
+    sheets <- committedSheets
+    saurus <- S.printingOf s registry "_____-o-saurus"
+    let (saurusId, after, asked) = entersNaming saurus (placingAt Nothing otter 1) (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))
+    Spec.assertEqWith s "CR 123.6e two +1/+1 counters for Otter" (S.counterOf CounterKind.PlusOnePlusOne saurusId after) 2
+    Spec.assertEqWith s "CR 123.6a it is _____-o-saurus Otter" (nameTexts saurusId after) [Text.pack "_____-o-saurus Otter"]
+    Spec.assertEqWith s "CR 123.6a one word, two positions" asked [Positioned S.alice [0, 1]]

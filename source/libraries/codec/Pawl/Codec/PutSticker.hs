@@ -4,6 +4,7 @@ module Pawl.Codec.PutSticker where
 
 import qualified Pawl.Codec.ObjectRef as ObjectRef
 import qualified Pawl.Codec.PlayerRef as PlayerRef
+import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Codec.StickerKind as StickerKind
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -16,9 +17,11 @@ codec = Fields.object $ do
   player <- Fields.required "player" PlayerRef.codec PutSticker.player
   ref <- Fields.required "ref" ObjectRef.codec PutSticker.ref
   kinds <- Fields.required "kinds" (Common.set StickerKind.codec) PutSticker.kinds
+  bound <- Fields.defaulted "bound" Nothing (Common.maybe SlotName.codec) PutSticker.bound
   pure
     PutSticker.MkPutSticker
       { PutSticker.player = player,
         PutSticker.ref = ref,
-        PutSticker.kinds = kinds
+        PutSticker.kinds = kinds,
+        PutSticker.bound = bound
       }

@@ -7,6 +7,7 @@ import qualified Pawl.Codec.ModeIndex as ModeIndex
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Codec.Recipient as Recipient
+import qualified Pawl.Codec.StickerRef as StickerRef
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
@@ -25,13 +26,15 @@ codec = Fields.object $ do
   modes <- Fields.defaulted "modes" Nothing (Common.maybe (Common.seq ModeIndex.codec)) Binding.modes
   copy <- Fields.defaulted "copy" Nothing (Common.maybe ProjectedCharacteristics.codec) Binding.copy
   objects <- Fields.defaulted "objects" Nothing (Common.maybe (Common.seq ObjectId.codec)) Binding.objects
+  sticker <- Fields.defaulted "sticker" Nothing (Common.maybe StickerRef.codec) Binding.sticker
   pure
     Binding.MkBinding
       { Binding.targets = targets,
         Binding.amount = amount,
         Binding.modes = modes,
         Binding.copy = copy,
-        Binding.objects = objects
+        Binding.objects = objects,
+        Binding.sticker = sticker
       }
 
 -- | A name-keyed map as a JSON OBJECT keyed by the slot name.

@@ -66,6 +66,9 @@ data Quantity
     -- announcement names, off the binding as WasBound reads it -- Screaming
     -- Swarm's "mills that many", over the attackers its trigger bound.
     BoundCount SlotName.SlotName
+  | -- | CR 123.6e: the unique vowels on the sticker that slot holds; 0 when it
+    -- holds none.
+    UniqueVowelsOnSticker SlotName.SlotName
   | -- | CR 208.2 / 208.2a: the printed star -- notation, which the projection
     -- seed substitutes (Projection.baseCharacteristics) and evaluate answers
     -- Nothing for.

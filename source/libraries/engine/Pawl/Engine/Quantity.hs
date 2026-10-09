@@ -16,6 +16,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.ManaCount as ManaCount
+import qualified Pawl.Engine.NameWords as NameWords
 import qualified Pawl.Engine.QuantitySlot as QuantitySlot
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Types.AgainstLastCardExiledWith as AgainstLastCardExiledWith
@@ -300,6 +301,13 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- counts toward Screaming Swarm's "that many" (CR 608.2i).
         Quantity.BoundCount slot ->
           Just (toInteger (Set.size (Map.findWithDefault Set.empty slot (Filter.slotObjects context))))
+        -- CR 123.6e's "that sticker", off the binding, WasBound's posture: an
+        -- unplaced sticker is an honest 0.
+        Quantity.UniqueVowelsOnSticker slot -> case Map.lookup slot (Filter.slotStickers context) of
+          Nothing -> Just 0
+          Just ref -> case Game.stickerWords ref gs of
+            Nothing -> Just 0
+            Just ws -> Just (toInteger (NameWords.uniqueVowels ws))
         -- CR 208.2: a bare star has no value of its own. Both readers of a
         -- characteristic-defining P/T substitute the object's quantity for it first,
         -- through Projection.seedCharacteristicPT at the projection's seed
@@ -1292,6 +1300,7 @@ objectSlots quantity = case quantity of
   -- only whether the slot is bound, so a plural slot does not damage it.
   Quantity.WasBound _ -> Set.empty
   Quantity.BoundCount _ -> Set.empty
+  Quantity.UniqueVowelsOnSticker _ -> Set.empty
   Quantity.Literal _ -> Set.empty
   Quantity.ManaValue -> Set.empty
   Quantity.Power -> Set.empty
@@ -1564,6 +1573,7 @@ readsX quantity = case quantity of
   -- a slot names an OBJECT, which Binding.variableX never does.
   Quantity.WasBound _ -> False
   Quantity.BoundCount _ -> False
+  Quantity.UniqueVowelsOnSticker _ -> False
   -- The whole point of the recursion: Vitalizing Cascade's "X plus 3" is
   -- Plus X (Literal 3), which reads X without being equal to it.
   Quantity.Plus (Plus.MkPlus a b) -> readsX a || readsX b

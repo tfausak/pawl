@@ -999,7 +999,7 @@ rewriteEffect pairs effect = case effect of
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named refs) -> Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named (fmap (rewriteObjectRef pairs) refs))
   -- ShuffleIntoLibrary's descent: the ref's filters are card text.
   Effect.Ante (Ante.MkAnte player ref mSlot) -> Effect.Ante (Ante.MkAnte player (rewriteObjectRef pairs ref) mSlot)
-  Effect.PutSticker (PutSticker.MkPutSticker player ref kinds) -> Effect.PutSticker (PutSticker.MkPutSticker player (rewriteObjectRef pairs ref) kinds)
+  Effect.PutSticker (PutSticker.MkPutSticker player ref kinds bound) -> Effect.PutSticker (PutSticker.MkPutSticker player (rewriteObjectRef pairs ref) kinds bound)
   Effect.SetOwner (SetOwner.MkSetOwner player ref) -> Effect.SetOwner (SetOwner.MkSetOwner player (rewriteObjectRef pairs ref))
   Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership one other) -> Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership (rewriteObjectRef pairs one) (rewriteObjectRef pairs other))
   Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary ref player) -> Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary (rewriteObjectRef pairs ref) player)
@@ -2200,6 +2200,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.InSlot _ -> quantity
   Quantity.Type.WasBound _ -> quantity
   Quantity.Type.BoundCount _ -> quantity
+  Quantity.Type.UniqueVowelsOnSticker _ -> quantity
   Quantity.Type.Star -> quantity
   Quantity.Type.ManaCount _ -> quantity
   Quantity.Type.LifeTotal _ -> quantity

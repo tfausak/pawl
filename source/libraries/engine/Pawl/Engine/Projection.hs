@@ -4178,6 +4178,7 @@ quantityReads q = case q of
   -- slot reads one.
   Quantity.Type.WasBound _ -> Set.empty
   Quantity.Type.BoundCount _ -> Set.empty
+  Quantity.Type.UniqueVowelsOnSticker _ -> Set.empty
   Quantity.Type.Star -> Set.empty
   Quantity.Type.ManaCount _ -> Set.empty
   Quantity.Type.LifeTotal _ -> Set.empty

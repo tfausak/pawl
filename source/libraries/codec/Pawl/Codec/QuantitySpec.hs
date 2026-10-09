@@ -105,6 +105,12 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.BoundCount (SlotName.MkSlotName (Text.pack "thoseAttackingCreatures")))
       " {\"type\":\"BoundCount\",\"value\":\"thoseAttackingCreatures\"} "
+  Spec.it s "UniqueVowelsOnSticker" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.UniqueVowelsOnSticker (SlotName.MkSlotName (Text.pack "placed")))
+      " {\"type\":\"UniqueVowelsOnSticker\",\"value\":\"placed\"} "
   Spec.it s "Star" $
     Common.assertCodec
       s
