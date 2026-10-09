@@ -1874,9 +1874,8 @@ battlefieldAbilitiesOf counts = concatMap (uncurry battlefieldAbilitiesFor) (Map
 -- the hand and graveyard mints, and CR 804.2's ability where `deploys`.
 --
 -- HAS, not can activate here: CR 113.6 says where an ability FUNCTIONS, so crew
--- is an ability of a Vehicle card in a deck (CR 702.122a) as cycling is of a
--- card on the battlefield. Pawl.CompanionSpec's Consulate Dreadnought case is
--- the board.
+-- is an ability of a Vehicle card in a library (CR 702.122a) as cycling is of a
+-- permanent. Pawl.CompanionSpec's Consulate Dreadnought case is the board.
 activatedAbilitiesOf :: Bool -> Set Keyword -> [ActivatedAbility Card (GrantedAbility.GrantedAbility Card)] -> [ActivatedAbility Card (GrantedAbility.GrantedAbility Card)]
 activatedAbilitiesOf deploys keywords abilities =
   abilities

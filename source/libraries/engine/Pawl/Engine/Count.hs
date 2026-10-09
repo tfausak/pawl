@@ -1100,7 +1100,9 @@ castOwner gs spell = case Game.lookupObject spell gs of
 -- Each record field is proved where a trigger reads it: the OWNER by
 -- Pawl.ConditionSpec's "the entrant killed between the two checks still grows
 -- the Knight" (that it answers; WHICH player is a fence, the record's controller
--- leaving it green), TOKEN status by Sunpearl Kirin's "if it was a token",
+-- leaving it green) and, over a departure, by Dimir Strandcatcher's "put into
+-- your graveyard" (Pawl.CountSpec), TOKEN status by Sunpearl Kirin's "if it
+-- was a token",
 -- BLOCKING by Guildsworn Prowler's intervening "if" and ATTACKING by Garna,
 -- Bloodfist of Keld's "if it was attacking". The three fields that follow the
 -- combat lookup on to the attacked permanent -- attackingPlayer,
@@ -1114,8 +1116,7 @@ castOwner gs spell = case Game.lookupObject spell gs of
 -- at the caller's depth, as viewOfCharacteristics' own `attachedViews` does.
 --
 -- Every other object field is the snapshot's blank, which is what the live read
--- answers for an id naming nothing too: no zone, no targets, untapped, no
--- designations.
+-- answers for an id naming nothing too: no zone, no targets, no designations.
 lastKnownView :: ViewOf -> ObjectId -> GameState -> LastKnown.LastKnown -> Filter.View
 lastKnownView peers oid gs lastKnown =
   ( viewOfSnapshot
