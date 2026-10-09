@@ -389,7 +389,7 @@ spec s registry = Spec.describe s "Meld" $ do
         -- CR 603.2c's "that many" counts the cards the FILTER admits: the same
         -- entry read under a creature-card filter binds 1, Hanweir Garrison
         -- being the one creature and Hanweir Battlements a land.
-        let creatures = TriggerCondition.CardsLeaveZone (CardLeavesZone.MkCardLeavesZone (Filter.Type.HasCardType CardType.Creature) TurnScope.EachTurn Zone.Exile Nothing)
+        let creatures = TriggerCondition.CardsLeaveZone (CardLeavesZone.MkCardLeavesZone (Filter.Type.HasCardType CardType.Creature) TurnScope.EachTurn Zone.Exile Nothing Nothing)
         Spec.assertEqWith
           s
           "a creature-card filter admits one of the two departures"

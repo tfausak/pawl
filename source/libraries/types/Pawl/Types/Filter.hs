@@ -166,9 +166,9 @@ data Filter keyword
     ControlledByRecipient
   | -- | CR 108.3 / 110.2: the candidate's OWNER relates thus to the perspective.
     -- A sibling of ControlledBy above and never derivable from it, and answerable
-    -- in every zone where that atom is not: an owner is fixed when the game
-    -- starts, while CR 108.4 gives a card outside the battlefield and the stack
-    -- no controller. False off an object, a printed card being none (CR 109.1).
+    -- in every zone where that atom is not: an owner changes only by CR 407.3's
+    -- ante cards, while CR 108.4 gives a card outside the battlefield and the
+    -- stack no controller. False off an object, a printed card being none (CR 109.1).
     OwnedBy PlayerRelation.PlayerRelation
   | -- | CR 108.3 / 701.9a: the candidate's OWNER is the player the surrounding
     -- effect is currently being applied to -- ControlledByRecipient's owner
@@ -655,7 +655,9 @@ data Filter keyword
     -- their hands" is @Not (IsInZone Hand)@ (#163). A cast gate reads it before
     -- CR 601.2a moves the card to the stack, which is what CR 601.2's "take it
     -- from where it is" asks for. Names a zone and not whose -- "in your
-    -- graveyard" is an OwnedBy conjunct beside this atom. Vacuously False where
+    -- graveyard" is an OwnedBy conjunct beside this atom, exact except between an
+    -- ownership change and the move that follows it in one resolution (CR
+    -- 407.3). Vacuously False where
     -- there is no OBJECT to ask (CR 109.1).
     IsInZone Zone.Zone
   | -- | CR 601.2a: which zone the candidate SPELL was moved to the stack from --

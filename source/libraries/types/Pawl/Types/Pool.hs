@@ -99,6 +99,8 @@ data Pool
     -- and it is not redundant -- the owner of a foretold card MAY look at it, so
     -- rule 406.4 offers it by name and Riftsweeper's own words refuse it.
     CardsInExile
+  | -- | CR 115.2 / 407: the cards in the ante (ToObject), Darkpact's target.
+    CardsInAnte
   | -- | CR 115.2 clause (a) exercised TWICE in one slot -- Savior of Ollenbock's
     -- "up to one other target creature from the battlefield or creature card from
     -- a graveyard". SpellsAndPermanents' shape across two zones instead of two

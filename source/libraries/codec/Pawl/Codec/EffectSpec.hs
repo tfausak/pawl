@@ -89,8 +89,10 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryAttack as EntryAttack
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeBlocks as ExchangeBlocks
+import qualified Pawl.Types.ExchangeOwnership as ExchangeOwnership
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
+import qualified Pawl.Types.ExchangeWithTopOfLibrary as ExchangeWithTopOfLibrary
 import qualified Pawl.Types.ExchangeZones as ExchangeZones
 import qualified Pawl.Types.ExchangedValue as ExchangedValue
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
@@ -181,6 +183,7 @@ import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
+import qualified Pawl.Types.SetOwner as SetOwner
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Types.SlotName as SlotName
@@ -1197,6 +1200,30 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Ante (Ante.MkAnte (PlayerRef.Relative PlayerRelation.You) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))) (Just (SlotName.MkSlotName (Text.pack "bird")))))
       " {\"type\":\"Ante\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"ref\":{\"type\":\"InSlot\",\"value\":\"self\"},\"slot\":\"bird\"}} "
+  -- CR 407.3: the new owner and what changes owner.
+  Spec.it s "SetOwner" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.SetOwner (SetOwner.MkSetOwner (PlayerRef.Relative PlayerRelation.You) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "card")))))
+      " {\"type\":\"SetOwner\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"ref\":{\"type\":\"InSlot\",\"value\":\"card\"}}} "
+  -- CR 701.12a: the two refs whose objects trade owners.
+  Spec.it s "ExchangeOwnership" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (ObjectRef.FromAnywhere (SlotName.MkSlotName (Text.pack "self")))))
+      " {\"type\":\"ExchangeOwnership\",\"value\":{\"one\":{\"type\":\"InSlot\",\"value\":\"target\"},\"other\":{\"type\":\"FromAnywhere\",\"value\":\"self\"}}} "
+  -- CR 701.12d: the card and whose library's top card it trades places with.
+  Spec.it s "ExchangeWithTopOfLibrary" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "card"))) (PlayerRef.Relative PlayerRelation.You)))
+      " {\"type\":\"ExchangeWithTopOfLibrary\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"ref\":{\"type\":\"InSlot\",\"value\":\"card\"}}} "
   -- CR 701.24a on its own: the arm above with no ref at all, so the payload is a
   -- bare PlayerRef. Undercity's "then shuffle" is what writes it.
   Spec.it s "Shuffle" $

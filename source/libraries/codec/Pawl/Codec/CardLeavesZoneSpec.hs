@@ -18,24 +18,27 @@ spec s = Spec.describe s "Pawl.Codec.CardLeavesZone" $ do
       s
       CardLeavesZone.codec
       ( CardLeavesZone.MkCardLeavesZone
-          { CardLeavesZone.filter = Filter.OwnedBy PlayerRelation.You,
+          { CardLeavesZone.filter = Filter.Not Filter.IsToken,
             CardLeavesZone.scope = TurnScope.ControllersTurn,
             CardLeavesZone.from = Zone.Graveyard,
-            CardLeavesZone.to = Nothing
+            CardLeavesZone.to = Nothing,
+            CardLeavesZone.whose = Just PlayerRelation.You
           }
       )
-      " {\"filter\":{\"type\":\"OwnedBy\",\"value\":{\"type\":\"You\"}},\"scope\":{\"type\":\"ControllersTurn\"},\"from\":{\"type\":\"Graveyard\"}} "
-  -- Rakshasa Vizier's: "put into exile from your graveyard".
+      " {\"filter\":{\"type\":\"Not\",\"value\":{\"type\":\"IsToken\"}},\"scope\":{\"type\":\"ControllersTurn\"},\"from\":{\"type\":\"Graveyard\"},\"whose\":{\"type\":\"You\"}} "
+  -- A destination, and no `whose`: "a card leaves a graveyard" names no pile's
+  -- player, so the key is left out.
   Spec.it s "MkCardLeavesZone, with a destination" $
     Common.assertCodec
       s
       CardLeavesZone.codec
       ( CardLeavesZone.MkCardLeavesZone
-          { CardLeavesZone.filter = Filter.OwnedBy PlayerRelation.You,
+          { CardLeavesZone.filter = Filter.Not Filter.IsToken,
             CardLeavesZone.scope = TurnScope.EachTurn,
             CardLeavesZone.from = Zone.Graveyard,
-            CardLeavesZone.to = Just Zone.Exile
+            CardLeavesZone.to = Just Zone.Exile,
+            CardLeavesZone.whose = Nothing
           }
       )
-      " {\"filter\":{\"type\":\"OwnedBy\",\"value\":{\"type\":\"You\"}},\"scope\":{\"type\":\"EachTurn\"},\"from\":{\"type\":\"Graveyard\"},\"to\":{\"type\":\"Exile\"}} "
+      " {\"filter\":{\"type\":\"Not\",\"value\":{\"type\":\"IsToken\"}},\"scope\":{\"type\":\"EachTurn\"},\"from\":{\"type\":\"Graveyard\"},\"to\":{\"type\":\"Exile\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s CardLeavesZone.codec

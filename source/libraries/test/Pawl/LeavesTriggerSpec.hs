@@ -724,7 +724,7 @@ handArrivalSpec s registry =
         Spec.it s "CR 400.7e a library-to-hand move binds handArrival and not became" $ do
           (_, (settled, _)) <- brinefarerDraws "Burrenton Forge-Tender"
           let arrived = Game.zoneMembers Zone.Hand S.alice settled
-              condition = TriggerCondition.CardLeavesZone (CardLeavesZone.MkCardLeavesZone (Filter.Type.And []) TurnScope.EachTurn Zone.Library (Just Zone.Hand))
+              condition = TriggerCondition.CardLeavesZone (CardLeavesZone.MkCardLeavesZone (Filter.Type.And []) TurnScope.EachTurn Zone.Library (Just Zone.Hand) Nothing)
               bindingsOf = Event.eventBindings settled Nothing Map.empty (ObjectId.MkObjectId 0) S.alice condition
               drew = [bindingsOf event | event@(GameEvent.Moved m) <- fmap LoggedEvent.event (Foldable.toList (GameState.events settled)), ZoneChange.to (Moved.change m) == Zone.Hand]
           Spec.assertEqWith s "the arrival is the card in alice's hand" drew (fmap (Map.singleton Binding.handArrival . Binding.toObject) arrived)

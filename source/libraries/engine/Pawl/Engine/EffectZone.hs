@@ -132,6 +132,8 @@ zoneFunctionedAgainst itself delayed effect = case effect of
     ObjectRef.ChosenPermanent _ -> Nothing
     ObjectRef.SourceAndChosenPermanent _ -> Nothing
     ObjectRef.AttachedToBound _ -> Nothing
+    -- The object may be in any zone by now.
+    ObjectRef.FromAnywhere _ -> Nothing
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> Nothing
   Effect.Fight {} -> Nothing
   Effect.ModifyTarget {} -> Nothing
@@ -330,6 +332,9 @@ zoneFunctionedAgainst itself delayed effect = case effect of
   Effect.TakeExtraTurn {} -> Nothing
   Effect.ShuffleIntoLibrary {} -> Nothing
   Effect.Ante {} -> Nothing
+  Effect.SetOwner {} -> Nothing
+  Effect.ExchangeOwnership {} -> Nothing
+  Effect.ExchangeWithTopOfLibrary {} -> Nothing
   Effect.Shuffle {} -> Nothing
   Effect.OfferCast {} -> Nothing
   Effect.OfferNamedCopy {} -> Nothing

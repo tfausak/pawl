@@ -192,7 +192,7 @@ keptFaceDown oid gs =
 withoutBeingCast :: GameState -> GameState
 withoutBeingCast gs =
   Map.foldrWithKey
-    (\oid object acc -> if Object.castFrom object == Just (Object.zone object) then removeFromZones (Object.owner object) oid acc else acc)
+    (\oid object acc -> if Object.castFrom object == Just (Object.zone object) then removeFromZones oid acc else acc)
     gs
     (GameState.objects gs)
 
@@ -628,29 +628,78 @@ attachments oid gs =
     (\attacher -> (lookupObject attacher gs >>= Object.attachedTo >>= Recipient.objectOf) == Just oid)
     (GameState.battlefield gs)
 
-removeFromZones :: PlayerId -> ObjectId -> GameState -> GameState
-removeFromZones pid oid gs =
-  gs
-    { GameState.library = Map.adjust (Seq.filter (/= oid)) pid (GameState.library gs),
-      GameState.hand = Map.adjust (Seq.filter (/= oid)) pid (GameState.hand gs),
-      GameState.graveyard = Map.adjust (Seq.filter (/= oid)) pid (GameState.graveyard gs),
-      GameState.battlefield = Set.delete oid (GameState.battlefield gs),
-      -- CR 702.26k: "phased-out permanents owned by a player who leaves the game
-      -- also leave the game", one of the three rules on the far side of CR 702.26b's
-      -- "except for rules and effects that specifically mention phased-out
-      -- permanents" -- so the battlefield line above does not reach them and this
-      -- one has to. Rule 702.26k's second sentence ("this doesn't cause zone-change
-      -- abilities to trigger") is free: nothing here funnels through
-      -- Pawl.Engine.Event.
-      GameState.phasedOut = Map.delete oid (GameState.phasedOut gs),
-      GameState.exile = Set.delete oid (GameState.exile gs),
-      GameState.command = Set.delete oid (GameState.command gs),
-      GameState.ante = Set.delete oid (GameState.ante gs),
-      GameState.attractionDecks = Map.adjust (Seq.filter (/= oid)) pid (GameState.attractionDecks gs),
-      GameState.planarDecks = Map.adjust (Seq.filter (/= oid)) pid (GameState.planarDecks gs),
-      GameState.schemeDecks = Map.adjust (Seq.filter (/= oid)) pid (GameState.schemeDecks gs),
-      GameState.stack = filter (/= oid) (GameState.stack gs)
-    }
+-- CR 400.1: the player whose library, hand or graveyard holds this card -- its
+-- owner (CR 400.3) except between an ownership change and a later move (CR
+-- 407.3) -- in every pool card, the next instruction of the same resolution.
+-- Found by search for that reason, in the one zone Object.zone names and the
+-- owner's pile first; Nothing for an object in no player's pile.
+pileHolderOf :: ObjectId -> GameState -> Maybe PlayerId
+pileHolderOf oid gs = case lookupObject oid gs of
+  Just obj -> case Object.zone obj of
+    Zone.Library -> pileHolderIn (Just (Object.owner obj)) oid (GameState.library gs)
+    Zone.Hand -> pileHolderIn (Just (Object.owner obj)) oid (GameState.hand gs)
+    Zone.Graveyard -> pileHolderIn (Just (Object.owner obj)) oid (GameState.graveyard gs)
+    _ -> Nothing
+  Nothing -> Foldable.asum (fmap (pileHolderIn Nothing oid) [GameState.library gs, GameState.hand gs, GameState.graveyard gs])
+
+-- The player whose pile in one per-player zone holds the id: the hinted
+-- player's pile first, then every pile.
+pileHolderIn :: Maybe PlayerId -> ObjectId -> Map.Map PlayerId (Seq.Seq ObjectId) -> Maybe PlayerId
+pileHolderIn hint oid piles = case hint of
+  Just pid | maybe False (Foldable.elem oid) (Map.lookup pid piles) -> Just pid
+  _ -> fmap fst (List.find (Foldable.elem oid . snd) (Map.toList piles))
+
+-- CR 108.3 / 407.3: this player now owns the object. A write on the object as
+-- it stands and not a zone change, so CR 400.7 mints nothing; CR 400.3 reads
+-- the new owner at its next move. Unknown ids are left alone.
+--
+-- CR 110.2: control does not follow. A permanent or spell whose default
+-- controller is the owner fallback (Object.enteredUnder Nothing) has that
+-- controller pinned first. Proved by
+-- data/scenarios/ante/ante-timmerian-fiends-the-artifact-dies-under-its-old-owners-control.json.
+setOwner :: ObjectId -> PlayerId -> GameState -> GameState
+setOwner oid pid gs =
+  let pinned obj
+        | Maybe.isNothing (Object.enteredUnder obj) && List.elem (Object.zone obj) [Zone.Battlefield, Zone.Stack] = obj {Object.enteredUnder = Just (Object.owner obj)}
+        | otherwise = obj
+   in gs {GameState.objects = Map.adjust (\obj -> (pinned obj) {Object.owner = pid}) oid (GameState.objects gs)}
+
+removeFromZones :: ObjectId -> GameState -> GameState
+removeFromZones oid gs =
+  let found = lookupObject oid gs
+      owner = fmap Object.owner found
+      -- Only the zone the object says it is in is searched; an unknown id
+      -- searches every pile.
+      searched zone = maybe True ((== zone) . Object.zone) found
+      -- CR 400.1: out of the pile that holds it, never Object.owner's, which an
+      -- ownership change can have moved first. The owner's pile is only probed
+      -- first.
+      fromPile zone piles
+        | searched zone = case pileHolderIn owner oid piles of
+            Just pid -> Map.adjust (Seq.filter (/= oid)) pid piles
+            Nothing -> piles
+        | otherwise = piles
+   in gs
+        { GameState.library = fromPile Zone.Library (GameState.library gs),
+          GameState.hand = fromPile Zone.Hand (GameState.hand gs),
+          GameState.graveyard = fromPile Zone.Graveyard (GameState.graveyard gs),
+          GameState.battlefield = Set.delete oid (GameState.battlefield gs),
+          -- CR 702.26k: "phased-out permanents owned by a player who leaves the game
+          -- also leave the game", one of the three rules on the far side of CR 702.26b's
+          -- "except for rules and effects that specifically mention phased-out
+          -- permanents" -- so the battlefield line above does not reach them and this
+          -- one has to. Rule 702.26k's second sentence ("this doesn't cause zone-change
+          -- abilities to trigger") is free: nothing here funnels through
+          -- Pawl.Engine.Event.
+          GameState.phasedOut = Map.delete oid (GameState.phasedOut gs),
+          GameState.exile = Set.delete oid (GameState.exile gs),
+          GameState.command = Set.delete oid (GameState.command gs),
+          GameState.ante = Set.delete oid (GameState.ante gs),
+          GameState.attractionDecks = fromPile Zone.Command (GameState.attractionDecks gs),
+          GameState.planarDecks = fromPile Zone.Command (GameState.planarDecks gs),
+          GameState.schemeDecks = fromPile Zone.Command (GameState.schemeDecks gs),
+          GameState.stack = filter (/= oid) (GameState.stack gs)
+        }
 
 -- CR 401.2: a library is an ORDERED pile, so a library arrival needs the END it
 -- arrives at. The Seq's HEAD is the top -- Event.drawCard takes the head, which
@@ -2852,6 +2901,32 @@ diedChange :: GameEvent -> Maybe ZoneChange.ZoneChange
 diedChange event = do
   change <- movedChange event
   if ZoneChange.from change == Zone.Battlefield && ZoneChange.to change == Zone.Graveyard then Just change else Nothing
+
+-- CR 400.7's link read back for a card that says "from anywhere" (Tempest
+-- Efreet, Timmerian Fiends): the object this id is now, following each logged
+-- zone change from the id that left to the id that arrived. Nothing once the
+-- trail reaches an id that is gone with no successor: the card left the game.
+-- The log is this turn's (GameState.events), which is enough, since the stack
+-- empties before any turn ends.
+--
+-- Not implemented: following a card out of a move with several arrivals, a
+-- merged permanent leaving the battlefield (#4837).
+currentIncarnation :: ObjectId -> GameState -> Maybe ObjectId
+currentIncarnation oid gs
+  | Map.member oid (GameState.objects gs) = Just oid
+  | otherwise = case successorOf oid gs of
+      Just next -> currentIncarnation next gs
+      Nothing -> Nothing
+
+-- The one id a logged single-arrival move turned this id into.
+successorOf :: ObjectId -> GameState -> Maybe ObjectId
+successorOf oid gs =
+  Maybe.listToMaybe
+    [ arrival
+    | LoggedEvent.MkLoggedEvent _ (GameEvent.Moved m) <- Foldable.toList (GameState.events gs),
+      ZoneChange.departed (Moved.change m) == oid,
+      [arrival] <- [Foldable.toList (Moved.arrivals m)]
+    ]
 
 -- CR 400.7's zone change itself, whatever its ends -- the exhaustive case the two
 -- readers above share, so a new GameEvent constructor is classified once rather

@@ -73,7 +73,7 @@ anthemBoard land anthem spell n =
       place zone printing gs0 =
         let (printingId, gs1) = Game.intern printing gs0
             (oid, gs2) = Engine.runGamePure Script.declining gs1 (Setup.createCard alice printingId)
-            moved = Game.insertIntoZone zone LibraryPosition.defaultValue alice oid (Game.removeFromZones alice oid gs2)
+            moved = Game.insertIntoZone zone LibraryPosition.defaultValue alice oid (Game.removeFromZones oid gs2)
          in moved {GameState.objects = Map.adjust (\o -> o {Object.zone = zone}) oid (GameState.objects moved)}
       times :: Natural -> (GameState.GameState -> GameState.GameState) -> GameState.GameState -> GameState.GameState
       times k f = foldr (.) id (List.genericReplicate k f)

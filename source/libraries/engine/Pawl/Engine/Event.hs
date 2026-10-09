@@ -5940,6 +5940,8 @@ storeEntryEffect entered gs (source, modification) =
           }
    in gs1 {GameState.continuousEffects = effect : GameState.continuousEffects gs1}
 
+-- Not implemented: leaving an object put into the zone it is already in where
+-- it is, rather than moving it (#4843).
 changeZoneWithCause :: Maybe DiscardCause.DiscardCause -> Maybe GameState -> Set ObjectId -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> Maybe Recipient.Recipient -> TapState.TapState -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> Maybe PlayerId -> Maybe CardName.CardName -> Facing.Facing -> Bool -> CarryOver.CarryOver -> Bool -> Seq.Seq (ObjectId, Modification.Modification (GrantedAbility.Type.GrantedAbility Card.Type.Card)) -> Game (Seq.Seq ObjectId)
 changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition seed tapped entering under shown facing concealed carrying resolving defining = do
   gs <- State.get
@@ -6550,7 +6552,7 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
               -- CR 712.13a's rollback point; see the branch after the entry loop.
               unentered <- State.get
               State.modify' $ \g ->
-                let g1 = Game.removeFromZones pid oid g
+                let g1 = Game.removeFromZones oid g
                  in g1
                       { GameState.objects = Map.delete oid (GameState.objects g1),
                         -- CR 506.4, first clause: "a permanent is removed from
@@ -6594,7 +6596,7 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                         -- id moves before its host, and the live board has already
                         -- forgotten it. Pawl.ZoneTriggerSpec's "the Equipment dying
                         -- in the same batch, ahead of its host" is the proof.
-                        GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Game.attachments oid lki) (Object.chosenNames obj) (Object.chosenPlayer obj) (Object.chosenColors obj) (Object.chosenSubtype obj) (Game.isAttacking oid gs) (Game.attackTargetOf oid gs) (Game.isBlocking oid gs) (Object.protector obj) (Object.paidCosts obj) (Object.controlClock obj) (Object.zone obj)) (GameState.lastKnown g1),
+                        GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Game.attachments oid lki) (Object.chosenNames obj) (Object.chosenPlayer obj) (Object.chosenColors obj) (Object.chosenSubtype obj) (Game.isAttacking oid gs) (Game.attackTargetOf oid gs) (Game.isBlocking oid gs) (Object.protector obj) (Object.paidCosts obj) (Object.controlClock obj) (Object.zone obj) (Game.pileHolderOf oid g)) (GameState.lastKnown g1),
                         -- CR 608.2h's record for a STACK object, filed in the same
                         -- write and from the same board as `lastKnown` above, which
                         -- cannot keep it: rule 707.10 copies the DECISIONS, and CR
@@ -8207,8 +8209,8 @@ createTokens controller card copy n tapped entering attached = do
 unmake :: ObjectId -> Game ()
 unmake oid = State.modify' $ \gs -> case Game.lookupObject oid gs of
   Nothing -> gs
-  Just obj ->
-    let gs1 = Game.removeFromZones (Object.owner obj) oid gs
+  Just _ ->
+    let gs1 = Game.removeFromZones oid gs
      in gs1 {GameState.objects = Map.delete oid (GameState.objects gs1)}
 
 -- The tail createTokens and conjureOntoBattlefield share, run after every entry
@@ -8717,10 +8719,10 @@ forgetObject gs oid = case Game.lookupObject oid gs of
   Just obj ->
     let snapshot = Projection.project oid gs
         lastController = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
-        cleared = Game.removeFromZones (Object.owner obj) oid gs
+        cleared = Game.removeFromZones oid gs
      in cleared
           { GameState.objects = Map.delete oid (GameState.objects cleared),
-            GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Game.attachments oid gs) (Object.chosenNames obj) (Object.chosenPlayer obj) (Object.chosenColors obj) (Object.chosenSubtype obj) (Game.isAttacking oid gs) (Game.attackTargetOf oid gs) (Game.isBlocking oid gs) (Object.protector obj) (Object.paidCosts obj) (Object.controlClock obj) (Object.zone obj)) (GameState.lastKnown cleared)
+            GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Game.attachments oid gs) (Object.chosenNames obj) (Object.chosenPlayer obj) (Object.chosenColors obj) (Object.chosenSubtype obj) (Game.isAttacking oid gs) (Game.attackTargetOf oid gs) (Game.isBlocking oid gs) (Object.protector obj) (Object.paidCosts obj) (Object.controlClock obj) (Object.zone obj) (Game.pileHolderOf oid gs)) (GameState.lastKnown cleared)
           }
 
 -- CR 119.3: move one player's life total by this much, and record the CR 608.2i
@@ -9348,17 +9350,17 @@ controllerTurnScoped cond = case cond of
   -- The third arm carrying a TurnScope, and the classification follows the FIELD
   -- rather than the constructor: Kishla Skimmer prints "during your turn" and a
   -- printing of the same family without it would not.
-  TriggerCondition.CardLeavesZone (CardLeavesZone.MkCardLeavesZone _ TurnScope.ControllersTurn _ _) -> True
-  TriggerCondition.CardLeavesZone (CardLeavesZone.MkCardLeavesZone _ TurnScope.EachTurn _ _) -> False
+  TriggerCondition.CardLeavesZone (CardLeavesZone.MkCardLeavesZone _ TurnScope.ControllersTurn _ _ _) -> True
+  TriggerCondition.CardLeavesZone (CardLeavesZone.MkCardLeavesZone _ TurnScope.EachTurn _ _ _) -> False
   -- No printing of this family says "during an opponent's turn", so this arm is
   -- unreachable from card data; answering True would make the classification wrong
   -- for the sake of that unreachable case.
-  TriggerCondition.CardLeavesZone (CardLeavesZone.MkCardLeavesZone _ TurnScope.OpponentsTurn _ _) -> False
+  TriggerCondition.CardLeavesZone (CardLeavesZone.MkCardLeavesZone _ TurnScope.OpponentsTurn _ _ _) -> False
   -- The batch reading of the same family, classified off the same field for the
   -- same reason: Spirit Mascot prints no turn clause where Kishla Skimmer does.
-  TriggerCondition.CardsLeaveZone (CardLeavesZone.MkCardLeavesZone _ TurnScope.ControllersTurn _ _) -> True
-  TriggerCondition.CardsLeaveZone (CardLeavesZone.MkCardLeavesZone _ TurnScope.EachTurn _ _) -> False
-  TriggerCondition.CardsLeaveZone (CardLeavesZone.MkCardLeavesZone _ TurnScope.OpponentsTurn _ _) -> False
+  TriggerCondition.CardsLeaveZone (CardLeavesZone.MkCardLeavesZone _ TurnScope.ControllersTurn _ _ _) -> True
+  TriggerCondition.CardsLeaveZone (CardLeavesZone.MkCardLeavesZone _ TurnScope.EachTurn _ _ _) -> False
+  TriggerCondition.CardsLeaveZone (CardLeavesZone.MkCardLeavesZone _ TurnScope.OpponentsTurn _ _ _) -> False
   -- Dutiful Knowledge Seeker's arrival names no turn.
   TriggerCondition.CardsPutIntoZone {} -> False
   TriggerCondition.SelfLeavesGraveyard -> False

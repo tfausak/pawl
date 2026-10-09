@@ -75,6 +75,13 @@ spec s = Spec.describe s "Pawl.Codec.Pool" $ do
       Pool.codec
       Pool.CardsInExile
       " {\"type\":\"CardsInExile\"} "
+  -- CR 407: the cards in the ante, nullary for CardsInExile's reason.
+  Spec.it s "CardsInAnte" $
+    Common.assertCodec
+      s
+      Pool.codec
+      Pool.CardsInAnte
+      " {\"type\":\"CardsInAnte\"} "
   -- The battlefield and CR 404.1's graveyard in one slot, so the graveyard half's
   -- scope is what the payload carries.
   Spec.it s "CreaturesAndCardsInGraveyard" $

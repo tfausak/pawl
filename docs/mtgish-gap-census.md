@@ -207,7 +207,7 @@ command-zone casting, even before Commander-format questions.
   battlefield, CR 702.26 — verify); **phasing** as a mechanism is absent. GAP.
 - **Face-down / turned-face-up** (morph, disguise, manifest, cloak) is a status +
   the copy/characteristics machinery — GAP, tied to copy (3.3).
-- **Ante** zone — landed (`Zone.Ante`, CR 407); ownership changes are unit 2 of `docs/superpowers/specs/2026-10-08-ante-design.md`.
+- **Ante** zone — landed (`Zone.Ante`, CR 407), and so have its ownership changes (`Effect.SetOwner`, `Effect.ExchangeOwnership`, CR 407.3); the ownership report is unit 3 of `docs/superpowers/specs/2026-10-08-ante-design.md`.
 - **"Outside the game"** (wish targets, `MayPlayLandsFromOutsideTheGame`) — mostly
   **OOS**-adjacent (sideboard); flag as VOCAB-if-ever.
 

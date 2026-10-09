@@ -5,11 +5,13 @@
 -- Pawl.Engine.Departure, and Pawl.Engine.Ante's CR 407.3 bar.
 module Pawl.AnteSpec where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -188,3 +190,27 @@ spec s registry = Spec.describe s "Ante" $ do
     Spec.assertEqWith s "CR 608.2d carol keeps her 7 life" (S.lifeOf S.carol after) (Just 7)
     Spec.assertEqWith s "CR 407.4 alice and bob anted, and went to 20" (S.lifeOf S.alice after, S.lifeOf S.bob after, length (anteOf S.alice after), length (anteOf S.bob after)) (Just 20, Just 20, 1, 1)
     Spec.assertEqWith s "CR 608.2d carol was never asked" (reverse asked) [S.alice, S.bob]
+  -- CR 400.1 / 400.3: between an ownership change and the move that follows it
+  -- (Tempest Efreet), a card sits in a pile its owner does not hold. It leaves
+  -- the pile that holds it and arrives in its owner's.
+  Spec.it s "CR 400.1 a card leaves the pile that holds it, not its owner's" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (card, g1) = S.addObjectIn Zone.Graveyard piker S.alice (Setup.gameWith anteGame S.bothPlayers)
+        g2 = g1 {GameState.objects = Map.adjust (\obj -> obj {Object.owner = S.bob}) card (GameState.objects g1)}
+        after = S.runPure S.identityAnswer g2 (Event.changeZone card Zone.Hand)
+    Spec.assertEqWith s "CR 400.1 alice's graveyard holds bob's card" (Game.pileHolderOf card g2) (Just S.alice)
+    Spec.assertEqWith s "CR 400.1 alice's graveyard no longer holds it" (Game.zoneMembers Zone.Graveyard S.alice after) []
+    Spec.assertEqWith s "CR 400.3 it is in bob's hand" (length (Game.zoneMembers Zone.Hand S.bob after)) 1
+  -- CR 400.7 / Tempest Efreet's "from anywhere": a card is followed through
+  -- every move it made this turn to the object it is now, and is lost once it
+  -- leaves the game (CR 800.4a). Three seats so alice's concession leaves a game.
+  Spec.it s "CR 400.7 from anywhere follows a card moved twice, and loses it once it leaves the game" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (start, g1) = S.addObjectIn Zone.Battlefield piker S.alice (Setup.gameWith anteGame S.threePlayers)
+        twice = do
+          arrived <- Event.changeZoneReturning start Zone.Graveyard
+          Monad.forM_ arrived (\gy -> Event.changeZone gy Zone.Exile)
+        after = S.runPure S.identityAnswer g1 twice
+        zoneNow gs = fmap Object.zone (Game.currentIncarnation start gs >>= \oid -> Game.lookupObject oid gs)
+    Spec.assertEqWith s "CR 400.7 it is followed into exile" (zoneNow after) (Just Zone.Exile)
+    Spec.assertEqWith s "CR 800.4a and lost once it has left the game" (Game.currentIncarnation start (S.departs Departure.Type.Conceded S.alice after)) Nothing

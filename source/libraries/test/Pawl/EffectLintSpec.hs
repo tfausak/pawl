@@ -106,7 +106,9 @@ import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.Earthbend as Earthbend
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRiders as EntryRiders
+import qualified Pawl.Types.ExchangeOwnership as ExchangeOwnership
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
+import qualified Pawl.Types.ExchangeWithTopOfLibrary as ExchangeWithTopOfLibrary
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
@@ -198,6 +200,7 @@ import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
+import qualified Pawl.Types.SetOwner as SetOwner
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Types.SlotArity as SlotArity
@@ -424,6 +427,9 @@ ownQuantities effect = case effect of
   Effect.TakeExtraTurn takeExtraTurn -> [TakeExtraTurn.count takeExtraTurn]
   Effect.ShuffleIntoLibrary {} -> []
   Effect.Ante {} -> []
+  Effect.SetOwner {} -> []
+  Effect.ExchangeOwnership {} -> []
+  Effect.ExchangeWithTopOfLibrary {} -> []
   Effect.Shuffle {} -> []
   Effect.OfferNamedCopy {} -> []
   Effect.OfferNotedCopy {} -> []
@@ -1301,6 +1307,7 @@ chooserRef ref = case ref of
   ObjectRef.ChosenPermanent {} -> True
   ObjectRef.SourceAndChosenPermanent {} -> True
   ObjectRef.AttachedToBound {} -> False
+  ObjectRef.FromAnywhere {} -> False
 
 -- The asking matrix itself: whether the site an Asks names asks THIS arm. A
 -- per-(site, arm) pair and not a per-site or per-arm predicate, because both
@@ -1580,6 +1587,9 @@ effectObjectRefs effect =
         Effect.TakeExtraTurn {} -> []
         Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ refs) -> read_ (NonEmpty.toList refs)
         Effect.Ante (Ante.MkAnte _ ref _) -> read_ [ref]
+        Effect.SetOwner (SetOwner.MkSetOwner _ ref) -> read_ [ref]
+        Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership one other) -> read_ [one, other]
+        Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary ref _) -> read_ [ref]
         -- No ObjectRef at all: the opcode names a library.
         Effect.Shuffle {} -> []
         -- Nor here: the opcode names cards by name.
@@ -2006,6 +2016,8 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           ObjectRef.SourceAndChosenPermanent _ -> False
           -- FALSE: every attachment to a host moves, however many there are.
           ObjectRef.AttachedToBound _ -> False
+          -- TRUE, InSlot's answer: the slot's object, followed.
+          ObjectRef.FromAnywhere _ -> True
         -- Does this PlayerRef name at most ONE seat? A per-player count over it
         -- -- a library's top card, a card chosen out of a hand -- moves at most
         -- one object exactly when it does.

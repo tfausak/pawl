@@ -182,7 +182,9 @@ import qualified Pawl.Types.EntryRestriction as EntryRestriction
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Equip as Equip
+import qualified Pawl.Types.ExchangeOwnership as ExchangeOwnership
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
+import qualified Pawl.Types.ExchangeWithTopOfLibrary as ExchangeWithTopOfLibrary
 import qualified Pawl.Types.ExchangeZones as ExchangeZones
 import qualified Pawl.Types.ExchangedValue as ExchangedValue
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
@@ -330,6 +332,7 @@ import qualified Pawl.Types.SelfCountersReached as SelfCountersReached
 import qualified Pawl.Types.SelfCountersRemoved as SelfCountersRemoved
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
+import qualified Pawl.Types.SetOwner as SetOwner
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Types.SlotCount as SlotCount
@@ -687,6 +690,9 @@ objectRefPositions =
         ("unsuspect", Effect.Unsuspect (plantedRef "us"), [plantedRef "us"]),
         ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary Nothing (NonEmpty.singleton (plantedRef "sl"))), [plantedRef "sl"]),
         ("ante", Effect.Ante (Ante.MkAnte (PlayerRef.Relative PlayerRelation.You) (plantedRef "an") Nothing), [plantedRef "an"]),
+        ("set-owner", Effect.SetOwner (SetOwner.MkSetOwner (PlayerRef.Relative PlayerRelation.You) (plantedRef "so")), [plantedRef "so"]),
+        ("exchange-ownership", Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership (plantedRef "eo") (plantedRef "ep")), [plantedRef "eo", plantedRef "ep"]),
+        ("exchange-top", Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary (plantedRef "et") (PlayerRef.Relative PlayerRelation.You)), [plantedRef "et"]),
         ("offer-cast", Effect.OfferCast (OfferCast.MkOfferCast (plantedRef "oc") (PlayerRef.Relative PlayerRelation.You) CastObligation.Optional PermissionVerb.Cast CastOffer.defaultValue CastRepetition.Once False False Nothing), [plantedRef "oc"]),
         ("grant-play-from-exile", Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.UntilEndOfTurn (PlayerRef.Relative PlayerRelation.You) (plantedRef "gp") ManaSpending.AsProduced Nothing Nothing PermissionVerb.Play 0 TapState.Untapped), [plantedRef "gp"]),
         ("grant-look-at-exiled", Effect.GrantLookAtExiled (GrantLookAtExiled.MkGrantLookAtExiled (plantedRef "gl") False), [plantedRef "gl"]),
@@ -743,6 +749,8 @@ playerRefPositions =
         ("take-extra-turn", Effect.TakeExtraTurn TakeExtraTurn.MkTakeExtraTurn {TakeExtraTurn.player = plantedPlayer "te", TakeExtraTurn.skips = Set.empty, TakeExtraTurn.count = Quantity.Type.Literal 1}, [plantedPlayer "te"]),
         ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary (Just (plantedPlayer "si")) (NonEmpty.singleton (plantedRef "si"))), [plantedPlayer "si"]),
         ("ante", Effect.Ante (Ante.MkAnte (plantedPlayer "ap") (plantedRef "ap") Nothing), [plantedPlayer "ap"]),
+        ("set-owner", Effect.SetOwner (SetOwner.MkSetOwner (plantedPlayer "sp") (plantedRef "sp")), [plantedPlayer "sp"]),
+        ("exchange-top", Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary (plantedRef "ep") (plantedPlayer "ep")), [plantedPlayer "ep"]),
         ("shuffle", Effect.Shuffle (plantedPlayer "sh"), [plantedPlayer "sh"]),
         ("cloak", Effect.Cloak (plantedPlayer "ck"), [plantedPlayer "ck"]),
         ("manifestDread", Effect.ManifestDread (plantedPlayer "md"), [plantedPlayer "md"]),
@@ -1461,6 +1469,9 @@ ownCounts effect = case effect of
   Effect.TakeExtraTurn takeExtraTurn -> quantityCounts (TakeExtraTurn.count takeExtraTurn)
   Effect.ShuffleIntoLibrary {} -> []
   Effect.Ante {} -> []
+  Effect.SetOwner {} -> []
+  Effect.ExchangeOwnership {} -> []
+  Effect.ExchangeWithTopOfLibrary {} -> []
   Effect.Shuffle {} -> []
   Effect.OfferNamedCopy {} -> []
   Effect.OfferNotedCopy {} -> []
@@ -1944,6 +1955,9 @@ effectNestedEffects effect = case effect of
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary {} -> []
   Effect.Ante {} -> []
+  Effect.SetOwner {} -> []
+  Effect.ExchangeOwnership {} -> []
+  Effect.ExchangeWithTopOfLibrary {} -> []
   Effect.Shuffle {} -> []
   Effect.OfferNamedCopy {} -> []
   Effect.OfferNotedCopy {} -> []
@@ -2498,6 +2512,9 @@ effectReplacements effect = case effect of
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary {} -> []
   Effect.Ante {} -> []
+  Effect.SetOwner {} -> []
+  Effect.ExchangeOwnership {} -> []
+  Effect.ExchangeWithTopOfLibrary {} -> []
   Effect.Shuffle {} -> []
   Effect.OfferNamedCopy {} -> []
   Effect.OfferNotedCopy {} -> []
@@ -3026,6 +3043,9 @@ effectMintedFaces effect = case effect of
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary {} -> []
   Effect.Ante {} -> []
+  Effect.SetOwner {} -> []
+  Effect.ExchangeOwnership {} -> []
+  Effect.ExchangeWithTopOfLibrary {} -> []
   Effect.Shuffle {} -> []
   Effect.OfferNamedCopy {} -> []
   Effect.OfferNotedCopy {} -> []
@@ -4041,6 +4061,7 @@ objectRefFilters ref = case ref of
   ObjectRef.SourceAndChosenPermanent f -> unframed [f]
   -- Rhuk's "all Equipment attached to that creature".
   ObjectRef.AttachedToBound (AttachedToBound.MkAttachedToBound _ f) -> unframed [f]
+  ObjectRef.FromAnywhere _ -> []
 
 -- The Filter a Count folds over (CR 608.2h). Delegated to the *Counts family
 -- above rather than re-walked: those traversals are already the project's answer
@@ -6234,6 +6255,9 @@ effectFilters effect = case effect of
   Effect.TakeExtraTurn takeExtraTurn -> frame Unframed (quantityFilters (TakeExtraTurn.count takeExtraTurn))
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ refs) -> frame SourceHostFramed (foldMap objectRefFilters refs)
   Effect.Ante (Ante.MkAnte _ ref _) -> frame SourceHostFramed (objectRefFilters ref)
+  Effect.SetOwner (SetOwner.MkSetOwner _ ref) -> frame SourceHostFramed (objectRefFilters ref)
+  Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership one other) -> frame SourceHostFramed (objectRefFilters one <> objectRefFilters other)
+  Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary ref _) -> frame SourceHostFramed (objectRefFilters ref)
   -- A PlayerRef carries no Filter, exactly as GainPlayerCounters' does not.
   Effect.Shuffle {} -> []
   -- Nor do card names.
@@ -7228,15 +7252,17 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 flagged = any Face.anteOnly faces
              in if prints == flagged then Nothing else Just (path <> ": prints the ante reminder " <> show prints <> " but anteOnly is " <> show flagged)
     Spec.assertEqWith s "every ante card is flagged, and only those" (Maybe.mapMaybe offends loaded) []
-  -- CR 407.3: only an ante card adds a card to the ante, and CR 407.4 makes
-  -- Effect.Ante the only road: a MoveToZone into the ante has no player to
-  -- check ownership against.
-  Spec.it s "CR 407.3/407.4 only an ante-only card antes, and only through Effect.Ante" $ do
+  -- CR 407.3: only an ante card adds a card to the ante or changes a card's
+  -- owner, and CR 407.4 makes Effect.Ante the only road into the ante: a
+  -- MoveToZone into the ante has no player to check ownership against.
+  Spec.it s "CR 407.3/407.4 only an ante-only card antes or changes an owner, and antes only through Effect.Ante" $ do
     root <- Registry.defaultRoot
     loaded <- Registry.loadRoot root
     Spec.assertBool s (not (null loaded)) "the corpus is not empty"
     let antes effect = case effect of
           Effect.Ante {} -> True
+          Effect.SetOwner {} -> True
+          Effect.ExchangeOwnership {} -> True
           _ -> False
         movesIntoAnte effect = case effect of
           Effect.MoveToZone m -> MoveToZone.zone m == Zone.Ante
@@ -7250,9 +7276,33 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                   then Just (path <> ": a MoveToZone into the ante skips CR 407.4's owner check")
                   else
                     if any antes effects && not (any Face.anteOnly faces)
-                      then Just (path <> ": antes without printing the CR 407.3 reminder")
+                      then Just (path <> ": antes or changes an owner without printing the CR 407.3 reminder")
                       else Nothing
     Spec.assertEqWith s "every ante is an ante card's Effect.Ante" (Maybe.mapMaybe offends loaded) []
+  -- CR 400.1: "your graveyard" in a card-leaves trigger is the pile the card
+  -- left (CardLeavesZone.whose), never an OwnedBy on the card -- an owner and
+  -- the pile disagree between an ownership change and its move (CR 407.3).
+  -- An OwnedBy beside `whose` is an arrival read ("into your hand").
+  Spec.it s "CR 400.1 a card-leaves trigger names whose pile through whose, never OwnedBy alone" $ do
+    root <- Registry.defaultRoot
+    loaded <- Registry.loadRoot root
+    Spec.assertBool s (not (null loaded)) "the corpus is not empty"
+    let piles = [Zone.Library, Zone.Hand, Zone.Graveyard]
+        ownedByConjunct f = case f of
+          Filter.Type.OwnedBy _ -> True
+          Filter.Type.And fs -> any ownedByConjunct fs
+          _ -> False
+        oldStyle p = List.elem (CardLeavesZone.from p) piles && Maybe.isNothing (CardLeavesZone.whose p) && ownedByConjunct (CardLeavesZone.filter p)
+        offendingCondition condition = case condition of
+          TriggerCondition.CardLeavesZone p -> oldStyle p
+          TriggerCondition.CardsLeaveZone p -> oldStyle p
+          _ -> False
+        offends (path, result) = case result of
+          Left reason -> Just (path <> ": " <> Text.unpack reason)
+          Right card ->
+            let conditions = concatMap (fmap TriggeredAbility.condition . Face.triggeredAbilities) (Card.Type.faces card)
+             in if any offendingCondition conditions then Just (path <> ": reads 'your' pile as OwnedBy; use whose") else Nothing
+    Spec.assertEqWith s "every card-leaves 'your' is whose" (Maybe.mapMaybe offends loaded) []
   -- The other direction: the sweep above SLUGIFIES the stem before comparing
   -- it to Registry.filedAs, so a committed Wax-Wane.json would still pass it --
   -- Slug.fromText normalizes rather than validates, folding case away before

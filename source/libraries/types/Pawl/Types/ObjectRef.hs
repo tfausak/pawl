@@ -179,4 +179,6 @@ data ObjectRef
   | -- | CR 303.4b / 301.5a / 608.2h: the permanents attached to the object a slot holds,
     -- or attached as it left (Rhuk, Hexgold Nabber; Fumble).
     AttachedToBound AttachedToBound.AttachedToBound
+  | -- | CR 400.7: the object a slot holds, followed to wherever it is now.
+    FromAnywhere SlotName.SlotName
   deriving (Eq, Ord, Show)

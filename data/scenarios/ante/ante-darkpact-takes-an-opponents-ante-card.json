@@ -1,0 +1,27 @@
+{
+  "description": "CR 407.3 / 701.12d Darkpact makes alice the owner of bob's ante card and exchanges it with the top card of her library",
+  "note": "The library check is the discriminator: a zone-only move would send bob's card to bob's library (CR 400.3), and without the ownership write the exchange refuses two owners (CR 701.12d).",
+  "board": {
+    "ante": true,
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Swamp", "label": "swamp-1" }, { "card": "Swamp", "label": "swamp-2" }, { "card": "Swamp", "label": "swamp-3" }],
+        "hand": [{ "card": "Darkpact", "label": "darkpact" }],
+        "library": [{ "card": "Island" }, { "card": "Mountain" }]
+      },
+      { "name": "bob", "ante": [{ "card": "Hill Giant", "label": "giant" }], "library": [{ "card": "Mountain" }] }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$darkpact", "targets": ["$giant"], "mana": ["$swamp-1", "$swamp-2", "$swamp-3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" }
+  ],
+  "final": [
+    { "View": { "of": "Zone", "player": "alice", "zone": "Library", "is": ["Hill Giant", "Mountain"] } },
+    { "Count": { "player": "alice", "zone": "Ante", "card": "Island", "count": 1 } },
+    { "Count": { "player": "bob", "zone": "Ante", "card": "Hill Giant", "count": 0 } }
+  ]
+}

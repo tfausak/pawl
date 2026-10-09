@@ -1,0 +1,25 @@
+{
+  "description": "CR 701.12a Darkpact with an empty library: alice owns bob's ante card, and with no top card the exchange does nothing",
+  "note": "Count in the ante counts what the player owns, so these checks read ownership.",
+  "board": {
+    "ante": true,
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Swamp", "label": "swamp-1" }, { "card": "Swamp", "label": "swamp-2" }, { "card": "Swamp", "label": "swamp-3" }],
+        "hand": [{ "card": "Darkpact", "label": "darkpact" }]
+      },
+      { "name": "bob", "ante": [{ "card": "Hill Giant", "label": "giant" }], "library": [{ "card": "Mountain" }] }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$darkpact", "targets": ["$giant"], "mana": ["$swamp-1", "$swamp-2", "$swamp-3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" }
+  ],
+  "final": [
+    { "Count": { "player": "alice", "zone": "Ante", "card": "Hill Giant", "count": 1 } },
+    { "Count": { "player": "bob", "zone": "Ante", "card": "Hill Giant", "count": 0 } }
+  ]
+}
