@@ -1454,7 +1454,6 @@ ownCounts effect = case effect of
   Effect.GiveGift -> []
   Effect.Train _ -> []
   Effect.ItBecomes _ -> []
-  Effect.ExileUntilMonarch _ -> []
   Effect.ExileHaunting {} -> []
   Effect.Attach _ -> []
   Effect.AttachAsThoughCreature _ -> []
@@ -1933,7 +1932,6 @@ effectNestedEffects effect = case effect of
   Effect.GiveGift -> []
   Effect.Train {} -> []
   Effect.ItBecomes {} -> []
-  Effect.ExileUntilMonarch {} -> []
   Effect.ExileHaunting {} -> []
   Effect.Attach {} -> []
   Effect.AttachAsThoughCreature {} -> []
@@ -2503,7 +2501,6 @@ effectReplacements effect = case effect of
   Effect.GiveGift -> []
   Effect.Train _ -> []
   Effect.ItBecomes _ -> []
-  Effect.ExileUntilMonarch _ -> []
   Effect.ExileHaunting {} -> []
   Effect.Attach _ -> []
   Effect.AttachAsThoughCreature _ -> []
@@ -3036,7 +3033,6 @@ effectMintedFaces effect = case effect of
   Effect.GiveGift -> []
   Effect.Train _ -> []
   Effect.ItBecomes _ -> []
-  Effect.ExileUntilMonarch _ -> []
   Effect.ExileHaunting {} -> []
   Effect.Attach _ -> []
   Effect.AttachAsThoughCreature _ -> []
@@ -6299,7 +6295,6 @@ effectFilters effect = case effect of
   Effect.GiveGift -> []
   Effect.Train _ -> []
   Effect.ItBecomes _ -> []
-  Effect.ExileUntilMonarch _ -> []
   Effect.ExileHaunting {} -> []
   -- CR 701.3's other attach, which moves the SOURCE rather than a target and
   -- carries no destination filter at all.
@@ -7609,7 +7604,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       (any (anyFace (any unrefusableAbility . Face.activatedAbilities) . Printing.card) ps)
       "and an activated ability whose X the board cannot refuse"
     Spec.assertEqWith s "every one of them states a maximum" (fmap (S.nameOf . Printing.card) offenders) []
-  -- The lint above, one rule over: Pawl.Engine.Suspend climbs the same ascending
+  -- The lint above, one rule over: Cost.payAction climbs the same ascending
   -- search for CR 107.3d's bound, and CR 702.62a's payload states no maximum for
   -- it to stop at, so a suspend cost whose X the board cannot refuse would climb
   -- forever. A card-data error rather than an engine one, caught here.

@@ -279,7 +279,6 @@ codec cardCodec abilityCodec =
           Arm.payload "Train" SlotName.codec Effect.Train (\x -> case x of Effect.Train y -> Just y; _ -> Nothing),
           Arm.payload "Firebend" ManaAddition.codec Effect.Firebend (\x -> case x of Effect.Firebend y -> Just y; _ -> Nothing),
           Arm.payload "ItBecomes" Daytime.codec Effect.ItBecomes (\x -> case x of Effect.ItBecomes y -> Just y; _ -> Nothing),
-          Arm.payload "ExileUntilMonarch" SlotName.codec Effect.ExileUntilMonarch (\x -> case x of Effect.ExileUntilMonarch y -> Just y; _ -> Nothing),
           Arm.payload "ExileHaunting" ExileHaunting.codec Effect.ExileHaunting (\x -> case x of Effect.ExileHaunting y -> Just y; _ -> Nothing),
           Arm.payload "Attach" SlotName.codec Effect.Attach (\x -> case x of Effect.Attach y -> Just y; _ -> Nothing),
           Arm.payload "AttachAsThoughCreature" SlotName.codec Effect.AttachAsThoughCreature (\x -> case x of Effect.AttachAsThoughCreature y -> Just y; _ -> Nothing),
@@ -459,7 +458,6 @@ tagOf x = case x of
   Effect.Train {} -> "Train"
   Effect.Firebend {} -> "Firebend"
   Effect.ItBecomes {} -> "ItBecomes"
-  Effect.ExileUntilMonarch {} -> "ExileUntilMonarch"
   Effect.ExileHaunting {} -> "ExileHaunting"
   Effect.Attach {} -> "Attach"
   Effect.AttachAsThoughCreature {} -> "AttachAsThoughCreature"

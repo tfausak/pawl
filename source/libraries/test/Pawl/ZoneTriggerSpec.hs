@@ -1775,6 +1775,9 @@ representativeEvents cond =
       combatDamage =
         GameEvent.DamageDealt
           (DamageEvent.MkDamageEvent departed (Recipient.ToPlayer S.bob) 2 False False False 0 Nothing Nothing mempty False DamageKind.Combat)
+      combatDamageToAlice =
+        GameEvent.DamageDealt
+          (DamageEvent.MkDamageEvent departed (Recipient.ToPlayer S.alice) 2 False False False 0 Nothing Nothing mempty False DamageKind.Combat)
       -- A row whose arm reads no arrival table, which is every arm but one.
       noTable e = (Map.empty, e)
       one e = noTable e NonEmpty.:| []
@@ -1835,16 +1838,13 @@ representativeEvents cond =
         -- the singular's), CR 603.2c's once-per-step scoping living in
         -- Event.eventTriggers instead -- PermanentsDie's posture below.
         TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> one combatDamage
-        TriggerCondition.CreatureDealtCombatDamageToMonarch -> one combatDamage
-        -- CR 726.2's pair, matched by Pawl.Engine.Initiative.inherentPending rather
-        -- than by Event.matchesTrigger, the monarch's condition above's posture.
-        TriggerCondition.CreaturesDealtCombatDamageToInitiative -> one combatDamage
-        TriggerCondition.PlayerTookInitiative -> one (GameEvent.TookInitiative S.bob)
-        -- CR 702.179d's own event. Like the monarch's condition above it, this
-        -- one is matched by Pawl.Engine.Speed.inherentPending rather than by
-        -- Event.matchesTrigger, which answers False for it whatever the event --
-        -- so the pin here is that an inherent condition binds nothing from the
-        -- log, which is what Event.eventBindingSlots claims for it.
+        -- CR 725.2's and CR 726.2's damage, dealt to alice: the inherent
+        -- abilities' "you" is the monarch or the holder, the player hit.
+        TriggerCondition.CreatureDealtCombatDamageToMonarch -> one combatDamageToAlice
+        TriggerCondition.CreaturesDealtCombatDamageToInitiative -> one combatDamageToAlice
+        -- CR 726.2's third ability is controlled by the taker, so alice's take.
+        TriggerCondition.PlayerTookInitiative -> one (GameEvent.TookInitiative S.alice)
+        -- CR 702.179d's own event, an opponent's loss.
         TriggerCondition.OpponentLostLifeDuringYourTurn -> one (GameEvent.LifeLost (LifeChange.MkLifeChange S.bob 2))
         TriggerCondition.SelfCycled -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.ToPayCyclingCost Nothing))
         -- CR 702.94a's cause, so the event is one this condition genuinely

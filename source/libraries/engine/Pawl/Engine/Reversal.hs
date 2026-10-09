@@ -71,6 +71,7 @@ withoutAnnouncement before entry closed = do
   planarDecks <- libraries GameState.planarDecks
   schemeDecks <- libraries GameState.schemeDecks
   stack <- listOf GameState.stack
+  stackedIn <- mapOf GameState.stackedIn
   players <- mapWith playerWith (GameState.players before) (GameState.players entry) (GameState.players closed)
   outsideObjects <- mapOf GameState.outsideObjects
   broughtIn <- seqOf GameState.broughtIn
@@ -162,8 +163,7 @@ withoutAnnouncement before entry closed = do
   castsBeforeThisTurn <- one GameState.castsBeforeThisTurn
   attacksInOwnLastTurn <- one GameState.attacksInOwnLastTurn
   resolvedNames <- mapOf GameState.resolvedNames
-  exiledUntilMonarch <- mapOf GameState.exiledUntilMonarch
-  movedUntilSourceLeaves <- mapOf GameState.movedUntilSourceLeaves
+  movedUntil <- mapOf GameState.movedUntil
   haunting <- mapOf GameState.haunting
   encoded <- mapOf GameState.encoded
   exiledWith <- mapOf GameState.exiledWith
@@ -193,6 +193,7 @@ withoutAnnouncement before entry closed = do
         GameState.planarDecks = planarDecks,
         GameState.schemeDecks = schemeDecks,
         GameState.stack = stack,
+        GameState.stackedIn = stackedIn,
         GameState.players = players,
         GameState.outsideObjects = outsideObjects,
         GameState.broughtIn = broughtIn,
@@ -279,8 +280,7 @@ withoutAnnouncement before entry closed = do
         GameState.castsBeforeThisTurn = castsBeforeThisTurn,
         GameState.attacksInOwnLastTurn = attacksInOwnLastTurn,
         GameState.resolvedNames = resolvedNames,
-        GameState.exiledUntilMonarch = exiledUntilMonarch,
-        GameState.movedUntilSourceLeaves = movedUntilSourceLeaves,
+        GameState.movedUntil = movedUntil,
         GameState.haunting = haunting,
         GameState.encoded = encoded,
         GameState.exiledWith = exiledWith,

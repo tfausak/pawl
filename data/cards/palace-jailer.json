@@ -70,8 +70,19 @@
                   {
                     "effects": [
                       {
-                        "type": "ExileUntilMonarch",
-                        "value": "target"
+                        "type": "MoveToZone",
+                        "value": {
+                          "duration": {
+                            "type": "UntilAnOpponentBecomesTheMonarch"
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "target"
+                          },
+                          "zone": {
+                            "type": "Exile"
+                          }
+                        }
                       }
                     ]
                   }

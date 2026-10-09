@@ -965,7 +965,6 @@ rewriteEffect pairs effect = case effect of
   Effect.GiveGift -> effect
   Effect.Train _ -> effect
   Effect.ItBecomes _ -> effect
-  Effect.ExileUntilMonarch _ -> effect
   Effect.ExileHaunting {} -> effect
   Effect.Attach _ -> effect
   Effect.AttachAsThoughCreature _ -> effect

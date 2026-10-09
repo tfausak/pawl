@@ -1267,7 +1267,7 @@ monarchTriggerSpec s registry =
             (_, g2) = S.addPermanent birdMaiden S.bob g1
          in snd (S.addPermanent bogWraith S.carol g2)
       -- CR 725.2's crown steal, driven by the damage EVENT rather than by a full
-      -- combat: Monarch.inherentMatch reads the recorded DamageEvent, and
+      -- combat: Event.Trigger.inherentTriggers reads the recorded DamageEvent, and
       -- ExpirySpec's monarch group drives the same rule the same way.
       combatDamageTo monarch damager =
         S.withEvents [GameEvent.DamageDealt (DamageEvent.MkDamageEvent damager (Recipient.ToPlayer monarch) 2 False False False 0 Nothing Nothing mempty False DamageKind.Combat)]
@@ -1320,9 +1320,9 @@ monarchTriggerSpec s registry =
           Spec.assertEqWith s "the stack is empty, so nothing is still pending" (GameState.stack after) []
         -- CR 725.2's crown steal reaches the SAME condition by a route the card
         -- has nothing to do with: the inherent ability has no source, and
-        -- Monarch.inherentMatch rather than Event.matchesTrigger is what fires
-        -- it. What the Lich matches is the crowning, not the entry that usually
-        -- causes one.
+        -- Event.Trigger.inherentTriggers rather than the scan over objects is
+        -- what gathers it. What the Lich matches is the crowning, not the entry
+        -- that usually causes one.
         Spec.it s "CR 725.2 a stolen crown is a crowning, and fires the same trigger" $ do
           custodiLich <- S.printingOf s registry "Custodi Lich"
           boggartBrute <- S.printingOf s registry "Boggart Brute"

@@ -45,12 +45,9 @@ import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.ManaCost as ManaCost
-import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
-import qualified Pawl.Types.Payment as Payment
-import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.TapState as TapState
@@ -153,32 +150,16 @@ foretellable pid gs = filter (\oid -> canForetell pid oid gs) (Game.zoneMembers 
 foretell :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> ObjectId -> Game ()
 foretell perform pid oid = do
   before <- State.get
-  if not (canForetell pid oid before)
-    then pure ()
-    else do
-      -- CR 118.13c, Pawl.Engine.FaceDown.turnFaceUp's announcement and for its
-      -- reasons. CR 116.2h fixes this cost at {2}, so no symbol here is ever
-      -- payable in multiple ways and no prompt is ever raised.
-      (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure actionCost
-      payment <- Cost.pay perform before PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
-      case payment of
-        -- CR 733.1's reversal, made inside the payment because this special
-        -- action IS the whole of what failed: `before` is where it began, so
-        -- Cost.pay cancels the payment flat and offers the payer back the mana
-        -- abilities the CR 605.3a window activated. Nothing is left to restore
-        -- here. Pawl.FaceDownSpec's "Reversal at a special action" group proves
-        -- it, at the megamorph cost Pawl.Engine.FaceDown.turnFaceUp pays.
-        Payment.Unpaid -> pure ()
-        -- Dropped, Pawl.Engine.Ignore's reason: this action exiles a card and
-        -- resolves nothing, and the later cast pays its own cost.
-        Payment.Paid _ -> do
-          -- One stamp per arrival, Pawl.Engine.Plot's reason: the funnel answers
-          -- with more than one only for a melded permanent leaving the
-          -- battlefield (CR 712.21), and this action exiles a card from a hand.
-          exiled <- Event.changeZoneEntering oid Zone.Exile LibraryPosition.defaultValue riders Nothing
-          Monad.forM_ exiled (State.modify' . becomeForetold (Maybe.listToMaybe (Maybe.mapMaybe reductionOf (foretellCostsOf oid before))))
-          -- CR 702.143c: "foretelling a card" is this special action.
-          Monad.unless (null exiled) (State.modify' (Event.recordEvent (GameEvent.Foretold pid)))
+  Monad.when (canForetell pid oid before) $ do
+    paid <- Cost.payAction perform before PaymentSubject.ForNeither 0 pid oid actionCost
+    Monad.forM_ paid $ \_ -> do
+      -- One stamp per arrival, Pawl.Engine.Plot's reason: the funnel answers
+      -- with more than one only for a melded permanent leaving the battlefield
+      -- (CR 712.21), and this action exiles a card from a hand.
+      exiled <- Event.changeZoneEntering oid Zone.Exile LibraryPosition.defaultValue riders Nothing
+      Monad.forM_ exiled (State.modify' . becomeForetold (Maybe.listToMaybe (Maybe.mapMaybe reductionOf (foretellCostsOf oid before))))
+      -- CR 702.143c: "foretelling a card" is this special action.
+      Monad.unless (null exiled) (State.modify' (Event.recordEvent (GameEvent.Foretold pid)))
 
 -- A granted foretell stops applying once the card leaves the hand, yet the card
 -- keeps the cost it was given (Dream Devourer's ruling): so a reduction off the

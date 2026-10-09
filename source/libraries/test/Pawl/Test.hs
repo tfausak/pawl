@@ -527,6 +527,7 @@ import qualified Pawl.Codec.RequirementAritySpec
 import qualified Pawl.Codec.RestartSignalSpec
 import qualified Pawl.Codec.RestrictedCreaturesSpec
 import qualified Pawl.Codec.ResultSpec
+import qualified Pawl.Codec.ReturnEndingSpec
 import qualified Pawl.Codec.ReturnPermanentsSpec
 import qualified Pawl.Codec.ReturnWatchSpec
 import qualified Pawl.Codec.RevealCauseSpec
@@ -1387,6 +1388,7 @@ spec s registry = do
   Pawl.Codec.RequirementAritySpec.spec s
   Pawl.Codec.RestartSignalSpec.spec s
   Pawl.Codec.ResultSpec.spec s
+  Pawl.Codec.ReturnEndingSpec.spec s
   Pawl.Codec.ReturnWatchSpec.spec s
   Pawl.Codec.RevealCauseSpec.spec s
   Pawl.Codec.RevealSpec.spec s

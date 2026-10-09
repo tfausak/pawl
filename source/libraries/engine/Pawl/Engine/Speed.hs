@@ -23,36 +23,24 @@
 -- Pawl.Engine.Quantity's Speed arm.
 module Pawl.Engine.Speed where
 
-import qualified Data.List as List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
-import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection.View as Projection
-import qualified Pawl.Engine.Turn as Turn
 import Pawl.Types.Card (Card)
-import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Effect as Effect
-import Pawl.Types.GameEvent (GameEvent)
-import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.LifeChange as LifeChange
-import qualified Pawl.Types.Modal as Modal
-import qualified Pawl.Types.Mode as Mode
-import qualified Pawl.Types.ModeSelection as ModeSelection
 import Pawl.Types.ObjectId (ObjectId)
-import qualified Pawl.Types.Optionality as Optionality
-import Pawl.Types.PendingTrigger (PendingTrigger)
-import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
@@ -62,7 +50,6 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerLimit as TriggerLimit
-import qualified Pawl.Types.TriggerSource as TriggerSource
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 
@@ -134,7 +121,7 @@ startEngines pid gs =
 -- the text is printed in the comprehensive rules, not on Muraganda Raceway.
 --
 -- The intervening "if" is REAL, unlike either monarch ability's: CR 603.4 checks
--- it when the trigger event occurs, which inherentPending does below, and CR
+-- it when the trigger event occurs, which Event.interveningHolds does, and CR
 -- 608.2a checks it again on resolution, which Pawl.Engine.Stack's
 -- OfInherentTrigger arm does. Both halves are needed -- an opponent losing life
 -- twice in one turn cannot raise speed past 4, and neither can a trigger that
@@ -147,15 +134,7 @@ increaseAbility :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 increaseAbility =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.OpponentLostLifeDuringYourTurn,
-      TriggeredAbility.modal =
-        Modal.MkModal
-          ( Seq.singleton
-              ( Mode.MkMode
-                  (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1))))))
-                  Map.empty
-              )
-          )
-          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.modal = Modal.single (Seq.singleton (Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)))),
       TriggeredAbility.intervening = Just belowMaxSpeed,
       -- CR 702.179d's own "this ability triggers only once each turn", stated in
       -- the data because the rule states it, and enforced from there like every
@@ -178,44 +157,15 @@ belowMaxSpeed =
         (Quantity.Literal (toInteger maxSpeed - 1))
     )
 
--- | CR 702.179d: the inherent trigger this batch of events fires, if any, as an
--- ordinary PendingTrigger whose source is TriggerSource.Sourceless -- what lets
--- Engine.placePendingTriggers merge it into the one batch CR 603.3b orders, and
--- Pawl.Engine.Monarch.placeInherent put it on the stack.
+-- | CR 702.179d: the speed increase, paired with each player who has it, for
+-- Pawl.Engine.Event.Trigger.inherentTriggers. "Associated with a player having
+-- 1 or more speed" and "controlled by that player", so a player CR 704.5aa has
+-- not yet reached has no such ability.
 --
--- AT MOST ONE PER ACTIVE PLAYER PER GATHER, and "one or more opponents lose
--- life" is the reason: a whole batch of simultaneous losses is a SINGLE
--- occurrence, which is why this scans the batch rather than mapping over it. The separate per-turn limit,
--- "this ability triggers only once each turn", is NOT enforced here --
--- `increaseAbility` prints the rider and Event.withinTriggerLimit spends it off
--- the CR 603.3b log, as it does for an ability a card bears.
---
--- Only an ACTIVE player's ability can fire, which is CR 702.179d's "during your
--- turn" and not a shortcut -- each member of the active team's under CR 805.4.
--- Only a player with 1 or more speed HAS the ability at all -- the rule hangs it
--- off exactly that -- so a player CR 704.5aa has not yet reached is asked
--- nothing.
-inherentPending :: [GameEvent] -> GameState -> [PendingTrigger]
-inherentPending events gs = concatMap (pendingFor events gs) (Turn.activePlayers gs)
-
-pendingFor :: [GameEvent] -> GameState -> PlayerId -> [PendingTrigger]
-pendingFor events gs you =
-  let opponents = Set.fromList (Game.opponentsOf you gs)
-      -- A PARTIAL case with a wildcard, Pawl.Engine.Monarch.inherentMatch's
-      -- posture and not an oversight: this matcher answers about one event shape,
-      -- and a new GameEvent constructor is not an event rule 702.179d names.
-      lostLife event = case event of
-        GameEvent.LifeLost (LifeChange.MkLifeChange pid _) -> Set.member pid opponents
-        _ -> False
-      hasSpeed = case Map.lookup you (GameState.players gs) of
-        Just player -> Maybe.maybe False (>= 1) (Player.speed player)
-        Nothing -> False
-      -- CR 603.4: the intervening "if" is checked here, as the event occurs. A
-      -- player already at max speed does not trigger at all, so the turn's one
-      -- trigger is still theirs to spend -- which Spikeshell Harrier's reduction
-      -- (Effect.DecreaseSpeed) can now make observable, a player dropped back
-      -- below 4 having spent no trigger.
-      below = Maybe.maybe False (< maxSpeed) (speedOf you gs)
-   in if hasSpeed && below && List.any lostLife events
-        then [PendingTrigger.MkPendingTrigger TriggerSource.Sourceless you increaseAbility Map.empty Nothing Nothing 1]
-        else []
+-- "During your turn" is the condition's own (Event.Match's
+-- OpponentLostLifeDuringYourTurn arm), "if your speed is less than 4" is CR
+-- 603.4's check (Event.interveningHolds), and "only once each turn" is the
+-- rider Event.withinTriggerLimit spends -- each read where a printed ability's
+-- would be.
+abilities :: GameState -> [(PlayerId, TriggeredAbility Card (GrantedAbility.GrantedAbility Card))]
+abilities gs = [(pid, increaseAbility) | (pid, player) <- Map.toList (GameState.players gs), Maybe.maybe False (>= 1) (Player.speed player)]

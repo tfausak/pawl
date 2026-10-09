@@ -105,17 +105,15 @@ data TriggerCondition
     -- damagers' controller and damaged player.
     PermanentsDealCombatDamageToPlayer PermanentsDealCombatDamageToPlayer.PermanentsDealCombatDamageToPlayer
   | -- | CR 725.2: a creature dealt combat damage to the monarch. Borne by no
-    -- card; matched only via Pawl.Engine.Monarch.inherentMatch.
+    -- card.
     CreatureDealtCombatDamageToMonarch
   | -- | CR 726.2: one or more creatures a player controls dealt combat damage to
-    -- the player who has the initiative. Borne by no card; matched only via
-    -- Pawl.Engine.Initiative.inherentPending.
+    -- the player who has the initiative. Borne by no card.
     CreaturesDealtCombatDamageToInitiative
-  | -- | CR 726.2: a player took the initiative. Borne by no card; matched only
-    -- via Pawl.Engine.Initiative.inherentPending.
+  | -- | CR 726.2: "you" took the initiative. Borne by no card.
     PlayerTookInitiative
   | -- | CR 702.179d: "whenever one or more opponents lose life during your
-    -- turn". Borne by no card; matched via Pawl.Engine.Speed.inherentPending.
+    -- turn". Borne by no card.
     OpponentLostLifeDuringYourTurn
   | -- | CR 702.29c: "when you cycle this card". Self-scoped.
     SelfCycled

@@ -1050,12 +1050,7 @@ checkOnce = do
             | otherwise -> Object.zone obj `notElem` [Zone.Stack, Zone.Battlefield]
           _ -> False
       vanishing = filter isVanishing (Map.keys (GameState.objects departed))
-      ceaseToExist g oid = case Game.lookupObject oid g of
-        Nothing -> g
-        Just _ ->
-          let g1 = Game.removeFromZones oid g
-           in g1 {GameState.objects = Map.delete oid (GameState.objects g1)}
-      vanished = List.foldl' ceaseToExist departed vanishing
+      vanished = List.foldl' (flip Game.deleteObject) departed vanishing
       removeN n c = let c2 = c - n in if c2 == 0 then Nothing else Just c2
       balance g (oid, n) =
         let strip obj = obj {Object.counters = Map.update (removeN n) CounterKind.MinusOneMinusOne (Map.update (removeN n) CounterKind.PlusOnePlusOne (Object.counters obj))}

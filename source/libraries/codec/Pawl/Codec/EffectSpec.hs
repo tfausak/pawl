@@ -2234,13 +2234,6 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.ItBecomes Daytime.Night)
       " {\"type\":\"ItBecomes\",\"value\":{\"type\":\"Night\"}} "
-  Spec.it s "ExileUntilMonarch" $
-    Common.assertJsonCodec
-      s
-      toJson
-      fromJson
-      (Effect.ExileUntilMonarch (SlotName.MkSlotName (Text.pack "target")))
-      " {\"type\":\"ExileUntilMonarch\",\"value\":\"target\"} "
   -- CR 702.55a's two ids: the card that is exiled, and the slot naming the
   -- creature it haunts.
   Spec.it s "ExileHaunting" $

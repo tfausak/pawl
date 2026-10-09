@@ -44,6 +44,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
@@ -57,6 +58,7 @@ import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.Phase as Phase
@@ -246,6 +248,49 @@ spec s registry = Spec.describe s "Range of influence" $ do
     Spec.assertBool s (S.onBattlefield plane (pass (S.withRange 1 carols))) "CR 801.12 at range 1 alice's Living Plane survives carol's newer Crossroads"
     Spec.assertBool s (not (S.onBattlefield plane (pass carols))) "at an unlimited range it is put into the graveyard"
     Spec.assertBool s (not (S.onBattlefield plane (pass (S.withRange 1 bobs)))) "and at range 1 bob's newer Crossroads, in range, buries it"
+
+  -- CR 801.11 for a SOURCELESS ability: CR 702.179d's speed increase has no
+  -- source whose controller CR 801.7 could read, but it "doesn't see ... events
+  -- outside its controller's range of influence". Carol, two seats from alice,
+  -- loses life on alice's turn. The board differs from its control in the range
+  -- alone, and from its positive pair in which opponent lost the life.
+  Spec.it s "CR 801.11 an opponent's life loss outside range raises no speed" $ do
+    let fast = S.fourPlayerGame {GameState.players = Map.adjust (\p -> p {Player.speed = Just 1}) S.alice (GameState.players S.fourPlayerGame)}
+        losing pid = S.withEvents [GameEvent.LifeLost (LifeChange.MkLifeChange pid 2)] fast
+        settle gs =
+          let placed = S.runPure S.identityAnswer gs Engine.placePendingTriggers
+           in if null (GameState.stack placed) then placed else S.runPure S.identityAnswer placed Stack.resolveTop
+        speedAfter gs = Player.speed =<< Map.lookup S.alice (GameState.players (settle gs))
+    Spec.assertEqWith s "alice is the active player" (GameState.activePlayer fast) S.alice
+    Spec.assertEqWith s "CR 801.11 at range 1 carol's loss raises nothing" (speedAfter (S.withRange 1 (losing S.carol))) (Just 1)
+    Spec.assertEqWith s "at an unlimited range it raises alice's speed" (speedAfter (losing S.carol)) (Just 2)
+    Spec.assertEqWith s "and at range 1 bob's loss, in range, raises it" (speedAfter (S.withRange 1 (losing S.bob))) (Just 2)
+
+  -- CR 805.4 with CR 801.7/801.11: under shared team turns the team's step is
+  -- dave's own step, though the event names bob, the active player, two seats
+  -- from dave. So dave's printed upkeep trigger (Bitterblossom) and his
+  -- inherent end step draw as the monarch (CR 725.2) both fire at range 1.
+  -- Paired with the same boards at an unlimited range.
+  Spec.it s "CR 805.4/801.7 a teammate two seats from the active player still sees the team's own step begin" $ do
+    bitterblossom <- S.printingOf s registry "Bitterblossom"
+    island <- S.printingOf s registry "Island"
+    let shared =
+          (S.inTeams [[S.alice], [S.bob, S.carol, S.dave]] S.fourPlayerGame)
+            { GameState.activePlayer = S.bob
+            }
+        teamed = shared {GameState.settings = (GameState.settings shared) {GameSettings.sharedTeamTurns = True}}
+        stocked = snd (S.addLibraryCard island S.dave (snd (S.addLibraryCard island S.dave teamed)))
+        (_, withBlossom) = S.addPermanent bitterblossom S.dave stocked
+        settle gs =
+          let placed = S.runPure S.identityAnswer gs Engine.placePendingTriggers
+           in if null (GameState.stack placed) then placed else S.runPure S.identityAnswer placed Stack.resolveTop
+        upkeep = S.withEvents [GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Beginning BeginningStep.Upkeep) S.bob)] withBlossom
+        endStep = S.withEvents [GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.bob)] (S.withMonarch S.dave stocked)
+        handOf gs = length (Game.zoneMembers Zone.Hand S.dave gs)
+    Spec.assertBool s (not (Game.wasInRangeOf S.dave S.bob (S.withRange 1 teamed))) "at range 1 bob is outside dave's range"
+    Spec.assertEqWith s "CR 805.4/801.7 Bitterblossom cost dave a life at the team's upkeep" (S.lifeOf S.dave (settle (S.withRange 1 upkeep))) (fmap (subtract 1) (S.lifeOf S.dave upkeep))
+    Spec.assertEqWith s "CR 725.2/801.11 dave, the monarch, drew at the team's end step" (handOf (settle (S.withRange 1 endStep))) (handOf endStep + 1)
+    Spec.assertEqWith s "as he does at an unlimited range" (handOf (settle endStep)) (handOf endStep + 1)
 
   -- CR 801.7 for an object the event involves: alice's Soul Warden ("Whenever
   -- another creature enters, you gain 1 life.") sees a Goblin Piker enter under

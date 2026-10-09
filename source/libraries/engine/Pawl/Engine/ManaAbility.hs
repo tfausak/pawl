@@ -458,7 +458,6 @@ manaProduced effect = case effect of
   Effect.GiveGift -> Nothing
   Effect.Train _ -> Nothing
   Effect.ItBecomes _ -> Nothing
-  Effect.ExileUntilMonarch _ -> Nothing
   Effect.ExileHaunting {} -> Nothing
   Effect.Attach _ -> Nothing
   Effect.AttachAsThoughCreature _ -> Nothing
@@ -654,7 +653,6 @@ playerChoice effect = case effect of
   Effect.GiveGift -> Nothing
   Effect.Train _ -> Nothing
   Effect.ItBecomes _ -> Nothing
-  Effect.ExileUntilMonarch _ -> Nothing
   Effect.ExileHaunting {} -> Nothing
   Effect.Attach _ -> Nothing
   Effect.AttachAsThoughCreature _ -> Nothing
@@ -945,7 +943,6 @@ movesLibraryCard effect = case effect of
   Effect.GiveGift -> False
   Effect.Train _ -> False
   Effect.ItBecomes _ -> False
-  Effect.ExileUntilMonarch _ -> False
   Effect.ExileHaunting {} -> False
   Effect.Attach _ -> False
   Effect.AttachAsThoughCreature _ -> False

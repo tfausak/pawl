@@ -164,6 +164,22 @@ revealing s registry = Spec.describe s "CR 103.2b the reveal" $ do
     Spec.assertEqWith s "CR 702.139a: bob's Doomed Traveler has none, so he may not reveal" (companionOf S.bob gs) Nothing
     Spec.assertEqWith s "CR 103.2b: the revealed card stays outside the game" (fmap (\i -> Map.findWithDefault 0 i (maybe Map.empty Player.outsideTheGame (Map.lookup S.alice (GameState.players gs)))) (idOf zirda)) (Just 1)
 
+  -- CR 702.122a: crew is an activated ability of a Vehicle card, and CR 113.6
+  -- limits only where it FUNCTIONS, so the card HAS it in a library, as a card
+  -- has cycling (CR 702.29b) on the battlefield. Consulate Dreadnought's only text is
+  -- "Crew 6" (data/cards/consulate-dreadnought.json; Oracle text checked against
+  -- api.scryfall.com, 2026-10-09), so a reader of a printed card that minted
+  -- rule 702's battlefield abilities nowhere rejects alice's deck. bob's holds the
+  -- same cards with Doomed Travelers in the Dreadnoughts' place.
+  Spec.it s "CR 702.122a a Vehicle whose one activated ability is crew fulfills it" $ do
+    (zirda, aliceDeck, bobDeck) <- decks s registry
+    dreadnought <- S.printingOf s registry "Consulate Dreadnought"
+    let vehicles = aliceDeck {Deck.cards = Map.insert dreadnought 4 (Deck.cards aliceDeck)}
+        gs = setup revealingAnswer vehicles bobDeck
+        idOf printing = Map.lookup printing (GameState.printingIds gs)
+    Spec.assertEqWith s "CR 702.139a: alice's four Dreadnoughts have crew, so she reveals Zirda" (companionOf S.alice gs) (fmap OutsideCard.InPool (idOf zirda))
+    Spec.assertEqWith s "CR 702.139a: bob's Travelers in their place have nothing" (companionOf S.bob gs) Nothing
+
   -- CR 103.2b's "if any players WISH to reveal": declining is an answer, and the
   -- default one. The board is alice's from the case above, so the only difference
   -- is what the answerer said.

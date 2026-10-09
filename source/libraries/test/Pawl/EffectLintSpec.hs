@@ -411,7 +411,6 @@ ownQuantities effect = case effect of
   Effect.GiveGift -> []
   Effect.Train _ -> []
   Effect.ItBecomes _ -> []
-  Effect.ExileUntilMonarch _ -> []
   Effect.ExileHaunting {} -> []
   Effect.Attach _ -> []
   Effect.AttachAsThoughCreature _ -> []
@@ -1578,7 +1577,6 @@ effectObjectRefs effect =
         Effect.GiveGift -> []
         Effect.Train {} -> []
         Effect.ItBecomes {} -> []
-        Effect.ExileUntilMonarch {} -> []
         Effect.ExileHaunting {} -> []
         Effect.Attach {} -> []
         Effect.AttachAsThoughCreature {} -> []
@@ -2185,7 +2183,6 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           -- The DESTINATION alone: AttachBound's `subject` goes through
           -- objectRefObjects, which reads slotGroup and attaches every member.
           Effect.AttachBound (AttachBound.MkAttachBound _ destination) -> [destination]
-          Effect.ExileUntilMonarch slot -> [slot]
           -- The host alone, through legalOne: the haunting card goes through
           -- slotBoundObjects, which reads slotGroup first and exiles every member.
           Effect.ExileHaunting (ExileHaunting.MkExileHaunting _ host) -> [host]

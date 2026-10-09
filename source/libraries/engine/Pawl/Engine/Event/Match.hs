@@ -8,6 +8,7 @@ module Pawl.Engine.Event.Match where
 
 import qualified Control.Monad as Monad
 import qualified Data.Foldable as Foldable
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -16,7 +17,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Count as Count
-import Pawl.Engine.Event.Binding (admitsDeparture, admittedAttackers, admittedDepartures, admittedPreventedSources, postEventView)
+import Pawl.Engine.Event.Binding (admitsDeparture, admittedAttackers, admittedDepartures, admittedPreventedSources, combatDamagerOn, postEventView)
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
@@ -1565,18 +1566,364 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
-  -- CR 725.2: never matched via a card's bearer -- the monarch's crown-steal is
-  -- an inherent ability of no object, so its real match lives in
-  -- Pawl.Engine.Monarch.inherentMatch, not here.
-  TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
-  -- CR 726.2, for the same reason one rule over: the initiative's two
-  -- card-invisible conditions are gathered from the recorded events by
-  -- Pawl.Engine.Initiative.inherentPending, not here.
-  TriggerCondition.CreaturesDealtCombatDamageToInitiative -> False
-  TriggerCondition.PlayerTookInitiative -> False
-  -- CR 702.179d: the same, one rule over. The speed-increase ability hangs on no
-  -- object either, so Pawl.Engine.Speed.inherentPending is where it is matched.
-  TriggerCondition.OpponentLostLifeDuringYourTurn -> False
+  -- CR 725.2: a creature dealt combat damage to the monarch, who is "you" --
+  -- the ability's controller (Event.Trigger.inherentTriggers). The damager is
+  -- read off the event's sample, for combatDamagerOn's reason.
+  TriggerCondition.CreatureDealtCombatDamageToMonarch -> case event of
+    GameEvent.DamageDealt _ -> Maybe.isJust (combatDamagerOn board you event)
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.TookInitiative _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mutated _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Exploited {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.BecameCrewed _ -> False
+    GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
+    GameEvent.Crewed _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
+    GameEvent.LostTheGame _ -> False
+    GameEvent.DungeonCompleted _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
+    GameEvent.RolledToVisit _ -> False
+    GameEvent.PlanarDieRolled _ -> False
+    GameEvent.SchemeSetInMotion _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+    GameEvent.BecameUntapped _ -> False
+    GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
+    GameEvent.ManaAbilityResolved _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.RingTempted _ -> False
+    GameEvent.Blighted _ -> False
+    GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
+    GameEvent.CollectedEvidence _ -> False
+    GameEvent.GaveGift _ -> False
+    GameEvent.AttractionOpened _ -> False
+    GameEvent.PrizeClaimed _ -> False
+    GameEvent.Earthbent _ -> False
+    GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
+    GameEvent.ActivatedAbilityResolved _ -> False
+    GameEvent.TriggeredAbilityResolved _ -> False
+    GameEvent.CardArrived _ -> False
+    GameEvent.Moved {} -> False
+  -- CR 726.2, the same reading one rule over, the holder being "you". Firing
+  -- once per damagers' controller is `batchScoped` and `batchPartition`, never
+  -- this arm.
+  TriggerCondition.CreaturesDealtCombatDamageToInitiative -> case event of
+    GameEvent.DamageDealt _ -> Maybe.isJust (combatDamagerOn board you event)
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.TookInitiative _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mutated _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Exploited {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.BecameCrewed _ -> False
+    GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
+    GameEvent.Crewed _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
+    GameEvent.LostTheGame _ -> False
+    GameEvent.DungeonCompleted _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
+    GameEvent.RolledToVisit _ -> False
+    GameEvent.PlanarDieRolled _ -> False
+    GameEvent.SchemeSetInMotion _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+    GameEvent.BecameUntapped _ -> False
+    GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
+    GameEvent.ManaAbilityResolved _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.RingTempted _ -> False
+    GameEvent.Blighted _ -> False
+    GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
+    GameEvent.CollectedEvidence _ -> False
+    GameEvent.GaveGift _ -> False
+    GameEvent.AttractionOpened _ -> False
+    GameEvent.PrizeClaimed _ -> False
+    GameEvent.Earthbent _ -> False
+    GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
+    GameEvent.ActivatedAbilityResolved _ -> False
+    GameEvent.TriggeredAbilityResolved _ -> False
+    GameEvent.CardArrived _ -> False
+    GameEvent.Moved {} -> False
+  -- CR 726.2's third ability is controlled by the player who TOOK the
+  -- initiative, so the taker is "you".
+  TriggerCondition.PlayerTookInitiative -> case event of
+    GameEvent.TookInitiative taker -> taker == you
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mutated _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Exploited {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.BecameCrewed _ -> False
+    GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
+    GameEvent.Crewed _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
+    GameEvent.LostTheGame _ -> False
+    GameEvent.DungeonCompleted _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
+    GameEvent.RolledToVisit _ -> False
+    GameEvent.PlanarDieRolled _ -> False
+    GameEvent.SchemeSetInMotion _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+    GameEvent.BecameUntapped _ -> False
+    GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
+    GameEvent.ManaAbilityResolved _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.RingTempted _ -> False
+    GameEvent.Blighted _ -> False
+    GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
+    GameEvent.CollectedEvidence _ -> False
+    GameEvent.GaveGift _ -> False
+    GameEvent.AttractionOpened _ -> False
+    GameEvent.PrizeClaimed _ -> False
+    GameEvent.Earthbent _ -> False
+    GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
+    GameEvent.ActivatedAbilityResolved _ -> False
+    GameEvent.TriggeredAbilityResolved _ -> False
+    GameEvent.CardArrived _ -> False
+    GameEvent.Moved {} -> False
+  -- CR 702.179d: an opponent still in the game (CR 102.3) lost life during
+  -- "your" turn -- each active player's, under CR 805.4's shared team turns.
+  TriggerCondition.OpponentLostLifeDuringYourTurn -> case event of
+    GameEvent.LifeLost (LifeChange.MkLifeChange lost _) -> Turn.isActive gs you && List.elem lost (Game.opponentsOf you gs)
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.TookInitiative _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mutated _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Exploited {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.BecameCrewed _ -> False
+    GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
+    GameEvent.Crewed _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
+    GameEvent.LostTheGame _ -> False
+    GameEvent.DungeonCompleted _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
+    GameEvent.RolledToVisit _ -> False
+    GameEvent.PlanarDieRolled _ -> False
+    GameEvent.SchemeSetInMotion _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+    GameEvent.BecameUntapped _ -> False
+    GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
+    GameEvent.ManaAbilityResolved _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.RingTempted _ -> False
+    GameEvent.Blighted _ -> False
+    GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
+    GameEvent.CollectedEvidence _ -> False
+    GameEvent.GaveGift _ -> False
+    GameEvent.AttractionOpened _ -> False
+    GameEvent.PrizeClaimed _ -> False
+    GameEvent.Earthbent _ -> False
+    GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
+    GameEvent.ActivatedAbilityResolved _ -> False
+    GameEvent.TriggeredAbilityResolved _ -> False
+    GameEvent.CardArrived _ -> False
+    GameEvent.Moved {} -> False
   -- CR 603.12: a reflexive matches no log entry at all. Its trigger event
   -- happened during the resolution that CREATED it, which CR 603.12's own
   -- exception makes a question about the entry's existence rather than about the
@@ -1706,6 +2053,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Revealed (Revealed.MkRevealed _ oid (RevealCause.ForMiracle _) _) -> oid == bearer
     GameEvent.Revealed (Revealed.MkRevealed _ _ RevealCause.Ordinary _) -> False
     GameEvent.Revealed (Revealed.MkRevealed _ _ RevealCause.LeavingFaceDown _) -> False
+    GameEvent.Revealed (Revealed.MkRevealed _ _ RevealCause.FaceDownSpell _) -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew {} -> False
     GameEvent.Moved {} -> False

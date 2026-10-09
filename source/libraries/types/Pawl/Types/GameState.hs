@@ -46,7 +46,6 @@ import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ModifiedRoll as ModifiedRoll
-import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OutsideObject as OutsideObject
@@ -102,6 +101,10 @@ data GameState = MkGameState
     -- the planar deck above is.
     schemeDecks :: Map.Map PlayerId.PlayerId (Seq.Seq ObjectId.ObjectId),
     stack :: [ObjectId.ObjectId],
+    -- | CR 610.3a / 610.3b: the event group current as each object was put on
+    -- the stack, so an event logged in it or a later one happened after that.
+    -- Written by Pawl.Engine.Game.putOnStack, cleared with `events`.
+    stackedIn :: Map.Map ObjectId.ObjectId EventGroup.EventGroup,
     players :: Map.Map PlayerId.PlayerId Player.Player,
     -- | CR 729.4: the cards outside this game that sit in a game on hold; empty
     -- for a game nobody is nested inside.
@@ -458,15 +461,10 @@ data GameState = MkGameState
     -- resolved this game, as they resolved, written by
     -- Pawl.Engine.Resolve.noteResolved.
     resolvedNames :: Map.Map PlayerId.PlayerId (Set.Set CardName.CardName),
-    -- | CR 725: objects exiled "until an opponent becomes the monarch", keyed
-    -- by the exiled incarnation, swept by
-    -- Pawl.Engine.MoveDuration.returnDue. Not an Expiry, which cannot
-    -- perform a zone change.
-    exiledUntilMonarch :: Map.Map ObjectId.ObjectId MonarchWatch.MonarchWatch,
-    -- | CR 610.3: objects moved "until this leaves the battlefield", keyed by
-    -- the incarnation the move minted, swept by
-    -- Pawl.Engine.MoveDuration.returnDue.
-    movedUntilSourceLeaves :: Map.Map ObjectId.ObjectId ReturnWatch.ReturnWatch,
+    -- | CR 610.3: objects moved "until" a specified event, keyed by the
+    -- incarnation the move minted, swept by Pawl.Engine.MoveDuration.returnDue.
+    -- Not an Expiry, which cannot perform a zone change.
+    movedUntil :: Map.Map ObjectId.ObjectId ReturnWatch.ReturnWatch,
     -- | CR 702.55b: which object each haunting card haunts, keyed by the exiled
     -- incarnation; the value is never cleaned up, the haunted creature dying
     -- being the point.

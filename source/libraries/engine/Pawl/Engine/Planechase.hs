@@ -30,11 +30,11 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Plane as Plane
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
 import Pawl.Types.Card (Card)
-import qualified Pawl.Types.Clause as Clause
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Effect as Effect
@@ -49,16 +49,9 @@ import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.ManaCost as ManaCost
-import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
-import qualified Pawl.Types.Modal as Modal
-import qualified Pawl.Types.Mode as Mode
-import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
-import qualified Pawl.Types.Optionality as Optionality
-import qualified Pawl.Types.Payment as Payment
-import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import Pawl.Types.PendingTrigger (PendingTrigger)
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
@@ -151,8 +144,7 @@ ceasePlaneswalking gs =
   let walking oid = case fmap Object.source (Game.lookupObject oid gs) of
         Just (Source.OfInherentTrigger inherent) -> InherentTriggerSource.ability inherent == planeswalkingAbility
         _ -> False
-      cease g oid = maybe g (\_ -> let g1 = Game.removeFromZones oid g in g1 {GameState.objects = Map.delete oid (GameState.objects g1)}) (Game.lookupObject oid g)
-   in List.foldl' cease gs (filter walking (GameState.stack gs))
+   in List.foldl' (flip Game.cease) gs (filter walking (GameState.stack gs))
 
 -- CR 701.31b's second half: move the top card off the planar deck and turn it
 -- face up, which is joining GameState.command. A fresh timestamp, since its
@@ -238,19 +230,15 @@ roll perform pid = do
   before <- State.get
   Monad.when (canRoll pid before) $ do
     noSource <- State.state Game.freshObjectId
-    (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid noSource pure (rollCost pid before)
-    payment <- Cost.pay perform before PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid noSource announced
-    case payment of
-      Payment.Unpaid -> pure ()
-      Payment.Paid _ -> do
-        rolled <- Game.ask (Prompt.RollDie 6)
-        State.modify' (Event.recordEvent (GameEvent.DiceRolled pid))
-        State.modify' (Event.recordEvent (GameEvent.PlanarDieRolled (PlanarDieRolled.MkPlanarDieRolled pid (faceOf rolled))))
+    paid <- Cost.payAction perform before PaymentSubject.ForNeither 0 pid noSource (rollCost pid before)
+    Monad.forM_ paid $ \_ -> do
+      rolled <- Game.ask (Prompt.RollDie 6)
+      State.modify' (Event.recordEvent (GameEvent.DiceRolled pid))
+      State.modify' (Event.recordEvent (GameEvent.PlanarDieRolled (PlanarDieRolled.MkPlanarDieRolled pid (faceOf rolled))))
 
 -- | CR 901.8: the planeswalking ability, "Whenever you roll the Planeswalker
 -- symbol on the planar die, planeswalk." It has no source and its roller
--- controls it, so it is gathered here as a TriggerSource.Sourceless entry, the
--- Pawl.Engine.Rad.inherentPending posture.
+-- controls it, so it is gathered here as a TriggerSource.Sourceless entry.
 inherentPending :: [GameEvent] -> GameState -> [PendingTrigger]
 inherentPending events _ =
   let rolledPlaneswalker event = case event of
@@ -264,10 +252,7 @@ planeswalkingAbility :: TriggeredAbility Card (GrantedAbility.GrantedAbility Car
 planeswalkingAbility =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.PlayerRollsDice PlayerRelation.You,
-      TriggeredAbility.modal =
-        Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton Effect.Planeswalk))) Map.empty))
-          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.modal = Modal.single (Seq.singleton Effect.Planeswalk),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.name = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited

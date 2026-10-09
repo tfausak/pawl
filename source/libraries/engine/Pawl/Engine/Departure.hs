@@ -29,17 +29,14 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
-import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.Decider as Decider
 import Pawl.Types.Departure (Departure)
 import qualified Pawl.Types.Departure as Departure
-import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
-import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LeftTheGame as LeftTheGame
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
@@ -49,7 +46,6 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.ReplacementBucket as ReplacementBucket
 import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Result as Result
-import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.Teams as Teams
@@ -175,17 +171,15 @@ continuesAfterDeparture :: GameState -> Bool
 continuesAfterDeparture gs = length (GameState.turnOrder gs) > 2
 
 -- CR 800.4a, first clause: every object owned by the departing player leaves the
--- game. Every id they own is deleted from GameState.objects and from every
--- collection that can name one -- the zones, the CR 725 exile watch, and the
--- parts of the combat record that stop meaning anything once the id is gone.
+-- game, each through Event.leaveTheGame -- the step CR 729.4a's subgame crossing
+-- shares -- which files its CR 608.2h record, hands over CR 604.2's lingering
+-- effects and deletes it with everything keyed on it.
 --
 -- Leaving the game is not a zone change, so this does not funnel through
 -- Event.changeZoneAttaching: no Moved event and no CR 616 replacement --
 -- Pawl.Engine.Sba's CR 704.5d token cease is the same shape for the same reason.
--- What it DOES borrow from that funnel is what CR 800.4a shares with a move: the
--- object ceases, so its CR 608.2h last known information is filed as it goes, and
--- a permanent's departure is recorded as a GameEvent.LeftTheGame so CR 603.6c's
--- second trigger event can be matched. Both are below.
+-- A permanent's departure is recorded as a GameEvent.LeftTheGame so CR 603.6c's
+-- second trigger event can be matched, below.
 --
 -- Combat.blockers is DELIBERATELY left untouched. Above all the KEY must stay:
 -- it is the record of blocked-ness (Combat.isBlocked), and CR 509.1h keeps a
@@ -222,7 +216,7 @@ continuesAfterDeparture gs = length (GameState.turnOrder gs) > 2
 --     are dropped (givesControlOnEntryTo), and only those.
 --
 --     GameState.continuousEffects is the one of the three this function WRITES,
---     and only ever by adding: `handover` below turns a departing permanent's
+--     and only ever by adding: Event.leaveTheGame turns a departing permanent's
 --     lingering static ability into a stored effect, which is CR 604.2's override
 --     rather than anything CR 800.4a ends.
 --
@@ -231,133 +225,21 @@ continuesAfterDeparture gs = length (GameState.turnOrder gs) > 2
 --     It stays, it triggers, and CR 800.4d is what stops it reaching the stack;
 --     the filter is in Engine.apnapPlayers.
 --
---   * an exiledUntilMonarch entry whose VALUE is the departing player. CR 800.4a
---     ends only effects which give that player control, and an exile grants
---     none. Only an entry whose KEY is owned by the departing player is dropped,
---     because that object is leaving; whether the value later reads as "an
---     opponent" of the new monarch is decided at the next crowning, by
---     Pawl.Engine.Monarch.crown, under the
---     reading recorded there, which is CR 102.3's and takes a teammate out of
---     the set. NOT CR 102.2 -- this function
---     only runs behind continuesAfterDeparture, so the game began with more than
---     two players (CR 800.1).
+--   * a CR 725 crowning watch in GameState.movedUntil whose controller is the
+--     departing player. CR 800.4a ends only effects which give that player
+--     control, and an exile grants none. Whether that player's opponents
+--     include the next monarch is decided at the crowning, by
+--     Pawl.Engine.Monarch.crown, under CR 102.3's reading recorded there. NOT
+--     CR 102.2 -- this function only runs behind continuesAfterDeparture, so the
+--     game began with more than two players (CR 800.1).
 --
---   * a GameState.movedUntilSourceLeaves entry whose VALUE names the departing
---     player's permanent. CR 610.3's duration is not an effect that gives anybody
---     control either, and the value needs no attention for a second reason: the
---     source is leaving the game, so it is no longer on the battlefield and
---     Pawl.Engine.MoveDuration's sweep returns the object at the next settle,
---     which is what rule 610.3 asks for. Only an entry whose KEY -- the moved
---     object -- belongs to the departing player is dropped, because that object
---     is leaving.
---
---   * a GameState.haunting entry whose VALUE is the departing player's permanent,
---     for the same reason and one rule over: CR 702.55b's link is not an effect
---     that gives anybody control, and rule 702.55b keeps naming the object the
---     haunt ability targeted after that object is gone. Only an entry whose KEY --
---     the haunting card itself -- belongs to the departing player is dropped,
---     because that card is leaving the game.
---
---   * a GameState.encoded entry, on haunting's terms: CR 702.99c ends the link
---     once the creature leaves the battlefield, which the reader checks, so only
---     an entry whose KEY -- the encoded card -- belongs to the departing player
---     is dropped.
---
---   * a GameState.exiledWith entry whose VALUE is the departing player's
---     permanent, for haunting's reason a third time: CR 607.2a's link keeps
---     naming the object whose ability exiled the card after that object is gone,
---     which is the whole of what Hoarding Dragon's dies trigger reads. Only an
---     entry whose KEY -- the exiled card -- belongs to the departing player is
---     dropped.
---
---   * a GameState.exilePiles entry, which has no value side to keep: CR 406.4's
---     stamp names a pile rather than an object, so the key is the whole of it and
---     a departing player's exiled card takes its pile membership with it.
+--   * any other row whose VALUE names a departing object; Event.leaveTheGame
+--     says why each of those stays.
 objectsLeaveWith :: PlayerId -> GameState -> GameState
 objectsLeaveWith pid gs =
   let -- CR 800.4n: objects the player owns in the ante do not leave the game,
       -- an exception to CR 800.4a.
       owned = Map.keys (Map.filter (\obj -> Object.owner obj == pid && Object.zone obj /= Zone.Ante) (GameState.objects gs))
-      leave :: GameState -> ObjectId -> GameState
-      leave g oid =
-        let g1 = Game.removeFromZones oid g
-            combat = Game.recordDefending oid (GameState.combat g1)
-         in g1
-              { GameState.objects = Map.delete oid (GameState.objects g1),
-                GameState.combat =
-                  combat
-                    { Combat.attackers = Map.delete oid (Combat.attackers combat),
-                      Combat.struckFirst = fmap (Set.delete oid) (Combat.struckFirst combat)
-                    },
-                GameState.exiledUntilMonarch = Map.delete oid (GameState.exiledUntilMonarch g1),
-                GameState.movedUntilSourceLeaves = Map.delete oid (GameState.movedUntilSourceLeaves g1),
-                GameState.haunting = Map.delete oid (GameState.haunting g1),
-                GameState.encoded = Map.delete oid (GameState.encoded g1),
-                GameState.exiledWith = Map.delete oid (GameState.exiledWith g1),
-                GameState.exilePiles = Map.delete oid (GameState.exilePiles g1)
-              }
-      -- CR 608.2h: each object ceases here, so this is the last moment its
-      -- information is known -- the same eight-part record
-      -- Event.changeZoneAttaching files at the same point of a zone change, read
-      -- from the same board and filed under the id the object had while it
-      -- existed. Nothing mints a new incarnation for a departure, so that id is
-      -- the only route back to what the object was.
-      --
-      -- Taken against `gs`, the board BEFORE any of them left, rather than
-      -- against the fold's running state: rule 800.4a's first clause is one
-      -- event, so a permanent's record must not read a board its siblings have
-      -- already been removed from. Event.changeZoneInBatch's `asOf` is the same
-      -- reading for the same reason.
-      --
-      -- Filed for every object the player owned, in every zone but the ante
-      -- (CR 800.4n, `owned` above), exactly as the
-      -- zone-change funnel files for every move -- the reader decides which ones
-      -- it has a question about.
-      filed oid = case Map.lookup oid (GameState.objects gs) of
-        -- Unreachable: `owned` is drawn from GameState.objects itself.
-        Nothing -> Nothing
-        Just obj ->
-          Just
-            ( oid,
-              LastKnown.MkLastKnown
-                (Projection.project oid gs)
-                -- CR 613.1b, and the reason this record is what a departure's
-                -- trigger is read from: a permanent this player OWNED could
-                -- have been controlled by somebody still in the game right up
-                -- to the moment it left, and CR 603.3a hands that player its
-                -- ability. The Object.owner fallback is unreachable for the
-                -- reason Event.changeZoneAttaching gives at its own call.
-                (Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs))
-                -- CR 108.3, which no projection moves: read straight off the
-                -- object, unlike the controller above.
-                (Object.owner obj)
-                (Object.source obj)
-                (Object.counters obj)
-                (Event.copiedSnapshot oid gs)
-                -- CR 303.4b / 301.5a with the arrow turned round, taken
-                -- while the answer still exists (CR 603.10a).
-                (Game.attachments oid gs)
-                (Object.chosenNames obj)
-                (Object.chosenPlayer obj)
-                (Object.chosenColors obj)
-                (Object.chosenSubtype obj)
-                -- CR 508.1k, the sibling read of the same record.
-                (Game.isAttacking oid gs)
-                (Game.attackTargetOf oid gs)
-                (Game.isBlocking oid gs)
-                -- CR 310.9a, read straight off the object like the owner above:
-                -- Nothing for everything that is not a battle.
-                (Object.protector obj)
-                -- CR 400.7d's cost record, read straight off the object too.
-                (Object.paidCosts obj)
-                -- CR 702.30a's echo window, the sibling read: per-incarnation, so
-                -- this is the last moment it exists.
-                (Object.controlClock obj)
-                (Object.zone obj)
-                -- CR 400.1: the pile it left, read off the board it left, as the
-                -- rest of this record is.
-                (Game.pileHolderOf oid gs)
-            )
       -- CR 603.6c's second trigger event: "when a phased-in permanent leaves the
       -- game because its owner leaves the game". Only those, which is CR 702.26k
       -- saying the phased-out ones cause no zone-change ability to trigger --
@@ -374,54 +256,21 @@ objectsLeaveWith pid gs =
       -- look-back condition reads them as simultaneous rather than as a
       -- sequence.
       permanents = filter (\oid -> Set.member oid (GameState.battlefield gs)) owned
-      -- CR 604.2's override, the other half of what this shares with a zone
-      -- change: a permanent leaving the GAME has left the battlefield, so a card
-      -- whose text says its effect continues anyway -- Titania's Song -- needs
-      -- that effect handed over to GameState.continuousEffects as it goes.
-      -- Event.lingeringHandover is the single writer of such an effect, shared
-      -- with the zone-change funnel; borrowing it costs this module nothing the
-      -- header warns about, since that function performs no move.
-      --
-      -- Nothing in CR 800.4a ends the handed-over effect: the second clause ends
-      -- only effects giving the departing player CONTROL, which is the same
-      -- reading that leaves their Giant Growth standing above. It expires on its
-      -- own duration, at CR 514.2's cleanup for Titania's Song.
-      --
-      -- Read from `gs`, the board before any of them left, for `filed`'s reason:
-      -- one event, so the effect handed over is the one that was applying while
-      -- every one of these objects still existed.
-      --
-      -- Gated on `permanents` -- GameState.battlefield membership -- rather than
-      -- on Object.zone, which is CR 702.26b: a phased-out permanent is treated as
-      -- though it does not exist, so its static ability was generating no effect
-      -- there is anything to continue. CR 702.26k still takes it out of the game
-      -- with its owner, which is `owned` above.
-      --
-      -- The controller is read the way `filed` reads it, and for CR 109.5's
-      -- reason: the arming's "you" is whoever controlled the permanent as it left,
-      -- who need not be its owner -- the Object.owner fallback is unreachable for
-      -- `filed`'s reason.
-      handover =
-        concatMap
-          (\oid -> Event.lingeringHandover oid (Maybe.fromMaybe pid (Projection.controllerOf oid gs)) gs)
-          permanents
-      removed = List.foldl' leave gs owned
-      recorded =
-        removed
-          { GameState.lastKnown = Map.fromList (Maybe.mapMaybe filed owned) <> GameState.lastKnown removed,
-            GameState.continuousEffects = handover <> GameState.continuousEffects removed
-          }
+      -- Every one read against `gs`, the board BEFORE any of them left, rather
+      -- than against the fold's running state: rule 800.4a's first clause is one
+      -- event, so a permanent's record must not read a board its siblings have
+      -- already been removed from. Event.changeZoneInBatch's `asOf` is the same
+      -- reading for the same reason.
+      removed = List.foldl' (Event.leaveTheGame gs) gs owned
       -- CR 708.9's third sentence: the departing player reveals each face-down
-      -- permanent they own, read off `gs` for `filed`'s reason and recorded
-      -- ahead of its LeftTheGame, as the zone-change funnel reveals before the
-      -- move. `permanents` again, for CR 702.26b. Pawl.FaceDownSpec's
-      -- "CR 708.9 the Witness draws when a face-down permanent's owner leaves
-      -- the game" proves it.
-      revealed = Maybe.mapMaybe (\oid -> Event.revealedOn RevealCause.LeavingFaceDown pid oid gs) (filter faceDown permanents)
-      faceDown oid = maybe False (Facing.isFaceDown . Object.facing) (Map.lookup oid (GameState.objects gs))
+      -- permanent and face-down spell they own, read off `gs` and recorded
+      -- ahead of the LeftTheGame events, as the zone-change funnel reveals before
+      -- the move. Pawl.FaceDownSpec's "CR 708.9 the Witness draws when a
+      -- face-down permanent's owner leaves the game" proves it.
+      revealed = Maybe.mapMaybe (Event.leavingReveal gs) owned
    in Event.simultaneouslyPure
         (\g -> List.foldl' (\g1 oid -> Event.recordEvent (GameEvent.LeftTheGame (LeftTheGame.MkLeftTheGame oid Zone.Battlefield)) g1) (List.foldl' (flip Event.recordEvent) g revealed) permanents)
-        recorded
+        removed
 
 -- CR 800.4a, second clause: any effects which give that player control of
 -- objects or players end.
@@ -614,12 +463,7 @@ nonCardStackObjectsCease pid gs =
           Source.OfCardCopy _ -> True
           Source.OfInherentTrigger _ -> True
       theirs oid = Projection.controllerOf oid gs == Just pid && notACard oid
-      cease g oid = case Game.lookupObject oid g of
-        Nothing -> g
-        Just _ ->
-          let g1 = Game.removeFromZones oid g
-           in g1 {GameState.objects = Map.delete oid (GameState.objects g1)}
-   in List.foldl' cease gs (filter theirs (GameState.stack gs))
+   in List.foldl' (flip Game.cease) gs (filter theirs (GameState.stack gs))
 
 -- CR 800.4a, fourth clause: objects still controlled by the departing player are
 -- exiled. CR 800.4a's third example is the case it exists for -- Bribery's Serra

@@ -57,7 +57,7 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- group supplies; CR 104.4b's `lastChoice` and `loopInvolvement`; the
 -- grow-only printing interning; and the scan state keyed off the log
 -- (`scannedThrough`, `damageScannedThrough`, `battlefieldWhenTriggered`,
--- `controlSample`). `lastKnown` and `stackArchive` are keyed by ids that have
+-- `controlSample`, `stackedIn`). `lastKnown` and `stackArchive` are keyed by ids that have
 -- left (CR 400.7), so an entry is reachable only through a kept field holding
 -- that id.
 --
@@ -92,6 +92,7 @@ digest gs =
             GameState.controlSample = Map.empty,
             GameState.lastKnown = Map.empty,
             GameState.stackArchive = Map.empty,
+            GameState.stackedIn = Map.empty,
             -- Canonical rather than dropped: a payment leaves an empty pool
             -- behind where there was no entry, and no card tells the two apart.
             GameState.manaPool = Map.filter (not . null . Mana.unwrap) (GameState.manaPool gs)
@@ -253,7 +254,9 @@ historyReaders =
     -- (CR 702.142a). Separate entries, the walk being case-sensitive.
     (["Storm"], via Game.castOf),
     (["Gravestorm"], via Game.diedChange),
-    (["Boast"], Just attackerDeclared)
+    (["Boast"], Just attackerDeclared),
+    -- Pawl.Engine.MoveDuration.hasHappened's CR 610.3a/b crowning look-back.
+    (["UntilAnOpponentBecomesTheMonarch"], Just becameMonarch)
   ]
   where
     via :: (GameEvent -> Maybe a) -> Reads
@@ -266,6 +269,11 @@ inHistory event = case event of
   GameEvent.CardArrived {} -> True
   GameEvent.LeftTheGame {} -> True
   GameEvent.SpellCast {} -> True
+  _ -> False
+
+becameMonarch :: GameEvent -> Bool
+becameMonarch event = case event of
+  GameEvent.BecameMonarch {} -> True
   _ -> False
 
 attackerDeclared :: GameEvent -> Bool
@@ -301,7 +309,7 @@ becameCrewed event = case event of
   GameEvent.BecameCrewed {} -> True
   _ -> False
 
--- Pawl.Engine.Projection.View.convokedThisTurnOf follows the convoked spell
+-- Pawl.Engine.Count.convokedThisTurn follows the convoked spell
 -- onto the battlefield through the move log.
 convokedOrMoved :: GameEvent -> Bool
 convokedOrMoved event = case event of
