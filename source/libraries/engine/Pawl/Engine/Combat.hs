@@ -2310,8 +2310,9 @@ attemptAttackDeclaration perform pid rejected = do
           then do
             -- CR 508.1's preamble: the declaration is illegal and CR 733.1
             -- reverses it, which Cost.payToll has done -- back to `before`, less
-            -- whatever the payer kept of the mana window. Reachable by an
-            -- ordinary player who declares more attackers than they can pay for.
+            -- whatever the payers kept of their mana windows and any card a toll
+            -- milled. Reachable by an ordinary player who declares more attackers
+            -- than they can pay for.
             --
             -- And then the declaration is made again, normally a smaller attack
             -- the player can afford. CombatEffectSpec's "CR 508.1 the rewound
@@ -2401,17 +2402,19 @@ attemptAttackDeclaration perform pid rejected = do
 
 -- CR 508.1j / 509.1f: pay each player's locked-in toll, in `owed`'s order,
 -- all or nothing -- a failed payment rewinds to `before` (Cost.payToll), which
--- also undoes the payments ahead of it. Each player pays for the creatures they
--- control, which only a shared team's declaration can split (CR 805.10b /
--- 805.10d). A player owing nothing is not asked.
+-- also undoes the payments ahead of it, less what CR 733.1 lets each player keep
+-- or forbids reversing: those payments' mana windows and library moves ride
+-- along to it. Each player pays for the creatures they control, which only a
+-- shared team's declaration can split (CR 805.10b / 805.10d). A player owing
+-- nothing is not asked.
 payTolls :: ManaAbilityPerformer.ManaAbilityPerformer -> GameState -> [(PlayerId, [(ObjectId, Cost Keyword.Keyword)])] -> Game Bool
-payTolls perform before owed = case owed of
-  [] -> pure True
-  (payer, charges) : rest
-    | null charges -> payTolls perform before rest
-    | otherwise -> do
-        paid <- Cost.payToll perform before payer charges
-        if paid then payTolls perform before rest else pure False
+payTolls perform before = go []
+  where
+    go earlier owed = case owed of
+      [] -> pure True
+      (payer, charges) : rest
+        | null charges -> go earlier rest
+        | otherwise -> Cost.payToll perform before earlier payer charges >>= maybe (pure False) (`go` rest)
 
 -- What an effect leaves open about CR 508.4's choice, which is a question about
 -- the EFFECT rather than about the board, so it is settled by
@@ -2868,7 +2871,7 @@ attemptBlockDeclaration perform pid attacking rejected = do
         paid <- payTolls perform before owed
         -- CR 509.1's preamble: a declaration the defending player cannot pay for
         -- is illegal and CR 733.1 reverses it, which Cost.payToll has done back
-        -- to `before`. The blocks themselves are recorded below, so the only
+        -- to `before`, less what CR 733.1 keeps. The blocks themselves are recorded below, so the only
         -- thing of this function's that undoes is the declaredBlockers write
         -- above -- which has to go, since the retry and the CR 509.1c
         -- degradation both ask the same toll again and would otherwise see stale

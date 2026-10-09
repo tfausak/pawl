@@ -4494,8 +4494,9 @@ criteriaOf component = case component of
 -- checked against.
 --
 -- Not implemented: asking where a set of answers does not compose. With
--- everything kept the whole action goes back unasked; otherwise the activation
--- stands unasked (#4860).
+-- everything kept the whole action goes back unasked, a combat toll's mill
+-- (`unreversibleStretch`) with it; otherwise the activation stands unasked
+-- (#4860).
 --
 -- The special actions and CR 118.12's payment announce nothing that writes:
 -- their two states differ only in GameState.lastChoice and, at
@@ -4547,10 +4548,9 @@ reverseIllegal windows before =
       -- CR 733.1: "players may not reverse actions that moved cards to a
       -- library [or] from a library to any zone other than the stack". An
       -- activation that did -- a CR 605.1b triggered mana ability that draws
-      -- (Synthetic Wellspring Growth) -- stands unasked.
-      movedLibraryCard key =
-        let held gs = Set.fromList (foldMap Foldable.toList (GameState.library gs))
-         in any (\segment -> held (ManaSegment.opened segment) /= held (ManaSegment.closed segment)) (Map.findWithDefault [] key segmentsOf)
+      -- (Synthetic Wellspring Growth) -- stands unasked, and so does a combat
+      -- toll's mill (`unreversibleStretch`).
+      movedLibraryCard key = any (\segment -> libraryMembershipChanged (ManaSegment.opened segment) (ManaSegment.closed segment)) (Map.findWithDefault [] key segmentsOf)
       askers = [entry | entry@(key, _, _) <- indexed, not (movedLibraryCard key)]
       compose reversed = composeReversal before windows (\w i -> Set.notMember (w, i) reversed)
       -- CR 733.1's "unless", per payer, replayed from the pool their first
@@ -4720,7 +4720,8 @@ composeReversal before windows keeps = case NonEmpty.nonEmpty windows of
 -- Pawl.CastSpec's "a refused library cast puts Panglacial back" is the proof
 -- that the card comes back; ReversalSpec's `restoredOrder` case that the shuffle
 -- stands. A MillCards cost never reaches this: CR 601.2h pays it in a second pass
--- that nothing can refuse after (`pay`).
+-- that nothing can refuse after (`pay`), and a combat toll whose LATER tag
+-- refuses keeps it by composition instead (`unreversibleStretch`).
 
 -- `events` keeps only the Revealed entries `since` gained past `snapshot`'s own
 -- length whose card is in a library on BOTH sides, not the whole suffix: a tap
@@ -4995,13 +4996,22 @@ paySubstitutingReading slots perform began earlier moment subject announced spen
 -- ALL OR NOTHING (CR 508.1j, CR 509.1f: "partial payments are not allowed"). A
 -- payer who sacrifices the first land and then cannot find a second ends up
 -- having sacrificed nothing. CR 508.1's and CR 509.1's preambles send the
--- illegal declaration to rule 733, so a False here has reversed the whole
+-- illegal declaration to rule 733, so a Nothing here has reversed the whole
 -- declaration back to `began`, the caller's snapshot ahead of CR 508.1a's or
 -- 509.1a's record, and the mana abilities the window activated go back only if
 -- the payer says so (`reverseIllegal` above) -- `pay`'s posture for CR 601.2h.
+-- A part that moved a card into or out of a library stands (`payTagged`).
 -- The declaration's own writes include CR 508.1f's tap and CR 508.1g's exert on
 -- a creature the window may tap for mana too, which is why
 -- Pawl.Engine.Reversal descends inside an Object.
+--
+-- `earlier` is what the players ahead of this one in the same declaration left
+-- standing -- their mana windows and their unreversible stretches, oldest first
+-- -- and a Just hands it back with this payer's appended, so that a later
+-- payer's refusal reverses the WHOLE declaration with each of them asked
+-- (Pawl.Engine.Combat.payTolls). The scenario
+-- team/cr-733-1-a-card-one-teammate-milled-to-attack-stays-milled-when-the-other-s-toll-fails
+-- is the proof.
 --
 -- The bound slots ride out unread. A component of a combat toll binds what
 -- payComponent binds it (Sacrifice, TapPermanents, TapForTotalPower, ExileThis
@@ -5013,7 +5023,7 @@ paySubstitutingReading slots perform began earlier moment subject announced spen
 -- The ORDER ACROSS TAGS is the payer's, which is what "in any order" says about
 -- a toll two permanents taxed: `tollOrderObservable` below decides whether the
 -- payer can tell one order from another, and Prompt.OrderCombatTolls asks. Each
--- tag's OWN components are ordered by payComponents after that, so the two
+-- tag's OWN components are ordered by payTagged after that, so the two
 -- prompts nest rather than compete. CombatEffectSpec's "CR 508.1j the payer
 -- orders the two taxing permanents: Hollow Warrior before Exalted Dragon" is the
 -- proof.
@@ -5021,13 +5031,14 @@ paySubstitutingReading slots perform began earlier moment subject announced spen
 -- The pooled MANA is paid before the order is asked, which is CR 508.1i and CR
 -- 509.1e sitting ahead of the payment rule rather than a choice pawl made, and
 -- `pay` above takes the same posture for CR 601.2g.
-payToll :: ManaAbilityPerformer.ManaAbilityPerformer -> GameState -> PlayerId -> [(ObjectId, Cost Keyword.Type.Keyword)] -> Game Bool
-payToll perform began pid charges =
+payToll :: ManaAbilityPerformer.ManaAbilityPerformer -> GameState -> [ManaWindow.ManaWindow] -> PlayerId -> [(ObjectId, Cost Keyword.Type.Keyword)] -> Game (Maybe [ManaWindow.ManaWindow])
+payToll perform began earlier pid charges =
   -- CR 118.6: a toll one of whose parts is unpayable is unpayable whole.
+  --
+  -- `earlier` rides along here as it does below, a FENCE rather than proven
+  -- behaviour: nothing in the suite reaches this arm behind another payer.
   case traverse (Cost.mana . snd) charges of
-    Nothing -> do
-      restoreKeepingLibraryActions began
-      pure False
+    Nothing -> refused earlier
     Just _ -> do
       announced <- announceToll pid charges
       let pooled = ManaCost.MkManaCost (concatMap (foldMap ManaCost.unwrap . Cost.mana . snd) announced)
@@ -5043,9 +5054,7 @@ payToll perform began pid charges =
             (paid, _, window) <- payManaWindow perform Set.empty Nothing PaymentSubject.ForNeither ManaSpending.AsProduced pid (\mc -> pure (mc, [])) pooled
             pure (paid, [window])
       if not paidMana
-        then do
-          Monad.void (reverseIllegal windows began)
-          pure False
+        then refused (earlier <> windows)
         else do
           let tagged = fmap (fmap Cost.components) announced
           ordered <-
@@ -5058,12 +5067,12 @@ payToll perform began pid charges =
                 -- payPass's posture below.
                 pure (Game.permute tagged answer)
               else pure tagged
-          outcome <- payTagged pid ordered
+          (outcome, stretches) <- payTagged pid ordered
           case outcome of
-            Payment.Paid _ -> pure True
-            Payment.Unpaid -> do
-              Monad.void (reverseIllegal windows began)
-              pure False
+            Payment.Paid _ -> pure (Just (earlier <> windows <> stretches))
+            Payment.Unpaid -> refused (earlier <> windows <> stretches)
+  where
+    refused windows = Nothing <$ reverseIllegal windows began
 
 -- Which way each of the toll's symbols payable in more than one way will be
 -- paid, chosen by the PAYER immediately before CR 508.1j's and CR 509.1f's
@@ -5157,8 +5166,9 @@ announceToll pid charges = do
 -- same offer either way. Sound only while no toll in `data/cards/` prints a part
 -- naming the permanent it is on -- Pawl.Types.CostComponent's SacrificeThis and
 -- TapThis, which would make two equal lists name two different permanents; the
--- pool's tolls are Exalted Dragon's Sacrifice, Hollow Warrior's TapPermanents
--- and Sphere of Safety's counted mana, and none of them does.
+-- pool's tolls are Exalted Dragon's Sacrifice, Hollow Warrior's TapPermanents,
+-- Synthetic Tithe of Memory's MillCards and Sphere of Safety's counted mana, and
+-- none of them does.
 --
 -- BOTH conjuncts are FENCES rather than proven behaviour, `orderObservable`'s
 -- admission below: the boards that would tell them apart print two identical
@@ -5174,26 +5184,76 @@ tollOrderObservable charges = case filter (any orderSensitive . snd) charges of
 -- stopping at the first refusal. payInOrder's shape one level up, and the merge is
 -- that function's for its reason.
 --
--- Not implemented: CR 733.1's OTHER library carve-out -- a card MillCards moved
--- from a library to a graveyard is not reversed either -- for a tag whose own
--- mill (`paidInSecondPass`) completes before a LATER tag in this fold refuses.
--- `payToll`'s and Pawl.Engine.Combat's reverts undo that mill along with the
--- rest: `keepingLibraryActions` hands a library whose membership changed back
--- to the snapshot, a library-to-zone move touching more than the library. No
--- toll in `data/cards/` mills (#3162).
-payTagged :: PlayerId -> [(ObjectId, [CostComponent.CostComponent Keyword.Type.Keyword])] -> Game Payment.Payment
+-- A part that moved a card into or out of a library comes back as a stretch CR
+-- 733.1 forbids reversing (`unreversibleStretch`): CR 508.1j's "in any order"
+-- lets a mill paid for one tag finish before a LATER tag refuses, and the
+-- reversal that follows must keep it. The scenario
+-- combat-cost/cr-733-1-a-card-milled-to-attack-stays-milled-when-a-later-toll-fails
+-- is the proof.
+--
+-- Not implemented: the payer's order WITHIN a tag. CR 508.1j and CR 509.1f say
+-- only "in any order", but each tag is split by payComponents' two passes
+-- (`paidInSecondPass`), so a mill is always paid after the tag's other parts.
+-- Not implemented either: keeping a reveal from a library standing when its part
+-- moved no card. Such a part falls in a reversed gap, so its Revealed events go
+-- back (#4862).
+payTagged :: PlayerId -> [(ObjectId, [CostComponent.CostComponent Keyword.Type.Keyword])] -> Game (Payment.Payment, [ManaWindow.ManaWindow])
 payTagged pid charges = case charges of
-  [] -> pure bindsNothing
+  [] -> pure (bindsNothing, [])
   (oid, components) : rest -> do
     -- CR 508.1j / 509.1f: a toll is paid during the declaration, which is a
     -- turn-based action and not a resolution (PaymentMoment's own reason).
     --
     -- No slots: a declaration announces no targets (CR 508.1h, CR 509.1d), so
     -- there is nothing for a toll's criterion to be bound to.
-    outcome <- payComponents PaymentMoment.OutsideResolution Map.empty pid oid components
-    case outcome of
-      Payment.Unpaid -> pure Payment.Unpaid
-      Payment.Paid bound -> fmap (mergeBound bound) (payTagged pid rest)
+    let (second, first) = List.partition paidInSecondPass components
+        payKeeping stretches parts = case parts of
+          [] -> pure (bindsNothing, reverse stretches)
+          component : others -> do
+            opened <- State.get
+            outcome <- payComponent PaymentMoment.OutsideResolution Map.empty pid oid component
+            closed <- State.get
+            let kept = [unreversibleStretch pid oid opened closed | libraryMembershipChanged opened closed] <> stretches
+            case outcome of
+              Payment.Unpaid -> pure (Payment.Unpaid, reverse kept)
+              Payment.Paid bound -> do
+                (rested, standing) <- payKeeping kept others
+                pure (mergeBound bound rested, standing)
+    firstOutcome <- payPass PaymentMoment.OutsideResolution Map.empty pid oid first
+    case firstOutcome of
+      Payment.Unpaid -> pure (Payment.Unpaid, [])
+      Payment.Paid firstBound -> do
+        (secondOutcome, stretches) <- payKeeping [] =<< orderPass pid oid second
+        case secondOutcome of
+          Payment.Unpaid -> pure (Payment.Unpaid, stretches)
+          Payment.Paid secondBound -> do
+            (outcome, later) <- payTagged pid rest
+            pure (mergeBound firstBound (mergeBound secondBound outcome), stretches <> later)
+
+-- A stretch of a payment that moved a card into or out of a library, which CR
+-- 733.1 forbids reversing, shaped as a window holding one activation that
+-- `reverseIllegal` keeps standing unasked -- the posture it takes towards a mana
+-- ability that drew. It is NOT a CR 605.3a window: `oid` is the permanent whose
+-- charge it paid, and nothing offers it back.
+unreversibleStretch :: PlayerId -> ObjectId -> GameState -> GameState -> ManaWindow.ManaWindow
+unreversibleStretch pid oid opened closed =
+  ManaWindow.MkManaWindow
+    { ManaWindow.payer = pid,
+      ManaWindow.activated = [ManaActivation.MkManaActivation {ManaActivation.sources = oid NonEmpty.:| [], ManaActivation.spent = [], ManaActivation.added = []}],
+      ManaWindow.segments = [ManaSegment.MkManaSegment {ManaSegment.activation = 0, ManaSegment.opened = opened, ManaSegment.closed = closed}],
+      ManaWindow.spent = [],
+      ManaWindow.opened = opened,
+      ManaWindow.closed = closed
+    }
+
+-- CR 733.1: did a card go into or out of a library between the two states? Its
+-- "moved cards to a library [or] from a library to any zone other than the
+-- stack", read off membership: nothing that reaches here moves a card from a
+-- library to the stack.
+libraryMembershipChanged :: GameState -> GameState -> Bool
+libraryMembershipChanged opened closed =
+  let held gs = Set.fromList (foldMap Foldable.toList (GameState.library gs))
+   in held opened /= held closed
 
 -- CR 601.2h: the parts are paid "in any order", and the ORDER IS THE PAYER'S.
 -- Observable: Jarad, Golgari Lich Lord's "Sacrifice a Swamp and a Forest" beside
@@ -5222,13 +5282,17 @@ payComponents moment slots pid oid components = do
 -- ONE of CR 601.2h's two passes: the payer orders it where the order is
 -- observable, then it is paid in that order.
 payPass :: PaymentMoment.PaymentMoment -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Game Payment.Payment
-payPass moment slots pid oid components =
+payPass moment slots pid oid components = payInOrder moment slots pid oid =<< orderPass pid oid components
+
+-- The payer's order for one pass, asked only where it is observable.
+orderPass :: PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Game [CostComponent.CostComponent Keyword.Type.Keyword]
+orderPass pid oid components =
   if orderObservable components
     then do
       gs <- State.get
       answer <- Game.choose (Prompt.OrderCostComponents (Decide.deciderFor pid gs) pid oid components)
-      payInOrder moment slots pid oid (Game.permute components answer)
-    else payInOrder moment slots pid oid components
+      pure (Game.permute components answer)
+    else pure components
 
 -- CR 601.2h: is this part paid in the SECOND pass -- "all costs that don't
 -- involve random elements or moving objects from the library to a public zone"
