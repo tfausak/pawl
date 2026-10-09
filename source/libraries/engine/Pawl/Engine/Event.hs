@@ -5940,6 +5940,8 @@ storeEntryEffect entered gs (source, modification) =
           }
    in gs1 {GameState.continuousEffects = effect : GameState.continuousEffects gs1}
 
+-- Not implemented: leaving an object put into the zone it is already in where
+-- it is, rather than moving it (#4843).
 changeZoneWithCause :: Maybe DiscardCause.DiscardCause -> Maybe GameState -> Set ObjectId -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> Maybe Recipient.Recipient -> TapState.TapState -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> Maybe PlayerId -> Maybe CardName.CardName -> Facing.Facing -> Bool -> CarryOver.CarryOver -> Bool -> Seq.Seq (ObjectId, Modification.Modification (GrantedAbility.Type.GrantedAbility Card.Type.Card)) -> Game (Seq.Seq ObjectId)
 changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition seed tapped entering under shown facing concealed carrying resolving defining = do
   gs <- State.get

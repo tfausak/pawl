@@ -630,31 +630,58 @@ attachments oid gs =
 -- CR 400.1: the player whose library, hand or graveyard holds this card -- its
 -- owner (CR 400.3) except between an ownership change and a later move (CR
 -- 407.3) -- in every pool card, the next instruction of the same resolution.
--- Found by search for that reason; Nothing for an object in no player's pile.
+-- Found by search for that reason, in the one zone Object.zone names and the
+-- owner's pile first; Nothing for an object in no player's pile.
 pileHolderOf :: ObjectId -> GameState -> Maybe PlayerId
-pileHolderOf oid gs = Foldable.asum (fmap (pileHolderIn oid) [GameState.library gs, GameState.hand gs, GameState.graveyard gs])
+pileHolderOf oid gs = case lookupObject oid gs of
+  Just obj -> case Object.zone obj of
+    Zone.Library -> pileHolderIn (Just (Object.owner obj)) oid (GameState.library gs)
+    Zone.Hand -> pileHolderIn (Just (Object.owner obj)) oid (GameState.hand gs)
+    Zone.Graveyard -> pileHolderIn (Just (Object.owner obj)) oid (GameState.graveyard gs)
+    _ -> Nothing
+  Nothing -> Foldable.asum (fmap (pileHolderIn Nothing oid) [GameState.library gs, GameState.hand gs, GameState.graveyard gs])
 
--- The player whose pile in one per-player zone holds the id.
-pileHolderIn :: ObjectId -> Map.Map PlayerId (Seq.Seq ObjectId) -> Maybe PlayerId
-pileHolderIn oid piles = fmap fst (List.find (Foldable.elem oid . snd) (Map.toList piles))
+-- The player whose pile in one per-player zone holds the id: the hinted
+-- player's pile first, then every pile.
+pileHolderIn :: Maybe PlayerId -> ObjectId -> Map.Map PlayerId (Seq.Seq ObjectId) -> Maybe PlayerId
+pileHolderIn hint oid piles = case hint of
+  Just pid | maybe False (Foldable.elem oid) (Map.lookup pid piles) -> Just pid
+  _ -> fmap fst (List.find (Foldable.elem oid . snd) (Map.toList piles))
 
 -- CR 108.3 / 407.3: this player now owns the object. A write on the object as
 -- it stands and not a zone change, so CR 400.7 mints nothing; CR 400.3 reads
 -- the new owner at its next move. Unknown ids are left alone.
+--
+-- CR 110.2: control does not follow. A permanent or spell whose default
+-- controller is the owner fallback (Object.enteredUnder Nothing) has that
+-- controller pinned first. Proved by
+-- data/scenarios/ante/ante-timmerian-fiends-the-artifact-dies-under-its-old-owners-control.json.
 setOwner :: ObjectId -> PlayerId -> GameState -> GameState
-setOwner oid pid gs = gs {GameState.objects = Map.adjust (\obj -> obj {Object.owner = pid}) oid (GameState.objects gs)}
+setOwner oid pid gs =
+  let pinned obj
+        | Maybe.isNothing (Object.enteredUnder obj) && List.elem (Object.zone obj) [Zone.Battlefield, Zone.Stack] = obj {Object.enteredUnder = Just (Object.owner obj)}
+        | otherwise = obj
+   in gs {GameState.objects = Map.adjust (\obj -> (pinned obj) {Object.owner = pid}) oid (GameState.objects gs)}
 
 removeFromZones :: ObjectId -> GameState -> GameState
 removeFromZones oid gs =
-  let -- CR 400.1: out of the pile that holds it, never Object.owner's, which an
-      -- ownership change can have moved first.
-      fromPile piles = case pileHolderIn oid piles of
-        Just pid -> Map.adjust (Seq.filter (/= oid)) pid piles
-        Nothing -> piles
+  let found = lookupObject oid gs
+      owner = fmap Object.owner found
+      -- Only the zone the object says it is in is searched; an unknown id
+      -- searches every pile.
+      searched zone = maybe True ((== zone) . Object.zone) found
+      -- CR 400.1: out of the pile that holds it, never Object.owner's, which an
+      -- ownership change can have moved first. The owner's pile is only probed
+      -- first.
+      fromPile zone piles
+        | searched zone = case pileHolderIn owner oid piles of
+            Just pid -> Map.adjust (Seq.filter (/= oid)) pid piles
+            Nothing -> piles
+        | otherwise = piles
    in gs
-        { GameState.library = fromPile (GameState.library gs),
-          GameState.hand = fromPile (GameState.hand gs),
-          GameState.graveyard = fromPile (GameState.graveyard gs),
+        { GameState.library = fromPile Zone.Library (GameState.library gs),
+          GameState.hand = fromPile Zone.Hand (GameState.hand gs),
+          GameState.graveyard = fromPile Zone.Graveyard (GameState.graveyard gs),
           GameState.battlefield = Set.delete oid (GameState.battlefield gs),
           -- CR 702.26k: "phased-out permanents owned by a player who leaves the game
           -- also leave the game", one of the three rules on the far side of CR 702.26b's
@@ -667,9 +694,9 @@ removeFromZones oid gs =
           GameState.exile = Set.delete oid (GameState.exile gs),
           GameState.command = Set.delete oid (GameState.command gs),
           GameState.ante = Set.delete oid (GameState.ante gs),
-          GameState.attractionDecks = fromPile (GameState.attractionDecks gs),
-          GameState.planarDecks = fromPile (GameState.planarDecks gs),
-          GameState.schemeDecks = fromPile (GameState.schemeDecks gs),
+          GameState.attractionDecks = fromPile Zone.Command (GameState.attractionDecks gs),
+          GameState.planarDecks = fromPile Zone.Command (GameState.planarDecks gs),
+          GameState.schemeDecks = fromPile Zone.Command (GameState.schemeDecks gs),
           GameState.stack = filter (/= oid) (GameState.stack gs)
         }
 

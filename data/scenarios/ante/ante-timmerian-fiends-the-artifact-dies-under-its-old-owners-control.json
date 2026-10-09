@@ -1,0 +1,110 @@
+{
+  "description": "CR 110.2 Timmerian Fiends makes alice the owner of bob's Ornithopter, which bob still controls as it dies, so bob's Garna, Bloodfist of Keld deals alice 1 damage",
+  "note": "An ownership write must not move control: the Ornithopter entered under no recorded controller, so its default controller is read off its owner.",
+  "board": {
+    "ante": true,
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Timmerian Fiends",
+            "label": "fiends"
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-1"
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-2"
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-3"
+          }
+        ],
+        "library": [
+          {
+            "card": "Mountain"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Ornithopter",
+            "label": "thopter"
+          },
+          {
+            "card": "Garna, Bloodfist of Keld"
+          }
+        ],
+        "library": [
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Mountain"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$fiends",
+          "ability": 0,
+          "targets": [
+            "$thopter"
+          ],
+          "mana": [
+            "$swamp-1",
+            "$swamp-2",
+            "$swamp-3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "ChooseOptional": {
+          "type": "Declines"
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Life": {
+        "player": "alice",
+        "life": 19
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Ornithopter",
+        "count": 1
+      }
+    }
+  ]
+}

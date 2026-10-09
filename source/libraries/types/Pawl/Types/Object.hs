@@ -46,7 +46,8 @@ data Object = MkObject
     -- arrivals CR 109.4 gives a controller: CR 110.2's battlefield entry and CR
     -- 405.4 / 601.2a's cast, which fixes a spell's controller as the card is put
     -- onto the stack (#83). Nothing is CR 108.4a's fallback to the owner, which
-    -- covers a token, a land played from hand and an ability (CR 113.8).
+    -- covers a token, a land played from hand and an ability (CR 113.8);
+    -- Game.setOwner pins it before an ownership change, so control stays put.
     --
     -- NOT a control-changing EFFECT: CR 800.4c distinguishes an effect that gives
     -- a player control of an object from the player who controlled it by default,

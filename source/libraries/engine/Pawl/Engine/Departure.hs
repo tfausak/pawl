@@ -554,17 +554,19 @@ givesControlOnEntryTo pid active =
 --      Object.enteredUnder where a rule recorded one, otherwise CR 108.4a's
 --      Object.owner. Only CR 407.3's ante cards change Object.owner, and none
 --      names an object on the stack, so the first clause deleted every object
---      `pid` owned. Object.enteredUnder is
---      written by three writers and no others (see Pawl.Types.Object):
---      Event.changeZoneAttaching for the effect that put a permanent onto the
---      battlefield (CR 110.2a), Pawl.Engine.Replacement's entry loop for a CR
---      616.1b rewrite of that, and Event.changeZoneCasting for the caster of a
---      spell (CR 405.4). Only the third writes a stack object, and what it
---      writes is a CARD being cast -- which `notACard` excludes -- so no object
---      this clause reaches can carry one. A battlefield permanent can
---      (Meandering Towershell returned under a thief who then leaves; Gather
---      Specimens' victim), and so can a spell cast off another player's card,
---      which is what clause 4 is for.
+--      `pid` owned. Object.enteredUnder is written by four writers and no
+--      others (see Pawl.Types.Object): Event.changeZoneAttaching for the effect
+--      that put a permanent onto the battlefield (CR 110.2a),
+--      Pawl.Engine.Replacement's entry loop for a CR 616.1b rewrite of that,
+--      Event.changeZoneCasting for the caster of a spell (CR 405.4), and
+--      Game.setOwner, which pins a permanent's default controller before an
+--      ante card changes its owner (CR 110.2). Only the third writes a stack
+--      object, and what it writes is a CARD being cast -- which `notACard`
+--      excludes -- so no object this clause reaches can carry one. A
+--      battlefield permanent can (Meandering Towershell returned under a thief
+--      who then leaves; Gather Specimens' victim; an artifact Timmerian Fiends
+--      gave away), and so can a spell cast off another player's card, which is
+--      what clause 4 is for.
 --   2. a stored layer-2 SetController, whose PlayerId is BAKED at resolution
 --      (CR 611.2c). The second clause deleted every stored effect whose payload
 --      is `pid`, whichever object it affects.
