@@ -112,6 +112,7 @@ import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.SpellWasCopied as SpellWasCopied
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.StepBegins as StepBegins
+import qualified Pawl.Types.StickerPut as StickerPut
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TappedForMana as TappedForMana
 import qualified Pawl.Types.Transformed as Transformed
@@ -288,6 +289,7 @@ movedOf event = case event of
   GameEvent.Waterbent _ -> Nothing
   GameEvent.Airbent _ -> Nothing
   GameEvent.Firebent _ -> Nothing
+  GameEvent.StickerPut _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.TriggeredAbilityResolved _ -> Nothing
 
@@ -435,6 +437,7 @@ participants event =
         GameEvent.Waterbent pid -> player pid
         GameEvent.Airbent pid -> player pid
         GameEvent.Firebent pid -> player pid
+        GameEvent.StickerPut put -> ([StickerPut.object put], [StickerPut.placer put])
         GameEvent.ActivatedAbilityResolved a -> one (ActivatedAbilitySource.source a)
         GameEvent.TriggeredAbilityResolved t -> one (TriggeredAbilitySource.source t)
 
@@ -494,6 +497,7 @@ looksBack condition = case condition of
   TriggerCondition.PlayerWaterbends _ -> False
   TriggerCondition.PlayerAirbends _ -> False
   TriggerCondition.PlayerFirebends _ -> False
+  TriggerCondition.PlacesSticker _ -> False
   -- Not on CR 603.10a's list, and CR 706.1's roll is no zone change: it moves
   -- no object at all, so CR 603.10's first sentence governs.
   TriggerCondition.PlayerRollsDice _ -> False
@@ -813,6 +817,7 @@ batchScoped condition = case condition of
   TriggerCondition.PlayerWaterbends _ -> False
   TriggerCondition.PlayerAirbends _ -> False
   TriggerCondition.PlayerFirebends _ -> False
+  TriggerCondition.PlacesSticker _ -> False
   TriggerCondition.PlayerCompletesDungeon _ -> False
   TriggerCondition.PlayerSurveils _ -> False
   TriggerCondition.PlayerPlaysLand _ -> False
@@ -1385,6 +1390,7 @@ eventTriggers events gs =
         GameEvent.Waterbent _ -> Map.empty
         GameEvent.Airbent _ -> Map.empty
         GameEvent.Firebent _ -> Map.empty
+        GameEvent.StickerPut _ -> Map.empty
         GameEvent.ActivatedAbilityResolved _ -> Map.empty
         GameEvent.TriggeredAbilityResolved _ -> Map.empty
         GameEvent.CardArrived _ -> Map.empty
@@ -1771,6 +1777,7 @@ eventTriggers events gs =
         GameEvent.Waterbent _ -> Map.empty
         GameEvent.Airbent _ -> Map.empty
         GameEvent.Firebent _ -> Map.empty
+        GameEvent.StickerPut _ -> Map.empty
         GameEvent.ActivatedAbilityResolved _ -> Map.empty
         GameEvent.TriggeredAbilityResolved _ -> Map.empty
         GameEvent.CardArrived _ -> Map.empty
@@ -2102,6 +2109,7 @@ eventTriggers events gs =
         GameEvent.Waterbent _ -> Map.empty
         GameEvent.Airbent _ -> Map.empty
         GameEvent.Firebent _ -> Map.empty
+        GameEvent.StickerPut _ -> Map.empty
         GameEvent.ActivatedAbilityResolved _ -> Map.empty
         GameEvent.TriggeredAbilityResolved _ -> Map.empty
         GameEvent.CardArrived _ -> Map.empty
@@ -2278,6 +2286,7 @@ eventTriggers events gs =
         GameEvent.Waterbent _ -> Map.empty
         GameEvent.Airbent _ -> Map.empty
         GameEvent.Firebent _ -> Map.empty
+        GameEvent.StickerPut _ -> Map.empty
         GameEvent.ActivatedAbilityResolved _ -> Map.empty
         GameEvent.TriggeredAbilityResolved _ -> Map.empty
         GameEvent.CardArrived _ -> Map.empty
@@ -2697,6 +2706,7 @@ zonesTriggeredFrom cond =
         TriggerCondition.PlayerWaterbends _ -> battlefield
         TriggerCondition.PlayerAirbends _ -> battlefield
         TriggerCondition.PlayerFirebends _ -> battlefield
+        TriggerCondition.PlacesSticker _ -> battlefield
         -- CR 113.6's default again, and NOT the graveyard, though Dungeon Crawler
         -- watches from there: completing a dungeon is a condition a battlefield
         -- permanent could watch perfectly well, so CR 113.6k's exception does not
@@ -3199,6 +3209,7 @@ stateTriggers gs
             TriggerCondition.PlayerWaterbends _ -> False
             TriggerCondition.PlayerAirbends _ -> False
             TriggerCondition.PlayerFirebends _ -> False
+            TriggerCondition.PlacesSticker _ -> False
             -- CR 603.2 once more: a die roll is something that HAPPENS, with its own log
             -- entry, never a CR 603.8 state that could be true standing still.
             TriggerCondition.PlayerRollsDice _ -> False
@@ -4027,5 +4038,6 @@ resnapshot gs without event =
         GameEvent.Waterbent {} -> Just event
         GameEvent.Airbent {} -> Just event
         GameEvent.Firebent {} -> Just event
+        GameEvent.StickerPut {} -> Just event
         GameEvent.ActivatedAbilityResolved {} -> Just event
         GameEvent.TriggeredAbilityResolved {} -> Just event

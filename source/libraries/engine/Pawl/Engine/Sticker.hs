@@ -9,8 +9,10 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Extra.Natural as Natural
+import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
@@ -19,6 +21,7 @@ import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.StickerKind as StickerKind
 import qualified Pawl.Types.StickerPlacement as StickerPlacement
+import qualified Pawl.Types.StickerPut as StickerPut
 import qualified Pawl.Types.StickerRef as StickerRef
 import qualified Pawl.Types.StickerSheet as StickerSheet
 
@@ -50,9 +53,11 @@ available pid kinds gs = case Map.lookup pid (GameState.players gs) of
           ]
      in filter (\ref -> Set.notMember ref used) offered
 
--- | CR 123.3 / 613.7k: put the sticker on the object, stamped now.
+-- | CR 123.3 / 613.7k: put the sticker on the object, stamped now, and record
+-- the placement for "whenever you place a sticker".
 put :: PlayerId -> ObjectId -> StickerRef.StickerRef -> GameState -> GameState
-put _placer oid ref gs =
+put placer oid ref gs =
   let (ts, stamped) = Game.freshTimestamp gs
       placement = StickerPlacement.MkStickerPlacement {StickerPlacement.sticker = ref, StickerPlacement.timestamp = ts}
-   in stamped {GameState.objects = Map.adjust (\o -> o {Object.stickers = Object.stickers o Seq.|> placement}) oid (GameState.objects stamped)}
+      placed = stamped {GameState.objects = Map.adjust (\o -> o {Object.stickers = Object.stickers o Seq.|> placement}) oid (GameState.objects stamped)}
+   in Event.recordEvent (GameEvent.StickerPut StickerPut.MkStickerPut {StickerPut.placer = placer, StickerPut.object = oid, StickerPut.kind = StickerRef.kind ref}) placed

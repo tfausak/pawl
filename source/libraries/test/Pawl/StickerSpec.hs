@@ -34,6 +34,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.StickerSheets as StickerSheets
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilitySticker as AbilitySticker
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameSettings as GameSettings
@@ -387,3 +388,13 @@ spec s registry = Spec.describe s "Sticker" $ do
     Spec.assertEqWith s "CR 115.1 only the Piker with an art sticker is offered" offered [marked]
     Spec.assertEqWith s "it gets +2/+0 and menace" (Projection.powerOf marked after, Projection.hasKeyword Keyword.Menace marked after) (Just 4, True)
     Spec.assertEqWith s "the other Piker is untouched" (Projection.powerOf plainPiker after) (Just 2)
+  -- Divergence 6: an art placement triggers the art ability alone, so one
+  -- counter and no pump; both firing would read power 2.
+  Spec.it s "CR 123.9 an art sticker puts one +1/+1 counter on Wee Champion and no pump" $ do
+    sheets <- committedSheets
+    pyrodancer <- S.printingOf s registry "Proficient Pyrodancer"
+    wee <- S.printingOf s registry "Wee Champion"
+    let (weeId, g1) = S.addPermanent wee S.alice (withSheets (take 1 sheets) (Setup.gameWith GameSettings.plain S.bothPlayers))
+        (pyro, after, _) = pyrodancerEnters pyrodancer Nothing g1
+    Spec.assertEqWith s "CR 123.9 Wee Champion is a 1/2 with one +1/+1 counter" (Projection.powerOf weeId after, S.counterOf CounterKind.PlusOnePlusOne weeId after) (Just 1, 1)
+    Spec.assertEqWith s "one art sticker went on alice's two permanents" (sum (fmap (\oid -> maybe 0 (Seq.length . Object.stickers) (Game.lookupObject oid after)) [weeId, pyro])) 1

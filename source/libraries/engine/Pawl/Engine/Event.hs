@@ -849,6 +849,7 @@ damageOf event = case event of
   GameEvent.Waterbent _ -> Nothing
   GameEvent.Airbent _ -> Nothing
   GameEvent.Firebent _ -> Nothing
+  GameEvent.StickerPut _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.TriggeredAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
@@ -939,6 +940,7 @@ revealOf event = case event of
   GameEvent.Waterbent _ -> Nothing
   GameEvent.Airbent _ -> Nothing
   GameEvent.Firebent _ -> Nothing
+  GameEvent.StickerPut _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.TriggeredAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
@@ -9182,6 +9184,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.PlayerWaterbends _ -> False
   TriggerCondition.PlayerAirbends _ -> False
   TriggerCondition.PlayerFirebends _ -> False
+  TriggerCondition.PlacesSticker _ -> False
   -- CR 706.1 names no turn either.
   TriggerCondition.PlayerRollsDice _ -> False
   TriggerCondition.PlayerRollsResult _ -> False
@@ -9797,6 +9800,7 @@ abilityTriggeredOf event = case event of
   GameEvent.Waterbent _ -> Nothing
   GameEvent.Airbent _ -> Nothing
   GameEvent.Firebent _ -> Nothing
+  GameEvent.StickerPut _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.TriggeredAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing

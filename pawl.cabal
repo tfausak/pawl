@@ -970,6 +970,7 @@ library codec
     Pawl.Codec.PileSpec
     Pawl.Codec.Placement
     Pawl.Codec.PlacementSpec
+    Pawl.Codec.PlacesSticker
     Pawl.Codec.PlanarDieFace
     Pawl.Codec.PlanarDieFaceSpec
     Pawl.Codec.PlanarDieRolled
@@ -1229,6 +1230,7 @@ library codec
     Pawl.Codec.StickerKind
     Pawl.Codec.StickerKindSpec
     Pawl.Codec.StickerPlacement
+    Pawl.Codec.StickerPut
     Pawl.Codec.StickerRef
     Pawl.Codec.StickerSheet
     Pawl.Codec.StickerSheetSpec
@@ -2481,6 +2483,7 @@ library types
     Pawl.Types.Pile
     Pawl.Types.PileDraw
     Pawl.Types.Placement
+    Pawl.Types.PlacesSticker
     Pawl.Types.PlanarDieFace
     Pawl.Types.PlanarDieRolled
     Pawl.Types.Player
@@ -2630,6 +2633,7 @@ library types
     Pawl.Types.StepBegins
     Pawl.Types.StickerKind
     Pawl.Types.StickerPlacement
+    Pawl.Types.StickerPut
     Pawl.Types.StickerRef
     Pawl.Types.StickerSheet
     Pawl.Types.StoredResult

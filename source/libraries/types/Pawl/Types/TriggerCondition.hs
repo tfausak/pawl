@@ -22,6 +22,7 @@ import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
 import qualified Pawl.Types.PermanentsDealCombatDamageToPlayer as PermanentsDealCombatDamageToPlayer
+import qualified Pawl.Types.PlacesSticker as PlacesSticker
 import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
@@ -717,4 +718,6 @@ data TriggerCondition
     -- GameEvent.Firebent -- a firebending ability resolving, not the attack
     -- that triggered it.
     PlayerFirebends PlayerRelation.PlayerRelation
+  | -- | CR 123.3: Wee Champion's "whenever you place a sticker".
+    PlacesSticker PlacesSticker.PlacesSticker
   deriving (Eq, Ord, Show)

@@ -2830,6 +2830,7 @@ triggerConditionNames asking x = case x of
   TriggerCondition.PlayerWaterbends _playerRelation -> False
   TriggerCondition.PlayerAirbends _playerRelation -> False
   TriggerCondition.PlayerFirebends _playerRelation -> False
+  TriggerCondition.PlacesSticker _placesSticker -> False
 
 triggeredAbilityNames :: Asking -> (card -> Bool) -> (ability -> Bool) -> TriggeredAbility.TriggeredAbility card ability -> Bool
 triggeredAbilityNames asking onCard onAbility x = case x of

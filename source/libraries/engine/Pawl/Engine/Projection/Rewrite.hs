@@ -2046,6 +2046,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PlayerWaterbends _ -> condition
   TriggerCondition.PlayerAirbends _ -> condition
   TriggerCondition.PlayerFirebends _ -> condition
+  TriggerCondition.PlacesSticker _ -> condition
   TriggerCondition.PlayerCompletesDungeon _ -> condition
   TriggerCondition.PlayerSurveils _ -> condition
   TriggerCondition.PlayerPlaysLand payload -> TriggerCondition.PlayerPlaysLand payload {PlaysLand.filter = Filter.rewrite pairs (PlaysLand.filter payload)}

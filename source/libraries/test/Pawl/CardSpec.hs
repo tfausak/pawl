@@ -1191,6 +1191,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PlayerWaterbends _ -> []
   TriggerCondition.PlayerAirbends _ -> []
   TriggerCondition.PlayerFirebends _ -> []
+  TriggerCondition.PlacesSticker _ -> []
   -- CR 701.43d carries nothing at all, so no Count either.
   TriggerCondition.SelfExerted -> []
   -- CR 701.3a's carries a Filter, and a Filter holds no Count for
@@ -4621,6 +4622,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PlayerWaterbends _ -> []
   TriggerCondition.PlayerAirbends _ -> []
   TriggerCondition.PlayerFirebends _ -> []
+  TriggerCondition.PlacesSticker _ -> []
   -- CR 701.44b DOES carry one, a predicate over the explorer -- Wildgrowth
   -- Walker's "a creature you control" -- which the card lint must sweep.
   TriggerCondition.PermanentExplores f -> unframed [f]
@@ -4853,6 +4855,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.PlayerWaterbends _ -> []
   TriggerCondition.PlayerAirbends _ -> []
   TriggerCondition.PlayerFirebends _ -> []
+  TriggerCondition.PlacesSticker _ -> []
   TriggerCondition.PlayerCompletesDungeon _ -> []
   TriggerCondition.PlayerSurveils _ -> []
   TriggerCondition.PlayerPlaysLand _ -> []
