@@ -224,9 +224,11 @@ data View = MkView
     playerIdentity :: Maybe PlayerId.PlayerId,
     -- CR 508.1k: is this candidate an attacking creature right now? Not a
     -- characteristic (CR 109.3 says so in as many words), so it is read from
-    -- GameState.combat rather than from a projection. False for every candidate
-    -- with no combat status to read: a printed card off the battlefield, a
-    -- player, an event snapshot -- the vacuous posture power and controller take.
+    -- GameState.combat rather than from a projection, or for an object that has
+    -- left off CR 608.2h's record of it (Pawl.Engine.Count.lastKnownView). False
+    -- for every candidate with no combat status to read: a printed card off the
+    -- battlefield, a player, a cast's snapshot -- the vacuous posture power and
+    -- controller take.
     attacking :: Bool,
     -- CR 508.1b: WHICH PLAYER is this candidate attacking? Read from
     -- GameState.combat like `attacking` above and off the same map, but off its
@@ -672,7 +674,7 @@ data View = MkView
     -- CR 601.2b: how many times was each optional additional cost a keyword of
     -- this candidate offers declared? Read off Object.paidCosts, or off
     -- LastKnown.paidCosts for an object that has left its zone (CR 608.2h), and
-    -- empty for a printed card, a player or an event snapshot. Its readers are Pawl.Engine.Quantity's WasKicked arm, answering
+    -- empty for a printed card, a player or a cast's snapshot. Its readers are Pawl.Engine.Quantity's WasKicked arm, answering
     -- Burst Lightning's clause conditions and Monstrous War-Leech's CR 604.2
     -- clause on its entry replacement, and its TimesPaid arm, answering Gnarlid
     -- Pack's count, Sunscape Battlemage's "kicked with its {1}{G} kicker" and CR

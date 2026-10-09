@@ -25,7 +25,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import Pawl.Engine.Projection.Rewrite (Modification, composeWordChanges, rewriteActivatedAbility, rewriteAffected, rewriteCharacteristicPT, rewriteCondition, rewriteMinted, rewriteModification, rewritePlayerStaticAbility, rewritePrintedReplacement, rewriteRuleAbilities, rewriteStaticAbility, rewriteTriggeredAbility)
-import Pawl.Engine.Projection.View (ControlGrant, abilitiesFromCharacteristics, abilityFaceOf, abilityFaceOfId, abilitySources, controlGrants, controllerOf, controllerOfGiven, copiableCharacteristics, copiableRuleAbilitiesOf, copiableSnapshotOf, copiableSpecialActionsOf, countersOf, definesColorless, definesEveryCreatureType, enchantedPlayerOf, functionsFromZone, grantedStaticAbilitiesOf, inSourceRangeGiven, lastKnownView, staticAbilitiesOf, staticTimestampOf, viewOfCard, viewOfCharacteristics, withAnnouncedX)
+import Pawl.Engine.Projection.View (ControlGrant, abilitiesFromCharacteristics, abilityFaceOf, abilityFaceOfId, abilitySources, controlGrants, controllerOf, controllerOfGiven, copiableCharacteristics, copiableRuleAbilitiesOf, copiableSnapshotOf, copiableSpecialActionsOf, countersOf, definesColorless, definesEveryCreatureType, enchantedPlayerOf, functionsFromZone, grantedStaticAbilitiesOf, inSourceRangeGiven, staticAbilitiesOf, staticTimestampOf, viewOfCard, viewOfCharacteristics, withAnnouncedX)
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.RuleAbilities as RuleAbilities.Engine
 import qualified Pawl.Engine.Saga as Saga
@@ -1142,45 +1142,13 @@ viewWithLastKnown src gs oid =
 -- widens it again to every object a resolution's slots name.
 --
 -- Nothing when the object is gone and nothing was filed, which lands on the no-op
--- every caller gives an unevaluable quantity. The controller and the COUNTERS come
--- from the record: CR 122.2 made the counters cease to exist with the object.
---
--- And so does the OWNER, written over the field viewOfCharacteristics fills: that
--- function reads CR 108.3 off the live object and answers Nothing for an id naming
--- nothing, which is what CR 608.2b wants of a gone TARGET and not what CR
--- 608.2h wants here. An intervening "if" asking whose zone a dead entrant came out
--- of (Pawl.Engine.Quantity's EnteredFrom) reads it, and would otherwise take the
--- whole quantity to Nothing. Proved by Pawl.ConditionSpec's "the entrant killed
--- between the two checks still grows the Knight" -- that it answers at all;
--- substituting the record's controller for its owner leaves that case green, so
--- WHICH player is a fence.
---
--- The TOKEN status is written over the same way, off the record's `source`
--- through the one classifier Game.isToken itself uses -- so CR 111.6's fixed
--- answer survives the id CR 400.7 deleted, which is what Sunpearl Kirin's "if it
--- was a token" asks after the bounce has already happened.
---
--- So is the BLOCKING status, off the record's own field: CR 506.4 takes a
--- departed creature out of GameState.combat, so the live read viewOfCharacteristics
--- makes is False for exactly the creature CR 603.4's intervening "if" on a
--- dies-trigger asks about (Guildsworn Prowler).
---
--- And so is the ATTACKING status, off the record's own field, for the blocking
--- status' reason on the other side of the declaration: Garna, Bloodfist of Keld's
--- "draw a card if it was attacking" reads it about the creature CR 400.7 deleted.
---
--- The three fields that follow the SAME GameState.combat lookup on to the attacked
--- permanent -- attackingPlayer, attackingPlaneswalkerController and
--- attackingBattleProtector -- are left reading live, and Pawl.Types.LastKnown's
--- `attacking` records the query behind that. So is `blocked`, whose one printing
--- asks a CR 608.2i question. The neighbouring `attackedThisTurn` needs no record
--- either: CR 608.2i makes it a fold over GameState.events, which CR 511.3 does not
--- clear and the death does not touch.
+-- every caller gives an unevaluable quantity. Count.lastKnownView is the view of
+-- the record, and says what it answers off it.
 viewWithLastKnownAnywhere :: GameState -> Count.ViewOf
 viewWithLastKnownAnywhere gs oid =
   if Map.member oid (GameState.objects gs)
     then fullView gs oid
-    else fmap (lastKnownView (fullView gs) oid gs) (Map.lookup oid (GameState.lastKnown gs))
+    else fmap (Count.lastKnownView (fullView gs) oid gs) (Map.lookup oid (GameState.lastKnown gs))
 
 -- CR 608.2h: this object's last known information, and only when the id names
 -- nothing, so a caller falls through to its live reader. Shared by the two
@@ -1201,7 +1169,7 @@ sampledView oid candidate gs =
   let pc = BattlefieldCandidate.characteristics candidate
       controller = BattlefieldCandidate.controller candidate
    in case lastKnownOf oid gs of
-        Just lk -> lastKnownView (viewWithLastKnownAnywhere gs) oid gs lk {LastKnown.characteristics = pc, LastKnown.controller = controller}
+        Just lk -> Count.lastKnownView (viewWithLastKnownAnywhere gs) oid gs lk {LastKnown.characteristics = pc, LastKnown.controller = controller}
         Nothing -> viewOfCharacteristics (viewWithLastKnownAnywhere gs) oid pc (Just controller) (countersOf oid gs) gs
 
 -- keywordsOf with CR 608.2h's fallback (CR 702.2e, CR 702.15c, CR 702.90d); toxic

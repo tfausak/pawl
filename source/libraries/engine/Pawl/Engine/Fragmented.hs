@@ -309,7 +309,7 @@ becameCrewed event = case event of
   GameEvent.BecameCrewed {} -> True
   _ -> False
 
--- Pawl.Engine.Projection.View.convokedThisTurnOf follows the convoked spell
+-- Pawl.Engine.Count.convokedThisTurn follows the convoked spell
 -- onto the battlefield through the move log.
 convokedOrMoved :: GameEvent -> Bool
 convokedOrMoved event = case event of

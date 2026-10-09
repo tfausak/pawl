@@ -597,7 +597,7 @@ copiedObject = SlotName.MkSlotName (Text.pack "thatCopiedObject")
 -- Vehicle" can find itself in it. The component is not those two keywords' alone,
 -- so the slot is named for the component; on any other cost nothing reads it.
 -- CR 702.122c's look-back reads that same event rather than this slot
--- (Pawl.Engine.Projection.View's crewedByIt), the relation outliving the payment.
+-- (Pawl.Engine.Count.crewedThisTurn), the relation outliving the payment.
 --
 -- SET-VALUED and read as a set: CR 702.122a's "any number" is a set by
 -- construction, so a reader taking Binding.onlyOne of it would go quiet on every

@@ -1672,7 +1672,7 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
   -- source on every case below and object 22 the one the candidate convoked
   -- instead, so "convoked it" and "convoked a spell" answer differently here.
   -- The set holds both a spell and the permanent it became, which is what
-  -- Pawl.Engine.Projection.View's convokedByIt puts in it.
+  -- Pawl.Engine.Count.convokedThisTurn puts in it.
   Spec.describe s "ConvokedSourceThisTurn" $ do
     let convokedBy ns = blackCreature {Filter.convokedThisTurn = Set.fromList (fmap ObjectId.MkObjectId ns)}
         asked n = self {Filter.source = Just (ObjectId.MkObjectId n)}

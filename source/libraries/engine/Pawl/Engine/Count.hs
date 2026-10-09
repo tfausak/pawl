@@ -22,25 +22,33 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.ManaAbility as ManaAbility
+import qualified Pawl.Engine.Projection.Rewrite as Rewrite
 import qualified Pawl.Engine.Subtype as Subtype
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.AttackingPlayers as AttackingPlayers
+import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardArrivedIn as CardArrivedIn
 import qualified Pawl.Types.Combat as Combat
+import qualified Pawl.Types.Convoking as Convoking
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Crewing as Crewing
 import qualified Pawl.Types.EventShape as EventShape
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LeftTheGame as LeftTheGame
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
+import qualified Pawl.Types.Milled as Milled
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.MovedBetween as MovedBetween
 import qualified Pawl.Types.Object as Object
@@ -51,6 +59,7 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Revealed as Revealed
+import qualified Pawl.Types.Saddling as Saddling
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
@@ -787,32 +796,27 @@ slotPlayers context gs name = case Map.lookup name (Filter.slotPlayers context) 
 -- recorded rather than from any object that may no longer exist.
 --
 -- The snapshot fills the characteristic fields it records (see viewOfSnapshot
--- below): card types, supertypes, colours, subtypes, keywords (CR 109.3 counts
--- abilities among an object's characteristics), power and mana value.
--- Everything that is not a characteristic is vacuously empty over a past event
--- -- identity and playerIdentity are Nothing, and combat status, attachment,
--- tap status and what the object did this turn are all False.
+-- below). A move reads the rest off CR 608.2h's record filed under the id it
+-- left behind, through lastKnownView -- the view a trigger takes of the same
+-- departure, so the two cannot disagree. A cast has no such record: CR 601.2a
+-- makes the caster its controller, and what is not a characteristic is
+-- vacuously empty over it.
 --
--- `controller`, `owner`, `token` and `counters` are the exceptions, and none of
--- the four is a characteristic (CR 109.3 / CR 108.3 / CR 111.6 / CR 122.1), so
--- none can ride the snapshot. Each arm answers them for itself: CR 601.2a makes
--- the player who cast a spell its controller, and a move reads CR 608.2h's
--- record filed under the id it left behind.
---
--- `viewOf` is the reader the CARD shape needs and no other does: CR 400.7 makes
--- the object that ARRIVED a new object of its own, so "a creature card was put
--- into a graveyard" is a question about the card lying there and not about the
+-- `viewOf` is the reader the CARD shape needs, and the one lastKnownView reads
+-- the permanents attached to a departed object through: CR 400.7 makes the
+-- object that ARRIVED a new object of its own, so "a creature card was put into
+-- a graveyard" is a question about the card lying there and not about the
 -- permanent that left. Injected rather than imported, for the reason ViewOf
 -- itself is: Pawl.Engine.Projection imports this module.
 snapshotView :: ViewOf -> GameState -> EventShape.EventShape -> GameEvent.GameEvent -> Maybe Filter.View
 snapshotView viewOf gs shape event = case event of
   GameEvent.Moved (Moved.MkMoved zc snapshot _ _ _) -> case shape of
     EventShape.MovedBetween (MovedBetween.MkMovedBetween from to) ->
-      if ZoneChange.from zc == from && ZoneChange.to zc == to then Just (departedView gs zc snapshot) else Nothing
+      if ZoneChange.from zc == from && ZoneChange.to zc == to then Just (departedView viewOf gs zc snapshot) else Nothing
     -- CR 603.6c: to another zone, so Event.recordMintedEntry's Battlefield to
     -- Battlefield entry of a token or conjured card is not a departure.
     EventShape.MovedFrom from ->
-      if ZoneChange.from zc == from && ZoneChange.to zc /= from then Just (departedView gs zc snapshot) else Nothing
+      if ZoneChange.from zc == from && ZoneChange.to zc /= from then Just (departedView viewOf gs zc snapshot) else Nothing
     -- CR 712.21e's second half, whose unit is the CARD: this event announces the
     -- move's LEADING arrival (Pawl.Engine.Event.changeZoneAttaching), so it is
     -- worth one card here and each arrival after it is worth another through the
@@ -823,7 +827,7 @@ snapshotView viewOf gs shape event = case event of
     -- the shape excludes one.
     EventShape.CardArrivedIn arrival ->
       if arrivalMatches arrival zc
-        then Just (Maybe.fromMaybe (departedView gs zc snapshot) (arrivedView viewOf gs (ZoneChange.object zc)))
+        then Just (Maybe.fromMaybe (departedView viewOf gs zc snapshot) (arrivedView viewOf gs (ZoneChange.object zc)))
         else Nothing
     EventShape.SpellCast -> Nothing
     EventShape.SpellCastThisGame -> Nothing
@@ -929,17 +933,8 @@ snapshotView viewOf gs shape event = case event of
   -- main-game zone: this event answers MovedFrom the zone it records and nothing
   -- else, read off the CR 608.2h record filed under its id.
   GameEvent.LeftTheGame (LeftTheGame.MkLeftTheGame oid from) -> case shape of
-    EventShape.MovedFrom zone | zone == from -> fmap leftView (Map.lookup oid (GameState.lastKnown gs))
+    EventShape.MovedFrom zone | zone == from -> fmap (lastKnownView viewOf oid gs) (Map.lookup oid (GameState.lastKnown gs))
     _ -> Nothing
-    where
-      leftView lastKnown =
-        viewOfSnapshot
-          (deployIn gs from)
-          (Just (LastKnown.controller lastKnown))
-          (Just (LastKnown.owner lastKnown))
-          (Game.sourceIsToken (LastKnown.source lastKnown))
-          (LastKnown.counters lastKnown)
-          (LastKnown.characteristics lastKnown)
   GameEvent.Scried _ -> Nothing
   GameEvent.LandPlayed {} -> Nothing
   GameEvent.LostTheGame _ -> Nothing
@@ -1008,7 +1003,7 @@ snapshotView viewOf gs shape event = case event of
       if arrivalMatches arrival zc
         then case arrivedView viewOf gs (ZoneChange.object zc) of
           Just view -> Just view
-          Nothing -> fmap (departedView gs zc . LastKnown.characteristics) (Map.lookup (ZoneChange.departed zc) (GameState.lastKnown gs))
+          Nothing -> fmap (lastKnownView viewOf (ZoneChange.departed zc) gs) (Map.lookup (ZoneChange.departed zc) (GameState.lastKnown gs))
         else Nothing
     EventShape.MovedBetween {} -> Nothing
     EventShape.MovedFrom {} -> Nothing
@@ -1035,20 +1030,7 @@ arrivedView :: ViewOf -> GameState -> ObjectId -> Maybe Filter.View
 arrivedView viewOf gs arrived =
   if Maybe.isJust (Game.lookupObject arrived gs)
     then viewOf arrived
-    else fmap (recordedView gs) (Map.lookup arrived (GameState.lastKnown gs))
-
--- CR 608.2h's record read as a view, the way departedView reads the one filed
--- under the departing id -- the same four non-characteristic fields off the same
--- record, over the characteristics the record itself carries.
-recordedView :: GameState -> LastKnown.LastKnown -> Filter.View
-recordedView gs lastKnown =
-  viewOfSnapshot
-    (deployIn gs (LastKnown.zone lastKnown))
-    (Just (LastKnown.controller lastKnown))
-    (Just (LastKnown.owner lastKnown))
-    (Game.sourceIsToken (LastKnown.source lastKnown))
-    (LastKnown.counters lastKnown)
-    (LastKnown.characteristics lastKnown)
+    else fmap (lastKnownView viewOf arrived gs) (Map.lookup arrived (GameState.lastKnown gs))
 
 -- CR 712.21e's destination narrowed by the printed clause's origin: the arrival
 -- landed in the named zone, and it did not come from one this shape excludes. An
@@ -1063,40 +1045,23 @@ arrivalMatches arrival zc =
   ZoneChange.to zc == CardArrivedIn.to arrival
     && Set.notMember (ZoneChange.from zc) (CardArrivedIn.excluding arrival)
 
--- CR 608.2h: who controlled the moving object and what KIND of object it was,
--- read from the record the move funnel filed under the DEPARTED id as the object
--- ceased -- the same pre-move state a Moved event's snapshot is taken against,
--- and the route Event.leftBattlefield already takes back from such an event (CR
--- 400.7 makes that id name nothing else, ever).
---
--- No record only where nothing departed: Event.recordTokenEntry's
--- battlefield-to-battlefield pseudo-move for a new token, whose object is
--- therefore still live and can be asked directly.
---
--- CR 108.3's owner rides the same record for `controller`'s reason: it is no more
--- a characteristic than control is, and the object it would be read off is gone.
--- Unlike control it never changed while the object lived, so this answers "your
--- graveyard" over a past arrival -- Dimir Strandcatcher's clause (Pawl.CountSpec).
---
--- CR 122.2 / 400.7: the counters ceased to exist as the object moved, so they are
--- a CR 608.2i look-back at what it HAD -- read off the same record `controller`
--- comes from, which the funnel took beside the projection precisely because CR
--- 613.4c has already consumed them into the power and toughness the snapshot
--- carries.
+-- CR 608.2h: the moving object as the record the move funnel filed under the
+-- DEPARTED id shows it -- the same pre-move state a Moved event's snapshot is
+-- taken against (CR 400.7 makes that id name nothing else, ever) -- with the
+-- event's own snapshot for its characteristics.
 --
 -- `snapshot` is a parameter rather than read from the record because the two
 -- events that reach here carry it differently: a Moved event stamps its own, and
 -- a CardArrived event has none of its own to stamp.
-departedView :: GameState -> ZoneChange.ZoneChange -> PC.ProjectedCharacteristics -> Filter.View
-departedView gs zc snapshot =
-  let lastKnown = Map.lookup (ZoneChange.departed zc) (GameState.lastKnown gs)
-   in viewOfSnapshot
-        (deployIn gs (ZoneChange.from zc))
-        (fmap LastKnown.controller lastKnown)
-        (fmap LastKnown.owner lastKnown)
-        (maybe (Game.isToken (ZoneChange.object zc) gs) (Game.sourceIsToken . LastKnown.source) lastKnown)
-        (maybe Map.empty LastKnown.counters lastKnown)
-        snapshot
+--
+-- No record only where nothing departed: Event.recordTokenEntry's
+-- battlefield-to-battlefield pseudo-move for a new token, which no shape here
+-- counts as a departure. The bare snapshot answers there, with no controller,
+-- owner or counters to read.
+departedView :: ViewOf -> GameState -> ZoneChange.ZoneChange -> PC.ProjectedCharacteristics -> Filter.View
+departedView viewOf gs zc snapshot = case Map.lookup (ZoneChange.departed zc) (GameState.lastKnown gs) of
+  Just lastKnown -> lastKnownView viewOf (ZoneChange.departed zc) gs lastKnown {LastKnown.characteristics = snapshot}
+  Nothing -> viewOfSnapshot (deployIn gs (ZoneChange.from zc)) Nothing Nothing (Game.isToken (ZoneChange.object zc) gs) Map.empty snapshot
 
 -- CR 108.3: who owns the card that became a recorded cast's spell. Never read
 -- off the caster, whom CR 405.4 makes the spell's controller and no more -- Dire
@@ -1116,6 +1081,202 @@ castOwner :: GameState -> ObjectId -> Maybe PlayerId
 castOwner gs spell = case Game.lookupObject spell gs of
   Just object -> Just (Object.owner object)
   Nothing -> fmap LastKnown.owner (Map.lookup spell (GameState.lastKnown gs))
+
+-- CR 608.2h: an object that has ceased, as its record shows it -- the one view
+-- of a LastKnown, read by a trigger or an intervening "if" asking about the
+-- object an event named (Pawl.Engine.Projection.viewWithLastKnownAnywhere), by
+-- an ability whose source has left (CR 113.7a), and by a look-back count's
+-- departures here, so that "attacking creatures that died this turn" sees what
+-- Brazen Cannonade's trigger sees (CR 608.2i). The count's twin scenarios in
+-- data/scenarios/count, cr-608-2i-an-attacking-giant-that-died-is-counted-as-attacking
+-- and its kept-home control, are the board.
+--
+-- The record's characteristics through viewOfSnapshot, and over them what the
+-- record keeps beside the characteristics because CR 109.3 counts none of it
+-- one: the controller (CR 110.2), the owner (CR 108.3), tokenhood (CR 111.6),
+-- the counters CR 122.2 destroyed and CR 613.4c had already consumed, the combat
+-- status CR 506.4 took away as it left, and the costs paid for it (CR 400.7d).
+--
+-- Each record field is proved where a trigger reads it: the OWNER by
+-- Pawl.ConditionSpec's "the entrant killed between the two checks still grows
+-- the Knight" (that it answers; WHICH player is a fence, the record's controller
+-- leaving it green) and, over a departure, by Dimir Strandcatcher's "put into
+-- your graveyard" (Pawl.CountSpec), TOKEN status by Sunpearl Kirin's "if it
+-- was a token",
+-- BLOCKING by Guildsworn Prowler's intervening "if" and ATTACKING by Garna,
+-- Bloodfist of Keld's "if it was attacking". The three fields that follow the
+-- combat lookup on to the attacked permanent -- attackingPlayer,
+-- attackingPlaneswalkerController and attackingBattleProtector -- answer
+-- Nothing, and Pawl.Types.LastKnown's `attacking` records the query behind
+-- that; so does `blocked`, whose one printing asks a CR 608.2i question.
+--
+-- `oid` is the id it had, so the turn's log still answers what it did while it
+-- existed (CR 608.2i) -- it attacked, it was dealt damage, it entered -- and
+-- IsSource still knows it. `peers` reads the permanents still attached to it,
+-- at the caller's depth, as viewOfCharacteristics' own `attachedViews` does.
+--
+-- Every other object field is the snapshot's blank, which is what the live read
+-- answers for an id naming nothing too: no zone, no targets, no designations.
+lastKnownView :: ViewOf -> ObjectId -> GameState -> LastKnown.LastKnown -> Filter.View
+lastKnownView peers oid gs lastKnown =
+  ( viewOfSnapshot
+      (deployIn gs (LastKnown.zone lastKnown))
+      (Just (LastKnown.controller lastKnown))
+      (Just (LastKnown.owner lastKnown))
+      (Game.sourceIsToken (LastKnown.source lastKnown))
+      (LastKnown.counters lastKnown)
+      (LastKnown.characteristics lastKnown)
+  )
+    { Filter.identity = Just oid,
+      Filter.attacking = LastKnown.attacking lastKnown,
+      Filter.blocking = LastKnown.blocking lastKnown,
+      Filter.paidCosts = LastKnown.paidCosts lastKnown,
+      Filter.attackedThisTurn = attackedThisTurn oid gs,
+      Filter.declaredAttackerThisCombat = declaredAttackerThisCombat oid gs,
+      Filter.declaredAttackedThisCombat = declaredAttackedThisCombat oid gs,
+      Filter.declaredBlockerThisCombat = declaredBlockerThisCombat oid gs,
+      Filter.milledThisTurn = milledThisTurn oid gs,
+      Filter.dealtDamageThisTurn = dealtDamageThisTurn oid gs,
+      Filter.enteredThisTurn = Game.enteredThisTurn oid gs,
+      Filter.crewedThisTurn = crewedThisTurn oid gs,
+      Filter.convokedThisTurn = convokedThisTurn oid gs,
+      Filter.saddledThisTurn = saddledThisTurn oid gs,
+      Filter.attachedViews = Maybe.mapMaybe peers (Set.toList (Game.attachments oid gs))
+    }
+
+-- CR 608.2i: was this object declared as an attacker this turn? From the turn's
+-- event log, which CR 511.3 does not clear. Only Combat.declareAttackers appends
+-- the event (CR 508.3a), so CR 508.4's creature put onto the battlefield
+-- attacking stays out.
+attackedThisTurn :: ObjectId -> GameState -> Bool
+attackedThisTurn oid gs =
+  let declaredIt event = case event of
+        GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared declared _ _ _ _) -> declared == oid
+        _ -> False
+   in any (declaredIt . LoggedEvent.event) (GameState.events gs)
+
+-- CR 508.1a / 509.1a: from the COMBAT record, which CR 511.3 does clear -- and
+-- not from the log above, which cannot answer it: CR 508.1k and CR 509.1g put
+-- the AttackerDeclared and BecameBlocking events after the payment these are
+-- read during, so a fold over them would be False for exactly the creatures
+-- being declared.
+declaredAttackerThisCombat :: ObjectId -> GameState -> Bool
+declaredAttackerThisCombat oid gs = Set.member oid (Combat.declaredAttackers (GameState.combat gs))
+
+-- CR 508.3b: the same record's other half, indexed by TARGET rather than by
+-- attacker. A permanent is named as AttackTarget.OfPlaneswalker or
+-- AttackTarget.OfBattle; playerView answers CR 508.3b's third subject off the
+-- same set.
+declaredAttackedThisCombat :: ObjectId -> GameState -> Bool
+declaredAttackedThisCombat oid gs =
+  Set.member (AttackTarget.OfPlaneswalker oid) (Combat.declaredAttacked (GameState.combat gs))
+    || Set.member (AttackTarget.OfBattle oid) (Combat.declaredAttacked (GameState.combat gs))
+
+-- CR 509.1a: declaredAttackerThisCombat's record, for the blockers.
+declaredBlockerThisCombat :: ObjectId -> GameState -> Bool
+declaredBlockerThisCombat oid gs = Set.member oid (Combat.declaredBlockers (GameState.combat gs))
+
+-- CR 701.17a / 608.2i: was this object one of a mill's cards this turn? Only
+-- Resolve's Mill arm appends the event, so a surveil's or an explore's bin stays
+-- out.
+milledThisTurn :: ObjectId -> GameState -> Bool
+milledThisTurn oid gs =
+  let milledIt event = case event of
+        GameEvent.Milled (Milled.MkMilled _ cards) -> Foldable.elem oid cards
+        _ -> False
+   in any (milledIt . LoggedEvent.event) (GameState.events gs)
+
+-- CR 120.1 / 608.2i: was this object dealt damage this turn? Never
+-- Object.damage -- CR 120.6 removes the marks on a regeneration, CR 701.69a heals
+-- them away and CR 120.3d/120.3e mark none at all for wither or infect, and any
+-- such creature was still dealt damage this turn.
+dealtDamageThisTurn :: ObjectId -> GameState -> Bool
+dealtDamageThisTurn oid gs = any ((== Just oid) . Game.damagedObject . LoggedEvent.event) (GameState.events gs)
+
+-- CR 702.122c / 608.2i: the Vehicles this object crewed this turn -- the half of
+-- the relation a candidate can answer; Pawl.Engine.Filter's
+-- CrewedSourceThisTurn compares them against the source it is evaluating for.
+-- GameEvent.Crewed is written as the cost is paid, so a crew ability that never
+-- resolves still leaves the relation behind.
+crewedThisTurn :: ObjectId -> GameState -> Set.Set ObjectId
+crewedThisTurn oid gs =
+  let crewedByIt event = case event of
+        GameEvent.Crewed crewed
+          | Set.member oid (Crewing.crewedBy crewed) -> Just (Crewing.vehicle crewed)
+        _ -> Nothing
+   in Set.fromList (Maybe.mapMaybe (crewedByIt . LoggedEvent.event) (Foldable.toList (GameState.events gs)))
+
+-- CR 702.171c: crewedThisTurn one keyword over, for the Mounts this object
+-- saddled.
+saddledThisTurn :: ObjectId -> GameState -> Set.Set ObjectId
+saddledThisTurn oid gs =
+  let saddledByIt event = case event of
+        GameEvent.Saddled saddled
+          | Set.member oid (Saddling.saddledBy saddled) -> Just (Saddling.mount saddled)
+        _ -> Nothing
+   in Set.fromList (Maybe.mapMaybe (saddledByIt . LoggedEvent.event) (Foldable.toList (GameState.events gs)))
+
+-- CR 702.51c: which spells did this object convoke, and which permanents did
+-- those spells become? GameEvent.Convoked is written as the cast's cost is paid
+-- and names the SPELL, which CR 400.7 ends the moment it resolves -- so a
+-- permanent's own entry trigger asking "each creature that convoked it"
+-- (Venerated Loxodon) would find nothing to compare against. The BECAME hop is
+-- CR 400.7d -- "an ability of a permanent can reference information about the
+-- spell that became that permanent as it resolved, including what costs were
+-- paid to cast that spell" -- and the becoming is read off the same log:
+-- Pawl.Engine.Event records the stack-to-battlefield move as a GameEvent.Moved
+-- whose `departed` is the spell.
+--
+-- Both ends are kept, so an effect that reads the relation while the spell is
+-- still on the stack answers too. A spell that never resolved contributes only
+-- itself. Pawl.Engine.Filter's ConvokedSourceThisTurn compares the set against
+-- the source it is evaluating for.
+convokedThisTurn :: ObjectId -> GameState -> Set.Set ObjectId
+convokedThisTurn oid gs =
+  let events = fmap LoggedEvent.event (Foldable.toList (GameState.events gs))
+      convokedByIt event = case event of
+        GameEvent.Convoked convoked
+          | Set.member oid (Convoking.convokedBy convoked) -> Just (Convoking.spell convoked)
+        _ -> Nothing
+      spells = Maybe.mapMaybe convokedByIt events
+   in Set.fromList (concatMap (\spell -> spell : becamePermanents spell events) spells)
+
+-- CR 400.7d's "the spell that became that permanent", asked the other way
+-- round: the permanents one object became by resolving off the stack, read
+-- off the move log. A list rather than a Maybe for CR 712.21's several arrivals,
+-- which no permanent spell reaches today.
+becamePermanents :: ObjectId -> [GameEvent.GameEvent] -> [ObjectId]
+becamePermanents spell events =
+  [ arrival
+  | GameEvent.Moved m <- events,
+    let zc = Moved.change m,
+    ZoneChange.departed zc == spell,
+    ZoneChange.to zc == Zone.Battlefield,
+    -- "as it resolved": a countered card put onto the battlefield instead
+    -- (Desertion) is not the permanent the spell became.
+    Moved.duringResolution m,
+    arrival <- Foldable.toList (Moved.arrivals m)
+  ]
+
+-- CR 602.1: every activated ability a set of characteristics gives,
+-- Keyword.activatedAbilitiesOf over the projection's own list and rule 702's
+-- battlefield mint taken through its CR 612 text changes (Rewrite.rewriteMinted,
+-- Pawl.AuraSpec's "CR 612.1 an Aura swap changed to Background" pair). CR
+-- 804.2's where `deploys`, which the caller decides: Deploy.grants over the
+-- characteristics, and only for a permanent (CR 109.2).
+--
+-- The hand and graveyard mints take no text change, since none can reach them
+-- where they function: CR 400.7 ends one when its object changes zones, and
+-- every "change the text" printing names a spell or a permanent, or a card type
+-- word rather than a subtype (Scryfall `o:"change the text" include:extras`,
+-- 2026-10-06, Deceptive Divination the one card-type hit). A card in a hand or
+-- graveyard changed by a subtype swap would refute it.
+abilitiesOf :: Bool -> PC.ProjectedCharacteristics -> [ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)]
+abilitiesOf deploys pc =
+  Keyword.activatedAbilitiesOf
+    deploys
+    (Map.keysSet (PC.keywords pc))
+    (PC.activatedAbilities pc <> Rewrite.rewriteMinted Rewrite.rewriteActivatedAbility Keyword.battlefieldAbilitiesOf pc)
 
 -- The Filter.View a recorded snapshot yields, shared by every arm of
 -- snapshotView above so that two shapes of event cannot disagree about what a
@@ -1314,42 +1475,19 @@ viewOfSnapshot deploy mController mOwner isToken counters snapshot =
       -- The same field one question over -- `manaSpentTagColors` above, same sentence.
       Filter.manaSpentAmount = 0,
       -- CR 602.1 / 605.1a off the snapshot, which is what it reads for `keywords`
-      -- and `power` too -- so this answers what the object HAD at the event.
+      -- and `power` too -- so this answers what the object HAD at the event,
+      -- through abilitiesOf, the roster every view builder reads.
       --
-      -- Rule 702's own abilities, and CR 804.2's, are minted on top, exactly as
-      -- Pawl.Engine.Projection.View.abilitiesFromCharacteristics mints them: a
-      -- ProjectedCharacteristics stores the printed and granted list only, so
-      -- reading the field bare would answer differently here than live for a
-      -- Vehicle with crew or a land with reinforce. CR 702.178a's grant condition
-      -- is not re-asked -- there is no board at the event to ask it against, and
-      -- no snapshot-shaped reader in the pool asks this question at all.
-      Filter.nonManaActivatedAbility =
-        not
-          ( all
-              ManaAbility.isManaAbility
-              ( PC.activatedAbilities snapshot
-                  <> Keyword.battlefieldAbilitiesOf (PC.keywords snapshot)
-                  <> Keyword.handAbilitiesOf (Map.keysSet (PC.keywords snapshot))
-                  <> Keyword.graveyardAbilitiesOf (Map.keysSet (PC.keywords snapshot))
-                  <> [Deploy.ability | Deploy.grants deploy snapshot]
-              )
-          ),
-      -- CR 602.1 off the same four lists, without CR 605.1a's exclusion, plus CR
-      -- 305.6's intrinsic ability -- which none of the four lists holds, since
-      -- they carry rule 702's abilities and the face's own. Read off the snapshot's
-      -- types for Pawl.Engine.Projection.View.viewOfCharacteristics' reason, and
-      -- through the reader every view builder shares so that the three cannot
-      -- disagree about one object.
+      -- Not implemented: an ability's CR 604.2 grant condition as it stood when
+      -- the snapshot was taken, so a conditional ability is always kept (#4880).
+      Filter.nonManaActivatedAbility = not (all ManaAbility.isManaAbility (abilitiesOf (Deploy.grants deploy snapshot) snapshot)),
+      -- CR 602.1 off the same roster, without CR 605.1a's exclusion, plus CR
+      -- 305.6's intrinsic ability, which the roster does not hold. Read off the
+      -- snapshot's types for Pawl.Engine.Projection.View.viewOfCharacteristics'
+      -- reason, and through the reader every view builder shares so that the
+      -- three cannot disagree about one object.
       Filter.hasActivatedAbility =
-        not
-          ( null
-              ( PC.activatedAbilities snapshot
-                  <> Keyword.battlefieldAbilitiesOf (PC.keywords snapshot)
-                  <> Keyword.handAbilitiesOf (Map.keysSet (PC.keywords snapshot))
-                  <> Keyword.graveyardAbilitiesOf (Map.keysSet (PC.keywords snapshot))
-                  <> [Deploy.ability | Deploy.grants deploy snapshot]
-              )
-          )
+        not (null (abilitiesOf (Deploy.grants deploy snapshot) snapshot))
           || Subtype.intrinsicManaAbilityOf snapshot,
       -- CR 702.184c off the snapshot, which carries the field: the marker
       -- outlives the object exactly as a keyword or a P/T does.

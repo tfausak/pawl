@@ -2141,7 +2141,7 @@ isEmblem oid gs = case lookupObject oid gs of
 -- ability was activated or triggered. Nothing for anything that is not an
 -- ability on the stack, and for CR 725.2's inherent trigger, which has no
 -- source. The id alone: once the source has left, CR 113.7a's last known
--- information is filed under it (Pawl.Engine.Projection.View.lastKnownView).
+-- information is filed under it (Pawl.Engine.Count.lastKnownView).
 abilitySourceOf :: ObjectId -> GameState -> Maybe ObjectId
 abilitySourceOf oid gs = case lookupObject oid gs of
   Nothing -> Nothing
@@ -2901,11 +2901,17 @@ discardOf event = case event of
 -- battlefield now. The same choice Pawl.Engine.Event's PermanentEnters arm makes
 -- for CR 603.6a, so a trigger and this reader agree on what entered.
 --
--- castOf's and discardOf's sibling, and here for their import-graph reason: the
--- callers are Pawl.Engine.Quantity's EnteredThisTurn arm and
--- Pawl.Engine.Projection.View's enteredThisTurn field.
+-- castOf's and discardOf's sibling, and here for their import-graph reason:
+-- enteredThisTurn below is the per-object reader.
 enteredBattlefield :: GameEvent -> Maybe ObjectId
 enteredBattlefield = fmap ZoneChange.object . enteredBattlefieldChange
+
+-- CR 400.7 / 608.2i: did this object enter the battlefield this turn? Keyed on
+-- the ARRIVAL's id, enteredBattlefield's. The one reader of the question:
+-- Filter.EnteredThisTurn's view field, Pawl.Engine.Quantity's EnteredThisTurn
+-- and Pawl.Engine.Saga's read ahead all ask here.
+enteredThisTurn :: ObjectId -> GameState -> Bool
+enteredThisTurn oid gs = any ((== Just oid) . enteredBattlefield . LoggedEvent.event) (GameState.events gs)
 
 -- The same entry, kept WHOLE: CR 400.7's `from` is what a reader asking where the
 -- entrant came from needs, and ZoneChange.departed is the id the spell had if it
@@ -3491,7 +3497,7 @@ bendingsThisTurn gs pid =
 --
 -- CR 508.4's creature put onto the battlefield attacking stays out, only
 -- Pawl.Engine.Combat.declareAttackers appending the event -- the same scope
--- Pawl.Engine.Projection.View.declaredIt reads.
+-- Pawl.Engine.Count.attackedThisTurn reads.
 attackersDeclaredThisTurn :: GameState -> PlayerId -> Natural
 attackersDeclaredThisTurn gs pid = Natural.length (filter (declaredBy pid . LoggedEvent.event) (Foldable.toList (GameState.events gs)))
 
