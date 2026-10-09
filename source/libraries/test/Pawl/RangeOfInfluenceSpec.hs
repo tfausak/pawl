@@ -266,6 +266,32 @@ spec s registry = Spec.describe s "Range of influence" $ do
     Spec.assertEqWith s "at an unlimited range it raises alice's speed" (speedAfter (losing S.carol)) (Just 2)
     Spec.assertEqWith s "and at range 1 bob's loss, in range, raises it" (speedAfter (S.withRange 1 (losing S.bob))) (Just 2)
 
+  -- CR 805.4 with CR 801.7/801.11: under shared team turns the team's step is
+  -- dave's own step, though the event names bob, the active player, two seats
+  -- from dave. So dave's printed upkeep trigger (Bitterblossom) and his
+  -- inherent end step draw as the monarch (CR 725.2) both fire at range 1.
+  -- Paired with the same boards at an unlimited range.
+  Spec.it s "CR 805.4/801.7 a teammate two seats from the active player still sees the team's own step begin" $ do
+    bitterblossom <- S.printingOf s registry "Bitterblossom"
+    island <- S.printingOf s registry "Island"
+    let shared =
+          (S.inTeams [[S.alice], [S.bob, S.carol, S.dave]] S.fourPlayerGame)
+            { GameState.activePlayer = S.bob
+            }
+        teamed = shared {GameState.settings = (GameState.settings shared) {GameSettings.sharedTeamTurns = True}}
+        stocked = snd (S.addLibraryCard island S.dave (snd (S.addLibraryCard island S.dave teamed)))
+        (_, withBlossom) = S.addPermanent bitterblossom S.dave stocked
+        settle gs =
+          let placed = S.runPure S.identityAnswer gs Engine.placePendingTriggers
+           in if null (GameState.stack placed) then placed else S.runPure S.identityAnswer placed Stack.resolveTop
+        upkeep = S.withEvents [GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Beginning BeginningStep.Upkeep) S.bob)] withBlossom
+        endStep = S.withEvents [GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.bob)] (S.withMonarch S.dave stocked)
+        handOf gs = length (Game.zoneMembers Zone.Hand S.dave gs)
+    Spec.assertBool s (not (Game.wasInRangeOf S.dave S.bob (S.withRange 1 teamed))) "at range 1 bob is outside dave's range"
+    Spec.assertEqWith s "CR 805.4/801.7 Bitterblossom cost dave a life at the team's upkeep" (S.lifeOf S.dave (settle (S.withRange 1 upkeep))) (fmap (subtract 1) (S.lifeOf S.dave upkeep))
+    Spec.assertEqWith s "CR 725.2/801.11 dave, the monarch, drew at the team's end step" (handOf (settle (S.withRange 1 endStep))) (handOf endStep + 1)
+    Spec.assertEqWith s "as he does at an unlimited range" (handOf (settle endStep)) (handOf endStep + 1)
+
   -- CR 801.7 for an object the event involves: alice's Soul Warden ("Whenever
   -- another creature enters, you gain 1 life.") sees a Goblin Piker enter under
   -- carol, two seats away, and one under bob, one seat away.

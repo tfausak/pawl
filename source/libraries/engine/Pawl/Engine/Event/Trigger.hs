@@ -33,6 +33,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.Resolve.Slots as Slots
 import qualified Pawl.Engine.SourceContext as SourceContext
+import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
@@ -302,6 +303,12 @@ movedOf event = case event of
 -- graveyard it went to. A player who left the game after the event is judged by
 -- the seat they held (Game.wasInRangeOf). An object nobody controls cuts
 -- nothing.
+--
+-- CR 805.4: under shared team turns a step that begins is every active
+-- teammate's step, so it is within the range of each player whose turn it is,
+-- however far that player sits from the active player the event names.
+-- Pawl.RangeOfInfluenceSpec's "CR 805.4/801.7 a teammate two seats from the
+-- active player still sees the team's own step begin" proves it.
 eventWithinRange :: Map.Map ObjectId (BattlefieldCandidate.BattlefieldCandidate PC.ProjectedCharacteristics) -> GameState -> PlayerId -> GameEvent -> Bool
 eventWithinRange board gs you event
   | Map.null (RangeOfInfluence.unwrap (GameSettings.rangeOfInfluence (GameState.settings gs))) = True
@@ -316,7 +323,13 @@ eventWithinRange board gs you event
           objectWithin oid = case controllerAt oid of
             Nothing -> True
             Just pid -> reaches pid || maybe False reaches (protectorAt oid)
-       in all reaches players && all objectWithin objects
+          -- A partial case with a wildcard: only a step beginning is shared by
+          -- the turn's players.
+          playerWithin pid =
+            reaches pid || case event of
+              GameEvent.StepBegan _ -> Turn.sharesTurn gs pid you
+              _ -> False
+       in all playerWithin players && all objectWithin objects
 
 -- CR 801.7: the objects and players an event involves, which is what "happens
 -- entirely within" a range is asked of. The event as its trigger event names
