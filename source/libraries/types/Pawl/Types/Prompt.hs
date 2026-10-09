@@ -734,6 +734,9 @@ data Prompt r where
   -- how many (CR 118.1); ChooseTaps\' shape, answering as Response.ChoseReturns
   -- so a replay cannot tap what it should have returned.
   ChooseReturns :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt (Set.Set ObjectId.ObjectId)
+  -- | Which permanents are exiled to pay a cost naming how many (CR 118.1,
+  -- 406.2); ChooseReturns\' shape, answering as Response.ChoseExiles.
+  ChooseExiles :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt (Set.Set ObjectId.ObjectId)
   -- | CR 118.1 as a cost: which ONE permanent loses the counters of one kind a
   -- cost names (Zameck Guildmage). ChooseBlight's shape rather than ChooseTaps',
   -- the count being counters and not objects, and elided at one candidate.

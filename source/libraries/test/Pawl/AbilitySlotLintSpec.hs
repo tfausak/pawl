@@ -342,6 +342,10 @@ activatedAbilityOffends ability =
         if exilesSelfAsCost (ActivatedAbility.cost ability)
           then Set.singleton Binding.exiledCard
           else Set.empty
+      exiledPermanents =
+        if exilesPermanentsAsCost (ActivatedAbility.cost ability)
+          then Set.singleton Binding.exiledPermanent
+          else Set.empty
       discarded =
         if discardsSelfAsCost (ActivatedAbility.cost ability)
           then Set.singleton Binding.discardedCard
@@ -350,7 +354,7 @@ activatedAbilityOffends ability =
         if removesCountersAsCost (ActivatedAbility.cost ability)
           then Set.singleton Binding.removedCounters
           else Set.empty
-   in modalSlotsOffend (Set.unions [Set.fromList [Binding.triggerSource, Binding.you, Binding.thisAbility], announcedX, sacrificed, tapped, tappedForTotal, exiled, discarded, removed, payGateBound (ActivatedAbility.modal ability)]) (ActivatedAbility.modal ability)
+   in modalSlotsOffend (Set.unions [Set.fromList [Binding.triggerSource, Binding.you, Binding.thisAbility], announcedX, sacrificed, tapped, tappedForTotal, exiled, exiledPermanents, discarded, removed, payGateBound (ActivatedAbility.modal ability)]) (ActivatedAbility.modal ability)
 
 -- Does this cost tap permanents the payer CHOOSES? sacrificesAsCost's shape, and
 -- the same reason: CR 601.2h's payment binds Binding.tappedPermanent
@@ -406,6 +410,17 @@ exilesSelfAsCost =
   let isExile component = case component of
         CostComponent.ExileThis -> True
         CostComponent.ExileThisFromGraveyard -> True
+        _ -> False
+   in any isExile . Cost.Type.components
+
+-- Does this cost EXILE permanents the payer CHOOSES? sacrificesAsCost's shape:
+-- CR 601.2h's payment binds Binding.exiledPermanent (Cost.payComponent's
+-- ExilePermanents arm), so Food Chain's "the exiled creature's mana value" is an
+-- ordinary slot read.
+exilesPermanentsAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
+exilesPermanentsAsCost =
+  let isExile component = case component of
+        CostComponent.ExilePermanents {} -> True
         _ -> False
    in any isExile . Cost.Type.components
 

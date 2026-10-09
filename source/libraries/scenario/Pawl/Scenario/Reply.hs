@@ -408,6 +408,7 @@ shapeOf prompt = case prompt of
   Prompt.ChooseTapsForTotalPower {} -> setOf object
   Prompt.ChooseTaps {} -> setOf object
   Prompt.ChooseReturns {} -> setOf object
+  Prompt.ChooseExiles {} -> setOf object
   Prompt.ChooseCounterRemoval {} -> object
   Prompt.ChooseCounterRemovalAmong {} -> mapOf object natural
   Prompt.ChooseCounterRemovalAtLeast {} -> mapOf object natural

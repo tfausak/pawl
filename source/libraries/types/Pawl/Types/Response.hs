@@ -639,6 +639,9 @@ data Response
     -- a transcript against the wrong one would tap what it should have
     -- returned.
     ChoseReturns (Set.Set ObjectId.ObjectId)
+  | -- | CR 406.2: the permanents a player chose to EXILE to pay a cost, its
+    -- own constructor for ChoseReturns\' reason.
+    ChoseExiles (Set.Set ObjectId.ObjectId)
   | -- | CR 608.2d: the permanents a player chose out of the ones an effect
     -- offered, where the effect stated no count. A separate constructor from
     -- ChoseSacrifices above, though the payload has the same shape, for

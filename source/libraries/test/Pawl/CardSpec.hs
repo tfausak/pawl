@@ -189,6 +189,7 @@ import qualified Pawl.Types.ExchangeZones as ExchangeZones
 import qualified Pawl.Types.ExchangedValue as ExchangedValue
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.ExileMaterials as ExileMaterials
+import qualified Pawl.Types.ExilePermanents as ExilePermanents
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
 import qualified Pawl.Types.FaceDownState as FaceDownState
@@ -2765,6 +2766,7 @@ reservedSlots =
       Binding.sacrificedCount,
       Binding.sacrificedPermanent,
       Binding.returnedPermanent,
+      Binding.exiledPermanent,
       Binding.exiledCard,
       Binding.craftMaterials,
       Binding.discardedCard,
@@ -3797,6 +3799,8 @@ costComponentFilters component = case component of
   CostComponent.TapPermanents (TapPermanents.MkTapPermanents _ f _) -> [f]
   -- CR 118.1 as a cost: Meloku the Clouded Mirror's "a land you control".
   CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents _ f) -> [f]
+  -- CR 406.2 as a cost: Food Chain's "a creature you control".
+  CostComponent.ExilePermanents (ExilePermanents.MkExilePermanents _ f) -> [f]
   -- CR 406.2 as a cost: Headless Skaab's "a creature card from your graveyard".
   CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard _ f) -> [f]
   -- CR 702.167a over the battlefield and the graveyard at once: Tithing Blade's

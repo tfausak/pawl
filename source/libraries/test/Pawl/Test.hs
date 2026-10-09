@@ -288,6 +288,7 @@ import qualified Pawl.Codec.ExileHauntingSpec
 import qualified Pawl.Codec.ExileLinkSpec
 import qualified Pawl.Codec.ExileLookerSpec
 import qualified Pawl.Codec.ExileMaterialsSpec
+import qualified Pawl.Codec.ExilePermanentsSpec
 import qualified Pawl.Codec.ExilePlayPermissionSpec
 import qualified Pawl.Codec.ExpansionSpec
 import qualified Pawl.Codec.ExpirySpec
@@ -1395,6 +1396,7 @@ spec s registry = do
   Pawl.Codec.SacrificeEffectSpec.spec s
   Pawl.Codec.SacrificeRestrictionSpec.spec s
   Pawl.Codec.ReturnPermanentsSpec.spec s
+  Pawl.Codec.ExilePermanentsSpec.spec s
   Pawl.Codec.SacrificeSpec.spec s
   Pawl.Codec.SacrificerSpec.spec s
   Pawl.Codec.ScalingSpec.spec s
