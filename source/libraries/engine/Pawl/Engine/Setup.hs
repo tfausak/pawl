@@ -1646,11 +1646,9 @@ applyCrossings finalSub parent =
 -- objectsLeaveWith never fires there, so their cards are still in `finalSub`
 -- and `returned` has them. An owner moves only by CR 407.3's ownership
 -- changers, so outside them an absent owner implies this `oid` is missing -- no
--- separate id check is needed. CR 800.4n's ante cards are the exception, which
--- is why both `ownersPresentInSub` and `returned` skip them.
---
--- Not implemented: a card whose owner changed inside the subgame, which the
--- departed former owner's rebuilt library takes back as well (#4835).
+-- separate id check is needed. CR 800.4n's ante cards are the exception:
+-- `ownersPresentInSub` skips them, and a card that survived is returned from
+-- the subgame rather than rebuilt (`survived`).
 funnelBack :: GameState -> GameState -> GameState
 funnelBack finalSub parent =
   let -- CR 729.5 / CR 712.21, the same split startGameFromCards performs, in a
@@ -1713,17 +1711,26 @@ funnelBack finalSub parent =
       removedByDeparture oid = case Map.lookup oid (GameState.objects parent) of
         Nothing -> False
         Just obj -> Set.notMember (Object.owner obj) ownersPresentInSub
-      recoveredIds = Set.filter removedByDeparture movedIds
-      -- `recovered` rebuilds a departed owner's whole main-game library, the
-      -- original of a card they anted in the subgame among it, so that owner's
-      -- subgame objects -- only CR 800.4n's ante cards survive objectsLeaveWith
-      -- -- are not returned a second time.
-      --
-      -- Not implemented: telling an ante card that came from that library from
-      -- one that entered the subgame from outside it, which CR 729.5 would
-      -- return and this drops (#4829).
-      departedOwners = Set.fromList (Maybe.mapMaybe (\oid -> fmap Object.owner (Map.lookup oid (GameState.objects parent))) (Set.toList recoveredIds))
-      returned = fmap toLibraryCard (Map.filter (\obj -> isCard obj && Set.notMember (Object.owner obj) departedOwners) (Map.withoutKeys subObjects (Set.unions [subCmdIds, Map.keysSet subAttractions, Map.keysSet subPlanar, Map.keysSet subSchemes])))
+      departedIds = Set.filter removedByDeparture movedIds
+      departedOwners = Set.fromList (Maybe.mapMaybe (\oid -> fmap Object.owner (Map.lookup oid (GameState.objects parent))) (Set.toList departedIds))
+      -- CR 800.4n / 729.5: a departed owner's card still in the subgame -- an
+      -- ante card, whoever owns it now (CR 407.2, 407.3) -- goes home from the
+      -- subgame under its owner, and is not rebuilt from the parent as well.
+      -- The subgame's copy of a parent card shares its identity.
+      identityIn pool oid = Map.lookup oid pool >>= Object.identity
+      identitiesInSub = Set.fromList (Maybe.mapMaybe Object.identity (filter isCard (Map.elems subObjects)))
+      fromParent = Set.fromList (Maybe.mapMaybe (identityIn (GameState.objects parent)) (Set.toList movedIds))
+      survived oid = case identityIn (GameState.objects parent) oid of
+        Just identity -> Set.member identity identitiesInSub
+        Nothing -> False
+      recoveredIds = Set.filter (not . survived) departedIds
+      -- Not implemented: returning a departed owner's ante card that came into
+      -- the subgame from outside it, which CR 729.5 would return and this drops
+      -- (#4829).
+      cameFromOutside obj = case Object.identity obj of
+        Just identity -> Set.notMember identity fromParent
+        Nothing -> True
+      returned = fmap toLibraryCard (Map.filter (\obj -> isCard obj && not (Set.member (Object.owner obj) departedOwners && cameFromOutside obj)) (Map.withoutKeys subObjects (Set.unions [subCmdIds, Map.keysSet subAttractions, Map.keysSet subPlanar, Map.keysSet subSchemes])))
       recovered = fmap toLibraryCard (Map.restrictKeys (GameState.objects parent) (Set.difference recoveredIds (Set.union oldCmdIds oldSuppIds)))
       -- A supplementary deck whose owner departed inside the subgame goes back
       -- to being their deck, the commander's reason below.
@@ -1777,7 +1784,7 @@ funnelBack finalSub parent =
       -- either game. That is the two rules read together rather than an oversight
       -- -- CR 729.4a took it out of the main game and CR 800.4a took it out of
       -- the subgame -- and Pawl.SetupSpec pins it. CR 800.4n's ante cards are
-      -- the exception: they stay in the subgame, see `departedOwners` (#4829).
+      -- the exception: they stay in the subgame, see `cameFromOutside` (#4829).
       -- For every other card, CR 729.5's funnel offers no
       -- third answer: it takes "cards they own that are in the subgame", and
       -- CR 800.4a removed this one before the subgame ended, so the rule's
