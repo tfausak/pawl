@@ -225,6 +225,7 @@ gameWith settings order =
           GameState.planarDecks = Map.empty,
           GameState.schemeDecks = Map.empty,
           GameState.stack = [],
+          GameState.stackedIn = Map.empty,
           GameState.players = Map.fromList (fmap newPlayer order_),
           -- CR 729.4: nobody is nested inside another game here.
           GameState.outsideObjects = Map.empty,
@@ -802,7 +803,8 @@ startGameFromCards perform exemptions = do
         -- CR 727.2 / 729.2: every card is rebuilt above, a seated player's ante
         -- card among the library cards, so no other old ante id survives.
         GameState.ante = Map.keysSet strandedAnte,
-        GameState.stack = []
+        GameState.stack = [],
+        GameState.stackedIn = Map.empty
       }
   Monad.forM_ owners Event.shuffleLibrary
   Monad.forM_ owners Event.shuffleAttractionDeck
@@ -1295,6 +1297,7 @@ subgameStateFrom starter parent =
           -- among CR 729.2a-c's movers.
           GameState.ante = mempty,
           GameState.stack = [],
+          GameState.stackedIn = Map.empty,
           GameState.manaPool = Map.empty,
           GameState.combat = Combat.emptyCombat,
           GameState.events = Seq.empty,

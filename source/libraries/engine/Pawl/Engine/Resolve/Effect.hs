@@ -5205,7 +5205,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- Ahead of the GATHER, so the CR 608.2d choice is not put to anybody
           -- either: with nothing able to move, that question has no board behind
           -- it.
-          declined <- State.gets (\gs -> any (\lasting -> MoveDuration.hasHappened lasting source gs) duration)
+          declined <- State.gets (\gs -> any (\lasting -> MoveDuration.hasHappened lasting resolving source controller gs) duration)
           Monad.unless declined $ do
             -- WHICH objects move, gathered first and moved second, so the CR 401.2
             -- and CR 401.4 questions between the two steps are asked of the whole

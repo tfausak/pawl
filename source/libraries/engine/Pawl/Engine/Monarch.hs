@@ -248,7 +248,7 @@ placeInherent pending = do
             Object.exertedBy = Set.empty,
             Object.activatedOnce = Map.empty
           }
-  State.put gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2), GameState.stack = abilId : GameState.stack gs2}
+  State.put (Game.putOnStack abilId gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2)})
 
 -- CR 725.1 / CR 725.3: crown a player. The ONE writer of GameState.monarch once
 -- a game is under way (Pawl.Engine.Setup only ever initialises it to Nothing, and

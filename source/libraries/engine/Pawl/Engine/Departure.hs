@@ -263,11 +263,11 @@ objectsLeaveWith pid gs =
       -- reading for the same reason.
       removed = List.foldl' (Event.leaveTheGame gs) gs owned
       -- CR 708.9's third sentence: the departing player reveals each face-down
-      -- permanent they own, read off `gs` and recorded ahead of its LeftTheGame,
-      -- as the zone-change funnel reveals before the move. Pawl.FaceDownSpec's
-      -- "CR 708.9 the Witness draws when a face-down permanent's owner leaves
-      -- the game" proves it.
-      revealed = Maybe.mapMaybe (Event.leavingReveal gs) permanents
+      -- permanent and face-down spell they own, read off `gs` and recorded
+      -- ahead of the LeftTheGame events, as the zone-change funnel reveals before
+      -- the move. Pawl.FaceDownSpec's "CR 708.9 the Witness draws when a
+      -- face-down permanent's owner leaves the game" proves it.
+      revealed = Maybe.mapMaybe (Event.leavingReveal gs) owned
    in Event.simultaneouslyPure
         (\g -> List.foldl' (\g1 oid -> Event.recordEvent (GameEvent.LeftTheGame (LeftTheGame.MkLeftTheGame oid Zone.Battlefield)) g1) (List.foldl' (flip Event.recordEvent) g revealed) permanents)
         removed

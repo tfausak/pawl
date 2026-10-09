@@ -71,6 +71,7 @@ withoutAnnouncement before entry closed = do
   planarDecks <- libraries GameState.planarDecks
   schemeDecks <- libraries GameState.schemeDecks
   stack <- listOf GameState.stack
+  stackedIn <- mapOf GameState.stackedIn
   players <- mapWith playerWith (GameState.players before) (GameState.players entry) (GameState.players closed)
   outsideObjects <- mapOf GameState.outsideObjects
   broughtIn <- seqOf GameState.broughtIn
@@ -192,6 +193,7 @@ withoutAnnouncement before entry closed = do
         GameState.planarDecks = planarDecks,
         GameState.schemeDecks = schemeDecks,
         GameState.stack = stack,
+        GameState.stackedIn = stackedIn,
         GameState.players = players,
         GameState.outsideObjects = outsideObjects,
         GameState.broughtIn = broughtIn,

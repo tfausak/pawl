@@ -2137,6 +2137,7 @@ oneMountainState mountain ph =
           GameState.planarDecks = Map.empty,
           GameState.schemeDecks = Map.empty,
           GameState.stack = [],
+          GameState.stackedIn = Map.empty,
           GameState.players = Map.empty,
           GameState.stackArchive = Map.empty,
           GameState.outsideObjects = Map.empty,

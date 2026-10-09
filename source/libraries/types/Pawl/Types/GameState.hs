@@ -101,6 +101,10 @@ data GameState = MkGameState
     -- the planar deck above is.
     schemeDecks :: Map.Map PlayerId.PlayerId (Seq.Seq ObjectId.ObjectId),
     stack :: [ObjectId.ObjectId],
+    -- | CR 610.3a / 610.3b: the event group current as each object was put on
+    -- the stack, so an event logged in it or a later one happened after that.
+    -- Written by Pawl.Engine.Game.putOnStack, cleared with `events`.
+    stackedIn :: Map.Map ObjectId.ObjectId EventGroup.EventGroup,
     players :: Map.Map PlayerId.PlayerId Player.Player,
     -- | CR 729.4: the cards outside this game that sit in a game on hold; empty
     -- for a game nobody is nested inside.

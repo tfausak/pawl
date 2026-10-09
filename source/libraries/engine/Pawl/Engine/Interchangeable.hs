@@ -469,6 +469,8 @@ namedByRelation oid gs =
         -- CR 305.1 / 601.2a: keyed by the spell or permanent a play made, too.
         || keyed (GameState.cardsPlayed gs)
         || keyed (GameState.activatedThisTurn gs)
+        -- CR 610.3a: keyed by a stack object, which is never a candidate.
+        || keyed (GameState.stackedIn gs)
         || keyed (GameState.castPermissionsUsedThisTurn gs)
         || keyed (GameState.rollModifiersUsedThisTurn gs)
         || keyed (GameState.namedCopyChoices gs)

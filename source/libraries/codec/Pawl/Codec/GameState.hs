@@ -128,6 +128,7 @@ codec resolve = Fields.object $ do
   planarDecks <- Fields.defaulted "planarDecks" Map.empty (Common.naturalMap PlayerId.codec (Common.seq ObjectId.codec)) GameState.planarDecks
   schemeDecks <- Fields.defaulted "schemeDecks" Map.empty (Common.naturalMap PlayerId.codec (Common.seq ObjectId.codec)) GameState.schemeDecks
   stack <- Fields.defaulted "stack" [] (Common.list ObjectId.codec) GameState.stack
+  stackedIn <- Fields.defaulted "stackedIn" Map.empty (Common.naturalMap ObjectId.codec EventGroup.codec) GameState.stackedIn
   players <- Fields.required "players" (Common.naturalMap PlayerId.codec Player.codec) GameState.players
   outsideObjects <- Fields.defaulted "outsideObjects" Map.empty (Common.naturalMap ObjectId.codec OutsideObject.codec) GameState.outsideObjects
   broughtIn <- Fields.defaulted "broughtIn" Seq.empty (Common.seq ObjectId.codec) GameState.broughtIn
@@ -242,6 +243,7 @@ codec resolve = Fields.object $ do
         GameState.planarDecks = planarDecks,
         GameState.schemeDecks = schemeDecks,
         GameState.stack = stack,
+        GameState.stackedIn = stackedIn,
         GameState.players = players,
         GameState.outsideObjects = outsideObjects,
         GameState.broughtIn = broughtIn,

@@ -6559,8 +6559,13 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
               -- it", so here -- after CR 616.1 has settled a move that will
               -- happen, and before CR 400.7 retires the id `reveal` needs.
               -- Pawl.FaceDownSpec's Synthetic Unmasking Witness group proves it.
+              -- The rule's second sentence is a face-down SPELL leaving the stack
+              -- for anywhere but the battlefield; Pawl.FaceDownSpec's "CR 708.9
+              -- a countered face-down spell is revealed" proves that half.
               Monad.when (fromZone == Zone.Battlefield && dest /= Zone.Battlefield && Facing.isFaceDown (Object.facing obj)) $
                 reveal RevealCause.LeavingFaceDown pid oid
+              Monad.when (fromZone == Zone.Stack && dest /= Zone.Battlefield && Facing.isFaceDown (Object.facing obj)) $
+                reveal RevealCause.FaceDownSpell pid oid
               -- CR 712.13a's rollback point; see the branch after the entry loop.
               unentered <- State.get
               State.modify' $ \g ->
@@ -8824,15 +8829,23 @@ leaveTheGame asOf g oid = case lastKnownRecord asOf oid of
             GameState.exilePiles = Map.delete oid (GameState.exilePiles g1)
           }
 
--- | CR 708.9: the reveal a face-down permanent's owner owes as it leaves the
--- game, read off `asOf`, the board it is leaving. Nothing for anything else,
--- including a phased-out permanent (CR 702.26b, GameState.battlefield
--- membership).
+-- | CR 708.9: the reveal a face-down permanent's or face-down spell's owner
+-- owes as it leaves the game, read off `asOf`, the board it is leaving.
+-- Nothing for anything else, including a phased-out permanent (CR 702.26b,
+-- GameState.battlefield membership). Pawl.FaceDownSpec's "CR 708.9 a face-down
+-- spell is revealed when its owner leaves the game" proves the spell half.
+--
+-- Not implemented: a face-down component of a face-up merged permanent, which
+-- needs a status per component (#4878).
 leavingReveal :: GameState -> ObjectId -> Maybe GameEvent.GameEvent
 leavingReveal asOf oid = do
   obj <- Game.lookupObject oid asOf
-  Monad.guard (Set.member oid (GameState.battlefield asOf) && Facing.isFaceDown (Object.facing obj))
-  revealedOn RevealCause.LeavingFaceDown (Object.owner obj) oid asOf
+  Monad.guard (Facing.isFaceDown (Object.facing obj))
+  cause <-
+    if Set.member oid (GameState.battlefield asOf)
+      then Just RevealCause.LeavingFaceDown
+      else if Object.zone obj == Zone.Stack then Just RevealCause.FaceDownSpell else Nothing
+  revealedOn cause (Object.owner obj) oid asOf
 
 -- CR 119.3: move one player's life total by this much, and record the CR 608.2i
 -- event of the matching sign. The write LoseLife, GainLife and

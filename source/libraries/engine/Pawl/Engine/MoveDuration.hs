@@ -56,16 +56,35 @@ hasLeftTheBattlefield oid gs = case Game.lookupObject oid gs of
   Just obj -> Object.zone obj /= Zone.Battlefield
 
 -- | CR 610.3a / 610.3b: has this duration's specified event already happened,
--- so the move it would make is declined? Asked by the resolver before it gathers
--- anything to move.
+-- so the move it would make is declined? Asked by the resolver, of the
+-- resolving object `resolving` and its `source` and `controller`, before it
+-- gathers anything to move.
 --
--- Not implemented: an opponent becoming the monarch after the ability triggered
--- (or the spell was cast) and before it resolves, which needs the stack object
--- to remember when it was put there (#4523).
-hasHappened :: MoveDuration -> ObjectId -> GameState -> Bool
-hasHappened duration source gs = case duration of
+-- A crowning is an EVENT, so it is looked for in the log: a GameEvent.BecameMonarch
+-- of an opponent of the controller, logged in the event group the resolving
+-- object was put on the stack in or a later one (GameState.stackedIn). The
+-- log is this turn's, and no stack object outlives a turn. An effect with no
+-- stack object behind it has nothing to have happened since.
+--
+-- Not implemented: for a triggered ability, a crowning after it triggered but
+-- before it was put on the stack -- CR 603.3's wait, in which only
+-- state-based actions run (#4877).
+--
+-- data/scenarios/trigger/cr-610-3b-a-crowning-ahead-of-palace-jailers-exile-keeps-the-creature.json
+-- is the proof: Jared Carthalion's trigger crowns bob ahead of Palace Jailer's
+-- exile, and the creature stays.
+hasHappened :: MoveDuration -> ObjectId -> ObjectId -> PlayerId -> GameState -> Bool
+hasHappened duration resolving source controller gs = case duration of
   MoveDuration.Type.UntilSourceLeavesTheBattlefield -> hasLeftTheBattlefield source gs
-  MoveDuration.Type.UntilAnOpponentBecomesTheMonarch -> False
+  MoveDuration.Type.UntilAnOpponentBecomesTheMonarch -> case Map.lookup resolving (GameState.stackedIn gs) of
+    Nothing -> False
+    Just since ->
+      any
+        ( \logged -> case LoggedEvent.event logged of
+            GameEvent.BecameMonarch pid -> LoggedEvent.group logged >= since && Game.areOpponents gs controller pid
+            _ -> False
+        )
+        (GameState.events gs)
 
 -- | The watch a move with this duration arms, for the move's source and the
 -- effect's controller. CR 725's watch is armed undischarged whoever holds the

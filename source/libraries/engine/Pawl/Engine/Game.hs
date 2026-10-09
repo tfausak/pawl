@@ -751,7 +751,17 @@ insertIntoZone zone position pid oid gs = case zone of
   Zone.Exile -> gs {GameState.exile = Set.insert oid (GameState.exile gs)}
   Zone.Command -> gs {GameState.command = Set.insert oid (GameState.command gs)}
   Zone.Ante -> gs {GameState.ante = Set.insert oid (GameState.ante gs)}
-  Zone.Stack -> gs {GameState.stack = oid : GameState.stack gs}
+  Zone.Stack -> putOnStack oid gs
+
+-- CR 405.2: put an object on top of the stack, noting the event group current
+-- as it arrives (GameState.stackedIn) for CR 610.3a / 610.3b's "after it was
+-- put onto the stack". Every arrival goes through here.
+putOnStack :: ObjectId -> GameState -> GameState
+putOnStack oid gs =
+  gs
+    { GameState.stack = oid : GameState.stack gs,
+      GameState.stackedIn = Map.insert oid (GameState.nextEventGroup gs) (GameState.stackedIn gs)
+    }
 
 -- Move a card already in a library to this many cards down from its top, 0
 -- being the top; a depth past the bottom lands on the bottom (Seq.insertAt's

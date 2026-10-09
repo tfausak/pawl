@@ -2826,6 +2826,34 @@ unmaskingSpec s registry = Spec.describe s "Revealed as it leaves (CR 708.9)" $ 
     Spec.assertEqWith s "a face-up Forest leaving with bob draws nothing" (libraryCount faceUpBoard - libraryCount control) 0
     Spec.assertEqWith s "CR 708.9 bob, the owner, revealed it" (departureReveals left) [S.bob]
 
+  -- CR 708.9's third sentence: a face-down SPELL owned by a departing player is
+  -- revealed too. alice casts Ainok Tracker face down in a three-player game and
+  -- concedes with it on the stack; the negative leg casts it face up.
+  Spec.it s "CR 708.9 a face-down spell is revealed when its owner leaves the game" $ do
+    (faceDown, spell) <- spellBoard s registry (Facing.faceDown FaceDownReason.Morphed)
+    (faceUp, _) <- spellBoard s registry Facing.FaceUp
+    let concede board = S.runPure S.identityAnswer board (Departure.leaveGame Departure.Type.Conceded S.alice)
+    Spec.assertEqWith s "CR 708.9 alice revealed her face-down spell" (spellReveals (concede faceDown)) [(S.alice, spell)]
+    Spec.assertEqWith s "a face-up spell leaving with her reveals nothing" (spellReveals (concede faceUp)) []
+    Spec.assertEqWith s "setup: the spell left the game with her" (Game.lookupObject spell (concede faceDown)) Nothing
+
+  -- CR 708.9's second sentence: a face-down spell moving from the stack to any
+  -- zone but the battlefield is revealed as it moves. bob counters it with
+  -- Cancel; the negative leg counters the same spell cast face up.
+  Spec.it s "CR 708.9 a countered face-down spell is revealed" $ do
+    (faceDown, spell) <- spellBoard s registry (Facing.faceDown FaceDownReason.Morphed)
+    (faceUp, upSpell) <- spellBoard s registry Facing.FaceUp
+    island <- S.printingOf s registry "Island"
+    cancel <- S.printingOf s registry "Cancel"
+    let counter board target =
+          let (cancelId, armed) = S.addHandCard cancel S.bob (S.landsFor island S.bob 3 board)
+           in S.runPure (aimedAt target) armed (Cast.castSpell S.manaPerformer S.bob cancelId (S.printingName cancel) Facing.FaceUp >> Stack.resolveTop)
+        countered = counter faceDown spell
+        control = counter faceUp upSpell
+    Spec.assertEqWith s "CR 708.9 alice revealed her countered face-down spell" (spellReveals countered) [(S.alice, spell)]
+    Spec.assertEqWith s "a countered face-up spell reveals nothing" (spellReveals control) []
+    Spec.assertEqWith s "setup: both spells were countered" (fmap (Game.zoneMembers Zone.Stack S.alice) [countered, control]) [[], []]
+
   -- CR 708.9's first sentence over CR 729.4a's crossing: a subgame's wish takes
   -- bob's permanent, which moves from the main-game battlefield to a subgame
   -- zone. Event.leavingReveal shared with the departure case above; the
@@ -2887,6 +2915,23 @@ departureBoard s registry faceDown = do
   case entered of
     Just _ -> pure board
     Nothing -> Spec.assertFailure s "bob's Forest did not reach the battlefield"
+
+-- A three-player game in alice's main phase with priority: eight Mountains
+-- under her and Ainok Tracker cast with `facing`, still on the stack. Returns
+-- the board and the spell.
+spellBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Facing.Facing -> m (GameState.GameState, ObjectId.ObjectId)
+spellBoard s registry facing = do
+  mountain <- S.printingOf s registry "Mountain"
+  ainok <- S.printingOf s registry "Ainok Tracker"
+  let (board, card) = S.handOne ainok (S.landsFor mountain S.alice 8 S.threePlayerGame {GameState.priority = Just S.alice})
+      cast = S.runPure S.identityAnswer board (Cast.castSpell S.manaPerformer S.alice card (S.printingName ainok) facing)
+  case GameState.stack cast of
+    [spell] -> pure (cast, spell)
+    _ -> Spec.assertFailure s "Ainok Tracker did not reach the stack"
+
+-- Each CR 708.9 face-down spell reveal on the log, by revealer and spell.
+spellReveals :: GameState.GameState -> [(PlayerId.PlayerId, ObjectId.ObjectId)]
+spellReveals gs = [(Revealed.player r, Revealed.card r) | GameEvent.Revealed r <- S.eventsOf gs, Revealed.cause r == RevealCause.FaceDownSpell]
 
 -- Who made each CR 708.9 departure reveal on the log, in order.
 departureReveals :: GameState.GameState -> [PlayerId.PlayerId]

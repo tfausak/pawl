@@ -25,4 +25,7 @@ data RevealCause
   | -- | CR 708.9: a face-down permanent, revealed by its owner as it leaves the
     -- battlefield.
     LeavingFaceDown
+  | -- | CR 708.9: a face-down spell, revealed by its owner as it leaves the stack
+    -- for anywhere but the battlefield, or as its owner leaves the game.
+    FaceDownSpell
   deriving (Eq, Ord, Show)
