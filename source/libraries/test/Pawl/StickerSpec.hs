@@ -22,6 +22,7 @@ import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.NameWords as NameWords
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -34,6 +35,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.StickerSheets as StickerSheets
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilitySticker as AbilitySticker
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Game as Game.Type
@@ -116,8 +118,27 @@ withSheets sheets gs =
 -- alice's first available art sticker on `oid`.
 stickerOn :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 stickerOn oid gs = case Sticker.available S.alice (Set.singleton StickerKind.Art) gs of
-  ref : _ -> Sticker.put S.alice oid ref gs
+  ref : _ -> Sticker.put S.alice oid ref Nothing gs
   [] -> gs
+
+-- One of alice's name stickers, by its sheet's position in committedSheets'
+-- order and its index among that sheet's name stickers.
+nameSticker :: Natural -> Natural -> StickerRef.StickerRef
+nameSticker slot i = StickerRef.MkStickerRef {StickerRef.owner = S.alice, StickerRef.sheet = slot, StickerRef.kind = StickerKind.Name, StickerRef.index = i}
+
+-- "Night", "Slimy" and "Otter".
+night :: StickerRef.StickerRef
+night = nameSticker 0 0
+
+slimy :: StickerRef.StickerRef
+slimy = nameSticker 1 0
+
+otter :: StickerRef.StickerRef
+otter = nameSticker 2 1
+
+-- The names an object shows, as text.
+nameTexts :: ObjectId.ObjectId -> GameState.GameState -> [Text.Text]
+nameTexts oid gs = fmap CardName.unwrap (Set.toList (Projection.namesOf oid gs))
 
 -- FILTERS the offered set, so CR 608.2b's re-read finds the target.
 namingTarget :: ObjectId.ObjectId -> Prompt.Prompt r -> r
@@ -398,3 +419,25 @@ spec s registry = Spec.describe s "Sticker" $ do
         (pyro, after, _) = pyrodancerEnters pyrodancer Nothing g1
     Spec.assertEqWith s "CR 123.9 Wee Champion is a 1/2 with one +1/+1 counter" (Projection.powerOf weeId after, S.counterOf CounterKind.PlusOnePlusOne weeId after) (Just 1, 1)
     Spec.assertEqWith s "one art sticker went on alice's two permanents" (sum (fmap (\oid -> maybe 0 (Seq.length . Object.stickers) (Game.lookupObject oid after)) [weeId, pyro])) 1
+  -- CR 123.6a over the three card names this unit adds that hold a blank.
+  Spec.it s "CR 123.6a a blank is not a word, and _____-o-saurus is one" $ do
+    let named = CardName.MkCardName . Text.pack
+    Spec.assertEqWith s "CR 123.6a Wolf in _____ Clothing has three words" (NameWords.wordCount (named "Wolf in _____ Clothing")) 3
+    Spec.assertEqWith s "CR 123.6a _____-o-saurus is one hyphenated word" (NameWords.wordCount (named "_____-o-saurus")) 1
+    Spec.assertEqWith s "CR 123.6a three blanks and Trespasser are one word" (NameWords.wordCount (named "_____ _____ _____ Trespasser")) 1
+  -- CR 123.6b's own example, then CR 123.6c's "fewer words" and a blank.
+  Spec.it s "CR 123.6b-c a word goes after k words, before a blank that follows, or at the end" $ do
+    let named = CardName.MkCardName . Text.pack
+        dark k = CardName.unwrap (NameWords.insertAfter k (Text.pack "Dark") (named "Bear Cub"))
+    Spec.assertEqWith s "CR 123.6b Dark Bear Cub, Bear Dark Cub, Bear Cub Dark" (fmap dark [0, 1, 2]) (fmap Text.pack ["Dark Bear Cub", "Bear Dark Cub", "Bear Cub Dark"])
+    Spec.assertEqWith s "CR 123.6c after five words of two: at the end" (dark 5) (Text.pack "Bear Cub Dark")
+    Spec.assertEqWith s "CR 123.6a after two words, before the blank" (CardName.unwrap (NameWords.insertAfter 2 (Text.pack "Otter") (named "Wolf in _____ Clothing"))) (Text.pack "Wolf in Otter _____ Clothing")
+  Spec.it s "CR 123.6d-e letters and unique vowels ignore case, and Y is a vowel" $ do
+    Spec.assertEqWith s "CR 123.6e Slimy, Otter, Ringmaster" (fmap (NameWords.uniqueVowels . Text.pack) ["Slimy", "Otter", "Ringmaster"]) [2, 2, 3]
+    Spec.assertEqWith s "CR 123.6d the o's in Otter Storm" (NameWords.letterCount (Text.pack "o") (Text.pack "Otter Storm")) 2
+  Spec.it s "CR 123.6 a name sticker's words come off its owner's sheet" $ do
+    sheets <- committedSheets
+    let gs = withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)
+        art = StickerRef.MkStickerRef S.alice 2 StickerKind.Art 0
+    Spec.assertEqWith s "Night, Slimy, Otter" (fmap (\ref -> Game.stickerWords ref gs) [night, slimy, otter]) (fmap (Just . Text.pack) ["Night", "Slimy", "Otter"])
+    Spec.assertEqWith s "an art sticker has none" (Game.stickerWords art gs) Nothing

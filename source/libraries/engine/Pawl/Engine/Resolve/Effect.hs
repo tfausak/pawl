@@ -5761,11 +5761,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       let owned = fmap Object.owner (Game.lookupObject oid gs) == Just placer
       Monad.when owned $ case Sticker.available placer kinds gs of
         [] -> pure ()
-        [only] -> State.modify' (Sticker.put placer oid only)
+        [only] -> State.modify' (Sticker.put placer oid only Nothing)
         first : rest -> do
           let offered = first NonEmpty.:| rest
           answer <- Game.choose (Prompt.ChooseSticker (Decide.deciderFor placer gs) placer oid offered)
-          State.modify' (Sticker.put placer oid (if List.elem answer offered then answer else first))
+          State.modify' (Sticker.put placer oid (if List.elem answer offered then answer else first) Nothing)
   -- CR 701.24a alone: randomize the named libraries so no player knows their
   -- order. Nothing moves, so there is no changeZone call and no CR 616.1
   -- opportunity -- the cards a "then shuffle" follows are still the objects they

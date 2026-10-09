@@ -11,6 +11,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Ord as Ord
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
@@ -79,7 +80,10 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.Status as Status
+import qualified Pawl.Types.StickerKind as StickerKind
 import qualified Pawl.Types.StickerPlacement as StickerPlacement
+import qualified Pawl.Types.StickerRef as StickerRef
+import qualified Pawl.Types.StickerSheet as StickerSheet
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
@@ -223,6 +227,20 @@ restampStickers oid gs = case lookupObject oid gs of
            in (acc Seq.|> placement {StickerPlacement.timestamp = ts}, g')
         (restamped, stamped) = Foldable.foldl' step (Seq.empty, gs) (Object.stickers obj)
      in stamped {GameState.objects = Map.adjust (\o -> o {Object.stickers = restamped}) oid (GameState.objects stamped)}
+
+-- | CR 123.6: the words printed on a name sticker, off its owner's sheet;
+-- Nothing for another kind or a reference naming no sticker.
+stickerWords :: StickerRef.StickerRef -> GameState -> Maybe Text.Text
+stickerWords ref gs = case StickerRef.kind ref of
+  StickerKind.Name -> do
+    player <- Map.lookup (StickerRef.owner ref) (GameState.players gs)
+    slot <- Natural.toInt (StickerRef.sheet ref)
+    sheet <- Seq.lookup slot (Player.stickerSheets player)
+    i <- Natural.toInt (StickerRef.index ref)
+    Seq.lookup i (StickerSheet.names sheet)
+  StickerKind.Ability -> Nothing
+  StickerKind.PowerToughness -> Nothing
+  StickerKind.Art -> Nothing
 
 freshPrintingId :: GameState -> (PrintingId.PrintingId, GameState)
 freshPrintingId gs =
