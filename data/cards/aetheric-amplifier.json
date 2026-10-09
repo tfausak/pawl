@@ -109,6 +109,34 @@
                         "type": "GainPlayerCounters",
                         "value": {
                           "kind": {
+                            "type": "Ticket"
+                          },
+                          "player": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          "quantity": {
+                            "type": "PlayerCounters",
+                            "value": {
+                              "kind": {
+                                "type": "Ticket"
+                              },
+                              "player": {
+                                "type": "Relative",
+                                "value": {
+                                  "type": "You"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "GainPlayerCounters",
+                        "value": {
+                          "kind": {
                             "type": "Poison"
                           },
                           "player": {

@@ -171,7 +171,7 @@ data Keyword
     -- CR 702.33d's "kicked" designation. CR 702.33b's two kicker costs are two of
     -- these on one face, which the keyword Set keeps apart by cost.
     --
-    -- Not implemented: CR 702.33h's sticker kicker, which needs stickers (#872).
+    -- Not implemented: CR 702.33h's sticker kicker (#872).
     Kicker (Cost.Cost Keyword)
   | -- | 702.33c: "You may pay an additional [cost] any number of times as you
     -- cast this spell". A multikicker cost IS a kicker cost, so everything

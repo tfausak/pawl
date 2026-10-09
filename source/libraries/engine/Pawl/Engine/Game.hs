@@ -79,6 +79,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.Status as Status
+import qualified Pawl.Types.StickerPlacement as StickerPlacement
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
@@ -209,6 +210,19 @@ freshTimestamp :: GameState -> (Timestamp.Timestamp, GameState)
 freshTimestamp gs =
   let Timestamp.MkTimestamp n = GameState.nextTimestamp gs
    in (Timestamp.MkTimestamp n, gs {GameState.nextTimestamp = Timestamp.MkTimestamp (n + 1)})
+
+-- CR 613.7k: each sticker on the object takes a new timestamp immediately
+-- after the object's own, keeping their relative order. Called right after the
+-- object is stamped, so nothing is minted in between.
+restampStickers :: ObjectId -> GameState -> GameState
+restampStickers oid gs = case lookupObject oid gs of
+  Nothing -> gs
+  Just obj ->
+    let step (acc, g) placement =
+          let (ts, g') = freshTimestamp g
+           in (acc Seq.|> placement {StickerPlacement.timestamp = ts}, g')
+        (restamped, stamped) = Foldable.foldl' step (Seq.empty, gs) (Object.stickers obj)
+     in stamped {GameState.objects = Map.adjust (\o -> o {Object.stickers = restamped}) oid (GameState.objects stamped)}
 
 freshPrintingId :: GameState -> (PrintingId.PrintingId, GameState)
 freshPrintingId gs =
@@ -341,9 +355,10 @@ permute xs order =
 --     decision. Engine.priorityLoop makes that call, being the only caller that
 --     knows the menu.
 --   * Prompt.Shuffle, Prompt.RandomFirstPlayer, Prompt.RandomObject,
---     Prompt.RandomPlayer, Prompt.RandomCard, Prompt.RandomDepth, Prompt.RollDie and
---     Prompt.FlipCoin, which ask for RANDOMNESS rather than for a choice (CR
---     701.24, CR 729.2, CR 706.1a, CR 705.1, and CR 701.9b's acknowledgment
+--     Prompt.RandomStickerSheet, Prompt.RandomPlayer, Prompt.RandomCard,
+--     Prompt.RandomDepth, Prompt.RollDie and Prompt.FlipCoin, which ask for
+--     RANDOMNESS rather than for a choice (CR 701.24, CR 729.2, CR 103.2d, CR
+--     706.1a, CR 705.1, and CR 701.9b's acknowledgment
 --     that "at random" is not "the player chooses"). A loop that reshuffles a
 --     library every cycle is still a loop of mandatory actions. Prompt.CallCoin is NOT among them: CR 705.2's call is a
 --     choice, so it comes through here.
@@ -1704,6 +1719,9 @@ sourceOfWithLastKnown oid gs = case lookupObject oid gs of
 -- and the gate is turnFaceOver's own, kept so that a road that later does cannot
 -- silently restamp a face-down card in exile, whose stamp names its
 -- Pawl.Types.Pile.
+--
+-- Not implemented: CR 613.7k's sticker restamp after this CR 613.7f timestamp
+-- (#872).
 turnFacing :: Facing.Facing -> ObjectId -> GameState -> GameState
 turnFacing facing oid gs =
   let (ts, stamped) = freshTimestamp gs
@@ -1764,6 +1782,9 @@ isDoubleFacedPermanent oid gs = case lookupObject oid gs of
 -- Reads the object's OWN card (cardOf), never a projected one, which is the
 -- footing Object.face is stored on: CR 712.9's first Example turns on a Clone
 -- being a one-faced card whatever it copied, and that is the same read.
+--
+-- Not implemented: CR 613.7k's sticker restamp after this CR 613.7g timestamp
+-- (#872).
 turnFaceOver :: Timestamp.Timestamp -> ObjectId -> GameState -> GameState
 turnFaceOver now oid gs = case (turnsTo oid gs, lookupObject oid gs) of
   (Just name, Just object) ->
@@ -2670,6 +2691,7 @@ castOf event = case event of
   GameEvent.Waterbent _ -> Nothing
   GameEvent.Airbent _ -> Nothing
   GameEvent.Firebent _ -> Nothing
+  GameEvent.StickerPut _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.TriggeredAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
@@ -2783,6 +2805,7 @@ abilityResolved event = case event of
   GameEvent.Waterbent _ -> Nothing
   GameEvent.Airbent _ -> Nothing
   GameEvent.Firebent _ -> Nothing
+  GameEvent.StickerPut _ -> Nothing
   GameEvent.ActivatedAbilityResolved activated -> Just (Source.OfAbility activated)
   GameEvent.TriggeredAbilityResolved triggered -> Just (Source.OfTrigger triggered)
   GameEvent.CardArrived _ -> Nothing
@@ -2887,6 +2910,7 @@ discardOf event = case event of
   GameEvent.Waterbent _ -> Nothing
   GameEvent.Airbent _ -> Nothing
   GameEvent.Firebent _ -> Nothing
+  GameEvent.StickerPut _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.TriggeredAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
@@ -3052,6 +3076,7 @@ movedChange event = case event of
   GameEvent.Waterbent _ -> Nothing
   GameEvent.Airbent _ -> Nothing
   GameEvent.Firebent _ -> Nothing
+  GameEvent.StickerPut _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.TriggeredAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
@@ -3175,6 +3200,7 @@ damageDealt event = case event of
   GameEvent.Waterbent _ -> Nothing
   GameEvent.Airbent _ -> Nothing
   GameEvent.Firebent _ -> Nothing
+  GameEvent.StickerPut _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.TriggeredAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
@@ -3463,6 +3489,7 @@ lifeGainOf event = case event of
   GameEvent.Waterbent _ -> Nothing
   GameEvent.Airbent _ -> Nothing
   GameEvent.Firebent _ -> Nothing
+  GameEvent.StickerPut _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.TriggeredAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing

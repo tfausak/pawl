@@ -3,6 +3,7 @@
 module Pawl.Codec.Player where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.GraveyardOrder as GraveyardOrder
@@ -11,6 +12,7 @@ import qualified Pawl.Codec.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Codec.PlayerDesignation as PlayerDesignation
 import qualified Pawl.Codec.PrintingId as PrintingId
 import qualified Pawl.Codec.Status as Status
+import qualified Pawl.Codec.StickerSheet as StickerSheet
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
@@ -46,6 +48,8 @@ codec = Fields.object $ do
   commanderDamage <- Fields.defaulted "commanderDamage" Map.empty (Common.naturalMap PrintingId.codec Common.natural) Player.commanderDamage
   dungeons <- Fields.defaulted "dungeons" Set.empty (Common.set PrintingId.codec) Player.dungeons
   outsideTheGame <- Fields.defaulted "outsideTheGame" Map.empty (Common.naturalMap PrintingId.codec Common.natural) Player.outsideTheGame
+  stickerSheets <- Fields.defaulted "stickerSheets" Seq.empty (Common.seq StickerSheet.codec) Player.stickerSheets
+  chosenStickerSheets <- Fields.defaulted "chosenStickerSheets" Set.empty (Common.set Common.natural) Player.chosenStickerSheets
   completedDungeons <- Fields.defaulted "completedDungeons" 0 Common.natural Player.completedDungeons
   completedDungeonNames <- Fields.defaulted "completedDungeonNames" Set.empty (Common.set CardName.codec) Player.completedDungeonNames
   startingDeck <- Fields.defaulted "startingDeck" Map.empty (Common.naturalMap PrintingId.codec Common.natural) Player.startingDeck
@@ -66,6 +70,8 @@ codec = Fields.object $ do
         Player.commanderDamage = commanderDamage,
         Player.dungeons = dungeons,
         Player.outsideTheGame = outsideTheGame,
+        Player.stickerSheets = stickerSheets,
+        Player.chosenStickerSheets = chosenStickerSheets,
         Player.completedDungeons = completedDungeons,
         Player.completedDungeonNames = completedDungeonNames,
         Player.startingDeck = startingDeck,

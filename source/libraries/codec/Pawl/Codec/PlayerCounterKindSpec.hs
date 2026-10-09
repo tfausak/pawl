@@ -13,6 +13,12 @@ spec s = Spec.describe s "Pawl.Codec.PlayerCounterKind" $ do
       PlayerCounterKind.codec
       PlayerCounterKind.Energy
       " {\"type\":\"Energy\"} "
+  Spec.it s "Ticket" $
+    Common.assertCodec
+      s
+      PlayerCounterKind.codec
+      PlayerCounterKind.Ticket
+      " {\"type\":\"Ticket\"} "
   Spec.it s "Poison" $
     Common.assertCodec
       s

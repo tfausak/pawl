@@ -282,6 +282,7 @@ import qualified Pawl.Types.ProliferateR as ProliferateR
 import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
+import qualified Pawl.Types.PutSticker as PutSticker
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.RandomCardInGraveyard as RandomCardInGraveyard
 import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
@@ -525,6 +526,8 @@ filterNames asking criterion = case criterion of
   Filter.HasDesignation _designation -> False
   Filter.HasCounters _kind -> False
   Filter.HasCountersOfAnyKind -> False
+  Filter.HasSticker _kind -> False
+  Filter.Stickered -> False
   Filter.HasNonManaActivatedAbility -> False
   Filter.HasActivatedAbility -> False
   Filter.IsInZone _zone -> False
@@ -1379,6 +1382,7 @@ effectNames asking onCard onAbility x = case x of
   Effect.TakeExtraTurn takeExtraTurn -> takeExtraTurnNames asking takeExtraTurn
   Effect.ShuffleIntoLibrary shuffleIntoLibrary -> shuffleIntoLibraryNames asking shuffleIntoLibrary
   Effect.Ante ante -> anteNames asking ante
+  Effect.PutSticker putSticker -> putStickerNames asking putSticker
   Effect.SetOwner (SetOwner.MkSetOwner player ref) -> playerRefNames asking player || objectRefNames asking ref
   Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership one other) -> objectRefNames asking one || objectRefNames asking other
   Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary ref player) -> objectRefNames asking ref || playerRefNames asking player
@@ -2564,6 +2568,10 @@ anteNames :: Asking -> Ante.Ante -> Bool
 anteNames asking x = case x of
   Ante.MkAnte player ref slot -> playerRefNames asking player || objectRefNames asking ref || any (slotNames asking) slot
 
+putStickerNames :: Asking -> PutSticker.PutSticker -> Bool
+putStickerNames asking x = case x of
+  PutSticker.MkPutSticker player ref _kinds -> playerRefNames asking player || objectRefNames asking ref
+
 shuffleIntoLibraryNames :: Asking -> ShuffleIntoLibrary.ShuffleIntoLibrary -> Bool
 shuffleIntoLibraryNames asking x = case x of
   ShuffleIntoLibrary.MkShuffleIntoLibrary library refs -> any (playerRefNames asking) library || any (objectRefNames asking) refs
@@ -2819,6 +2827,7 @@ triggerConditionNames asking x = case x of
   TriggerCondition.PlayerWaterbends _playerRelation -> False
   TriggerCondition.PlayerAirbends _playerRelation -> False
   TriggerCondition.PlayerFirebends _playerRelation -> False
+  TriggerCondition.PlacesSticker _placesSticker -> False
 
 triggeredAbilityNames :: Asking -> (card -> Bool) -> (ability -> Bool) -> TriggeredAbility.TriggeredAbility card ability -> Bool
 triggeredAbilityNames asking onCard onAbility x = case x of

@@ -190,6 +190,7 @@ import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
+import qualified Pawl.Types.PutSticker as PutSticker
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.RandomCardInGraveyard as RandomCardInGraveyard
 import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
@@ -995,6 +996,7 @@ rewriteEffect pairs effect = case effect of
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named refs) -> Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named (fmap (rewriteObjectRef pairs) refs))
   -- ShuffleIntoLibrary's descent: the ref's filters are card text.
   Effect.Ante (Ante.MkAnte player ref mSlot) -> Effect.Ante (Ante.MkAnte player (rewriteObjectRef pairs ref) mSlot)
+  Effect.PutSticker (PutSticker.MkPutSticker player ref kinds) -> Effect.PutSticker (PutSticker.MkPutSticker player (rewriteObjectRef pairs ref) kinds)
   Effect.SetOwner (SetOwner.MkSetOwner player ref) -> Effect.SetOwner (SetOwner.MkSetOwner player (rewriteObjectRef pairs ref))
   Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership one other) -> Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership (rewriteObjectRef pairs one) (rewriteObjectRef pairs other))
   Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary ref player) -> Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary (rewriteObjectRef pairs ref) player)
@@ -2043,6 +2045,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PlayerWaterbends _ -> condition
   TriggerCondition.PlayerAirbends _ -> condition
   TriggerCondition.PlayerFirebends _ -> condition
+  TriggerCondition.PlacesSticker _ -> condition
   TriggerCondition.PlayerCompletesDungeon _ -> condition
   TriggerCondition.PlayerSurveils _ -> condition
   TriggerCondition.PlayerPlaysLand payload -> TriggerCondition.PlayerPlaysLand payload {PlaysLand.filter = Filter.rewrite pairs (PlaysLand.filter payload)}

@@ -12,6 +12,7 @@ import qualified Data.Text.IO as TextIO
 import qualified Pawl.Benchmark
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.Scenario as Codec.Scenario
+import qualified Pawl.Codec.StickerSheet as StickerSheet
 import qualified Pawl.DeckList as DeckList
 import qualified Pawl.Ingest as Ingest
 import qualified Pawl.Json.Value as Value
@@ -21,10 +22,12 @@ import qualified Pawl.JsonSchema.Define as Define
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Scenario.Load as Load
+import qualified Pawl.StickerSheets as StickerSheets
 import qualified Pawl.Test
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.StickerSheet as StickerSheet.Type
 import qualified System.Directory as Directory
 import qualified System.Environment as Environment
 import qualified System.Exit as Exit
@@ -107,10 +110,14 @@ ingest path = do
       outcomes <- mapM (ingestOne root) records
       loaded <- Registry.loadRoot root
       stamped <- fmap length . Monad.filterM (stampOne known) $ Maybe.mapMaybe (\entry@(file, _) -> fmap ((,) file) (Registry.referenceCard entry)) loaded
+      sheetRoot <- StickerSheets.defaultRoot
+      sheets <- StickerSheets.loadRoot sheetRoot
+      sheetsStamped <- fmap length (Monad.filterM (stampSheet known) [(file, sheet) | (file, Right sheet) <- sheets])
       let reasons = Map.fromListWith (+) [(Text.takeWhile (/= ':') reason, 1 :: Int) | Left reason <- outcomes]
       putStrLn $ "written: " <> show (length (filter (== Right True) outcomes))
       putStrLn $ "already in the pool: " <> show (length (filter (== Right False) outcomes))
       putStrLn $ "pool files given Oracle text: " <> show stamped
+      putStrLn $ "sticker sheets given Oracle text: " <> show sheetsStamped
       putStrLn $ "left out: " <> show (sum reasons)
       mapM_ (\(kind, n) -> TextIO.putStrLn (Text.pack "  " <> kind <> Text.pack (": " <> show n))) (Map.toDescList reasons)
 
@@ -136,6 +143,16 @@ stampOne :: (Map.Map (Text.Text, Text.Text) Text.Text, Map.Map Text.Text Text.Te
 stampOne known (file, card) =
   let stamped = Ingest.stamp known card
    in if stamped == card then pure False else True <$ writeCard file stamped
+
+-- True when the sheet's file changed: CR 123.2's sheet given MTGJSON's text,
+-- stampOne's posture for a sheet. A sheet has one face, its own name.
+stampSheet :: (Map.Map (Text.Text, Text.Text) Text.Text, Map.Map Text.Text Text.Text) -> (FilePath, StickerSheet.Type.StickerSheet) -> IO Bool
+stampSheet (exact, _) (file, sheet) =
+  let name = StickerSheet.Type.name sheet
+      stamped = sheet {StickerSheet.Type.oracleText = Map.lookup (name, name) exact}
+   in if stamped == sheet || Maybe.isNothing (StickerSheet.Type.oracleText stamped)
+        then pure False
+        else True <$ ByteString.writeFile file (Encoding.encodeUtf8 (Common.render (Codec.encode StickerSheet.codec stamped)))
 
 writeCard :: FilePath -> Card.Type.Card -> IO ()
 writeCard file = ByteString.writeFile file . Encoding.encodeUtf8 . Common.render . Codec.encode Card.codec

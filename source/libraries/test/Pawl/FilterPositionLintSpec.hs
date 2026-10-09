@@ -217,6 +217,8 @@ canHostSubjects predicate = case predicate of
   -- is no Filter position inside it for a card author to reach -- the descent
   -- above exists only because a CounterKind can carry a Keyword.
   Filter.Type.HasCountersOfAnyKind -> 0
+  Filter.Type.HasSticker _ -> 0
+  Filter.Type.Stickered -> 0
   -- Zero and not a descent, unlike the atom above: a family is payload-free, so
   -- there is no Filter position inside it for a card author to reach.
   Filter.Type.HasKeywordFamily _ -> 0

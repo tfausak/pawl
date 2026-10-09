@@ -583,6 +583,8 @@ import qualified Pawl.Codec.StaticAbilitySpec
 import qualified Pawl.Codec.StatusSpec
 import qualified Pawl.Codec.StepBeganSpec
 import qualified Pawl.Codec.StepBeginsSpec
+import qualified Pawl.Codec.StickerKindSpec
+import qualified Pawl.Codec.StickerSheetSpec
 import qualified Pawl.Codec.StoredResultSpec
 import qualified Pawl.Codec.SubtypeFamilySpec
 import qualified Pawl.Codec.SubtypeSpec
@@ -789,6 +791,7 @@ import qualified Pawl.SpecialActionSpec
 import qualified Pawl.SpeedSpec
 import qualified Pawl.SplitSecondSpec
 import qualified Pawl.StationSpec
+import qualified Pawl.StickerSpec
 import qualified Pawl.TargetPerPlayerSpec
 import qualified Pawl.TargetSpec
 import qualified Pawl.TeamSpec
@@ -1324,6 +1327,8 @@ spec s registry = do
   Pawl.Codec.PileDrawSpec.spec s
   Pawl.Codec.PlayPermissionOriginSpec.spec s
   Pawl.Codec.PlayerCounterKindSpec.spec s
+  Pawl.Codec.StickerKindSpec.spec s
+  Pawl.Codec.StickerSheetSpec.spec s
   Pawl.Codec.PlayerAttacksPlayerSpec.spec s
   Pawl.Codec.PlayerAttacksWithSpec.spec s
   Pawl.Codec.PlayerCounterTallySpec.spec s
@@ -1506,6 +1511,7 @@ spec s registry = do
   Pawl.ConjureSpec.spec s registry
   Pawl.ConspiracySpec.spec s registry
   Pawl.AnteSpec.spec s registry
+  Pawl.StickerSpec.spec s registry
   Pawl.CopySpec.spec s registry
   Pawl.CopySpec.copySpellSpec s registry
   Pawl.CopySpec.stirCopySpec s registry

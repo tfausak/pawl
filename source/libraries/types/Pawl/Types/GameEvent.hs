@@ -44,6 +44,7 @@ import qualified Pawl.Types.SchemeSetInMotion as SchemeSetInMotion
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.SpellWasCopied as SpellWasCopied
 import qualified Pawl.Types.StepBegan as StepBegan
+import qualified Pawl.Types.StickerPut as StickerPut
 import qualified Pawl.Types.TappedForMana as TappedForMana
 import qualified Pawl.Types.Transformed as Transformed
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
@@ -660,4 +661,6 @@ data GameEvent
     -- above is. Two firings of one CR 603.7 delayed ability share the entry's
     -- createdAt, so they are one key too.
     TriggeredAbilityResolved TriggeredAbilitySource.TriggeredAbilitySource
+  | -- | CR 123.3.
+    StickerPut StickerPut.StickerPut
   deriving (Eq, Ord, Show)

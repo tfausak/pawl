@@ -78,6 +78,8 @@ import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
+import qualified Pawl.Types.StickerPlacement as StickerPlacement
+import qualified Pawl.Types.StickerRef as StickerRef
 import qualified Pawl.Types.Teams as Teams
 import Pawl.Types.Timestamp (Timestamp)
 import qualified Pawl.Types.Toughness as Toughness
@@ -247,6 +249,8 @@ viewOfCard face =
           -- CR 122.1a-b: a counter can sit on a card off the battlefield, but this
           -- builder describes a printed FACE, so there is nothing to be on.
           Filter.counters = Map.empty,
+          -- CR 123.1: a printed face has no object to be on.
+          Filter.stickerKinds = Seq.empty,
           -- CR 701.54b: the designation rides an OBJECT, and CR 701.54a gives it
           -- only to a battlefield permanent.
           Filter.ringBearerFor = Nothing,
@@ -741,6 +745,9 @@ viewOfCharacteristics peers oid pc controller counters gs =
           && not (Game.isFrontFaceUp oid gs)
           && maybe True (Seq.null . Game.componentsOf . Object.source) (Game.lookupObject oid gs),
       Filter.counters = counters,
+      -- CR 123.1: off the object, live, `designations`' posture. Not
+      -- implemented: CR 608.2h's record of a departed object's stickers (#4890).
+      Filter.stickerKinds = foldMap (fmap (StickerRef.kind . StickerPlacement.sticker) . Object.stickers) (Game.lookupObject oid gs),
       -- CR 701.54b: a designation rather than a characteristic. Nothing for an id
       -- naming no object -- a designation dies with the permanent (CR 400.7).
       Filter.ringBearerFor = Game.lookupObject oid gs >>= Object.ringBearerFor,

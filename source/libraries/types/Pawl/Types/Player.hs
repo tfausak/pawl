@@ -1,6 +1,7 @@
 module Pawl.Types.Player where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.CardName as CardName
@@ -10,6 +11,7 @@ import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerDesignation as PlayerDesignation
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Status as Status
+import qualified Pawl.Types.StickerSheet as StickerSheet
 
 data Player = MkPlayer
   { life :: Integer,
@@ -181,10 +183,16 @@ data Player = MkPlayer
     -- outside it -- deliberately did NOT land here: those are objects in a game
     -- that is on hold rather than a count of printings a player set aside, so
     -- they ride Pawl.Types.GameState's outsideObjects and only for as long as
-    -- the subgame runs. Sticker sheets (#872) are
-    -- outside the game too but are not cards and have no characteristics (CR
-    -- 123.2), so they need a field of their own rather than this one.
+    -- the subgame runs. Sticker sheets are outside the game too but are not
+    -- cards (CR 123.2); they ride `stickerSheets` below.
     outsideTheGame :: Map.Map PrintingId.PrintingId Natural.Natural,
+    -- | CR 123.2 / 123.2c: the sticker sheets this player brought, revealed.
+    -- Kept on the player for `dungeons`' reason: CR 727.2 and CR 729.2 rerun
+    -- CR 103.2d's draw with no Deck in hand.
+    stickerSheets :: Seq.Seq StickerSheet.StickerSheet,
+    -- | CR 103.2d: the positions in `stickerSheets` drawn for this game. Only
+    -- their stickers are available (Pawl.Engine.Sticker.available).
+    chosenStickerSheets :: Set.Set Natural.Natural,
     -- | CR 309.7: how many dungeons this player has completed. "A player
     -- completes a dungeon as that dungeon card is removed from the game", so
     -- Pawl.Engine.Dungeon.remove is the sole writer -- the one function both CR

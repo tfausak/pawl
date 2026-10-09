@@ -20,6 +20,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.StickerKind as StickerKind
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.Zone as Zone
@@ -775,6 +776,8 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.HasCountersOfAnyKind
       " {\"type\":\"HasCountersOfAnyKind\"} "
+  Spec.it s "HasSticker" $ Common.assertCodec s codec (Filter.HasSticker StickerKind.Art) " {\"type\":\"HasSticker\",\"value\":{\"type\":\"Art\"}} "
+  Spec.it s "Stickered" $ Common.assertCodec s codec Filter.Stickered " {\"type\":\"Stickered\"} "
   Spec.it s "And" $
     Common.assertCodec
       s

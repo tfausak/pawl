@@ -124,6 +124,7 @@ import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
 import qualified Pawl.Types.PermanentsDealCombatDamageToPlayer as PermanentsDealCombatDamageToPlayer
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
+import qualified Pawl.Types.PlacesSticker as PlacesSticker
 import qualified Pawl.Types.PlanarDieFace as PlanarDieFace
 import qualified Pawl.Types.PlanarDieRolled as PlanarDieRolled
 import qualified Pawl.Types.Player as Player
@@ -152,6 +153,8 @@ import qualified Pawl.Types.SpellWasCopied as SpellWasCopied
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.StepBegins as StepBegins
+import qualified Pawl.Types.StickerKind as StickerKind
+import qualified Pawl.Types.StickerPut as StickerPut
 import qualified Pawl.Types.TappedForMana as TappedForMana
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Transformed as Transformed
@@ -2331,6 +2334,7 @@ representativeEvents cond =
         TriggerCondition.PlayerWaterbends _ -> one (GameEvent.Waterbent S.bob)
         TriggerCondition.PlayerAirbends _ -> one (GameEvent.Airbent S.bob)
         TriggerCondition.PlayerFirebends _ -> one (GameEvent.Firebent S.bob)
+        TriggerCondition.PlacesSticker _ -> one (GameEvent.StickerPut StickerPut.MkStickerPut {StickerPut.placer = S.bob, StickerPut.object = departed, StickerPut.kind = StickerKind.Art})
         -- CR 309.7's own event, and the only one this condition admits. bob
         -- rather than the perspective player, on the PlayerScries arm's reasoning.
         TriggerCondition.PlayerCompletesDungeon _ -> one (GameEvent.DungeonCompleted S.bob)
@@ -2688,7 +2692,8 @@ everyTriggerCondition =
     TriggerCondition.PlayerAirbends PlayerRelation.AnyPlayer,
     TriggerCondition.PlayerFirebends PlayerRelation.You,
     TriggerCondition.PlayerFirebends PlayerRelation.Opponent,
-    TriggerCondition.PlayerFirebends PlayerRelation.AnyPlayer
+    TriggerCondition.PlayerFirebends PlayerRelation.AnyPlayer,
+    TriggerCondition.PlacesSticker (PlacesSticker.MkPlacesSticker PlayerRelation.You (Set.singleton StickerKind.Art))
   ]
 
 -- CR 702.46 soulshift N, the first minted keyword ability that TARGETS A CARD IN

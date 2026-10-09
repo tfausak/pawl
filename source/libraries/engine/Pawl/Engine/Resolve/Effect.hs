@@ -83,6 +83,7 @@ import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Soulbond as Soulbond
 import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Star as Star
+import qualified Pawl.Engine.Sticker as Sticker
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.TimeTravel as TimeTravel
 import qualified Pawl.Engine.Turn as Turn
@@ -330,6 +331,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.ProposedEvent as ProposedEvent
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
+import qualified Pawl.Types.PutSticker as PutSticker
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.RandomCardInGraveyard as RandomCardInGraveyard
 import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
@@ -3524,6 +3526,17 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
           Just obj -> List.elem (Object.owner obj) anteing
           Nothing -> False
      in not (null anteing) && not (any theirs named)
+  -- CR 608.2d / 123.3: no placer has an available sticker of an allowed kind
+  -- and a named object they own. The ChosenPermanent read is the candidate set
+  -- chosenPermanentOf offers, the pure sweep answering nothing for it.
+  Effect.PutSticker (PutSticker.MkPutSticker player ref kinds) ->
+    let placers = playerRefPlayers legal controller gs player
+        named = case ref of
+          ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent filter_ _) -> battlefieldMatching legal resolving controller source gs filter_
+          _ -> objectRefObjects legal resolving controller source gs ref
+        owns pid oid = fmap Object.owner (Game.lookupObject oid gs) == Just pid
+        placeable pid = not (null (Sticker.available pid kinds gs)) && any (owns pid) named
+     in not (null placers) && not (any placeable placers)
   Effect.Shuffle {} -> False
   Effect.OfferCast {} -> False
   Effect.OfferNamedCopy {} -> False
@@ -5733,6 +5746,26 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         [] -> pure ()
         [only] -> State.modify' (bindSlot resolving slot only)
         several -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList several))
+  -- CR 123.3: each placer chooses a sticker of an allowed kind not on any
+  -- object they own and puts it on each named object. CR 123.3b: an object
+  -- the placer does not own takes nothing; a regression fence, since the one
+  -- producer's own filter already says "you own". Placing nothing writes
+  -- nothing, so happenedBetween reads it as not having happened.
+  Effect.PutSticker (PutSticker.MkPutSticker player ref kinds) -> do
+    named <- case ref of
+      ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent filter_ chooser) -> chosenPermanentOf legal resolving controller source filter_ chooser
+      _ -> fmap (\gs -> objectRefObjects legal resolving controller source gs ref) State.get
+    placers <- State.gets (\gs -> playerRefPlayers legal controller gs player)
+    Monad.forM_ placers $ \placer -> Monad.forM_ (ListUtils.nubOrd named) $ \oid -> do
+      gs <- State.get
+      let owned = fmap Object.owner (Game.lookupObject oid gs) == Just placer
+      Monad.when owned $ case Sticker.available placer kinds gs of
+        [] -> pure ()
+        [only] -> State.modify' (Sticker.put placer oid only)
+        first : rest -> do
+          let offered = first NonEmpty.:| rest
+          answer <- Game.choose (Prompt.ChooseSticker (Decide.deciderFor placer gs) placer oid offered)
+          State.modify' (Sticker.put placer oid (if List.elem answer offered then answer else first))
   -- CR 701.24a alone: randomize the named libraries so no player knows their
   -- order. Nothing moves, so there is no changeZone call and no CR 616.1
   -- opportunity -- the cards a "then shuffle" follows are still the objects they
@@ -7630,6 +7663,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       -- the printed text. Pawl.CastSpec's Twincast splice case
                       -- is the proof.
                       Object.spliced = Seq.empty,
+                      -- CR 123.1: stickers are not copiable. A regression
+                      -- fence: no unit-1 board copies a stickered spell.
+                      Object.stickers = Seq.empty,
                       -- CR 400.7d's record of what PAID, which CR 707.10 does not
                       -- carry across: the copy is neither cast nor activated, and
                       -- the rule's objects-used-to-pay sentence stops at objects --

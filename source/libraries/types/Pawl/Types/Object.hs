@@ -32,6 +32,7 @@ import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.StickerPlacement as StickerPlacement
 import qualified Pawl.Types.StoredResult as StoredResult
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
@@ -877,7 +878,12 @@ data Object = MkObject
     -- copiable values the card was conjured with. They are the card's own, so
     -- NOT per-incarnation: newIncarnation keeps them, as it keeps `source`.
     -- Read through Pawl.Engine.Game.copyStampOf, beneath any copy stamp.
-    duplicate :: Maybe ProjectedCharacteristics.ProjectedCharacteristics
+    duplicate :: Maybe ProjectedCharacteristics.ProjectedCharacteristics,
+    -- | CR 123.1: the stickers on this object, oldest first. Per-incarnation,
+    -- save for CR 123.5's exception: Pawl.Engine.Event.changeZoneWithCause's
+    -- mkObj carries them across a move into a public zone. Not copiable (CR
+    -- 123.1): no ProjectedCharacteristics holds them.
+    stickers :: Seq.Seq StickerPlacement.StickerPlacement
   }
   deriving (Eq, Ord, Show)
 
@@ -1003,5 +1009,8 @@ newIncarnation object =
       -- with anything. Pawl.Engine.Soulbond.endWhenBroken supplies the same
       -- ending for the creature LEFT BEHIND, which no incarnation of its own
       -- clears.
-      paired = Nothing
+      paired = Nothing,
+      -- CR 123.5's exception is written back by
+      -- Pawl.Engine.Event.changeZoneWithCause's mkObj, for a public destination.
+      stickers = Seq.empty
     }
