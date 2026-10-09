@@ -31,8 +31,8 @@ data DrawRewrite
     -- game into your hand".
     --
     -- The player is the one the EVENT names, GainLife's seat above and for its
-    -- reason -- the producer's Pawl.Types.DrawR writes `whose` as Yours, so the
-    -- two are one seat on it.
+    -- reason -- every producer's Pawl.Types.DrawR writes `whose` as Yours, so
+    -- the two are one seat on it.
     FromOutsideTheGame FromOutsideTheGame.FromOutsideTheGame
   | -- | CR 702.52a: dredge N -- "you may instead mill N cards and return this
     -- card from your graveyard to your hand".

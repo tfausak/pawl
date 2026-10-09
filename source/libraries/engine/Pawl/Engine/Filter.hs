@@ -993,7 +993,9 @@ data Context = MkContext
     -- Pawl.Engine.Target.admittedGiven for a target slot,
     -- Pawl.Engine.Event.matchesTrigger for CR 702.149a's trigger condition, and
     -- Pawl.Engine.CombatRestriction.cantBeBlockedBy and cantBlockCreatures for
-    -- CR 509.1b's pairwise restrictions (CR 701.54c, Spitfire Handler).
+    -- CR 509.1b's pairwise restrictions (CR 701.54c, Spitfire Handler), and
+    -- Pawl.Engine.Event.eligible for a wish's filter (CR 400.11c, Synthetic
+    -- Wishful Djinn).
     --
     -- LAZY, and load-bearingly so: filling it costs a projection of the source,
     -- and no filter that omits the atom ever forces it. That is the posture
@@ -1584,8 +1586,9 @@ data Context = MkContext
 -- A Context for every match whose Filter cannot name a context-relative atom --
 -- that is, every match but a target slot's, CR 702.149a's trigger condition and
 -- CR 509.1b's blocking gate. The source-power atoms reach a card only through
--- Pawl.Engine.Keyword's own mentor and training and through
--- Pawl.Engine.Ring's emblem, and CR 702.39a's defending-player atom only through
+-- Pawl.Engine.Keyword's own mentor and training, through Pawl.Engine.Ring's
+-- emblem and through a wish's filter (Pawl.Engine.Event.eligible fills the power
+-- there), and CR 702.39a's defending-player atom only through
 -- provoke; Pawl.CardSpec's lints keep all three out of card data, so no other
 -- position can read the Nothings this leaves.
 --
@@ -3675,6 +3678,132 @@ statesAQuality predicate = case predicate of
   -- unreachable from a search for their reason: a card sitting in a library was
   -- never paid for.
   Filter.TagWasSpent _ -> True
+
+-- Does the Filter compare a candidate against Context.sourcePower anywhere, so
+-- that matching it under two different sources may admit different candidates?
+-- Pawl.Engine.Replacement.readsSource's question for a draw-replacing wish (CR
+-- 616.1), whose filter Pawl.Engine.Event.eligible matches with that field filled.
+--
+-- Every nest is descended into, since `matches` judges a nest in the same
+-- Context; statesAQuality's exhaustive posture, for its reason.
+readsSourcePower :: Filter.Filter keyword -> Bool
+readsSourcePower predicate = case predicate of
+  Filter.And fs -> any readsSourcePower fs
+  Filter.Or fs -> any readsSourcePower fs
+  Filter.Not f -> readsSourcePower f
+  Filter.ControlsMoreThanYou _ f -> readsSourcePower f
+  Filter.ManaValueAtMost _ -> False
+  Filter.ManaValueLessThanSource -> False
+  Filter.ManaValueGreaterThanSource -> False
+  Filter.ManaValueEqualToSource -> False
+  Filter.ManaValueIsEven -> False
+  Filter.ManaValueAtMostAmount -> False
+  Filter.ManaValueEqualToAmount -> False
+  Filter.PowerAtMostAmount -> False
+  Filter.HasCardType _ -> False
+  Filter.HasSupertype _ -> False
+  Filter.HasColor _ -> False
+  Filter.IsMonocolored -> False
+  Filter.SharesColorWithSource -> False
+  Filter.HasSubtype _ -> False
+  Filter.HasName _ -> False
+  Filter.HasNameOriginallyPrintedIn _ -> False
+  -- A keyword's own Filter is compared, never matched (statesAQuality's
+  -- HasKeyword arm), so nothing inside it reads the context.
+  Filter.HasKeyword _ -> False
+  Filter.HasKeywordFamily _ -> False
+  Filter.PowerAtLeast _ -> False
+  Filter.PowerAtMost _ -> False
+  Filter.ToughnessGreaterThanPower -> False
+  Filter.PowerLessThanSource -> True
+  Filter.PowerGreaterThanSource -> True
+  -- Reads the source's TOUGHNESS, never its power.
+  Filter.PowerAtLeastSourceToughness -> False
+  Filter.PowerIsAmountInSlot _ -> False
+  Filter.PowerAtLeastAmountInSlot _ -> False
+  Filter.ControlledBy _ -> False
+  Filter.ControlledByDefendingPlayer -> False
+  Filter.ControlledByBound _ -> False
+  Filter.ControlledByPlayer _ -> False
+  Filter.ControlledByRecipient -> False
+  Filter.OwnedBy _ -> False
+  Filter.OwnedByRecipient -> False
+  Filter.IsSource -> False
+  Filter.IsObject _ -> False
+  Filter.TargetsSource -> False
+  Filter.TargetsOnlySource -> False
+  Filter.HasSingleTarget -> False
+  Filter.TargetsOnlyOne f -> readsSourcePower f
+  Filter.TargetsMatching f -> readsSourcePower f
+  Filter.TargetsPlayer _ -> False
+  Filter.IsBound _ -> False
+  Filter.IsTarget -> False
+  Filter.SameNameAsBound _ -> False
+  Filter.SameNameAsSource -> False
+  Filter.SameOwnerAsSource -> False
+  Filter.SameControllerAsBound _ -> False
+  Filter.SameControllerAsHostOfBound _ -> False
+  Filter.SharesCreatureTypeWithBound _ -> False
+  Filter.ToughnessLessThanBound _ -> False
+  Filter.HasChosenName -> False
+  Filter.HasChosenColor -> False
+  Filter.HasChosenSubtype -> False
+  Filter.IsLastExiledWithSource -> False
+  Filter.OfChosenPlayer -> False
+  Filter.IsPlayer _ -> False
+  Filter.IsControllerOfBound _ -> False
+  Filter.CardsInGraveyardAtLeast _ -> False
+  Filter.IsAttacking -> False
+  Filter.IsAttackingPlayer _ -> False
+  Filter.IsAttackingPlaneswalker _ -> False
+  Filter.IsAttackingBattle _ -> False
+  Filter.IsBlocking -> False
+  Filter.IsBlocked -> False
+  Filter.AttackedThisTurn -> False
+  Filter.DeclaredAttackerThisCombat -> False
+  Filter.DeclaredAttackedThisCombat -> False
+  Filter.DeclaredBlockerThisCombat -> False
+  Filter.MilledThisTurn -> False
+  Filter.CantCrewVehicles -> False
+  Filter.DealtDamageThisTurn -> False
+  Filter.EnteredThisTurn -> False
+  Filter.CrewedSourceThisTurn -> False
+  Filter.ConvokedSourceThisTurn -> False
+  Filter.SaddledSourceThisTurn -> False
+  Filter.ControlledSinceTurnBegan -> False
+  Filter.AttachedTo f -> readsSourcePower f
+  Filter.HasAttached f -> readsSourcePower f
+  Filter.IsAttachedToSource -> False
+  Filter.IsAttachedToEvaluated -> False
+  Filter.IsHostOfSource -> False
+  Filter.EnteredWithSource -> False
+  Filter.AttachedNoLaterThanSource -> False
+  Filter.CanHostSubject -> False
+  Filter.CanAttachToSubject -> False
+  Filter.HostOfSubjectHasCardType _ -> False
+  Filter.IsCommander -> False
+  Filter.IsToken -> False
+  Filter.IsActivatedAbility -> False
+  Filter.IsAbility -> False
+  Filter.IsEmblem -> False
+  Filter.FromSource f -> readsSourcePower f
+  Filter.IsTapped -> False
+  Filter.IsFaceDown -> False
+  Filter.RepresentedByCard f -> readsSourcePower f
+  Filter.IsExiledFaceDown -> False
+  Filter.Transformed -> False
+  Filter.IsRingBearer -> False
+  Filter.IsPaired -> False
+  Filter.IsPairedWithSource -> False
+  Filter.IsBlockedBySource -> False
+  Filter.HasDesignation _ -> False
+  Filter.HasCounters _ -> False
+  Filter.HasCountersOfAnyKind -> False
+  Filter.HasNonManaActivatedAbility -> False
+  Filter.HasActivatedAbility -> False
+  Filter.IsInZone _ -> False
+  Filter.WasCastFrom _ -> False
+  Filter.TagWasSpent _ -> False
 
 -- Every slot NAME a Filter carries, as one traversal: `boundSlots` below READS
 -- them and `renameBound` REWRITES them. One walk rather than two, because the two

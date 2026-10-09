@@ -426,7 +426,8 @@ canHostSubjectCounts card =
 --
 -- Parameterized because several atoms want it: CR 701.3a's and CR 709.4a's,
 -- counted here for their traversal cross-checks, and CR 702.134a's
--- Filter.PowerLessThanSource, which no card may carry at all.
+-- Filter.PowerLessThanSource, which a card may carry only in a wish or a pairwise
+-- combat restriction.
 jsonAtoms :: Text.Text -> Value.Value -> Int
 jsonAtoms tag value = case value of
   Value.String s -> if String.unwrap s == tag then 1 else 0
@@ -449,6 +450,24 @@ triggerConditionAtoms tag value = case value of
         rest = sum [triggerConditionAtoms tag (Pair.value p) | p <- pairs, not (triggered && String.unwrap (Pair.name p) == Text.pack "condition")]
      in own + rest
   Value.Array a -> sum (fmap (triggerConditionAtoms tag) (Array.unwrap a))
+  Value.String _ -> 0
+  Value.Null _ -> 0
+  Value.Boolean _ -> 0
+  Value.Number _ -> 0
+
+-- How many `tag` atoms sit in a wish's filter -- the payload of a
+-- "FromOutsideTheGame" arm, an effect's or a draw rewrite's -- the one position
+-- Pawl.Engine.Event.eligible matches with the source's power filled.
+wishFilterAtoms :: Text.Text -> Value.Value -> Int
+wishFilterAtoms tag value = case value of
+  Value.Object o ->
+    let pairs = Object.unwrap o
+        named k = [Pair.value p | p <- pairs, String.unwrap (Pair.name p) == Text.pack k]
+        isWish = any (\v -> case v of Value.String t -> String.unwrap t == Text.pack "FromOutsideTheGame"; _ -> False) (named "type")
+     in if isWish
+          then sum (fmap (jsonAtoms tag) (named "value"))
+          else sum (fmap (wishFilterAtoms tag . Pair.value) pairs)
+  Value.Array a -> sum (fmap (wishFilterAtoms tag) (Array.unwrap a))
   Value.String _ -> 0
   Value.Null _ -> 0
   Value.Boolean _ -> 0
@@ -2536,10 +2555,12 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
   -- toughness, filled by the same callers): Filter.Context.sourcePower is filled by
   -- Pawl.Engine.Target.admittedGiven for a target slot (CR 702.134a), by
   -- Pawl.Engine.Event.matchesTrigger for CR 702.149a's condition and by
-  -- Pawl.Engine.CombatRestriction's two CR 509.1b pairwise walks, and is Nothing
+  -- Pawl.Engine.CombatRestriction's two CR 509.1b pairwise walks, and (power
+  -- alone) by Pawl.Engine.Event.eligible for a wish's filter, and is Nothing
   -- everywhere else -- so either atom in a card's affected set, Count filter or
   -- search filter would be a silent False. Outside a face's own pairwise
-  -- position (Spitfire Handler's, Ironclaw Curse's), only Pawl.Engine.Keyword's mentor and
+  -- position (Spitfire Handler's, Ironclaw Curse's) and a wish's filter
+  -- (Synthetic Wishful Djinn's), only Pawl.Engine.Keyword's mentor and
   -- training and Pawl.Engine.Ring's emblem write them, and this is what keeps
   -- that true.
   Spec.it s "CR 702.134a / CR 702.149a no card writes a source-power comparison" $ do
@@ -2549,11 +2570,15 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
           CombatRestriction.CantBeBlockedBy x -> [CantBeBlockedBy.blockers x]
           CombatRestriction.CantBlockCreatures x -> [CantBlockCreatures.attackers x]
           _ -> []
-        atoms c = jsonAtoms (Text.pack "PowerLessThanSource") (Codec.encode (Face.Codec.codec Card.codec) c) - pairwise "PowerLessThanSource" c
-        greater c = jsonAtoms (Text.pack "PowerGreaterThanSource") (Codec.encode (Face.Codec.codec Card.codec) c) - pairwise "PowerGreaterThanSource" c
+        wish tag c = wishFilterAtoms (Text.pack tag) (Codec.encode (Face.Codec.codec Card.codec) c)
+        atoms c = jsonAtoms (Text.pack "PowerLessThanSource") (Codec.encode (Face.Codec.codec Card.codec) c) - pairwise "PowerLessThanSource" c - wish "PowerLessThanSource" c
+        greater c = jsonAtoms (Text.pack "PowerGreaterThanSource") (Codec.encode (Face.Codec.codec Card.codec) c) - pairwise "PowerGreaterThanSource" c - wish "PowerGreaterThanSource" c
         toughness c = jsonAtoms (Text.pack "PowerAtLeastSourceToughness") (Codec.encode (Face.Codec.codec Card.codec) c) - pairwise "PowerAtLeastSourceToughness" c
         offenders = filter (anyFace (\c -> atoms c /= 0 || greater c /= 0 || toughness c /= 0) . Printing.card) ps
     Spec.assertEqWith s "the atoms are the engine's alone" (fmap (S.nameOf . Printing.card) offenders) []
+    -- The wish exemption is not vacuous either: the Djinn's one atom is in it.
+    djinn <- S.printingOf s registry "Synthetic Wishful Djinn"
+    Spec.assertEqWith s "the Djinn writes it in a wish's filter" (wish "PowerLessThanSource" (S.combinedFace djinn), atoms (S.combinedFace djinn)) (1, 0)
     -- NOT vacuous, the way the sweep above would be on its own: the same counter
     -- over a hand-built face that DOES carry the atom -- buried under all three
     -- combinators, in a target slot, the one position a card author would reach

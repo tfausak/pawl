@@ -53,6 +53,8 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Extra.Int as Int
+import Pawl.PreventionSpec (answersFor, wasAskedToReplace)
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -86,6 +88,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.SearchPlace as SearchPlace
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
@@ -1061,6 +1064,50 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
     Spec.assertEqWith s "CR 121.1 she drew the library card" (printingsIn Zone.Hand S.alice after) [piker]
     Spec.assertEqWith s "which came off her library" (length (Game.zoneMembers Zone.Library S.alice after)) 1
     Spec.assertEqWith s "CR 400.11b and nothing was taken out of the pool" (Map.size (poolOf S.alice after)) 1
+  -- CR 616.1 / 616.1e: Synthetic Wishful Djinn ({3}{U}{U} Creature -- Djinn 3/3,
+  -- "If you would draw a card, instead put a card you own from outside the game
+  -- with power less than this creature's power into your hand"), synthetic: no
+  -- printing replaces a draw with a wish that names its source -- Scryfall
+  -- o:"outside the game" o:"would draw", 2026-10-09, Ring of Ma'rûf alone.
+  --
+  -- Two Djinns, one carrying a +1/+1 counter, both apply to her draw; once one
+  -- applies the draw is gone (CR 616.1f), so which she picks decides the card.
+  -- The pool holds one Hill Giant (power 3): the 4-power Djinn reaches it and
+  -- the 3-power one reaches nothing. Each run names one Djinn, so whichever the
+  -- engine would take unasked, one of the two runs disagrees with it.
+  Spec.it s "CR 616.1 two Djinns of different power are a choice, and the answer decides what arrives" $ do
+    plains <- S.printingOf s registry "Plains"
+    djinn <- S.printingOf s registry "Synthetic Wishful Djinn"
+    piker <- S.printingOf s registry "Goblin Piker"
+    giant <- S.printingOf s registry "Hill Giant"
+    let (board, pumped, plain) = djinnBoard plains djinn piker giant
+        drawn preferred = S.runPure (preferringRow preferred) board (Event.drawCard S.alice)
+        viaPumped = drawn pumped
+        viaPlain = drawn plain
+    Spec.assertEqWith s "setup: the Djinns' powers are four and three" (Projection.powerOf pumped board, Projection.powerOf plain board) (Just 4, Just 3)
+    -- THE BEHAVIOUR, ahead of every proxy.
+    Spec.assertEqWith s "CR 616.1 through the bigger Djinn the Hill Giant reached her hand" (printingsIn Zone.Hand S.alice viaPumped) [giant]
+    Spec.assertEqWith s "CR 616.1 through the smaller Djinn nothing did" (printingsIn Zone.Hand S.alice viaPlain) []
+    Spec.assertEqWith s "CR 400.11b the Giant left the pool only the first way" (Map.size (poolOf S.alice viaPumped), Map.size (poolOf S.alice viaPlain)) (0, 1)
+    Spec.assertEqWith s "CR 614.6 both ways the draw was replaced" (length (Game.zoneMembers Zone.Library S.alice viaPumped), length (Game.zoneMembers Zone.Library S.alice viaPlain)) (2, 2)
+    Spec.assertBool s (wasAskedToReplace (answersFor (preferringRow pumped) board (Event.drawCard S.alice))) "a ChooseReplacement was raised"
+  -- The other side of the classification: two Rings of Ma'rûf, both activated,
+  -- install two rows alike in `effect` whose filter (`And []`) reads nothing of
+  -- either Ring, so either one brings in the same card and there is nothing to
+  -- ask.
+  Spec.it s "CR 616.1 two Rings' wishes are not a choice" $ do
+    plains <- S.printingOf s registry "Plains"
+    ring <- S.printingOf s registry "Ring of Ma'rûf"
+    piker <- S.printingOf s registry "Goblin Piker"
+    signInBlood <- S.printingOf s registry "Sign in Blood"
+    let (armed, _) = ringBoard plains ring piker signInBlood True
+        (secondId, g1) = S.addPermanent ring S.alice (S.landsFor plains S.alice 5 armed)
+        twice = case Face.activatedAbilities (S.combinedFace ring) of
+          ability : _ -> S.runPure S.identityAnswer g1 (Activate.activateAbility S.alice secondId ability >> Stack.resolveTop)
+          [] -> g1
+    Spec.assertEqWith s "setup: both Rings were exiled, so both rows stand" (Set.member secondId (GameState.battlefield twice), length (GameState.replacements twice)) (False, 2)
+    Spec.assertBool s (not (wasAskedToReplace (answersFor S.identityAnswer twice (Event.drawCard S.alice)))) "no ChooseReplacement was raised"
+    Spec.assertEqWith s "CR 400.11c and the card she owns outside the game reached her hand" (printingsIn Zone.Hand S.alice (S.runPure S.identityAnswer twice (Event.drawCard S.alice))) [signInBlood]
   -- CR 315.3: "conspiracy cards that aren't in the game can't be brought into the
   -- game". The first case's board with Sentinel Dispatch in the pool instead of
   -- Sign in Blood: the draw is still replaced, and nothing arrives (CR 609.3).
@@ -1397,6 +1444,27 @@ arcaviosAnswer places found takeOutside p = case p of
   Prompt.Search {} -> found
   Prompt.ChooseFromOutsideTheGame _ _ offered _ _ -> if takeOutside then NonEmpty.toList offered else []
   Prompt.Shuffle ids -> reverse ids
+  _ -> S.identityAnswer p
+
+-- alice with two Synthetic Wishful Djinns, the first carrying a +1/+1 counter,
+-- two library cards of one printing and one card of another outside the game.
+-- Answers the board and the two Djinns' ids, the bigger first.
+djinnBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+djinnBoard plains djinn stock outside =
+  let (pumped, g1) = S.addPermanent djinn S.alice (S.landsInPlay plains 1)
+      (plain, g2) = S.addPermanent djinn S.alice g1
+      g3 = stockLibrary stock 2 S.alice (S.addCounter CounterKind.PlusOnePlusOne 1 pumped g2)
+      (outsideId, g4) = Game.intern outside g3
+      pool p = p {Player.outsideTheGame = Map.singleton outsideId 1}
+   in (g4 {GameState.players = Map.adjust pool S.alice (GameState.players g4)}, pumped, plain)
+
+-- CR 616.1: name the replacement whose source is `preferred`, filtering the
+-- offered entries rather than building one; every other prompt takes the
+-- default.
+preferringRow :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+preferringRow preferred p = case p of
+  Prompt.ChooseReplacement _ _ entries ->
+    maybe 0 Int.toNaturalSaturating (List.findIndex ((== preferred) . ReplacementEntry.source) entries)
   _ -> S.identityAnswer p
 
 -- alice with five untapped lands, a Ring of Ma'rûf on the battlefield, two
