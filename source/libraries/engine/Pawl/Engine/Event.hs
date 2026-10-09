@@ -8830,21 +8830,26 @@ leaveTheGame asOf g oid = case lastKnownRecord asOf oid of
           }
 
 -- | CR 708.9: the reveal a face-down permanent's or face-down spell's owner
--- owes as it leaves the game, read off `asOf`, the board it is leaving.
--- Nothing for anything else, including a phased-out permanent (CR 702.26b,
+-- owes as it leaves the game, read off `asOf`, the board it is leaving; and CR
+-- 702.143f's for a face-down foretold card in exile, a plain reveal. Nothing for
+-- anything else, including a phased-out permanent (CR 702.26b,
 -- GameState.battlefield membership). Pawl.FaceDownSpec's "CR 708.9 a face-down
--- spell is revealed when its owner leaves the game" proves the spell half.
+-- spell is revealed when its owner leaves the game" and Pawl.ExileSpec's "CR
+-- 702.143f a face-down foretold card is revealed when its owner leaves the
+-- game" prove the two halves past permanents.
 --
 -- Not implemented: a face-down component of a face-up merged permanent, which
 -- needs a status per component (#4878).
 leavingReveal :: GameState -> ObjectId -> Maybe GameEvent.GameEvent
 leavingReveal asOf oid = do
   obj <- Game.lookupObject oid asOf
-  Monad.guard (Facing.isFaceDown (Object.facing obj))
-  cause <-
-    if Set.member oid (GameState.battlefield asOf)
-      then Just RevealCause.LeavingFaceDown
-      else if Object.zone obj == Zone.Stack then Just RevealCause.FaceDownSpell else Nothing
+  let faceDown = Facing.isFaceDown (Object.facing obj)
+      causeOf
+        | Set.member oid (GameState.battlefield asOf) && faceDown = Just RevealCause.LeavingFaceDown
+        | Object.zone obj == Zone.Stack && faceDown = Just RevealCause.FaceDownSpell
+        | Object.zone obj == Zone.Exile && Object.exiledFaceDown obj && Maybe.isJust (Object.foretold obj) = Just RevealCause.Ordinary
+        | otherwise = Nothing
+  cause <- causeOf
   revealedOn cause (Object.owner obj) oid asOf
 
 -- CR 119.3: move one player's life total by this much, and record the CR 608.2i
