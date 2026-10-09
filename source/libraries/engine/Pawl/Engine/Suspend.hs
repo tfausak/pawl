@@ -19,11 +19,9 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
-import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
-import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
@@ -35,13 +33,9 @@ import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
-import qualified Pawl.Types.ManaSpending as ManaSpending
 import Pawl.Types.ObjectId (ObjectId)
-import qualified Pawl.Types.Payment as Payment
-import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import Pawl.Types.PlayerId (PlayerId)
-import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Suspend as Suspend
 import qualified Pawl.Types.SuspendCounters as SuspendCounters
 import qualified Pawl.Types.Zone as Zone
@@ -98,15 +92,7 @@ canSuspend pid oid gs = case suspendOf oid gs of
   Just ability ->
     elem oid (Game.zoneMembers Zone.Hand pid gs)
       && maybe False (\card -> Cast.couldBeginToCast pid oid (Face.name (Card.combined card)) gs) (Game.cardOfHandMember oid gs)
-      && payableAtX (SuspendCounters.leastX (Suspend.counters ability)) pid oid ability gs
-
--- CR 107.3d's cost at one value of X: what the gate above measures at the floor
--- and what the announcement below is judged against, so a gate and an
--- announcement cannot disagree about what this cost is. Cost.substituteX is the
--- identity on a cost with no X, which is every suspend cost printing a numeral
--- for N.
-payableAtX :: Natural -> PlayerId -> ObjectId -> Suspend.Suspend Keyword -> GameState -> Bool
-payableAtX x pid oid ability = Cost.canPay PaymentSubject.ForNeither pid oid (Cost.substituteX x (Suspend.cost ability))
+      && Cost.actionPayableAt PaymentSubject.ForNeither (SuspendCounters.leastX (Suspend.counters ability)) pid oid (Suspend.cost ability) gs
 
 -- Every card this player may suspend right now -- what Action.Suspend is built
 -- from, and the shape Plot.plottable and Foretell.foretellable have.
@@ -138,13 +124,11 @@ suspendable pid gs = filter (\oid -> canSuspend pid oid gs) (Game.zoneMembers Zo
 -- only "exile it", so the default facing stands and every player can see what was
 -- suspended.
 --
--- CR 107.3d's X is announced HERE, "immediately before they pay that cost", and
--- the one value answers both halves of the printed line: rule 107.3i makes the N
--- and the {X} in the cost the same number, so the card is exiled with as many
--- time counters as the mana it cost. Reject-not-repair, Cast.castProposed's
--- posture: the answer is honoured and then measured, against CR 101.1's floor
--- ("X can't be 0") and against the board, and a value that fails either leaves
--- the card in hand with nothing paid.
+-- CR 107.3d's X is named in Cost.payAction, and the one value answers both
+-- halves of the printed line: rule 107.3i makes the N and the {X} in the cost
+-- the same number, so the card is exiled with as many time counters as the mana
+-- it cost. An X below CR 101.1's floor ("X can't be 0") or one the board cannot
+-- pay leaves the card in hand with nothing paid.
 --
 -- NO STAMP, which is the difference from plot and foretell both: CR 702.62b
 -- defines "suspended" out of state the game already holds -- exiled, has
@@ -153,61 +137,29 @@ suspendable pid gs = filter (\oid -> canSuspend pid oid gs) (Game.zoneMembers Zo
 suspend :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> ObjectId -> Game ()
 suspend perform pid oid = do
   before <- State.get
-  if not (canSuspend pid oid before)
-    then pure ()
-    else do
-      let ability = Maybe.fromMaybe (Suspend.MkSuspend (SuspendCounters.Literal 0) Cost.unpayable) (suspendOf oid before)
-          printed = Suspend.cost ability
-      -- CR 107.3d: the taker of the special action names X. The bound is
-      -- advisory (see Prompt.ChooseX) and TERMINATES for the reason
-      -- Cost.greatestPayableX needs one -- a suspend cost's X is a generic mana
-      -- symbol, so its demand grows without bound; Pawl.CardSpec's "CR 107.3d
-      -- every suspend cost's X is one the board can refuse" is what keeps a
-      -- printing whose X the board could pay forever out of the pool. No ceiling
-      -- is passed because no printed suspend line states one -- Scryfall
-      -- `keyword:suspend o:"suspend x"`, 2026-09-17, five cards, each stating a
-      -- floor and no maximum.
-      mAmount <-
-        if Cost.hasVariable printed
-          then fmap Just (Game.choose (Prompt.ChooseX (Decide.deciderFor pid before) pid oid (SuspendCounters.leastX (Suspend.counters ability)) (Cost.greatestPayableX Nothing (\x -> payableAtX x pid oid ability before) printed)))
-          else pure Nothing
-      let announcedX = Maybe.fromMaybe 0 mAmount
-          -- Rule 107.3i: one announcement, both halves of "Suspend X--{X}...".
-          counters = case Suspend.counters ability of
+  Monad.when (canSuspend pid oid before) $ do
+    let ability = Maybe.fromMaybe (Suspend.MkSuspend (SuspendCounters.Literal 0) Cost.unpayable) (suspendOf oid before)
+    -- CR 107.3d: the taker of the special action names X, at least CR 101.1's
+    -- floor. The X prompt TERMINATES for the reason Cost.greatestPayableX needs
+    -- one -- a suspend cost's X is a generic mana symbol, so its demand grows
+    -- without bound; Pawl.CardSpec's "CR 107.3d every suspend cost's X is one
+    -- the board can refuse" is what keeps a printing whose X the board could pay
+    -- forever out of the pool. No printed suspend line states a ceiling --
+    -- Scryfall `keyword:suspend o:"suspend x"`, 2026-09-17, five cards, each
+    -- stating a floor and no maximum.
+    paid <- Cost.payAction perform before PaymentSubject.ForNeither (SuspendCounters.leastX (Suspend.counters ability)) pid oid (Suspend.cost ability)
+    Monad.forM_ paid $ \announcedX -> do
+      -- Rule 107.3i: one announcement, both halves of "Suspend X--{X}...".
+      let counters = case Suspend.counters ability of
             SuspendCounters.Literal n -> n
             SuspendCounters.Variable _ -> announcedX
-      -- CR 101.1 for the floor and CR 101.2 for its direction, CR 116.2f for the
-      -- payment: an announcement the card forbids or the board cannot pay takes
-      -- the whole special action away rather than being clamped to something the
-      -- player did not choose. Measured with the SAME predicate the gate above
-      -- asked at the floor.
-      if announcedX < SuspendCounters.leastX (Suspend.counters ability) || not (payableAtX announcedX pid oid ability before)
-        then pure ()
-        else do
-          -- CR 118.13c, Pawl.Engine.FaceDown.turnFaceUp's announcement and for
-          -- its reasons. No printed suspend cost holds a symbol payable in more
-          -- than one way -- Scryfall `keyword:suspend`, 2026-09-17, every suspend
-          -- cost generic, monocoloured or CR 107.4b's {X} -- so no prompt is
-          -- raised today.
-          (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure (Cost.substituteX announcedX printed)
-          payment <- Cost.pay perform before PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
-          case payment of
-            -- CR 733.1's reversal, Pawl.Engine.Foretell.foretell's reason: this
-            -- special action IS the whole of what failed, so `before` goes to
-            -- Cost.pay and the reversal -- the payer's choice about the CR 605.3a
-            -- window included -- happens there.
-            Payment.Unpaid -> pure ()
-            -- Dropped, Pawl.Engine.Plot's reason: the card is exiled and the later
-            -- cast is free (CR 702.62a).
-            Payment.Paid _ -> do
-              -- The counters go on the id the move RETURNS and never onto `oid`,
-              -- the reading Plot.plot gives its stamp: CR 400.7 mints a fresh
-              -- incarnation in exile and deletes the one that was in hand.
-              -- Nothing comes back when the move was cancelled, and then there is
-              -- no exiled card to suspend.
-              --
-              -- One arrival, Plot.plot's reason: the funnel answers with more
-              -- than one only for a melded permanent leaving the battlefield (CR
-              -- 712.21), and this special action exiles a card from a hand.
-              exiled <- Event.changeZoneReturning oid Zone.Exile
-              Monad.forM_ exiled (\newId -> Event.putCounters (CounterCause.ByRule pid) newId CounterKind.Time counters)
+      -- The counters go on the id the move RETURNS and never onto `oid`, the
+      -- reading Plot.plot gives its stamp: CR 400.7 mints a fresh incarnation in
+      -- exile and deletes the one that was in hand. Nothing comes back when the
+      -- move was cancelled, and then there is no exiled card to suspend.
+      --
+      -- One arrival, Plot.plot's reason: the funnel answers with more than one
+      -- only for a melded permanent leaving the battlefield (CR 712.21), and this
+      -- special action exiles a card from a hand.
+      exiled <- Event.changeZoneReturning oid Zone.Exile
+      Monad.forM_ exiled (\newId -> Event.putCounters (CounterCause.ByRule pid) newId CounterKind.Time counters)
