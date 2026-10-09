@@ -858,7 +858,8 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       ( GameEvent.ActivatedAbilityResolved
           ActivatedAbilitySource.MkActivatedAbilitySource
             { ActivatedAbilitySource.source = ObjectId.MkObjectId 6,
-              ActivatedAbilitySource.ability = ActivatedAbilitySourceSpec.ability
+              ActivatedAbilitySource.ability = ActivatedAbilitySourceSpec.ability,
+              ActivatedAbilitySource.delayed = Map.empty
             }
       )
       " {\"type\":\"ActivatedAbilityResolved\",\"value\":{\"source\":6,\"ability\":{\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]},\"modal\":{\"modes\":[{}]}}}} "
@@ -872,7 +873,8 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
           TriggeredAbilitySource.MkTriggeredAbilitySource
             { TriggeredAbilitySource.source = ObjectId.MkObjectId 7,
               TriggeredAbilitySource.ability = TriggeredAbilitySourceSpec.ability,
-              TriggeredAbilitySource.createdAt = Just (Timestamp.MkTimestamp 4)
+              TriggeredAbilitySource.createdAt = Just (Timestamp.MkTimestamp 4),
+              TriggeredAbilitySource.delayed = Map.empty
             }
       )
       " {\"type\":\"TriggeredAbilityResolved\",\"value\":{\"source\":7,\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}},\"createdAt\":4}} "

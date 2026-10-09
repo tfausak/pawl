@@ -3,6 +3,7 @@ module Pawl.Types.ProjectedCharacteristics where
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.Card as Card
@@ -228,6 +229,13 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- 603.2's scan reads this field, so a granted trigger fires without
     -- Pawl.Engine.Event learning that it was granted.
     triggeredAbilities :: [TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)],
+    -- | CR 603.7 / 707.2: the delayed triggered abilities this object's rules
+    -- text declares by name (Face.delayedAbilities), seeded with that text and
+    -- so copiable with it -- a Clone arms the text it copied, not its printed
+    -- card's. No layer 6 removal writes it: a delayed ability is not ON the
+    -- object (CR 603.7d), so only an ability that arms one decides whether it is
+    -- created.
+    delayedAbilities :: Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)),
     -- | CR 702.5a / 613 layer 6: this object's enchant abilities after the layer
     -- system -- what restricts an Aura spell's target and what the Aura can
     -- enchant. Seeded from Face.enchant and added to by CR 613.1f's grant

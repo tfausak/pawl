@@ -1,0 +1,191 @@
+{
+  "faces": [
+    {
+      "enchant": [
+        {
+          "pool": {
+            "type": "Creatures"
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Elemental Mastery",
+      "oracleText": "Enchant creature\nEnchanted creature has \"{T}: Create X 1/1 red Elemental creature tokens with haste, where X is this creature's power. Exile them at the beginning of the next end step.\"",
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Creature"
+                  }
+                },
+                {
+                  "type": "HasAttached",
+                  "value": {
+                    "type": "IsSource"
+                  }
+                }
+              ]
+            }
+          },
+          "modifications": [
+            {
+              "type": "GainAbility",
+              "value": {
+                "type": "Activated",
+                "value": {
+                  "cost": {
+                    "components": [
+                      {
+                        "type": "TapThis"
+                      }
+                    ],
+                    "mana": []
+                  },
+                  "modal": {
+                    "modes": [
+                      {
+                        "clauses": [
+                          {
+                            "effects": [
+                              {
+                                "type": "Create",
+                                "value": {
+                                  "card": {
+                                    "faces": [
+                                      {
+                                        "colorIndicator": [
+                                          {
+                                            "type": "Red"
+                                          }
+                                        ],
+                                        "keywords": [
+                                          {
+                                            "type": "Haste"
+                                          }
+                                        ],
+                                        "name": "Elemental Token",
+                                        "power": {
+                                          "type": "Literal",
+                                          "value": 1
+                                        },
+                                        "toughness": {
+                                          "type": "Literal",
+                                          "value": 1
+                                        },
+                                        "typeLine": {
+                                          "subtypes": [
+                                            {
+                                              "type": "Elemental"
+                                            }
+                                          ],
+                                          "types": [
+                                            {
+                                              "type": "Creature"
+                                            }
+                                          ]
+                                        }
+                                      }
+                                    ]
+                                  },
+                                  "quantity": {
+                                    "type": "Power"
+                                  },
+                                  "slot": "tokens"
+                                }
+                              },
+                              {
+                                "type": "ArmDelayedTrigger",
+                                "value": {
+                                  "ability": {
+                                    "type": "Triggered",
+                                    "value": {
+                                      "condition": {
+                                        "type": "StepBegins",
+                                        "value": {
+                                          "phase": {
+                                            "type": "Ending",
+                                            "value": {
+                                              "type": "EndStep"
+                                            }
+                                          },
+                                          "scope": {
+                                            "type": "EachTurn"
+                                          }
+                                        }
+                                      },
+                                      "modal": {
+                                        "modes": [
+                                          {
+                                            "clauses": [
+                                              {
+                                                "effects": [
+                                                  {
+                                                    "type": "MoveToZone",
+                                                    "value": {
+                                                      "ref": {
+                                                        "type": "InSlot",
+                                                        "value": "tokens"
+                                                      },
+                                                      "zone": {
+                                                        "type": "Exile"
+                                                      }
+                                                    }
+                                                  }
+                                                ]
+                                              }
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  },
+                                  "name": "exile them"
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Aura"
+          }
+        ],
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}

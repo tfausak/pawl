@@ -1253,13 +1253,13 @@ eventTriggers events gs =
       -- `Pawl.LeavesTriggerSpec.ivoryGargoyleSpec` proves a mutation dropping the
       -- exception empties this event's own candidate list.
       --
-      -- The delayed map is the HOST's own face while `abilitiesOf` is the
-      -- PROJECTED list. A granted ability's arm carries its delayed ability
+      -- The delayed map is the projection's too (CR 707.2), so a copy reads the
+      -- text it copied. A granted ability's arm carries its delayed ability
       -- (Pawl.AbilitySlotLintSpec's quoted-arm lint) and EffectZone reads it off
       -- the arm, so the host's map never has to hold the grantor's text.
       -- Pawl.Engine.Activatable.abilitiesForGiven carries the same pairing and
       -- the same note.
-      battlefieldAbilitiesOf oid pc = Maybe.mapMaybe (functionsIn (PC.subtypes pc) (Game.delayedAbilitiesOf oid gs) Zone.Battlefield) (abilitiesOf pc)
+      battlefieldAbilitiesOf _ pc = Maybe.mapMaybe (functionsIn (PC.subtypes pc) (PC.delayedAbilities pc) Zone.Battlefield) (abilitiesOf pc)
       -- CR 603.10's first sentence, per EVENT GROUP: the permanents that existed
       -- immediately after the event, with the abilities and the CR 603.3a
       -- controller each of them had THEN. The three readings the live board gets
@@ -1321,9 +1321,8 @@ eventTriggers events gs =
       -- permanent recovered stood there through the event (`laterGroups`,
       -- `sameGroup`) or was taken off BY it (`leftBattlefield`, CR 603.10a's
       -- look-back). It takes the departing id as well as the characteristics: CR
-      -- 113.6m's final sentence reads the card's CR 603.7 declarations, which are
-      -- not characteristics and so are reached through Game.delayedAbilitiesOf
-      -- off the id.
+      -- 113.6m's final sentence reads the CR 603.7 declarations, which the
+      -- characteristics carry (PC.delayedAbilities).
       leftBattlefield event = case event of
         GameEvent.Moved (Moved.MkMoved zc _ _ _ _)
           | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc /= Zone.Battlefield ->
@@ -1899,7 +1898,7 @@ eventTriggers events gs =
               case Map.lookup (ZoneChange.departed zc) (GameState.lastKnown gs) of
                 Nothing -> Map.empty
                 Just lk ->
-                  case Maybe.mapMaybe (functionsIn (PC.subtypes (LastKnown.characteristics lk)) (Game.delayedAbilitiesOf (ZoneChange.departed zc) gs) Zone.Graveyard) (PC.triggeredAbilities (LastKnown.characteristics lk)) of
+                  case Maybe.mapMaybe (functionsIn (PC.subtypes (LastKnown.characteristics lk)) (PC.delayedAbilities (LastKnown.characteristics lk)) Zone.Graveyard) (PC.triggeredAbilities (LastKnown.characteristics lk)) of
                     [] -> Map.empty
                     abilities -> Map.singleton (ZoneChange.departed zc) (LastKnown.controller lk, abilities)
         _ -> Map.empty
@@ -2010,14 +2009,14 @@ eventTriggers events gs =
       -- The abilities and keywords are the PROJECTION's (CR 613.1 names no
       -- zone), so Imoti, Celebrant of Bounty's granted cascade triggers --
       -- Pawl.KeywordTriggerSpec's "CR 613.1f Imoti grants a six-drop spell
-      -- cascade" proves it. The face is read only for its delayed-ability
-      -- declarations, which are card data rather than a characteristic.
+      -- cascade" proves it. The delayed declarations are the projection's too
+      -- (CR 707.2); the face only gates a spell with a card behind it.
       spellCast event = case event of
         GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _ _ _) -> case Game.faceOf spell gs of
           Nothing -> Map.empty
-          Just face ->
+          Just _ ->
             let pc = Projection.project spell gs
-             in case Maybe.mapMaybe (functionsIn (PC.subtypes pc) (Face.delayedAbilities face) Zone.Stack) (PC.triggeredAbilities pc) <> fmap whole (Keyword.stackTriggeredAbilitiesOf (PC.keywords pc)) of
+             in case Maybe.mapMaybe (functionsIn (PC.subtypes pc) (PC.delayedAbilities pc) Zone.Stack) (PC.triggeredAbilities pc) <> fmap whole (Keyword.stackTriggeredAbilitiesOf (PC.keywords pc)) of
                   [] -> Map.empty
                   abilities -> Map.singleton spell (caster, abilities)
         -- CR 707.10: a copy is not cast, so no "when you cast this spell" fires.

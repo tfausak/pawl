@@ -1457,9 +1457,8 @@ spellFaceOf oid gs =
 -- static, the triggered and the keyword-minted side.
 --
 -- PROJECTION-FREE, staticAbilitiesOf's reason: the gatherers run while the
--- projection is being built. Only the fields an ability read asks are laid over;
--- the delayed-ability declarations stay the printing's, card data rather than a
--- characteristic (Game.delayedAbilitiesOf).
+-- projection is being built. Only the fields an ability read asks are laid over,
+-- the delayed-ability declarations among them (CR 707.2).
 --
 -- Walked per card in every hand and library on every projection behind
 -- Pawl.Engine.Projection.mayStateZone, so an object carrying no stamp on a board
@@ -1486,6 +1485,7 @@ abilityFaceOf oid obj gs
                 Face.activatedAbilities = PC.activatedAbilities pc,
                 Face.replacementEffects = PC.replacementEffects pc,
                 Face.triggeredAbilities = PC.triggeredAbilities pc,
+                Face.delayedAbilities = PC.delayedAbilities pc,
                 Face.enchant = PC.enchant pc,
                 Face.castingPermissions = PC.castingPermissions pc,
                 Face.spell = PC.spell pc
@@ -1751,6 +1751,7 @@ noCharacteristics =
       PC.activatedAbilities = [],
       PC.replacementEffects = [],
       PC.triggeredAbilities = [],
+      PC.delayedAbilities = Map.empty,
       PC.enchant = [],
       PC.castingPermissions = [],
       -- CR 613.11: no characteristics, so none of the twelve families either.
@@ -1911,6 +1912,8 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
               PC.activatedAbilities = Face.activatedAbilities face,
               PC.replacementEffects = Face.replacementEffects face,
               PC.triggeredAbilities = Face.triggeredAbilities face,
+              -- CR 707.2: rules text, so copiable, for enchant's reason below.
+              PC.delayedAbilities = Face.delayedAbilities face,
               -- CR 702.5a's printed instances. In the SEED rather than folded in
               -- later, so they ride copiableCharacteristics: CR 707.2 names rules
               -- text among the copiable values, and a granted instance is not
@@ -2084,6 +2087,8 @@ withMergedAbilities donor base =
       PC.activatedAbilities = PC.activatedAbilities base <> PC.activatedAbilities donor,
       PC.replacementEffects = PC.replacementEffects base <> PC.replacementEffects donor,
       PC.triggeredAbilities = PC.triggeredAbilities base <> PC.triggeredAbilities donor,
+      -- Left-biased: CR 730.2a's tie-break between two components naming one.
+      PC.delayedAbilities = Map.union (PC.delayedAbilities base) (PC.delayedAbilities donor),
       PC.enchant = PC.enchant base <> PC.enchant donor,
       PC.castingPermissions = PC.castingPermissions base <> PC.castingPermissions donor,
       -- CR 613.11's twelve families, whose Semigroup is the same concatenation

@@ -71,6 +71,7 @@ codec = Fields.object $ do
   activatedAbilities <- Fields.defaulted "activatedAbilities" [] (Common.list (ActivatedAbility.codec Card.codec (GrantedAbility.codec Card.codec))) PC.activatedAbilities
   replacementEffects <- Fields.defaulted "replacementEffects" [] (Common.list (PrintedReplacement.codec Card.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))) PC.replacementEffects
   triggeredAbilities <- Fields.defaulted "triggeredAbilities" [] (Common.list (TriggeredAbility.codec Card.codec (GrantedAbility.codec Card.codec))) PC.triggeredAbilities
+  delayedAbilities <- Fields.defaulted "delayedAbilities" Map.empty (TriggeredAbility.codecDelayed Card.codec (GrantedAbility.codec Card.codec)) PC.delayedAbilities
   enchant <- Fields.defaulted "enchant" [] (Common.list TargetSlot.codec) PC.enchant
   castingPermissions <- Fields.defaulted "castingPermissions" [] (Common.list CastingPermission.codec) PC.castingPermissions
   ruleAbilities <- Fields.defaulted "ruleAbilities" mempty RuleAbilities.codec PC.ruleAbilities
@@ -119,6 +120,7 @@ codec = Fields.object $ do
         PC.activatedAbilities = activatedAbilities,
         PC.replacementEffects = replacementEffects,
         PC.triggeredAbilities = triggeredAbilities,
+        PC.delayedAbilities = delayedAbilities,
         PC.enchant = enchant,
         PC.castingPermissions = castingPermissions,
         PC.ruleAbilities = ruleAbilities,

@@ -15,6 +15,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Types.AbilityKind as AbilityKind
@@ -130,7 +131,8 @@ activateAbilityWith runSubgame pid srcId ability = Event.announcing $ do
               Source.OfAbility
                 ActivatedAbilitySource.MkActivatedAbilitySource
                   { ActivatedAbilitySource.source = srcId,
-                    ActivatedAbilitySource.ability = ability
+                    ActivatedAbilitySource.ability = ability,
+                    ActivatedAbilitySource.delayed = Projection.delayedSnapshotOf srcId gs
                   },
             Object.zone = Zone.Stack,
             Object.tapped = TapState.Untapped,

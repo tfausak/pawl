@@ -1,0 +1,30 @@
+{
+  "description": "CR 603.7a / 613.1f Elemental Mastery's granted ability makes X Elementals and exiles them at the next end step",
+  "note": "X is the Giant's power, 3, read through the granted ability's own source. The exile is written inside the Aura's quoted ability, which the Giant's card does not declare. The pre-end-step count shows the tokens were made, so the later count of zero means they were exiled.",
+  "board": {
+    "active": "bob",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Elemental Mastery", "label": "mastery", "attached": "giant" }],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Hill Giant", "label": "giant", "ready": true }],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Activate": { "object": "$giant" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "OrderTimestamps": ["Elemental Token", "Elemental Token#2", "Elemental Token#3"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Elemental Token", "count": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Keywords": { "object": "Elemental Token", "keyword": { "type": "Haste" }, "count": 1 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": [] } },
+    { "turn": 2, "step": "Upkeep", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Elemental Token", "count": 0 } } },
+    { "turn": 2, "step": "Upkeep", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Hill Giant", "count": 1 } } }
+  ]
+}

@@ -1,5 +1,7 @@
 module Pawl.Types.TriggeredAbilitySource where
 
+import qualified Data.Map.Strict as Map
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -31,6 +33,12 @@ data TriggeredAbilitySource = MkTriggeredAbilitySource
     -- Carried on the object rather than looked up, the entry it came from being
     -- gone by resolution: an entry with no stated duration is retired as it
     -- fires (Pawl.Engine.Event.Trigger.delayedPending).
-    createdAt :: Maybe Timestamp.Timestamp
+    createdAt :: Maybe Timestamp.Timestamp,
+    -- | CR 113.7a / 603.7: the delayed abilities the source's rules text
+    -- declared as this object was put on the stack (PC.delayedAbilities),
+    -- frozen with it: the ability exists independently of its source, so a copy
+    -- effect or text change on the source afterwards does not change what its
+    -- arms create.
+    delayed :: Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card))
   }
   deriving (Eq, Ord, Show)
