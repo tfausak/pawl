@@ -6648,8 +6648,9 @@ activatedAbilityFilters ability =
     -- SameControllerAsBound, which belong to InTargetSlot and whose vacuous
     -- directions differ (see the Framing haddock). The two source-power
     -- comparisons have no tag of their own and are fenced corpus-wide instead, by
-    -- the CR 702.134a / CR 702.149a case below, which refuses them in every
-    -- card-authored position rather than in the ones a tag names.
+    -- Pawl.FilterPositionLintSpec's CR 702.134a / CR 702.149a case, which
+    -- refuses them in every card-authored position but a pairwise combat
+    -- restriction and a wish's filter rather than in the ones a tag names.
     <> frame Unframed (concatMap conditionFilters (concatMap restrictionConditions (ActivatedAbility.restrictions ability)))
     <> modalFilters (ActivatedAbility.modal ability)
 

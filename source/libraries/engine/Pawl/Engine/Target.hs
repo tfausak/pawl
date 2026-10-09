@@ -302,8 +302,9 @@ admittedGiven pcs grants pools perspective unannounced bindings source slot gs =
 -- bare Filter.contextFor that would answer differently for the atoms filled
 -- here.
 --
--- THE one site that fills Filter.sourcePower and Filter.slotAmount, and one of
--- the two that fill Filter.defendingPlayer, because it is the one site that
+-- THE one site that fills Filter.slotAmount, one of those that fill
+-- Filter.sourcePower (see that field for the rest), and one of the two that
+-- fill Filter.defendingPlayer, because it is the one site that
 -- matches a TARGET SLOT's Filter -- both of CR 115's moments (CR 601.2c's
 -- choosing and CR 608.2b's re-check) reach those atoms through here, and CR
 -- 702.134a, CR 702.39a, CR 202.3's computed bound and CR 508.5's printed

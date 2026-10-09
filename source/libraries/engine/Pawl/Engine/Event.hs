@@ -1389,9 +1389,9 @@ createEmblem pid card = do
 -- braces -- and cheap enough to keep, since a caller assembling this map by hand
 -- would otherwise offer a card that is no longer out there.
 --
--- The Context is a BARE Filter.contextFor, carrying no slot bindings even where a
--- resolution is in flight -- and the draw-replacement caller in `apply` has none
--- to carry at all. Honest rather than silent: CR 400.11c keeps a spell or
+-- The Context is Filter.contextFor with the source's power laid over it, and
+-- carries no slot bindings even where a resolution is in flight -- and the
+-- draw-replacement caller in `apply` has none to carry at all. Honest rather than silent: CR 400.11c keeps a spell or
 -- ability from affecting a card outside the game, so no slot of
 -- the resolution can name one, and the candidate view below is a printed FACE
 -- with no `identity` for Filter.IsBound to compare in any case. Pawl.CardSpec's
@@ -1437,7 +1437,10 @@ createEmblem pid card = do
 eligible :: Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> PlayerId -> GameState.GameState -> [OutsideCard.OutsideCard]
 eligible predicate source pid gs =
   let pool = maybe Map.empty Player.outsideTheGame (Map.lookup pid (GameState.players gs))
-      context = Filter.contextFor (Game.teams gs) (Just pid) (Just source)
+      -- CR 608.2h: the source's power as it is now, or as it last existed, for
+      -- a wish that compares against it (Synthetic Wishful Djinn's "power less
+      -- than this creature's"). A thunk, Filter.Context.sourcePower's posture.
+      context = (Filter.contextFor (Game.teams gs) (Just pid) (Just source)) {Filter.sourcePower = Projection.powerWithLastKnownGiven Map.empty source gs}
       matchesFace face = Filter.matches context (Projection.viewOfCard face) predicate
       admits printingId = case Game.cardOfPrinting printingId gs of
         Nothing -> False
