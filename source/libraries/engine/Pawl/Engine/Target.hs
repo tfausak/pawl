@@ -23,6 +23,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Modal as Modal.Engine
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
+import qualified Pawl.Engine.Players as Players
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
@@ -1754,15 +1755,9 @@ chooseTargets pid oid source seed x slots sets = do
 -- card has said. A slot naming no player, or a seat no longer reachable, leaves
 -- the slots unanswered as an empty relation does.
 --
--- Which prompt is picked by whether the offer holds the controller, the posture
--- Pawl.Engine.Resolve.Effect's CR 608.2d choice takes: Prompt.ChooseOpponent
--- promises never to offer them, Prompt.ChoosePlayer is the one that may. An
--- answer naming somebody never offered falls back to the first, the announcement
--- being mandatory.
---
--- Off Game.reachableBy, so a seat that has left (CR 104.3a), or sits outside the
--- controller's range (CR 801.5a), neither chooses nor is counted towards eliding
--- the question.
+-- The relation's offer is Players.offer and the ask Players.chooseOne, so a
+-- seat that has left (CR 104.3a), or sits outside the controller's range (CR
+-- 801.5a), neither chooses nor is counted towards eliding the question.
 chooserOf :: PlayerId -> ObjectId -> Map SlotName Binding.Type.Binding -> Maybe TargetChooser.TargetChooser -> Game (Maybe PlayerId)
 chooserOf controller oid seed chooser = case chooser of
   Nothing -> pure (Just controller)
@@ -1771,18 +1766,7 @@ chooserOf controller oid seed chooser = case chooser of
     pure (List.find (`List.elem` Game.reachableBy controller gs) (Map.lookup slot (Binding.playerSlots seed)))
   Just (TargetChooser.Relative r) -> do
     gs <- State.get
-    case List.filter (PlayerRelation.holds (Game.teams gs) r controller) (Game.reachableBy controller gs) of
-      [] -> pure Nothing
-      [sole] -> pure (Just sole)
-      first : second : rest -> do
-        let offered = first NonEmpty.:| (second : rest)
-            decider = Decide.deciderFor controller gs
-            question =
-              if List.elem controller (NonEmpty.toList offered)
-                then Prompt.ChoosePlayer decider controller oid offered
-                else Prompt.ChooseOpponent decider controller oid offered
-        answer <- Game.choose question
-        pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
+    Players.chooseOne controller oid (Players.offer controller gs r)
 
 -- CR 601.2c's two announcements over ONE chooser's slots, in the rule's own
 -- order: how many targets each variable slot gets, then the targets themselves.

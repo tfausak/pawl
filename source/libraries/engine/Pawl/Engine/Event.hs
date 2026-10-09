@@ -54,6 +54,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.ManaRider as ManaRider
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
+import qualified Pawl.Engine.Players as Players
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
@@ -2592,33 +2593,19 @@ apply batch candidate event =
       -- EntryRewrite.ChoosePlayer.
       EntryRewrite.ChoosePlayer -> do
         gs <- State.get
-        let candidates = maybe (Game.stillPlaying gs) (`Game.reachableBy` gs) (Projection.controllerOf oid gs)
-        picked <- case (Projection.controllerOf oid gs, NonEmpty.nonEmpty candidates) of
-          -- Nobody left to choose from, a board CR 104.2a has already ended the
-          -- game on. Chooses nobody rather than conjuring a seat, the posture
-          -- designateProtector takes for a battle with no legal protector.
-          (_, Nothing) -> pure Nothing
+        picked <- case Projection.controllerOf oid gs of
           -- Unreachable, and defensive for ChoiceOf's reason: the object is
           -- materialized on the battlefield before this loop runs, so
           -- controllerOf falls back to its owner. Chooses NOBODY rather than
           -- conjuring a seat the way ChooseColors' arm conjures a colour, because a
           -- player is a real board object where a colour is not -- and CR 101.3
           -- already ignores the share of a later instruction that names nobody.
-          (Nothing, _) -> pure Nothing
-          (Just controller, Just offer)
-            -- One candidate is one outcome, so the options are indistinguishable
-            -- and the engine decides nothing by not asking.
-            | null (NonEmpty.tail offer) -> pure (Just (NonEmpty.head offer))
-            | otherwise -> do
-                let decider = Decide.deciderFor controller gs
-                answer <- Game.choose (Prompt.ChoosePlayer decider controller oid offer)
-                -- Filters rather than trusts the answer, Battle.designateProtector's
-                -- posture: an interpreter naming a player who is not in the game
-                -- gets the head of the offer instead of an illegal designation.
-                pure . Just $
-                  if List.elem answer candidates
-                    then answer
-                    else NonEmpty.head offer
+          Nothing -> pure Nothing
+          -- CR 801.5a's offer, asked through Players.chooseOne. Nobody left to
+          -- choose from is a board CR 104.2a has already ended the game on, and
+          -- chooses nobody, the posture designateProtector takes for a battle
+          -- with no legal protector.
+          Just controller -> Players.chooseOne controller oid (Players.offer controller gs PlayerRelation.AnyPlayer)
         Replacement.consume (ReplacementCandidate.identity candidate)
         State.modify' $ \g ->
           let stamp o = o {Object.chosenPlayer = picked}
@@ -2642,26 +2629,9 @@ apply batch candidate event =
           -- in the Oracle card reference.
           Nothing -> pure Set.empty
           Just controller -> do
-            -- CR 102.1 makes a player one of the people IN the game, and CR
-            -- 104.3a lets one leave at any time -- so the offer is
-            -- Game.stillPlaying and not GameState.turnOrder, which keeps a
-            -- departed seat -- cut to the controller's range (CR 801.5a).
-            let opponents = Game.opponentsInReach controller gs
-            opponent <- case opponents of
-              -- CR 102.2: a two-player game leaves exactly one opponent, and
-              -- one option is not a choice. The empty case is a game whose
-              -- other seats have all left (CR 104.2a) -- nobody to ask, and no
-              -- second name.
-              [] -> pure Nothing
-              [sole] -> pure (Just sole)
-              first : second : rest -> do
-                let offered = first NonEmpty.:| (second : rest)
-                answer <- Game.choose (Prompt.ChooseOpponent (Decide.deciderFor controller gs) controller oid offered)
-                -- FILTERED, NOT TRUSTED, the posture Sba.chooseLegendVictims
-                -- takes: an answer naming somebody who is not an opponent would
-                -- otherwise hand a second name to a player the card never asked,
-                -- so it falls back to the head.
-                pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
+            -- CR 801.5a's offer of opponents, asked through Players.chooseOne.
+            -- No opponent left (CR 104.2a) asks nobody and adds no second name.
+            opponent <- Players.chooseOne controller oid (Players.offer controller gs PlayerRelation.Opponent)
             -- CR 101.4: the active player chooses first, then the rest in turn
             -- order. Both names are chosen as one event, so the order is the
             -- rule's and not the card's reading order.
@@ -3354,24 +3324,10 @@ apply batch candidate event =
           -- Unreachable, and defensive for the reason riot's arm gives above.
           Nothing -> pure (Just event)
           Just controller -> do
-            -- CR 102.1's seats still in the game, cut to the controller's range
-            -- (CR 801.5a) -- a player who has left (CR 104.3a) is nobody's
-            -- opponent and cannot be offered the choice.
-            chosen <- case Game.opponentsInReach controller gs of
-              -- No opponent left to ask, a board CR 104.2a has already ended the
-              -- game on. Nobody decides, so tribute is not paid -- the state rule
-              -- 702.104b's condition reads as true.
-              [] -> pure Nothing
-              -- CR 102.2: one opponent is one option, and the engine decides
-              -- nothing by not asking.
-              [sole] -> pure (Just sole)
-              first : second : rest -> do
-                let offered = first NonEmpty.:| (second : rest)
-                answer <- Game.choose (Prompt.ChooseOpponent (Decide.deciderFor controller gs) controller oid offered)
-                -- FILTERED, NOT TRUSTED, ChooseCardNames' posture above: an answer
-                -- naming somebody who is not an opponent would otherwise hand the
-                -- decision to a player rule 702.104a never asks.
-                pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
+            -- CR 801.5a's offer of opponents, asked through Players.chooseOne.
+            -- No opponent left to ask (CR 104.2a) means nobody decides, so
+            -- tribute is not paid -- rule 702.104b's condition reads as true.
+            chosen <- Players.chooseOne controller oid (Players.offer controller gs PlayerRelation.Opponent)
             case chosen of
               Nothing -> pure ()
               Just opponent -> do

@@ -605,7 +605,9 @@ playersFor viewOf context gs =
         Players.slotPlayers = slotPlayers context gs,
         Players.slotObject = (`Filter.slotOneObject` context),
         Players.controllerOf = viewOf Monad.>=> Filter.controller,
-        Players.ownerOf = viewOf Monad.>=> Filter.owner
+        Players.ownerOf = viewOf Monad.>=> Filter.owner,
+        Players.roster = Players.table (Filter.perspective context) gs,
+        Players.reaches = const True
       }
     gs
 
