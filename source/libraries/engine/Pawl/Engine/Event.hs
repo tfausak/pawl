@@ -1093,6 +1093,7 @@ cardObject oid pid under printingId dest tapped ts =
       Object.warped = Nothing,
       Object.preparedCopyOf = Nothing,
       Object.ringBearerFor = Nothing,
+      Object.stickers = Seq.empty,
       Object.duplicate = Nothing,
       Object.paired = Nothing,
       Object.protector = Nothing,
@@ -1326,6 +1327,7 @@ createEmblem pid card = do
                 Object.warped = Nothing,
                 Object.preparedCopyOf = Nothing,
                 Object.ringBearerFor = Nothing,
+                Object.stickers = Seq.empty,
                 Object.duplicate = Nothing,
                 Object.paired = Nothing,
                 Object.protector = Nothing,
@@ -6452,7 +6454,11 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                     -- BATTLEFIELD ONLY, `paidCosts`' gate and for its reason: rule
                     -- 400.7d speaks about a permanent, and a countered gift spell
                     -- becomes a card whose enters trigger never fires.
-                    Object.chosenPlayer = if resolvedOnto then Object.chosenPlayer obj else Nothing
+                    Object.chosenPlayer = if resolvedOnto then Object.chosenPlayer obj else Nothing,
+                    -- CR 123.5 / 400.7m: stickers stay on an object moving to
+                    -- a public zone and apply to the new object; a hidden zone
+                    -- drops them. Restamped after placeObject (CR 613.7k).
+                    Object.stickers = if Game.isHiddenZone dest then Seq.empty else Object.stickers obj
                   }
               -- CR 604.2's override, handed over as the permanent leaves the
               -- battlefield. lingeringHandover below is the whole of it; this
@@ -6705,10 +6711,12 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                   -- way in, so the two agree about which component the
                   -- designation can sit on.
                   (commandComponents, destComponents) = Seq.partition (\component -> Game.componentIsCard component && Just (Game.printingOfComponent component) == splitOff) components
+                  -- Not implemented: CR 123.5c's owner choosing which split object
+                  -- keeps the stickers (#872).
                   asComponent zone mComponent ts =
                     ( case mComponent of
                         Nothing -> mkObj entrySeed ts
-                        Just component -> Game.representComponent component (mkObj entrySeed ts)
+                        Just component -> (Game.representComponent component (mkObj entrySeed ts)) {Object.stickers = Seq.empty}
                     )
                       { Object.zone = zone
                       }
@@ -6726,6 +6734,8 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                     c Seq.:< cs -> (Just c, cs)
               start <- State.gets GameState.nextTimestamp
               newId <- placeObject pid (asComponent dest leading) dest position
+              -- CR 613.7k.
+              State.modify' (Game.restampStickers newId)
               trailingIds0 <- Monad.forM trailing (\component -> placeObject pid (asComponent dest (Just component)) dest position)
               -- CR 712.21b / 730.3b: "if a player exiles a melded permanent, that
               -- player determines the relative timestamp order of the two cards",
@@ -8082,6 +8092,7 @@ createTokens controller card copy n tapped entering attached = do
                       Object.warped = Nothing,
                       Object.preparedCopyOf = Nothing,
                       Object.ringBearerFor = Nothing,
+                      Object.stickers = Seq.empty,
                       Object.duplicate = Nothing,
                       Object.paired = Nothing,
                       Object.protector = Nothing,
@@ -8368,6 +8379,8 @@ meld controller victims resultCard = do
                 Object.warped = Nothing,
                 Object.preparedCopyOf = Nothing,
                 Object.ringBearerFor = Nothing,
+                -- Not implemented: CR 123.5a's stickers on a melded permanent (#872).
+                Object.stickers = Seq.empty,
                 Object.duplicate = Nothing,
                 Object.paired = Nothing,
                 Object.protector = Nothing,

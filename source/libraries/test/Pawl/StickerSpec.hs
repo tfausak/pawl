@@ -20,8 +20,10 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Engine.Sticker as Sticker
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Oracle as Oracle
 import qualified Pawl.Registry as Registry
@@ -35,13 +37,20 @@ import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
+import qualified Pawl.Types.Object as Object
+import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PowerToughnessSticker as PowerToughnessSticker
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.StickerKind as StickerKind
+import qualified Pawl.Types.StickerPlacement as StickerPlacement
 import qualified Pawl.Types.StickerSheet as StickerSheet
+import qualified Pawl.Types.Timestamp as Timestamp
+import qualified Pawl.Types.Zone as Zone
 
 -- Alice active with priority in her precombat main phase.
 mainPhaseForAlice :: GameState.GameState -> GameState.GameState
@@ -89,6 +98,27 @@ chosenOf pid gs = foldMap Player.chosenStickerSheets (Map.lookup pid (GameState.
 
 withSheetsDeck :: [StickerSheet.StickerSheet] -> Deck.Deck -> Deck.Deck
 withSheetsDeck sheets deck = deck {Deck.stickerSheets = Seq.fromList sheets}
+
+-- alice brings these sheets and has every one chosen, as CR 103.2d leaves
+-- three or fewer.
+withSheets :: [StickerSheet.StickerSheet] -> GameState.GameState -> GameState.GameState
+withSheets sheets gs =
+  gs {GameState.players = Map.adjust (\p -> p {Player.stickerSheets = Seq.fromList sheets, Player.chosenStickerSheets = Set.fromList (zipWith const [0 ..] sheets)}) S.alice (GameState.players gs)}
+
+-- alice's first available art sticker on `oid`.
+stickerOn :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+stickerOn oid gs = case Sticker.available S.alice (Set.singleton StickerKind.Art) gs of
+  ref : _ -> Sticker.put S.alice oid ref gs
+  [] -> gs
+
+-- FILTERS the offered set, so CR 608.2b's re-read finds the target.
+namingTarget :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+namingTarget oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, offered) -> Set.filter ((== Just oid) . Recipient.objectOf) offered) sets
+  _ -> S.identityAnswer p
+
+stickersIn :: Zone.Zone -> GameState.GameState -> [(Seq.Seq StickerPlacement.StickerPlacement, Timestamp.Timestamp)]
+stickersIn zone gs = [(Object.stickers obj, Object.timestamp obj) | oid <- Game.zoneMembers zone S.alice gs, Just obj <- [Game.lookupObject oid gs]]
 
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Sticker" $ do
@@ -165,3 +195,41 @@ spec s registry = Spec.describe s "Sticker" $ do
         (gs, asked) = startedWith ((S.alice, withSheetsDeck (take 3 sheets) plain) NonEmpty.:| [(S.bob, plain)])
     Spec.assertEqWith s "CR 123.2b all three are chosen" (chosenOf S.alice gs) (Set.fromList [0, 1, 2])
     Spec.assertEqWith s "and nothing was drawn at random" asked []
+  -- Review Focus 3. One board, two bob spells: a Bolt kills the Piker (public
+  -- to public) and an Unsummon bounces it (public to hidden).
+  Spec.it s "CR 123.5/613.7k an art sticker stays through a death, restamped, and comes off in a bounce" $ do
+    sheets <- committedSheets
+    piker <- S.printingOf s registry "Goblin Piker"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    unsummon <- S.printingOf s registry "Unsummon"
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    let base = withSheets (take 1 sheets) (S.landsFor island S.bob 1 (S.landsFor mountain S.bob 1 (Setup.gameWith GameSettings.plain S.bothPlayers)))
+        (pikerId, g1) = S.addPermanent piker S.alice base
+        stickered = stickerOn pikerId g1
+        placed = foldMap (Foldable.toList . Object.stickers) (Game.lookupObject pikerId stickered)
+        (boltId, g2) = S.addHandCard bolt S.bob stickered
+        (unsummonId, g3) = S.addHandCard unsummon S.bob g2
+        bobsWindow = g3 {GameState.priority = Just S.bob}
+        killed = S.settleSba (S.runPure (namingTarget pikerId) bobsWindow (S.cast S.bob boltId >> Stack.resolveTop))
+        bounced = S.runPure (namingTarget pikerId) bobsWindow (S.cast S.bob unsummonId >> Stack.resolveTop)
+    case (stickersIn Zone.Graveyard killed, placed) of
+      ([(kept, stamp)], [placement]) -> do
+        Spec.assertEqWith s "CR 123.5 the same art sticker is on the card in the graveyard" (fmap StickerPlacement.sticker (Foldable.toList kept)) [StickerPlacement.sticker placement]
+        Spec.assertBool s (all (\p -> StickerPlacement.timestamp p > stamp) kept) "CR 613.7k restamped right after the card's new timestamp"
+      other -> Spec.assertFailure s ("expected one graveyard card and one placement, got " <> show other)
+    Spec.assertEqWith s "CR 123.5 the card bounced to hand has none" (fmap fst (stickersIn Zone.Hand bounced)) [Seq.empty]
+  -- Review Focus 2. Twenty cards a deck so nobody is decked.
+  Spec.it s "CR 727.2/103.2d a restart draws the sheets again and every sticker comes off" $ do
+    sheets <- committedSheets
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let plain = Deck.fromCards (Map.singleton mountain 20)
+        (started, _) = startedWith ((S.alice, withSheetsDeck sheets plain) NonEmpty.:| [(S.bob, plain)])
+        (pikerId, withPiker) = S.addPermanent piker S.alice started
+        stickered = stickerOn pikerId withPiker
+        ((_, restarted), asked) = State.runState (Engine.runGame sheetDraws stickered (Setup.restartGame S.performer Set.empty S.alice)) []
+        stickeredObjects g = Map.keys (Map.filter (not . Seq.null . Object.stickers) (GameState.objects g))
+    Spec.assertEqWith s "the Piker was stickered before the restart" (stickeredObjects stickered) [pikerId]
+    Spec.assertEqWith s "CR 727.2 no object is stickered after it" (stickeredObjects restarted) []
+    Spec.assertEqWith s "CR 103.2d the restart drew three sheets again" (reverse asked) [[0, 1, 2, 3], [0, 1, 2], [0, 1]]

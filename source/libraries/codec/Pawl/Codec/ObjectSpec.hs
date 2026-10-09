@@ -46,6 +46,9 @@ import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.StickerKind as StickerKind
+import qualified Pawl.Types.StickerPlacement as StickerPlacement
+import qualified Pawl.Types.StickerRef as StickerRef
 import qualified Pawl.Types.StoredResult as StoredResult
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
@@ -96,6 +99,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.warped = Nothing,
           Object.preparedCopyOf = Nothing,
           Object.ringBearerFor = Nothing,
+          Object.stickers = Seq.empty,
           Object.duplicate = Nothing,
           Object.paired = Nothing,
           Object.protector = Nothing,
@@ -208,6 +212,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.preparedCopyOf = Just (ObjectId.MkObjectId 26),
           Object.ringBearerFor = Just (PlayerId.MkPlayerId 16),
           Object.duplicate = Just ProjectedCharacteristicsSpec.minimalCharacteristics,
+          Object.stickers = Seq.singleton (StickerPlacement.MkStickerPlacement (StickerRef.MkStickerRef (PlayerId.MkPlayerId 1) 0 StickerKind.Art 2) (Timestamp.MkTimestamp 5)),
           Object.paired = Nothing,
           Object.protector = Just (PlayerId.MkPlayerId 17),
           Object.ventureRoom = Just (RoomIndex.MkRoomIndex 18),
@@ -274,6 +279,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"warped\":28,\"preparedCopyOf\":26"
           <> ",\"ringBearerFor\":16"
           <> ",\"duplicate\":{\"names\":[\"Mountain\"],\"cardTypes\":[{\"type\":\"Land\"}]}"
+          <> ",\"stickers\":[{\"sticker\":{\"owner\":1,\"sheet\":0,\"kind\":{\"type\":\"Art\"},\"index\":2},\"timestamp\":5}]"
           <> ",\"protector\":17"
           <> ",\"ventureRoom\":18,\"classLevel\":2,\"unlockedHalves\":[{\"type\":\"LeftHalf\"}]"
           <> ",\"designations\":[{\"type\":\"Renowned\"}]"

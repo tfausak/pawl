@@ -146,6 +146,9 @@ reassign start ordered gs =
       mapping = Map.fromList (zip dealt (List.sort dealt))
       remap ts = Map.findWithDefault ts ts mapping
       member = (`elem` ordered)
+      -- Not implemented: CR 613.7k's sticker restamp under this reorder, and
+      -- under a new timestamp without a zone change (CR 613.7e-g); unobservable
+      -- while stickers are art (#872).
       restampObject oid obj
         | member oid = obj {Object.timestamp = remap (Object.timestamp obj), Object.counterTimestamps = fmap remap (Object.counterTimestamps obj)}
         | otherwise = obj

@@ -7634,6 +7634,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       -- the printed text. Pawl.CastSpec's Twincast splice case
                       -- is the proof.
                       Object.spliced = Seq.empty,
+                      -- CR 123.1: stickers are not copiable. A regression
+                      -- fence: no unit-1 board copies a stickered spell.
+                      Object.stickers = Seq.empty,
                       -- CR 400.7d's record of what PAID, which CR 707.10 does not
                       -- carry across: the copy is neither cast nor activated, and
                       -- the rule's objects-used-to-pay sentence stops at objects --

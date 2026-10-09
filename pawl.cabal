@@ -1515,6 +1515,7 @@ library engine
     Pawl.Engine.SplitSecond
     Pawl.Engine.Stack
     Pawl.Engine.Star
+    Pawl.Engine.Sticker
     Pawl.Engine.Subtype
     Pawl.Engine.Summoning
     Pawl.Engine.Suspend

@@ -79,6 +79,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.Status as Status
+import qualified Pawl.Types.StickerPlacement as StickerPlacement
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
@@ -209,6 +210,19 @@ freshTimestamp :: GameState -> (Timestamp.Timestamp, GameState)
 freshTimestamp gs =
   let Timestamp.MkTimestamp n = GameState.nextTimestamp gs
    in (Timestamp.MkTimestamp n, gs {GameState.nextTimestamp = Timestamp.MkTimestamp (n + 1)})
+
+-- CR 613.7k: each sticker on the object takes a new timestamp immediately
+-- after the object's own, keeping their relative order. Called right after the
+-- object is stamped, so nothing is minted in between.
+restampStickers :: ObjectId -> GameState -> GameState
+restampStickers oid gs = case lookupObject oid gs of
+  Nothing -> gs
+  Just obj ->
+    let step (acc, g) placement =
+          let (ts, g') = freshTimestamp g
+           in (acc Seq.|> placement {StickerPlacement.timestamp = ts}, g')
+        (restamped, stamped) = Foldable.foldl' step (Seq.empty, gs) (Object.stickers obj)
+     in stamped {GameState.objects = Map.adjust (\o -> o {Object.stickers = restamped}) oid (GameState.objects stamped)}
 
 freshPrintingId :: GameState -> (PrintingId.PrintingId, GameState)
 freshPrintingId gs =

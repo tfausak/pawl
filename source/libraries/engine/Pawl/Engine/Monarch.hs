@@ -217,6 +217,7 @@ placeInherent pending = do
             Object.warped = Nothing,
             Object.preparedCopyOf = Nothing,
             Object.ringBearerFor = Nothing,
+            Object.stickers = Seq.empty,
             Object.duplicate = Nothing,
             Object.paired = Nothing,
             Object.protector = Nothing,
