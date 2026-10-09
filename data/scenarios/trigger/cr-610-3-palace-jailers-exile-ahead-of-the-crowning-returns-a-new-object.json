@@ -1,0 +1,52 @@
+{
+  "description": "CR 610.3 Palace Jailer's exile resolving ahead of the crowning moves the creature, which returns a new object",
+  "note": "The pair of cr-610-3b-a-crowning-ahead-of-palace-jailers-exile-keeps-the-creature: the same board with Jared Carthalion, True Heir's trigger at the bottom. The exile happens, Jared crowns bob, and CR 610.3 returns the Goblin Piker as a new object without its +1/+1 counter (CR 400.7, 122.2).",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true }
+        ],
+        "hand": [
+          { "card": "Rise of the Dark Realms", "label": "rise" }
+        ],
+        "graveyard": [
+          { "card": "Palace Jailer" },
+          { "card": "Jared Carthalion, True Heir" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker", "counters": [{ "key": { "type": "PlusOnePlusOne" }, "value": 1 }] }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$rise", "mana": ["Swamp", "Swamp#2", "Swamp#3", "Swamp#4", "Swamp#5", "Swamp#6", "Swamp#7", "Swamp#8", "Swamp#9"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Palace Jailer", "Jared Carthalion, True Heir"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTriggers": ["Jared Carthalion, True Heir", "Palace Jailer", "Palace Jailer"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "opponent": ["$bob"] } }, "source": "Jared Carthalion, True Heir" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "target": ["$piker"] } }, "source": "Palace Jailer" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Monarch": { "player": "bob" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "Goblin Piker", "kind": { "type": "PlusOnePlusOne" }, "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "View": { "of": "Stack", "is": [] } } }
+  ]
+}

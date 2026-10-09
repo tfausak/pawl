@@ -51,6 +51,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Exile as Exile
@@ -67,6 +68,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -81,6 +83,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
@@ -383,6 +386,22 @@ spec s registry = Spec.describe s "Face-down exile" $ do
 -- content and the one thing the two casts differ in.
 foretold :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 foretold s registry = Spec.describe s "Augury Raven" $ do
+  -- CR 702.143f: a departing player reveals every face-down foretold card they
+  -- own. alice foretells Augury Raven in a three-player game and concedes; the
+  -- negative leg concedes with the Raven still in her hand.
+  Spec.it s "CR 702.143f a face-down foretold card is revealed when its owner leaves the game" $ do
+    raven <- S.printingOf s registry "Augury Raven"
+    island <- S.printingOf s registry "Island"
+    let (handRaven, g1) = S.addHandCard raven S.alice (S.landsFor island S.alice 2 S.threePlayerGame)
+        before = g1 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+        foretoldGs = S.runPure S.identityAnswer before (Foretell.foretell S.manaPerformer S.alice handRaven)
+        concede board = S.runPure S.identityAnswer board (Departure.leaveGame Departure.Type.Conceded S.alice)
+        revealsIn board = [(Revealed.player r, Revealed.card r) | GameEvent.Revealed r <- S.eventsOf board]
+    case faceDownExiled foretoldGs of
+      [ravenId] -> do
+        Spec.assertEqWith s "CR 702.143f alice revealed her foretold card" (revealsIn (concede foretoldGs)) [(S.alice, ravenId)]
+        Spec.assertEqWith s "a card in her hand leaving with her reveals nothing" (revealsIn (concede before)) []
+      _ -> Spec.assertFailure s "setup: the Raven was not foretold"
   Spec.it s "CR 406.4 the owner of a foretold card shuffles it out of exile and an opponent aiming at it by name gets the face-up one" $ do
     (downId, upId, aliceSpell, bobSpell, board) <- foretoldBoard s registry
     let aliceAfter = resolveCast S.alice aliceSpell downId board

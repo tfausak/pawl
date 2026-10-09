@@ -27,5 +27,11 @@ spec s = Spec.describe s "Pawl.Codec.RevealCause" $ do
       RevealCause.codec
       RevealCause.LeavingFaceDown
       " {\"type\":\"LeavingFaceDown\"} "
+  Spec.it s "FaceDownSpell" $
+    Common.assertCodec
+      s
+      RevealCause.codec
+      RevealCause.FaceDownSpell
+      " {\"type\":\"FaceDownSpell\"} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s RevealCause.codec

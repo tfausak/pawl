@@ -59,6 +59,8 @@ import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Result as Result
+import qualified Pawl.Types.ReturnEnding as ReturnEnding
+import qualified Pawl.Types.ReturnWatch as ReturnWatch
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.StepBegan as StepBegan
@@ -457,12 +459,12 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
         gone = S.departs Departure.Type.Conceded S.bob snapshotted
     Spec.assertEqWith s "bob's id is pruned from the CR 510.4 first-strike snapshot" (Combat.Type.struckFirst (GameState.combat gone)) (Just Set.empty)
 
-  Spec.it s "CR 725 an exiledUntilMonarch entry KEYED on the departing player's own object is dropped" $ do
+  Spec.it s "CR 725 a crowning watch KEYED on the departing player's own object is dropped" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (onField, g1) = S.addPermanent piker S.bob S.threePlayerGame
-        exiled = g1 {GameState.exiledUntilMonarch = Map.singleton onField (MonarchWatch.MkMonarchWatch {MonarchWatch.controller = S.alice, MonarchWatch.due = Nothing})}
+        exiled = g1 {GameState.movedUntil = Map.singleton onField (ReturnWatch.MkReturnWatch (ReturnEnding.OpponentCrowned MonarchWatch.MkMonarchWatch {MonarchWatch.controller = S.alice, MonarchWatch.due = Nothing}) Zone.Battlefield)}
         gone = S.departs Departure.Type.Conceded S.bob exiled
-    Spec.assertEqWith s "the entry keyed on bob's own (now-gone) object is dropped" (GameState.exiledUntilMonarch gone) Map.empty
+    Spec.assertEqWith s "the entry keyed on bob's own (now-gone) object is dropped" (GameState.movedUntil gone) Map.empty
 
   -- CR 509.1h's last sentence: "A creature remains blocked even if all the
   -- creatures blocking it are removed from combat." The blocker here is

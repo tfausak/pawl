@@ -678,6 +678,18 @@ setOwner oid pid gs =
         | otherwise = obj
    in gs {GameState.objects = Map.adjust (\obj -> (pinned obj) {Object.owner = pid}) oid (GameState.objects gs)}
 
+-- Remove an object from the game: out of its zone AND the object table, so
+-- nothing can look it up afterwards. No zone change happens, so nothing arrives
+-- and CR 400.7 mints no new incarnation; what the object leaves behind (its CR
+-- 608.2h record, its combat entries, its side tables) is the caller's. Unknown
+-- ids are left alone.
+deleteObject :: ObjectId -> GameState -> GameState
+deleteObject oid gs = case lookupObject oid gs of
+  Nothing -> gs
+  Just _ ->
+    let g1 = removeFromZones oid gs
+     in g1 {GameState.objects = Map.delete oid (GameState.objects g1)}
+
 removeFromZones :: ObjectId -> GameState -> GameState
 removeFromZones oid gs =
   let found = lookupObject oid gs
@@ -739,7 +751,17 @@ insertIntoZone zone position pid oid gs = case zone of
   Zone.Exile -> gs {GameState.exile = Set.insert oid (GameState.exile gs)}
   Zone.Command -> gs {GameState.command = Set.insert oid (GameState.command gs)}
   Zone.Ante -> gs {GameState.ante = Set.insert oid (GameState.ante gs)}
-  Zone.Stack -> gs {GameState.stack = oid : GameState.stack gs}
+  Zone.Stack -> putOnStack oid gs
+
+-- CR 405.2: put an object on top of the stack, noting the event group current
+-- as it arrives (GameState.stackedIn) for CR 610.3a / 610.3b's "after it was
+-- put onto the stack". Every arrival goes through here.
+putOnStack :: ObjectId -> GameState -> GameState
+putOnStack oid gs =
+  gs
+    { GameState.stack = oid : GameState.stack gs,
+      GameState.stackedIn = Map.insert oid (GameState.nextEventGroup gs) (GameState.stackedIn gs)
+    }
 
 -- Move a card already in a library to this many cards down from its top, 0
 -- being the top; a depth past the bottom lands on the bottom (Seq.insertAt's
@@ -753,17 +775,15 @@ sinkInLibrary depth pid oid gs = gs {GameState.library = Map.adjust (Seq.insertA
 -- goes through Pawl.Engine.Event.changeZone: nothing arrives, so CR 400.7 mints
 -- no new incarnation and CR 614 has no destination to replace.
 --
--- The one way an ability object leaves the stack, and here rather than with the
--- resolution machinery because CR 608.2n's ending is not the only one that
--- needs it: CR 603.3c (Engine.placeBorne), CR 608.2a's failed intervening "if"
--- (Pawl.Engine.Stack), and CR 701.6a's countering (Pawl.Engine.Event.counter),
--- which cannot import Pawl.Engine.Resolve.
+-- The one way a stack object not represented by a card ceases to exist, and
+-- here rather than with the resolution machinery because CR 608.2n's ending is
+-- not the only one that needs it: CR 603.3c (Engine.placeBorne), CR 608.2a's
+-- failed intervening "if" (Pawl.Engine.Stack), CR 701.6a's countering
+-- (Pawl.Engine.Event.counter), which cannot import Pawl.Engine.Resolve, CR
+-- 800.4a's third clause (Pawl.Engine.Departure) and CR 901.10a
+-- (Pawl.Engine.Planechase).
 cease :: ObjectId -> GameState -> GameState
-cease abilId gs =
-  gs
-    { GameState.stack = filter (/= abilId) (GameState.stack gs),
-      GameState.objects = Map.delete abilId (GameState.objects gs)
-    }
+cease = deleteObject
 
 -- The card an object is a copy of. Nothing when the id is unknown.
 cardOf :: ObjectId -> GameState -> Maybe Card

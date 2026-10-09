@@ -1111,6 +1111,8 @@ library codec
     Pawl.Codec.RestrictedCreaturesSpec
     Pawl.Codec.Result
     Pawl.Codec.ResultSpec
+    Pawl.Codec.ReturnEnding
+    Pawl.Codec.ReturnEndingSpec
     Pawl.Codec.ReturnPermanents
     Pawl.Codec.ReturnPermanentsSpec
     Pawl.Codec.ReturnWatch
@@ -2549,6 +2551,7 @@ library types
     Pawl.Types.RestartSignal
     Pawl.Types.RestrictedCreatures
     Pawl.Types.Result
+    Pawl.Types.ReturnEnding
     Pawl.Types.ReturnPermanents
     Pawl.Types.ReturnWatch
     Pawl.Types.Reveal

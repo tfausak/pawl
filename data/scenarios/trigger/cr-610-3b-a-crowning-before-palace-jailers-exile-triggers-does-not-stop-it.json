@@ -1,0 +1,48 @@
+{
+  "description": "CR 610.3b a crowning before Palace Jailer's exile triggers does not stop the exile",
+  "note": "The lower bound of the 610.3b look-back. Jared Carthalion, True Heir crowns bob, and its rider keeps alice from taking the crown this turn. Only then does alice cast Palace Jailer. bob's crowning came before the exile triggered, so 610.3b does not apply, and the Goblin Piker is exiled. It stays there, since no opponent is crowned afterwards. A look-back with no lower bound would count the earlier crowning and leave the Piker on the battlefield.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "m", "ready": true },
+          { "card": "Forest", "label": "f", "ready": true },
+          { "card": "Plains", "label": "p1", "ready": true },
+          { "card": "Plains", "label": "p2", "ready": true },
+          { "card": "Plains", "label": "p3", "ready": true },
+          { "card": "Plains", "label": "p4", "ready": true },
+          { "card": "Plains", "label": "p5", "ready": true }
+        ],
+        "hand": [
+          { "card": "Jared Carthalion, True Heir", "label": "jared" },
+          { "card": "Palace Jailer", "label": "jailer" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$jared", "mana": ["$m", "$f", "$p1", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "opponent": ["$bob"] } }, "source": "Jared Carthalion, True Heir" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Monarch": { "player": "bob" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$jailer", "mana": ["$p2", "$p3", "$p4", "$p5"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTriggers": ["Palace Jailer", "Palace Jailer"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "target": ["$piker"] } }, "source": "Palace Jailer" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Monarch": { "player": "bob" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "View": { "of": "Stack", "is": [] } } }
+  ]
+}
