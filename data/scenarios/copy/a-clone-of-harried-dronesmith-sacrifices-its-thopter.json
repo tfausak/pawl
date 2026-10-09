@@ -1,0 +1,34 @@
+{
+  "description": "CR 707.2 / 603.7a a Clone of Harried Dronesmith sacrifices the Thopter its copied trigger made",
+  "note": "The delayed sacrifice is declared by name on Harried Dronesmith's card, and the Clone's printed card declares nothing. A lookup that reads the printed card arms nothing, so the Thopter stays. The Dronesmith is bob's, so the only Thopter alice can have is the Clone's.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "i1", "ready": true },
+          { "card": "Island", "label": "i2", "ready": true },
+          { "card": "Island", "label": "i3", "ready": true },
+          { "card": "Island", "label": "i4", "ready": true }
+        ],
+        "hand": [{ "card": "Clone", "label": "clone" }],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Harried Dronesmith", "label": "smith" }],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$clone", "mana": ["$i1", "$i2", "$i3", "$i4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "$smith" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Thopter Token", "count": 1 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": [] } },
+    { "turn": 2, "step": "Upkeep", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Thopter Token", "count": 0 } } }
+  ]
+}

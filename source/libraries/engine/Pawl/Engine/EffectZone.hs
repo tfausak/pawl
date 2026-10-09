@@ -76,8 +76,9 @@ import Pawl.Types.Zone (Zone)
 -- needs the text an Effect.ArmDelayedTrigger stands for. An arm inside a quoted
 -- ability carries it (Pawl.Engine.Game.carriedDelayedAbility); any other names
 -- it (Pawl.Types.Face.delayedAbilities holds the payload). Every caller supplies
--- the map off the same card the ability is read from, which is where
--- Pawl.Engine.Game.declaredDelayedAbility resolves the name at run time. Rule
+-- the map off the same characteristics the ability is read from
+-- (PC.delayedAbilities), which is where Pawl.Engine.Projection's
+-- declaredDelayedAbility resolves the name at run time. Rule
 -- 702's own roster
 -- (Pawl.Engine.Keyword.mintedDelayedAbilities) is unioned in BEHIND that map, the
 -- order Pawl.Engine.Resolve.Effect's arm resolves a name in, so the two cannot

@@ -605,7 +605,7 @@ happenedBetween before after =
         || comparable before /= comparable after
 
 -- CR 603.12: does this instruction create a REFLEXIVE triggered ability? The arm
--- is resolved exactly as the arm itself resolves it (Game.armedDelayedAbility,
+-- is resolved exactly as the arm itself resolves it (Projection.armedDelayedAbility,
 -- then rule 702's minted roster), and the answer is the created ability's own
 -- CLASSIFICATION -- its trigger condition -- never which card armed it.
 armsReflexive :: ObjectId -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> GameState -> Bool
@@ -614,7 +614,7 @@ armsReflexive source effect gs = case effect of
     maybe
       False
       ((== TriggerCondition.Reflexive) . TriggeredAbility.condition)
-      (Game.armedDelayedAbility source arm gs <|> Keyword.mintedDelayedAbility (ArmDelayedTrigger.name arm))
+      (Projection.armedDelayedAbility source arm gs <|> Keyword.mintedDelayedAbility (ArmDelayedTrigger.name arm))
   _ -> False
 
 -- The players a PlayerRef names, in CR 101.4's APNAP order -- playerRefPlayers
@@ -7625,7 +7625,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- id `source` names. CR 603.7: a rule 702 keyword has no card text to declare
     -- the far end in, so a name a minted ability arms resolves against rule 702's
     -- own roster instead; the two namespaces are kept disjoint by Pawl.CardSpec.
-    case Game.armedDelayedAbility source arm gs <|> Keyword.mintedDelayedAbility name of
+    case Projection.armedDelayedAbility source arm gs <|> Keyword.mintedDelayedAbility name of
       -- For a CARD's name the dataflow lint makes a dangling one a failing test,
       -- and this arm only keeps the executor total. A MINTED name has no such
       -- lint, so a forgotten roster row lands here and does nothing.

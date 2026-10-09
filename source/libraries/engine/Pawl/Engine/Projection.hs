@@ -38,6 +38,7 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AgainstLastCardExiledWith as AgainstLastCardExiledWith
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.BattlefieldCandidate as BattlefieldCandidate
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
@@ -562,6 +563,7 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
                   { PC.keywords = keywords,
                     PC.activatedAbilities = fmap (rewriteActivatedAbility pairs) (PC.activatedAbilities pc),
                     PC.triggeredAbilities = fmap (rewriteTriggeredAbility pairs) (PC.triggeredAbilities pc),
+                    PC.delayedAbilities = fmap (rewriteTriggeredAbility pairs) (PC.delayedAbilities pc),
                     PC.replacementEffects = fmap (rewritePrintedReplacement pairs) (PC.replacementEffects pc),
                     PC.characteristicPT = fmap (rewriteCharacteristicPT pairs) (PC.characteristicPT pc),
                     PC.staticAbilities = fmap (rewriteStaticAbility pairs) (PC.staticAbilities pc),
@@ -797,6 +799,8 @@ exchangeTextBoxFrom from pc =
       PC.subtypeWordChanges = PC.subtypeWordChanges from,
       PC.activatedAbilities = PC.activatedAbilities from,
       PC.triggeredAbilities = PC.triggeredAbilities from,
+      -- CR 612.5: the text box holds the delayed declarations too.
+      PC.delayedAbilities = PC.delayedAbilities from,
       PC.replacementEffects = PC.replacementEffects from,
       PC.enchant = PC.enchant from,
       PC.castingPermissions = PC.castingPermissions from,
@@ -1244,6 +1248,25 @@ projectWithLastKnown :: ObjectId -> GameState -> ProjectedCharacteristics
 projectWithLastKnown oid gs = case lastKnownOf oid gs of
   Just lk -> LastKnown.characteristics lk
   Nothing -> project oid gs
+
+-- CR 603.7 / 707.2: the text an Effect.ArmDelayedTrigger's or a
+-- Pawl.Types.WhenSpent's NAME stands for on `source` -- its rules text as
+-- projected (PC.delayedAbilities), so a copy, a merged permanent (CR 702.140e)
+-- and a conjured duplicate arm the text they carry rather than their printed
+-- card's, and a departed source answers with its last known text (CR 608.2h).
+-- Then the printed card's other faces (Game.declaredDelayedAbility), for the
+-- face that turned away mid-resolution. data/scenarios/copy's and
+-- data/scenarios/conjure's Harried Dronesmith scenarios prove the projected
+-- half; the merged half is a regression fence, the printed fallback walking
+-- every component too.
+declaredDelayedAbility :: ObjectId -> AbilityName.AbilityName -> GameState -> Maybe (TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
+declaredDelayedAbility source name gs =
+  Map.lookup name (PC.delayedAbilities (projectWithLastKnown source gs)) Applicative.<|> Game.declaredDelayedAbility source name gs
+
+-- CR 603.7: the text an Effect.ArmDelayedTrigger stands for -- the one it
+-- carries (Game.carriedDelayedAbility), else its name's (declaredDelayedAbility).
+armedDelayedAbility :: ObjectId -> ArmDelayedTrigger.ArmDelayedTrigger (GrantedAbility.GrantedAbility Card.Type.Card) -> GameState -> Maybe (TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
+armedDelayedAbility source arm gs = Game.carriedDelayedAbility arm Applicative.<|> declaredDelayedAbility source (ArmDelayedTrigger.name arm) gs
 
 -- powerGiven with the same fallback, on CR 608.2b's own sentence about target
 -- re-validation -- so a mentor (CR 702.134a) killed in response leaves its
