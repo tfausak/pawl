@@ -33,6 +33,7 @@ import qualified Pawl.Codec.PrintingId as Codec.PrintingId
 import qualified Pawl.Codec.Reference as Codec.Reference
 import qualified Pawl.Codec.Reply as Codec.Reply
 import qualified Pawl.Codec.SlotName as Codec.SlotName
+import qualified Pawl.Codec.StickerRef as Codec.StickerRef
 import qualified Pawl.Codec.StoredResult as Codec.StoredResult
 import qualified Pawl.Codec.Subtype as Codec.Subtype
 import qualified Pawl.Codec.Zone as Codec.Zone
@@ -336,6 +337,7 @@ shapeOf prompt = case prompt of
   Prompt.ChooseCardFromAmong {} -> object
   Prompt.ChooseCardsFromAmong {} -> setOf object
   Prompt.ChooseDungeon {} -> viaCodec Codec.PrintingId.codec
+  Prompt.ChooseSticker {} -> viaCodec Codec.StickerRef.codec
   Prompt.ChooseCompanion {} -> maybeOf (viaCodec Codec.OutsideCard.codec)
   Prompt.ChooseFromOutsideTheGame {} -> unsupported (Text.pack "outside cards")
   Prompt.ChooseRoom {} -> wrapped RoomIndex.MkRoomIndex RoomIndex.unwrap

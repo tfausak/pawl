@@ -82,6 +82,7 @@ import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Types.PreventNextDamageInstance as PreventNextDamageInstance
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
+import qualified Pawl.Types.PutSticker as PutSticker
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
@@ -810,6 +811,8 @@ data Effect card ability
     ShuffleIntoLibrary ShuffleIntoLibrary.ShuffleIntoLibrary
   | -- | CR 407.4: ante the objects the payload names, each by its owner.
     Ante Ante.Ante
+  | -- | CR 123.3: put a sticker on each named object.
+    PutSticker PutSticker.PutSticker
   | -- | CR 701.24a on its own: the libraries the PlayerRef names are randomized,
     -- and nothing moves. A second arm rather than an empty ref on the one above,
     -- which would send cards through the CR 400.7 funnel.

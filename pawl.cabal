@@ -1058,6 +1058,7 @@ library codec
     Pawl.Codec.PutCountersFrom
     Pawl.Codec.PutCountersFromSpec
     Pawl.Codec.PutCountersSpec
+    Pawl.Codec.PutSticker
     Pawl.Codec.Quantity
     Pawl.Codec.QuantitySpec
     Pawl.Codec.RandomCardInGraveyard
@@ -2528,6 +2529,7 @@ library types
     Pawl.Types.Prototype
     Pawl.Types.PutCounters
     Pawl.Types.PutCountersFrom
+    Pawl.Types.PutSticker
     Pawl.Types.Quantity
     Pawl.Types.RandomCardInGraveyard
     Pawl.Types.RandomCardInHand

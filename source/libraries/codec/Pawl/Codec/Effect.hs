@@ -94,6 +94,7 @@ import qualified Pawl.Codec.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Codec.PreventNextDamageInstance as PreventNextDamageInstance
 import qualified Pawl.Codec.PutCounters as PutCounters
 import qualified Pawl.Codec.PutCountersFrom as PutCountersFrom
+import qualified Pawl.Codec.PutSticker as PutSticker
 import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Codec.RedirectDamage as RedirectDamage
 import qualified Pawl.Codec.RemoveCounters as RemoveCounters
@@ -295,6 +296,7 @@ codec cardCodec abilityCodec =
           Arm.payload "TakeExtraTurn" TakeExtraTurn.codec Effect.TakeExtraTurn (\x -> case x of Effect.TakeExtraTurn y -> Just y; _ -> Nothing),
           Arm.payload "ShuffleIntoLibrary" ShuffleIntoLibrary.codec Effect.ShuffleIntoLibrary (\x -> case x of Effect.ShuffleIntoLibrary y -> Just y; _ -> Nothing),
           Arm.payload "Ante" Ante.codec Effect.Ante (\x -> case x of Effect.Ante y -> Just y; _ -> Nothing),
+          Arm.payload "PutSticker" PutSticker.codec Effect.PutSticker (\x -> case x of Effect.PutSticker y -> Just y; _ -> Nothing),
           Arm.payload "SetOwner" SetOwner.codec Effect.SetOwner (\x -> case x of Effect.SetOwner y -> Just y; _ -> Nothing),
           Arm.payload "ExchangeOwnership" ExchangeOwnership.codec Effect.ExchangeOwnership (\x -> case x of Effect.ExchangeOwnership y -> Just y; _ -> Nothing),
           Arm.payload "ExchangeWithTopOfLibrary" ExchangeWithTopOfLibrary.codec Effect.ExchangeWithTopOfLibrary (\x -> case x of Effect.ExchangeWithTopOfLibrary y -> Just y; _ -> Nothing),
@@ -474,6 +476,7 @@ tagOf x = case x of
   Effect.TakeExtraTurn {} -> "TakeExtraTurn"
   Effect.ShuffleIntoLibrary {} -> "ShuffleIntoLibrary"
   Effect.Ante {} -> "Ante"
+  Effect.PutSticker {} -> "PutSticker"
   Effect.SetOwner {} -> "SetOwner"
   Effect.ExchangeOwnership {} -> "ExchangeOwnership"
   Effect.ExchangeWithTopOfLibrary {} -> "ExchangeWithTopOfLibrary"

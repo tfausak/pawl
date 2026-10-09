@@ -333,6 +333,7 @@ zoneFunctionedAgainst itself delayed effect = case effect of
   Effect.TakeExtraTurn {} -> Nothing
   Effect.ShuffleIntoLibrary {} -> Nothing
   Effect.Ante {} -> Nothing
+  Effect.PutSticker {} -> Nothing
   Effect.SetOwner {} -> Nothing
   Effect.ExchangeOwnership {} -> Nothing
   Effect.ExchangeWithTopOfLibrary {} -> Nothing

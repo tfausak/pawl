@@ -7,6 +7,7 @@
 -- TriggerCondition.PlacesSticker.
 module Pawl.StickerSpec where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
@@ -34,6 +35,7 @@ import qualified Pawl.StickerSheets as StickerSheets
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilitySticker as AbilitySticker
 import qualified Pawl.Types.Deck as Deck
+import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
@@ -41,15 +43,18 @@ import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PowerToughnessSticker as PowerToughnessSticker
+import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.StickerKind as StickerKind
 import qualified Pawl.Types.StickerPlacement as StickerPlacement
+import qualified Pawl.Types.StickerRef as StickerRef
 import qualified Pawl.Types.StickerSheet as StickerSheet
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Zone as Zone
@@ -127,6 +132,40 @@ copying :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 copying oid p = case p of
   Prompt.ChooseCopyTarget {} -> Just oid
   _ -> S.identityAnswer p
+
+-- What a placement asked: the permanents offered, the stickers offered and the
+-- "may"s, each newest first.
+data Offers = MkOffers {permanents :: [[ObjectId.ObjectId]], stickers :: [[StickerRef.StickerRef]], mays :: Int}
+
+-- Accepts every "may", names `onto` where a permanent is chosen and it is
+-- offered, and answers ChooseSticker with the FIRST offered, pinned by position.
+placing :: Maybe ObjectId.ObjectId -> Prompt.Prompt r -> State.State Offers r
+placing onto p = case p of
+  Prompt.ChooseOptional {} -> do
+    State.modify' (\o -> o {mays = mays o + 1})
+    pure OptionalDecision.Exercises
+  Prompt.ChoosePermanent _ _ _ offered -> do
+    State.modify' (\o -> o {permanents = NonEmpty.toList offered : permanents o})
+    pure (case onto of Just oid | List.elem oid offered -> oid; _ -> NonEmpty.head offered)
+  Prompt.ChooseSticker _ _ _ offered -> do
+    State.modify' (\o -> o {stickers = NonEmpty.toList offered : stickers o})
+    pure (NonEmpty.head offered)
+  _ -> pure (S.identityAnswer p)
+
+-- Settle and resolve until the stack is empty.
+drain :: Game.Type.Game ()
+drain = do
+  Engine.settleForPriority
+  stack <- State.gets GameState.stack
+  Monad.unless (null stack) (Stack.resolveTop >> drain)
+
+-- A Pyrodancer enters under alice with its enters event, and everything it
+-- triggers resolves under `placing onto`.
+pyrodancerEnters :: Printing.Printing -> Maybe ObjectId.ObjectId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState, Offers)
+pyrodancerEnters pyrodancer onto gs0 =
+  let (pyro, entered) = S.entersWithTrigger pyrodancer S.alice gs0
+      ((_, after), offers) = State.runState (Engine.runGame (placing onto) entered drain) (MkOffers [] [] 0)
+   in (pyro, after, offers)
 
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Sticker" $ do
@@ -275,3 +314,76 @@ spec s registry = Spec.describe s "Sticker" $ do
         bounced = S.runPure (namingTarget pikerId) (g3 {GameState.priority = Just S.bob}) (S.cast S.bob unsummonId >> Stack.resolveTop)
     Spec.assertEqWith s "CR 123.1 with the stickered Piker gone, its Clone does not keep Croakid flying" (Projection.hasKeyword Keyword.Flying croakidId bounced) False
     Spec.assertEqWith s "the Clone is on the battlefield beside Croakid" (length (filter (\oid -> Set.notMember oid (GameState.battlefield base)) (Game.zoneMembers Zone.Battlefield S.alice bounced))) 2
+  -- The spec's retention bullet as the whole card: Pyrodancer stickers itself
+  -- (the only nonland permanent alice owns) and dies to a Bolt.
+  Spec.it s "CR 123.9 whole card: Pyrodancer's art sticker is on it, and stays through its death" $ do
+    sheets <- committedSheets
+    pyrodancer <- S.printingOf s registry "Proficient Pyrodancer"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    mountain <- S.printingOf s registry "Mountain"
+    let base = withSheets (take 1 sheets) (S.landsFor mountain S.bob 1 (Setup.gameWith GameSettings.plain S.bothPlayers))
+        (pyro, stickered, _) = pyrodancerEnters pyrodancer Nothing base
+        (boltId, g1) = S.addHandCard bolt S.bob stickered
+        killed = S.settleSba (S.runPure (namingTarget pyro) (g1 {GameState.priority = Just S.bob}) (S.cast S.bob boltId >> Stack.resolveTop))
+    Spec.assertEqWith s "CR 123.9 Pyrodancer's art sticker is on it" (fmap (fmap (StickerRef.kind . StickerPlacement.sticker) . Foldable.toList . Object.stickers) (Game.lookupObject pyro stickered)) (Just [StickerKind.Art])
+    Spec.assertEqWith s "CR 123.5 and on the card in the graveyard" (fmap (Seq.length . fst) (stickersIn Zone.Graveyard killed)) [1]
+  -- Review Focus 4. Two copies of one sheet: six art stickers, all distinct.
+  -- Two placements on the Piker, then a bounce frees both.
+  Spec.it s "CR 123.3/123.3a a used sticker is not offered again until its card reaches a hidden zone" $ do
+    sheets <- committedSheets
+    pyrodancer <- S.printingOf s registry "Proficient Pyrodancer"
+    piker <- S.printingOf s registry "Goblin Piker"
+    unsummon <- S.printingOf s registry "Unsummon"
+    island <- S.printingOf s registry "Island"
+    let sheet = take 1 sheets
+        (pikerId, g1) = S.addPermanent piker S.alice (withSheets (sheet <> sheet) (S.landsFor island S.bob 1 (Setup.gameWith GameSettings.plain S.bothPlayers)))
+        (_, g2, first) = pyrodancerEnters pyrodancer (Just pikerId) g1
+        (_, g3, second) = pyrodancerEnters pyrodancer (Just pikerId) g2
+        (unsummonId, g4) = S.addHandCard unsummon S.bob g3
+        bounced = S.runPure (namingTarget pikerId) (g4 {GameState.priority = Just S.bob}) (S.cast S.bob unsummonId >> Stack.resolveTop)
+        (_, _, third) = pyrodancerEnters pyrodancer Nothing bounced
+        offered o = concat (take 1 (stickers o))
+    Spec.assertEqWith s "CR 123.3 the used sticker is not offered again" (offered second) (drop 1 (offered first))
+    Spec.assertEqWith s "CR 123.5 the bounce frees both" (offered third) (offered first)
+    Spec.assertEqWith s "CR 123.3a two copies of one sheet offer six art stickers" (length (offered first)) 6
+  -- CR 123.3b through the card's "you own": alice controls bob's Piker, and
+  -- only her own nonland permanents are offered.
+  Spec.it s "CR 123.3b Pyrodancer offers only a permanent alice owns" $ do
+    sheets <- committedSheets
+    pyrodancer <- S.printingOf s registry "Proficient Pyrodancer"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    let (bobsPiker, g1) = S.addPermanent piker S.bob (withSheets (take 1 sheets) (Setup.gameWith GameSettings.plain S.bothPlayers))
+        (bearsId, g2) = S.addPermanent bears S.alice (S.giveControl bobsPiker S.alice g1)
+        (pyro, after, offers) = pyrodancerEnters pyrodancer (Just bearsId) g2
+    Spec.assertEqWith s "CR 123.3b bob's Piker is not offered, alice's two permanents are" (fmap List.sort (permanents offers)) [List.sort [pyro, bearsId]]
+    Spec.assertEqWith s "and it took no sticker" (fmap (Seq.length . Object.stickers) (Game.lookupObject bobsPiker after)) (Just 0)
+  -- Review Focus 1's gameplay half: no sheets, nothing to place, no "may".
+  Spec.it s "CR 608.2d with no sheets Pyrodancer's may is not offered" $ do
+    pyrodancer <- S.printingOf s registry "Proficient Pyrodancer"
+    let (pyro, after, offers) = pyrodancerEnters pyrodancer Nothing (Setup.gameWith GameSettings.plain S.bothPlayers)
+    Spec.assertEqWith s "CR 608.2d alice was not asked" (mays offers) 0
+    Spec.assertEqWith s "and nothing is stickered" (fmap (Seq.length . Object.stickers) (Game.lookupObject pyro after)) (Just 0)
+  -- Two Pikers, one stickered: only it is a legal target, and it gets +2/+0
+  -- and menace.
+  Spec.it s "CR 123.9 Pyrodancer's ability targets only a creature with an art sticker" $ do
+    sheets <- committedSheets
+    pyrodancer <- S.printingOf s registry "Proficient Pyrodancer"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    let (marked, g1) = S.addPermanent piker S.alice (mainPhaseForAlice (S.landsFor mountain S.alice 3 (withSheets (take 1 sheets) (Setup.gameWith GameSettings.plain S.bothPlayers))))
+        (plainPiker, g2) = S.addPermanent piker S.alice g1
+        (pyro, g3, _) = pyrodancerEnters pyrodancer (Just marked) g2
+        board = mainPhaseForAlice g3
+        recording :: Prompt.Prompt r -> State.State [ObjectId.ObjectId] r
+        recording p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> do
+            State.put (concatMap (Maybe.mapMaybe Recipient.objectOf . Set.toList . snd) (Map.elems sets))
+            pure (namingTarget marked p)
+          _ -> pure (S.identityAnswer p)
+        ((_, after), offered) = case Activatable.abilitiesFor pyro board of
+          [ability] -> State.runState (Engine.runGame recording board (Activate.activateAbility S.alice pyro ability >> Stack.resolveTop)) []
+          _ -> (((), board), [])
+    Spec.assertEqWith s "CR 115.1 only the Piker with an art sticker is offered" offered [marked]
+    Spec.assertEqWith s "it gets +2/+0 and menace" (Projection.powerOf marked after, Projection.hasKeyword Keyword.Menace marked after) (Just 4, True)
+    Spec.assertEqWith s "the other Piker is untouched" (Projection.powerOf plainPiker after) (Just 2)

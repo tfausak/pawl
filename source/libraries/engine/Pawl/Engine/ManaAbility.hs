@@ -475,6 +475,7 @@ manaProduced effect = case effect of
   Effect.TakeExtraTurn {} -> Nothing
   Effect.ShuffleIntoLibrary {} -> Nothing
   Effect.Ante {} -> Nothing
+  Effect.PutSticker {} -> Nothing
   Effect.SetOwner {} -> Nothing
   Effect.ExchangeOwnership {} -> Nothing
   Effect.ExchangeWithTopOfLibrary {} -> Nothing
@@ -670,6 +671,7 @@ playerChoice effect = case effect of
   Effect.TakeExtraTurn {} -> Nothing
   Effect.ShuffleIntoLibrary {} -> Nothing
   Effect.Ante {} -> Nothing
+  Effect.PutSticker {} -> Nothing
   Effect.SetOwner {} -> Nothing
   Effect.ExchangeOwnership {} -> Nothing
   Effect.ExchangeWithTopOfLibrary {} -> Nothing
@@ -727,6 +729,8 @@ movesLibraryCard effect = case effect of
   Effect.ShuffleIntoLibrary {} -> True
   -- CR 407.4: never INTO a library; out of one where the ref reaches it.
   Effect.Ante (Ante.MkAnte _ ref _) -> refReachesLibrary ref
+  -- CR 123.3: a sticker moves nothing.
+  Effect.PutSticker {} -> False
   -- CR 108.3: an ownership write moves no card at all.
   Effect.SetOwner {} -> False
   -- CR 108.3: nor does a trade of owners.

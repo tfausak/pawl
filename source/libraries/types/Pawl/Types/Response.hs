@@ -48,6 +48,7 @@ import qualified Pawl.Types.RollAdjustment as RollAdjustment
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SearchPlace as SearchPlace
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.StickerRef as StickerRef
 import qualified Pawl.Types.StoredResult as StoredResult
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TimeTravelChoice as TimeTravelChoice
@@ -378,6 +379,8 @@ data Response
     -- dungeon already in the command zone, this one names the CARD, and a
     -- transcript of one must not satisfy the other.
     ChoseDungeon PrintingId.PrintingId
+  | -- | CR 123.3: the sticker a player put on an object.
+    ChoseSticker StickerRef.StickerRef
   | -- | CR 103.2b \/ 702.139a: the card a player revealed as their companion
     -- before the game began, or Nothing for a player who revealed none.
     --

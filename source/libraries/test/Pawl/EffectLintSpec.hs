@@ -174,6 +174,7 @@ import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
+import qualified Pawl.Types.PutSticker as PutSticker
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.RandomCardInGraveyard as RandomCardInGraveyard
 import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
@@ -427,6 +428,7 @@ ownQuantities effect = case effect of
   Effect.TakeExtraTurn takeExtraTurn -> [TakeExtraTurn.count takeExtraTurn]
   Effect.ShuffleIntoLibrary {} -> []
   Effect.Ante {} -> []
+  Effect.PutSticker {} -> []
   Effect.SetOwner {} -> []
   Effect.ExchangeOwnership {} -> []
   Effect.ExchangeWithTopOfLibrary {} -> []
@@ -1251,11 +1253,12 @@ data Asks
     -- it" -- through the same chooseCardsInHand the move gather uses, and falls
     -- through to the pure sweep for every other arm.
     AsksLookAtArm
-  | -- | Pawl.Engine.Resolve's Effect.Pair and Effect.ModifyTarget arms. Each
-    -- asks the chosen-permanent arm through chosenPermanentOf -- CR 702.95a's
-    -- "another unpaired creature you control", Mirkwood Trapper's "that player
-    -- chooses an attacking creature" -- and falls through to the pure sweep for
-    -- everything else.
+  | -- | Pawl.Engine.Resolve's Effect.Pair, Effect.ModifyTarget and
+    -- Effect.PutSticker arms. Each asks the chosen-permanent arm through
+    -- chosenPermanentOf -- CR 702.95a's "another unpaired creature you control",
+    -- Mirkwood Trapper's "that player chooses an attacking creature", Proficient
+    -- Pyrodancer's "a nonland permanent you own" -- and falls through to the pure
+    -- sweep for everything else.
     AsksChosenPermanent
   | -- | Pawl.Engine.Resolve's Effect.ExchangeWithCardInHand arm, which asks
     -- its one hand chooser through chooseCardsInHand.
@@ -1587,6 +1590,7 @@ effectObjectRefs effect =
         Effect.TakeExtraTurn {} -> []
         Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ refs) -> read_ (NonEmpty.toList refs)
         Effect.Ante (Ante.MkAnte _ ref _) -> read_ [ref]
+        Effect.PutSticker (PutSticker.MkPutSticker _ ref _) -> [(AsksChosenPermanent, ref)]
         Effect.SetOwner (SetOwner.MkSetOwner _ ref) -> read_ [ref]
         Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership one other) -> read_ [one, other]
         Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary ref _) -> read_ [ref]

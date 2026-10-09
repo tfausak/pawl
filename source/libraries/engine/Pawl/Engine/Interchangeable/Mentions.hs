@@ -282,6 +282,7 @@ import qualified Pawl.Types.ProliferateR as ProliferateR
 import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
+import qualified Pawl.Types.PutSticker as PutSticker
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.RandomCardInGraveyard as RandomCardInGraveyard
 import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
@@ -1384,6 +1385,7 @@ effectNames asking onCard onAbility x = case x of
   Effect.TakeExtraTurn takeExtraTurn -> takeExtraTurnNames asking takeExtraTurn
   Effect.ShuffleIntoLibrary shuffleIntoLibrary -> shuffleIntoLibraryNames asking shuffleIntoLibrary
   Effect.Ante ante -> anteNames asking ante
+  Effect.PutSticker putSticker -> putStickerNames asking putSticker
   Effect.SetOwner (SetOwner.MkSetOwner player ref) -> playerRefNames asking player || objectRefNames asking ref
   Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership one other) -> objectRefNames asking one || objectRefNames asking other
   Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary ref player) -> objectRefNames asking ref || playerRefNames asking player
@@ -2568,6 +2570,10 @@ setHalfLockedNames asking x = case x of
 anteNames :: Asking -> Ante.Ante -> Bool
 anteNames asking x = case x of
   Ante.MkAnte player ref slot -> playerRefNames asking player || objectRefNames asking ref || any (slotNames asking) slot
+
+putStickerNames :: Asking -> PutSticker.PutSticker -> Bool
+putStickerNames asking x = case x of
+  PutSticker.MkPutSticker player ref _kinds -> playerRefNames asking player || objectRefNames asking ref
 
 shuffleIntoLibraryNames :: Asking -> ShuffleIntoLibrary.ShuffleIntoLibrary -> Bool
 shuffleIntoLibraryNames asking x = case x of

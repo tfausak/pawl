@@ -113,6 +113,7 @@ encode p answer = case p of
   Prompt.ChooseCardFromAmong {} -> Response.ChoseCardFromAmong answer
   Prompt.ChooseCardsFromAmong {} -> Response.ChoseCardsFromAmong answer
   Prompt.ChooseDungeon {} -> Response.ChoseDungeon answer
+  Prompt.ChooseSticker {} -> Response.ChoseSticker answer
   Prompt.ChooseCompanion {} -> Response.ChoseCompanion answer
   Prompt.ChooseFromOutsideTheGame {} -> Response.ChoseFromOutsideTheGame answer
   Prompt.ChooseRoom {} -> Response.ChoseRoom answer
@@ -410,6 +411,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseDungeon {} -> case response of
     Response.ChoseDungeon printingId -> Just printingId
+    _ -> Nothing
+  Prompt.ChooseSticker {} -> case response of
+    Response.ChoseSticker ref -> Just ref
     _ -> Nothing
   Prompt.ChooseCompanion {} -> case response of
     Response.ChoseCompanion printingId -> Just printingId
@@ -950,6 +954,8 @@ defaultAnswer p = case p of
   -- CR 309.2a: the prompt is only raised where the player owns two or more
   -- dungeon cards, and every one of them is a dungeon they may bring in.
   Prompt.ChooseDungeon _ _ candidates -> NonEmpty.head candidates
+  -- CR 123.3: asked only at two or more, every one available.
+  Prompt.ChooseSticker _ _ _ candidates -> NonEmpty.head candidates
   -- CR 103.2b's "if any players WISH to reveal": declining is the answer that
   -- asks for nothing, and this default is not a choice being made for a player
   -- but the absence of one.

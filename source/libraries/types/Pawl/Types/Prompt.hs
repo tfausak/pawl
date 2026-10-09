@@ -62,6 +62,7 @@ import qualified Pawl.Types.RollAdjustment as RollAdjustment
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SearchPlace as SearchPlace
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.StickerRef as StickerRef
 import qualified Pawl.Types.StoredResult as StoredResult
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TargetCount as TargetCount
@@ -352,6 +353,9 @@ data Prompt r where
   -- player brings in from outside the game (CR 400.11), there being no object
   -- for it yet.
   ChooseDungeon :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty PrintingId.PrintingId -> Prompt PrintingId.PrintingId
+  -- | CR 123.3: which available sticker the placer puts on this object.
+  -- ChooseDungeon's posture: asked at two or more, filtered rather than trusted.
+  ChooseSticker :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty StickerRef.StickerRef -> Prompt StickerRef.StickerRef
   -- | CR 103.2b \/ 702.139a: which card, if any, a player reveals from outside
   -- the game as their companion, before the game begins. An OutsideCard for
   -- ChooseFromOutsideTheGame's reason: in a subgame a main-game object is
