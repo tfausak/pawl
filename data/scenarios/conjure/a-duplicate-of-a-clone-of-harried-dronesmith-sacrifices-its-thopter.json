@@ -1,0 +1,56 @@
+{
+  "description": "CR 707.2 / 603.7a a duplicate of a Clone of Harried Dronesmith sacrifices the Thopter its trigger made",
+  "note": "The duplicate's printed card is Clone, and the values it was minted with are Harried Dronesmith's (Object.duplicate), so the delayed sacrifice its combat trigger arms by name is found only through those values. The first Day of Judgment clears the Clone and bob's Dronesmith before the duplicate is cast, so the only Thopter alice can get is the duplicate's.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Mountain", "ready": true },
+          { "card": "Plains", "ready": true },
+          { "card": "Plains", "ready": true },
+          { "card": "Plains", "ready": true },
+          { "card": "Plains", "ready": true },
+          { "card": "Plains", "ready": true },
+          { "card": "Plains", "ready": true },
+          { "card": "Plains", "ready": true }
+        ],
+        "hand": [
+          { "card": "Clone", "label": "clone" },
+          { "card": "Sinister Reflections", "label": "reflections" },
+          { "card": "Day of Judgment", "label": "judgment" }
+        ],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Harried Dronesmith", "label": "smith" }],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$clone", "mana": ["Island", "Island#2", "Island#3", "Island#4", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "$smith" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$reflections", "targets": ["Clone"], "mana": ["Island#5", "Island#6", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$judgment", "mana": ["Plains", "Plains#2", "Plains#3", "Plains#4", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Harried Dronesmith", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "Clone", "mana": ["Mountain", "Plains#5", "Plains#6", "Plains#7"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Harried Dronesmith", "count": 1 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Thopter Token", "count": 1 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": [] } },
+    { "turn": 2, "step": "Upkeep", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Thopter Token", "count": 0 } } }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "description": "CR 113.7a Baboon Spirit's flicker returns the Giant at this end step even after Mirrorweave makes the Spirit a Meandering Towershell",
+  "note": "The ability exists on the stack independently of its source, so the delayed return it creates is the text the Spirit had when it was activated. Mirrorweave in response makes the Spirit a copy of bob's Towershell, whose own delayed ability has the same name, \"return it\", but returns at the declare attackers step of a later turn. Reading the source's text at resolution would arm the Towershell's, which waits for the declare attackers step of alice's next turn and leaves the Giant in exile through turn 2. The activation is after combat so that step cannot come this turn.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Baboon Spirit", "label": "spirit", "ready": true },
+          { "card": "Hill Giant", "label": "giant", "ready": true },
+          { "card": "Island", "label": "i1", "ready": true },
+          { "card": "Island", "label": "i2", "ready": true },
+          { "card": "Island", "label": "i3", "ready": true },
+          { "card": "Island", "label": "i4", "ready": true },
+          { "card": "Island", "label": "i5", "ready": true },
+          { "card": "Island", "label": "i6", "ready": true },
+          { "card": "Island", "label": "i7", "ready": true },
+          { "card": "Island", "label": "i8", "ready": true }
+        ],
+        "hand": [{ "card": "Mirrorweave", "label": "mirrorweave" }],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Meandering Towershell", "label": "towershell" }],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": [] } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "do": { "Activate": { "object": "$spirit", "targets": ["$giant"], "mana": ["$i1", "$i2", "$i3", "$i4", null] } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "do": { "Cast": { "object": "$mirrorweave", "targets": ["$towershell"], "mana": ["$i5", "$i6", "$i7", "$i8"] } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Names": { "object": "$spirit", "names": ["Meandering Towershell"] } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Exile", "card": "Hill Giant", "count": 1 } } },
+    { "turn": 2, "step": "Upkeep", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Hill Giant", "count": 1 } } },
+    { "turn": 2, "step": "Upkeep", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Exile", "card": "Hill Giant", "count": 0 } } }
+  ]
+}

@@ -2,9 +2,11 @@ module Pawl.Codec.TriggeredAbilitySourceSpec where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
+import qualified Data.Text as Text
 import qualified Pawl.Codec.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Modal as Modal
@@ -46,7 +48,8 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbilitySource" $ do
       TriggeredAbilitySource.MkTriggeredAbilitySource
         { TriggeredAbilitySource.source = ObjectId.MkObjectId 6,
           TriggeredAbilitySource.ability = ability,
-          TriggeredAbilitySource.createdAt = Nothing
+          TriggeredAbilitySource.createdAt = Nothing,
+          TriggeredAbilitySource.delayed = Map.empty
         }
       " {\"source\":6,\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}}} "
   -- CR 603.7a: the same record for an ability that fired from a delayed entry,
@@ -58,8 +61,21 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbilitySource" $ do
       TriggeredAbilitySource.MkTriggeredAbilitySource
         { TriggeredAbilitySource.source = ObjectId.MkObjectId 6,
           TriggeredAbilitySource.ability = ability,
-          TriggeredAbilitySource.createdAt = Just (Timestamp.MkTimestamp 3)
+          TriggeredAbilitySource.createdAt = Just (Timestamp.MkTimestamp 3),
+          TriggeredAbilitySource.delayed = Map.empty
         }
       " {\"source\":6,\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}},\"createdAt\":3} "
+  -- CR 113.7a: the delayed declarations frozen as the ability went on the stack.
+  Spec.it s "a triggered ability carrying its source's delayed declarations" $
+    Common.assertCodec
+      s
+      TriggeredAbilitySource.codec
+      TriggeredAbilitySource.MkTriggeredAbilitySource
+        { TriggeredAbilitySource.source = ObjectId.MkObjectId 6,
+          TriggeredAbilitySource.ability = ability,
+          TriggeredAbilitySource.createdAt = Nothing,
+          TriggeredAbilitySource.delayed = Map.singleton (AbilityName.MkAbilityName (Text.pack "later")) ability
+        }
+      " {\"source\":6,\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}},\"delayed\":{\"later\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}}}} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s TriggeredAbilitySource.codec

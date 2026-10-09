@@ -1,0 +1,48 @@
+{
+  "description": "CR 113.7a a Clone of Harried Dronesmith Mirrorweaved into a Hill Giant while its combat trigger waits still sacrifices the Thopter",
+  "note": "The triggered ability exists on the stack independently of its source, so the delayed sacrifice it creates is the text the Clone had as the trigger went on the stack. Mirrorweave in response makes the Clone a Hill Giant, and the Clone's printed card declares nothing, so reading either at resolution arms nothing and the Thopter stays. Bob's Dronesmith triggers only on bob's turn, so the only Thopter alice can have is the Clone's.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "i1", "ready": true },
+          { "card": "Island", "label": "i2", "ready": true },
+          { "card": "Island", "label": "i3", "ready": true },
+          { "card": "Island", "label": "i4", "ready": true },
+          { "card": "Island", "label": "i5", "ready": true },
+          { "card": "Island", "label": "i6", "ready": true },
+          { "card": "Island", "label": "i7", "ready": true },
+          { "card": "Island", "label": "i8", "ready": true }
+        ],
+        "hand": [
+          { "card": "Clone", "label": "clone" },
+          { "card": "Mirrorweave", "label": "mirrorweave" }
+        ],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Harried Dronesmith", "label": "smith" },
+          { "card": "Hill Giant", "label": "giant" }
+        ],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$clone", "mana": ["$i1", "$i2", "$i3", "$i4", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "$smith" } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "do": { "Cast": { "object": "$mirrorweave", "targets": ["$giant"], "mana": ["$i5", "$i6", "$i7", "$i8"] } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Hill Giant", "count": 1 } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Thopter Token", "count": 1 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": [] } },
+    { "turn": 2, "step": "Upkeep", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Thopter Token", "count": 0 } } }
+  ]
+}

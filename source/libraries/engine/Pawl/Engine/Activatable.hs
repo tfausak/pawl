@@ -34,7 +34,6 @@ import qualified Pawl.Types.Card as Card
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostAdjustments as CostAdjustments
-import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -122,13 +121,13 @@ abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) 
   -- your graveyard to the battlefield" is payable by a Skeleton standing on the
   -- battlefield, and only this filter stops it being offered there.
   --
-  -- The delayed map is the HOST's own face while the abilities are the
-  -- PROJECTED ones. A granted ability's arm carries its delayed ability
+  -- The delayed map is the projection's too (CR 707.2), so a copy reads the text
+  -- it copied. A granted ability's arm carries its delayed ability
   -- (Pawl.AbilitySlotLintSpec's quoted-arm lint) and EffectZone reads it off the
   -- arm, so the host's map never has to hold the grantor's text.
   -- Pawl.Engine.Event.battlefieldAbilitiesOf carries the same pairing and the
   -- same note.
-  Just Zone.Battlefield -> filter (functionsIn (Game.delayedAbilitiesOf oid gs) Zone.Battlefield) (Projection.abilitiesGiven pcs oid gs)
+  Just Zone.Battlefield -> filter (functionsIn (PC.delayedAbilities (Projection.projectGiven pcs oid gs)) Zone.Battlefield) (Projection.abilitiesGiven pcs oid gs)
   -- CR 113.6j: the MINTED abilities rule 702 gives the keywords, plus the
   -- card's own AUTHORED ones that name the hand. The two are disjoint by
   -- construction -- handAbilitiesOf reads keywords and zoneAbilitiesOf reads
@@ -198,8 +197,7 @@ abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) 
 -- The abilities are the PROJECTION's (CR 613.1f and CR 707.2 name no zone), so
 -- a graveyard card that Synthetic Mirror of the Fallen made a copy of
 -- Reassembling Skeleton offers the Skeleton's return; Pawl.CopySpec's Mirror
--- pair proves it. The delayed map stays the printed face's, the battlefield
--- arm's pairing.
+-- pair proves it. The delayed map is the same projection's.
 --
 -- The condition's perspective is the OWNER. CR 109.5's "your" is the ability's
 -- controller, and the Max Speed glossary entry says which player that is for a
@@ -213,8 +211,9 @@ abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) 
 -- here is inside the layer fold, so there is no circularity to bound against.
 zoneAbilitiesOf :: Map.Map ObjectId PC.ProjectedCharacteristics -> Zone.Zone -> ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)]
 zoneAbilitiesOf pcs zone oid gs = case (Game.faceOf oid gs, Game.lookupObject oid gs) of
-  (Just face, Just _) ->
-    let delayed = Face.delayedAbilities face
+  (Just _, Just _) ->
+    let projected = Projection.projectGiven pcs oid gs
+        delayed = PC.delayedAbilities projected
         -- CR 113.6p, the limb beside CR 113.6b that reads the OBJECT rather than
         -- the ability: an emblem's abilities function in the command zone (CR
         -- 114.4), and a face-up vanguard card's (CR 902.7) and conspiracy's (CR
@@ -234,7 +233,7 @@ zoneAbilitiesOf pcs zone oid gs = case (Game.faceOf oid gs, Game.lookupObject oi
         granted ability = case ActivatedAbility.condition ability of
           Nothing -> True
           Just cond -> Condition.holds (Projection.fullView gs) (Filter.contextFor (Game.teams gs) (activatorOf oid gs) (Just oid)) gs oid cond
-     in filter (\ability -> functionsHere ability && granted ability) (PC.activatedAbilities (Projection.projectGiven pcs oid gs))
+     in filter (\ability -> functionsHere ability && granted ability) (PC.activatedAbilities projected)
   _ -> []
 
 -- CR 113.6m in full: "an ability whose cost OR EFFECT specifies that it moves

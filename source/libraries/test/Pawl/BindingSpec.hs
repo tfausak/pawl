@@ -45,6 +45,7 @@ sampleSnapshot =
       PC.activatedAbilities = [],
       PC.replacementEffects = [],
       PC.triggeredAbilities = [],
+      PC.delayedAbilities = Map.empty,
       PC.enchant = [],
       PC.castingPermissions = [],
       PC.ruleAbilities = mempty,
