@@ -799,7 +799,7 @@ matchesPrinted viewOf gs event candidate =
                 && matchesController gs candidate (CounterPattern.whose pat) oid
                 && matchesPermanent viewOf gs Nothing Map.empty Nothing (CounterPattern.onWhat pat) oid
         -- CR 109.5: "under YOUR control" -- the tokens' controller against the
-        -- effect source's controller. CR 102.2's Opponents has no producer today.
+        -- candidate's "you". No producer today names an opponent here.
         --
         -- And WHAT is being created (Queen Allenal of Ruadach's "creature
         -- tokens"): "one or more" is ANY lot matching, each judged as its token

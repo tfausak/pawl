@@ -16,8 +16,8 @@ data CounterSubject
     -- misses CR 714.3c's lore counter and CR 120.3's damage results.
     ByEffect
   | -- | "If YOU would put", "if an OPPONENT would put" -- Vorinclex, Monstrous
-    -- Raider. CR 109.5 reads the relation against the controller of the effect's
-    -- source. Every cause names a player, so this subject reaches all of them,
+    -- Raider. CR 109.5 reads the relation against the candidate's "you". Every
+    -- cause names a player, so this subject reaches all of them,
     -- narrowed by which player that is.
     ByPlayer ControllerRelation.ControllerRelation
   | -- | "If one or more +1/+1 counters would be put on a creature you control" --

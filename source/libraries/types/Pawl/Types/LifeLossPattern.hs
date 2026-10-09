@@ -18,7 +18,7 @@ import qualified Pawl.Types.LifeLossCause as LifeLossCause
 -- zone count, which Pawl.Engine.Replacement.breaches asks per rewrite. Both are
 -- questions a pattern shared by every rewrite cannot phrase.
 data LifeLossPattern = MkLifeLossPattern
-  { -- | CR 109.5's relation, read against the effect source's controller.
+  { -- | CR 109.5's relation, read against the candidate's "you".
     whose :: ControllerRelation.ControllerRelation,
     -- | Our own encoding convention, not a rule: Nothing means any cause, never
     -- no cause.
