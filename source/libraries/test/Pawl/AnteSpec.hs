@@ -11,6 +11,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Ante as Ante
+import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -34,7 +35,10 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.TeamId as TeamId
+import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Zone as Zone
 
 anteGame :: GameSettings.GameSettings
@@ -259,3 +263,34 @@ spec s registry = Spec.describe s "Ante" $ do
         alike = Interchangeable.objects (Projection.projectAll g4) g4
     Spec.assertEqWith s "two Mountains alice began the game with are interchangeable" (alike a b) True
     Spec.assertEqWith s "one bob began the game with is not" (alike a c) False
+  -- CR 104.4a: two players who lose at once draw, and a draw has no winner,
+  -- so CR 407.2 pays nobody.
+  Spec.it s "CR 104.4a/407.2 a drawn game pays out no ante card" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (alices, g1) = S.addObjectIn Zone.Ante piker S.alice (Setup.gameWith anteGame S.bothPlayers)
+        (bobs, g2) = S.addObjectIn Zone.Ante piker S.bob g1
+        drawn = S.runPure S.identityAnswer g2 (Departure.leaveGameTogether Departure.Type.Lost [S.alice, S.bob])
+        ownerOf oid = fmap Object.owner (Game.lookupObject oid drawn)
+    Spec.assertEqWith s "CR 407.2 nobody won, so each ante card keeps its owner" (ownerOf alices, ownerOf bobs) (Just S.alice, Just S.bob)
+    Spec.assertEqWith s "CR 104.4a the game is a draw" (GameState.result drawn) (Just Result.Drawn)
+  -- bob draws and leaves while alice and carol play on (CR 801.16's partial
+  -- draw is a departure); CR 800.4n keeps his ante card in the game, and when
+  -- carol concedes, alice, the winner, owns all three.
+  Spec.it s "CR 800.4n/407.2 a player who draws leaves their ante card to the eventual winner" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let stake pid (ids, g) = let (oid, g') = S.addObjectIn Zone.Ante piker pid g in (ids <> [oid], g')
+        (staked, g1) = stake S.carol (stake S.bob (stake S.alice ([], Setup.gameWith anteGame S.threePlayers)))
+        drew = S.runPure S.identityAnswer g1 (Departure.leaveGameTogether Departure.Type.Drew [S.bob])
+        won = S.runPure S.identityAnswer drew (Departure.leaveGame Departure.Type.Conceded S.carol)
+    Spec.assertEqWith s "CR 407.2 alice, the winner, owns every ante card" (fmap (\oid -> fmap Object.owner (Game.lookupObject oid won)) staked) (replicate 3 (Just S.alice))
+    Spec.assertEqWith s "CR 104.2a alice won" (GameState.result won) (Just (Result.Won S.alice))
+    Spec.assertEqWith s "and bob's draw had decided nothing" (GameState.result drew) Nothing
+  -- alice and bob are a team; carol concedes and the team wins (CR 104.2c).
+  -- CR 407.2's one winner says nothing of a team.
+  Spec.it s "CR 104.2c a team's win pays out no ante card" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let teamed = anteGame {GameSettings.teams = Teams.MkTeams (Map.fromList [(S.alice, TeamId.MkTeamId 0), (S.bob, TeamId.MkTeamId 0), (S.carol, TeamId.MkTeamId 1)])}
+        (carols, g1) = S.addObjectIn Zone.Ante piker S.carol (Setup.gameWith teamed S.threePlayers)
+        won = S.runPure S.identityAnswer g1 (Departure.leaveGame Departure.Type.Conceded S.carol)
+    Spec.assertEqWith s "carol's ante card is still hers" (fmap Object.owner (Game.lookupObject carols won)) (Just S.carol)
+    Spec.assertEqWith s "CR 104.2c the team won" (GameState.result won) (Just (Result.TeamWon (TeamId.MkTeamId 0)))

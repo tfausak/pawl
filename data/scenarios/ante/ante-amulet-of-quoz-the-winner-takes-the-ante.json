@@ -1,0 +1,27 @@
+{
+  "description": "CR 407.2 Amulet of Quoz: bob declines to ante, alice wins the flip and the game, and becomes the owner of every card in the ante",
+  "note": "Count reads a shared zone by owner, so alice's Count of the Goblin Piker is the payout. Two different cards so the report's one line can only be bob's.",
+  "board": {
+    "ante": true,
+    "active": "alice",
+    "step": "Upkeep",
+    "seats": [
+      { "name": "alice", "battlefield": [{ "card": "Amulet of Quoz", "label": "amulet" }], "ante": [{ "card": "Hill Giant" }], "library": [{ "card": "Mountain" }, { "card": "Mountain" }] },
+      { "name": "bob", "ante": [{ "card": "Goblin Piker" }], "library": [{ "card": "Plains" }, { "card": "Mountain" }] }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "Answer": { "prompt": "CallCoin", "with": { "type": "Heads" } } } },
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "Answer": { "prompt": "FlipCoin", "with": { "type": "Heads" } } } },
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "Activate": { "object": "$amulet", "ability": 0, "targets": ["$bob"], "costOrder": [0, 1] } } },
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "Upkeep", "player": "bob", "do": { "ChooseOptional": { "type": "Declines" } } }
+  ],
+  "final": [
+    { "Count": { "player": "alice", "zone": "Ante", "card": "Goblin Piker", "count": 1 } },
+    { "Count": { "player": "alice", "zone": "Ante", "card": "Hill Giant", "count": 1 } },
+    { "Count": { "player": "bob", "zone": "Ante", "card": "Goblin Piker", "count": 0 } },
+    { "View": { "of": "Result", "is": { "won": "alice" } } },
+    { "View": { "of": "OwnershipChanges", "is": [["Goblin Piker", "bob", "alice"]] } }
+  ]
+}
