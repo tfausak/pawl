@@ -364,15 +364,15 @@ eventBindingsOver board gs bearerBecame becameInGraveyard bearer you cond event 
   --
   -- Read off CR 608.2h's record of the DEPARTED id, not off the arrival, and CR
   -- 108.3 makes the two the same answer: a zone change carries the owner across,
-  -- and only Game.setOwner (CR 407.3) writes one. The arrival is what CR 111.7 and CR 704.5d take away -- a token
-  -- that reached a hand ceases to exist, and Engine.performSettle runs that
-  -- state-based action BEFORE placePendingTriggers, so by the time this runs the
-  -- arriving object is already deleted and a live lookup of it would leave the
-  -- slot unbound for exactly the case CR 111.7's parenthetical says must still
-  -- trigger. The departed id's record survives: the zone-change funnel files it
-  -- in the same write that deletes the object, and nothing prunes it. Proved by
-  -- Pawl.ZoneTriggerSpec's "CR 111.7 bob's Piker TOKEN under alice's control
-  -- still makes bob discard".
+  -- and only Game.setOwner (CR 407.3) writes one. The arrival is what CR 111.7
+  -- and CR 704.5d take away -- a token that reached a hand ceases to exist, and
+  -- Engine.performSettle runs that state-based action BEFORE
+  -- placePendingTriggers, so by the time this runs the arriving object is already
+  -- deleted and a live lookup of it would leave the slot unbound for exactly the
+  -- case CR 111.7's parenthetical says must still trigger. The departed id's
+  -- record survives: the zone-change funnel files it in the same write that
+  -- deletes the object, and nothing prunes it. Proved by Pawl.ZoneTriggerSpec's
+  -- "CR 111.7 bob's Piker TOKEN under alice's control still makes bob discard".
   --
   -- CR 400.7e's `became` is NOT bound: a hand is hidden (CR 400.2), the
   -- SelfLeavesTheBattlefield arm's guard, here settled by the condition itself.
@@ -1170,8 +1170,8 @@ admitsDeparture gs bearer you p departed = case Projection.viewWithLastKnown dep
   Nothing -> False
   Just view ->
     -- CR 400.1: "your graveyard" is the pile the card LEFT, off CR 608.2h's
-    -- record -- its owner's but between an ownership change and the move that
-    -- follows it (Tempest Efreet), where the owner names the wrong seat.
+    -- record -- its owner's except between an ownership change and the move
+    -- that follows it (Tempest Efreet), where the owner names the wrong seat.
     let fromWhose = case CardLeavesZone.whose p of
           Nothing -> True
           Just relation -> case Projection.lastKnownOf departed gs >>= LastKnown.pile of

@@ -5681,8 +5681,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       _ -> pure ()
   -- CR 701.12d: the one named card and the top card of the named player's
   -- library exchange zones. All or nothing (CR 701.12a): one card named, a top
-  -- card that is another card, and one owner for both (CR 701.12d's "only if
-  -- all the cards are owned by the same player"). Then one event (CR 608.2f):
+  -- card that is another card (CR 701.12d's "even if one zone is empty" is for
+  -- exchanging zones' contents, and Darkpact names one card, "the top card"),
+  -- and one owner for both (CR 701.12d's "only if all the cards are owned by
+  -- the same player"). Then one event (CR 608.2f):
   -- the named card onto the top of its owner's library (CR 400.3), the top card
   -- into the zone the named card left.
   Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary ref player) -> do

@@ -655,7 +655,7 @@ data Filter keyword
     -- their hands" is @Not (IsInZone Hand)@ (#163). A cast gate reads it before
     -- CR 601.2a moves the card to the stack, which is what CR 601.2's "take it
     -- from where it is" asks for. Names a zone and not whose -- "in your
-    -- graveyard" is an OwnedBy conjunct beside this atom, exact but between an
+    -- graveyard" is an OwnedBy conjunct beside this atom, exact except between an
     -- ownership change and the move that follows it in one resolution (CR
     -- 407.3). Vacuously False where
     -- there is no OBJECT to ask (CR 109.1).

@@ -628,9 +628,9 @@ attachments oid gs =
     (GameState.battlefield gs)
 
 -- CR 400.1: the player whose library, hand or graveyard holds this card -- its
--- owner (CR 400.3) except between an ownership change and the move that follows
--- it in one resolution (CR 407.3). Found by search for that reason; Nothing for
--- an object in no player's pile.
+-- owner (CR 400.3) except between an ownership change and a later move (CR
+-- 407.3) -- in every pool card, the next instruction of the same resolution.
+-- Found by search for that reason; Nothing for an object in no player's pile.
 pileHolderOf :: ObjectId -> GameState -> Maybe PlayerId
 pileHolderOf oid gs = Foldable.asum (fmap (pileHolderIn oid) [GameState.library gs, GameState.hand gs, GameState.graveyard gs])
 

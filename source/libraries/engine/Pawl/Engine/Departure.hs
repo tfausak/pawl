@@ -552,8 +552,9 @@ givesControlOnEntryTo pid active =
 --
 --   1. CR 110.2's DEFAULT controller (Projection.defaultControllerOf):
 --      Object.enteredUnder where a rule recorded one, otherwise CR 108.4a's
---      Object.owner. Object.owner is baked at creation and never mutated, and
---      the first clause deleted every object `pid` owned. Object.enteredUnder is
+--      Object.owner. Only CR 407.3's ante cards change Object.owner, and none
+--      names an object on the stack, so the first clause deleted every object
+--      `pid` owned. Object.enteredUnder is
 --      written by three writers and no others (see Pawl.Types.Object):
 --      Event.changeZoneAttaching for the effect that put a permanent onto the
 --      battlefield (CR 110.2a), Pawl.Engine.Replacement's entry loop for a CR
