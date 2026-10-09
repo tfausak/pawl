@@ -109,6 +109,19 @@
       "step": "DeclareBlockers",
       "player": "bob",
       "do": {
+        "Answer": {
+          "prompt": "ReverseManaAbilities",
+          "with": {
+            "type": "Exercises"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
         "Block": {
           "$free": [
             "$attacker"

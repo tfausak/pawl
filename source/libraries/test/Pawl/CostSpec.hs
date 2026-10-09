@@ -36,6 +36,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Setup as Setup
@@ -2645,6 +2646,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   veneratedLoxodonSpec s registry
   convokeWindowSpec s registry
   assistSpec s registry
+  partialReversalSpec s registry
   treasureCruiseSpec s registry
   geyserLeaperSpec s registry
   kataraSpec s registry
@@ -4922,7 +4924,7 @@ announcedReversalSpec s registry = Spec.describe s "Reversal after an announceme
         Spec.assertEqWith s "and CR 602.5b's record was never written" (GameState.activatedThisTurn kept) (GameState.activatedThisTurn gs)
         Spec.assertEqWith s "the payer who reverses gets nothing floating" (poolSize S.alice reversed) 0
         Spec.assertBool s (not (isTapped battlementsId reversed || isTapped mountainId reversed)) "and both lands untapped"
-        Spec.assertEqWith s "alice was asked once" asked 1
+        Spec.assertEqWith s "alice was asked once per land" asked 2
 
   -- Mystic Gate's "{W/U}, {T}" activated from nothing: its own window taps the
   -- Gate for its "{T}: Add {C}" and then the Island for {U}, so the {W/U} is
@@ -4940,7 +4942,7 @@ announcedReversalSpec s registry = Spec.describe s "Reversal after an announceme
     Spec.assertEqWith s "the payer who reverses gets nothing floating" (poolSize S.alice reversed) 0
     Spec.assertBool s (not (isTapped islandId reversed || isTapped gateId reversed)) "and both untapped"
     Spec.assertBool s (not paid) "CR 601.2h the {W/U} activation itself was refused"
-    Spec.assertEqWith s "alice was asked once" asked 1
+    Spec.assertEqWith s "alice was asked once per source" asked 2
 
 -- `n` copies of one printing onto alice's battlefield, ids in creation order.
 addPermanents :: Printing.Printing -> Int -> GameState.GameState -> ([ObjectId.ObjectId], GameState.GameState)
@@ -5763,7 +5765,7 @@ assistSpec s registry = Spec.describe s "Charging Binox" $ do
     Spec.assertEqWith s "both keeping: bob's three and alice's one" (poolSize S.bob bothKeep, poolSize S.alice bothKeep) (3, 1)
     Spec.assertEqWith s "both reversing: nothing tapped" (S.tappedCount S.bob neither + S.tappedCount S.alice neither) 0
     Spec.assertEqWith s "CR 601.2a the Binox is back in alice's hand whatever they answered" (fmap (\g -> (GameState.stack g, Game.zoneMembers Zone.Hand S.alice g)) [bobKeeps, aliceKeeps, bothKeep, neither]) (replicate 4 ([], [spell]))
-    Spec.assertEqWith s "CR 101.4 alice then bob, each once" asked [S.alice, S.bob]
+    Spec.assertEqWith s "CR 101.4 alice then bob, bob once per Plains" asked [S.alice, S.bob, S.bob, S.bob]
   -- CR 101.4b: bob answers second, knowing alice's answer. The pair differs
   -- only in what alice answered; the board bob is asked on is what shows it.
   Spec.it s "CR 101.4b the helper is asked on the board the caster's answer left" $ do
@@ -5776,11 +5778,11 @@ assistSpec s registry = Spec.describe s "Charging Binox" $ do
         (_, seenKeep) = run OptionalDecision.Declines OptionalDecision.Declines
         (_, seenReverse) = run OptionalDecision.Exercises OptionalDecision.Declines
         ((_, neither), seenNeither) = run OptionalDecision.Exercises OptionalDecision.Exercises
-    Spec.assertEqWith s "bob is asked with alice's reversed Forest untapped" (fmap (isTapped forestId) seenReverse) [False]
-    Spec.assertEqWith s "and with her kept Forest tapped" (fmap (isTapped forestId) seenKeep) [True]
+    Spec.assertEqWith s "bob is asked with alice's reversed Forest untapped" (fmap (isTapped forestId) seenReverse) [False, False, False]
+    Spec.assertEqWith s "and with her kept Forest tapped" (fmap (isTapped forestId) seenKeep) [True, True, True]
     -- CR 104.4b: the stamp bob's question wrote survives the final restore,
     -- which for two reversals goes back to a state from before the cast.
-    Spec.assertEqWith s "CR 104.4b the last question's stamp stands" (fmap GameState.lastChoice seenNeither) [GameState.lastChoice neither]
+    Spec.assertEqWith s "CR 104.4b the last question's stamp stands" (fmap GameState.lastChoice (take 1 (reverse seenNeither))) [GameState.lastChoice neither]
   -- CR 106.6a on the HELPER's mana: bob sacrifices Generator Servant ({T},
   -- Sacrifice: "Add {C}{C}. If any of that mana is spent on a creature spell, it
   -- gains haste until end of turn.") in his assist window and pays seven with its
@@ -5850,6 +5852,140 @@ reversingAssist alice bob forestId plainsIds p = case p of
     State.modify' (<> [player])
     pure (if player == S.bob then bob else alice)
   _ -> pure (assisting (Just S.bob) (Natural.Extra.length plainsIds) forestId plainsIds p)
+
+-- CR 733.1's "each player may also reverse ANY legal mana abilities that
+-- player activated", one question per activation, newest first. Oracle text
+-- checked against Scryfall 2026-10-09:
+--
+--   Llanowar Elves {G} Creature -- Elf Druid 1/1: "{T}: Add {G}."
+--   Ancient Tomb Land: "{T}: Add {C}{C}. This land deals 2 damage to you."
+--   Skyshroud Elf {1}{G} Creature -- Elf Druid 1/1: "{T}: Add {G}. {1}: Add
+--   {R} or {W}."
+--   Goblin Piker {1}{R} Creature -- Goblin Warrior 2/1, no rules text.
+--
+-- alice casts the Piker and closes the window short of it, so CR 601.2h
+-- refuses it. Each case is one board answered two ways.
+partialReversalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+partialReversalSpec s registry = Spec.describe s "Reversing some mana abilities" $ do
+  -- The Elves' {G} kept while the Tomb's {C}{C} and 2 damage go back, a state
+  -- neither whole answer leaves.
+  Spec.it s "CR 733.1 alice keeps the Elves' {G} and reverses the Tomb's damage" $ do
+    elves <- S.printingOf s registry "Llanowar Elves"
+    tomb <- S.printingOf s registry "Ancient Tomb"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    let (spell, elvesId, tombId, gs) = partialReversalBoard mountain elves tomb piker
+        run decide = State.runState (Engine.runGame (reversingSome redType (const decide)) gs (S.cast S.alice spell)) ([elvesId, tombId], [])
+        ((_, keptElves), (_, asked)) = run (\oid -> if oid == tombId then OptionalDecision.Exercises else OptionalDecision.Declines)
+        ((_, keptTomb), _) = run (\oid -> if oid == elvesId then OptionalDecision.Exercises else OptionalDecision.Declines)
+    Spec.assertBool s (isTapped elvesId keptElves && not (isTapped tombId keptElves)) "the Elves stay tapped and the Tomb untaps"
+    Spec.assertEqWith s "CR 120.3a the Tomb's 2 damage is undone" (S.lifeOf S.alice keptElves) (Just 20)
+    Spec.assertEqWith s "CR 106.4 the Elves' {G} floats alone" (poolTypes S.alice keptElves) [ManaType.Colored Color.Green]
+    Spec.assertBool s (isTapped tombId keptTomb && not (isTapped elvesId keptTomb)) "the other way round: the Tomb stays tapped and the Elves untap"
+    Spec.assertEqWith s "and its damage stands" (S.lifeOf S.alice keptTomb) (Just 18)
+    Spec.assertEqWith s "and its {C}{C} floats alone" (poolTypes S.alice keptTomb) [ManaType.Colorless, ManaType.Colorless]
+    Spec.assertEqWith s "CR 601.2a the Piker is back in alice's hand" (Game.zoneMembers Zone.Hand S.alice keptElves, GameState.stack keptElves) ([spell], [])
+    Spec.assertEqWith s "the Tomb is asked first, then the Elves" asked [[tombId], [elvesId]]
+
+  -- Two Tombs each dealt 2: reversing the older one undoes its 2 alone.
+  Spec.it s "CR 733.1 reversing the older of two Tombs undoes only its damage" $ do
+    tomb <- S.printingOf s registry "Ancient Tomb"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    let (spell, olderId, newerId, gs) = partialReversalBoard mountain tomb tomb piker
+        ((_, after), (_, asked)) = State.runState (Engine.runGame (reversingSome redType (const (\oid -> if oid == olderId then OptionalDecision.Exercises else OptionalDecision.Declines))) gs (S.cast S.alice spell)) ([olderId, newerId], [])
+    Spec.assertBool s (isTapped newerId after && not (isTapped olderId after)) "the newer Tomb stays tapped and the older one untaps"
+    Spec.assertEqWith s "CR 120.3a alice has taken the newer Tomb's 2 alone" (S.lifeOf S.alice after) (Just 18)
+    Spec.assertEqWith s "and has its {C}{C} floating" (poolTypes S.alice after) [ManaType.Colorless, ManaType.Colorless]
+    Spec.assertEqWith s "both Tombs are asked, newest first" asked [[newerId], [olderId]]
+
+  -- The Elves' {G} pays Skyshroud Elf's {1}. Keeping the Skyshroud's {R}
+  -- leaves the Elves nothing to ask: CR 733.1's "unless mana from those
+  -- abilities ... was spent on another mana ability that wasn't reversed".
+  Spec.it s "CR 733.1 the Elves whose {G} paid a kept Skyshroud Elf are not offered back" $ do
+    elves <- S.printingOf s registry "Llanowar Elves"
+    skyshroud <- S.printingOf s registry "Skyshroud Elf"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    let (spell, elvesId, skyshroudId, gs) = partialReversalBoard mountain elves skyshroud piker
+        run decide = State.runState (Engine.runGame (reversingSome redType (const decide)) gs (S.cast S.alice spell)) ([elvesId, skyshroudId], [])
+        ((_, kept), (_, keptAsked)) = run (\oid -> if oid == skyshroudId then OptionalDecision.Declines else OptionalDecision.Exercises)
+        ((_, reversed), (_, reversedAsked)) = run (const OptionalDecision.Exercises)
+    Spec.assertBool s (isTapped elvesId kept) "the Elves stay tapped"
+    Spec.assertEqWith s "CR 106.4 the {R} the {G} paid for floats" (poolTypes S.alice kept) [ManaType.Colored Color.Red]
+    Spec.assertEqWith s "only the Skyshroud Elf is asked" keptAsked [[skyshroudId]]
+    Spec.assertBool s (not (isTapped elvesId reversed)) "reversing the Skyshroud Elf too: the Elves untap"
+    Spec.assertEqWith s "and nothing floats" (poolTypes S.alice reversed) []
+    Spec.assertEqWith s "both asked, newest first" reversedAsked [[skyshroudId], [elvesId]]
+
+  -- Workhorse's ability activated twice, each removing a +1/+1 counter:
+  -- reversing the older puts back its counter alone.
+  Spec.it s "CR 733.1 reversing the older of two Workhorse activations puts back one counter" $ do
+    horse <- S.printingOf s registry "Workhorse"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    let (spell, horseId, _, gs0) = partialReversalBoard mountain horse mountain piker
+        gs = S.addCounter CounterKind.PlusOnePlusOne 4 horseId gs0
+        counters g = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject horseId g)
+        ((_, after), (_, asked)) = State.runState (Engine.runGame (reversingSome redType (\i _ -> if i == 0 then OptionalDecision.Declines else OptionalDecision.Exercises)) gs (S.cast S.alice spell)) ([horseId, horseId], [])
+    Spec.assertEqWith s "CR 122.1 the Workhorse has three counters, the kept activation's removal standing" (counters after) (Just 3)
+    Spec.assertEqWith s "CR 106.4 and its {C} floats" (poolTypes S.alice after) [ManaType.Colorless]
+    Spec.assertEqWith s "both activations are asked" asked [[horseId], [horseId]]
+
+  -- Two Aether Hubs each paid {E}: reversing the older gives back its {E}
+  -- alone.
+  Spec.it s "CR 733.1 reversing the older of two Aether Hubs gives back one energy" $ do
+    hub <- S.printingOf s registry "Aether Hub"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    let (spell, olderId, newerId, gs0) = partialReversalBoard mountain hub hub piker
+        gs = S.addPlayerCounter PlayerCounterKind.Energy 2 S.alice gs0
+        green = ManaType.Colored Color.Green
+        ((_, after), (_, asked)) = State.runState (Engine.runGame (reversingSome green (const (\oid -> if oid == olderId then OptionalDecision.Exercises else OptionalDecision.Declines))) gs (S.cast S.alice spell)) ([olderId, newerId], [])
+    Spec.assertBool s (isTapped newerId after && not (isTapped olderId after)) "the newer Hub stays tapped and the older one untaps"
+    Spec.assertEqWith s "CR 122.1 alice has the older Hub's {E} back" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 1
+    Spec.assertEqWith s "CR 106.4 and the newer Hub's {G} floats" (poolTypes S.alice after) [green]
+    Spec.assertEqWith s "both Hubs are asked, newest first" asked [[newerId], [olderId]]
+
+-- alice holds `card` with `first` and then `second` on her battlefield, and
+-- has priority in her precombat main phase. A Mountain beside them makes the
+-- cast payable, so it is offered; no window here taps it.
+partialReversalBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+partialReversalBoard mountain first second card =
+  let (firstId, gs1) = S.addPermanent first S.alice (Setup.emptyGame S.bothPlayers)
+      (secondId, gs2) = S.addPermanent second S.alice gs1
+      (_, gs3) = S.addPermanent mountain S.alice gs2
+      (spell, gs4) = S.addHandCard card S.alice gs3
+   in (spell, firstId, secondId, gs4 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice})
+
+-- CR 605.3a's windows answered off the queue in the state, each source taken
+-- when it is offered and every window closed once its head is not; a route
+-- yielding `wanted` taken where one is offered, pinned rather than searched
+-- for. CR 733.1's questions answered by `decide`, from how many were asked
+-- before and the first source named, and recorded in order.
+reversingSome :: ManaType.ManaType -> (Int -> ObjectId.ObjectId -> OptionalDecision.OptionalDecision) -> Prompt.Prompt r -> State.State ([ObjectId.ObjectId], [[ObjectId.ObjectId]]) r
+reversingSome wanted decide p = case p of
+  Prompt.ChooseManaSource _ _ candidates -> next candidates
+  Prompt.ChooseExtraManaSource _ _ candidates -> next candidates
+  Prompt.ReverseManaAbilities _ _ sources -> do
+    (queue, asked) <- State.get
+    State.put (queue, asked <> [NonEmpty.toList sources])
+    pure (decide (length asked) (NonEmpty.head sources))
+  Prompt.ChooseManaYield _ _ _ candidates -> pure (Maybe.fromMaybe (NonEmpty.head candidates) (List.find ((==) [wanted] . fmap ManaUnit.manaType . Mana.yieldUnits) (NonEmpty.toList candidates)))
+  _ -> pure (S.identityAnswer p)
+  where
+    next candidates = do
+      (queue, asked) <- State.get
+      case queue of
+        oid : rest | elem oid candidates -> Just oid <$ State.put (rest, asked)
+        _ -> pure Nothing
+
+redType :: ManaType.ManaType
+redType = ManaType.Colored Color.Red
+
+-- The types of the units floating in a player's pool, in pool order.
+poolTypes :: PlayerId.PlayerId -> GameState.GameState -> [ManaType.ManaType]
+poolTypes pid gs = fmap ManaUnit.manaType (Mana.Type.unwrap (Game.poolOf pid gs))
 
 -- A spell whose own cost sentence reads its CR 601.2c targets. Oracle
 -- text checked against Scryfall 2026-09-27:

@@ -1,6 +1,6 @@
 {
-  "description": "CR 733.1 what a nested window kept is offered again when the outer payment fails",
-  "note": "The Gate's {W/U} route opens a nested window that alice pays by tapping the Gate itself for {C} and the Island for {U}, which leaves the route's own {T} unpayable; she then stops, so the Piker's payment fails too. Four ReverseManaAbilities answers are scheduled and all are taken (one per source in the nested window, then one per source in the cast's): keeping both leaves {C}{U} floating and both lands tapped.",
+  "description": "CR 733.1 what a nested window kept is offered again one activation at a time",
+  "note": "The Gate's {W/U} route opens a nested window that alice pays by tapping the Gate itself for {C} and the Island for {U}, which leaves the route's own {T} unpayable; she keeps both there, then stops, so the Piker's payment fails too. The cast's reversal offers the two back one at a time, newest first: she reverses the Island's and keeps the Gate's, so {C} floats with the Gate tapped and the Island untapped.",
   "board": {
     "seats": [
       {
@@ -119,7 +119,7 @@
         "Answer": {
           "prompt": "ReverseManaAbilities",
           "with": {
-            "type": "Declines"
+            "type": "Exercises"
           }
         }
       }
@@ -157,21 +157,6 @@
               "restriction": null,
               "rider": null,
               "sourceChoices": null
-            },
-            {
-              "manaType": {
-                "type": "Colored",
-                "value": {
-                  "type": "Blue"
-                }
-              },
-              "tags": [],
-              "retention": {
-                "type": "Ordinary"
-              },
-              "restriction": null,
-              "rider": null,
-              "sourceChoices": null
             }
           ]
         }
@@ -195,7 +180,7 @@
       "check": {
         "Tapped": {
           "object": "$island",
-          "tapped": true
+          "tapped": false
         }
       }
     },

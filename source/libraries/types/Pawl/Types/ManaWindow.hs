@@ -1,7 +1,7 @@
 module Pawl.Types.ManaWindow where
 
 import Pawl.Types.GameState (GameState)
-import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.ManaActivation as ManaActivation
 import qualified Pawl.Types.PlayerId as PlayerId
 
 -- | A CR 605.3a mana window that has closed, as CR 733.1 needs it to reverse
@@ -12,9 +12,8 @@ import qualified Pawl.Types.PlayerId as PlayerId
 data ManaWindow = MkManaWindow
   { -- | The player the window was offered to.
     payer :: PlayerId.PlayerId,
-    -- | The sources whose mana abilities the payer activated in it, oldest
-    -- first.
-    activated :: [ObjectId.ObjectId],
+    -- | The mana abilities the payer activated in it, oldest first.
+    activated :: [ManaActivation.ManaActivation],
     -- | The state the window opened on.
     opened :: GameState,
     -- | The state it closed on, before a symbol of the cost was paid.

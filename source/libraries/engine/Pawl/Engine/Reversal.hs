@@ -2,9 +2,10 @@
 -- the state a player ends in who reverses an illegal play but KEEPS the legal
 -- mana abilities they activated while making it.
 --
--- Three states go in -- where the action began, where the CR 605.3a mana window
--- opened, and where it closed -- and one comes out, holding the window's writes
--- and none of the announcement's. It is one-directional: the announcement's own
+-- Three states go in -- where the undone stretch began, where it ended, and
+-- where the payment's mana window closed -- and one comes out, holding the
+-- writes after the stretch and none of the stretch's own. The stretch is the
+-- announcement, with any mana abilities the payer reversed. It is one-directional: the announcement's own
 -- `before -> entry` diff is undone on top of `closed`, rather than the window
 -- being replayed onto `before`. Replaying is not exact, and Crypt of Agadeem is
 -- why -- a mana ability that counts the graveyard counts it with the
@@ -14,15 +15,22 @@
 -- Pawl.Engine.Cost.composeReversal is the caller.
 module Pawl.Engine.Reversal where
 
+import qualified Control.Monad as Monad
 import qualified Data.Foldable as Foldable
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import Numeric.Natural (Natural)
+import qualified Pawl.Extra.Integer as Integer
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Mana as Mana
 import Pawl.Types.Object (Object)
 import qualified Pawl.Types.Object as Object
+import Pawl.Types.Player (Player)
+import qualified Pawl.Types.Player as Player
 
 -- CR 733.1: `closed` with the announcement undone -- "the entire action is
 -- reversed and any payments already made are canceled", while the mana
@@ -30,12 +38,14 @@ import qualified Pawl.Types.Object as Object
 -- began, where the payment's mana window opened, and where it closed.
 --
 -- Nothing where some leaf was written by BOTH sides to two different values,
--- which is a state this function declines to invent. That is CONSERVATIVE
--- rather than a claim of impossibility: Pawl.Engine.Cost then reverses the whole
--- action unasked, which is what every caller did before this function existed,
--- so the worst it can cost is the question. Nothing in the suite reaches it --
--- the Reversal groups in CostSpec, CombatCostSpec and Pawl.FaceDownSpec would
--- lose their prompt if it did.
+-- which is a state this function declines to invent -- except a pool, a life
+-- total and a count of counters, whose two changes add up (`pools`,
+-- `playerWith`, `tally`). Where a pool's do not, the undone side's mana was
+-- spent after it, and that Nothing is CR 733.1's "unless" clause
+-- (Pawl.Engine.Cost.reverseIllegal). Any other Nothing is CONSERVATIVE rather
+-- than a claim of impossibility: Pawl.Engine.Cost then leaves the activation
+-- standing, or reverses the whole action unasked, so the worst it can cost is
+-- the question.
 --
 -- A TOTAL record construction, one bind per field, never a record update: a new
 -- GameState field is then a `-Wmissing-fields` error here rather than a leaf
@@ -61,10 +71,10 @@ withoutAnnouncement before entry closed = do
   planarDecks <- libraries GameState.planarDecks
   schemeDecks <- libraries GameState.schemeDecks
   stack <- listOf GameState.stack
-  players <- mapOf GameState.players
+  players <- mapWith playerWith (GameState.players before) (GameState.players entry) (GameState.players closed)
   outsideObjects <- mapOf GameState.outsideObjects
   broughtIn <- seqOf GameState.broughtIn
-  manaPool <- mapOf GameState.manaPool
+  manaPool <- pools (GameState.manaPool before) (GameState.manaPool entry) (GameState.manaPool closed)
   combat <- one GameState.combat
   events <- eventsOf GameState.events
   nextEventGroup <- newest GameState.nextEventGroup
@@ -354,7 +364,7 @@ objectWith before entry closed = do
   sickness <- field Object.sickness
   controlClock <- field Object.controlClock
   bindings <- field Object.bindings
-  counters <- field Object.counters
+  counters <- tally (Object.counters before) (Object.counters entry) (Object.counters closed)
   counterTimestamps <- field Object.counterTimestamps
   attachedTo <- field Object.attachedTo
   chosenColors <- field Object.chosenColors
@@ -465,6 +475,63 @@ objectWith before entry closed = do
   where
     field :: (Eq a) => (Object -> a) -> Maybe a
     field get = leaf (get before) (get entry) (get closed)
+
+-- `leaf` for a player, with a life total and a counter count both sides
+-- changed each taken as the sum of their two changes: Ancient Tomb's 2 damage
+-- and a second Tomb's are two losses, and undoing one leaves the other. Every
+-- other field is still one leaf.
+playerWith :: Player -> Player -> Player -> Maybe Player
+playerWith before entry closed = case leaf before entry closed of
+  Just player -> Just player
+  Nothing -> do
+    let bare player = player {Player.life = 0, Player.counters = Map.empty}
+    player <- leaf (bare before) (bare entry) (bare closed)
+    counters <- tally (Player.counters before) (Player.counters entry) (Player.counters closed)
+    pure player {Player.life = Player.life closed + Player.life before - Player.life entry, Player.counters = counters}
+
+-- `leaf` for a count of counters, with a count both sides changed taken as
+-- the sum of their two changes, absent meaning zero: Workhorse's "Remove a
+-- +1/+1 counter" activated twice, and Aether Hub's {E} paid by two Hubs.
+-- Nothing where the sum would go below zero.
+tally :: (Ord k) => Map.Map k Natural -> Map.Map k Natural -> Map.Map k Natural -> Maybe (Map.Map k Natural)
+tally before entry closed = case leaf before entry closed of
+  Just counts -> Just counts
+  Nothing ->
+    let count key = toInteger . Map.findWithDefault 0 key
+        at key = case leaf (Map.lookup key before) (Map.lookup key entry) (Map.lookup key closed) of
+          Just value -> Just (key, value)
+          Nothing -> fmap (\summed -> (key, if summed == 0 then Nothing else Just summed)) (Integer.toNatural (count key closed + count key before - count key entry))
+        keys = Set.unions [Map.keysSet before, Map.keysSet entry, Map.keysSet closed]
+     in fmap (Map.fromList . Maybe.mapMaybe (\(key, value) -> fmap ((,) key) value)) (traverse at (Set.toList keys))
+
+-- CR 106.4's pools, each read as a multiset of units where `leaf` finds both
+-- sides wrote it: what the undone side added comes out of `closed` and what it
+-- spent goes back. Nothing where an added unit is no longer there -- CR
+-- 733.1's "unless mana from those abilities ... was spent on another mana
+-- ability that wasn't reversed", where Pawl.Engine.Cost.composeReversal is
+-- the caller. A unit has no identity beyond its fields (Pawl.Types.ManaUnit),
+-- so which of two equal units was spent is not a fact to recover.
+--
+-- An absent pool is an empty one, so a key goes through `leaf` whole first.
+pools :: (Ord k) => Map.Map k Mana.Mana -> Map.Map k Mana.Mana -> Map.Map k Mana.Mana -> Maybe (Map.Map k Mana.Mana)
+pools before entry closed =
+  let at key =
+        let get = Map.lookup key
+            held = Mana.unwrap . Maybe.fromMaybe (Mana.MkMana []) . get
+         in case leaf (get before) (get entry) (get closed) of
+              Just value -> Just (key, value)
+              Nothing -> fmap (\units -> (key, Just (Mana.MkMana units))) (pooled (held before) (held entry) (held closed))
+      keys = Set.unions [Map.keysSet before, Map.keysSet entry, Map.keysSet closed]
+   in fmap (Map.fromList . Maybe.mapMaybe (\(key, value) -> fmap ((,) key) value)) (traverse at (Set.toList keys))
+
+-- One pool's units, multiset-wise: `closed` less what `entry` added over
+-- `before`, plus what it took.
+pooled :: (Eq a) => [a] -> [a] -> [a] -> Maybe [a]
+pooled before entry closed =
+  let without xs y = case break (== y) xs of
+        (above, _ : below) -> Just (above <> below)
+        (_, []) -> Nothing
+   in fmap (<> (before List.\\ entry)) (Monad.foldM without closed (entry List.\\ before))
 
 -- The rule every leaf takes. `before` is where the action began, `entry` where
 -- the mana window opened, `closed` where it shut.
