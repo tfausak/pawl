@@ -159,6 +159,19 @@
       "step": "PrecombatMain",
       "player": "bob",
       "do": {
+        "Answer": {
+          "prompt": "ReverseManaAbilities",
+          "with": {
+            "type": "Exercises"
+          }
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
         "Cast": {
           "object": "Goblin Piker",
           "mana": [

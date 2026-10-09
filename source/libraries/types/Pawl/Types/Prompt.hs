@@ -237,9 +237,9 @@ data Prompt r where
   -- covers the cost, or Nothing to pay; never elided, floating being
   -- observable, and collapsed as ChooseManaSource is.
   ChooseExtraManaSource :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt (Maybe ObjectId.ObjectId)
-  -- | CR 733.1: whether the mana abilities activated while making a reversed
-  -- action are reversed too; the mana stays in the pool either way (CR
-  -- 106.4). All or nothing rather than a subset (gap #3134).
+  -- | CR 733.1: whether one mana ability activated while making a reversed
+  -- action is reversed too, asked per activation, newest first
+  -- (Pawl.Engine.Cost.reverseIllegal).
   ReverseManaAbilities :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt OptionalDecision.OptionalDecision
   -- | CR 605.3b: which mana the source produces, as the mana ability resolves;
   -- candidates are deduplicated by the whole option (Mana.manaOptionsOf).

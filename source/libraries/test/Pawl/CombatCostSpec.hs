@@ -2112,7 +2112,7 @@ tollReversalSpec s registry = Spec.describe s "Reversal at a combat toll" $ do
         Spec.assertEqWith s "CR 509.1 nothing blocks" (blockersOf attacker kept) Set.empty
         Spec.assertEqWith s "the payer who reverses gets nothing floating" (floating S.bob reversed) 0
         Spec.assertBool s (allUntapped forests reversed) "and both Forests untapped"
-        Spec.assertEqWith s "bob was asked" (tollReversals keptAsks) 1
+        Spec.assertEqWith s "bob was asked once per Forest" (tollReversals keptAsks) 2
       _ -> Spec.assertFailure s "fixture should have one attacker and one blocker"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()

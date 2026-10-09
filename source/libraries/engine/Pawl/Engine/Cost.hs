@@ -24,6 +24,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Semigroup as Semigroup
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
@@ -114,10 +115,12 @@ import qualified Pawl.Types.LoyaltyKind as LoyaltyKind
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.ManaAbilityResolved as ManaAbilityResolved
+import qualified Pawl.Types.ManaActivation as ManaActivation
 import qualified Pawl.Types.ManaAdded as ManaAdded
 import qualified Pawl.Types.ManaAddedCause as ManaAddedCause
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaOption as ManaOption
+import qualified Pawl.Types.ManaSegment as ManaSegment
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -4452,30 +4455,48 @@ criteriaOf component = case component of
 -- every payment made -- is undone by going back to it.
 --
 -- `windows` are the CR 605.3a mana windows the action opened, oldest first,
--- each holding the states it opened and closed on. A window's `closed` holds
--- its activations with nothing paid out of them yet, and it is what its payer
--- gets by declining to reverse: the sources stay tapped, the mana they made
--- stays in the pool (CR 106.4), and CR 405.6c's other effects -- Ancient Tomb's
--- 2 damage -- stay done.
+-- each holding the states it opened and closed on, its activations -- nested
+-- ones included -- and the stretches each of them wrote. A window's `closed`
+-- holds its activations with nothing paid out of them yet, and it is what its
+-- payer gets by keeping every one: the sources stay tapped, the mana they made
+-- stays in the pool (CR 106.4), and CR 405.6c's other effects -- Ancient
+-- Tomb's 2 damage -- stay done.
 --
 -- The CHOICE is each payer's because rule 733.1 says "each player MAY also
--- reverse" of exactly these, where the rest of the sentence is flat. A window's
--- activations are what it offers, so an empty one is no choice and raises
--- nothing. Most actions open one window; a cast with CR 702.132a's assist opens
--- the chosen player's ahead of the caster's (`offerAssist`), so two players can
--- each be asked. They answer in APNAP order (CR 101.4), each against the state
--- the cancellation and the earlier answers leave, with every window not yet
--- answered still standing -- so a later player sees what an earlier one chose
--- (CR 101.4b).
+-- reverse ANY" of exactly these, where the rest of the sentence is flat: one
+-- question per activation. Most actions open one window; a cast with CR
+-- 702.132a's assist opens the chosen player's ahead of the caster's
+-- (`offerAssist`), so two players can each be asked. They answer in APNAP
+-- order (CR 101.4), each against the state the cancellation and the earlier
+-- answers leave, with everything not yet answered still standing -- so a later
+-- answer sees what an earlier one chose (CR 101.4b).
 --
--- Where each window OPENED is what tells the sides apart: everything between
--- one window's close (or `before`) and the next one's opening is the
--- announcement's and goes back, and everything a kept window wrote stays.
--- `composeReversal` builds the state for each combination of answers out of
+-- One payer's activations are asked NEWEST FIRST, in the order they finished,
+-- which is what makes the rule's "unless" clause a question about answers
+-- already given: mana is only ever spent on an activation that finished later,
+-- so whether reversing one leaves its mana spent on another that was kept is
+-- settled once every later one is answered. Such an activation is not asked,
+-- since the rule leaves nothing to ask. `spendable` is that check: replayed in
+-- the order they finished, each kept activation must still be able to take
+-- what it spent out of the pool the window opened on and what the kept ones
+-- before it added. A unit has no identity beyond its fields
+-- (Pawl.Types.ManaUnit), so where two equal units could have paid, either is
+-- taken to have. CostSpec's Skyshroud Elf and Mystic Gate cases are the proof.
+--
+-- Where each kept stretch OPENED is what tells the sides apart: everything
+-- between one kept stretch's close (or `before`) and the next one's opening is
+-- reversed, and everything a kept stretch wrote stays. `composeReversal` builds
+-- the state for a set of answers out of
 -- Pawl.Engine.Reversal.withoutAnnouncement, which answers Nothing where two
--- sides wrote one leaf differently. Every combination is composed BEFORE anyone
--- is asked, and a Nothing anywhere falls back to the whole reversal unasked --
--- conservative, and reached by nothing in the suite.
+-- sides wrote one leaf irreconcilably. An activation is offered only where
+-- reversing it composes, with every one not yet answered kept, so the final
+-- state is always one already composed: the one the last "reverse" answer was
+-- checked against.
+--
+-- Not implemented: asking where a set of answers does not compose. With
+-- everything kept the whole action goes back unasked; otherwise the activation
+-- stands unasked (#4860).
+--
 -- The special actions and CR 118.12's payment announce nothing that writes:
 -- their two states differ only in GameState.lastChoice and, at
 -- Pawl.Engine.Companion.take, in GameState.nextObjectId, both of which ride at
@@ -4485,15 +4506,20 @@ criteriaOf component = case component of
 -- Pawl.FaceDownSpec's "Reversal at a special action" group at a special
 -- action's, CostSpec's "Reversal after an announcement" group at a cast, an
 -- activation and a mana ability's own cost, CombatCostSpec's "Reversal at a
--- combat toll" group at CR 508.1's and CR 509.1's declarations, and CostSpec's
--- "Charging Binox" group at an assisted cast's two windows.
+-- combat toll" group at CR 508.1's and CR 509.1's declarations, CostSpec's
+-- "Charging Binox" group at an assisted cast's two windows, and CostSpec's
+-- "Reversing some mana abilities" group at a subset, a nested activation and
+-- the "unless" clause.
 --
--- ALL OR NOTHING per window, where the rule's "any" admits a subset (gap
--- #3134). That is also what keeps its "unless" clause -- mana from a reversed
--- ability spent on another that was not -- true by construction: a nested
--- activation is inside its window's `closed` and `before` alike, so it goes
--- back with its parent or stays with it. Two windows cannot spend each other's
--- mana, since each pays from its own payer's pool.
+-- A nested window's kept activations come back to the enclosing window when
+-- the activation they paid for failed, each re-based onto the states keeping
+-- only it and the ones before it, so the enclosing reversal offers each again
+-- on its own; the scenario
+-- cost/cr-733-1-what-a-nested-window-kept-is-offered-again-one-activation-at-a-time
+-- is the proof.
+--
+-- Not implemented: telling them apart where such a state does not compose;
+-- they come back as one (#4860).
 --
 -- The CANCELLATION HAPPENS FIRST, before the question: rule 733.1 reverses the
 -- action and cancels the payments flat, and only its last-but-one sentence
@@ -4511,45 +4537,52 @@ criteriaOf component = case component of
 -- no-activation arm reads the LIVE state rather than a window's `closed`, which
 -- is what the callers it took this restore over from did.
 --
--- The answer is the sources whose activations STAND, empty unless a payer kept
--- them: a nested window's caller (`tapForManaWith`) hands them to the window it
--- is nested in, whose own reversal then offers them too.
-reverseIllegal :: [ManaWindow.ManaWindow] -> GameState -> Game [ObjectId]
+-- The answer is the activations that STAND, empty unless a payer kept them: a
+-- nested window's caller (`tapForManaWith`) hands them to the window it is
+-- nested in, whose own reversal then offers them too.
+reverseIllegal :: [ManaWindow.ManaWindow] -> GameState -> Game ([ManaActivation.ManaActivation], [ManaSegment.ManaSegment])
 reverseIllegal windows before =
-  let -- CR 733.1: "players may not reverse actions that moved cards to a
-      -- library [or] from a library to any zone other than the stack". A
-      -- window whose abilities did -- a CR 605.1b triggered mana ability that
-      -- draws (Synthetic Wellspring Growth) -- stands unasked, and whole, as
-      -- every window answers (gap #3134).
-      movedLibraryCard window =
+  let indexed = [((w, i), window, activation) | (w, window) <- zip [0 :: Int ..] windows, (i, activation) <- zip [0 :: Int ..] (ManaWindow.activated window)]
+      segmentsOf = Map.fromListWith (flip (<>)) [((w, ManaSegment.activation segment), [segment]) | (w, window) <- zip [0 :: Int ..] windows, segment <- ManaWindow.segments window]
+      -- CR 733.1: "players may not reverse actions that moved cards to a
+      -- library [or] from a library to any zone other than the stack". An
+      -- activation that did -- a CR 605.1b triggered mana ability that draws
+      -- (Synthetic Wellspring Growth) -- stands unasked.
+      movedLibraryCard key =
         let held gs = Set.fromList (foldMap Foldable.toList (GameState.library gs))
-         in held (ManaWindow.opened window) /= held (ManaWindow.closed window)
-      standing window = not (null (ManaWindow.activated window)) && movedLibraryCard window
-      asks window = not (null (ManaWindow.activated window)) && not (movedLibraryCard window)
-      -- Every combination of answers, as one keep-or-not flag per window; a
-      -- window with nothing to offer is never kept, and a standing one always.
-      combinations = traverse (\window -> if asks window then [True, False] else [standing window]) windows
-      composed = traverse (\keeps -> fmap ((,) keeps) (composeReversal before (zip windows keeps))) combinations
-   in case (filter (asks . snd) (zip [0 :: Int ..] windows), composed) of
-        ([], _) | not (any standing windows) -> [] <$ restoreKeepingLibraryActions before
-        -- No state answers some combination where two sides wrote one leaf to
-        -- two values, so the whole action goes back unasked (Pawl.Engine.Reversal
-        -- says why that is conservative rather than invented).
-        (_, Nothing) -> [] <$ restoreKeepingLibraryActions before
-        (askers, Just table) -> do
-          -- The flags for the answers given so far, a window not yet answered
-          -- still standing; and the state they leave, put with the live CR
-          -- 104.4b stamp so that no answer's is discarded. The stamp was drawn
-          -- from the live GameState.nextTimestamp, so that supply comes across
-          -- with it: a state that goes back past the announcement would
-          -- otherwise hold a stamp ahead of its own supply, which
+         in any (\segment -> held (ManaSegment.opened segment) /= held (ManaSegment.closed segment)) (Map.findWithDefault [] key segmentsOf)
+      askers = [entry | entry@(key, _, _) <- indexed, not (movedLibraryCard key)]
+      compose reversed = composeReversal before windows (\w i -> Set.notMember (w, i) reversed)
+      -- CR 733.1's "unless", per payer, replayed from the pool their first
+      -- window opened on.
+      spendable reversed =
+        all
+          ( \window ->
+              let pid = ManaWindow.payer window
+                  kept = [activation | (key, owner, activation) <- indexed, ManaWindow.payer owner == pid, Set.notMember key reversed]
+                  step held activation = fmap (<> ManaActivation.added activation) (Monad.foldM takeUnit held (ManaActivation.spent activation))
+               in Maybe.isJust (Monad.foldM step (Mana.Type.unwrap (Game.poolOf pid (ManaWindow.opened window))) kept)
+          )
+          (ListUtils.nubOrdOn ManaWindow.payer windows)
+      takeUnit held unit = case break (== unit) held of
+        (above, _ : below) -> Just (above <> below)
+        (_, []) -> Nothing
+   in case (indexed, compose Set.empty) of
+        ([], _) -> noActivations <$ restoreKeepingLibraryActions before
+        (_, Nothing) -> noActivations <$ restoreKeepingLibraryActions before
+        (_, Just _) -> do
+          -- The state the answers given so far leave, everything not yet
+          -- answered still standing, put with the live CR 104.4b stamp so that
+          -- no answer's is discarded. The stamp was drawn from the live
+          -- GameState.nextTimestamp, so that supply comes across with it: a
+          -- state that goes back past the announcement would otherwise hold a
+          -- stamp ahead of its own supply, which
           -- Pawl.Engine.Engine.checkMandatoryLoop's gap underflows on. The
           -- scenario cost/cr-733-1-an-underpaid-curtain-of-light-reverses-its-plains
           -- is the proof.
-          let flags answers = [Maybe.fromMaybe (asks window || standing window) (lookup i answers) | (i, window) <- zip [0 :: Int ..] windows]
-              settle answers =
+          let settle reversed =
                 Monad.forM_
-                  (lookup (flags answers) table)
+                  (compose reversed)
                   ( \composedState ->
                       State.modify'
                         ( \live ->
@@ -4559,50 +4592,119 @@ reverseIllegal windows before =
                               }
                         )
                   )
-          settle []
+          settle Set.empty
           cancelled <- State.get
-          let rank (_, window) = List.elemIndex (ManaWindow.payer window) (Game.apnapOrder cancelled)
-          answers <-
+          let rank (_, window, _) = List.elemIndex (ManaWindow.payer window) (Game.apnapOrder cancelled)
+          reversed <-
             Monad.foldM
-              ( \given (i, window) -> case NonEmpty.nonEmpty (ManaWindow.activated window) of
-                  Nothing -> pure given
-                  Just sources -> do
-                    -- CR 101.4b: the board already shows the earlier answers.
-                    settle given
-                    current <- State.get
-                    answer <- Game.choose (Prompt.ReverseManaAbilities (Decide.deciderFor (ManaWindow.payer window) current) (ManaWindow.payer window) sources)
-                    pure $ case answer of
-                      OptionalDecision.Exercises -> given <> [(i, False)]
-                      OptionalDecision.Declines -> given <> [(i, True)]
+              ( \given (key, window, activation) ->
+                  let trying = Set.insert key given
+                   in if not (spendable trying) || Maybe.isNothing (compose trying)
+                        then pure given
+                        else do
+                          -- CR 101.4b: the board already shows the earlier answers.
+                          settle given
+                          current <- State.get
+                          answer <- Game.choose (Prompt.ReverseManaAbilities (Decide.deciderFor (ManaWindow.payer window) current) (ManaWindow.payer window) (ManaActivation.sources activation))
+                          pure $ case answer of
+                            OptionalDecision.Exercises -> trying
+                            OptionalDecision.Declines -> given
               )
-              []
-              (List.sortOn rank askers)
-          settle answers
-          pure (concat [ManaWindow.activated window | (window, True) <- zip windows (flags answers)])
+              Set.empty
+              (List.sortOn rank (reverse askers))
+          settle reversed
+          live <- State.get
+          -- What stands, each re-based onto the states keeping only it and
+          -- the ones that finished before it, so that the window this one is
+          -- nested in can offer each back on its own; the last closes on the
+          -- live state, the enclosing window's next activation opening on it.
+          let standing = [(key, activation) | (key, _, activation) <- indexed, Set.notMember key reversed]
+              keepingFirst k = compose (Set.union reversed (Set.fromList (fmap fst (drop k standing))))
+              rebased i activation opened closed = ([activation], [ManaSegment.MkManaSegment {ManaSegment.activation = i, ManaSegment.opened = opened, ManaSegment.closed = closed}])
+          pure $ case NonEmpty.nonEmpty standing of
+            Nothing -> noActivations
+            Just stood -> case traverse keepingFirst [0 .. length standing - 1] of
+              Just states -> mconcat (List.zipWith4 rebased [0 ..] (fmap snd standing) states (drop 1 states <> [live]))
+              Nothing ->
+                let activations = fmap snd stood
+                 in rebased
+                      0
+                      ManaActivation.MkManaActivation
+                        { ManaActivation.sources = Semigroup.sconcat (fmap ManaActivation.sources activations),
+                          ManaActivation.spent = foldMap ManaActivation.spent activations,
+                          ManaActivation.added = foldMap ManaActivation.added activations
+                        }
+                      (Maybe.fromMaybe before (keepingFirst 0))
+                      live
 
--- One combination of CR 733.1's answers composed into the state it leaves:
--- `windows` oldest first, each flagged with whether its payer keeps it.
+-- No activations, and so no stretches.
+noActivations :: ([ManaActivation.ManaActivation], [ManaSegment.ManaSegment])
+noActivations = ([], [])
+
+-- `later`'s activations after `earlier`'s, its stretches renumbered to match.
+spliceActivations :: ([ManaActivation.ManaActivation], [ManaSegment.ManaSegment]) -> ([ManaActivation.ManaActivation], [ManaSegment.ManaSegment]) -> ([ManaActivation.ManaActivation], [ManaSegment.ManaSegment])
+spliceActivations (earlier, earlierSegments) (later, laterSegments) =
+  let shift segment = segment {ManaSegment.activation = ManaSegment.activation segment + length earlier}
+   in (earlier <> later, earlierSegments <> fmap shift laterSegments)
+
+-- The activation of `oid` that ran from `start` to `end` and paid, after the
+-- nested activations that paid for it: it owns the stretches either side of
+-- theirs, and what it ADDED to `pid`'s pool is what those stretches changed
+-- there plus what its cost took out.
+withParent :: PlayerId -> ObjectId -> GameState -> GameState -> ([ManaActivation.ManaActivation], [ManaSegment.ManaSegment]) -> [ManaUnit.ManaUnit] -> ([ManaActivation.ManaActivation], [ManaSegment.ManaSegment])
+withParent pid oid start end (children, childSegments) spentUnits =
+  let parent = length children
+      own = zipWith (\opened closed -> ManaSegment.MkManaSegment {ManaSegment.activation = parent, ManaSegment.opened = opened, ManaSegment.closed = closed}) (start : fmap ManaSegment.closed childSegments) (fmap ManaSegment.opened childSegments <> [end])
+      counted units = Map.fromListWith (+) [(unit, 1 :: Int) | unit <- units]
+      pooled gs = counted (Mana.Type.unwrap (Game.poolOf pid gs))
+      change segment = Map.unionWith (+) (pooled (ManaSegment.closed segment)) (fmap negate (pooled (ManaSegment.opened segment)))
+      added = concat [replicate n unit | (unit, n) <- Map.toList (Map.unionsWith (+) (counted spentUnits : fmap change own)), n > 0]
+      activation = ManaActivation.MkManaActivation {ManaActivation.sources = oid NonEmpty.:| [], ManaActivation.spent = spentUnits, ManaActivation.added = added}
+   in (children <> [activation], concat (zipWith (\mine theirs -> [mine, theirs]) own childSegments) <> drop (length childSegments) own)
+
+-- One set of CR 733.1's answers composed into the state it leaves: `windows`
+-- oldest first, `keeps w i` whether the payer keeps window `w`'s activation
+-- `i`.
 --
--- The stretches that go back are the gaps between a kept window's close (or
--- `before`) and the next kept one's opening, which hold the announcement and
--- every window in between that was reversed. Each is undone with
--- Pawl.Engine.Reversal.withoutAnnouncement, NEWEST FIRST: that function reads
--- the log of its first state as a prefix of its third's, which holds only while
--- nothing earlier has been cut out. A stretch past the newest kept window is
--- dropped by going back to that window's close, keeping the library actions
--- the rest performed (`keepingLibraryActions`).
-composeReversal :: GameState -> [(ManaWindow.ManaWindow, Bool)] -> Maybe GameState
-composeReversal before windows = case NonEmpty.nonEmpty windows of
+-- A window's kept stretches are taken in maximal runs, each from its first
+-- stretch's opening to its last one's close -- from the window's own opening
+-- or to its own close where the run reaches that end, so a window kept whole
+-- is the one stretch it always was. The stretches that go back are the gaps
+-- between one kept run's close (or `before`) and the next one's opening, which
+-- hold the announcement and everything reversed in between. Each is undone
+-- with Pawl.Engine.Reversal.withoutAnnouncement, NEWEST FIRST: that function
+-- reads the log of its first state as a prefix of its third's, which holds
+-- only while nothing earlier has been cut out. A stretch past the newest kept
+-- one is dropped by going back to that one's close, keeping the library
+-- actions the rest performed (`keepingLibraryActions`).
+composeReversal :: GameState -> [ManaWindow.ManaWindow] -> (Int -> Int -> Bool) -> Maybe GameState
+composeReversal before windows keeps = case NonEmpty.nonEmpty windows of
   Nothing -> Just before
-  Just flagged ->
-    let final = ManaWindow.closed (fst (NonEmpty.last flagged))
-        kept = [window | (window, True) <- windows]
-     in case reverse kept of
+  Just ws ->
+    let final = ManaWindow.closed (NonEmpty.last ws)
+        newestWindow = length windows - 1
+        -- Each run as its opening, its close, and whether it is the newest
+        -- window's and reaches that window's close.
+        stretches w window =
+          let segments = zip [0 :: Int ..] (ManaWindow.segments window)
+              lastIndex = length segments - 1
+              kept = keeps w . ManaSegment.activation . snd
+              runs = filter (kept . NonEmpty.head) (NonEmpty.groupWith kept segments)
+              stretch run =
+                let (first, firstSegment) = NonEmpty.head run
+                    (end, endSegment) = NonEmpty.last run
+                 in ( if first == 0 then ManaWindow.opened window else ManaSegment.opened firstSegment,
+                      if end == lastIndex then ManaWindow.closed window else ManaSegment.closed endSegment,
+                      w == newestWindow && end == lastIndex
+                    )
+           in fmap stretch runs
+        keptRuns = concat (zipWith stretches [0 :: Int ..] windows)
+     in case reverse keptRuns of
           [] -> Just (keepingLibraryActions final before)
-          newest : _ ->
-            let tailState = if snd (NonEmpty.last flagged) then ManaWindow.closed newest else keepingLibraryActions final (ManaWindow.closed newest)
-                starts = before : fmap ManaWindow.closed kept
-             in foldr (\(start, window) rest -> rest >>= Reversal.withoutAnnouncement start (ManaWindow.opened window)) (Just tailState) (zip starts kept)
+          (_, newest, reachesFinal) : _ ->
+            let tailState = if reachesFinal then newest else keepingLibraryActions final newest
+                starts = before : fmap (\(_, closed, _) -> closed) keptRuns
+             in foldr (\(start, (opened, _, _)) rest -> rest >>= Reversal.withoutAnnouncement start opened) (Just tailState) (zip starts keptRuns)
 
 -- CR 733.1's last sentence: shuffling a library or revealing cards from one is
 -- never reversed, even where the mana ability that did it is. Restoring
@@ -5449,9 +5551,10 @@ payManaWindow perform inFlight record subject spending pid substituting cost = d
       -- mid-payment stops applying (CR 604.2) -- the opposite of `spending`, which
       -- rule 118.14 fixes when the cast was permitted.
       settlement gs = Mana.spend (PlayerEffect.spendManaAsThoughFor pid subject gs) spending (Maybe.fromMaybe 0 (Mana.lifeNeeded subject (midPayment (manaActivationsGiven (PlayerEffect.applying pid gs))) spending pid cost gs)) cost (Mana.Type.MkMana (fst (Mana.spendableFor subject pid gs)))
-      -- `activated` is the sources whose mana ability this window ran, newest
-      -- first -- CR 733.1's "any legal mana abilities that player activated",
-      -- gathered because that rule offers them back.
+      -- `activated` is the mana abilities this window has run, in the order
+      -- they finished, with what each wrote -- CR 733.1's "any legal mana
+      -- abilities that player activated", gathered because that rule offers
+      -- each of them back.
       window refused activated = do
         gs <- State.get
         let covered = Maybe.isJust (settlement gs)
@@ -5484,20 +5587,24 @@ payManaWindow perform inFlight record subject spending pid substituting cost = d
             case answer of
               Nothing -> settle activated
               Just oid -> do
-                (produced, kept, failed) <- tapForManaWith perform midPayment inFlight refused pid oid
+                start <- State.get
+                (produced, nested, nestedSpent, failed) <- tapForManaWith perform midPayment inFlight refused pid oid
+                end <- State.get
                 -- An activation that FAILED reversed itself already (payActivation
                 -- below), so it is not one of rule 733.1's to offer back -- but
-                -- the sources its own nested window activated and the payer KEPT
-                -- are, since their activations stand in this window.
-                window (Set.union failed refused) (if produced then oid : activated else reverse kept <> activated)
+                -- the activations its own nested window ran and the payer KEPT
+                -- are, since they stand in this window. One that PAID is offered
+                -- back beside the nested activations that paid for it: CR 733.1
+                -- offers "any legal mana abilities", and a nested one is one.
+                window (Set.union failed refused) (spliceActivations activated (if produced then withParent pid oid start end nested nestedSpent else nested))
       -- CR 601.2h: the window is closed, so the cost is paid out of what is there
       -- -- and simply is not paid when the player floated too little.
       --
       -- WHICH mana goes is the payer's (Mana.spendChosen), so this asks rather
       -- than reading `settlement`'s assignment: that one answers only whether the
       -- pool pays.
-      settle :: [ObjectId] -> Game (Bool, [(Keyword.Substitute, Natural)], ManaWindow.ManaWindow)
-      settle activated = do
+      settle :: ([ManaActivation.ManaActivation], [ManaSegment.ManaSegment]) -> Game (Bool, [(Keyword.Substitute, Natural)], ManaWindow.ManaWindow)
+      settle (activated, segments) = do
         -- The state the window CLOSED on, which is the one a payer who declines
         -- to reverse their mana abilities goes back to: this is after every
         -- activation and before a symbol of the cost has been paid out of the
@@ -5516,7 +5623,7 @@ payManaWindow perform inFlight record subject spending pid substituting cost = d
         -- CR 106.6: the payment sees only the mana it may spend, and the rest of
         -- the pool goes back beside what it leaves (CR 106.4 -- unspent mana stays
         -- unspent, it does not vanish because one cost could not use it).
-        let shut = ManaWindow.MkManaWindow {ManaWindow.payer = pid, ManaWindow.activated = reverse activated, ManaWindow.opened = entry, ManaWindow.closed = closed}
+        let shut = ManaWindow.MkManaWindow {ManaWindow.payer = pid, ManaWindow.activated = activated, ManaWindow.segments = segments, ManaWindow.spent = [], ManaWindow.opened = entry, ManaWindow.closed = closed}
             (available, withheld) = Mana.spendableFor subject pid gs
         case Mana.plan (PlayerEffect.spendManaAsThoughFor pid subject gs) spending (Maybe.fromMaybe 0 (Mana.lifeNeeded subject (midPayment (manaActivationsGiven (PlayerEffect.applying pid gs))) spending pid residual gs)) residual (Mana.Type.MkMana available) of
           Nothing -> pure (False, extra, shut)
@@ -5529,7 +5636,7 @@ payManaWindow perform inFlight record subject spending pid substituting cost = d
             State.modify' (Mana.setPool pid (Mana.Type.MkMana (withheld <> left)))
             Event.payLife pid life
             State.modify' (recordSpent spent)
-            pure (True, extra, shut)
+            pure (True, extra, shut {ManaWindow.spent = Mana.Type.unwrap spent})
       -- CR 400.7d's cost record for the MANA, kept where CR 107.4h's third
       -- sentence can be asked about it afterwards -- "the {S} symbol can also be
       -- used to refer to mana of any type produced by a snow source spent to pay a
@@ -5551,7 +5658,7 @@ payManaWindow perform inFlight record subject spending pid substituting cost = d
       -- writes nothing: `payMana` restores the state it entered with, and this
       -- line is only reached once the payment has settled.
       recordSpent spent gs = maybe gs (\sid -> recordPayment sid spent gs) record
-  window Set.empty []
+  window Set.empty noActivations
 
 -- CR 400.7d's record of mana spent on `sid`, ADDED to what is there: CR
 -- 702.132a's assisting player pays ahead of the caster (`payAssist`), and both
@@ -5787,7 +5894,7 @@ payAssist helper subject sid cost = case Cost.mana cost of
 -- `pid` is the player activating it (CR 602.1a), who need not control the
 -- permanent where the route says any player may (CR 602.1b).
 tapForMana :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> ObjectId -> Game Bool
-tapForMana perform pid oid = fmap (\(produced, _, _) -> produced) (tapForManaWith perform id Set.empty Set.empty pid oid)
+tapForMana perform pid oid = fmap (\(produced, _, _, _) -> produced) (tapForManaWith perform id Set.empty Set.empty pid oid)
 
 -- The same activation carrying the abilities already mid-activation (CR
 -- 605.3c), which is payManaExcept's one narrowing: the route CHOSEN here joins
@@ -5802,9 +5909,11 @@ tapForMana perform pid oid = fmap (\(produced, _, _) -> produced) (tapForManaWit
 -- `midPayment` inside a payment, the identity at priority (`tapForMana`).
 --
 -- `refused` is payManaWindow's routes already declined on this window, kept off
--- the choice here as on the offer there; the answer's third part is the route
--- this activation adds to them, empty when it paid.
-tapForManaWith :: ManaAbilityPerformer.ManaAbilityPerformer -> (Mana.Capacity -> Mana.Capacity) -> Mana.InFlight -> Mana.InFlight -> PlayerId -> ObjectId -> Game (Bool, [ObjectId], Mana.InFlight)
+-- the choice here as on the offer there; the answer's last part is the route
+-- this activation adds to them, empty when it paid. Its second and third are
+-- what CR 733.1 reads of the activation's own cost: the nested activations
+-- that stand (`payActivation`) and the mana it took from the pool.
+tapForManaWith :: ManaAbilityPerformer.ManaAbilityPerformer -> (Mana.Capacity -> Mana.Capacity) -> Mana.InFlight -> Mana.InFlight -> PlayerId -> ObjectId -> Game (Bool, ([ManaActivation.ManaActivation], [ManaSegment.ManaSegment]), [ManaUnit.ManaUnit], Mana.InFlight)
 tapForManaWith perform window inFlight refused activator oid = do
   gs <- State.get
   -- Every route of this permanent, off the offer's own list
@@ -5813,7 +5922,7 @@ tapForManaWith perform window inFlight refused activator oid = do
   -- so this only keeps payManaWindow's loop finite should they ever not.
   let everyRoute = Set.fromList (fmap (\(_, _, ability, _) -> (oid, ability)) (Mana.manaRoutesOfGiven Map.empty oid gs))
   case Game.lookupObject oid gs of
-    Nothing -> pure (False, [], everyRoute)
+    Nothing -> pure (False, noActivations, [], everyRoute)
     Just _ -> do
       -- CR 109.4a/113.8: the mana ability's controller is the player
       -- activating it -- the permanent's controller, or anyone at all for a
@@ -5832,7 +5941,7 @@ tapForManaWith perform window inFlight refused activator oid = do
           -- own, and that walk is the shape #1073 was about.
           capacity = window (manaActivationsGiven (PlayerEffect.applying controller gs))
       case filter (\option -> permitted option && not (Mana.inFlightRoute (Set.union inFlight refused) oid (ManaOption.ability option)) && Activations.times (capacity Mana.ForOffer Map.empty controller oid (ManaOption.cost option) (ManaOption.restrictions option) (ManaOption.ability option) gs) > 0) (Mana.manaOptionsOf oid gs) of
-        [] -> pure (False, [], everyRoute)
+        [] -> pure (False, noActivations, [], everyRoute)
         first : rest -> do
           -- CR 106.3 / 608.2d: the activator picks the route and the mana for
           -- their OWN pool (@Relative You@). A share under any other reference
@@ -5871,9 +5980,9 @@ tapForManaWith perform window inFlight refused activator oid = do
           -- elided by announceReductions wherever the answers cannot differ,
           -- which is every board `data/cards/` can build today.
           announced <- announceReductions controller oid gs announcedCost gathered
-          (outcome, kept) <- payActivation perform (Set.insert (oid, ManaOption.ability chosen) inFlight) controller oid (totalWith announced announcedCost)
+          (outcome, nested, nestedSpent) <- payActivation perform (Set.insert (oid, ManaOption.ability chosen) inFlight) controller oid (totalWith announced announcedCost)
           case outcome of
-            Payment.Unpaid -> pure (False, kept, Set.singleton (oid, ManaOption.ability chosen))
+            Payment.Unpaid -> pure (False, nested, [], Set.singleton (oid, ManaOption.ability chosen))
             Payment.Paid paid -> do
               -- CR 601.2h / 608.2h: the yield is priced again with the slots
               -- the payment bound, since an offer cannot know which artifact
@@ -6032,7 +6141,7 @@ tapForManaWith perform window inFlight refused activator oid = do
                   -- CR 106.4 sent it to.
                   manaAbilityResolved = GameEvent.ManaAbilityResolved (ManaAbilityResolved.MkManaAbilityResolved {ManaAbilityResolved.permanent = oid, ManaAbilityResolved.amount = Natural.length producedUnits})
               applyManaTriggers perform (tappedForMana <> manaAdded <> [manaAbilityResolved])
-              pure (True, [], Set.empty)
+              pure (True, nested, nestedSpent, Set.empty)
 
 -- CR 605.4a: record the events one activated mana ability wrote -- CR 106.12a's
 -- tap for mana, CR 605.1b's mana being added and CR 605.3b's own resolution --
@@ -6101,7 +6210,7 @@ applyManaTriggers perform events = do
 --
 -- The recursion CR 602.2b makes of that window is bounded by the in-flight set
 -- `tapForManaWith` added this route to (CR 605.3c), not by the order.
-payActivation :: ManaAbilityPerformer.ManaAbilityPerformer -> Mana.InFlight -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game (Payment.Payment, [ObjectId])
+payActivation :: ManaAbilityPerformer.ManaAbilityPerformer -> Mana.InFlight -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game (Payment.Payment, ([ManaActivation.ManaActivation], [ManaSegment.ManaSegment]), [ManaUnit.ManaUnit])
 payActivation perform inFlight pid oid cost = do
   before <- State.get
   (paid, windows) <- case Cost.mana cost of
@@ -6127,11 +6236,13 @@ payActivation perform inFlight pid oid cost = do
   let settled = case outcome of
         Payment.Paid _ -> paid
         Payment.Unpaid -> False
-  kept <- if settled then pure [] else reverseIllegal windows before
+  standing <- if settled then pure (foldr (spliceActivations . \window -> (ManaWindow.activated window, ManaWindow.segments window)) noActivations windows) else reverseIllegal windows before
   -- `outcome` and not a fresh Paid: the components' bound slots are what the
-  -- payment bound, the mana half binding none of its own. `kept` is what the
-  -- payer chose to keep of a refused payment's window.
-  pure (if settled then outcome else Payment.Unpaid, kept)
+  -- payment bound, the mana half binding none of its own. `standing` is the
+  -- nested activations that stand -- every one of a paid window's, and what
+  -- the payer chose to keep of a refused one's -- and the mana is what the
+  -- payment took from the pool, which CR 733.1's "unless" clause reads.
+  pure (if settled then outcome else Payment.Unpaid, standing, if settled then foldMap ManaWindow.spent windows else [])
 
 -- Which way this source is tapped -- which mana ability, in which mode, and
 -- which colour each of that mode's AddMana effects makes -- asked as ONE
