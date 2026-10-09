@@ -25,5 +25,9 @@ data ManaWindow = MkManaWindow
     -- | The state the window opened on.
     opened :: GameState,
     -- | The state it closed on, before a symbol of the cost was paid.
-    closed :: GameState
+    closed :: GameState,
+    -- | Not a mana window at all but a stretch of a combat toll's payment that
+    -- CR 733.1 forbids reversing (Pawl.Engine.Cost.unreversibleStretch): it
+    -- stands, and nobody is asked about it.
+    unreversible :: Bool
   }
