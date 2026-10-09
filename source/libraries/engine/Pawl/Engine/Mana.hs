@@ -13,6 +13,7 @@ import qualified Data.Ord as Ord
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Claim as Claim
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Count as Count
@@ -36,10 +37,13 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.Activations as Activations
 import qualified Pawl.Types.Activator as Activator
+import qualified Pawl.Types.Binding as Binding.Type
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import Pawl.Types.Claim (Claim)
+import qualified Pawl.Types.Claim as Claim.Type
+import qualified Pawl.Types.ClaimAxis as ClaimAxis
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import Pawl.Types.Cost (Cost)
@@ -90,6 +94,8 @@ import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SourceChoices as SourceChoices
 import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
@@ -97,6 +103,7 @@ import qualified Pawl.Types.SpendTrigger as SpendTrigger
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.WhenSpent as WhenSpent
+import qualified Pawl.Types.Zone as Zone
 
 -- | Asked of a mana ability's OWN activation cost: HOW MANY TIMES may this
 -- player activate it, for the ability on this object? CR 602.2b is why the
@@ -454,7 +461,13 @@ manaYieldsOfGiven pcs oid gs = ListUtils.nubOrd (fmap (Mana.MkMana . yieldUnits)
 -- rather than tidiness: "the type of mana a permanent could produce" is defined
 -- to IGNORE whether the ability's costs could be paid, so manaTypesOf has to go
 -- on answering the ungated question.
-manaSuppliesGiven :: Capacity -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> GameState -> [(Activations.Activations, Mana, ManaCost)]
+--
+-- The FOURTH element is what this yield's own activation spends, and the
+-- first what its ROUTE's does; they differ only for a yield priced per
+-- sacrifice candidate (`perCandidate` below), whose own claim names just the
+-- candidates that give it. sourceOptions groups by the route, so such yields
+-- are one choice of at most one of them per activation.
+manaSuppliesGiven :: Capacity -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> GameState -> [(Activations.Activations, Mana, ManaCost, Activations.Activations)]
 manaSuppliesGiven capacity pcs pid oid gs =
   let -- Applied HERE and not left to the caller: this is the one reader of a
       -- route's yield on the supply side, so wrapping it once is what makes the
@@ -465,34 +478,59 @@ manaSuppliesGiven capacity pcs pid oid gs =
       supply = supplyCapacity capacity
       measured option =
         ( supply ForOffer pcs pid oid (ManaOption.cost option) (ManaOption.restrictions option) (ManaOption.ability option) gs,
-          -- CR 106.4: the PAYER's share alone. A route whose AddMana names
-          -- somebody else fills that player's pool and not this one's, so
-          -- counting its units here would offer a cast the payment cannot make
-          -- -- the direction that matters, since overstating supply offers an
-          -- unpayable spell where understating it only refuses a payable one.
-          -- Yurlok of Scorch Thrash's "Each player adds {B}{R}{G}" names the
-          -- payer among the rest, so its share is the whole yield; a route
-          -- naming an opponent alone supplies nothing.
-          --
-          -- `pid` stands in for the CONTROLLER recipientsOf resolves against,
-          -- and is one: CR 109.4a and CR 113.8 make the player activating a
-          -- mana ability its controller, whoever controls the permanent.
-          --
-          -- Still a supply of NO units rather than no supply at all: the
-          -- triple carries what the activation spends, and an empty yield is
-          -- just a source that adds this player nothing.
-          --
-          -- CR 608.2d: a recipient the route's own clauses CHOOSE names the
-          -- payer wherever the payer is among the players offered, since the
-          -- payer activates it and may choose themself -- Spectral
-          -- Searchlight's ruling, "You may choose yourself". Pawl.ManaSpec's
-          -- Spectral Searchlight group casts off that supply.
-          Mana.MkMana (concatMap (\(ref, mana) -> if List.elem pid (recipientsOf pid (choosable option) gs ref) then unitsOf mana else []) (Map.toList (ManaOption.yield option))),
+          payerShare option,
           -- CR 118.6's Nothing never survives the filter below, supplyCapacity
           -- answering 0 for it, so the empty stand-in is unreachable rather than
           -- a claim that such a route costs nothing.
           Maybe.fromMaybe (ManaCost.MkManaCost []) (Cost.mana (ManaOption.cost option))
         )
+      payerShare option =
+        -- CR 106.4: the PAYER's share alone. A route whose AddMana names
+        -- somebody else fills that player's pool and not this one's, so
+        -- counting its units here would offer a cast the payment cannot make
+        -- -- the direction that matters, since overstating supply offers an
+        -- unpayable spell where understating it only refuses a payable one.
+        -- Yurlok of Scorch Thrash's "Each player adds {B}{R}{G}" names the
+        -- payer among the rest, so its share is the whole yield; a route
+        -- naming an opponent alone supplies nothing.
+        --
+        -- `pid` stands in for the CONTROLLER recipientsOf resolves against,
+        -- and is one: CR 109.4a and CR 113.8 make the player activating a
+        -- mana ability its controller, whoever controls the permanent.
+        --
+        -- Still a supply of NO units rather than no supply at all: the
+        -- triple carries what the activation spends, and an empty yield is
+        -- just a source that adds this player nothing.
+        --
+        -- CR 608.2d: a recipient the route's own clauses CHOOSE names the
+        -- payer wherever the payer is among the players offered, since the
+        -- payer activates it and may choose themself -- Spectral
+        -- Searchlight's ruling, "You may choose yourself". Pawl.ManaSpec's
+        -- Spectral Searchlight group casts off that supply.
+        Mana.MkMana (concatMap (\(ref, mana) -> if List.elem pid (recipientsOf pid (choosable option) gs ref) then unitsOf mana else []) (Map.toList (ManaOption.yield option)))
+      -- CR 601.2h / 608.2h on the supply side: a yield reading the permanent
+      -- its cost sacrifices -- Priest of Yawgmoth's "equal to the sacrificed
+      -- artifact's mana value" -- is one supply per yield some candidate gives,
+      -- each claiming only the candidates that give it, so the walk can count
+      -- the artifact a cast actually needs and cannot count it twice. Offered,
+      -- it reads none, which would supply nothing at all. Pawl.ManaSpec's
+      -- Priest of Yawgmoth group casts off this supply.
+      --
+      -- Not implemented: a yield reading any other slot its cost binds, which
+      -- is supplied as the offer prices it (#4851, #4855).
+      perCandidate option =
+        let (activations, share, manaCost) = measured option
+            readsSacrificed = any (\(clause, _) -> any (Set.member Binding.sacrificedPermanent . Quantity.objectSlots . ManaAddition.count) (Maybe.mapMaybe ManaAbility.manaProduced (Foldable.toList (Clause.effects clause)))) (ManaOption.steps option)
+            sacrifices = [() | CostComponent.Sacrifice sacrifice <- Cost.components (ManaOption.cost option), Sacrifice.count sacrifice == 1]
+            onBattlefield = filter ((==) (ClaimAxis.Removal Zone.Battlefield) . Claim.Type.axis) (Activations.claims activations)
+         in case (sacrifices, onBattlefield) of
+              ([()], [claim])
+                | readsSacrificed && Claim.Type.count claim == 1 && Maybe.isNothing (Claim.Type.threshold claim) ->
+                    let pricedFor candidate = [payerShare priced | (offered, priced) <- manaRepricingsGiven (Binding.paidObjects Binding.sacrificedPermanent (Set.singleton (Recipient.ToObject candidate))) pcs oid gs, offered == option]
+                        byYield = Map.fromListWith Set.union [(yield, Set.singleton candidate) | candidate <- Set.toList (Claim.Type.pool claim), yield <- pricedFor candidate]
+                        narrowed candidates = activations {Activations.claims = fmap (\other -> if other == claim then other {Claim.Type.pool = candidates} else other) (Activations.claims activations)}
+                     in [(activations, yield, manaCost, narrowed candidates) | (yield, candidates) <- Map.toList byYield, not (null (unitsOf yield))]
+              _ -> [(activations, share, manaCost, activations)]
       choosable option =
         Map.fromList
           [ (ChoosePlayer.slot choice, Set.singleton pid)
@@ -504,12 +542,12 @@ manaSuppliesGiven capacity pcs pid oid gs =
       -- Lazy, and forced only for a permanent mixing open and closed routes:
       -- manaSourcesGiven hands this nothing else pid does not control.
       controls = not (any (openToAnyone . ManaOption.ability) options) || Projection.controllerOf oid gs == Just pid
-      counted = fmap measured (filter (permitsRoute controls . ManaOption.ability) options)
-      available = filter (\(activations, _, _) -> Activations.times activations > 0) counted
-      yieldOf (_, yield, _) = yield
+      counted = concatMap perCandidate (filter (permitsRoute controls . ManaOption.ability) options)
+      available = filter (\(activations, _, _, _) -> Activations.times activations > 0) counted
+      yieldOf (_, yield, _, _) = yield
       -- Ordered so `maximumBy` prefers the larger count, and a mana-free route
       -- over a mana-eating one at equal counts.
-      rankOf (activations, _, manaCost) = (Activations.times activations, null (ManaCost.unwrap manaCost))
+      rankOf (activations, _, manaCost, _) = (Activations.times activations, null (ManaCost.unwrap manaCost))
    in fmap
         (\yield -> List.maximumBy (Ord.comparing rankOf) (filter ((==) yield . yieldOf) available))
         (ListUtils.nubOrd (fmap yieldOf available))
@@ -549,7 +587,23 @@ manaOptionsOf = manaOptionsOfGiven Map.empty
 
 -- The same options against a pre-projected board (#200).
 manaOptionsOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [ManaOption]
-manaOptionsOfGiven pcs oid gs =
+manaOptionsOfGiven pcs oid gs = ListUtils.nubOrd (fmap fst (pricedOptionsGiven Map.empty pcs oid gs))
+
+-- CR 601.2h / 608.2h: each option as OFFERED beside the same option priced with
+-- the slots its cost's payment bound -- Priest of Yawgmoth's "equal to the
+-- sacrificed artifact's mana value", which no offer can know before the player
+-- picks the artifact. One pair per colour choice, so an offer that collapsed
+-- several (a count of none is the same option in every colour) still names each
+-- choice it now stands for. Read on the board the activation BEGAN on, where the
+-- sacrificed artifact is still the permanent CR 608.2h's last-known information
+-- describes. Pawl.Engine.Cost.tapForManaWith and manaSuppliesGiven read it.
+manaRepricingsGiven :: Map.Map SlotName.SlotName Binding.Type.Binding -> Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [(ManaOption, ManaOption)]
+manaRepricingsGiven paid pcs oid gs = ListUtils.nubOrd (pricedOptionsGiven paid pcs oid gs)
+
+-- Both prices off ONE traversal of the colour choices, so a pair's halves are
+-- the same choice. Unshared: manaOptionsOfGiven forces the offered half alone.
+pricedOptionsGiven :: Map.Map SlotName.SlotName Binding.Type.Binding -> Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [(ManaOption, ManaOption)]
+pricedOptionsGiven paid pcs oid gs =
   let tags = productionTagsGiven pcs oid gs
       choices = sourceChoicesOf oid gs
       lastExiled = lastExiledWith oid gs
@@ -596,7 +650,9 @@ manaOptionsOfGiven pcs oid gs =
       -- offers has to measure it here. Pawl.Engine.Resolve.Effect's AddMana arm
       -- evaluates the same quantity for an addition that resolves off the stack,
       -- and manaSuppliesGiven measures CR 605.3a's offer off this very yield, so
-      -- all three read one number and no board can tell them apart.
+      -- all three read one number and no board can tell them apart -- save a
+      -- count reading a slot the cost binds, which the payment and the supply
+      -- read off the PRICED half instead (manaRepricingsGiven).
       --
       -- The perspective is the source's CONTROLLER (CR 109.5 / 110.2), which is
       -- what makes "you control" mean the player who would tap it; an object
@@ -604,8 +660,12 @@ manaOptionsOfGiven pcs oid gs =
       -- filter then matches nobody. A NEGATIVE count adds nothing (CR 107.1b's
       -- game value floors at a count of none), and an undeterminable one reads 0
       -- for Quantity.determineWith's reason.
+      --
+      -- The PRICED half reads the same quantity with the payment's slots bound,
+      -- and an offer reading one of them reads 0.
       countContext = Filter.contextFor (Game.teams gs) (Projection.controllerOf oid gs) (Just oid)
-      howMany addition = max 0 (Integer.toIntSaturating (Maybe.fromMaybe 0 (Quantity.evaluate (Projection.fullView gs) countContext gs oid (ManaAddition.count addition))))
+      pricedContext = countContext {Filter.slotObjects = Binding.slotObjects paid, Filter.boundAmounts = Map.mapMaybe Binding.Type.amount paid}
+      howManyIn context addition = max 0 (Integer.toIntSaturating (Maybe.fromMaybe 0 (Quantity.evaluate (Projection.fullView gs) context gs oid (ManaAddition.count addition))))
       -- CR 105.4's choice is per INSTRUCTION, so the count replicates the unit
       -- AFTER the type is picked: an addition of two AnyColor offers five options
       -- here, not twenty-five. Loot, the Pathfinder's "{G}, {T}: Add three mana
@@ -628,25 +688,26 @@ manaOptionsOfGiven pcs oid gs =
       pooled = List.foldl' (\acc (ref, units) -> Map.insertWith (\new old -> Mana.MkMana (unitsOf old <> unitsOf new)) ref (Mana.MkMana units) acc) Map.empty
       expand (cost, restrictions, ability, clauses) =
         let indexed = zip [0 :: Int ..] clauses
-         in fmap
-              ( \parts ->
-                  ManaOption.MkManaOption
+            build howMany picks =
+              let parts = fmap (\(i, (addition, run)) -> (i, (ManaAddition.player addition, concat (replicate (howMany addition) run)))) picks
+               in ManaOption.MkManaOption
                     { ManaOption.cost = cost,
                       ManaOption.restrictions = restrictions,
                       ManaOption.ability = ability,
                       ManaOption.yield = pooled (fmap snd parts),
                       ManaOption.steps = fmap (\(i, (clause, _)) -> (clause, pooled [part | (j, part) <- parts, j == i])) indexed
                     }
-              )
-              (traverse (\(i, addition) -> fmap ((,) i . (,) (ManaAddition.player addition)) (additionUnits addition)) [(i, addition) | (i, (_, additions)) <- indexed, addition <- additions])
+         in fmap
+              (\picks -> (build (howManyIn countContext) picks, build (howManyIn pricedContext) picks))
+              (traverse (\(i, addition) -> fmap ((,) i . (,) addition) (additionRuns addition)) [(i, addition) | (i, (_, additions)) <- indexed, addition <- additions])
       -- CR 106.5: an addition of an undefined type -- CR 607.2d's chosen colour
       -- with none chosen -- adds no mana, and the activation is still one the
       -- player may make. Resolve.Effect's AddMana arm answers the same. A
       -- settled run is repeated whole by the count (CR 607.2e's noted mana).
-      additionUnits addition = case produced oid gs (ManaAddition.production addition) of
-        Settles run -> [concat (replicate (howMany addition) (fmap (unitFor addition) run))]
-        Offers types -> fmap (replicate (howMany addition) . unitFor addition) (NonEmpty.toList types)
-   in ListUtils.nubOrd (concatMap expand (manaRoutesOfGiven pcs oid gs))
+      additionRuns addition = case produced oid gs (ManaAddition.production addition) of
+        Settles run -> [fmap (unitFor addition) run]
+        Offers types -> fmap (\manaType -> [unitFor addition manaType]) (NonEmpty.toList types)
+   in concatMap expand (manaRoutesOfGiven pcs oid gs)
 
 -- Every unit one option adds, whoever gets it, in printed order within each
 -- recipient's share (Pawl.Types.ManaOption.yield).
@@ -2078,7 +2139,7 @@ data SourceOption = MkSourceOption
   }
   deriving (Eq, Ord, Show)
 
-sourceOptions :: [SpendManaAsThough.SpendManaAsThough] -> (ManaUnit -> Set.Set PaymentSubject.PaymentSubject) -> ([Claim] -> Bool) -> [(Activations.Activations, Mana, ManaCost)] -> [[SourceOption]]
+sourceOptions :: [SpendManaAsThough.SpendManaAsThough] -> (ManaUnit -> Set.Set PaymentSubject.PaymentSubject) -> ([Claim] -> Bool) -> [(Activations.Activations, Mana, ManaCost, Activations.Activations)] -> [[SourceOption]]
 sourceOptions clauses admitting contends supplies =
   let -- Grouped by what ONE activation costs, which is what lets k activations of
       -- the group take k alternatives independently.
@@ -2086,7 +2147,7 @@ sourceOptions clauses admitting contends supplies =
         Map.toList
           ( Map.fromListWith
               (flip (<>))
-              (fmap (\(activations, yield, manaCost) -> ((activations, manaCost), [unitsOf yield])) supplies)
+              (fmap (\(activations, yield, manaCost, own) -> ((activations, manaCost), [(unitsOf yield, own)])) supplies)
           )
       -- CR 106.6 joins the key the narrow yields are unioned by, so the collapse
       -- never unions a mana one payment admits with one it does not into a supply
@@ -2105,13 +2166,25 @@ sourceOptions clauses admitting contends supplies =
          in case ListUtils.nubOrd (filter (not . null) (unions <> apart)) of
               [] -> [[]]
               some -> some
-      optionsFor ((activations, manaCost), yields) =
-        let claims = Activations.claims activations
+      optionsFor ((activations, manaCost), entries) =
+        let yields = fmap fst entries
+            claims = Activations.claims activations
             life = Activations.life activations
             energy = Activations.energy activations
             times = Activations.times activations
             contended = contends claims
-            alternatives = alternativesOf yields
+            -- A yield whose own claim is narrower than its route's (Priest of
+            -- Yawgmoth's, per sacrifice candidate) is an alternative carrying
+            -- that claim: never unioned with another, since each spends a
+            -- different object, and taking k of them claims what each one does.
+            -- One activation of the Priest is then none or exactly one of its
+            -- yields, rather than one group per yield multiplying the boards.
+            -- Pawl.ManaSpec's Priest of Yawgmoth group is the proof.
+            exclusive = any ((/= activations) . snd) entries
+            alternatives =
+              if exclusive
+                then [(fmap (rewriteSupply clauses . supplyOf admitting) units, Activations.claims own) | (units, own) <- entries, not (null units)]
+                else fmap (\alternative -> (alternative, claims)) (alternativesOf yields)
             eats = not (null (ManaCost.unwrap manaCost))
             -- A mana-EATING option is always worth taking fewer times, for the same
             -- reason a claiming or a life-paying one is: what it does not activate
@@ -2134,9 +2207,9 @@ sourceOptions clauses admitting contends supplies =
               (demands, generic, owed) <- resolved
               pure
                 MkSourceOption
-                  { optionSupplies = concat taken,
+                  { optionSupplies = concatMap fst taken,
                     optionDemands = concat (List.genericReplicate k (demands <> List.genericReplicate generic anyTypeDemand)),
-                    optionClaims = Claim.scale k claims,
+                    optionClaims = if exclusive then concatMap snd taken else Claim.scale k claims,
                     optionLife = k * (life + owed),
                     optionEnergy = k * energy
                   }
@@ -2332,7 +2405,7 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed comm
       -- GROUPWISE, one entry per sourceOptions group plus `claimed`, so one
       -- group's own claims meeting each other is not contention --
       -- Cost.repeatsOf has already measured that, and it is what `times` is.
-      groupClaimsOf supplies = fmap (Activations.claims . fst) (ListUtils.nubOrd (fmap (\(activations, _, manaCost) -> (activations, manaCost)) supplies))
+      groupClaimsOf supplies = fmap (Activations.claims . fst) (ListUtils.nubOrd (fmap (\(activations, _, manaCost, _) -> (activations, manaCost)) supplies))
       contested = Claim.contested (claimed : concatMap groupClaimsOf suppliesPer)
       energyHeld = Game.energyOf pid gs
       -- Each option paired with the SOURCE it came from, which is what says

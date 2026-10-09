@@ -11163,11 +11163,10 @@ performTriggeredManaAbility runSubgame pending = case PendingTrigger.source pend
 --
 -- Not implemented: an object of the ability's own to carry slots the bindings
 -- below do not. A slot read that misses them falls through to the source
--- PERMANENT's bindings instead. Exact for the pool as it stands -- CR 605.1a
--- leaves a mana ability no targets to have bound, and the other slots
--- Pawl.CardSpec's activatedAbilityOffends admits a read of are ones the payment
--- binds and Cost.tapForManaWith's Paid branch drops, which no mana ability in
--- data/cards/ reads (#3124).
+-- PERMANENT's bindings instead. CR 605.1a leaves a mana ability no targets to
+-- have bound; the other slots Pawl.AbilitySlotLintSpec's activatedAbilityOffends
+-- admits a read of are the ones its cost's payment binds, which reach the yield
+-- (Cost.tapForManaWith) and not these effects (#4850).
 performManaAbilityEffects :: Game Result -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> Game (Map.Map SlotName (Set Recipient))
 performManaAbilityEffects runSubgame source controller =
   -- CR 109.5's "you" is the player who activated the ability, and the reserved

@@ -1826,6 +1826,98 @@ phyrexianTowerSpec s registry = Spec.describe s "Phyrexian Tower" $ do
     Spec.assertEqWith s "with no Piker there is no {B}{B} and the cast fails" (countOf "Withered Wretch" without) 0
     Spec.assertEqWith s "and nothing was spent trying" (S.tappedCount S.alice without) 0
 
+-- CR 601.2h / 608.2h: Priest of Yawgmoth's "{T}, Sacrifice an artifact: Add an
+-- amount of {B} equal to the sacrificed artifact's mana value" reads a slot its
+-- own cost binds, so no offer can price it before the artifact is picked.
+-- Krark's Thumb (mana value 2) and Crucible of Worlds (3) are the artifacts,
+-- neither a mana source, so the Priest is the only supply on every board.
+priestOfYawgmothSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+priestOfYawgmothSpec s registry = Spec.describe s "Priest of Yawgmoth" $ do
+  let artifacts = do
+        priest <- S.printingOf s registry "Priest of Yawgmoth"
+        thumb <- S.printingOf s registry "Krark's Thumb"
+        crucible <- S.printingOf s registry "Crucible of Worlds"
+        let (priestId, g1) = S.addPermanent priest S.alice (Setup.emptyGame S.bothPlayers)
+            (thumbId, thumbOnly) = S.addPermanent thumb S.alice g1
+            (crucibleId, both) = S.addPermanent crucible S.alice thumbOnly
+        pure (priestId, thumbId, crucibleId, thumbOnly, both)
+      black = ManaType.Colored Color.Black
+      countOf name = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack name)) S.alice
+
+  Spec.it s "CR 608.2h it adds {B} equal to the mana value of the artifact it sacrificed" $ do
+    (priestId, thumbId, crucibleId, _, board) <- artifacts
+    Spec.assertEqWith s "sacrificing the Crucible of Worlds adds {B}{B}{B}" (tappedFor (sacrificing crucibleId) priestId board) [black, black, black]
+    Spec.assertEqWith s "sacrificing the Krark's Thumb adds {B}{B}" (tappedFor (sacrificing thumbId) priestId board) [black, black]
+    Spec.assertEqWith s "and the artifact goes" (countOf "Crucible of Worlds" (S.runPure (sacrificing crucibleId) board (S.tapForMana priestId))) 0
+
+  -- The supply walk counts the artifact the cast needs: {1}{B}{B} beside the
+  -- Crucible, and not beside the Thumb alone, the one difference between the
+  -- two boards.
+  Spec.it s "CR 601.2g Vampire Nighthawk is cast off a Priest that eats a Crucible of Worlds" $ do
+    nighthawk <- S.printingOf s registry "Vampire Nighthawk"
+    (_, _, crucibleId, thumbOnly, both) <- artifacts
+    let holding gs =
+          let (board, oid) = S.handOne nighthawk (gs {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
+           in S.castable S.alice oid board
+        resolved = castFrom (sacrificing crucibleId) both nighthawk
+    Spec.assertBool s (holding both) "{1}{B}{B} is offered beside a mana-value-3 artifact"
+    Spec.assertBool s (not (holding thumbOnly)) "and not beside a mana-value-2 one alone"
+    Spec.assertEqWith s "the Nighthawk resolved" (countOf "Vampire Nighthawk" resolved) 1
+    Spec.assertEqWith s "the Crucible paid for it" (countOf "Crucible of Worlds" resolved) 0
+    Spec.assertEqWith s "and the Thumb is still there" (countOf "Krark's Thumb" resolved) 1
+
+  -- CR 118.3 across two Priests: each supply claims only the artifacts that
+  -- give its yield, so the Crucible is not counted under both. Five is the
+  -- Crucible's 3 and the Thumb's 2; six would need the Crucible twice.
+  Spec.it s "CR 118.3 two Priests cannot both sacrifice the one Crucible of Worlds" $ do
+    priest <- S.printingOf s registry "Priest of Yawgmoth"
+    (_, _, _, _, both) <- artifacts
+    let twoPriests = snd (S.addPermanent priest S.alice both)
+        generic n = ManaCost.MkManaCost [ManaSymbol.Generic n]
+    Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice (generic 6) twoPriests)) "{6} would need the Crucible twice"
+    Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice (generic 5) twoPriests) "and {5} is the Crucible and the Thumb"
+
+  -- The same question on a WIDE board: eight artifacts of mana values 1 to 8
+  -- give each of three Priests eight yields, and the walk takes at most one per
+  -- Priest rather than every subset of the twenty-four. Twenty-one is the 8,
+  -- the 7 and the 6.
+  Spec.it s "CR 118.3 three Priests beside eight artifacts pay {21} and not {22}" $ do
+    priest <- S.printingOf s registry "Priest of Yawgmoth"
+    fodder <- traverse (S.printingOf s registry) ["Basilisk Collar", "Aegis of the Legion", "Crawlspace", "Damping Engine", "Clearwater Goblet", "Arachnoid", "Darksteel Gargoyle", "The Ten Rings"]
+    let board = alicePermanents (priest : priest : priest : fodder)
+        generic n = ManaCost.MkManaCost [ManaSymbol.Generic n]
+    Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice (generic 22) board)) "{22} would need one artifact twice"
+    Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice (generic 21) board) "and {21} is the three largest"
+
+  -- CR 608.2h on the Priest itself: Red Priest of Yawgmoth is an artifact, so
+  -- it may sacrifice itself, and its own mana value is read as it last was.
+  Spec.it s "CR 608.2h Red Priest of Yawgmoth sacrificing itself adds {R}{R}" $ do
+    redPriest <- S.printingOf s registry "Red Priest of Yawgmoth"
+    let (priestId, board) = S.addPermanent redPriest S.alice (Setup.emptyGame S.bothPlayers)
+        red = ManaType.Colored Color.Red
+    Spec.assertEqWith s "its own mana value, 2" (tappedFor (sacrificing priestId) priestId board) [red, red]
+    Spec.assertEqWith s "and it is gone" (countOf "Red Priest of Yawgmoth" (S.runPure (sacrificing priestId) board (S.tapForMana priestId))) 0
+
+  -- The same pricing over another characteristic: Furgul, Quag Nurturer's "equal
+  -- to the sacrificed creature's power", Craw Wurm's 6 against Grizzly Bears' 2.
+  Spec.it s "CR 608.2h Furgul, Quag Nurturer adds {G} equal to the sacrificed creature's power" $ do
+    furgul <- S.printingOf s registry "Furgul, Quag Nurturer"
+    wurm <- S.printingOf s registry "Craw Wurm"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    let (furgulId, g1) = S.addPermanent furgul S.alice (Setup.emptyGame S.bothPlayers)
+        (wurmId, g2) = S.addPermanent wurm S.alice g1
+        (bearsId, board) = S.addPermanent bears S.alice g2
+        green = ManaType.Colored Color.Green
+    Spec.assertEqWith s "sacrificing the Craw Wurm adds six {G}" (tappedFor (sacrificing wurmId) furgulId board) (replicate 6 green)
+    Spec.assertEqWith s "sacrificing the Grizzly Bears adds two" (tappedFor (sacrificing bearsId) furgulId board) [green, green]
+
+-- Answers Prompt.ChooseSacrifices with `victim` alone, and defers everything
+-- else to S.identityAnswer.
+sacrificing :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+sacrificing victim p = case p of
+  Prompt.ChooseSacrifices _ _ _ candidates _ _ -> Set.filter (== victim) (Set.fromList candidates)
+  _ -> S.identityAnswer p
+
 -- CR 106.12: to "tap [a permanent] for mana" is to activate a mana ability of
 -- that permanent that includes {T} in its activation cost. Blood Pet ({B}
 -- Creature -- Thrull, "Sacrifice this creature: Add {B}.") is the pool's first
@@ -3710,6 +3802,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   wellspringSpec s registry
   manaConfluenceSpec s registry
   phyrexianTowerSpec s registry
+  priestOfYawgmothSpec s registry
   bloodPetSpec s registry
   ashnodsAltarSpec s registry
   workhorseSpec s registry

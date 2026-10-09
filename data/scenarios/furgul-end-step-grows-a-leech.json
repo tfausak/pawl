@@ -1,0 +1,24 @@
+{
+  "description": "Furgul, Quag Nurturer puts a +1/+1 counter on alice's Leech at her end step instead of conjuring another",
+  "note": "furgul-end-step-conjures-a-leech is the other branch; this board differs only in the Slimy Dualleech already on the battlefield.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Furgul, Quag Nurturer", "label": "furgul" }, { "card": "Slimy Dualleech", "label": "leech" }],
+        "library": [{ "card": "Grizzly Bears" }, { "card": "Grizzly Bears" }]
+      },
+      {
+        "name": "bob",
+        "library": [{ "card": "Grizzly Bears" }, { "card": "Grizzly Bears" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PostcombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "EndStep", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Slimy Dualleech", "count": 1 } } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Counters": { "object": "$leech", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } } }
+  ]
+}

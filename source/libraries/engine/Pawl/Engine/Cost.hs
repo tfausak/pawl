@@ -4303,7 +4303,9 @@ aimingSignature pid oid gs cost
             if Set.null axes
               then []
               else [(source, supply) | source <- Mana.manaSourcesGiven Set.empty capacity (Projection.controlGrants gs) pcs pid gs, supply <- Mana.manaSuppliesGiven capacity pcs pid source gs]
-          relevant (activations, _, _) = filter ((`Set.member` axes) . Claim.Type.axis) (Activations.claims activations)
+          -- The yield's OWN claims, narrowed per sacrifice candidate where the
+          -- supply prices one (Mana.manaSuppliesGiven's fourth element).
+          relevant (_, _, _, own) = filter ((`Set.member` axes) . Claim.Type.axis) (Activations.claims own)
           -- Is the target in each source's claim pool, one entry per claim for
           -- every target alike, so the lists line up by source. A pool of the
           -- source alone is left out: only that source is in it, and its routes
@@ -4318,7 +4320,7 @@ aimingSignature pid oid gs cost
             )
           routes r = case Recipient.objectOf r of
             Nothing -> []
-            Just o -> [(activations {Activations.claims = []}, fmap (selfless o) (relevant supply), mana, cost') | (source, supply@(activations, mana, cost')) <- supplies, source == o, not (null (relevant supply))]
+            Just o -> [(activations {Activations.claims = []}, fmap (selfless o) (relevant supply), mana, cost') | (source, supply@(_, mana, cost', activations)) <- supplies, source == o, not (null (relevant supply))]
        in Just (\r -> (fmap (toInteger . fromEnum) (PlayerEffect.targetQuestions pid gs r) <> self r <> claimed r <> evidence r <> pooled r, routes r))
   where
     criteria = concatMap criteriaOf (Cost.components cost)
@@ -5851,10 +5853,24 @@ tapForManaWith perform window inFlight refused activator oid = do
           (outcome, kept) <- payActivation perform (Set.insert (oid, ManaOption.ability chosen) inFlight) controller oid (totalWith announced announcedCost)
           case outcome of
             Payment.Unpaid -> pure (False, kept, Set.singleton (oid, ManaOption.ability chosen))
-            -- CR 605.3b: a mana ability's cost binds nothing this path could
-            -- read, so the payment's own slots are dropped here. The ability
-            -- itself has no object either -- see `perform` below.
-            Payment.Paid _ -> do
+            Payment.Paid paid -> do
+              -- CR 601.2h / 608.2h: the yield is priced again with the slots
+              -- the payment bound, since an offer cannot know which artifact
+              -- Priest of Yawgmoth's cost will sacrifice (Pawl.ManaSpec's Priest
+              -- of Yawgmoth group). Every pair whose offer the activator picked
+              -- among is a candidate, so a colour choice the offer collapsed is
+              -- asked now, and a yield the slots leave unchanged asks nothing.
+              -- That question is a regression fence: Food Chain is the printing
+              -- that asks it (gap #4851).
+              --
+              -- Not implemented: the slots reaching CR 405.6c's other effects,
+              -- which run with none of them -- see `perform` below (#4850).
+              gsPaid <- State.get
+              let pricedAlike = [priced | (offered, priced) <- Mana.manaRepricingsGiven paid Map.empty oid gs, List.elem offered alike]
+              pricedChosen <- case ListUtils.nubOrdOn ownPart pricedAlike of
+                route : routes -> chooseManaYield controller oid (route NonEmpty.:| routes) gsPaid
+                [] -> pure chosen
+              let pricedShares = filter (\option -> ownPart option == ownPart pricedChosen) pricedAlike
               -- CR 608.2c: the clauses in printed order, each decided as it is
               -- reached, on the board the cost and the earlier clauses left --
               -- Hickory Woodlot's "if there are no depletion counters" reads the
@@ -5882,8 +5898,8 @@ tapForManaWith perform window inFlight refused activator oid = do
               -- (Pawl.Types.Mana) and CR 101.4's ordering rule is about CHOICES,
               -- of which the addition itself makes none.
               --
-              -- A clause's mana is the share the OFFER priced, so a clause whose
-              -- "if" only the cost makes true adds no mana. MTGJSON's dump of
+              -- A clause offers mana only where its "if" held at the OFFER, so one
+              -- whose "if" only the cost makes true adds none. MTGJSON's dump of
               -- 2026-08-23 prints no such clause (mana-ability lines matching
               -- "Add ... . If ... add", every hit an "instead" whose "if" no cost
               -- of its own touches); a land whose cost removes the counter its
@@ -5904,7 +5920,7 @@ tapForManaWith perform window inFlight refused activator oid = do
               -- alike in the activator's own part: Spectral Searchlight's "any
               -- color they choose" (Pawl.ManaSpec's Spectral Searchlight group).
               let shareAt i ref option = Map.lookup ref . snd =<< Maybe.listToMaybe (drop i (ManaOption.steps option))
-                  pickShare i ref recipient mana = case ListUtils.nubOrdOn (shareAt i ref) alike of
+                  pickShare i ref recipient mana = case ListUtils.nubOrdOn (shareAt i ref) pricedShares of
                     representative : more@(_ : _) | ref /= you -> do
                       gsNow <- State.get
                       picked <- chooseManaYield recipient oid (representative NonEmpty.:| more) gsNow
@@ -5941,7 +5957,7 @@ tapForManaWith perform window inFlight refused activator oid = do
                         State.modify' (\g -> List.foldl' (\acc (recipient, units) -> Mana.addMana recipient units acc) g activated)
                         bound2 <- ManaAbilityPerformer.effects perform oid controller bound1 (filter (Maybe.isNothing . ManaAbility.manaProduced) trailing)
                         pure (answers2, bound2, filled <> shares, made <> produced)
-              (_, _, shares, producedUnits) <- Monad.foldM step (Map.empty, Map.empty, [], []) (zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (zip [0 :: Int ..] (ManaOption.steps chosen)))
+              (_, _, shares, producedUnits) <- Monad.foldM step (Map.empty, Map.empty, [], []) (zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (zip [0 :: Int ..] (ManaOption.steps pricedChosen)))
               -- CR 605.1b's "mana being added to a player's mana pool", one event
               -- per player whose pool this activation filled, and CR 106.12a's
               -- "produced": what the clauses that happened added, whoever's pool.

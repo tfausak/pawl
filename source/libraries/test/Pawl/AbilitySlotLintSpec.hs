@@ -315,12 +315,11 @@ triggeredAbilityOffendsGiven inherited ability =
 -- another road -- one "doesn't go on the stack, so it can't be targeted,
 -- countered, or otherwise responded to. Rather, it resolves immediately after it
 -- is activated" -- so Cost.tapForManaWith pays the route's cost, adds the mana
--- and runs the rest through Resolve.performManaAbility (CR 405.6c). That binds
--- Binding.triggerSource and Binding.you and nothing else: the payment's own
--- bound slots are dropped, there being no ability object to write them onto. The
--- exemptions this lint grants beyond those two are therefore wider than a mana
--- ability gets, and no mana ability in the pool reads one, so applying the same
--- available side to one is uniformity rather than a claim.
+-- and runs the rest through Resolve.performManaAbility (CR 405.6c). The
+-- payment's bound slots price the YIELD -- Priest of Yawgmoth's "the sacrificed
+-- artifact's mana value" -- but the rest sees only Binding.triggerSource and
+-- Binding.you, so an exemption this lint grants is wider than a mana ability's
+-- other effects get (#4850).
 activatedAbilityOffends :: ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 activatedAbilityOffends ability =
   let announcedX =
