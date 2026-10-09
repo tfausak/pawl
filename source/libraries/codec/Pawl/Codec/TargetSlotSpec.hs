@@ -44,7 +44,7 @@ spec s = Spec.describe s "Pawl.Codec.TargetSlot" $ do
     Common.assertCodec
       s
       TargetSlot.codec
-      (TargetSlot.required (Pool.CardsInGraveyard (ZoneScope.Scoped PlayerScope.You)) (Just (Filter.HasCardType CardType.Creature)))
+      (TargetSlot.required (Pool.CardsInGraveyard (ZoneScope.Scoped (PlayerScope.Related PlayerRelation.You))) (Just (Filter.HasCardType CardType.Creature)))
       " {\"pool\":{\"type\":\"CardsInGraveyard\",\"value\":{\"type\":\"Scoped\",\"value\":{\"type\":\"You\"}}},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
   -- CR 115.2 clause (a)'s other zone: no PlayerScope (CR 400.1's shared zone)
   -- and no Filter.

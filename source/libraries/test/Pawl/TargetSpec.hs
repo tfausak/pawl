@@ -600,6 +600,25 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         Spec.assertBool s (Set.member (Recipient.ToPlayer S.bob) (legalFor S.bob)) "but bob may bolt himself -- hexproof names only opponents"
         Spec.assertBool s (Set.member (Recipient.ToPlayer S.alice) (legalFor S.bob)) "and alice is targetable as ever"
 
+  -- The two cards once more, asked with NO caster: a question with no CR 109.5
+  -- "you" in it. Shroud names no player (CR 702.18a), so Ivory Mask's scope,
+  -- PlayerRelation.AnyPlayer, is perspective-free and still stops it; hexproof
+  -- names the caster's relation to bob (CR 702.11c), which nobody stands in.
+  -- Pawl.Types.PlayerRelation.perspectiveFree is the line this pins.
+  Spec.it s "CR 702.18a shroud stops a casterless targeting and CR 702.11c hexproof does not" $ do
+    ivoryMask <- S.printingOf s registry "Ivory Mask"
+    leyline <- S.printingOf s registry "Leyline of Sanctity"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let bare = Setup.emptyGame S.bothPlayers
+        (_, masked) = S.addPermanent ivoryMask S.bob bare
+        (_, warded) = S.addPermanent leyline S.bob bare
+    case S.spellTargetSlot bolt of
+      Nothing -> Spec.assertFailure s "Lightning Bolt should declare a target slot"
+      Just theSlot -> do
+        let casterless = Target.legalRecipients Nothing S.noSource theSlot
+        Spec.assertBool s (not (Set.member (Recipient.ToPlayer S.bob) (casterless masked))) "CR 702.18a under Ivory Mask, bob is no casterless target"
+        Spec.assertBool s (Set.member (Recipient.ToPlayer S.bob) (casterless warded)) "CR 702.11c under Leyline of Sanctity, he is"
+
   -- The GAMEPLAY-level proof for both cards, which the legality reads above are
   -- not: a Lightning Bolt actually cast, with an answerer that aims at bob
   -- whenever the engine offers him. Under the Mask he is never offered, so the
@@ -1711,7 +1730,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   --
   -- THREE SEATS, because two collapse the reading under test: with alice and bob
   -- alone, "bob's graveyard" and "not the caster's graveyard" pick out the same
-  -- cards, so a pool that had scoped itself to PlayerScope.Opponents would pass.
+  -- cards, so a pool that had scoped itself to PlayerScope.Related Opponent would pass.
   -- carol's card is the one only the slot scoping can exclude.
   --
   -- The three runs differ in EXACTLY ONE thing apiece: which graveyard the

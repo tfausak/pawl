@@ -1,19 +1,16 @@
 {
   "faces": [
     {
+      "keywords": [
+        {
+          "type": "PartnerWith",
+          "value": "Toothy, Imaginary Friend"
+        }
+      ],
       "manaCost": [
         {
           "type": "Generic",
           "value": 2
-        },
-        {
-          "type": "OfType",
-          "value": {
-            "type": "Colored",
-            "value": {
-              "type": "Black"
-            }
-          }
         },
         {
           "type": "OfType",
@@ -25,11 +22,11 @@
           }
         }
       ],
-      "name": "Corpsejack Menace",
-      "oracleText": "If one or more +1/+1 counters would be put on a creature you control, twice that many +1/+1 counters are put on it instead.",
+      "name": "Pir, Imaginative Rascal",
+      "oracleText": "Partner with Toothy, Imaginary Friend (When this creature enters, target player may put Toothy into their hand from their library, then shuffle.)\nIf one or more counters would be put on a permanent your team controls, that many plus one of each of those kinds of counters are put on that permanent instead.",
       "power": {
         "type": "Literal",
-        "value": 4
+        "value": 1
       },
       "replacementEffects": [
         {
@@ -38,24 +35,19 @@
             "value": {
               "matching": {
                 "onWhat": {
-                  "type": "HasCardType",
-                  "value": {
-                    "type": "Creature"
-                  }
+                  "type": "And",
+                  "value": []
                 },
                 "subject": {
                   "type": "ByAnything"
                 },
-                "whichKind": {
-                  "type": "PlusOnePlusOne"
-                },
                 "whose": {
-                  "type": "You"
+                  "type": "YourTeam"
                 }
               },
               "scaling": {
-                "type": "Multiply",
-                "value": 2
+                "type": "AddMore",
+                "value": 1
               }
             }
           }
@@ -63,12 +55,17 @@
       ],
       "toughness": {
         "type": "Literal",
-        "value": 4
+        "value": 1
       },
       "typeLine": {
         "subtypes": [
           {
-            "type": "Fungus"
+            "type": "Human"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
           }
         ],
         "types": [

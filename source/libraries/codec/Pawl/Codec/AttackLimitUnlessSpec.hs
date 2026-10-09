@@ -7,6 +7,7 @@ import qualified Pawl.Types.AttackLimitUnless as AttackLimitUnless
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Quantity as Quantity
 
@@ -25,7 +26,7 @@ spec s = Spec.describe s "Pawl.Codec.AttackLimitUnless" $ do
     Common.assertCodec
       s
       AttackLimitUnless.codec
-      (AttackLimitUnless.MkAttackLimitUnless {AttackLimitUnless.limit = 2, AttackLimitUnless.defenders = Just PlayerScope.You, AttackLimitUnless.unless = Nothing})
+      (AttackLimitUnless.MkAttackLimitUnless {AttackLimitUnless.limit = 2, AttackLimitUnless.defenders = Just (PlayerScope.Related PlayerRelation.You), AttackLimitUnless.unless = Nothing})
       " {\"limit\":2,\"defenders\":{\"type\":\"You\"}} "
   Spec.it s "MkAttackLimitUnless, unless written" $
     Common.assertCodec

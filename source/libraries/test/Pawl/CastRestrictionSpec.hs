@@ -1781,7 +1781,7 @@ drannithMagistrateSpec s registry = Spec.describe s "Drannith Magistrate" $ do
 -- offers it on alice's turn, where a creature card would be refused by CR 302.1
 -- and the board could not tell Teferi from the rules.
 --
--- THREE seats, so PlayerScope.Opponents is not a two-seat coincidence and a fix
+-- THREE seats, so PlayerScope.Related Opponent is not a two-seat coincidence and a fix
 -- that hardcoded "the player whose turn it isn't" fails carol. ONE Mountain and
 -- ONE Bolt per seat, alice included: she controls Teferi and is no opponent of
 -- her own, so her copy is what fails an over-broad fix, and the identical mana
@@ -1803,8 +1803,8 @@ teferiSorcerySpeedSpec s registry = Spec.describe s "Teferi, Mage of Zhalfir" $ 
     Spec.assertBool s (not (casting S.carol carolBolt board)) "and neither may carol, the third seat"
     Spec.assertBool s (casting S.alice aliceBolt board) "while alice, who controls Teferi, is no opponent of her own"
     -- The SAME control at a moment alice is outside CR 307.5's window, which is
-    -- what tells PlayerScope.Opponents from PlayerScope.EachPlayer: on bob's turn
-    -- her own instant is still hers to cast, and an EachPlayer carrier would take
+    -- what tells PlayerScope.Related Opponent from PlayerScope.Related AnyPlayer: on bob's turn
+    -- her own instant is still hers to cast, and an AnyPlayer carrier would take
     -- it away.
     Spec.assertBool s (casting S.alice aliceBolt (bobsTurn board)) "and still is on bob's turn, where the clause would bite if it reached her"
     Spec.assertBool s (casting S.bob bobBolt (bobsTurn board)) "and bob's own main phase with an empty stack still admits it"
@@ -1882,7 +1882,7 @@ addTeferi teferi gs = snd (S.addPermanent teferi S.alice gs)
 --
 -- The pair with Drannith Magistrate above is the point of putting it here: the
 -- two sentences differ in the SCOPE and in nothing else, so one board tells
--- PlayerScope.EachPlayer from PlayerScope.Opponents. "Players" includes the Cage's
+-- PlayerScope.Related AnyPlayer from PlayerScope.Related Opponent. "Players" includes the Cage's
 -- own controller (CR 109.5 has no "you" in that sentence to exclude her).
 --
 -- The LIBRARY half has its own case below, off Panglacial Wurm's mid-search
@@ -1906,9 +1906,9 @@ grafdiggersCageCastSpec s registry = Spec.describe s "Grafdigger's Cage" $ do
     Spec.assertBool s (casting S.bob bobHand board) "while the hand cast the sentence does not name is still offered"
     Spec.assertBool s (casting S.alice aliceGrave open) "the pair: with no Cage on the battlefield alice's flashback is legal"
     -- The scope is what separates the two cards: Drannith Magistrate's
-    -- PlayerScope.Opponents leaves its controller alone where this leaves nobody
+    -- PlayerScope.Related Opponent leaves its controller alone where this leaves nobody
     -- alone, on the same board and the same graveyard cast.
-    Spec.assertBool s (casting S.alice aliceGrave (withMagistrate magistrate open)) "and the Magistrate's PlayerScope.Opponents, on the same board, spares her"
+    Spec.assertBool s (casting S.alice aliceGrave (withMagistrate magistrate open)) "and the Magistrate's (PlayerScope.Related PlayerRelation.Opponent), on the same board, spares her"
   -- The Or's second disjunct on the mid-search road, where the Cage is the one
   -- permanent between the two readings. The standing top-of-library permission
   -- is the same disjunct's other road, in Pawl.PlayerEffectSpec.
@@ -2057,7 +2057,7 @@ senTripletsSpec s registry =
           Spec.assertEqWith s "and not in alice's" (Game.zoneMembers Zone.Graveyard S.alice resolved) []
           Spec.assertBool s (notElem (A.Cast bobSpell name Facing.FaceUp) (offeredTo S.alice open)) "before the trigger, bob's card is not offered to alice"
           Spec.assertBool s (elem (A.Cast bobSpell name Facing.FaceUp) (offeredTo S.alice after)) "with the grant, bob's card is offered to alice"
-        -- CR 109.5 / PlayerScope.You: the grant is alice's, and the hand it names
+        -- CR 109.5 / PlayerScope.Related You: the grant is alice's, and the hand it names
         -- is bob's. Two copies of one card in the two opponents' hands differ in
         -- nothing but whose hand they are in.
         Spec.it s "CR 601.3 the grant names bob's hand alone" $ do
@@ -2433,7 +2433,7 @@ terrorOfThePeaksSpec s registry = Spec.describe s "Terror of the Peaks" $ do
     Spec.assertEqWith s "the same Bolt at the Piker cost no life" (S.lifeOf S.bob atPiker) (Just 20)
     Spec.assertEqWith s "and is on the stack too" (length (GameState.stack atPiker)) 1
     Spec.assertEqWith s "the {R} was paid on both boards" (S.tappedCount S.bob atDragon, S.tappedCount S.bob atPiker) (1, 1)
-  -- CR 109.5 / PlayerScope.Opponents: "your opponents" excludes the Dragon's
+  -- CR 109.5 / PlayerScope.Related Opponent: "your opponents" excludes the Dragon's
   -- own controller, so alice's Bolt at her own Dragon costs her nothing. Same
   -- board with the Bolt and the Mountain moved to alice's seat.
   Spec.it s "CR 109.5 the Dragon's own controller pays no life to target it" $ do

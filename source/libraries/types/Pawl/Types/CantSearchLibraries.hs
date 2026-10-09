@@ -13,11 +13,11 @@ import qualified Pawl.Types.PlayerScope as PlayerScope
 data CantSearchLibraries = MkCantSearchLibraries
   { -- | CR 701.23: whose library may not be searched -- Ashiok, Dream Render's
     -- "their library" (You), Leonin Arbiter's unqualified "libraries"
-    -- (EachPlayer).
+    -- (AnyPlayer).
     library :: PlayerScope.PlayerScope,
     -- | CR 405.4: who must control the spell or ability causing the search --
     -- Ashiok's "spells and abilities your opponents control" (You), read as the
-    -- cause's CONTROLLER and not as the cause itself. EachPlayer states no
+    -- cause's CONTROLLER and not as the cause itself. AnyPlayer states no
     -- cause.
     cause :: PlayerScope.PlayerScope
   }

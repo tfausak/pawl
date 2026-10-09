@@ -69,7 +69,7 @@
           },
           "name": "hush",
           "scope": {
-            "type": "Opponents"
+            "type": "Opponent"
           }
         }
       ],

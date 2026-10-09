@@ -53,7 +53,7 @@ data SpecialAction
     -- WHO may take it is not carried either, and needs no payload: the rule's own
     -- answer is the players the ability is AFFECTING. On the player axis that is
     -- the carrier's PlayerScope -- Leonin Arbiter's "any player" is its
-    -- EachPlayer scope and Damping Engine's "that player" is its narrower one.
+    -- AnyPlayer scope and Damping Engine's "that player" is its narrower one.
     -- On the OBJECT axis the ability names no player, so it is the controller of
     -- what the ability restricts: Volrath's Curse's and Lost in Thought's "that
     -- creature's controller". Pawl.Engine.Ignore.canIgnore derives all three.

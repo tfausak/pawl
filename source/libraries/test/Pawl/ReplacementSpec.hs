@@ -152,7 +152,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     Spec.assertBool s (not (wasAskedToReplace asked)) "no ChooseReplacement was raised"
   -- The other side of Replacement.readsApplier, and the reason it exists rather
   -- than a blanket "compare the controller too". Rest in Peace's pattern is
-  -- the trivial Filter under ControllerRelation.Anyones, so alice's copy
+  -- the trivial Filter under ControllerRelation.Related AnyPlayer, so alice's copy
   -- and bob's are both applicable to bob's dying Piker at once, equal in `effect`
   -- and differing only in who controls the row. Applying either exiles the same
   -- card, so there is nothing to decide and nothing to ask -- where comparing

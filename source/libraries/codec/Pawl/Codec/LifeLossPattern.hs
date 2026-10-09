@@ -9,11 +9,12 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.LifeLossPattern as LifeLossPattern
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 
 -- | CR 109.5 reads a controller relation against the effect's source; "anyone's"
 -- is the unrestricted reading, so it is what a pattern that says nothing means.
 defaultWhose :: ControllerRelation.ControllerRelation
-defaultWhose = ControllerRelation.Anyones
+defaultWhose = ControllerRelation.Related PlayerRelation.AnyPlayer
 
 codec :: Codec.Codec LifeLossPattern.LifeLossPattern
 codec = Fields.object $ do

@@ -63,7 +63,7 @@
                       "players": {
                         "type": "Scoped",
                         "value": {
-                          "type": "EachPlayer"
+                          "type": "AnyPlayer"
                         }
                       }
                     }
@@ -83,7 +83,7 @@
                       "players": {
                         "type": "Scoped",
                         "value": {
-                          "type": "EachPlayer"
+                          "type": "AnyPlayer"
                         }
                       }
                     }

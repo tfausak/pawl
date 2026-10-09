@@ -4047,7 +4047,7 @@ apply batch candidate event =
       -- LifeGainR row resizes it.
       --
       -- The seat is the one the EVENT named, which for the producer is CR 109.5's
-      -- "you" as well: its pattern is LifeLossPattern's Yours.
+      -- "you" as well: its pattern is LifeLossPattern's Related You.
       LifeLossRewrite.GainInstead -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         settled <- resolveLifeGain pid n
@@ -4175,7 +4175,7 @@ apply batch candidate event =
     -- player still draws one, which is CR 614.6's "instructions that can't be
     -- carried out are simply ignored"; the same filter collapses the two to one
     -- draw where the row's controller IS the instructed player, which the pool's
-    -- one producer never is -- its pattern is ControllerRelation.Opponents.
+    -- one producer never is -- its pattern is ControllerRelation.Related Opponent.
     --
     -- Each of these is an individual draw through `drawCard`, so CR 616.1g's inner
     -- events still raise their own WouldDraw and a per-draw row (Words of Worship)

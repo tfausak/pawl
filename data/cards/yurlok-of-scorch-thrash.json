@@ -127,7 +127,7 @@
             "type": "LoseLifeForUnspentMana"
           },
           "scope": {
-            "type": "EachPlayer"
+            "type": "AnyPlayer"
           }
         }
       ],

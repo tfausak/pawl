@@ -5,6 +5,7 @@ import qualified Pawl.Codec.ChoosePlayer as ChoosePlayer
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.SlotName as SlotName
 
@@ -17,19 +18,19 @@ spec s = Spec.describe s "Pawl.Codec.ChoosePlayer" $ do
       s
       ChoosePlayer.codec
       ( ChoosePlayer.MkChoosePlayer
-          { ChoosePlayer.scope = PlayerScope.Opponents,
+          { ChoosePlayer.scope = PlayerScope.Related PlayerRelation.Opponent,
             ChoosePlayer.slot = SlotName.MkSlotName (Text.pack "opponent")
           }
       )
-      " {\"scope\":{\"type\":\"Opponents\"},\"slot\":\"opponent\"} "
+      " {\"scope\":{\"type\":\"Opponent\"},\"slot\":\"opponent\"} "
   Spec.it s "MkChoosePlayer, a player (Stadium Vendors)" $
     Common.assertCodec
       s
       ChoosePlayer.codec
       ( ChoosePlayer.MkChoosePlayer
-          { ChoosePlayer.scope = PlayerScope.EachPlayer,
+          { ChoosePlayer.scope = PlayerScope.Related PlayerRelation.AnyPlayer,
             ChoosePlayer.slot = SlotName.MkSlotName (Text.pack "chosen")
           }
       )
-      " {\"scope\":{\"type\":\"EachPlayer\"},\"slot\":\"chosen\"} "
+      " {\"scope\":{\"type\":\"AnyPlayer\"},\"slot\":\"chosen\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ChoosePlayer.codec

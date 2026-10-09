@@ -896,9 +896,7 @@ controlSidesNames asking x = case x of
 
 controllerRelationNames :: Asking -> ControllerRelation.ControllerRelation -> Bool
 controllerRelationNames asking x = case x of
-  ControllerRelation.Yours -> False
-  ControllerRelation.Anyones -> False
-  ControllerRelation.Opponents -> False
+  ControllerRelation.Related _ -> False
   ControllerRelation.EnchantedPlayers -> False
   ControllerRelation.InSlot slotName -> slotNames asking slotName
   ControllerRelation.Among _playerId -> False

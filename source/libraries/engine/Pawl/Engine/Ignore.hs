@@ -75,7 +75,7 @@ ignoreCostOf oid name gs = case fmap snd (filter (\(n, _) -> n == name) (ignoreG
 --     that it is on the battlefield with a face to read it from;
 --   * the rule's own WHO -- this player is one the NAMED ability is actually
 --     affecting, which is what every printed producer's sentence says. Leonin
---     Arbiter's "any player" is the EachPlayer scope its own prohibition carries,
+--     Arbiter's "any player" is the AnyPlayer scope its own prohibition carries,
 --     and Damping Engine's "that player" is the one player its scope reaches; a
 --     seat that ability is not changing the game for is offered nothing to
 --     ignore, however much the rest of the permanent is doing to them. Asked as

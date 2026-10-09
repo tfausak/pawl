@@ -673,9 +673,7 @@ engineOnlyOffends replacement = any isAmong (Resolve.relationsOf replacement) ||
   where
     isAmong rel = case rel of
       ControllerRelation.Among _ -> True
-      ControllerRelation.Yours -> False
-      ControllerRelation.Anyones -> False
-      ControllerRelation.Opponents -> False
+      ControllerRelation.Related _ -> False
       ControllerRelation.EnchantedPlayers -> False
       ControllerRelation.InSlot _ -> False
 
@@ -1020,7 +1018,7 @@ clausePlayerRefs clause =
 -- sentence is about a damage EVENT and names no player to ask about. It gathers
 -- from the whole board instead -- "which seats have such an effect applying?" --
 -- which admits the same events as "it applies" exactly when the scope is
--- PlayerScope.EachPlayer, and reads a narrower one as board-wide. This lint is
+-- PlayerScope.Related AnyPlayer, and reads a narrower one as board-wide. This lint is
 -- what makes that exactness a property of the pool rather than a hope: no card
 -- may author the scope the fold cannot see.
 --
@@ -1041,11 +1039,11 @@ unpreventableScopeOffends :: AffectedPlayers.AffectedPlayers SlotName.SlotName -
 unpreventableScopeOffends scope playerEffect = case playerEffect of
   -- A NAMED seat is a narrowing like any other, and the strictest one there is:
   -- "target player" reaches one player where CR 615.12 reaches the whole table.
-  PlayerEffect.DamageCantBePrevented _ -> scope /= AffectedPlayers.Scoped PlayerScope.EachPlayer
+  PlayerEffect.DamageCantBePrevented _ -> scope /= AffectedPlayers.Scoped (PlayerScope.Related PlayerRelation.AnyPlayer)
   -- CR 614.9's twin, banned on the same axis for the same reason: its subject is
   -- a damage event too, so Pawl.Engine.PlayerEffect.unredirectable's board-wide
-  -- fold is exact only while EachPlayer is the one scope a card may write.
-  PlayerEffect.DamageCantBeRedirected _ -> scope /= AffectedPlayers.Scoped PlayerScope.EachPlayer
+  -- fold is exact only while AnyPlayer is the one scope a card may write.
+  PlayerEffect.DamageCantBeRedirected _ -> scope /= AffectedPlayers.Scoped (PlayerScope.Related PlayerRelation.AnyPlayer)
   PlayerEffect.CantSearchLibraries _ -> False
   PlayerEffect.HasProtectionFrom _ -> False
   PlayerEffect.CantBecomeMonarch -> False
@@ -1053,7 +1051,7 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.CantAttackWithCreatures -> False
   -- Every other arm IS asked about a player, so its scope is read exactly as
   -- written and any of the three is legitimate: Rule of Law and Thalia say
-  -- EachPlayer, Silence's stored prohibition says Opponents, and Prowling
+  -- AnyPlayer, Silence's stored prohibition says Opponent, and Prowling
   -- Serpopard says You.
   PlayerEffect.IncreaseSpellCost {} -> False
   PlayerEffect.IncreaseActivationCost {} -> False
@@ -2021,12 +2019,14 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
         -- one object exactly when it does.
         -- namesOneSeat one type over, for the scope that says WHOSE zone (CR
         -- 400.1): a slot holds one player and CR 108.4's controller is one
-        -- player, where the two plural PlayerScopes are the whole table or the
-        -- opponents. ControllingMostPermanents is at most one by its own rule.
+        -- player, where the plural PlayerScopes are the whole table, the opponents
+        -- or a team. ControllingMostPermanents is at most one by its own rule.
         namesOneGraveyard scope = case scope of
-          ZoneScope.Scoped PlayerScope.You -> True
-          ZoneScope.Scoped PlayerScope.Opponents -> False
-          ZoneScope.Scoped PlayerScope.EachPlayer -> False
+          ZoneScope.Scoped (PlayerScope.Related PlayerRelation.You) -> True
+          ZoneScope.Scoped (PlayerScope.Related PlayerRelation.Opponent) -> False
+          ZoneScope.Scoped (PlayerScope.Related PlayerRelation.AnyPlayer) -> False
+          ZoneScope.Scoped (PlayerScope.Related PlayerRelation.Teammate) -> False
+          ZoneScope.Scoped (PlayerScope.Related PlayerRelation.YourTeam) -> False
           ZoneScope.Scoped PlayerScope.ControllingMostPermanents -> True
           ZoneScope.InSlot _ -> True
           ZoneScope.ControllerOfBound _ -> True
@@ -2038,6 +2038,8 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           PlayerRef.Relative PlayerRelation.AnyPlayer -> False
           -- CR 102.3's teammates, of whom a team of three has two.
           PlayerRef.Relative PlayerRelation.Teammate -> False
+          -- CR 102.4's you and your teammates.
+          PlayerRef.Relative PlayerRelation.YourTeam -> False
           PlayerRef.InSlot _ -> True
           -- A SET -- the arm above's plural, and the whole of what parts them.
           PlayerRef.EachInSlot _ -> False
@@ -2571,11 +2573,11 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     exhume <- S.printingOf s registry "Exhume"
     let anyCard = Filter.Type.HasCardType CardType.Creature
         group = SlotName.MkSlotName (Text.pack "revealed")
-        inGraveyard = ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController (ZoneScope.Scoped PlayerScope.You) anyCard (Quantity.Type.Literal 1))
+        inGraveyard = ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController (ZoneScope.Scoped (PlayerScope.Related PlayerRelation.You)) anyCard (Quantity.Type.Literal 1))
         inHand = ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand (PlayerRef.Relative PlayerRelation.You) anyCard)
         fromAmong = ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong group anyCard (Quantity.Type.Literal 1) (PlayerRef.Relative PlayerRelation.You) False)
         atRandom = ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand (PlayerRef.Relative PlayerRelation.You) anyCard (Quantity.Type.Literal 1))
-        atRandomInGraveyard = ObjectRef.RandomCardInGraveyard (RandomCardInGraveyard.MkRandomCardInGraveyard (ZoneScope.Scoped PlayerScope.You) anyCard (Quantity.Type.Literal 1))
+        atRandomInGraveyard = ObjectRef.RandomCardInGraveyard (RandomCardInGraveyard.MkRandomCardInGraveyard (ZoneScope.Scoped (PlayerScope.Related PlayerRelation.You)) anyCard (Quantity.Type.Literal 1))
         sought = ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary (PlayerRef.Relative PlayerRelation.You) anyCard (Quantity.Type.Literal 1))
         anyNumber = ObjectRef.AnyNumberMatching (AnyNumberMatching.MkAnyNumberMatching anyCard Nothing)
         onePermanent = ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent anyCard (PlayerRef.Relative PlayerRelation.You))
@@ -3172,25 +3174,25 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "the lint itself catches a narrowed unpreventable-damage carrier" $ do
     spiderPunk <- S.printingOf s registry "Spider-Punk"
     let card = S.combinedFace spiderPunk
-        narrow ability = ability {PlayerStaticAbility.scope = PlayerScope.You}
+        narrow ability = ability {PlayerStaticAbility.scope = PlayerScope.Related PlayerRelation.You}
         narrowed = card {Face.playerAbilities = fmap narrow (Face.playerAbilities card)}
         offends = any (uncurry unpreventableScopeOffends) . cardPlayerScopes
     Spec.assertBool s (not (offends card)) "the real Spider-Punk names nobody and is accepted"
     Spec.assertBool s (offends narrowed) "and the same card scoped to its controller is rejected"
     -- The ban is CR 615.12's alone: rescoping does not condemn a card whose
     -- effects are all asked about a player. Prowling Serpopard is the printing
-    -- that legitimately says PlayerScope.You.
+    -- that legitimately says PlayerScope.Related You.
     serpopard <- S.printingOf s registry "Prowling Serpopard"
     Spec.assertBool s (not (offends (S.combinedFace serpopard))) "a You-scoped countering prohibition is accepted"
     -- And the STORED carrier, which Lava Burst really does pair with CR 615.12:
     -- restated onto Silence's own Effect.AffectPlayers here, so the rejecting
-    -- direction is proven on a card whose scope is NOT EachPlayer to begin with.
+    -- direction is proven on a card whose scope is NOT AnyPlayer to begin with.
     silence <- S.printingOf s registry "Silence"
     let unpreventable effect = case effect of
           Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration scope _) -> Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration scope (PlayerEffect.DamageCantBePrevented anyDamage))
           other -> other
         widen effect = case effect of
-          Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ playerEffect) -> Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration (AffectedPlayers.Scoped PlayerScope.EachPlayer) playerEffect)
+          Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ playerEffect) -> Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration (AffectedPlayers.Scoped (PlayerScope.Related PlayerRelation.AnyPlayer)) playerEffect)
           other -> other
         overSpell f face =
           face
@@ -3535,7 +3537,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
                   (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
                   (ModeSelection.ChooseExactly 1)
             }
-        prohibition = Effect.AffectPlayers (AffectPlayers.MkAffectPlayers Duration.UntilUsed (AffectedPlayers.Scoped PlayerScope.You) PlayerEffect.CantCastSpells)
+        prohibition = Effect.AffectPlayers (AffectPlayers.MkAffectPlayers Duration.UntilUsed (AffectedPlayers.Scoped (PlayerScope.Related PlayerRelation.You)) PlayerEffect.CantCastSpells)
         pump = Effect.ModifyTarget (ModifyTarget.MkModifyTarget Duration.UntilUsed (Modification.GainKeyword Keyword.Flying) (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)) Nothing)
     Spec.assertBool s (not (anyFace untilUsedOffends (Printing.card berserker))) "the real Hardened Berserker is accepted"
     Spec.assertBool s (untilUsedOffends (planted prohibition)) "a prohibition no cast uses up is rejected"

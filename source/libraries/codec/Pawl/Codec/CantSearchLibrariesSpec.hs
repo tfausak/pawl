@@ -4,6 +4,7 @@ import qualified Pawl.Codec.CantSearchLibraries as CantSearchLibraries
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CantSearchLibraries as CantSearchLibraries
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -15,18 +16,18 @@ spec s = Spec.describe s "Pawl.Codec.CantSearchLibraries" $ do
       s
       CantSearchLibraries.codec
       CantSearchLibraries.MkCantSearchLibraries
-        { CantSearchLibraries.library = PlayerScope.EachPlayer,
-          CantSearchLibraries.cause = PlayerScope.EachPlayer
+        { CantSearchLibraries.library = PlayerScope.Related PlayerRelation.AnyPlayer,
+          CantSearchLibraries.cause = PlayerScope.Related PlayerRelation.AnyPlayer
         }
-      " {\"library\":{\"type\":\"EachPlayer\"},\"cause\":{\"type\":\"EachPlayer\"}} "
+      " {\"library\":{\"type\":\"AnyPlayer\"},\"cause\":{\"type\":\"AnyPlayer\"}} "
   -- Ashiok, Dream Render: both axes narrowed to the prohibited player.
   Spec.it s "MkCantSearchLibraries narrowed on both axes" $
     Common.assertCodec
       s
       CantSearchLibraries.codec
       CantSearchLibraries.MkCantSearchLibraries
-        { CantSearchLibraries.library = PlayerScope.You,
-          CantSearchLibraries.cause = PlayerScope.You
+        { CantSearchLibraries.library = PlayerScope.Related PlayerRelation.You,
+          CantSearchLibraries.cause = PlayerScope.Related PlayerRelation.You
         }
       " {\"library\":{\"type\":\"You\"},\"cause\":{\"type\":\"You\"}} "
   -- The two fields hold the same type and the cases above give them the same
@@ -37,8 +38,8 @@ spec s = Spec.describe s "Pawl.Codec.CantSearchLibraries" $ do
       s
       CantSearchLibraries.codec
       CantSearchLibraries.MkCantSearchLibraries
-        { CantSearchLibraries.library = PlayerScope.You,
-          CantSearchLibraries.cause = PlayerScope.Opponents
+        { CantSearchLibraries.library = PlayerScope.Related PlayerRelation.You,
+          CantSearchLibraries.cause = PlayerScope.Related PlayerRelation.Opponent
         }
-      " {\"library\":{\"type\":\"You\"},\"cause\":{\"type\":\"Opponents\"}} "
+      " {\"library\":{\"type\":\"You\"},\"cause\":{\"type\":\"Opponent\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s CantSearchLibraries.codec

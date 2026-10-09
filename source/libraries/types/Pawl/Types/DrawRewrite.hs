@@ -22,7 +22,7 @@ data DrawRewrite
     -- The gainer is the player the EVENT names -- the one who would have drawn --
     -- and not the row's controller, whom CR 109.5 would make "you". The two are
     -- one seat on the producer in the pool, whose clause reads "the next time YOU
-    -- would draw a card" and so writes Pawl.Types.DrawR's `whose` as Yours.
+    -- would draw a card" and so writes Pawl.Types.DrawR's `whose` as Related You.
     -- Reading the event is what keeps Pawl.Engine.Replacement.readsApplier
     -- answering False for this rewrite; a printing whose two halves named
     -- different seats would have to revisit that.
@@ -31,7 +31,7 @@ data DrawRewrite
     -- game into your hand".
     --
     -- The player is the one the EVENT names, GainLife's seat above and for its
-    -- reason -- every producer's Pawl.Types.DrawR writes `whose` as Yours, so
+    -- reason -- every producer's Pawl.Types.DrawR writes `whose` as Related You, so
     -- the two are one seat on it.
     FromOutsideTheGame FromOutsideTheGame.FromOutsideTheGame
   | -- | CR 702.52a: dredge N -- "you may instead mill N cards and return this

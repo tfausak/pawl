@@ -1439,7 +1439,7 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
                 LibraryPlacement.defaultValue
                 Nothing
             )
-        scoped = [lintMode [takeFrom (ZoneScope.Scoped PlayerScope.You)] [victim]]
+        scoped = [lintMode [takeFrom (ZoneScope.Scoped (PlayerScope.Related PlayerRelation.You))] [victim]]
         inSlot = [lintMode [takeFrom (ZoneScope.InSlot victim)] [victim]]
     Spec.assertBool s (activatedAbilityOffends (modalActivated unread)) "an activated ability declaring an unread slot is rejected"
     Spec.assertBool s (not (activatedAbilityOffends (modalActivated read_))) "and reading everything it declares is accepted"

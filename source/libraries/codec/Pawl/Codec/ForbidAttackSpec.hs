@@ -13,6 +13,7 @@ import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import qualified Pawl.Types.SlotName as SlotName
@@ -39,7 +40,7 @@ spec s = Spec.describe s "Pawl.Codec.ForbidAttack" $ do
       ( ForbidAttack.MkForbidAttack
           { ForbidAttack.duration = Duration.UntilYourNextTurn,
             ForbidAttack.affected = RestrictedCreatures.Matching (Filter.HasCardType CardType.Creature),
-            ForbidAttack.aimedAt = Just (AimedAt.MkAimedAt (AimedPlayers.Scoped PlayerScope.You) (Set.singleton AttackTargetKind.OfPlayer))
+            ForbidAttack.aimedAt = Just (AimedAt.MkAimedAt (AimedPlayers.Scoped (PlayerScope.Related PlayerRelation.You)) (Set.singleton AttackTargetKind.OfPlayer))
           }
       )
       " {\"duration\":{\"type\":\"UntilYourNextTurn\"},\"affected\":{\"type\":\"Matching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"aimedAt\":{\"defenders\":{\"type\":\"Scoped\",\"value\":{\"type\":\"You\"}},\"kinds\":[{\"type\":\"OfPlayer\"}]}} "

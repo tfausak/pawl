@@ -3120,7 +3120,7 @@ kiliTheResourcefulSpec s registry = Spec.describe s "KiliTheResourceful" $ do
 -- attributable to the reduction.
 --
 -- Heartstone sits with alice however `owner` reads, because its sentence is
--- symmetric ("activated abilities of creatures", PlayerScope.EachPlayer): the
+-- symmetric ("activated abilities of creatures", PlayerScope.Related AnyPlayer): the
 -- board that proves that is the one where the activating player does not control
 -- it.
 heartstoneBoard ::
@@ -3219,7 +3219,7 @@ activationCostReductionSpec s registry = Spec.describe s "ActivationCostReductio
       (S.tappedCount S.alice (S.runPure S.identityAnswer oneLand (Activate.activateAbility S.alice oneLandId ability)))
       1
 
-  -- CR 613.11 with PlayerScope.EachPlayer: Heartstone reduces the abilities of
+  -- CR 613.11 with PlayerScope.Related AnyPlayer: Heartstone reduces the abilities of
   -- EVERY player's creatures, so the read site has to consult it for an activation
   -- its controller is not making. bob's three Mountains pay two, alice's Heartstone
   -- untouched -- and bob's own board is the one that would still cost {3} under
@@ -3244,7 +3244,7 @@ activationCostReductionSpec s registry = Spec.describe s "ActivationCostReductio
 --
 -- Brutal Suppression sits with bob however the activation goes, because its
 -- sentence is symmetric ("activated abilities of nontoken Rebels", no
--- possessive, PlayerScope.EachPlayer) -- the board that proves that is the one
+-- possessive, PlayerScope.Related AnyPlayer) -- the board that proves that is the one
 -- where the activating player does not control it.
 suppressionBoard ::
   Printing.Printing ->

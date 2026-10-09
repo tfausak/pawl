@@ -7,7 +7,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Zone as Zone
 
 -- | CR 614.1a: which zone changes a redirect intercepts. Rest in Peace is
--- (Just Graveyard, Anyones, And []) -- any object that would be put into a
+-- (Just Graveyard, Related AnyPlayer, And []) -- any object that would be put into a
 -- graveyard from anywhere. `whenDestination` is compared against the event's
 -- CURRENT destination, so a redirect NAMING a destination cannot re-fire on its
 -- own output even before CR 614.5 is consulted. A `Nothing` pattern has no such

@@ -54,7 +54,7 @@
                   "value": {
                     "type": "Scoped",
                     "value": {
-                      "type": "Opponents"
+                      "type": "Opponent"
                     }
                   }
                 }

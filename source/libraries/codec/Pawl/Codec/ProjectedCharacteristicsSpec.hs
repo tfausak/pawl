@@ -35,6 +35,7 @@ import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.Pool as Pool
@@ -79,8 +80,8 @@ testCharacteristics =
       PC.cardTypes = Set.singleton CardType.Creature,
       PC.subtypes = Set.singleton Subtype.Human,
       PC.staticAbilities = [StaticAbility.MkStaticAbility Affected.Attached Nothing Set.empty Nothing Nothing (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying))],
-      PC.playerAbilities = [PlayerStaticAbility.MkPlayerStaticAbility {PlayerStaticAbility.scope = PlayerScope.EachPlayer, PlayerStaticAbility.condition = Nothing, PlayerStaticAbility.name = Nothing, PlayerStaticAbility.effect = PlayerEffect.CantCastMoreThan 1}],
-      PC.grantedPlayerAbilities = [(Timestamp.MkTimestamp 3, PlayerStaticAbility.MkPlayerStaticAbility {PlayerStaticAbility.scope = PlayerScope.You, PlayerStaticAbility.condition = Nothing, PlayerStaticAbility.name = Nothing, PlayerStaticAbility.effect = PlayerEffect.NoMaximumHandSize})],
+      PC.playerAbilities = [PlayerStaticAbility.MkPlayerStaticAbility {PlayerStaticAbility.scope = PlayerScope.Related PlayerRelation.AnyPlayer, PlayerStaticAbility.condition = Nothing, PlayerStaticAbility.name = Nothing, PlayerStaticAbility.effect = PlayerEffect.CantCastMoreThan 1}],
+      PC.grantedPlayerAbilities = [(Timestamp.MkTimestamp 3, PlayerStaticAbility.MkPlayerStaticAbility {PlayerStaticAbility.scope = PlayerScope.Related PlayerRelation.You, PlayerStaticAbility.condition = Nothing, PlayerStaticAbility.name = Nothing, PlayerStaticAbility.effect = PlayerEffect.NoMaximumHandSize})],
       PC.grantedStaticAbilities = [(Timestamp.MkTimestamp 4, StaticAbility.MkStaticAbility Affected.Attached Nothing Set.empty Nothing Nothing (NonEmpty.singleton (Modification.GainKeyword Keyword.Trample)))],
       PC.grantedRuleAbilities = RuleAbilitiesSpec.testRuleAbilities,
       PC.specialActions = [SpecialAction.DiscardThisAnyTime],
@@ -141,7 +142,7 @@ testCharacteristicsJson =
     <> "\"manaValue\":3,\"power\":1,\"toughness\":2,"
     <> "\"cardTypes\":[{\"type\":\"Creature\"}],\"subtypes\":[{\"type\":\"Human\"}],"
     <> "\"staticAbilities\":[{\"affected\":{\"type\":\"Attached\"},\"modifications\":[{\"type\":\"GainKeyword\",\"value\":{\"type\":\"Flying\"}}]}],"
-    <> "\"playerAbilities\":[{\"scope\":{\"type\":\"EachPlayer\"},\"effect\":{\"type\":\"CantCastMoreThan\",\"value\":1}}],"
+    <> "\"playerAbilities\":[{\"scope\":{\"type\":\"AnyPlayer\"},\"effect\":{\"type\":\"CantCastMoreThan\",\"value\":1}}],"
     <> "\"grantedPlayerAbilities\":[{\"key\":3,\"value\":{\"scope\":{\"type\":\"You\"},\"effect\":{\"type\":\"NoMaximumHandSize\"}}}],"
     <> "\"grantedStaticAbilities\":[{\"key\":4,\"value\":{\"affected\":{\"type\":\"Attached\"},\"modifications\":[{\"type\":\"GainKeyword\",\"value\":{\"type\":\"Trample\"}}]}}],"
     <> "\"grantedRuleAbilities\":"

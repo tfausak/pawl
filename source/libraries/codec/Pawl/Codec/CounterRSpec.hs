@@ -10,6 +10,7 @@ import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.CounterR as CounterR
 import qualified Pawl.Types.CounterSubject as CounterSubject
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Scaling as Scaling
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -24,12 +25,12 @@ spec s = Spec.describe s "Pawl.Codec.CounterR" $ do
               CounterPattern.MkCounterPattern
                 { CounterPattern.whichKind = Just CounterKind.PlusOnePlusOne,
                   CounterPattern.subject = CounterSubject.ByAnything,
-                  CounterPattern.whose = ControllerRelation.Yours,
+                  CounterPattern.whose = ControllerRelation.Related PlayerRelation.You,
                   CounterPattern.onWhat = Filter.HasCardType CardType.Creature,
                   CounterPattern.onWho = Nothing
                 },
             CounterR.scaling = Scaling.AddMore 1
           }
       )
-      " {\"matching\":{\"whichKind\":{\"type\":\"PlusOnePlusOne\"},\"subject\":{\"type\":\"ByAnything\"},\"whose\":{\"type\":\"Yours\"},\"onWhat\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"scaling\":{\"type\":\"AddMore\",\"value\":1}} "
+      " {\"matching\":{\"whichKind\":{\"type\":\"PlusOnePlusOne\"},\"subject\":{\"type\":\"ByAnything\"},\"whose\":{\"type\":\"You\"},\"onWhat\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"scaling\":{\"type\":\"AddMore\",\"value\":1}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s CounterR.codec

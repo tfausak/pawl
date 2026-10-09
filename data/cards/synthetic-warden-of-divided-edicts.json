@@ -39,7 +39,7 @@
           },
           "name": "creature ban",
           "scope": {
-            "type": "Opponents"
+            "type": "Opponent"
           }
         },
         {
@@ -51,7 +51,7 @@
             }
           },
           "scope": {
-            "type": "EachPlayer"
+            "type": "AnyPlayer"
           }
         }
       ],

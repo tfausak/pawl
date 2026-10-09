@@ -25,7 +25,7 @@
             "value": {
               "matching": {
                 "whose": {
-                  "type": "Yours"
+                  "type": "You"
                 }
               },
               "scaling": {
@@ -48,7 +48,7 @@
                   "type": "ByEffect"
                 },
                 "whose": {
-                  "type": "Yours"
+                  "type": "You"
                 }
               },
               "scaling": {

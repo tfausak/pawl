@@ -261,16 +261,16 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.CantBeTargetedBy PlayerScope.EachPlayer)
-      " {\"type\":\"CantBeTargetedBy\",\"value\":{\"type\":\"EachPlayer\"}} "
+      (PlayerEffect.CantBeTargetedBy (PlayerScope.Related PlayerRelation.AnyPlayer))
+      " {\"type\":\"CantBeTargetedBy\",\"value\":{\"type\":\"AnyPlayer\"}} "
   -- CR 702.11c: the OTHER scope, so a codec that dropped the payload would
   -- round-trip one of these and not both.
   Spec.it s "CantBeTargetedBy, hexproof's Opponents" $
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.CantBeTargetedBy PlayerScope.Opponents)
-      " {\"type\":\"CantBeTargetedBy\",\"value\":{\"type\":\"Opponents\"}} "
+      (PlayerEffect.CantBeTargetedBy (PlayerScope.Related PlayerRelation.Opponent))
+      " {\"type\":\"CantBeTargetedBy\",\"value\":{\"type\":\"Opponent\"}} "
   -- CR 601.3b / Vedalken Orrery: "spells" names no quality, so the filter is the
   -- trivial predicate. This is the shape data/cards/vedalken-orrery.json carries.
   Spec.it s "CastAsThoughItHadFlash, Vedalken Orrery's unqualified spells" $
@@ -357,8 +357,8 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.CantSearchLibraries CantSearchLibraries.MkCantSearchLibraries {CantSearchLibraries.library = PlayerScope.EachPlayer, CantSearchLibraries.cause = PlayerScope.EachPlayer})
-      " {\"type\":\"CantSearchLibraries\",\"value\":{\"library\":{\"type\":\"EachPlayer\"},\"cause\":{\"type\":\"EachPlayer\"}}} "
+      (PlayerEffect.CantSearchLibraries CantSearchLibraries.MkCantSearchLibraries {CantSearchLibraries.library = PlayerScope.Related PlayerRelation.AnyPlayer, CantSearchLibraries.cause = PlayerScope.Related PlayerRelation.AnyPlayer})
+      " {\"type\":\"CantSearchLibraries\",\"value\":{\"library\":{\"type\":\"AnyPlayer\"},\"cause\":{\"type\":\"AnyPlayer\"}}} "
   -- CR 702.16j / The Stasis Coffin: "protection from everything" as the empty
   -- conjunction.
   Spec.it s "HasProtectionFrom" $

@@ -45,7 +45,7 @@
             "value": {
               "type": "Scoped",
               "value": {
-                "type": "EachPlayer"
+                "type": "AnyPlayer"
               }
             }
           }
@@ -172,7 +172,7 @@
                                 "value": {
                                   "type": "Scoped",
                                   "value": {
-                                    "type": "EachPlayer"
+                                    "type": "AnyPlayer"
                                   }
                                 }
                               }
@@ -230,7 +230,7 @@
                               "graveyards": {
                                 "type": "Scoped",
                                 "value": {
-                                  "type": "EachPlayer"
+                                  "type": "AnyPlayer"
                                 }
                               }
                             }

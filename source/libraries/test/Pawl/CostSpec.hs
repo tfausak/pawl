@@ -2709,7 +2709,7 @@ omniscienceSpec s registry =
       Spec.assertBool s (not (any (S.isCastOf withoutIt) (Action.legalActions S.alice ungranted))) "and not offered"
       Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack refused)) 0
       Spec.assertEqWith s "and bob was untouched either way" (S.lifeOf S.bob resolved) (Just 20)
-    -- The grant is its CONTROLLER's, which is what the card's PlayerScope.You
+    -- The grant is its CONTROLLER's, which is what the card's PlayerScope.Related You
     -- says, and it is scoped to that player's own HAND, which is what the
     -- sentence says. Asserted on the candidate list rather than on castability,
     -- because only one player holds priority on any one board and an instant bob

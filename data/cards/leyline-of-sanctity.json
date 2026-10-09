@@ -50,7 +50,7 @@
           "effect": {
             "type": "CantBeTargetedBy",
             "value": {
-              "type": "Opponents"
+              "type": "Opponent"
             }
           },
           "scope": {

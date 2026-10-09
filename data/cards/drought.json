@@ -59,7 +59,7 @@
             }
           },
           "scope": {
-            "type": "EachPlayer"
+            "type": "AnyPlayer"
           }
         },
         {
@@ -93,7 +93,7 @@
             }
           },
           "scope": {
-            "type": "EachPlayer"
+            "type": "AnyPlayer"
           }
         }
       ],

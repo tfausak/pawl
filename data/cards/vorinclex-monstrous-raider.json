@@ -50,12 +50,12 @@
                   "value": []
                 },
                 "onWho": {
-                  "type": "Anyones"
+                  "type": "AnyPlayer"
                 },
                 "subject": {
                   "type": "ByPlayer",
                   "value": {
-                    "type": "Yours"
+                    "type": "You"
                   }
                 }
               },
@@ -76,12 +76,12 @@
                   "value": []
                 },
                 "onWho": {
-                  "type": "Anyones"
+                  "type": "AnyPlayer"
                 },
                 "subject": {
                   "type": "ByPlayer",
                   "value": {
-                    "type": "Opponents"
+                    "type": "Opponent"
                   }
                 }
               },

@@ -58,7 +58,7 @@
                         "type": "ChoosePlayer",
                         "value": {
                           "scope": {
-                            "type": "Opponents"
+                            "type": "Opponent"
                           },
                           "slot": "opponent"
                         }
@@ -80,7 +80,7 @@
                               "players": {
                                 "type": "Scoped",
                                 "value": {
-                                  "type": "EachPlayer"
+                                  "type": "AnyPlayer"
                                 }
                               }
                             }

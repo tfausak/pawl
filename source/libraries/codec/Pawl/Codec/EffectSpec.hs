@@ -2022,8 +2022,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.AffectPlayers (AffectPlayers.MkAffectPlayers Duration.UntilEndOfTurn (AffectedPlayers.Scoped PlayerScope.Opponents) PlayerEffect.CantCastSpells))
-      " {\"type\":\"AffectPlayers\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"players\":{\"type\":\"Scoped\",\"value\":{\"type\":\"Opponents\"}},\"effect\":{\"type\":\"CantCastSpells\"}}} "
+      (Effect.AffectPlayers (AffectPlayers.MkAffectPlayers Duration.UntilEndOfTurn (AffectedPlayers.Scoped (PlayerScope.Related PlayerRelation.Opponent)) PlayerEffect.CantCastSpells))
+      " {\"type\":\"AffectPlayers\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"players\":{\"type\":\"Scoped\",\"value\":{\"type\":\"Opponent\"}},\"effect\":{\"type\":\"CantCastSpells\"}}} "
   -- The targeted seat, which is the arm no scope can say (Cease-Fire).
   Spec.it s "AffectPlayers at a named slot" $
     Common.assertJsonCodec
@@ -2245,22 +2245,22 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.ChoosePlayer (ChoosePlayer.MkChoosePlayer PlayerScope.Opponents (SlotName.MkSlotName (Text.pack "opponent"))))
-      " {\"type\":\"ChoosePlayer\",\"value\":{\"scope\":{\"type\":\"Opponents\"},\"slot\":\"opponent\"}} "
+      (Effect.ChoosePlayer (ChoosePlayer.MkChoosePlayer (PlayerScope.Related PlayerRelation.Opponent) (SlotName.MkSlotName (Text.pack "opponent"))))
+      " {\"type\":\"ChoosePlayer\",\"value\":{\"scope\":{\"type\":\"Opponent\"},\"slot\":\"opponent\"}} "
   Spec.it s "ChoosePlayer, a player" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.ChoosePlayer (ChoosePlayer.MkChoosePlayer PlayerScope.EachPlayer (SlotName.MkSlotName (Text.pack "chosen"))))
-      " {\"type\":\"ChoosePlayer\",\"value\":{\"scope\":{\"type\":\"EachPlayer\"},\"slot\":\"chosen\"}} "
+      (Effect.ChoosePlayer (ChoosePlayer.MkChoosePlayer (PlayerScope.Related PlayerRelation.AnyPlayer) (SlotName.MkSlotName (Text.pack "chosen"))))
+      " {\"type\":\"ChoosePlayer\",\"value\":{\"scope\":{\"type\":\"AnyPlayer\"},\"slot\":\"chosen\"}} "
   Spec.it s "ChoosePlayerAtRandom" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.ChoosePlayerAtRandom (ChoosePlayerAtRandom.MkChoosePlayerAtRandom PlayerScope.Opponents (SlotName.MkSlotName (Text.pack "opponent"))))
-      " {\"type\":\"ChoosePlayerAtRandom\",\"value\":{\"scope\":{\"type\":\"Opponents\"},\"slot\":\"opponent\"}} "
+      (Effect.ChoosePlayerAtRandom (ChoosePlayerAtRandom.MkChoosePlayerAtRandom (PlayerScope.Related PlayerRelation.Opponent) (SlotName.MkSlotName (Text.pack "opponent"))))
+      " {\"type\":\"ChoosePlayerAtRandom\",\"value\":{\"scope\":{\"type\":\"Opponent\"},\"slot\":\"opponent\"}} "
   Spec.it s "ChoosePermanents" $
     Common.assertJsonCodec
       s
@@ -2273,7 +2273,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.RollDie RollDie.MkRollDie {RollDie.sides = 20, RollDie.count = Quantity.Literal 1, RollDie.modifier = Nothing, RollDie.reading = DiceReading.ChooseOne, RollDie.slot = SlotName.MkSlotName (Text.pack "result"), RollDie.other = Nothing, RollDie.roller = PlayerScope.You, RollDie.highest = Nothing, RollDie.store = Nothing})
+      (Effect.RollDie RollDie.MkRollDie {RollDie.sides = 20, RollDie.count = Quantity.Literal 1, RollDie.modifier = Nothing, RollDie.reading = DiceReading.ChooseOne, RollDie.slot = SlotName.MkSlotName (Text.pack "result"), RollDie.other = Nothing, RollDie.roller = PlayerScope.Related PlayerRelation.You, RollDie.highest = Nothing, RollDie.store = Nothing})
       " {\"type\":\"RollDie\",\"value\":{\"sides\":20,\"slot\":\"result\"}} "
   -- CR 706.2's modifier, so the elided field above is not the only shape this
   -- arm round-trips.
@@ -2282,7 +2282,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.RollDie RollDie.MkRollDie {RollDie.sides = 20, RollDie.count = Quantity.Literal 1, RollDie.modifier = Just (Quantity.Literal 3), RollDie.reading = DiceReading.ChooseOne, RollDie.slot = SlotName.MkSlotName (Text.pack "result"), RollDie.other = Nothing, RollDie.roller = PlayerScope.You, RollDie.highest = Nothing, RollDie.store = Nothing})
+      (Effect.RollDie RollDie.MkRollDie {RollDie.sides = 20, RollDie.count = Quantity.Literal 1, RollDie.modifier = Just (Quantity.Literal 3), RollDie.reading = DiceReading.ChooseOne, RollDie.slot = SlotName.MkSlotName (Text.pack "result"), RollDie.other = Nothing, RollDie.roller = PlayerScope.Related PlayerRelation.You, RollDie.highest = Nothing, RollDie.store = Nothing})
       " {\"type\":\"RollDie\",\"value\":{\"modifier\":{\"type\":\"Literal\",\"value\":3},\"sides\":20,\"slot\":\"result\"}} "
   Spec.it s "FlipCoin" $
     Common.assertJsonCodec

@@ -5,6 +5,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.CounterSubject as CounterSubject
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.CounterSubject" $ do
@@ -18,8 +19,8 @@ spec s = Spec.describe s "Pawl.Codec.CounterSubject" $ do
     Common.assertCodec
       s
       CounterSubject.codec
-      (CounterSubject.ByPlayer ControllerRelation.Opponents)
-      " {\"type\":\"ByPlayer\",\"value\":{\"type\":\"Opponents\"}} "
+      (CounterSubject.ByPlayer (ControllerRelation.Related PlayerRelation.Opponent))
+      " {\"type\":\"ByPlayer\",\"value\":{\"type\":\"Opponent\"}} "
   Spec.it s "ByAnything (Hardened Scales)" $
     Common.assertCodec
       s

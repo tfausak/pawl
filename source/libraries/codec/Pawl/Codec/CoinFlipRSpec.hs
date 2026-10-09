@@ -6,6 +6,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CoinFlipR as CoinFlipR
 import qualified Pawl.Types.CoinFlipRewrite as CoinFlipRewrite
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.CoinFlipR" $ do
@@ -14,6 +15,6 @@ spec s = Spec.describe s "Pawl.Codec.CoinFlipR" $ do
     Common.assertCodec
       s
       CoinFlipR.codec
-      (CoinFlipR.MkCoinFlipR ControllerRelation.Yours CoinFlipRewrite.Doubled)
-      " {\"whose\":{\"type\":\"Yours\"},\"rewrite\":{\"type\":\"Doubled\"}} "
+      (CoinFlipR.MkCoinFlipR (ControllerRelation.Related PlayerRelation.You) CoinFlipRewrite.Doubled)
+      " {\"whose\":{\"type\":\"You\"},\"rewrite\":{\"type\":\"Doubled\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s CoinFlipR.codec

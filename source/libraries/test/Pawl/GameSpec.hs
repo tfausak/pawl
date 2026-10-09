@@ -87,6 +87,7 @@ import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerEffect as PlayerEffect.Type
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.PrintingId as PrintingId
@@ -1681,7 +1682,7 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
     let armed =
           S.addPlayerEffect
             (Expiry.Type.AtTurnOf S.bob)
-            (AffectedPlayers.Scoped PlayerScope.Opponents)
+            (AffectedPlayers.Scoped (PlayerScope.Related PlayerRelation.Opponent))
             PlayerEffect.Type.CantCastSpells
             S.bob
             (S.threePlayerGame {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice})

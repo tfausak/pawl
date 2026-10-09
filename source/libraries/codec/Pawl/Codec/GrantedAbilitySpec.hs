@@ -124,7 +124,7 @@ spec s = Spec.describe s "Pawl.Codec.GrantedAbility" $ do
     Common.assertCodec
       s
       codec
-      (GrantedAbility.Player (PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You Nothing Nothing PlayerEffect.NoMaximumHandSize))
+      (GrantedAbility.Player (PlayerStaticAbility.MkPlayerStaticAbility (PlayerScope.Related PlayerRelation.You) Nothing Nothing PlayerEffect.NoMaximumHandSize))
       " {\"type\":\"Player\",\"value\":{\"scope\":{\"type\":\"You\"},\"effect\":{\"type\":\"NoMaximumHandSize\"}}} "
   -- CR 601.2f: Richlau, Headmaster's "This spell costs {1} less to cast".
   Spec.it s "SelfCostReduction" $

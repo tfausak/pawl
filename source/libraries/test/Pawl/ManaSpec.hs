@@ -859,7 +859,7 @@ anyColorSpec s registry = Spec.describe s "Mana of any color" $ do
 -- mana" the step end would take away.
 --
 -- Both seats float, because the symmetry is the assertion: Upwelling's scope is
--- CR 613.11 EachPlayer, and a You-scoped implementation keeps only alice's.
+-- CR 613.11 AnyPlayer, and a You-scoped implementation keeps only alice's.
 --
 -- Returns the ids of the `alices` printings, in the order given, so a caller can
 -- destroy one without hunting the battlefield for it by name.
@@ -900,7 +900,7 @@ upwellingSpec s registry = Spec.describe s "Upwelling" $ do
     Spec.assertEqWith s "alice kept it" (poolSize S.alice (Mana.emptiedManaPools floated)) 1
 
   -- The discriminating half of the scope. Alice controls the Upwelling and
-  -- bob keeps his mana anyway -- that is what PlayerScope.EachPlayer means,
+  -- bob keeps his mana anyway -- that is what PlayerScope.Related AnyPlayer means,
   -- and a You-scoped implementation passes the test above and fails this one.
   Spec.it s "CR 613.11 Upwelling is symmetric: an opponent's unspent mana is kept too" $ do
     forest <- S.printingOf s registry "Forest"
@@ -965,7 +965,7 @@ upwellingSpec s registry = Spec.describe s "Upwelling" $ do
 -- Legendary Creature -- Elemental) says "You don't lose unspent green mana as
 -- steps and phases end", which differs from Upwelling on both axes the carrier
 -- has: it names a MANA TYPE (CR 106.1a), so the rest of the pool still empties,
--- and its CR 613.11 scope is PlayerScope.You, so an opponent's pool still
+-- and its CR 613.11 scope is PlayerScope.Related You, so an opponent's pool still
 -- empties. Each axis has its own falsifier below. Oracle text verified against
 -- Scryfall.
 --
@@ -995,7 +995,7 @@ omnathSpec s registry = Spec.describe s "Omnath, Locus of Mana" $ do
 
   -- The scope axis, and the mirror image of Upwelling's symmetry test above:
   -- alice controls the Omnath and BOB's green still empties, because CR 613.11's
-  -- carrier here is PlayerScope.You. An EachPlayer implementation passes the
+  -- carrier here is PlayerScope.Related You. An AnyPlayer implementation passes the
   -- test above and fails this one.
   Spec.it s "CR 613.11 Omnath is You-scoped: an opponent's green mana still empties" $ do
     forest <- S.printingOf s registry "Forest"

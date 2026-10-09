@@ -9,6 +9,7 @@ import qualified Pawl.Types.InstanceOrdinal as InstanceOrdinal
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PermanentCandidate as PermanentCandidate
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementProvenance as ReplacementProvenance
 import qualified Pawl.Types.Zone as Zone
@@ -25,7 +26,7 @@ effect =
         ZoneChangePattern.MkZoneChangePattern
           { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
             ZoneChangePattern.whatObject = Filter.And [],
-            ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
+            ZoneChangePattern.whoseObject = ControllerRelation.Related PlayerRelation.AnyPlayer,
             ZoneChangePattern.whenDiscarded = Nothing,
             ZoneChangePattern.duringResolution = False
           }
