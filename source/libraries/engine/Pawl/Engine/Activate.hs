@@ -125,6 +125,7 @@ activateAbilityWith runSubgame pid srcId ability = Event.announcing $ do
       obj =
         Object.MkObject
           { Object.owner = pid,
+            Object.identity = Nothing,
             Object.enteredUnder = Nothing,
             Object.source =
               Source.OfAbility

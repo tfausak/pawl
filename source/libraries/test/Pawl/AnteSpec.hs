@@ -2,7 +2,9 @@
 
 -- Covers CR 407's ante: Pawl.Engine.Setup's CR 407.2 step, Effect.Ante's CR
 -- 407.4 owner check (Pawl.Engine.Resolve.Effect), CR 800.4n in
--- Pawl.Engine.Departure, and Pawl.Engine.Ante's CR 407.3 bar.
+-- Pawl.Engine.Departure, and Pawl.Engine.Ante's CR 407.3 bar, CR 407.2 payout
+-- and CR 108.3 ownership report, with the card identity
+-- (Pawl.Types.CardIdentity) the report reads.
 module Pawl.AnteSpec where
 
 import qualified Control.Monad as Monad
@@ -10,14 +12,19 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Pawl.Engine.Ante as Ante
+import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Interchangeable as Interchangeable
+import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.CardIdentity as CardIdentity
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.GameSettings as GameSettings
@@ -26,10 +33,15 @@ import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.OutsideDestination as OutsideDestination
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Result as Result
+import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.TeamId as TeamId
+import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Zone as Zone
 
 anteGame :: GameSettings.GameSettings
@@ -109,6 +121,21 @@ spec s registry = Spec.describe s "Ante" $ do
         inAnte oid = fmap Object.zone (Game.lookupObject oid restarted) == Just Zone.Ante
     Spec.assertEqWith s "CR 407.2 two cards in the ante again, each really there" (Set.size (GameState.ante restarted), all inAnte (Set.toList (GameState.ante restarted))) (2, True)
     Spec.assertEqWith s "CR 727.2 and nobody's cards went missing" (ownedBy S.alice restarted, ownedBy S.bob restarted) (20, 20)
+  -- CR 727.1: a restarted game has no winner, so nothing is paid; CR 727.2:
+  -- ownership does not change, so a card alice took before the restart (the
+  -- write Darkpact makes) is still hers, and still reported as bob's to begin.
+  Spec.it s "CR 727.1/727.2 a restart pays nothing, and an ownership change outlives it" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    let deck = Deck.fromCards (Map.singleton mountain 20)
+        (anted, _) = startedWith anteGame ((S.alice, deck) NonEmpty.:| [(S.bob, deck)])
+    case anteOf S.bob anted of
+      [bobs] -> do
+        let taken = Game.setOwner bobs S.alice anted
+            restarted = S.runPure S.identityAnswer taken (Setup.restartGame S.performer Set.empty S.alice)
+        Spec.assertEqWith s "CR 727.2 the card alice took is reported, bob's to begin and hers now" (Map.elems (Ante.ownershipChanges restarted)) [(S.bob, S.alice)]
+        Spec.assertEqWith s "CR 727.1 nobody won the restarted game" (GameState.result restarted) Nothing
+        Spec.assertEqWith s "CR 727.2 and nothing else changed hands" (ownedBy S.alice restarted, ownedBy S.bob restarted) (21, 19)
+      other -> Spec.assertFailure s ("bob anted " <> show (length other) <> " cards")
   -- CR 729.2 moves the main-game libraries, and a seat whose library is empty
   -- brings nothing to ante.
   Spec.it s "CR 729.2/407.2 a subgame seat with no library antes nothing" $ do
@@ -142,6 +169,66 @@ spec s registry = Spec.describe s "Ante" $ do
         back = Setup.funnelBack left parent
     Spec.assertEqWith s "CR 729.5 bob's main-game library is whole again, and not one card more" (length (Game.zoneMembers Zone.Library S.bob back)) 9
     Spec.assertEqWith s "CR 800.4n bob's subgame ante card stayed behind him" (length (anteOf S.bob left)) 1
+  -- CR 407.3 / 729.5: alice takes bob's subgame ante card (Darkpact's write,
+  -- through the function its opcode calls), then bob concedes. The card goes
+  -- to alice's main-game library, and bob's is rebuilt without it.
+  Spec.it s "CR 729.5 a card whose owner changed in a subgame goes home once, to its new owner" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    let stock pid gs0 = foldr (\_ gs -> snd (S.addLibraryCard mountain pid gs)) gs0 (replicate 9 ())
+        parent = stock S.carol (stock S.bob (stock S.alice (Setup.gameWith anteGame S.threePlayers)))
+        sub = S.runPure S.identityAnswer (Setup.subgameStateFrom S.alice parent) (Setup.startGameFromCards S.performer Set.empty)
+    case anteOf S.bob sub of
+      [bobs] -> do
+        let back = Setup.funnelBack (S.departs Departure.Type.Conceded S.bob (Game.setOwner bobs S.alice sub)) parent
+        Spec.assertEqWith s "CR 729.5 bob's main-game library is rebuilt without it" (length (Game.zoneMembers Zone.Library S.bob back)) 8
+        Spec.assertEqWith s "CR 729.5 and alice's holds it" (length (Game.zoneMembers Zone.Library S.alice back)) 10
+      other -> Spec.assertFailure s ("bob anted " <> show (length other) <> " cards")
+  -- CR 108.3 / 729.4a: a card alice took from bob in the main game (its
+  -- identity says bob began the game with it) is wished into a subgame from
+  -- her hand. It is the same card in there, so the report still lists it once
+  -- it comes home (CR 729.5).
+  Spec.it s "CR 729.4a a card brought into a subgame from the main game keeps its identity" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    let stock pid gs0 = foldr (\_ gs -> snd (S.addLibraryCard mountain pid gs)) gs0 (replicate 9 ())
+        (bearsId, g1) = S.addObjectIn Zone.Hand bears S.alice (stock S.carol (stock S.bob (stock S.alice (Setup.gameWith anteGame S.threePlayers))))
+        bobs obj = obj {Object.identity = fmap (\i -> i {CardIdentity.startingOwner = S.bob}) (Object.identity obj)}
+        parent = g1 {GameState.objects = Map.adjust bobs bearsId (GameState.objects g1)}
+        sub = S.runPure S.identityAnswer (Setup.subgameStateFrom S.alice parent) (Setup.startGameFromCards S.performer Set.empty)
+        (_, crossed) = Event.bringInFrom OutsideDestination.Hand S.alice bearsId sub
+        back = Setup.funnelBack crossed (Setup.applyCrossings crossed parent)
+    Spec.assertEqWith s "CR 108.3 the Bears are still bob's to begin and alice's now" (Map.elems (Ante.ownershipChanges back)) [(S.bob, S.alice)]
+  -- CR 800.4n / 729.5: bob wishes his own main-game Jeweled Bird into a
+  -- three-seat subgame, antes it, and concedes. The Bird stays in the subgame,
+  -- and at its end goes to his main-game library with the rest of his cards.
+  Spec.it s "CR 729.5 a departed player's ante card from the main game goes to their main-game library" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    bird <- S.printingOf s registry "Jeweled Bird"
+    let stock pid gs0 = foldr (\_ gs -> snd (S.addLibraryCard mountain pid gs)) gs0 (replicate 9 ())
+        (birdId, parent) = S.addObjectIn Zone.Hand bird S.bob (stock S.carol (stock S.bob (stock S.alice (Setup.gameWith anteGame S.threePlayers))))
+        sub = S.runPure S.identityAnswer (Setup.subgameStateFrom S.alice parent) (Setup.startGameFromCards S.performer Set.empty)
+    case Event.bringInFrom OutsideDestination.Hand S.bob birdId sub of
+      (Just (inSub NonEmpty.:| []), crossed) -> do
+        let anted = S.departs Departure.Type.Conceded S.bob (S.runPure S.identityAnswer crossed (Event.changeZone inSub Zone.Ante))
+            back = Setup.funnelBack anted (Setup.applyCrossings anted parent)
+        Spec.assertEqWith s "CR 729.5 bob's main-game library holds his nine and the Bird" (length (Game.zoneMembers Zone.Library S.bob back)) 10
+      _ -> Spec.assertFailure s "the Bird was not brought in"
+  -- The same from bob's sideboard (CR 400.11a): the Bird goes to his library,
+  -- and so is no longer in his pool.
+  Spec.it s "CR 729.5 a departed player's ante card from their sideboard goes to their main-game library, not back to the pool" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    bird <- S.printingOf s registry "Jeweled Bird"
+    let stock pid gs0 = foldr (\_ gs -> snd (S.addLibraryCard mountain pid gs)) gs0 (replicate 9 ())
+        (birdPrinting, g1) = Game.intern bird (stock S.carol (stock S.bob (stock S.alice (Setup.gameWith anteGame S.threePlayers))))
+        pooled p = p {Player.outsideTheGame = Map.singleton birdPrinting 1}
+        parent = g1 {GameState.players = Map.adjust pooled S.bob (GameState.players g1)}
+        sub = S.runPure S.identityAnswer (Setup.subgameStateFrom S.alice parent) (Setup.startGameFromCards S.performer Set.empty)
+        (inSub, brought) = Event.bringIn OutsideDestination.Hand S.bob birdPrinting sub
+        anted = S.departs Departure.Type.Conceded S.bob (S.runPure S.identityAnswer brought (Event.changeZone inSub Zone.Ante))
+        back = Setup.funnelBack anted (Setup.applyCrossings anted parent)
+        poolOf pid gs = foldMap Player.outsideTheGame (Map.lookup pid (GameState.players gs))
+    Spec.assertEqWith s "CR 729.5 bob's main-game library holds his nine and the Bird" (length (Game.zoneMembers Zone.Library S.bob back)) 10
+    Spec.assertEqWith s "CR 400.11a and his pool no longer does" (poolOf S.bob back) Map.empty
   -- CR 729.5: a subgame played for ante antes one card from each library, and
   -- at its end each still-playing owner's ante card goes into their main-game
   -- library with the rest of their cards; the main game's own ante is untouched.
@@ -214,3 +301,59 @@ spec s registry = Spec.describe s "Ante" $ do
         zoneNow gs = fmap Object.zone (Game.currentIncarnation start gs >>= \oid -> Game.lookupObject oid gs)
     Spec.assertEqWith s "CR 400.7 it is followed into exile" (zoneNow after) (Just Zone.Exile)
     Spec.assertEqWith s "CR 800.4a and lost once it has left the game" (Game.currentIncarnation start (S.departs Departure.Type.Conceded S.alice after)) Nothing
+  -- CR 108.3: every card a game begins with is one card through every move,
+  -- and the player who began the game with it is its starting owner. Only
+  -- cards carry an identity, and no two share one.
+  Spec.it s "CR 108.3 every card a game starts with carries its own identity" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    let deck = Deck.fromCards (Map.singleton mountain 10)
+        (started, _) = startedWith anteGame ((S.alice, deck) NonEmpty.:| [(S.bob, deck)])
+        cards = filter (\obj -> case Object.source obj of Source.OfCard _ -> True; _ -> False) (Map.elems (GameState.objects started))
+        identities = fmap Object.identity cards
+        serials = fmap (fmap CardIdentity.serial) identities
+    Spec.assertEqWith s "CR 108.3 each card's starting owner is its owner" (fmap (fmap CardIdentity.startingOwner) identities) (fmap (Just . Object.owner) cards)
+    Spec.assertEqWith s "and no two cards share an identity" (Set.size (Set.fromList serials)) 20
+  -- A serial is bookkeeping no rule reads, so two Mountains alice began the
+  -- game with stay interchangeable and a choice between them is elided. One
+  -- bob began the game with does not: the ownership report tells it apart.
+  Spec.it s "CR 108.3 two cards differing only in their identity's serial are interchangeable, and not when their starting owners differ" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    let (a, g1) = S.addObjectIn Zone.Hand mountain S.alice (Setup.gameWith anteGame S.bothPlayers)
+        (b, g2) = S.addObjectIn Zone.Hand mountain S.alice g1
+        (c, g3) = S.addObjectIn Zone.Hand mountain S.alice g2
+        bobs obj = obj {Object.identity = fmap (\i -> i {CardIdentity.startingOwner = S.bob}) (Object.identity obj)}
+        g4 = g3 {GameState.objects = Map.adjust bobs c (GameState.objects g3)}
+        alike = Interchangeable.objects (Projection.projectAll g4) g4
+    Spec.assertEqWith s "two Mountains alice began the game with are interchangeable" (alike a b) True
+    Spec.assertEqWith s "one bob began the game with is not" (alike a c) False
+  -- CR 104.4a: two players who lose at once draw, and a draw has no winner,
+  -- so CR 407.2 pays nobody.
+  Spec.it s "CR 104.4a/407.2 a drawn game pays out no ante card" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (alices, g1) = S.addObjectIn Zone.Ante piker S.alice (Setup.gameWith anteGame S.bothPlayers)
+        (bobs, g2) = S.addObjectIn Zone.Ante piker S.bob g1
+        drawn = S.runPure S.identityAnswer g2 (Departure.leaveGameTogether Departure.Type.Lost [S.alice, S.bob])
+        ownerOf oid = fmap Object.owner (Game.lookupObject oid drawn)
+    Spec.assertEqWith s "CR 407.2 nobody won, so each ante card keeps its owner" (ownerOf alices, ownerOf bobs) (Just S.alice, Just S.bob)
+    Spec.assertEqWith s "CR 104.4a the game is a draw" (GameState.result drawn) (Just Result.Drawn)
+  -- bob draws and leaves while alice and carol play on (CR 801.16's partial
+  -- draw is a departure); CR 800.4n keeps his ante card in the game, and when
+  -- carol concedes, alice, the winner, owns all three.
+  Spec.it s "CR 800.4n/407.2 a player who draws leaves their ante card to the eventual winner" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let stake pid (ids, g) = let (oid, g') = S.addObjectIn Zone.Ante piker pid g in (ids <> [oid], g')
+        (staked, g1) = stake S.carol (stake S.bob (stake S.alice ([], Setup.gameWith anteGame S.threePlayers)))
+        drew = S.runPure S.identityAnswer g1 (Departure.leaveGameTogether Departure.Type.Drew [S.bob])
+        won = S.runPure S.identityAnswer drew (Departure.leaveGame Departure.Type.Conceded S.carol)
+    Spec.assertEqWith s "CR 407.2 alice, the winner, owns every ante card" (fmap (\oid -> fmap Object.owner (Game.lookupObject oid won)) staked) (replicate 3 (Just S.alice))
+    Spec.assertEqWith s "CR 104.2a alice won" (GameState.result won) (Just (Result.Won S.alice))
+    Spec.assertEqWith s "and bob's draw had decided nothing" (GameState.result drew) Nothing
+  -- alice and bob are a team; carol concedes and the team wins (CR 104.2c).
+  -- CR 407.2's one winner says nothing of a team.
+  Spec.it s "CR 104.2c a team's win pays out no ante card" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let teamed = anteGame {GameSettings.teams = Teams.MkTeams (Map.fromList [(S.alice, TeamId.MkTeamId 0), (S.bob, TeamId.MkTeamId 0), (S.carol, TeamId.MkTeamId 1)])}
+        (carols, g1) = S.addObjectIn Zone.Ante piker S.carol (Setup.gameWith teamed S.threePlayers)
+        won = S.runPure S.identityAnswer g1 (Departure.leaveGame Departure.Type.Conceded S.carol)
+    Spec.assertEqWith s "carol's ante card is still hers" (fmap Object.owner (Game.lookupObject carols won)) (Just S.carol)
+    Spec.assertEqWith s "CR 104.2c the team won" (GameState.result won) (Just (Result.TeamWon (TeamId.MkTeamId 0)))

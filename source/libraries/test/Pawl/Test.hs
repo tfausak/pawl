@@ -112,6 +112,7 @@ import qualified Pawl.Codec.CantBeRegeneratedSpec
 import qualified Pawl.Codec.CantBlockCreaturesSpec
 import qualified Pawl.Codec.CantSearchLibrariesSpec
 import qualified Pawl.Codec.CardArrivedInSpec
+import qualified Pawl.Codec.CardIdentitySpec
 import qualified Pawl.Codec.CardLeavesZoneSpec
 import qualified Pawl.Codec.CardNameSpec
 import qualified Pawl.Codec.CardPutIntoGraveyardSpec
@@ -959,6 +960,7 @@ spec s registry = do
   Pawl.Codec.OwnedZoneSpec.spec s
   Pawl.Codec.CardsPutIntoZoneSpec.spec s
   Pawl.Codec.CardNameSpec.spec s
+  Pawl.Codec.CardIdentitySpec.spec s
   Pawl.Codec.CardSpec.spec s
   Pawl.Codec.CardTypeSpec.spec s
   Pawl.Codec.CastFromSpec.spec s

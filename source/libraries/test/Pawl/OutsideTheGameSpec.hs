@@ -42,7 +42,9 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Ante as Ante
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
@@ -1120,6 +1122,57 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
     Spec.assertEqWith s "CR 407.3 the main-game ante card was never offered" offeredSign False
     Spec.assertEqWith s "CR 407.3 and it is still in alice's main-game ante" (Set.member signId (GameState.ante after), fmap Object.zone (Game.lookupObject signId after)) (True, Just Zone.Ante)
     Spec.assertEqWith s "CR 729.1a the subgame did not decide the main game, so nobody decked out" (GameState.result after) Nothing
+  -- CR 108.3 / 729.4a / 729.5: an ownership change survives a card's trip
+  -- through a subgame. In the main game alice's Tempest Efreet trades
+  -- ownership with bob's one card in hand, a Sign in Blood (CR 407.3), which
+  -- goes to her hand. Then she casts Shahrazad, and inside the subgame (the
+  -- CR 407.3/729.4 case's sizing) Burning Wish takes that Sign in Blood out of
+  -- her main-game hand. CR 729.5 sends it home to her main-game library, and
+  -- the ownership report still names bob as the player who began the game
+  -- with it, beside the Efreet that went the other way and the subgame ante
+  -- card alice won (CR 407.2).
+  Spec.it s "CR 108.3/729.4a gameplay: a card whose owner changed keeps its history through a subgame wish" $ do
+    plains <- S.printingOf s registry "Plains"
+    mountain <- S.printingOf s registry "Mountain"
+    shahrazad <- S.printingOf s registry "Shahrazad"
+    burningWish <- S.printingOf s registry "Burning Wish"
+    signInBlood <- S.printingOf s registry "Sign in Blood"
+    efreet <- S.printingOf s registry "Tempest Efreet"
+    let g0 = Setup.gameWith GameSettings.plain {GameSettings.ante = True} S.bothPlayers
+        (efreetId, g1) = S.addPermanent efreet S.alice g0
+        (_, g2) = S.addHandCard signInBlood S.bob (S.landsFor plains S.alice 2 g1)
+        (wishLibraryId, g3) = S.addLibraryCard burningWish S.alice g2
+        g4 = stockLibrary mountain 10 S.bob (stockLibrary mountain 9 S.alice g3)
+        (shahrazadId, g5) = S.addHandCard shahrazad S.alice g4
+        board = g5 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+        -- bob declines the Efreet's 10 life (CR 608.2d), so the trade happens.
+        trading :: Prompt.Prompt r -> r
+        trading p = case p of
+          Prompt.ChooseOptional {} -> OptionalDecision.Declines
+          _ -> S.identityAnswer p
+        traded = case Activatable.abilitiesFor efreetId board of
+          [ability] -> S.runPure trading board (Activate.activateAbility S.alice efreetId ability >> Stack.resolveTop)
+          _ -> board
+        taken = filter (/= shahrazadId) (Game.zoneMembers Zone.Hand S.alice traded)
+        wanted candidate = case candidate of
+          OutsideCard.InAnotherGame oid -> List.elem oid taken
+          OutsideCard.InPool _ -> False
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+          Prompt.ChooseFromOutsideTheGame _ _ offered _ _ -> [Maybe.fromMaybe (NonEmpty.head offered) (List.find wanted (NonEmpty.toList offered))]
+          Prompt.RandomFirstPlayer _ -> S.alice
+          -- CR 407.2 in the subgame: never ante the wish.
+          Prompt.RandomObject offered -> Maybe.fromMaybe (NonEmpty.head offered) (List.find (/= wishLibraryId) (NonEmpty.toList offered))
+          _ -> S.castAnswer p
+        after = snd (Engine.runGamePure answer traded Engine.priorityLoop)
+    let report = Ante.ownershipChanges after
+        reportFor printing = [pair | (oid, pair) <- Map.toList report, Game.printingOfObject oid after == Just printing]
+    Spec.assertEqWith s "CR 108.3 the report names bob as the Sign in Blood's first owner and alice as its owner" (reportFor signInBlood) [(S.bob, S.alice)]
+    Spec.assertEqWith s "and the Efreet the other way" (reportFor efreet) [(S.alice, S.bob)]
+    Spec.assertEqWith s "CR 407.2 and alice, who won the subgame, took bob's subgame ante card" (reportFor mountain) [(S.bob, S.alice)]
+    Spec.assertEqWith s "CR 407.3 the Efreet traded bob's Sign in Blood into alice's hand" (printingsIn Zone.Hand S.alice traded) [shahrazad, signInBlood]
+    Spec.assertEqWith s "CR 729.4a/729.5 the wish took it, and it came home to her main-game library" (printingsIn Zone.Hand S.alice after, length (filter (== signInBlood) (printingsIn Zone.Library S.alice after))) ([], 1)
   Spec.it s "CR 407.3/729.4 a main-game ante card is not outside the subgame; the same card in exile is" $ do
     sign <- S.printingOf s registry "Sign in Blood"
     let parent = Setup.gameWith GameSettings.plain {GameSettings.ante = True} S.bothPlayers

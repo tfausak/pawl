@@ -163,6 +163,7 @@ mint oid gs =
           copy =
             Object.MkObject
               { Object.owner = controller,
+                Object.identity = Nothing,
                 Object.enteredUnder = Nothing,
                 Object.source = Source.OfCardCopy printingId,
                 Object.zone = Zone.Exile,

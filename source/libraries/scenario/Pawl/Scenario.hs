@@ -31,6 +31,7 @@ import qualified Pawl.Codec.Reference as Codec.Reference
 import qualified Pawl.Codec.Reply as Codec.Reply
 import qualified Pawl.Codec.Timed as Codec.Timed
 import qualified Pawl.Engine.Action as ActionEngine
+import qualified Pawl.Engine.Ante as Ante
 import qualified Pawl.Engine.Attach as Attach
 import qualified Pawl.Engine.Card as Engine.Card
 import qualified Pawl.Engine.Combat as Combat
@@ -1674,6 +1675,13 @@ renderView gs viewIs =
         View.RingBearer -> do
           oid <- needObject
           maybe (pure ReplyType.Null) (named . labelOf) (Game.lookupObject oid gs >>= Object.ringBearerFor)
+        View.OwnershipChanges -> do
+          rows <- Monad.forM (Map.toAscList (Ante.ownershipChanges gs)) $ \(oid, (from, to)) -> do
+            card <- describeObject gs oid
+            fromLabel <- labelOf from
+            toLabel <- labelOf to
+            pure (ReplyType.Array (fmap ReplyType.Text [card, Label.unwrap fromLabel, Label.unwrap toLabel]))
+          pure (ReplyType.Array rows)
 
 -- | A value as its codec writes it, for a View to compare.
 encoded :: Codec.Codec a -> a -> ReplyType.Reply

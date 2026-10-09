@@ -17,6 +17,7 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Ante as Ante
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
@@ -177,6 +178,7 @@ gameSpec s registry = Spec.describe s "Game" $ do
       ( Just
           Object.MkObject
             { Object.owner = S.alice,
+              Object.identity = Just (Game.mintIdentity (ObjectId.MkObjectId 0) S.alice),
               Object.enteredUnder = Nothing,
               Object.source = Source.OfCard S.oneMountainPrintingId,
               Object.zone = Zone.Battlefield,
@@ -962,6 +964,43 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     Spec.assertEqWith s "and so does carol" (S.lifeOf S.carol after) (Just 4)
     Spec.assertEqWith s "the drawn SUBGAME did not decide the main game (CR 729.1a)" (GameState.result after) Nothing
     Spec.assertEqWith s "Shahrazad resolved and left the stack" (GameState.stack after) []
+
+  -- The CR 729.1b board played for ante: the subgame antes one card from each
+  -- library (CR 407.2), bob's 6 and carol's 4 cannot fill a 7-card hand, both
+  -- leave (CR 800.4a: three seats), and CR 800.4n keeps their ante cards for
+  -- alice, who wins. alice has 9 because CR 103.8c has her draw on turn 1.
+  -- Then CR 729.5 sends every card to its owner's main-game library: alice's 9
+  -- and the two she won, and the rest of bob's and carol's -- once each.
+  Spec.it s "CR 407.2/729.5 gameplay: a Shahrazad subgame's ante goes to its winner's main-game library" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    shahrazad <- S.printingOf s registry "Shahrazad"
+    let after = castShahrazad forAnte mountain plains shahrazad 9
+        libraryOf pid = length (Game.zoneMembers Zone.Library pid after)
+    Spec.assertEqWith s "CR 407.2/729.5 alice's main-game library holds the two ante cards she won" (libraryOf S.alice) 11
+    Spec.assertEqWith s "CR 729.5 bob's library is one short: his ante card is alice's now" (libraryOf S.bob) 5
+    Spec.assertEqWith s "and carol's" (libraryOf S.carol) 3
+    Spec.assertEqWith s "CR 108.3 the report lists both" (List.sort (Map.elems (Ante.ownershipChanges after))) [(S.bob, S.alice), (S.carol, S.alice)]
+    Spec.assertEqWith s "the main game did not end" (GameState.result after) Nothing
+  -- The drawn board (CR 104.4a): all three leave, nobody is paid, and each
+  -- library comes back whole, its ante card in it.
+  Spec.it s "CR 104.4a/729.5 gameplay: a drawn Shahrazad subgame pays out no ante card" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    shahrazad <- S.printingOf s registry "Shahrazad"
+    let after = castShahrazad forAnte mountain plains shahrazad 3
+    Spec.assertEqWith s "CR 729.5 each library is whole again" (fmap (\pid -> length (Game.zoneMembers Zone.Library pid after)) [S.alice, S.bob, S.carol]) [3, 6, 4]
+    Spec.assertEqWith s "CR 407.2 and no card changed owner" (Ante.ownershipChanges after) Map.empty
+  -- The won board with alice and bob on one team (CR 104.2c), which pays
+  -- nobody (#4849).
+  Spec.it s "CR 104.2c gameplay: a Shahrazad subgame won by a team pays out no ante card" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    shahrazad <- S.printingOf s registry "Shahrazad"
+    let teamed gs = gs {GameState.settings = (GameState.settings gs) {GameSettings.teams = Teams.MkTeams (Map.fromList [(S.alice, TeamId.MkTeamId 0), (S.bob, TeamId.MkTeamId 0), (S.carol, TeamId.MkTeamId 1)])}}
+        after = castShahrazad (forAnte . teamed) mountain plains shahrazad 9
+    Spec.assertEqWith s "CR 729.5 each library is whole again" (fmap (\pid -> length (Game.zoneMembers Zone.Library pid after)) [S.alice, S.bob, S.carol]) [9, 6, 4]
+    Spec.assertEqWith s "CR 407.2 and no card changed owner" (Ante.ownershipChanges after) Map.empty
 
   -- CR 104.2c with CR 729.1b: the same board as the first case with alice and
   -- bob on one team. bob decks in the subgame, but alice's survival is their
@@ -2084,6 +2123,7 @@ handBobBolt lightningBolt gs =
       obj =
         Object.MkObject
           { Object.owner = S.bob,
+            Object.identity = Just (Game.mintIdentity oid S.bob),
             Object.enteredUnder = Nothing,
             Object.source = Source.OfCard printingId,
             Object.zone = Zone.Hand,
@@ -2554,6 +2594,7 @@ restartOnStack mountain =
       abilObj =
         Object.MkObject
           { Object.owner = S.bob,
+            Object.identity = Nothing,
             Object.enteredUnder = Nothing,
             Object.source =
               Source.OfAbility
@@ -2744,6 +2785,10 @@ cleanupStepSpec s registry = Spec.describe s "extra cleanup step (CR 514.3a)" $ 
     megrim <- S.printingOf s registry "Megrim"
     let (_, asked) = runCountingActions (cleanupBoard piker 8 [megrim]) Engine.runStep
     Spec.assertEqWith s "two passes to resolve the trigger, two to end the step" asked 4
+
+-- The CR 729.1b board played for ante (CR 407.1); the subgame inherits it.
+forAnte :: GameState.GameState -> GameState.GameState
+forAnte gs = gs {GameState.settings = (GameState.settings gs) {GameSettings.ante = True}}
 
 -- Shahrazad's board: three seats on distinct life totals, alice holding Shahrazad and
 -- two untapped Plains to cast it with, and libraries of `aliceLibrary`, 6 and 4

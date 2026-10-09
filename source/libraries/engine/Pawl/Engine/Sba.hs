@@ -1,6 +1,5 @@
 module Pawl.Engine.Sba where
 
-import Control.Applicative ((<|>))
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Containers.ListUtils as ListUtils
@@ -1111,7 +1110,7 @@ checkOnce = do
       acted = not (null legendVictims) || not (null worldLosers) || not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations) || not (null unattachedAuras) || not (null unbestowing) || not (null detaching) || not (null revving) || not (null told) || not (null undefended) || not (null returningCommanders) || not (null finishedDungeons) || not (null spentSchemes) || not (null routed)
   -- CR 104.1: a game ends the moment a result is reached, so a later pass may
   -- not replace one. The existing result therefore wins; this pass only settles
-  -- an outcome when the game did not already have one. Same ordering as
-  -- Departure.leaveGame -- the two doors that write GameState.result agree.
-  State.put undungeoned {GameState.result = GameState.result undungeoned <|> outcome}
+  -- an outcome when the game did not already have one. Departure.settle is
+  -- the one door, shared with Departure.leaveGame.
+  State.put (Departure.settle outcome undungeoned)
   pure (acted, thenExile)
