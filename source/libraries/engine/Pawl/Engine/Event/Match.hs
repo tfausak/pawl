@@ -1652,6 +1652,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Waterbent _ -> False
     GameEvent.Airbent _ -> False
     GameEvent.Firebent _ -> False
+    GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
@@ -1742,6 +1743,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Waterbent _ -> False
     GameEvent.Airbent _ -> False
     GameEvent.Firebent _ -> False
+    GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
@@ -1831,6 +1833,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Waterbent _ -> False
     GameEvent.Airbent _ -> False
     GameEvent.Firebent _ -> False
+    GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
@@ -1920,6 +1923,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Waterbent _ -> False
     GameEvent.Airbent _ -> False
     GameEvent.Firebent _ -> False
+    GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
