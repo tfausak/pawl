@@ -3855,6 +3855,7 @@ costComponentFilters component = case component of
   -- CR 701.17a takes the cards off the top, so this component carries no Filter
   -- to narrow -- ExileThisFromGraveyard's answer above and for its reason.
   CostComponent.MillCards _ -> []
+  CostComponent.RevealTopOfLibrary _ -> []
   -- CR 702.174a names an opponent rather than an object, so this component
   -- carries no Filter either.
   CostComponent.ChooseOpponent -> []

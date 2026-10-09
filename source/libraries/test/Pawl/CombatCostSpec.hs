@@ -8,6 +8,7 @@
 module Pawl.CombatCostSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -24,6 +25,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Turn as Turn
+import qualified Pawl.Extra.Int as Int
 import Pawl.PlaneswalkerCombatSpec (allTapped, allUntapped, atLife, jaceBoard, stillThere)
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
@@ -54,6 +56,7 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
+import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -309,6 +312,45 @@ attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
     Spec.assertEqWith s "nothing was declared" (S.attackerDeclarationsOf after) []
     Spec.assertEqWith s "and nothing is attacking" (Combat.Type.attackers (GameState.combat after)) Map.empty
     Spec.assertBool s (allUntapped mine after) "CR 508.1f's tapping was undone too"
+
+  Spec.it s "CR 733.1 a card revealed to attack stays revealed when a later toll fails" $ do
+    -- alice pays Synthetic Tithe of Omens' reveal, then Synthetic Tithe of
+    -- Memory's mill, then has no land for Exalted Dragon's sacrifice. The mill
+    -- makes the reversal compose around a kept stretch, which is the road that
+    -- used to drop the reveal ahead of it. Pinned by index: the answerer names
+    -- the order rather than searching for a legal one. Stateful so that the
+    -- rewound declaration (CR 508.1's preamble) is made again as no attack,
+    -- rather than the same one paid a second time.
+    omens <- S.printingOf s registry "Synthetic Tithe of Omens"
+    memory <- S.printingOf s registry "Synthetic Tithe of Memory"
+    dragon <- S.printingOf s registry "Exalted Dragon"
+    island <- S.printingOf s registry "Island"
+    let (gs, mine, _) = S.combatBoardOf [omens, memory, dragon] []
+        (first, withFirst) = S.addLibraryCard island S.alice gs
+        (second, board) = S.addLibraryCard island S.alice withFirst
+        answer :: Prompt.Prompt r -> State.State Int r
+        answer p = case p of
+          Prompt.DeclareAttackers _ _ ids -> do
+            asked <- State.get
+            State.put (asked + 1)
+            pure (if asked == 0 then ids else [])
+          Prompt.OrderCombatTolls _ _ tags -> pure (Maybe.mapMaybe (\oid -> Int.toNatural =<< List.elemIndex oid tags) mine)
+          _ -> pure (S.aggressiveAnswer p)
+        after = snd (State.evalState (Engine.runGame answer board (Combat.declareAttackers S.manaPerformer S.alice)) 0)
+        revealed = [Revealed.card r | GameEvent.Revealed r <- fmap LoggedEvent.event (Foldable.toList (GameState.events after)), Revealed.player r == S.alice]
+    Spec.assertBool s (any (`elem` [first, second]) revealed) "CR 733.1 the reveal from alice's library stands"
+    Spec.assertEqWith s "and so does the mill" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+    Spec.assertEqWith s "while the declaration is reversed" (Combat.Type.attackers (GameState.combat after)) Map.empty
+  Spec.it s "CR 118.3 an empty library cannot pay Synthetic Tithe of Omens' reveal" $ do
+    -- The pair differs in the one library card: with it the Tithe attacks, and
+    -- without it there is nothing to reveal and the attack is reversed.
+    omens <- S.printingOf s registry "Synthetic Tithe of Omens"
+    island <- S.printingOf s registry "Island"
+    let (empty, _, _) = S.combatBoardOf [omens] []
+        (_, stocked) = S.addLibraryCard island S.alice empty
+        attackersAfter board = Map.size (Combat.Type.attackers (GameState.combat (S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.manaPerformer S.alice))))
+    Spec.assertEqWith s "CR 118.3 nothing to reveal, so nothing attacks" (attackersAfter empty) 0
+    Spec.assertEqWith s "while one card pays and the Tithe attacks" (attackersAfter stocked) 1
 
 -- `n` untapped Forests under `who`'s control, ids first. addForests with the
 -- payer as an argument: CR 509.1f's payer is the DEFENDING player, where CR

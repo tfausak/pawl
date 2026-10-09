@@ -322,6 +322,13 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       (CostComponent.MillCards 1)
       " {\"type\":\"MillCards\",\"value\":1} "
+  -- CR 701.20a as a cost, MillCards' shape: the top cards, nothing to choose.
+  Spec.it s "RevealTopOfLibrary" $
+    Common.assertCodec
+      s
+      codec
+      (CostComponent.RevealTopOfLibrary 2)
+      " {\"type\":\"RevealTopOfLibrary\",\"value\":2} "
   -- CR 702.174a as a cost, nullary on the wire for FlipCoin's reason above: the
   -- rule fixes every word but the payer's own call -- Scrapshooter's gift.
   Spec.it s "ChooseOpponent" $

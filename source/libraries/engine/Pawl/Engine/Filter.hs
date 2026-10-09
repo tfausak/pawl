@@ -3113,6 +3113,7 @@ rewriteComponent pairs component = case component of
   CostComponent.ExileThisFromGraveyard -> component
   CostComponent.ExileThis -> component
   CostComponent.MillCards _ -> component
+  CostComponent.RevealTopOfLibrary _ -> component
   CostComponent.ChooseOpponent -> component
   CostComponent.Waterbend _ -> component
   CostComponent.WaterbendInstead _ -> component

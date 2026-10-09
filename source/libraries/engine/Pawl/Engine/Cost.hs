@@ -1645,6 +1645,7 @@ substituteXInComponent x component = case component of
   CostComponent.Behold _ -> component
   CostComponent.BeholdAndExile _ -> component
   CostComponent.MillCards _ -> component
+  CostComponent.RevealTopOfLibrary _ -> component
 
 -- Does this cost contain an X (CR 107.3)? What decides whether the caster is
 -- asked for a value at CR 601.2b. BOTH HALVES: CR 601.2b names the mana cost as
@@ -1719,6 +1720,7 @@ componentHasVariable component = case component of
   CostComponent.Behold _ -> False
   CostComponent.BeholdAndExile _ -> False
   CostComponent.MillCards _ -> False
+  CostComponent.RevealTopOfLibrary _ -> False
 
 -- CR 601.2b: the greatest value of X this player could legally announce -- what
 -- Prompt.ChooseX carries -- found by ASCENDING SEARCH from 0 over the caller's
@@ -1830,6 +1832,7 @@ componentDemandGrowsWithX component = case component of
   CostComponent.Behold _ -> False
   CostComponent.BeholdAndExile _ -> False
   CostComponent.MillCards _ -> False
+  CostComponent.RevealTopOfLibrary _ -> False
 
 -- CR 101.1: the ceiling this face's own words put on CR 601.2b's announced X --
 -- Soul Immolation's "X can't be greater than the greatest toughness among
@@ -2134,6 +2137,7 @@ loyaltyAmountOf component = case component of
   CostComponent.Behold _ -> Nothing
   CostComponent.BeholdAndExile _ -> Nothing
   CostComponent.MillCards _ -> Nothing
+  CostComponent.RevealTopOfLibrary _ -> Nothing
 
 -- CR 606.5: multiple costs to add or remove loyalty counters are combined into a
 -- single one. Carth the Lion's added [+1] on Jace Beleren's printed [-10] is one
@@ -2238,6 +2242,7 @@ zoneOfComponent component = case component of
   -- than the object the cost is on -- a Millikin on the battlefield is not in the
   -- library it mills.
   CostComponent.MillCards _ -> Nothing
+  CostComponent.RevealTopOfLibrary _ -> Nothing
   CostComponent.PayEnergy _ -> Nothing
   CostComponent.AddLoyaltyToThis _ -> Nothing
   CostComponent.RemoveLoyaltyFromThis _ -> Nothing
@@ -2366,6 +2371,7 @@ componentStatesHiddenQuality component = case component of
   -- The whole of CR 118.8c's phrase is "cards with a stated quality in a hidden
   -- zone", and this component can never state one, having no Filter at all.
   CostComponent.MillCards _ -> False
+  CostComponent.RevealTopOfLibrary _ -> False
 
 -- CR 306.5c: a planeswalker's loyalty is the number of loyalty counters on it.
 -- Zero for an object with none, which CR 704.5i reads as loyalty 0 -- so this is
@@ -2878,6 +2884,8 @@ claimOf slots pid oid component gs =
         -- FENCE, no card in `data/cards/` milling twice in one cost.
         CostComponent.MillCards n ->
           claim (ClaimAxis.Removal Zone.Library) (Set.fromList (Game.zoneMembers Zone.Library pid gs)) n
+        -- CR 701.20a removes nothing: the cards stay where they were.
+        CostComponent.RevealTopOfLibrary _ -> Nothing
         -- CR 107.5: {T} spends exactly the untapped-ness the TapPermanents arm below
         -- claims, so it is the same axis, on a pool of one.
         CostComponent.TapThis -> claim ClaimAxis.Tapping itself 1
@@ -3349,6 +3357,7 @@ uncountedCeiling pid oid claims gs component = case component of
   CostComponent.ExileThis -> Nothing
   -- Counted by `objectCeiling` too, the library being this claim's pool.
   CostComponent.MillCards _ -> Nothing
+  CostComponent.RevealTopOfLibrary _ -> Nothing
   -- Counted by `lifeCeiling`, CR 119.4.
   CostComponent.PayLife _ -> Nothing
   CostComponent.PayHalfLife _ -> Nothing
@@ -3768,6 +3777,7 @@ targetComputed component = case component of
   CostComponent.Behold _ -> False
   CostComponent.BeholdAndExile _ -> False
   CostComponent.MillCards _ -> False
+  CostComponent.RevealTopOfLibrary _ -> False
   CostComponent.ChooseOpponent -> False
   CostComponent.Waterbend _ -> False
   CostComponent.WaterbendInstead _ -> False
@@ -3832,6 +3842,7 @@ lifeOwedByComponent pid gs component = case component of
   CostComponent.Behold _ -> 0
   CostComponent.BeholdAndExile _ -> 0
   CostComponent.MillCards _ -> 0
+  CostComponent.RevealTopOfLibrary _ -> 0
 
 -- CR 107.14's payments a cost owes outside its mana part, added up --
 -- `lifeOwedBy`'s energy sibling, and what `repeatsOf`'s energyCeiling divides
@@ -3887,6 +3898,7 @@ energyOwedByComponent component = case component of
   CostComponent.Behold _ -> 0
   CostComponent.BeholdAndExile _ -> 0
   CostComponent.MillCards _ -> 0
+  CostComponent.RevealTopOfLibrary _ -> 0
 
 -- The counters a cost takes OFF the object it is on, added up per kind --
 -- `lifeOwedBy`'s counter sibling, and `repeatsOf`'s counterCeiling is what
@@ -3950,6 +3962,7 @@ countersOwedByComponent component = case component of
   CostComponent.Behold _ -> []
   CostComponent.BeholdAndExile _ -> []
   CostComponent.MillCards _ -> []
+  CostComponent.RevealTopOfLibrary _ -> []
 
 -- CR 118.3 for ONE component. `slots` is what CR 601.2c has bound, or would bind
 -- under the announcement the caller is measuring; every criterion below is read
@@ -4236,6 +4249,8 @@ canPayComponent slots pid oid component gs = case component of
   -- This component ALONE, Sacrifice's caveat: two mills in one cost can each see
   -- the same cards here, and `jointlyPayable` asks them together.
   CostComponent.MillCards n -> Natural.length (Game.zoneMembers Zone.Library pid gs) >= n
+  -- CR 118.3: there must be that many cards to show.
+  CostComponent.RevealTopOfLibrary n -> Natural.length (Game.zoneMembers Zone.Library pid gs) >= n
   -- CR 601.2b: the component BEFORE X is announced, so there is no number of
   -- counters to measure rule 701.68b against -- PayLifeX's arm above, verbatim.
   -- Unreachable from either cast path, both of which substitute before they
@@ -4444,6 +4459,7 @@ criteriaOf component = case component of
   CostComponent.ExileThisFromGraveyard -> []
   CostComponent.ExileThis -> []
   CostComponent.MillCards _ -> []
+  CostComponent.RevealTopOfLibrary _ -> []
 
 -- CR 733.1: put back what an action the player could not legally complete did.
 --
@@ -4549,9 +4565,9 @@ reverseIllegal windows before =
       -- library [or] from a library to any zone other than the stack". An
       -- activation that did -- a CR 605.1b triggered mana ability that draws
       -- (Synthetic Wellspring Growth) -- stands unasked, and so does a combat
-      -- toll's mill (`unreversibleStretch`).
+      -- toll's mill or reveal (ManaWindow.unreversible).
       movedLibraryCard key = any (\segment -> libraryMembershipChanged (ManaSegment.opened segment) (ManaSegment.closed segment)) (Map.findWithDefault [] key segmentsOf)
-      askers = [entry | entry@(key, _, _) <- indexed, not (movedLibraryCard key)]
+      askers = [entry | entry@(key, window, _) <- indexed, not (movedLibraryCard key || ManaWindow.unreversible window)]
       compose reversed = composeReversal before windows (\w i -> Set.notMember (w, i) reversed)
       -- CR 733.1's "unless", per payer, replayed from the pool their first
       -- window opened on.
@@ -5000,7 +5016,8 @@ paySubstitutingReading slots perform began earlier moment subject announced spen
 -- declaration back to `began`, the caller's snapshot ahead of CR 508.1a's or
 -- 509.1a's record, and the mana abilities the window activated go back only if
 -- the payer says so (`reverseIllegal` above) -- `pay`'s posture for CR 601.2h.
--- A part that moved a card into or out of a library stands (`payTagged`).
+-- A part that moved a card into or out of a library, or revealed one there,
+-- stands (`payTagged`).
 -- The declaration's own writes include CR 508.1f's tap and CR 508.1g's exert on
 -- a creature the window may tap for mana too, which is why
 -- Pawl.Engine.Reversal descends inside an Object.
@@ -5167,8 +5184,8 @@ announceToll pid charges = do
 -- naming the permanent it is on -- Pawl.Types.CostComponent's SacrificeThis and
 -- TapThis, which would make two equal lists name two different permanents; the
 -- pool's tolls are Exalted Dragon's Sacrifice, Hollow Warrior's TapPermanents,
--- Synthetic Tithe of Memory's MillCards and Sphere of Safety's counted mana, and
--- none of them does.
+-- the Synthetic Tithes' MillCards, ExileCardsFromGraveyard and
+-- RevealTopOfLibrary, and Sphere of Safety's counted mana, and none of them does.
 --
 -- BOTH conjuncts are FENCES rather than proven behaviour, `orderObservable`'s
 -- admission below: the boards that would tell them apart print two identical
@@ -5184,19 +5201,19 @@ tollOrderObservable charges = case filter (any orderSensitive . snd) charges of
 -- stopping at the first refusal. payInOrder's shape one level up, and the merge is
 -- that function's for its reason.
 --
--- A part that moved a card into or out of a library comes back as a stretch CR
--- 733.1 forbids reversing (`unreversibleStretch`): CR 508.1j's "in any order"
--- lets a mill paid for one tag finish before a LATER tag refuses, and the
--- reversal that follows must keep it. The scenario
--- combat-cost/cr-733-1-a-card-milled-to-attack-stays-milled-when-a-later-toll-fails
+-- ONE PASS per tag, in the payer's order (`orderPass`): CR 508.1j and CR 509.1f
+-- say only "in any order", with none of CR 601.2h's two passes, so a mill may
+-- come before the tag's other parts. The scenario
+-- combat-cost/cr-508-1j-milling-first-feeds-the-exile-a-tithe-of-ashes-attacks
 -- is the proof.
 --
--- Not implemented: the payer's order WITHIN a tag. CR 508.1j and CR 509.1f say
--- only "in any order", but each tag is split by payComponents' two passes
--- (`paidInSecondPass`), so a mill is always paid after the tag's other parts.
--- Not implemented either: keeping a reveal from a library standing when its part
--- moved no card. Such a part falls in a reversed gap, so its Revealed events go
--- back (#4862).
+-- A part that moved a card into or out of a library, or revealed one there,
+-- comes back as a stretch CR 733.1 forbids reversing (`unreversibleStretch`):
+-- "in any order" lets it finish before a LATER part refuses, and the reversal
+-- that follows must keep it. The scenario
+-- combat-cost/cr-733-1-a-card-milled-to-attack-stays-milled-when-a-later-toll-fails
+-- is the proof for a mill, and CombatCostSpec's "CR 733.1 a card revealed to
+-- attack stays revealed when a later toll fails" for a reveal.
 payTagged :: PlayerId -> [(ObjectId, [CostComponent.CostComponent Keyword.Type.Keyword])] -> Game (Payment.Payment, [ManaWindow.ManaWindow])
 payTagged pid charges = case charges of
   [] -> pure (bindsNothing, [])
@@ -5206,35 +5223,30 @@ payTagged pid charges = case charges of
     --
     -- No slots: a declaration announces no targets (CR 508.1h, CR 509.1d), so
     -- there is nothing for a toll's criterion to be bound to.
-    let (second, first) = List.partition paidInSecondPass components
-        payKeeping stretches parts = case parts of
+    let payKeeping stretches parts = case parts of
           [] -> pure (bindsNothing, reverse stretches)
           component : others -> do
             opened <- State.get
             outcome <- payComponent PaymentMoment.OutsideResolution Map.empty pid oid component
             closed <- State.get
-            let kept = [unreversibleStretch pid oid opened closed | libraryMembershipChanged opened closed] <> stretches
+            let kept = [unreversibleStretch pid oid opened closed | libraryMembershipChanged opened closed || revealsLibraryCard opened closed] <> stretches
             case outcome of
               Payment.Unpaid -> pure (Payment.Unpaid, reverse kept)
               Payment.Paid bound -> do
                 (rested, standing) <- payKeeping kept others
                 pure (mergeBound bound rested, standing)
-    firstOutcome <- payPass PaymentMoment.OutsideResolution Map.empty pid oid first
-    case firstOutcome of
-      Payment.Unpaid -> pure (Payment.Unpaid, [])
-      Payment.Paid firstBound -> do
-        (secondOutcome, stretches) <- payKeeping [] =<< orderPass pid oid second
-        case secondOutcome of
-          Payment.Unpaid -> pure (Payment.Unpaid, stretches)
-          Payment.Paid secondBound -> do
-            (outcome, later) <- payTagged pid rest
-            pure (mergeBound firstBound (mergeBound secondBound outcome), stretches <> later)
+    (outcome, stretches) <- payKeeping [] =<< orderPass pid oid components
+    case outcome of
+      Payment.Unpaid -> pure (Payment.Unpaid, stretches)
+      Payment.Paid bound -> do
+        (rested, later) <- payTagged pid rest
+        pure (mergeBound bound rested, stretches <> later)
 
--- A stretch of a payment that moved a card into or out of a library, which CR
--- 733.1 forbids reversing, shaped as a window holding one activation that
--- `reverseIllegal` keeps standing unasked -- the posture it takes towards a mana
--- ability that drew. It is NOT a CR 605.3a window: `oid` is the permanent whose
--- charge it paid, and nothing offers it back.
+-- A stretch of a payment that moved a card into or out of a library or revealed
+-- one there, which CR 733.1 forbids reversing, shaped as a window holding one
+-- activation so that `composeReversal` keeps it in order beside the real ones.
+-- It is NOT a CR 605.3a window: `oid` is the permanent whose charge it paid, and
+-- ManaWindow.unreversible keeps `reverseIllegal` from offering it back.
 unreversibleStretch :: PlayerId -> ObjectId -> GameState -> GameState -> ManaWindow.ManaWindow
 unreversibleStretch pid oid opened closed =
   ManaWindow.MkManaWindow
@@ -5243,7 +5255,8 @@ unreversibleStretch pid oid opened closed =
       ManaWindow.segments = [ManaSegment.MkManaSegment {ManaSegment.activation = 0, ManaSegment.opened = opened, ManaSegment.closed = closed}],
       ManaWindow.spent = [],
       ManaWindow.opened = opened,
-      ManaWindow.closed = closed
+      ManaWindow.closed = closed,
+      ManaWindow.unreversible = True
     }
 
 -- CR 733.1: did a card go into or out of a library between the two states? Its
@@ -5254,6 +5267,17 @@ libraryMembershipChanged :: GameState -> GameState -> Bool
 libraryMembershipChanged opened closed =
   let held gs = Set.fromList (foldMap Foldable.toList (GameState.library gs))
    in held opened /= held closed
+
+-- CR 733.1: did the log gain a reveal of a card that is in a library, its
+-- "caused cards from a library to be revealed"? `keepingLibraryActions`' test,
+-- read over one stretch.
+revealsLibraryCard :: GameState -> GameState -> Bool
+revealsLibraryCard opened closed =
+  let inLibrary oid = any (Foldable.elem oid) (GameState.library closed)
+      fromLibrary logged = case LoggedEvent.event logged of
+        GameEvent.Revealed revealed -> inLibrary (Revealed.card revealed)
+        _ -> False
+   in any fromLibrary (Seq.drop (Seq.length (GameState.events opened)) (GameState.events closed))
 
 -- CR 601.2h: the parts are paid "in any order", and the ORDER IS THE PAYER'S.
 -- Observable: Jarad, Golgari Lich Lord's "Sacrifice a Swamp and a Forest" beside
@@ -5309,6 +5333,8 @@ paidInSecondPass component = case component of
   -- CR 701.17a moves cards from a library to a graveyard, and CR 400.2 makes the
   -- one hidden and the other public. The one True arm in the vocabulary.
   CostComponent.MillCards _ -> True
+  -- CR 701.20a shows the cards and moves none, so the first pass holds it.
+  CostComponent.RevealTopOfLibrary _ -> False
   -- A HAND is not a library (CR 400.2 makes both hidden, which is not what rule
   -- 601.2h asks), and a graveyard, a battlefield and a stack are not either, so
   -- every other component that moves an object stays in the first pass.
@@ -5513,10 +5539,14 @@ orderSensitive component = case component of
   CostComponent.WaterbendInstead _ -> False
   -- CR 701.17a puts a card into a graveyard, which a graveyard-reading part of
   -- the same cost could then spend (Circling Vultures' "the top creature card of
-  -- your graveyard"). Alone in CR 601.2h's second pass on this pool, so nothing
-  -- it could compete with is ever in the same pass -- a FENCE, not proven
-  -- behaviour.
+  -- your graveyard"). Alone in CR 601.2h's second pass on this pool, but a combat
+  -- toll pays in one pass (`payTagged`), where Synthetic Tithe of Ashes' exile
+  -- competes with it: the scenario
+  -- combat-cost/cr-508-1j-milling-first-feeds-the-exile-a-tithe-of-ashes-attacks
+  -- is the proof.
   CostComponent.MillCards _ -> True
+  -- CR 701.20a leaves the cards where they were, so no other part's pool changes.
+  CostComponent.RevealTopOfLibrary _ -> False
   CostComponent.PayLife _ -> False
   CostComponent.PayHalfLife _ -> False
   CostComponent.PayLifeX -> False
@@ -5687,7 +5717,7 @@ payManaWindow perform inFlight record subject spending pid substituting cost = d
         -- CR 106.6: the payment sees only the mana it may spend, and the rest of
         -- the pool goes back beside what it leaves (CR 106.4 -- unspent mana stays
         -- unspent, it does not vanish because one cost could not use it).
-        let shut = ManaWindow.MkManaWindow {ManaWindow.payer = pid, ManaWindow.activated = activated, ManaWindow.segments = segments, ManaWindow.spent = [], ManaWindow.opened = entry, ManaWindow.closed = closed}
+        let shut = ManaWindow.MkManaWindow {ManaWindow.payer = pid, ManaWindow.activated = activated, ManaWindow.segments = segments, ManaWindow.spent = [], ManaWindow.opened = entry, ManaWindow.closed = closed, ManaWindow.unreversible = False}
             (available, withheld) = Mana.spendableFor subject pid gs
         case Mana.plan (PlayerEffect.spendManaAsThoughFor pid subject gs) spending (Maybe.fromMaybe 0 (Mana.lifeNeeded subject (midPayment (manaActivationsGiven (PlayerEffect.applying pid gs))) spending pid residual gs)) residual (Mana.Type.MkMana available) of
           Nothing -> pure (False, extra, shut)
@@ -6446,6 +6476,12 @@ payPayable moment slots pid oid component = case component of
   CostComponent.MillCards n -> do
     arrived <- Event.millFrom pid n
     Monad.unless (null arrived) (State.modify' (Event.recordEvent (GameEvent.Milled (Milled.MkMilled pid (Seq.fromList arrived)))))
+    pure bindsNothing
+  -- CR 701.20a: one Revealed per card, top first. Binds no slot: no card that
+  -- prints this reads back what it showed.
+  CostComponent.RevealTopOfLibrary n -> do
+    gs <- State.get
+    Monad.mapM_ (Event.reveal RevealCause.Ordinary pid) (List.genericTake n (Game.zoneMembers Zone.Library pid gs))
     pure bindsNothing
   -- CR 701.21a: the player chooses which of their permanents dies, so this is a
   -- prompt. Elided only when forced -- exactly as many candidates as the count,
