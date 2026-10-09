@@ -15,12 +15,13 @@ import qualified Pawl.Types.SlotName as SlotName
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.PlayerRef" $ do
-  Spec.it s "EachPlayer" $
+  -- CR 102.1's whole table has one spelling, the relation every reader judges.
+  Spec.it s "Relative AnyPlayer is the whole table" $
     Common.assertCodec
       s
       PlayerRef.codec
-      PlayerRef.EachPlayer
-      " {\"type\":\"EachPlayer\"} "
+      (PlayerRef.Relative PlayerRelation.AnyPlayer)
+      " {\"type\":\"Relative\",\"value\":{\"type\":\"AnyPlayer\"}} "
   Spec.it s "Relative" $
     Common.assertCodec
       s

@@ -9,6 +9,7 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Zone as Zone
 
 -- | CR 400.1: "each player has their own library, hand, and graveyard. The other
@@ -34,7 +35,7 @@ shared zone = case zone of
 --
 -- The question a card means when it writes one is CONTROL or OWNERSHIP of the
 -- objects in the zone rather than a share of the zone itself -- Nightmare's
--- "Swamps you control" is 'PlayerRef.EachPlayer' with a
+-- "Swamps you control" is @PlayerRef.Relative AnyPlayer@ with a
 -- @Filter.ControlledBy You@ conjunct -- and both have their own spelling in the
 -- Filter, which is where CR 110.2 and CR 108.3 can come apart. Without this the
 -- pairing decoded and Pawl.Engine.Count answered it off Game.zoneMembers, which
@@ -42,7 +43,7 @@ shared zone = case zone of
 -- rules do not have (#161).
 undividedShared :: InZone.InZone -> Either Text.Text InZone.InZone
 undividedShared inZone
-  | shared (InZone.zone inZone) && InZone.player inZone /= PlayerRef.EachPlayer =
+  | shared (InZone.zone inZone) && InZone.player inZone /= PlayerRef.Relative PlayerRelation.AnyPlayer =
       Left (Text.pack ("InZone: CR 400.1 makes " <> show (InZone.zone inZone) <> " shared by all players, so it cannot be scoped to " <> show (InZone.player inZone)))
   | otherwise = Right inZone
 

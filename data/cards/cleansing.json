@@ -69,7 +69,10 @@
                           "mana": []
                         },
                         "payer": {
-                          "type": "EachPlayer"
+                          "type": "Relative",
+                          "value": {
+                            "type": "AnyPlayer"
+                          }
                         }
                       },
                       "ref": {

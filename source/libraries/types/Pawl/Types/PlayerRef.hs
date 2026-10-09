@@ -18,12 +18,7 @@ import qualified Pawl.Types.SlotName as SlotName
 -- Pawl.Types.ZoneScope is: this type's Relative arm cannot say CR 806.1's
 -- "each opponent" as one value, and PlayerScope has no slot.
 data PlayerRef
-  = -- | Every player's copy of the zone. For a SHARED zone (CR 400.1: battlefield,
-    -- stack, exile, command) this is the only meaningful value; the pairing is
-    -- rejected by Pawl.Codec.InZone as card data is decoded and swept for again
-    -- by Pawl.CardSpec, not by this type, see #161.
-    EachPlayer
-  | -- | EachPlayer minus the players a slot names -- Shahrazad's "each player who
+  = -- | Every player minus the players a slot names -- Shahrazad's "each player who
     -- doesn't win the subgame", where the slot holds the subgame's winner, or
     -- CR 104.2c's winning team.
     --
@@ -51,6 +46,9 @@ data PlayerRef
     -- opponent.
     EachOpponentExcept SlotName.SlotName
   | -- | CR 109.5 / 102.2, resolved against the evaluation context's perspective.
+    -- @Relative AnyPlayer@ is CR 102.1's whole table, and every player's copy of
+    -- a zone; for a SHARED zone (CR 400.1) it is the only meaningful value, which
+    -- Pawl.Codec.InZone enforces as card data is decoded (#161).
     Relative PlayerRelation.PlayerRelation
   | -- | The player bound in a slot -- Sudden Impact's "that player's hand", where
     -- the slot was filled by targeting (CR 601.2c).
@@ -142,12 +140,10 @@ data PlayerRef
     -- controller at all, so the live reading is empty by the time the next clause
     -- asks. That rule's "or if the effect has moved it from a public zone to a
     -- hidden zone, the effect uses the object's last known information" is the
-    -- clause this arm rests on, and every reader answers it through a last-known
-    -- aware view: Pawl.Engine.Resolve.Slots.playerRefPlayers through
-    -- Pawl.Engine.Projection.controllerWithLastKnown,
-    -- Pawl.Engine.Count.playersFor -- which Pawl.Engine.Quantity and
-    -- Pawl.Engine.ManaCount both route through -- off the view its caller
-    -- supplies.
+    -- clause this arm rests on, and Pawl.Engine.Players.named answers it
+    -- through the controller read its caller supplies: a resolution's is
+    -- Pawl.Engine.Projection.controllerWithLastKnown, a count's the last-known
+    -- aware view its own caller hands it.
     --
     -- Undeterminable where no view can answer, which is Candidate's posture: a
     -- slot naming no object, naming several, or naming one the projection cannot
@@ -184,7 +180,7 @@ data PlayerRef
   | -- | CR 508.6: the players attacking the player a slot names, narrowed by
     -- relation -- Curse of Vitality's "each opponent attacking that player".
     --
-    -- A SET, like EachPlayer and Relative Opponent and unlike the two slot-reading
+    -- A SET, like Relative AnyPlayer and Relative Opponent and unlike the two slot-reading
     -- arms above, which name one seat each. The card text is a plural and the rule
     -- it quotes is a predicate over the table, so the arm folds the roster rather
     -- than indirecting through one player.
@@ -194,11 +190,8 @@ data PlayerRef
     -- creature attacking a given player -- is about the combat record rather than
     -- about a characteristic.
     --
-    -- TWO readers, folding the same live combat record:
-    -- Pawl.Engine.Resolve.Slots.playerRefPlayers for the reference in an effect's own
-    -- recipient position, and Pawl.Engine.Count.playersFor -- which
-    -- Pawl.Engine.Quantity and Pawl.Engine.ManaCount both route through -- under a
-    -- Scope or a ManaCount. Pawl.CountSpec's Synthetic Toll of the Siege proves
-    -- the second.
+    -- Folded off the live combat record by Pawl.Engine.Players.named, for an
+    -- effect's recipient and a Scope or ManaCount alike. Pawl.CountSpec's
+    -- Synthetic Toll of the Siege proves the count.
     Attacking AttackingPlayers.AttackingPlayers
   deriving (Eq, Ord, Show)

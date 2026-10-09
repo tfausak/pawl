@@ -7205,7 +7205,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         selfNaming, dangling, disagreeing, halfVillainous :: [(Int, Maybe OrElse.OrElse)]
         selfNaming = [(0, branchTo 0), (1, branchTo 1)]
         dangling = [(0, branchTo 7), (1, branchTo 7)]
-        disagreeing = [(0, Just (OrElse.MkOrElse (ClauseIndex.MkClauseIndex 1) PlayerRef.EachPlayer False))]
+        disagreeing = [(0, Just (OrElse.MkOrElse (ClauseIndex.MkClauseIndex 1) (PlayerRef.Relative PlayerRelation.AnyPlayer) False))]
         halfVillainous = [(0, Just (OrElse.MkOrElse (ClauseIndex.MkClauseIndex 1) (PlayerRef.Relative PlayerRelation.You) True))]
     Spec.assertBool s (not (cardBranchesAreAsymmetric face)) "Twiddle's tap and untap name each other, and are accepted"
     Spec.assertBool s (cardBranchesAreAsymmetric (rewrite [(1, Nothing)])) "a branch whose sibling names nobody back is rejected"

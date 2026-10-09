@@ -54,7 +54,7 @@ data ManaOption = MkManaOption
     -- | CR 106.4: WHO gets WHAT -- the mana this activation adds, keyed by the
     -- reference each AddMana named its recipient with. Llanowar Elves' is a
     -- single @Relative You@ entry; Yurlok of Scorch Thrash's "Each player adds
-    -- {B}{R}{G}" is a single @EachPlayer@ one, which is a different set of
+    -- {B}{R}{G}" is a single @Relative AnyPlayer@ one, which is a different set of
     -- pools.
     --
     -- Keyed by the REFERENCE and not by a resolved PlayerId, because an option

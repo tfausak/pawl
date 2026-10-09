@@ -2602,7 +2602,7 @@ reconfigureOff cost =
                 ( Compares.MkCompares
                     ( Quantity.Count
                         ( Count.MkCount
-                            (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
+                            (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer)))
                             (Filter.And [Filter.IsSource, Filter.AttachedTo (Filter.HasCardType CardType.Creature)])
                             Aggregation.Members
                         )
@@ -3462,13 +3462,13 @@ selfCostReductionsFor :: Keyword -> [CostReduction.CostReduction]
 selfCostReductionsFor keyword = case keyword of
   -- CR 702.41a's "for each [text] YOU CONTROL": the card carries the [text] and
   -- the rule carries the control clause and the battlefield, so the Filter the
-  -- count runs is the conjunction. EachPlayer's battlefield and not yours,
+  -- count runs is the conjunction. Relative AnyPlayer's battlefield and not yours,
   -- because CR 403.1 makes the battlefield one shared zone -- Filter.ControlledBy
   -- is the control question, and the scope's reference is not.
   Keyword.Affinity quality ->
     [ oneLessPerEach
         ( Count.MkCount
-            (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
+            (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer)))
             (Filter.And [quality, Filter.ControlledBy PlayerRelation.You])
             Aggregation.Members
         )
@@ -5499,7 +5499,7 @@ printedRiders keyword = case keyword of
       ActivationRestriction.SorcerySpeed
     ]
   -- "This creature attacked this turn" is a count of the source among the
-  -- battlefield's permanents that did (Filter.AttackedThisTurn), EachPlayer's
+  -- battlefield's permanents that did (Filter.AttackedThisTurn), Relative AnyPlayer's
   -- battlefield because CR 400.1 makes it one shared zone.
   Keyword.Boast ->
     [ ActivationRestriction.OnlyIf
@@ -5507,7 +5507,7 @@ printedRiders keyword = case keyword of
             ( Compares.MkCompares
                 ( Quantity.Count
                     ( Count.MkCount
-                        (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
+                        (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer)))
                         (Filter.And [Filter.IsSource, Filter.AttackedThisTurn])
                         Aggregation.Members
                     )
@@ -6319,7 +6319,7 @@ unpairedOther =
 soulbondSelfEligible :: Condition.Condition
 soulbondSelfEligible =
   atLeastOneMatching
-    (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
+    (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer)))
     (Filter.And [Filter.IsSource, Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.You, Filter.Not Filter.IsPaired])
 
 -- "At least one candidate", as CR 603.4 wants it: a Count of the scope's members
@@ -6361,7 +6361,7 @@ soulbondSelfEnters =
             Just
               ( Condition.All
                   [ soulbondSelfEligible,
-                    atLeastOneMatching (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) unpairedOther
+                    atLeastOneMatching (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer))) unpairedOther
                   ]
               ),
           TriggeredAbility.name = Nothing,
@@ -6581,7 +6581,7 @@ increment =
       isCreature =
         Condition.Compares
           ( Compares.MkCompares
-              (Quantity.Count (Count.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) (Filter.And [Filter.IsSource, Filter.HasCardType CardType.Creature]) Aggregation.Members))
+              (Quantity.Count (Count.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer))) (Filter.And [Filter.IsSource, Filter.HasCardType CardType.Creature]) Aggregation.Members))
               Comparison.AtLeast
               (Quantity.Literal 1)
           )
@@ -7797,7 +7797,7 @@ backup (Backup.MkBackup n above) =
             { Compares.measured =
                 Quantity.Count
                   ( Count.MkCount
-                      (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
+                      (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer)))
                       (Filter.And [Filter.IsBound backupTarget, Filter.HasCardType CardType.Creature, Filter.Not Filter.IsSource])
                       Aggregation.Members
                   ),
@@ -9201,7 +9201,7 @@ suspendLastCounter keyword =
 -- a count of the exile zone kept by Filter.IsSource, which is at least one
 -- exactly while the card the ability is on is still there.
 --
--- PlayerRef.EachPlayer because exile is shared and has no per-player copy to
+-- PlayerRef.Relative AnyPlayer because exile is shared and has no per-player copy to
 -- name (Pawl.Types.InZone).
 --
 -- THE TWO READINGS AGREE on every board in this pool, and by accident rather
@@ -9216,7 +9216,7 @@ stillExiled :: Condition.Condition
 stillExiled =
   Condition.Compares
     ( Compares.MkCompares
-        (Quantity.Count (Count.MkCount (Scope.InZone (InZone.MkInZone Zone.Exile PlayerRef.EachPlayer)) Filter.IsSource Aggregation.Members))
+        (Quantity.Count (Count.MkCount (Scope.InZone (InZone.MkInZone Zone.Exile (PlayerRef.Relative PlayerRelation.AnyPlayer))) Filter.IsSource Aggregation.Members))
         Comparison.AtLeast
         (Quantity.Literal 1)
     )
@@ -9618,7 +9618,7 @@ youControlSource =
     ( Compares.MkCompares
         ( Quantity.Count
             ( Count.MkCount
-                (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
+                (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer)))
                 (Filter.And [Filter.IsSource, Filter.ControlledBy PlayerRelation.You])
                 Aggregation.Members
             )
@@ -9776,7 +9776,7 @@ cumulativeUpkeep cost =
   let onBattlefield =
         Condition.Compares
           ( Compares.MkCompares
-              (Quantity.Count (Count.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) Filter.IsSource Aggregation.Members))
+              (Quantity.Count (Count.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer))) Filter.IsSource Aggregation.Members))
               Comparison.AtLeast
               (Quantity.Literal 1)
           )

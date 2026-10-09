@@ -121,7 +121,10 @@
                   "scope": {
                     "type": "OverPlayers",
                     "value": {
-                      "type": "EachPlayer"
+                      "type": "Relative",
+                      "value": {
+                        "type": "AnyPlayer"
+                      }
                     }
                   }
                 }
@@ -275,7 +278,10 @@
                   "scope": {
                     "type": "OverPlayers",
                     "value": {
-                      "type": "EachPlayer"
+                      "type": "Relative",
+                      "value": {
+                        "type": "AnyPlayer"
+                      }
                     }
                   }
                 }

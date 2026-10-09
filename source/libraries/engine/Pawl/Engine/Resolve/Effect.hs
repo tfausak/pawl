@@ -637,6 +637,14 @@ apnapPlayersOf ref legal controller gs =
   let named = playerRefPlayers legal controller gs ref
    in filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
 
+-- The ONE seat a PlayerRef names, for a designation CR 725.3 and CR 726.3 give
+-- to exactly one player at a time; a reference naming nobody or several moves
+-- nothing (CR 101.3).
+oneSeat :: Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> PlayerRef -> Maybe PlayerId
+oneSeat legal controller gs ref = case playerRefPlayers legal controller gs ref of
+  [pid] -> Just pid
+  _ -> Nothing
+
 -- CR 608.2c / 800.4g: the ONE seat a choice opcode's own chooser reference
 -- names, and who answers instead when that seat has LEFT the game.
 --
@@ -1052,15 +1060,6 @@ settleArrivals depthOf zone placement targets =
         -- the position it is handed.
         _ -> pure (fmap (\oid -> (oid, (LibraryPosition.defaultValue, 0))) targets)
 
--- Game.apnapOrder cut to Game.reachableBy: a departed seat is no longer a player
--- (CR 102.1), and CR 801.10 keeps an effect off one outside its controller's
--- range. Pawl.RangeOfInfluenceSpec's and Pawl.DepartureSpec's Fanatic of Mogis
--- prove both.
-reachableInApnap :: PlayerId -> GameState -> [PlayerId]
-reachableInApnap controller gs =
-  let reachable = Game.reachableBy controller gs
-   in filter (`elem` reachable) (Game.apnapOrder gs)
-
 -- The same sweep as objectRefObjects, one step earlier: what an ObjectRef names
 -- as RECIPIENTS. It exists because CR 115.4's "any target" includes a player and
 -- CR 120.1 lets damage go to one, so DealDamage's InSlot arm must name something
@@ -1086,13 +1085,14 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.EachSpell _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachAbility _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachOnStack _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
-  -- CR 120.3a: a player is a damage recipient. APNAP (CR 608.2f) via
-  -- reachableInApnap.
-  ObjectRef.EachPlayer -> fmap Recipient.ToPlayer (reachableInApnap controller gs)
-  -- CR 120.3a again, over CR 102.1's opponents alone -- the arm above filtered
-  -- by PlayerRelation.holds against CR 109.5's "you", which is the resolving
-  -- controller. APNAP order survives the filter (CR 608.2f).
-  ObjectRef.EachOpponent -> fmap Recipient.ToPlayer (filter (PlayerRelation.holds (Game.teams gs) PlayerRelation.Opponent controller) (reachableInApnap controller gs))
+  -- CR 120.3a: a player is a damage recipient. The printed nouns "each player"
+  -- and "each opponent" (CR 102.1, 109.5), resolved as the PlayerRef they
+  -- spell and in APNAP order (CR 608.2f), so CR 801.10's range and CR 102.1's
+  -- departed seat are cut where every other reference cuts them.
+  -- Pawl.RangeOfInfluenceSpec's and Pawl.DepartureSpec's Fanatic of Mogis
+  -- prove both.
+  ObjectRef.EachPlayer -> fmap Recipient.ToPlayer (apnapPlayersOf (PlayerRef.Relative PlayerRelation.AnyPlayer) legal controller gs)
+  ObjectRef.EachOpponent -> fmap Recipient.ToPlayer (apnapPlayersOf (PlayerRef.Relative PlayerRelation.Opponent) legal controller gs)
   -- CR 120.3a, one seat wide: the player the SOURCE chose as it entered (CR
   -- 614.12a). Read off `source` (CR 113.7a), not `resolving`, which for a
   -- triggered ability is the ability object and never carries the choice.
@@ -1103,7 +1103,7 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   -- CR 120.3a, at whatever width the reference has: the seats a PlayerRef names,
   -- which for Deflecting Palm's ControllerOfBound is CR 108.4's controller of the
   -- object a slot holds, read through CR 608.2h's last known information.
-  ObjectRef.Players playerRef -> fmap Recipient.ToPlayer (playerRefPlayers legal controller gs playerRef)
+  ObjectRef.Players playerRef -> fmap Recipient.ToPlayer (apnapPlayersOf playerRef legal controller gs)
   -- No recipients: the answer needs the chooser asked, and only a gather in the
   -- Game monad can ask.
   ObjectRef.ChosenCardInGraveyard {} -> []
@@ -8412,28 +8412,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     pure ()
   Effect.BecomeMonarch target -> do
     gs <- State.get
-    let newMonarch = case target of
-          MonarchTarget.TheController -> Just controller
+    let newMonarch = oneSeat legal controller gs $ case target of
+          MonarchTarget.TheController -> PlayerRef.Relative PlayerRelation.You
           -- CR 725.2: the controller of the ability's bound source, read from the
-          -- reserved trigger-source slot.
-          --
-          -- CR 608.2h's last known information, not the live board: the creature
-          -- that stole the crown by connecting is routinely dead by the time this
-          -- resolves -- it traded with its blocker in the same damage step -- and
-          -- a live read would crown nobody. Same reading as
+          -- reserved trigger-source slot through CR 608.2h's last known
+          -- information: the creature that stole the crown by connecting is
+          -- routinely dead by the time this resolves -- it traded with its
+          -- blocker in the same damage step. Same reading as
           -- Event.Binding.combatDamagerOn, which admitted the damager.
-          MonarchTarget.ControllerOfSource ->
-            Map.lookup Binding.triggerSource chosen
-              >>= Binding.onlyOne
-              >>= Recipient.objectOf
-              >>= (\o -> Projection.controllerWithLastKnown o gs)
+          MonarchTarget.ControllerOfSource -> PlayerRef.ControllerOfBound Binding.triggerSource
           -- CR 601.2c's chosen player, re-checked under CR 608.2b: the slot is a
           -- TARGET, so an illegal one crowns nobody while the rest of the ability
           -- still resolves.
-          MonarchTarget.InSlot slot ->
-            case legalOne slot legal of
-              Just (Recipient.ToPlayer crowned) -> Just crowned
-              _ -> Nothing
+          MonarchTarget.InSlot slot -> PlayerRef.InSlot slot
     case newMonarch of
       Nothing -> pure ()
       -- CR 101.2: a "can't become the monarch" effect outranks this instruction
@@ -8446,16 +8437,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- CR 726.1: the initiative moves, whichever InitiativeTarget named the taker.
   Effect.TakeTheInitiative target -> do
     gs <- State.get
-    let taker = case target of
-          InitiativeTarget.TheController -> Just controller
-          -- CR 726.2: the controller of the ability's bound source, read from the
-          -- reserved trigger-source slot. CR 608.2h's last known information, for
+    let taker = oneSeat legal controller gs $ case target of
+          InitiativeTarget.TheController -> PlayerRef.Relative PlayerRelation.You
+          -- CR 726.2: the controller of the ability's bound source, for
           -- Effect.BecomeMonarch ControllerOfSource's reason one rule over.
-          InitiativeTarget.ControllerOfSource ->
-            Map.lookup Binding.triggerSource chosen
-              >>= Binding.onlyOne
-              >>= Recipient.objectOf
-              >>= (\o -> Projection.controllerWithLastKnown o gs)
+          InitiativeTarget.ControllerOfSource -> PlayerRef.ControllerOfBound Binding.triggerSource
     case taker of
       Nothing -> pure ()
       -- CR 726.3's hand-off, CR 726.5's re-take and the CR 603.2 event are all

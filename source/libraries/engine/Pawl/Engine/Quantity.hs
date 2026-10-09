@@ -155,7 +155,6 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         PlayerRef.OwnerOfObject _ -> Count.playersFor viewOf context gs ref
         -- The arm above's route: Count.playersFor reads the slot the same way.
         PlayerRef.ChosenPlayerOfBound _ -> Count.playersFor viewOf context gs ref
-        PlayerRef.EachPlayer -> Count.playersFor viewOf context gs ref
         PlayerRef.EachPlayerExcept _ -> Count.playersFor viewOf context gs ref
         PlayerRef.EachOpponentExcept _ -> Count.playersFor viewOf context gs ref
         PlayerRef.Relative _ -> Count.playersFor viewOf context gs ref
@@ -464,7 +463,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- agree on every board, and Queen Marchesa's "if an opponent is the monarch" is
         -- answerable at any number of seats. The siblings keep their one-player
         -- restriction, where the multi-player answer really is an aggregation choice
-        -- (#681). EachPlayer therefore asks "is there a monarch?", and the empty list a
+        -- (#681). Relative AnyPlayer therefore asks "is there a monarch?", and the empty list a
         -- departure (CR 800.4) can leave behind answers 0. Nothing stays reserved for a
         -- reference that could not be resolved at all.
         --
@@ -1084,12 +1083,12 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- copy of the zone, who owns the card, and who cast the spell. The first two
         -- are one question by CR 400.3, which puts a card only in its OWNER's library,
         -- hand or graveyard, and CR 400.1's shared zones can only take
-        -- PlayerRef.EachPlayer (Pawl.Codec.InZone.undividedShared) where both conjuncts
+        -- PlayerRef.Relative AnyPlayer (Pawl.Codec.InZone.undividedShared) where both conjuncts
         -- go vacuous; that pair is `from`, read exactly as EnteredFrom reads its own.
         -- CR 601.2a's caster is `caster`, and it really does come apart from the other
         -- two: Tinybones, the Pickpocket casts a nonland permanent card out of the
         -- graveyard of the player it damaged, so Breathless Knight's "you cast it from
-        -- A graveyard" is Relative You over EachPlayer's graveyards and its two halves
+        -- A graveyard" is Relative You over Relative AnyPlayer's graveyards and its two halves
         -- disagree on that board. Fblthp, the Lost's agentless "was cast from your
         -- library" constrains them the other way round.
         --
@@ -1398,7 +1397,6 @@ slotsAreExhaustive = all (either playerRefIsSlotless (const False)) . QuantitySl
 -- context alone (Resolve.playerRefSlots says the same thing as a set).
 playerRefIsSlotless :: PlayerRef.PlayerRef -> Bool
 playerRefIsSlotless ref = case ref of
-  PlayerRef.EachPlayer -> True
   -- The exclusion names a slot, so this reads one -- InSlot's answer, even though
   -- the slot decides who is left OUT rather than who is in.
   PlayerRef.EachPlayerExcept _ -> False
@@ -1485,7 +1483,6 @@ forCandidate :: PlayerId.PlayerId -> Quantity -> Quantity
 forCandidate pid =
   let substitute ref = case ref of
         PlayerRef.Candidate -> PlayerRef.Specific pid
-        PlayerRef.EachPlayer -> ref
         PlayerRef.EachPlayerExcept _ -> ref
         PlayerRef.EachOpponentExcept _ -> ref
         PlayerRef.Relative _ -> ref
@@ -1510,7 +1507,6 @@ bakePlayerRef players objects ref = case ref of
   -- bake to. Every scalar this function traverses reads exactly one player, so
   -- the reference answers Nothing baked or not.
   PlayerRef.EachInSlot _ -> ref
-  PlayerRef.EachPlayer -> ref
   -- LEFT STANDING, as there is nothing to bake TO: PlayerRef.Specific names one
   -- seat and this names the rest of the table. It costs nothing either way,
   -- since every scalar this function traverses reads exactly one player (see

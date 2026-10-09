@@ -46,7 +46,10 @@
                         "type": "SetLifeTotal",
                         "value": {
                           "player": {
-                            "type": "EachPlayer"
+                            "type": "Relative",
+                            "value": {
+                              "type": "AnyPlayer"
+                            }
                           },
                           "quantity": {
                             "type": "Count",
@@ -67,7 +70,10 @@
                               "scope": {
                                 "type": "OverPlayers",
                                 "value": {
-                                  "type": "EachPlayer"
+                                  "type": "Relative",
+                                  "value": {
+                                    "type": "AnyPlayer"
+                                  }
                                 }
                               }
                             }

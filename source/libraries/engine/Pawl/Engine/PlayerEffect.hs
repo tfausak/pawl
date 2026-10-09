@@ -2178,7 +2178,6 @@ mayCastAsThoughItHadFlashAt pid oid manaValue gs =
 -- reading belongs.
 zoneOwners :: PlayerId -> PlayerRef.PlayerRef -> GameState -> [PlayerId]
 zoneOwners pid ref gs = case ref of
-  PlayerRef.EachPlayer -> Game.stillPlaying gs
   PlayerRef.Relative relation -> filter (PlayerRelation.holds (Game.teams gs) relation pid) (Game.stillPlaying gs)
   PlayerRef.Specific other -> [other]
   PlayerRef.InSlot _ -> []

@@ -202,7 +202,7 @@ spec s = Spec.describe s "Pawl.Registry" $ do
   -- Pawl.CardSpec's sweep of the committed pool.
   --
   -- The two corpora below differ in exactly one thing: Nightmare's own scope,
-  -- with EachPlayer swapped for a relative reference. The unmodified file
+  -- with Relative AnyPlayer narrowed to Relative You. The unmodified file
   -- loading is what makes the rejection attributable to that swap rather than
   -- to anything else about the card, and the assertion that the two texts
   -- differ is what keeps the case from passing vacuously if the file's
@@ -211,8 +211,8 @@ spec s = Spec.describe s "Pawl.Registry" $ do
     nightmare <- S.nightmareJson
     let divided =
           Text.replace
-            (Text.pack "\"type\": \"EachPlayer\"")
-            (Text.pack "\"type\": \"Relative\", \"value\": {\"type\": \"You\"}")
+            (Text.pack "\"type\": \"AnyPlayer\"")
+            (Text.pack "\"type\": \"You\"")
             nightmare
     Spec.assertBool s (divided /= nightmare) "the fixture's scope was actually divided"
     withCorpus "shared-zone-whole" [("nightmare.json", nightmare)] $ \_ registry -> do

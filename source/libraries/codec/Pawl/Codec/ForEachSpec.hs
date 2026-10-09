@@ -20,6 +20,7 @@ import qualified Pawl.Types.PayBranch as PayBranch
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PayObligation as PayObligation
 import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.SlotName as SlotName
 
 -- | The @effect@ parameter is instantiated at 'Text.Text' rather than at
@@ -98,7 +99,7 @@ spec s = Spec.describe s "Pawl.Codec.ForEach" $ do
             ForEach.payGate =
               Just
                 PayGate.MkPayGate
-                  { PayGate.payer = PlayerRef.EachPlayer,
+                  { PayGate.payer = PlayerRef.Relative PlayerRelation.AnyPlayer,
                     PayGate.cost = CostChoice.MkCostChoice (Cost.MkCost (Just (ManaCost.MkManaCost [])) [CostComponent.PayLife 1] NonEmpty.:| []),
                     PayGate.basis = Nothing,
                     PayGate.branch = PayBranch.IfNonePaid,
@@ -108,5 +109,5 @@ spec s = Spec.describe s "Pawl.Codec.ForEach" $ do
                   }
           }
       )
-      " {\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}},\"slot\":\"land\",\"body\":[\"destroy\"],\"payGate\":{\"payer\":{\"type\":\"EachPlayer\"},\"cost\":{\"mana\":[],\"components\":[{\"type\":\"PayLife\",\"value\":1}]},\"branch\":{\"type\":\"IfNonePaid\"}}} "
+      " {\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}},\"slot\":\"land\",\"body\":[\"destroy\"],\"payGate\":{\"payer\":{\"type\":\"Relative\",\"value\":{\"type\":\"AnyPlayer\"}},\"cost\":{\"mana\":[],\"components\":[{\"type\":\"PayLife\",\"value\":1}]},\"branch\":{\"type\":\"IfNonePaid\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

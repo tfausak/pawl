@@ -2205,7 +2205,6 @@ playerQuantityNames asking x = case x of
 
 playerRefNames :: Asking -> PlayerRef.PlayerRef -> Bool
 playerRefNames asking x = case x of
-  PlayerRef.EachPlayer -> False
   PlayerRef.EachPlayerExcept slotName -> slotNames asking slotName
   PlayerRef.EachOpponentExcept slotName -> slotNames asking slotName
   PlayerRef.Relative _playerRelation -> False

@@ -70,7 +70,7 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 swampsYouControl :: Count.Type.Count Quantity.Type.Quantity
 swampsYouControl =
   Count.Type.MkCount
-    (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
+    (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer)))
     (Filter.Type.And [Filter.Type.HasSubtype Subtype.Swamp, Filter.Type.ControlledBy PlayerRelation.You])
     Aggregation.Members
 
@@ -111,7 +111,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
             ]
         count =
           Count.Type.MkCount
-            (Scope.InZone (InZone.MkInZone Zone.Graveyard PlayerRef.EachPlayer))
+            (Scope.InZone (InZone.MkInZone Zone.Graveyard (PlayerRef.Relative PlayerRelation.AnyPlayer)))
             (Filter.Type.And [])
             Aggregation.DistinctCardTypes
     Spec.assertEqWith s "two types" (S.countOf viewOf (Filter.contextFor Teams.none Nothing Nothing) gs count) $ Just 2
@@ -175,13 +175,13 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
   -- disagree observably, since a departing player's objects leave the game
   -- with them (CR 800.4a) and Game.zoneMembers already answered [] for every
   -- zone of theirs, but a scope that folds the PLAYERS charges one apiece.
-  Spec.it s "CR 800.4a neither EachPlayer nor Opponent names a player who has left the game" $ do
+  Spec.it s "CR 800.4a neither AnyPlayer nor Opponent names a player who has left the game" $ do
     let gs = S.departs Departure.Type.Conceded S.carol S.threePlayerGame
         countOver ref = S.countOf (S.stubView []) (Filter.contextFor Teams.none (Just S.alice) Nothing) gs (Count.Type.MkCount (Scope.OverPlayers ref) (Filter.Type.And []) Aggregation.Members)
     Spec.assertEqWith
       s
-      "EachPlayer names the two still in the game"
-      (Count.playersFor (S.stubView []) (Filter.contextFor Teams.none Nothing Nothing) gs PlayerRef.EachPlayer)
+      "AnyPlayer, asked with no perspective, names the two still in the game"
+      (Count.playersFor (S.stubView []) (Filter.contextFor Teams.none Nothing Nothing) gs (PlayerRef.Relative PlayerRelation.AnyPlayer))
       (Just [S.alice, S.bob])
     Spec.assertEqWith
       s
@@ -190,7 +190,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
       (Just [S.bob])
     -- The seating roster still has three (CR 800.5), so a count off it would
     -- say 3 and 2. These are the numbers only the still-playing reading gives.
-    Spec.assertEqWith s "a count of the players in the game is 2" (countOver PlayerRef.EachPlayer) (Just 2)
+    Spec.assertEqWith s "a count of the players in the game is 2" (countOver (PlayerRef.Relative PlayerRelation.AnyPlayer)) (Just 2)
     Spec.assertEqWith s "and of alice's opponents, 1" (countOver (PlayerRef.Relative PlayerRelation.Opponent)) (Just 1)
 
   Spec.it s "CR 102.1 OverPlayers folds the players themselves, not their objects" $ do
@@ -200,7 +200,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
     -- had folded a zone would answer 0 for every reference.
     let gs = S.threePlayerGame
         countOver ref = S.countOf (S.stubView []) (Filter.contextFor Teams.none (Just S.alice) Nothing) gs (Count.Type.MkCount (Scope.OverPlayers ref) (Filter.Type.And []) Aggregation.Members)
-    Spec.assertEqWith s "three players in the game" (countOver PlayerRef.EachPlayer) (Just 3)
+    Spec.assertEqWith s "three players in the game" (countOver (PlayerRef.Relative PlayerRelation.AnyPlayer)) (Just 3)
     Spec.assertEqWith s "CR 806.1 two of them are alice's opponents" (countOver (PlayerRef.Relative PlayerRelation.Opponent)) (Just 2)
     Spec.assertEqWith s "CR 109.5 and one of them is alice" (countOver (PlayerRef.Relative PlayerRelation.You)) (Just 1)
     -- Nothing rather than 0, the posture the InZone arm takes for the same
@@ -235,7 +235,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
             Aggregation.Members
     Spec.assertEqWith s "one death" (S.countOf (S.stubView []) (Filter.contextFor Teams.none Nothing Nothing) gs count) $ Just 1
 
-  Spec.it s "EachPlayer folds every player's copy" $ do
+  Spec.it s "Relative AnyPlayer folds every player's copy" $ do
     -- The first case's board with the ControlledBy conjunct dropped: all
     -- three Swamps across both players count.
     swampPrinting <- S.printingOf s registry "Swamp"
@@ -253,7 +253,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
             ]
         count =
           Count.Type.MkCount
-            (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
+            (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer)))
             (Filter.Type.HasSubtype Subtype.Swamp)
             Aggregation.Members
     Spec.assertEqWith s "three" (S.countOf viewOf (Filter.contextFor Teams.none (Just S.alice) Nothing) gs count) $ Just 3
@@ -317,7 +317,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
         viewOf = S.stubView [(b1, land, Set.singleton Subtype.Swamp, Just S.bob)]
         count =
           Count.Type.MkCount
-            (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
+            (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer)))
             (Filter.Type.And [Filter.Type.HasSubtype Subtype.Swamp, Filter.Type.ControlledBy PlayerRelation.You])
             (Aggregation.Greatest Quantity.Type.ManaValue)
     -- Alice keeps none of Bob's one Swamp, so the fold has no members. The
@@ -344,7 +344,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
         pumped = S.addCounter CounterKind.PlusOnePlusOne 2 pikerId printed
         count =
           Count.Type.MkCount
-            (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
+            (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer)))
             (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.ControlledBy PlayerRelation.You])
             (Aggregation.Greatest Quantity.Type.Power)
         greatestPower g =
@@ -363,7 +363,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
         (a1, gs) = S.addPermanent swampPrinting S.alice gs0
         count =
           Count.Type.MkCount
-            (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
+            (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer)))
             (Filter.Type.ControlledBy PlayerRelation.You)
             (Aggregation.Greatest Quantity.Type.Power)
         viewOf = S.stubView [(a1, Set.singleton CardType.Land, Set.singleton Subtype.Swamp, Just S.alice)]
