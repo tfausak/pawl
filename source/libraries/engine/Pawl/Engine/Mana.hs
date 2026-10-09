@@ -2256,6 +2256,10 @@ sourceOptions clauses admitting contends demanded needs supplies =
       -- Pawl.ManaSpec's Food Chain group casts Progenitus off forty-five
       -- creatures, which every colour in every amount made billions of boards.
       -- Nothing for any other group, which the enumeration above takes.
+      --
+      -- Not implemented: covering a group whose claims another group or the
+      -- cost contests -- a second Food Chain, a Blood Pet or an Ashnod's Altar
+      -- beside it -- which the enumeration takes and may not finish (#4858).
       coverOptions count entries =
         let raw = [(fmap (rewriteSupply clauses . supplyOf admitting) (List.genericTake demanded units), Activations.claims own) | (units, own) <- entries, not (null units)]
             single units = case units of
