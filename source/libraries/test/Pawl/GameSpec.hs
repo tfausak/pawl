@@ -1752,7 +1752,7 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
         -- `victim`'s battlefield id. `victim` is kept only as a deterministic,
         -- total fallback -- unreachable once the size assertion below holds --
         -- so no partial function is needed to find it.
-        prisoner = Maybe.fromMaybe victim (Maybe.listToMaybe (Map.keys (GameState.exiledUntilMonarch resolved)))
+        prisoner = Maybe.fromMaybe victim (Maybe.listToMaybe (Map.keys (GameState.movedUntil resolved)))
         (attacker, g4) = S.addPermanent piker S.alice resolved
         board =
           g4
@@ -1783,7 +1783,7 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
         hitCarol = S.runCombat (attackTo S.carol) board
     -- The fixture really is what the test claims.
     Spec.assertEqWith s "bob is the monarch before combat" (GameState.monarch board) (Just S.bob)
-    Spec.assertEqWith s "exactly one creature is under the watch" (Map.size (GameState.exiledUntilMonarch board)) 1
+    Spec.assertEqWith s "exactly one creature is under the watch" (Map.size (GameState.movedUntil board)) 1
     Spec.assertEqWith s "carol's Piker left the battlefield" (S.creaturesInPlay S.carol board) 0
     Spec.assertBool s (Combat.canAttack S.alice attacker board) "alice has an attacker"
     -- Run A: alice attacks the monarch.
@@ -1797,10 +1797,10 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
     -- is due and nothing consistent with that fact can leave it
     -- undischarged. They are not a second, independent observation that the
     -- crown moved; what they add is real coverage of the return machinery
-    -- itself (Resolve's ExileUntilMonarch arm, Event.changeZoneReturning,
+    -- itself (Resolve's MoveToZone arm with CR 725's duration,
     -- and this settle-loop return) running inside a full
     -- Engine.runStep-driven combat.
-    Spec.assertEqWith s "the watch is discharged" (GameState.exiledUntilMonarch hitBob) Map.empty
+    Spec.assertEqWith s "the watch is discharged" (GameState.movedUntil hitBob) Map.empty
     -- CR 400.7: the return is itself a zone change, so the returned
     -- permanent has yet another new object id -- `prisoner`'s id (the one it
     -- held while exiled) never appears on any battlefield. Carol's creature
@@ -1815,7 +1815,7 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
     -- Entailed by "bob is still the monarch" just above, for the same
     -- reason as run A's pair: real coverage of the same return code path,
     -- not independent evidence that the crown followed the chosen defender.
-    Spec.assertBool s (Map.member prisoner (GameState.exiledUntilMonarch hitCarol)) "the watch still stands"
+    Spec.assertBool s (Map.member prisoner (GameState.movedUntil hitCarol)) "the watch still stands"
     Spec.assertEqWith s "and the prisoner is still exiled, not back on carol's battlefield" (S.creaturesInPlay S.carol hitCarol) 0
     Spec.assertEqWith s "neither run ended the game" (GameState.result hitBob, GameState.result hitCarol) (Nothing, Nothing)
 

@@ -1,12 +1,11 @@
 -- CR 610.3: a zone change a card makes "until" a specified event, which is one
 -- one-shot effect with a duration rather than a pair of abilities.
 --
--- Two halves live here: the EVENT -- has the move's source left the battlefield?
--- -- which both the resolver's CR 610.3b gate and the sweep below ask, and the
--- SECOND ONE-SHOT EFFECT that rule 610.3 creates immediately after that event,
--- for both registers that carry an "until": GameState.movedUntilSourceLeaves,
--- written by Pawl.Engine.Resolve's MoveToZone arm, and
--- GameState.exiledUntilMonarch, written by its ExileUntilMonarch arm.
+-- Two halves live here: the EVENT -- has the duration's specified event
+-- happened? -- which both the resolver's CR 610.3a/b gate and the sweep below
+-- ask, and the SECOND ONE-SHOT EFFECT that rule 610.3 creates immediately after
+-- that event, for every watch in GameState.movedUntil, written by
+-- Pawl.Engine.Resolve's MoveToZone arm whatever the duration.
 --
 -- THE INVARIANT: the closed half. Nothing here reads which card or which effect
 -- moved the object -- a MoveDuration is a classification the resolver hands over,
@@ -27,9 +26,14 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LeftTheGame as LeftTheGame
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
+import Pawl.Types.MoveDuration (MoveDuration)
+import qualified Pawl.Types.MoveDuration as MoveDuration.Type
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import Pawl.Types.PlayerId (PlayerId)
+import Pawl.Types.ReturnEnding (ReturnEnding)
+import qualified Pawl.Types.ReturnEnding as ReturnEnding
 import qualified Pawl.Types.ReturnWatch as ReturnWatch
 import qualified Pawl.Types.Zone as Zone
 
@@ -51,13 +55,51 @@ hasLeftTheBattlefield oid gs = case Game.lookupObject oid gs of
   Nothing -> True
   Just obj -> Object.zone obj /= Zone.Battlefield
 
+-- | CR 610.3a / 610.3b: has this duration's specified event already happened,
+-- so the move it would make is declined? Asked by the resolver, of the
+-- resolving object `resolving` and its `source` and `controller`, before it
+-- gathers anything to move.
+--
+-- A crowning is an EVENT, so it is looked for in the log: a GameEvent.BecameMonarch
+-- of an opponent of the controller, logged in the event group the resolving
+-- object was put on the stack in or a later one (GameState.stackedIn). The
+-- log is this turn's, and no stack object outlives a turn. An effect with no
+-- stack object behind it has nothing to have happened since.
+--
+-- Not implemented: for a triggered ability, a crowning after it triggered but
+-- before it was put on the stack -- CR 603.3's wait, in which only
+-- state-based actions run (#4877).
+--
+-- data/scenarios/trigger/cr-610-3b-a-crowning-ahead-of-palace-jailers-exile-keeps-the-creature.json
+-- is the proof: Jared Carthalion's trigger crowns bob ahead of Palace Jailer's
+-- exile, and the creature stays.
+hasHappened :: MoveDuration -> ObjectId -> ObjectId -> PlayerId -> GameState -> Bool
+hasHappened duration resolving source controller gs = case duration of
+  MoveDuration.Type.UntilSourceLeavesTheBattlefield -> hasLeftTheBattlefield source gs
+  MoveDuration.Type.UntilAnOpponentBecomesTheMonarch -> case Map.lookup resolving (GameState.stackedIn gs) of
+    Nothing -> False
+    Just since ->
+      any
+        ( \logged -> case LoggedEvent.event logged of
+            GameEvent.BecameMonarch pid -> LoggedEvent.group logged >= since && Game.areOpponents gs controller pid
+            _ -> False
+        )
+        (GameState.events gs)
+
+-- | The watch a move with this duration arms, for the move's source and the
+-- effect's controller. CR 725's watch is armed undischarged whoever holds the
+-- crown now, so an opponent who already holds it does not free the object:
+-- Palace Jailer's ruling makes the ending a crowning, not a state.
+endingOf :: MoveDuration -> ObjectId -> PlayerId -> ReturnEnding
+endingOf duration source controller = case duration of
+  MoveDuration.Type.UntilSourceLeavesTheBattlefield -> ReturnEnding.SourceLeaves source
+  MoveDuration.Type.UntilAnOpponentBecomesTheMonarch ->
+    ReturnEnding.OpponentCrowned MonarchWatch.MkMonarchWatch {MonarchWatch.controller = controller, MonarchWatch.due = Nothing}
+
 -- | CR 610.3: perform the second one-shot effect for every "until" whose
 -- specified event has happened, returning each object to the zone it came from.
--- Two registers carry such a duration: GameState.movedUntilSourceLeaves (an
--- object moved until its source leaves the battlefield) and
--- GameState.exiledUntilMonarch (Palace Jailer's "until an opponent becomes the
--- monarch", whose watch Pawl.Engine.Monarch.crown marks with the crowning's
--- event group).
+-- A source-leaves watch is read off the board; a crowning watch is marked by
+-- Pawl.Engine.Monarch.crown with the crowning's event group.
 --
 -- Runs in the settle loop: CR 704.3 makes "whenever a player would get
 -- priority" the coarsest moment anything can observe the board, so deciding at
@@ -67,7 +109,7 @@ hasLeftTheBattlefield oid gs = case Game.lookupObject oid gs of
 -- removed -- see #2626.
 --
 -- CR 610.3d: the returns created after one event are one event too, whichever
--- register created them, so every due return is keyed by the event group of
+-- ending they watched, so every due return is keyed by the event group of
 -- its specified event -- the crowning's, or the logged departure of a moved
 -- object's source (a GameEvent.Moved, or the GameEvent.LeftTheGame of CR
 -- 800.4a) -- and each group moves as one (Event.changeZonesTogether), earlier
@@ -90,25 +132,28 @@ hasLeftTheBattlefield oid gs = case Game.lookupObject oid gs of
 -- but it is a fence and not a proof: a ReturnWatch records no controller, so the
 -- other reading cannot be spelled here to mutate against.
 --
--- Pawl.Engine.Departure.objectsLeaveWith drops a watch whose KEY (the moved
--- object) belongs to a departing player, never one whose source or controller
--- does, so either duration survives its controller's departure.
+-- Pawl.Engine.Event.leaveTheGame drops a watch whose KEY (the moved object)
+-- leaves the game, never one whose source or controller does, so either
+-- duration survives its controller's departure.
 returnDue :: Game Bool
 returnDue = do
   gs <- State.get
-  let moved =
-        [ (departedIn (ReturnWatch.source watch) gs, (oid, ReturnWatch.zone watch))
-        | (oid, watch) <- Map.toList (GameState.movedUntilSourceLeaves gs),
-          hasLeftTheBattlefield (ReturnWatch.source watch) gs
-        ]
-      crowned = [(Just group, (oid, Zone.Battlefield)) | (oid, Just group) <- Map.toList (fmap MonarchWatch.due (GameState.exiledUntilMonarch gs))]
+  let -- Nothing while the event has not happened; Just the group it happened
+      -- in otherwise, which is Nothing for a source with no logged departure.
+      dueIn watch = case ReturnWatch.ending watch of
+        ReturnEnding.SourceLeaves source
+          | hasLeftTheBattlefield source gs -> Just (departedIn source gs)
+          | otherwise -> Nothing
+        ReturnEnding.OpponentCrowned crowned -> fmap Just (MonarchWatch.due crowned)
       -- Left before Right, so a logged event's returns precede the unlogged.
-      batches = Map.fromListWith (flip (<>)) [(maybe (Right ()) Left group, [move]) | (group, move) <- crowned <> moved]
-      discharge g oid =
-        g
-          { GameState.movedUntilSourceLeaves = Map.delete oid (GameState.movedUntilSourceLeaves g),
-            GameState.exiledUntilMonarch = Map.delete oid (GameState.exiledUntilMonarch g)
-          }
+      batches =
+        Map.fromListWith
+          (flip (<>))
+          [ (maybe (Right ()) Left group, [(oid, ReturnWatch.zone watch)])
+          | (oid, watch) <- Map.toList (GameState.movedUntil gs),
+            Just group <- [dueIn watch]
+          ]
+      discharge g oid = g {GameState.movedUntil = Map.delete oid (GameState.movedUntil g)}
   if Map.null batches
     then pure False
     else do

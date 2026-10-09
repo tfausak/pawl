@@ -20,14 +20,11 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.Plane as Plane
 import qualified Pawl.Engine.Planechase as Planechase
-import qualified Pawl.Engine.Projection as Projection
-import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Scheme as Scheme
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.CardIdentity as CardIdentity
-import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Emperors as Emperors
 import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
@@ -41,7 +38,6 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GraveyardOrder as GraveyardOrder
 import Pawl.Types.HandActionPerformer (HandActionPerformer)
-import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LeftTheGame as LeftTheGame
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Mana as Mana
@@ -229,6 +225,7 @@ gameWith settings order =
           GameState.planarDecks = Map.empty,
           GameState.schemeDecks = Map.empty,
           GameState.stack = [],
+          GameState.stackedIn = Map.empty,
           GameState.players = Map.fromList (fmap newPlayer order_),
           -- CR 729.4: nobody is nested inside another game here.
           GameState.outsideObjects = Map.empty,
@@ -317,8 +314,7 @@ gameWith settings order =
           GameState.castsBeforeThisTurn = mempty,
           GameState.attacksInOwnLastTurn = mempty,
           GameState.resolvedNames = Map.empty,
-          GameState.exiledUntilMonarch = Map.empty,
-          GameState.movedUntilSourceLeaves = Map.empty,
+          GameState.movedUntil = Map.empty,
           GameState.haunting = Map.empty,
           GameState.encoded = Map.empty,
           GameState.exiledWith = Map.empty,
@@ -807,7 +803,8 @@ startGameFromCards perform exemptions = do
         -- CR 727.2 / 729.2: every card is rebuilt above, a seated player's ante
         -- card among the library cards, so no other old ante id survives.
         GameState.ante = Map.keysSet strandedAnte,
-        GameState.stack = []
+        GameState.stack = [],
+        GameState.stackedIn = Map.empty
       }
   Monad.forM_ owners Event.shuffleLibrary
   Monad.forM_ owners Event.shuffleAttractionDeck
@@ -1102,8 +1099,7 @@ restartGame perform exempt starter = do
             GameState.castsBeforeThisTurn = mempty,
             GameState.attacksInOwnLastTurn = mempty,
             GameState.resolvedNames = Map.empty,
-            GameState.exiledUntilMonarch = Map.empty,
-            GameState.movedUntilSourceLeaves = Map.empty,
+            GameState.movedUntil = Map.empty,
             GameState.haunting = Map.empty,
             GameState.encoded = Map.empty,
             -- Kept for the CR 727.5 exemptions alone, and cleared for every
@@ -1301,6 +1297,7 @@ subgameStateFrom starter parent =
           -- among CR 729.2a-c's movers.
           GameState.ante = mempty,
           GameState.stack = [],
+          GameState.stackedIn = Map.empty,
           GameState.manaPool = Map.empty,
           GameState.combat = Combat.emptyCombat,
           GameState.events = Seq.empty,
@@ -1379,8 +1376,7 @@ subgameStateFrom starter parent =
           GameState.castsBeforeThisTurn = mempty,
           GameState.attacksInOwnLastTurn = mempty,
           GameState.resolvedNames = Map.empty,
-          GameState.exiledUntilMonarch = Map.empty,
-          GameState.movedUntilSourceLeaves = Map.empty,
+          GameState.movedUntil = Map.empty,
           GameState.haunting = Map.empty,
           GameState.encoded = Map.empty,
           GameState.exiledWith = Map.empty,
@@ -1414,10 +1410,10 @@ subgameStateFrom starter parent =
 -- crossed. Rule 729.5's last sentence says the abilities that
 -- triggered wait for the main game to resume anyway, so nothing is owed earlier.
 --
--- Borrowed from Pawl.Engine.Departure.objectsLeaveWith, CR 800.4a's departure and
--- the tree's other road out of the game that reaches no zone: file CR 608.2h last
--- known information, remove from the zones, delete the object, record a
--- GameEvent.LeftTheGame. What is NOT borrowed is that function's shape. Rule
+-- Shared with Pawl.Engine.Departure.objectsLeaveWith, CR 800.4a's departure and
+-- the tree's other road out of the game that reaches no zone: Event.leaveTheGame
+-- files CR 608.2h last known information and deletes the object, and a
+-- GameEvent.LeftTheGame is recorded. What is NOT shared is that function's shape. Rule
 -- 800.4a's objects leave at ONE INSTANT, which is why it may read one board for
 -- the whole batch and wrap the events in Event.simultaneouslyPure; these crossed
 -- at different moments of the subgame, so this is a RUNNING fold instead -- one
@@ -1457,88 +1453,19 @@ applyCrossings finalSub parent =
   let crossed = Foldable.toList (GameState.broughtIn finalSub)
       isOurs oid = Map.member oid (GameState.objects parent)
       (mine, further) = List.partition isOurs crossed
-      -- The same deletion Departure.objectsLeaveWith performs, dropping the same
-      -- carriers keyed on the departing id: its combat entries (CR 506.4 removes
-      -- a permanent from combat as it leaves the battlefield), its
-      -- exile-until-monarch entry, CR 610.3's return watch, CR 702.55b's haunt link, CR 607.2a's
-      -- exiled-with link and CR 406.4's pile stamp. See there for why each is
-      -- keyed on the KEY and not the value.
-      leave g oid = case Map.lookup oid (GameState.objects g) of
-        -- Unreachable: `mine` holds only ids GameState.objects answered for, and
-        -- no id crosses twice -- Event.bringInFrom drops the entry it
-        -- spent, so a second wish cannot reach the same card.
-        Nothing -> g
-        Just _ ->
-          let g1 = Game.removeFromZones oid g
-              combat = GameState.combat g1
-           in g1
-                { GameState.objects = Map.delete oid (GameState.objects g1),
-                  GameState.combat =
-                    combat
-                      { Combat.Type.attackers = Map.delete oid (Combat.Type.attackers combat),
-                        Combat.Type.struckFirst = fmap (Set.delete oid) (Combat.Type.struckFirst combat)
-                      },
-                  GameState.exiledUntilMonarch = Map.delete oid (GameState.exiledUntilMonarch g1),
-                  GameState.movedUntilSourceLeaves = Map.delete oid (GameState.movedUntilSourceLeaves g1),
-                  GameState.haunting = Map.delete oid (GameState.haunting g1),
-                  GameState.encoded = Map.delete oid (GameState.encoded g1),
-                  GameState.exiledWith = Map.delete oid (GameState.exiledWith g1),
-                  GameState.exilePiles = Map.delete oid (GameState.exilePiles g1)
-                }
-      -- CR 608.2h, taken against `g` -- the running state, which is this game as
-      -- it stands at the moment THIS card crosses. The object itself is still in
-      -- it, exactly as Departure.objectsLeaveWith's own `filed` reads a board its
-      -- subject has not left yet; what is different is that the cards which
-      -- crossed EARLIER have already gone.
-      filed g oid = case Map.lookup oid (GameState.objects g) of
-        -- Unreachable, for `leave`'s reason.
-        Nothing -> Nothing
-        Just obj ->
-          Just
-            ( oid,
-              LastKnown.MkLastKnown
-                (Projection.project oid g)
-                -- CR 613.1b: the projected controller as it left, who need not be
-                -- its owner. The fallback is unreachable for the reason
-                -- Departure.objectsLeaveWith gives.
-                (Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid g))
-                -- CR 108.3, which no projection moves: read straight off the
-                -- object, unlike the controller above.
-                (Object.owner obj)
-                (Object.source obj)
-                (Object.counters obj)
-                (Event.copiedSnapshot oid g)
-                -- CR 303.4b / 301.5a with the arrow turned round, taken
-                -- while the answer still exists (CR 603.10a).
-                (Game.attachments oid g)
-                (Object.chosenNames obj)
-                (Object.chosenPlayer obj)
-                (Object.chosenColors obj)
-                (Object.chosenSubtype obj)
-                -- CR 508.1k, the sibling read of the same record.
-                (Game.isAttacking oid g)
-                (Game.attackTargetOf oid g)
-                (Game.isBlocking oid g)
-                -- CR 310.9a, read straight off the object like the owner above:
-                -- Nothing for everything that is not a battle.
-                (Object.protector obj)
-                -- CR 400.7d's cost record, read straight off the object too.
-                (Object.paidCosts obj)
-                -- CR 702.30a's echo window, the sibling read: per-incarnation, so
-                -- this is the last moment it exists.
-                (Object.controlClock obj)
-                (Object.zone obj)
-                -- CR 400.1: the pile it left, `filed`'s board as above.
-                (Game.pileHolderOf oid g)
-            )
-      -- One crossing: file, delete, then record. The event LAST, so that
-      -- Event.recordEvent's CR 603.10 sample is of the board immediately after
-      -- this card left and before the next one does.
+      -- One crossing: Event.leaveTheGame, the step CR 800.4a's departure
+      -- shares, then the events. Read against `g` -- the running state, which is
+      -- this game as it stands at the moment THIS card crosses: the cards which
+      -- crossed EARLIER have already gone, so CR 608.2h's record and CR 604.2's
+      -- handover are what was true at this instant, and CR 611.2c then freezes
+      -- the handed-over set.
+      --
+      -- The events LAST, so that Event.recordEvent's CR 603.10 sample is of the
+      -- board immediately after this card left and before the next one does.
       --
       -- The event names the zone the card left, since CR 729.4a's main-game
       -- abilities "trigger on objects leaving a main-game zone" -- a card a wish
-      -- took out of a graveyard is Spirit Mascot's trigger event. CR 604.2's
-      -- handover below is for a permanent on the battlefield alone.
+      -- took out of a graveyard is Spirit Mascot's trigger event.
       --
       -- Battlefield MEMBERSHIP rather than Object.zone, the way
       -- Departure.objectsLeaveWith reads the same question, since
@@ -1557,43 +1484,28 @@ applyCrossings finalSub parent =
       -- one rule 702.26b speaks of. Pawl.SetupSpec's "CR 702.26b a phased-out
       -- permanent a subgame takes leaves the main game and triggers nothing" is
       -- the proof, against a phased-in leg differing in the phase-out alone.
+      --
+      -- CR 708.9's first sentence: a face-down permanent moving from the
+      -- battlefield to any other zone is revealed by its owner, and a subgame's
+      -- zone is another zone. Recorded in the LeftTheGame's own group, ahead of
+      -- it, as Departure.objectsLeaveWith does. Pawl.FaceDownSpec's "CR 708.9 the
+      -- Witness draws when a subgame takes a face-down permanent" proves it.
       cross g oid =
-        let noted = case filed g oid of
-              Nothing -> g
-              Just (key, value) -> g {GameState.lastKnown = Map.insert key value (GameState.lastKnown g)}
-            gone = leave noted oid
+        let gone = Event.leaveTheGame g g oid
             left zone = GameEvent.LeftTheGame (LeftTheGame.MkLeftTheGame oid zone)
+            recordLeft zone = case Event.leavingReveal g oid of
+              Nothing -> Event.recordEvent (left zone)
+              Just revealed -> Event.simultaneouslyPure (Event.recordEvent (left zone) . Event.recordEvent revealed)
          in if Set.member oid (GameState.battlefield g)
-              then
-                Event.recordEvent
-                  (left Zone.Battlefield)
-                  gone {GameState.continuousEffects = handover g oid <> GameState.continuousEffects gone}
+              then recordLeft Zone.Battlefield gone
               else case fmap Object.zone (Map.lookup oid (GameState.objects g)) of
                 -- Phased out, CR 702.26b above.
                 Just Zone.Battlefield -> gone
-                Just zone -> Event.recordEvent (left zone) gone
-                -- Unreachable, for `leave`'s reason.
+                Just zone -> recordLeft zone gone
+                -- Unreachable: `mine` holds only ids GameState.objects answered
+                -- for, and no id crosses twice -- Event.bringInFrom drops the
+                -- entry it spent, so a second wish cannot reach the same card.
                 Nothing -> gone
-      -- CR 604.2's override, the same one Departure.objectsLeaveWith performs on
-      -- the other road out of the game: a permanent that leaves the GAME has left
-      -- the battlefield, so a card whose text says its effect continues anyway --
-      -- Titania's Song -- needs that effect handed to GameState.continuousEffects
-      -- as it goes. Event.lingeringHandover is the single writer.
-      --
-      -- Read from `g`, the running board this crossing is leaving, for `filed`'s
-      -- reason: what continues is what was applying at THIS instant, with every
-      -- earlier crossing already gone. CR 611.2c then freezes the set.
-      --
-      -- Gated by the caller on GameState.battlefield membership, for CR
-      -- 702.26b's reason: a phased-out permanent was generating no effect there
-      -- is anything to continue.
-      --
-      -- The controller is read the way `filed` reads it (CR 109.5 / CR 613.1b),
-      -- and the Object.owner fallback is unreachable for `filed`'s reason.
-      handover g oid = case Map.lookup oid (GameState.objects g) of
-        -- Unreachable, for `leave`'s reason.
-        Nothing -> []
-        Just obj -> Event.lingeringHandover oid (Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid g)) g
       applied = List.foldl' cross parent mine
    in applied
         { GameState.outsideObjects = Map.withoutKeys (GameState.outsideObjects applied) (Set.fromList further),
@@ -1631,7 +1543,7 @@ applyCrossings finalSub parent =
 -- `finalSub`: CR 400.7 mints a fresh id on every zone change, including the
 -- opening-hand draws, so a missing `movedIds` id is the ordinary case for a
 -- card that is alive under a new id. Nothing but objectsLeaveWith deletes a
--- real card's object outright (Sba's `ceaseToExist` reaches only a Source the
+-- real card's object outright (Sba's CR 704.5d/e pass reaches only a Source the
 -- rules say is not a card -- a token under CR 704.5d, a copy of a spell under CR
 -- 704.5e),
 -- so its firing is the only thing that can need recovering.

@@ -649,10 +649,6 @@ data Effect card ability
     -- designation, which CR 702.145c and CR 702.145f make daybound and
     -- nightbound permanents transform for.
     ItBecomes Daytime.Daytime
-  | -- | CR 725 (Palace Jailer): exile the slot's target until an opponent of the
-    -- effect's controller becomes the monarch. Not MoveToZone, which schedules
-    -- no return.
-    ExileUntilMonarch SlotName.SlotName
   | -- | CR 702.55a: exile the object the ObjectRef names, haunting the creature
     -- the SlotName's target names; the link is filed in GameState.haunting,
     -- which CR 702.55b reads.
