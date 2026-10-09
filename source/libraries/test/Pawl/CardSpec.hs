@@ -33,6 +33,7 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as KeywordEngine
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Mulligan as Mulligan
@@ -1421,7 +1422,7 @@ ownCounts effect = case effect of
   Effect.GainControl (DurationRef.MkDurationRef duration _) -> durationCounts duration
   Effect.GiveControl _ -> []
   Effect.ExchangeControl _ -> []
-  Effect.ArmDelayedTrigger {} -> []
+  Effect.ArmDelayedTrigger arm -> foldMap triggeredAbilityCounts (Game.carriedDelayedAbility arm)
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ _) -> durationCounts duration
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration _ _) -> durationCounts duration
   Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration _) -> durationCounts duration
@@ -1939,7 +1940,9 @@ effectNestedEffects effect = case effect of
   Effect.ChoosePermanents {} -> []
   Effect.RollDie {} -> []
   Effect.FlipCoin {} -> []
-  Effect.ArmDelayedTrigger {} -> []
+  -- CR 603.7a: the delayed ability an arm carries, as Face.delayedAbilities'
+  -- are a carrier of cardCarrierEffects.
+  Effect.ArmDelayedTrigger arm -> foldMap (Modal.allEffects . TriggeredAbility.modal) (Game.carriedDelayedAbility arm)
   Effect.AffectPlayers {} -> []
   Effect.RequireBlock {} -> []
   Effect.CantBeRegenerated {} -> []
@@ -1973,6 +1976,21 @@ cardCarrierEffects card =
     -- every lint below has to read it here or nowhere.
     <> concatMap (Modal.allEffects . ActivatedAbility.modal) (grantedActivatedAbilities card)
     <> concatMap (Modal.allEffects . TriggeredAbility.modal) (grantedTriggeredAbilities card)
+
+-- CR 603.7a: every delayed ability a face declares -- by name
+-- (Face.delayedAbilities) or carried by an arm (ArmDelayedTrigger.ability), the
+-- second carrier, which a quoted ability's arm uses. The carried half is read off
+-- cardAuthoredEffects, whose nesting closure reaches an arm inside another
+-- carried ability too.
+delayedDeclarations :: Face.Face Card.Type.Card -> [TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
+delayedDeclarations card =
+  Map.elems (Face.delayedAbilities card)
+    <> Maybe.mapMaybe
+      ( \effect -> case effect of
+          Effect.ArmDelayedTrigger arm -> Game.carriedDelayedAbility arm
+          _ -> Nothing
+      )
+      (cardAuthoredEffects card)
 
 -- The limbs of cardCarrierEffects that do NOT go through a grant. Split out so
 -- grantedModifications below can walk them without closing a loop with the two
@@ -2454,7 +2472,7 @@ effectReplacements effect = case effect of
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> []
   Effect.GiveControl _ -> []
   Effect.ExchangeControl _ -> []
-  Effect.ArmDelayedTrigger {} -> []
+  Effect.ArmDelayedTrigger arm -> concatMap effectReplacements (foldMap (Modal.allEffects . TriggeredAbility.modal) (Game.carriedDelayedAbility arm))
   Effect.AffectPlayers {} -> []
   Effect.RequireBlock {} -> []
   Effect.CantBeRegenerated {} -> []
@@ -2512,7 +2530,7 @@ faceModals card =
   Face.spell card
     : fmap ActivatedAbility.modal (Face.activatedAbilities card)
       <> fmap TriggeredAbility.modal (Face.triggeredAbilities card)
-      <> fmap TriggeredAbility.modal (Map.elems (Face.delayedAbilities card))
+      <> fmap TriggeredAbility.modal (delayedDeclarations card)
       <> fmap DungeonRoom.ability (Foldable.toList (Face.rooms card))
 
 -- CR 608.2d: does any clause's either-or name a sibling that does not name it
@@ -2637,7 +2655,7 @@ cardSlotNamesCollide card =
    in slotNamesCollide (Map.keysSet (Card.enchantSlotMap card) : Set.singleton Card.mutateSlot : modeSlots (Face.spell card))
         || any (slotNamesCollide . modeSlots . ActivatedAbility.modal) (Face.activatedAbilities card)
         || any (slotNamesCollide . modeSlots . TriggeredAbility.modal) (Face.triggeredAbilities card)
-        || any (slotNamesCollide . modeSlots . TriggeredAbility.modal) (Map.elems (Face.delayedAbilities card))
+        || any (slotNamesCollide . modeSlots . TriggeredAbility.modal) (delayedDeclarations card)
         || any (slotNamesCollide . modeSlots . DungeonRoom.ability) (Face.rooms card)
 
 -- A one-mode, targetless triggered ability running one effect under one
@@ -2985,7 +3003,7 @@ effectMintedFaces effect = case effect of
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> []
   Effect.GiveControl _ -> []
   Effect.ExchangeControl _ -> []
-  Effect.ArmDelayedTrigger {} -> []
+  Effect.ArmDelayedTrigger arm -> concatMap effectMintedFaces (foldMap (Modal.allEffects . TriggeredAbility.modal) (Game.carriedDelayedAbility arm))
   Effect.AffectPlayers {} -> []
   Effect.RequireBlock {} -> []
   Effect.CantBeRegenerated {} -> []
@@ -3056,7 +3074,7 @@ ownDeclaredTargetSlots card =
           (Map.keysSet . Modal.allTargetSlots)
           ( fmap ActivatedAbility.modal (Face.activatedAbilities card)
               <> fmap TriggeredAbility.modal (Face.triggeredAbilities card)
-              <> fmap TriggeredAbility.modal (Map.elems (Face.delayedAbilities card))
+              <> fmap TriggeredAbility.modal (delayedDeclarations card)
               <> fmap DungeonRoom.ability (Foldable.toList (Face.rooms card))
           )
     )
@@ -6164,7 +6182,7 @@ effectFilters effect = case effect of
   Effect.GainControl (DurationRef.MkDurationRef duration ref) -> frame Unframed (durationFilters duration) <> frame SourceHostFramed (objectRefFilters ref)
   Effect.GiveControl (GiveControl.MkGiveControl _ ref) -> frame SourceHostFramed (objectRefFilters ref)
   Effect.ExchangeControl _ -> []
-  Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger _ _ mDuration) -> frame Unframed (concatMap durationFilters (Maybe.maybeToList mDuration))
+  Effect.ArmDelayedTrigger arm@(ArmDelayedTrigger.MkArmDelayedTrigger _ _ mDuration _) -> frame Unframed (concatMap durationFilters (Maybe.maybeToList mDuration)) <> foldMap triggeredAbilityFilters (Game.carriedDelayedAbility arm)
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ playerEffect) -> frame Unframed (durationFilters duration) <> fmap ((,) StoredPlayerEffectFramed) (playerEffectFilters playerEffect)
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration blocker attacker) -> frame Unframed (durationFilters duration) <> frame SourceHostFramed (objectRefFilters blocker <> objectRefFilters attacker)
   -- RequireBlock's arm one axis narrower.
@@ -7065,7 +7083,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           Face.spell card
             : fmap ActivatedAbility.modal (Face.activatedAbilities card)
               <> fmap TriggeredAbility.modal (Face.triggeredAbilities card)
-              <> fmap TriggeredAbility.modal (Map.elems (Face.delayedAbilities card))
+              <> fmap TriggeredAbility.modal (delayedDeclarations card)
               <> fmap DungeonRoom.ability (Foldable.toList (Face.rooms card))
         offenders = filter (anyFace cardSlotNamesCollide . Printing.card) ps
     -- Guards against passing vacuously: a pool whose every modal had at most one
@@ -7602,7 +7620,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "CR 603.3d only an enters-the-battlefield or turned-face-up triggered ability's target count reads an announced X" $ do
     ps <- S.allPrintings s
     let inheritsX ability = TriggeredAbility.condition ability `elem` [TriggerCondition.SelfEnters, TriggerCondition.SelfTurnedFaceUp]
-        triggers f = Face.triggeredAbilities f <> Map.elems (Face.delayedAbilities f) <> grantedTriggeredAbilities f
+        triggers f = Face.triggeredAbilities f <> delayedDeclarations f <> grantedTriggeredAbilities f
         countsByX :: [Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> Bool
         countsByX = any (any (countReadsX . TargetSlot.count) . Modal.allTargetSlots)
         offends f =
