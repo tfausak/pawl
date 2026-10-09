@@ -372,7 +372,6 @@ sourceFramed framing = case framing of
   AffectedSetFramed -> True
   ActivationCostFramed -> True
   TriggerConditionFramed -> True
-  SlotlessCostFramed -> True
   AttachDestination -> True
   EntryAttachDestination -> True
   -- The stored CR 611.2c row's: a resolved spell has no permanent behind it to
@@ -392,6 +391,10 @@ sourceFramed framing = case framing of
   -- Conservative for KeywordFramed's reason: everything else, some of it read
   -- with no source at all.
   Unframed -> False
+  -- Pawl.Engine.Resolve.Effect.offerCastOnce pays CastOffer.payingInstead,
+  -- which carries this tag, framed by the OFFERED card rather than by the
+  -- offering object, so a source-derived atom there is a silent False.
+  SlotlessCostFramed -> False
 
 -- How many CR 701.3a atoms this card carries in a position framed by an attach
 -- -- Effect.AttachTarget's destination, Effect.AttachTargetToEach's,
@@ -698,7 +701,7 @@ hasChosenNameTag = Text.pack "HasChosenName"
 -- what Ancient Vendetta, Predict, Petra Sphinx, Null Chamber, Conjurer's Ban and
 -- Runed Halo legitimately have.
 --
--- SourceHostFramed and not `sourceFramed`: since #3320 that tag means an effect's
+-- SourceHostFramed and not `hostFramed`: since #3320 that tag means an effect's
 -- ObjectRef and nothing else, which is what makes it admissible here. The
 -- positions it used to share the tag with carry StandingHostFramed and are
 -- REJECTED, though Pawl.Engine.SourceContext fills their contexts: no card asks
@@ -1030,13 +1033,28 @@ hostOfSourceTag = Text.pack "IsHostOfSource"
 -- own positions count as elsewhere, chosenValueCounts' rule: a spell is attached
 -- to nothing.
 hostOfSourceCounts :: Face.Face Card.Type.Card -> (Int, Int)
-hostOfSourceCounts = chosenValueCounts sourceFramed hostOfSourceTag
+hostOfSourceCounts = chosenValueCounts hostFramed hostOfSourceTag
+
+-- The source-framed positions the host atom is admitted in: narrower than
+-- `sourceFramed`, because Pawl.Engine.SourceContext reads the host live. Not
+-- implemented: CR 608.2h's look-back to the host of a source that has left,
+-- which a CR 603.10a trigger condition ("whenever enchanted creature dies")
+-- and a target slot's CR 608.2b re-check would need (#4875). These four
+-- read it while the source is on the battlefield, or already did before the
+-- shared builder.
+hostFramed :: Framing -> Bool
+hostFramed framing = case framing of
+  SourceHostFramed -> True
+  StandingHostFramed -> True
+  PlayerEffectFramed -> True
+  ReplacementRowFramed -> True
+  _ -> False
 
 -- CR 303.4b's "enchanted" is answerable only where Filter.Context.sourceAttachedTo
--- is filled, which is the positions `sourceFramed` admits and nothing else:
--- Filter.contextFor leaves it Nothing, so Filter.IsHostOfSource read through a
--- bare one is a silent False rather than a rejected card. This is where that is
--- made loud.
+-- is filled and the source is still attached when it is read: the positions
+-- `hostFramed` admits. Filter.contextFor leaves it Nothing, and a departed
+-- source reads Nothing too (#4875), so Filter.IsHostOfSource elsewhere is a
+-- silent False rather than a rejected card. This is where that is made loud.
 --
 -- Two offences under one name, for canHostSubjectOffends' two reasons: the
 -- traversal found the atom outside those positions, or the traversal and the
@@ -1876,8 +1894,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "a planted atom in an amountless slot is an offence" (counts (planted id)) (0, 1)
     Spec.assertEqWith s "and the same atom in a slot that names one is not" (counts (planted (TargetSlot.withAmount (Quantity.Type.Literal 2)))) (1, 0)
   -- CR 303.4b's Filter.IsHostOfSource is CR 709.4a's atom one axis over again:
-  -- answerable only where Filter.Context.sourceAttachedTo is filled, which is the
-  -- positions `sourceFramed` admits. See hostOfSourceOffends for the two offences.
+  -- answerable only in the positions `hostFramed` admits. See hostOfSourceOffends for the two offences.
   Spec.it s "CR 303.4b no card asks IsHostOfSource where the source's host is unknown" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace hostOfSourceOffends . Printing.card) ps
@@ -1967,6 +1984,15 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
             }
     Spec.assertEqWith s "a planted atom is an offence" (hostOfSourceCounts planted) (0, 1)
     Spec.assertBool s (hostOfSourceOffends planted) "and the lint says so"
+    -- A PERMANENT's trigger condition is source-framed, but its host is read
+    -- live and CR 704.5m/n has unattached the Aura before a CR 603.10a
+    -- "whenever enchanted creature dies" is matched (#4875), so it is refused.
+    let onTrigger = (S.combinedFace piker) {Face.triggeredAbilities = [oneEffectTrigger (TriggerCondition.PermanentEnters buried) (Effect.Draw (Draw.MkDraw (PlayerRef.InSlot Binding.you) (Quantity.Type.Literal 1) Nothing))]}
+    Spec.assertEqWith s "a trigger condition asking it is an offence too" (hostOfSourceCounts onTrigger) (0, 1)
+    -- CastOffer.payingInstead carries SlotlessCostFramed and is paid framed by
+    -- the OFFERED card (Pawl.Engine.Resolve.Effect.offerCastOnce), so neither the
+    -- host nor a chosen value of the offering object answers there.
+    Spec.assertEqWith s "an offer's cost is not source-framed" (sourceFramed SlotlessCostFramed, hostFramed SlotlessCostFramed) (False, False)
   -- CR 613.4c's "attached to it": Filter.IsAttachedToEvaluated is answerable only
   -- in a Count's filter. See evaluatedOffends.
   Spec.it s "CR 613.4c no card asks IsAttachedToEvaluated outside a Count" $ do
@@ -2177,7 +2203,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
   -- quotes it, so a quoting position's promise is not inherited by the keyword's
   -- text -- which matters because counterKindFilters is reached from positions
   -- that promise more than a keyword can keep: a CR 614.1 replacement ROW, whose
-  -- `sourceFramed` is True, and a MODE's target-slot amount, which is InTargetSlot.
+  -- `hostFramed` is True, and a MODE's target-slot amount, which is InTargetSlot.
   Spec.it s "CR 702 a keyword's own filter is framed by the keyword and not by whatever quotes it" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let base = S.combinedFace piker

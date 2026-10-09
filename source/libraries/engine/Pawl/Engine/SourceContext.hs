@@ -35,6 +35,9 @@ framedBy source gs = framedWith (choicesOf source gs) source gs
 -- (CR 608.2h), in place of the source's current ones. Every other field is
 -- still read off the board. All are thunks: a filter that names none of their
 -- atoms forces none of them.
+--
+-- Not implemented: CR 608.2h's last known host for a source that has left the
+-- battlefield; the host is read live, so it is Nothing then (#4875).
 framedWith :: SourceChoices.SourceChoices -> ObjectId.ObjectId -> GameState.GameState -> Filter.Context -> Filter.Context
 framedWith choices source gs context =
   (withChoices choices context)

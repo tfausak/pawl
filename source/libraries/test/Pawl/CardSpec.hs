@@ -5548,7 +5548,7 @@ blockPermissionFilters permission =
 --     Split off SourceHostFramed by #3320 over ONE atom: CR 201.4's
 --     Filter.HasChosenName, which Pawl.Engine.SourceContext answers here too but
 --     whose lint admits only where a card asks. Not a general
---     "these supply nothing" tag -- `sourceFramed` treats the two alike, and the
+--     "these supply nothing" tag -- `hostFramed` treats the two alike, and the
 --     intervening "if" fills Filter.Context.slotObjects off the TRIGGER's
 --     bindings, which is why isBoundCounts admits it exactly as before.
 --
@@ -5565,7 +5565,7 @@ blockPermissionFilters permission =
 --
 --     The fifth of those positions carries its OWN constructor below rather than
 --     this one, for a reason that is about the lints and not about the rule:
---     `sourceFramed` treats the two alike, and only the ObjectRef twin lint tells
+--     `hostFramed` treats the two alike, and only the ObjectRef twin lint tells
 --     them apart.
 --   * KeywordFramed -- a KEYWORD's own Filter, wherever the keyword is written.
 --     One of the two tags applied by the leaf that PRODUCES the Filter rather
@@ -5664,7 +5664,7 @@ data Framing
     -- and printed-recipient halves, CR 614.9's printed destination, an entry
     -- pattern, and every other Filter a ReplacementEffect holds. Every one of
     -- them is read through Pawl.Engine.Replacement.candidateContext, so the
-    -- source's host IS supplied and `sourceFramed` below admits this exactly as it
+    -- source's host IS supplied and `hostFramed` below admits this exactly as it
     -- admits SourceHostFramed.
     --
     -- A constructor of its own only because effectFilters' SourceHostFramed
@@ -5689,7 +5689,7 @@ data Framing
     -- 122.1b's keyword counter, which carries a whole Keyword. Read off a
     -- continuous effect or off the printed face, and never in a context carrying
     -- the resolution's SLOTS -- sweptForSingularSlots below is where that is
-    -- argued. `sourceFramed` below is the conservative half of the same posture:
+    -- argued. `hostFramed` below is the conservative half of the same posture:
     -- the CR 702.16e route does reach a context filling the source's host, and
     -- refusing the atom anyway only narrows what a card may write.
     --

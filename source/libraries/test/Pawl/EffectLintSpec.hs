@@ -2697,7 +2697,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
   -- because effectNestedEffects reaches a superset of effectFilters' own
   -- recursion (replacementPrintedEffects contains replacementEffectRiders).
   --
-  -- SourceHostFramed and not `sourceFramed`: inside an Effect that tag means "an
+  -- SourceHostFramed and not `hostFramed`: inside an Effect that tag means "an
   -- ObjectRef's filter" to this comparison, which is why a stored Effect.Replace's
   -- own row carries ReplacementRowFramed instead.
   --
