@@ -1911,6 +1911,87 @@ priestOfYawgmothSpec s registry = Spec.describe s "Priest of Yawgmoth" $ do
     Spec.assertEqWith s "sacrificing the Craw Wurm adds six {G}" (tappedFor (sacrificing wurmId) furgulId board) (replicate 6 green)
     Spec.assertEqWith s "sacrificing the Grizzly Bears adds two" (tappedFor (sacrificing bearsId) furgulId board) [green, green]
 
+-- CR 406.2 / 608.2h / 105.4: Food Chain's "Exile a creature you control: Add X
+-- mana of any one color, where X is 1 plus the exiled creature's mana value.
+-- Spend this mana only to cast creature spells." The cost exiles, the count
+-- reads the exiled creature as it last was, and the colour is chosen once the
+-- count is known.
+foodChainSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+foodChainSpec s registry = Spec.describe s "Food Chain" $ do
+  let board = do
+        chain <- S.printingOf s registry "Food Chain"
+        stag <- S.printingOf s registry "Axebane Stag"
+        myr <- S.printingOf s registry "Alpha Myr"
+        let (chainId, g1) = S.addPermanent chain S.alice (Setup.emptyGame S.bothPlayers)
+            (stagId, g2) = S.addPermanent stag S.alice g1
+            (myrId, gs) = S.addPermanent myr S.alice g2
+        pure (chainId, stagId, myrId, gs)
+      countOf name = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack name)) S.alice
+      -- Exiles `victim`, and picks the yield all of `color`; every candidate the
+      -- yield prompt offered is recorded.
+      feeding :: ObjectId.ObjectId -> Color.Color -> Prompt.Prompt r -> State.State [[ManaType.ManaType]] r
+      feeding victim color p = case p of
+        Prompt.ChooseExiles _ _ _ candidates _ -> pure (Set.filter (== victim) (Set.fromList candidates))
+        Prompt.ChooseManaYield _ _ _ candidates -> do
+          State.modify' (<> fmap (fmap ManaUnit.manaType . Mana.yieldUnits) (NonEmpty.toList candidates))
+          pure (Maybe.fromMaybe (NonEmpty.head candidates) (List.find (all ((== ManaType.Colored color) . ManaUnit.manaType) . Mana.yieldUnits) (NonEmpty.toList candidates)))
+        _ -> pure (S.identityAnswer p)
+      activated victim color chainId gs = State.runState (Engine.runGame (feeding victim color) gs (S.tapForMana chainId)) []
+
+  Spec.it s "CR 608.2h exiling Axebane Stag adds eight mana of the colour chosen after it" $ do
+    (chainId, stagId, _, gs) <- board
+    let ((_, afterRed), asked) = activated stagId Color.Red chainId gs
+        ((_, afterGreen), _) = activated stagId Color.Green chainId gs
+    Spec.assertEqWith s "eight red, 1 plus the Stag's 7" (poolTypes S.alice afterRed) (replicate 8 (ManaType.Colored Color.Red))
+    Spec.assertEqWith s "eight green when green is the answer" (poolTypes S.alice afterGreen) (replicate 8 (ManaType.Colored Color.Green))
+    Spec.assertEqWith s "the five colours were offered at eight each, so the count was known when asked" asked (fmap (replicate 8 . ManaType.Colored) [Color.White, Color.Blue, Color.Black, Color.Red, Color.Green])
+    Spec.assertEqWith s "and the Stag is gone" (countOf "Axebane Stag" afterRed) 0
+
+  -- CR 106.6: the mana pays a creature spell and not Divination, off one board.
+  Spec.it s "CR 106.6 Food Chain's mana casts Ancient Carp and not Divination" $ do
+    carp <- S.printingOf s registry "Ancient Carp"
+    divination <- S.printingOf s registry "Divination"
+    (_, _, _, gs) <- board
+    let holding printing =
+          let (held, oid) = S.handOne printing (gs {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
+           in S.castable S.alice oid held
+    Spec.assertBool s (holding carp) "{4}{U} off the Stag's eight"
+    Spec.assertBool s (not (holding divination)) "and {2}{U} not, it being no creature spell"
+
+  -- A WIDE board: five each of nine creatures of mana values 0 to 8. The supply
+  -- walk takes Food Chain's yields only in the colours a cast names and at most
+  -- as many activations as it demands mana, so it stays small.
+  Spec.it s "CR 118.3 Food Chain beside forty-five creatures still answers at once" $ do
+    chain <- S.printingOf s registry "Food Chain"
+    creatures <- traverse (S.printingOf s registry) ["Crimson Kobolds", "Aegis Turtle", "Alpha Myr", "Alaborn Trooper", "Axebane Beast", "Ancient Carp", "Alpha Tyrranax", "Axebane Stag", "Ancient Brontodon"]
+    brontodon <- S.printingOf s registry "Ancient Brontodon"
+    progenitus <- S.printingOf s registry "Progenitus"
+    divination <- S.printingOf s registry "Divination"
+    let wide = alicePermanents (chain : concatMap (replicate 5) creatures)
+        holding printing =
+          let (held, oid) = S.handOne printing (wide {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
+           in S.castable S.alice oid held
+    Spec.assertBool s (holding brontodon) "{6}{G}{G} is offered"
+    Spec.assertBool s (holding progenitus) "{W}{W}{U}{U}{B}{B}{R}{R}{G}{G}, every colour twice, is offered"
+    Spec.assertBool s (not (holding divination)) "and Divination is not"
+
+  -- The colours made of SEVERAL blocks: Crimson Kobolds' mana value is 0, so
+  -- each exile adds one mana, and Alpha Myr's 2 makes three. Progenitus wants
+  -- two of each colour: the Myr's three cover one, and the other four take two
+  -- Kobolds each. Eight Kobolds are exactly enough and seven are not, the one
+  -- difference between the boards; the Myr is what makes the yields differ by
+  -- creature, so the colours are covered rather than collapsed.
+  Spec.it s "CR 118.3 an Alpha Myr and eight Crimson Kobolds feed Progenitus through Food Chain and seven do not" $ do
+    chain <- S.printingOf s registry "Food Chain"
+    myr <- S.printingOf s registry "Alpha Myr"
+    kobolds <- S.printingOf s registry "Crimson Kobolds"
+    progenitus <- S.printingOf s registry "Progenitus"
+    let holding n =
+          let (held, oid) = S.handOne progenitus ((alicePermanents (chain : myr : replicate n kobolds)) {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
+           in S.castable S.alice oid held
+    Spec.assertBool s (holding 8) "the Myr's three for one colour, two Kobolds for each of the others"
+    Spec.assertBool s (not (holding 7)) "and seven Kobolds leave a colour short"
+
 -- Answers Prompt.ChooseSacrifices with `victim` alone, and defers everything
 -- else to S.identityAnswer.
 sacrificing :: ObjectId.ObjectId -> Prompt.Prompt r -> r
@@ -3803,6 +3884,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   manaConfluenceSpec s registry
   phyrexianTowerSpec s registry
   priestOfYawgmothSpec s registry
+  foodChainSpec s registry
   bloodPetSpec s registry
   ashnodsAltarSpec s registry
   workhorseSpec s registry

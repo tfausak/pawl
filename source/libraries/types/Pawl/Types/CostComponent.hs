@@ -8,6 +8,7 @@ import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.ExileMaterials as ExileMaterials
+import qualified Pawl.Types.ExilePermanents as ExilePermanents
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.Rounding as Rounding
@@ -69,6 +70,9 @@ data CostComponent keyword
   | -- | CR 118.1 as a cost / Meloku the Clouded Mirror: return exactly this many
     -- permanents matching the Filter to their owners' hands, chosen by the payer.
     ReturnPermanents (ReturnPermanents.ReturnPermanents keyword)
+  | -- | CR 118.1 / 406.2 as a cost / Food Chain: exile exactly this many
+    -- permanents matching the Filter, chosen by the payer.
+    ExilePermanents (ExilePermanents.ExilePermanents keyword)
   | -- | CR 601.2f / 701.9b / Cathartic Reunion, Magmatic Insight: discard this many
     -- cards matching the Filter from hand, which the discarding player chooses.
     DiscardCards (DiscardCards.DiscardCards keyword)

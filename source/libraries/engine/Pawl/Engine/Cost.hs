@@ -97,6 +97,7 @@ import qualified Pawl.Types.Emerge as Emerge
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.ExileLink as ExileLink
 import qualified Pawl.Types.ExileMaterials as ExileMaterials
+import qualified Pawl.Types.ExilePermanents as ExilePermanents
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
@@ -1600,6 +1601,7 @@ substituteXInComponent x component = case component of
   CostComponent.TapForTotalPower {} -> component
   CostComponent.TapPermanents {} -> component
   CostComponent.ReturnPermanents {} -> component
+  CostComponent.ExilePermanents {} -> component
   CostComponent.DiscardCards {} -> component
   CostComponent.DiscardThis _ -> component
   CostComponent.PutCardFromHandOntoBattlefield _ -> component
@@ -1681,6 +1683,7 @@ componentHasVariable component = case component of
   CostComponent.TapForTotalPower {} -> False
   CostComponent.TapPermanents {} -> False
   CostComponent.ReturnPermanents {} -> False
+  CostComponent.ExilePermanents {} -> False
   CostComponent.DiscardCards {} -> False
   CostComponent.DiscardThis _ -> False
   CostComponent.PutCardFromHandOntoBattlefield _ -> False
@@ -1785,6 +1788,7 @@ componentDemandGrowsWithX component = case component of
   CostComponent.TapForTotalPower {} -> False
   CostComponent.TapPermanents {} -> False
   CostComponent.ReturnPermanents {} -> False
+  CostComponent.ExilePermanents {} -> False
   CostComponent.DiscardCards {} -> False
   CostComponent.DiscardThis _ -> False
   CostComponent.PutCardFromHandOntoBattlefield _ -> False
@@ -2090,6 +2094,7 @@ loyaltyAmountOf component = case component of
   CostComponent.TapForTotalPower {} -> Nothing
   CostComponent.TapPermanents {} -> Nothing
   CostComponent.ReturnPermanents {} -> Nothing
+  CostComponent.ExilePermanents {} -> Nothing
   CostComponent.DiscardCards {} -> Nothing
   CostComponent.DiscardThis _ -> Nothing
   CostComponent.PutCardFromHandOntoBattlefield _ -> Nothing
@@ -2200,6 +2205,7 @@ zoneOfComponent component = case component of
   -- Nothing, and NOT Just Zone.Battlefield: CR 113.6m is about an ability that
   -- moves THE OBJECT IT'S ON, and this moves OTHER permanents.
   CostComponent.ReturnPermanents {} -> Nothing
+  CostComponent.ExilePermanents {} -> Nothing
   -- Nothing, and NOT Just Zone.Graveyard: rule 113.6m again, and these move
   -- OTHER cards.
   CostComponent.ExileCardsFromGraveyard {} -> Nothing
@@ -2313,6 +2319,7 @@ componentStatesHiddenQuality component = case component of
   CostComponent.TapForTotalPower {} -> False
   CostComponent.TapPermanents {} -> False
   CostComponent.ReturnPermanents {} -> False
+  CostComponent.ExilePermanents {} -> False
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
   CostComponent.ExileMaterials {} -> False
@@ -2925,6 +2932,9 @@ claimOf slots pid oid component gs =
         -- instead leaves the suite green.
         CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n criterion) ->
           claim (ClaimAxis.Removal Zone.Battlefield) (Set.fromList (returnCandidates slots pid oid criterion gs)) n
+        -- CR 406.2's exile out of the same pool, ReturnPermanents' reading.
+        CostComponent.ExilePermanents (ExilePermanents.MkExilePermanents n criterion) ->
+          claim (ClaimAxis.Removal Zone.Battlefield) (Set.fromList (returnCandidates slots pid oid criterion gs)) n
         CostComponent.PayLife _ -> Nothing
         CostComponent.PayHalfLife _ -> Nothing
         CostComponent.PayLifeX -> Nothing
@@ -3323,6 +3333,7 @@ uncountedCeiling pid oid claims gs component = case component of
   CostComponent.SacrificeThis -> Nothing
   CostComponent.ReturnThis -> Nothing
   CostComponent.ReturnPermanents {} -> Nothing
+  CostComponent.ExilePermanents {} -> Nothing
   CostComponent.DiscardCards {} -> Nothing
   CostComponent.DiscardThis _ -> Nothing
   CostComponent.PutCardFromHandOntoBattlefield _ -> Nothing
@@ -3729,6 +3740,7 @@ targetComputed component = case component of
   CostComponent.TapForTotalPower _ -> False
   CostComponent.TapPermanents _ -> False
   CostComponent.ReturnPermanents _ -> False
+  CostComponent.ExilePermanents _ -> False
   CostComponent.DiscardCards _ -> False
   CostComponent.DiscardThis _ -> False
   CostComponent.PutCardFromHandOntoBattlefield _ -> False
@@ -3786,6 +3798,7 @@ lifeOwedByComponent pid gs component = case component of
   CostComponent.TapForTotalPower {} -> 0
   CostComponent.TapPermanents {} -> 0
   CostComponent.ReturnPermanents {} -> 0
+  CostComponent.ExilePermanents {} -> 0
   CostComponent.DiscardCards {} -> 0
   CostComponent.DiscardThis _ -> 0
   CostComponent.PutCardFromHandOntoBattlefield _ -> 0
@@ -3841,6 +3854,7 @@ energyOwedByComponent component = case component of
   CostComponent.TapForTotalPower {} -> 0
   CostComponent.TapPermanents {} -> 0
   CostComponent.ReturnPermanents {} -> 0
+  CostComponent.ExilePermanents {} -> 0
   CostComponent.DiscardCards {} -> 0
   CostComponent.DiscardThis _ -> 0
   CostComponent.PutCardFromHandOntoBattlefield _ -> 0
@@ -3907,6 +3921,7 @@ countersOwedByComponent component = case component of
   CostComponent.TapForTotalPower {} -> []
   CostComponent.TapPermanents {} -> []
   CostComponent.ReturnPermanents {} -> []
+  CostComponent.ExilePermanents {} -> []
   CostComponent.DiscardCards {} -> []
   CostComponent.DiscardThis _ -> []
   CostComponent.PutCardFromHandOntoBattlefield _ -> []
@@ -4031,6 +4046,9 @@ canPayComponent slots pid oid component gs = case component of
   -- Pawl.CostSpec asks this function directly: relaxing this arm alone leaves
   -- the gate green, `jointlyPayable`'s empty pool refusing the same activation.
   CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n criterion) ->
+    Natural.length (returnCandidates slots pid oid criterion gs) >= n
+  -- CR 118.3 for the exile, the arm above's reading over the same pool.
+  CostComponent.ExilePermanents (ExilePermanents.MkExilePermanents n criterion) ->
     Natural.length (returnCandidates slots pid oid criterion gs) >= n
   -- CR 601.2f: payable only if the hand holds at least that many cards the
   -- criterion admits -- Magmatic Insight is uncastable out of a landless hand
@@ -4375,6 +4393,7 @@ criteriaOf component = case component of
   CostComponent.TapForTotalPower tap -> [TapForTotalPower.whichPermanents tap]
   CostComponent.TapPermanents tap -> [TapPermanents.whichPermanents tap]
   CostComponent.ReturnPermanents ret -> [ReturnPermanents.whichPermanents ret]
+  CostComponent.ExilePermanents exiled -> [ExilePermanents.whichPermanents exiled]
   CostComponent.DiscardCards discard -> [DiscardCards.whichCards discard]
   CostComponent.PutCardFromHandOntoBattlefield criterion -> [criterion]
   CostComponent.ExileCardFromHand criterion -> [criterion]
@@ -5181,6 +5200,7 @@ paidInSecondPass component = case component of
   CostComponent.Sacrifice {} -> False
   CostComponent.ReturnThis -> False
   CostComponent.ReturnPermanents {} -> False
+  CostComponent.ExilePermanents {} -> False
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileThis -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
@@ -5304,6 +5324,7 @@ orderSensitive component = case component of
   -- CR 702.49a's ninjutsu, CR 702.188a's web-slinging and CR 702.190a's sneak,
   -- which each append exactly this component to a mana cost and nothing else.
   CostComponent.ReturnPermanents {} -> True
+  CostComponent.ExilePermanents {} -> True
   CostComponent.DiscardCards {} -> True
   CostComponent.DiscardThis _ -> True
   CostComponent.PutCardFromHandOntoBattlefield _ -> True
@@ -5910,9 +5931,8 @@ tapForManaWith perform window inFlight refused activator oid = do
               -- Priest of Yawgmoth's cost will sacrifice (Pawl.ManaSpec's Priest
               -- of Yawgmoth group). Every pair whose offer the activator picked
               -- among is a candidate, so a colour choice the offer collapsed is
-              -- asked now, and a yield the slots leave unchanged asks nothing.
-              -- That question is a regression fence: Food Chain is the printing
-              -- that asks it (gap #4851).
+              -- asked now -- Food Chain's colour (Pawl.ManaSpec's Food Chain
+              -- group) -- and a yield the slots leave unchanged asks nothing.
               --
               -- Not implemented: the slots reaching CR 405.6c's other effects,
               -- which run with none of them -- see `perform` below (#4850).
@@ -6432,6 +6452,24 @@ payPayable moment slots pid oid component = case component of
       then do
         Monad.void (Event.changeZonesTogether (fmap (\returned -> (returned, Zone.Hand)) (Set.toAscList chosen)))
         pure (Payment.Paid (Binding.paidObjects Binding.returnedPermanent (Set.map Recipient.ToObject chosen)))
+      else pure Payment.Unpaid
+  -- CR 406.2 as a cost: Food Chain's "Exile a creature you control". The
+  -- payer chooses (CR 118.1), ReturnPermanents' prompt posture, and the exiles
+  -- are ONE event, its reason. Binds Binding.exiledPermanent, the ids as they
+  -- were BEFORE the move: "the exiled creature's mana value" is CR 608.2h's
+  -- last known information of the permanent.
+  CostComponent.ExilePermanents (ExilePermanents.MkExilePermanents n criterion) -> do
+    gs <- State.get
+    let candidates = returnCandidates slots pid oid criterion gs
+        decider = Decide.deciderFor pid gs
+    chosen <-
+      if Natural.length candidates <= n
+        then pure (Set.fromList candidates)
+        else Game.choose (Prompt.ChooseExiles decider pid oid candidates n)
+    if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
+      then do
+        Monad.void (Event.changeZonesTogether (fmap (\exiled -> (exiled, Zone.Exile)) (Set.toAscList chosen)))
+        pure (Payment.Paid (Binding.paidObjects Binding.exiledPermanent (Set.map Recipient.ToObject chosen)))
       else pure Payment.Unpaid
   -- CR 701.9b: the discarding player chooses which cards, so this is a prompt.
   -- Elided only when forced -- as many MATCHING cards in hand as the count, which

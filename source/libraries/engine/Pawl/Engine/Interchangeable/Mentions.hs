@@ -177,6 +177,7 @@ import qualified Pawl.Types.ExchangedValue as ExchangedValue
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.ExileMaterials as ExileMaterials
+import qualified Pawl.Types.ExilePermanents as ExilePermanents
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
@@ -958,6 +959,7 @@ costComponentNames asking onKeyword x = case x of
   CostComponent.TapForTotalPower tapForTotalPower -> tapForTotalPowerNames asking tapForTotalPower
   CostComponent.TapPermanents tapPermanents -> tapPermanentsNames asking tapPermanents
   CostComponent.ReturnPermanents returnPermanents -> returnPermanentsNames asking returnPermanents
+  CostComponent.ExilePermanents exilePermanents -> exilePermanentsNames asking exilePermanents
   CostComponent.DiscardCards discardCards -> discardCardsNames asking discardCards
   CostComponent.DiscardThis _discardCause -> False
   CostComponent.PutCardFromHandOntoBattlefield filter_ -> filterNames asking filter_
@@ -2482,6 +2484,10 @@ restrictedCreaturesNames :: Asking -> (named -> Bool) -> RestrictedCreatures.Res
 restrictedCreaturesNames asking onNamed x = case x of
   RestrictedCreatures.Named named -> onNamed named
   RestrictedCreatures.Matching filter_ -> filterNames asking filter_
+
+exilePermanentsNames :: Asking -> ExilePermanents.ExilePermanents keyword -> Bool
+exilePermanentsNames asking x = case x of
+  ExilePermanents.MkExilePermanents _count whichPermanents -> filterNames asking whichPermanents
 
 returnPermanentsNames :: Asking -> ReturnPermanents.ReturnPermanents keyword -> Bool
 returnPermanentsNames asking x = case x of

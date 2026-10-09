@@ -16,6 +16,7 @@ import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.ExileMaterials as ExileMaterials
+import qualified Pawl.Types.ExilePermanents as ExilePermanents
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
@@ -108,6 +109,13 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       (CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents 1 (Filter.HasCardType CardType.Land)))
       " {\"type\":\"ReturnPermanents\",\"value\":{\"count\":1,\"whichPermanents\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}} "
+  -- The same shape spelled over an exile -- Food Chain's one creature.
+  Spec.it s "ExilePermanents" $
+    Common.assertCodec
+      s
+      codec
+      (CostComponent.ExilePermanents (ExilePermanents.MkExilePermanents 1 (Filter.HasCardType CardType.Creature)))
+      " {\"type\":\"ExilePermanents\",\"value\":{\"count\":1,\"whichPermanents\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
   Spec.it s "DiscardCards" $
     Common.assertCodec
       s
