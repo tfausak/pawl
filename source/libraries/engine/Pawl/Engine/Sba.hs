@@ -1053,8 +1053,8 @@ checkOnce = do
       vanishing = filter isVanishing (Map.keys (GameState.objects departed))
       ceaseToExist g oid = case Game.lookupObject oid g of
         Nothing -> g
-        Just obj ->
-          let g1 = Game.removeFromZones (Object.owner obj) oid g
+        Just _ ->
+          let g1 = Game.removeFromZones oid g
            in g1 {GameState.objects = Map.delete oid (GameState.objects g1)}
       vanished = List.foldl' ceaseToExist departed vanishing
       removeN n c = let c2 = c - n in if c2 == 0 then Nothing else Just c2

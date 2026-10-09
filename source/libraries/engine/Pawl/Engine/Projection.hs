@@ -1219,9 +1219,9 @@ controllerWithLastKnown oid gs = case lastKnownOf oid gs of
   Just lk -> Just (LastKnown.controller lk)
   Nothing -> controllerOf oid gs
 
--- CR 108.3's owner, with the same fallback -- unlike control (CR 110.2) an
--- owner never moves, so the live half is Object.owner straight off the
--- object rather than a projection. PlayerRef.OwnerOfBound's reader
+-- CR 108.3's owner, with the same fallback -- unlike control (CR 110.2) no
+-- projection moves an owner (only CR 407.3's Game.setOwner writes one), so the
+-- live half is Object.owner straight off the object. PlayerRef.OwnerOfBound's reader
 -- (Pawl.Engine.Resolve.Slots.playerRefPlayers); The Deck of Many Things' 20
 -- band is the producer.
 ownerWithLastKnown :: ObjectId -> GameState -> Maybe PlayerId.PlayerId

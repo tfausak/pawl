@@ -116,8 +116,10 @@ import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeBlocks as ExchangeBlocks
+import qualified Pawl.Types.ExchangeOwnership as ExchangeOwnership
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
+import qualified Pawl.Types.ExchangeWithTopOfLibrary as ExchangeWithTopOfLibrary
 import qualified Pawl.Types.ExchangeZones as ExchangeZones
 import qualified Pawl.Types.ExchangedValue as ExchangedValue
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
@@ -214,6 +216,7 @@ import qualified Pawl.Types.ScryR as ScryR
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
+import qualified Pawl.Types.SetOwner as SetOwner
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import Pawl.Types.SlotArity (SlotArity)
@@ -458,6 +461,8 @@ zoneScopeSlots scope = case scope of
 objectRefSlots :: ObjectRef -> Map.Map SlotName SlotArity
 objectRefSlots ref = joinTwo (joinSlots (fmap playerRefSlots (objectRefPlayerRefs ref))) $ case ref of
   ObjectRef.InSlot slot -> Map.singleton slot SlotArity.Many
+  -- InSlot's read of the slot, never a target (CR 115.10a).
+  ObjectRef.FromAnywhere slot -> Map.singleton slot SlotArity.Many
   ObjectRef.EachMatching _ -> Map.empty
   -- The sweeping arms that DO name a slot are this one and EachCardInHand below:
   -- CR 400.1's per-player zones leave "whose" to be said, and Angel of Finality
@@ -607,6 +612,7 @@ objectRefQuantities ref = case ref of
   ObjectRef.ChosenPermanent _ -> []
   ObjectRef.SourceAndChosenPermanent _ -> []
   ObjectRef.AttachedToBound _ -> []
+  ObjectRef.FromAnywhere _ -> []
 
 -- Every PlayerRef nested in one ObjectRef -- effectPlayerRefs' other half, and
 -- the seat a per-player walk counts against. objectRefSlots takes its player
@@ -667,6 +673,7 @@ objectRefPlayerRefs ref = case ref of
   -- and CR 608.2c's resolving controller is the only seat that picks it.
   ObjectRef.SourceAndChosenPermanent _ -> []
   ObjectRef.AttachedToBound _ -> []
+  ObjectRef.FromAnywhere _ -> []
 
 -- The refs a CR 707.10 answer names: rule 707.10d's candidates, and nothing for
 -- the other two, neither of which describes anything.
@@ -895,6 +902,9 @@ effectObjectRefs effect = case effect of
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ refs) -> NonEmpty.toList refs
   Effect.Ante (Ante.MkAnte _ ref _) -> [ref]
+  Effect.SetOwner (SetOwner.MkSetOwner _ ref) -> [ref]
+  Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership one other) -> [one, other]
+  Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary ref _) -> [ref]
   Effect.Shuffle {} -> []
   Effect.OfferCast (OfferCast.MkOfferCast ref _ _ _ _ _ _ _ _) -> [ref]
   Effect.OfferNamedCopy {} -> []
@@ -1115,6 +1125,9 @@ effectPlayerRefs effect = case effect of
   Effect.TakeExtraTurn takeExtraTurn -> [TakeExtraTurn.player takeExtraTurn]
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named _) -> Maybe.maybeToList named
   Effect.Ante (Ante.MkAnte player _ _) -> [player]
+  Effect.SetOwner (SetOwner.MkSetOwner player _) -> [player]
+  Effect.ExchangeOwnership {} -> []
+  Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary _ player) -> [player]
   Effect.Shuffle ref -> [ref]
   Effect.OfferCast (OfferCast.MkOfferCast _ caster _ _ _ _ _ _ _) -> [caster]
   Effect.OfferNamedCopy {} -> []
@@ -1521,6 +1534,9 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.TakeExtraTurn takeExtraTurn -> quantitySlots (TakeExtraTurn.count takeExtraTurn)
   Effect.ShuffleIntoLibrary {} -> Map.empty
   Effect.Ante {} -> Map.empty
+  Effect.SetOwner {} -> Map.empty
+  Effect.ExchangeOwnership {} -> Map.empty
+  Effect.ExchangeWithTopOfLibrary {} -> Map.empty
   -- The arm above's library read, reported at the head; nothing is shuffled into
   -- it, so there is no ref beside it either.
   Effect.Shuffle {} -> Map.empty
@@ -2232,6 +2248,9 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.TakeExtraTurn takeExtraTurn -> Quantity.slotsAreExhaustive (TakeExtraTurn.count takeExtraTurn)
   Effect.ShuffleIntoLibrary {} -> True
   Effect.Ante {} -> True
+  Effect.SetOwner {} -> True
+  Effect.ExchangeOwnership {} -> True
+  Effect.ExchangeWithTopOfLibrary {} -> True
   Effect.Shuffle {} -> True
   Effect.OfferCast {} -> True
   Effect.OfferNamedCopy {} -> True
@@ -2481,6 +2500,9 @@ readsX =
         Effect.TakeExtraTurn takeExtraTurn -> Quantity.readsX (TakeExtraTurn.count takeExtraTurn)
         Effect.ShuffleIntoLibrary {} -> False
         Effect.Ante {} -> False
+        Effect.SetOwner {} -> False
+        Effect.ExchangeOwnership {} -> False
+        Effect.ExchangeWithTopOfLibrary {} -> False
         Effect.Shuffle {} -> False
         Effect.OfferCast offer -> any Quantity.readsX (repetitionQuantities (OfferCast.repetition offer))
         Effect.OfferNamedCopy {} -> False
@@ -2506,6 +2528,9 @@ boundSlots effect = case effect of
   Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ _ mSlot _ _ _) -> foldMap Set.singleton mSlot
   -- MoveToZone's reason: the anted incarnations (CR 400.7).
   Effect.Ante (Ante.MkAnte _ _ mSlot) -> foldMap Set.singleton mSlot
+  Effect.SetOwner {} -> Set.empty
+  Effect.ExchangeOwnership {} -> Set.empty
+  Effect.ExchangeWithTopOfLibrary {} -> Set.empty
   -- The tokens this Create minted, for CR 603.7c's delayed trigger to name.
   Effect.Create (Create.MkCreate _ _ _ mSlot _) -> foldMap Set.singleton mSlot
   -- Create's reason: the conjured cards, for CR 603.7c.
@@ -2830,9 +2855,9 @@ playerRefPlayers legal controller gs ref =
           Nothing -> []
         -- CR 108.3: the OWNER of the object the slot names, ControllerOfBound's
         -- arm one word over -- The Deck of Many Things' 20 band, "its owner
-        -- loses the game", read off the reanimated creature's slot. An owner
-        -- never moves (CR 110.2), but the object CR 400.7 replaced still has to
-        -- answer, so this takes the same CR 608.2h last-known road.
+        -- loses the game", read off the reanimated creature's slot. No
+        -- projection moves an owner (CR 110.2), but the object CR 400.7 replaced
+        -- still has to answer, so this takes the same CR 608.2h last-known road.
         PlayerRef.OwnerOfBound slot -> case legalOne slot legal of
           Just recipient -> case Recipient.objectOf recipient of
             Just oid -> Maybe.maybeToList (Projection.ownerWithLastKnown oid gs)
@@ -2991,6 +3016,9 @@ objectRefObjects legal resolving controller source gs ref = case ref of
           | otherwise = maybe Set.empty LastKnown.attached (Projection.lastKnownOf host gs)
         attached = foldMap attachedTo hosts
      in filter (`Set.member` attached) (battlefieldMatching legal resolving controller source gs filter_)
+  -- CR 400.7's link read back: each object the slot holds, followed through
+  -- this turn's logged zone changes to the object it is now.
+  ObjectRef.FromAnywhere slot -> Maybe.mapMaybe (\oid -> Game.currentIncarnation oid gs) (objectRefObjects legal resolving controller source gs (ObjectRef.InSlot slot))
   -- EachMatching's sweep with CR 109.2's battlefield default switched off by the
   -- card's own words (CR 109.2a), over CR 400.1's per-player zone. Whose
   -- graveyards is zoneScopePlayers below -- either the perspective's own
@@ -3656,6 +3684,7 @@ poolSlot pool = case pool of
     ZoneScope.ControllerOfBound slot -> oneSlot slot
     ZoneScope.BoundPlayer _ -> Map.empty
   Pool.CardsInExile -> Map.empty
+  Pool.CardsInAnte -> Map.empty
   -- The graveyard half's scope; the battlefield half names no slot.
   Pool.CreaturesAndCardsInGraveyard scope -> case scope of
     ZoneScope.Scoped _ -> Map.empty

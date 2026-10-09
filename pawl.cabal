@@ -603,10 +603,12 @@ library codec
     Pawl.Codec.ExchangeBlocksSpec
     Pawl.Codec.ExchangedValue
     Pawl.Codec.ExchangedValueSpec
+    Pawl.Codec.ExchangeOwnership
     Pawl.Codec.ExchangeSides
     Pawl.Codec.ExchangeSidesSpec
     Pawl.Codec.ExchangeValues
     Pawl.Codec.ExchangeValuesSpec
+    Pawl.Codec.ExchangeWithTopOfLibrary
     Pawl.Codec.ExchangeZones
     Pawl.Codec.ExchangeZonesSpec
     Pawl.Codec.ExileCardsFromGraveyard
@@ -1169,6 +1171,7 @@ library codec
     Pawl.Codec.SetClassLevelSpec
     Pawl.Codec.SetHalfLocked
     Pawl.Codec.SetHalfLockedSpec
+    Pawl.Codec.SetOwner
     Pawl.Codec.SetPowerToughness
     Pawl.Codec.SetPowerToughnessSpec
     Pawl.Codec.ShuffleIntoLibrary
@@ -2247,8 +2250,10 @@ library types
     Pawl.Types.ExcessDestination
     Pawl.Types.ExchangeBlocks
     Pawl.Types.ExchangedValue
+    Pawl.Types.ExchangeOwnership
     Pawl.Types.ExchangeSides
     Pawl.Types.ExchangeValues
+    Pawl.Types.ExchangeWithTopOfLibrary
     Pawl.Types.ExchangeZones
     Pawl.Types.ExileCardsFromGraveyard
     Pawl.Types.ExileHaunting
@@ -2572,6 +2577,7 @@ library types
     Pawl.Types.SetBasePowerToughness
     Pawl.Types.SetClassLevel
     Pawl.Types.SetHalfLocked
+    Pawl.Types.SetOwner
     Pawl.Types.SetPowerToughness
     Pawl.Types.ShuffleIntoLibrary
     Pawl.Types.Sickness

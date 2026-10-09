@@ -217,6 +217,9 @@ historyReaders =
     (["SpellsCastBefore"], via Game.castOf),
     (["EnteredFrom"], via Game.enteredBattlefieldChange),
     (["WasCastFrom"], via Game.enteredBattlefieldChange),
+    -- ObjectRef.FromAnywhere (Game.currentIncarnation), which follows a card
+    -- through the move log.
+    (["FromAnywhere"], via Game.movedChange),
     -- Pawl.Engine.Cost.candidateCostsGiven's surge, spectacle, prowl,
     -- freerunning and mayhem clauses, and
     -- Pawl.Engine.PlayerEffect.mayPlayByMayhem.

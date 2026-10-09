@@ -57,7 +57,8 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           LastKnown.protector = Just (PlayerId.MkPlayerId 7),
           LastKnown.paidCosts = Map.singleton (Keyword.Offspring (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [])) 1,
           LastKnown.controlClock = Map.singleton (PlayerId.MkPlayerId 1) ControlClock.SinceLastUpkeep,
-          LastKnown.zone = Zone.Battlefield
+          LastKnown.zone = Zone.Battlefield,
+          LastKnown.pile = Just (PlayerId.MkPlayerId 6)
         }
       ( " {\"characteristics\":"
           <> ProjectedCharacteristicsSpec.testCharacteristicsJson
@@ -69,7 +70,7 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           <> ",\"chosenNames\":[\"Goblin Piker\"],\"chosenPlayer\":3,\"chosenColors\":[{\"type\":\"Green\"}],\"chosenSubtype\":{\"type\":\"Goblin\"},\"attacking\":false,\"attackTarget\":null,\"blocking\":true,\"protector\":7"
           <> ",\"paidCosts\":[{\"key\":{\"type\":\"Offspring\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}},\"value\":1}]"
           <> ",\"controlClock\":[{\"player\":1,\"clock\":{\"type\":\"SinceLastUpkeep\"}}]"
-          <> ",\"zone\":{\"type\":\"Battlefield\"}} "
+          <> ",\"zone\":{\"type\":\"Battlefield\"},\"pile\":6} "
       )
   -- CR 109.3: neither an attachment nor a chosen name is a characteristic, and
   -- most objects have neither, so the absent case is written out rather than left
@@ -96,7 +97,8 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           LastKnown.protector = Nothing,
           LastKnown.paidCosts = Map.empty,
           LastKnown.controlClock = Map.empty,
-          LastKnown.zone = Zone.Stack
+          LastKnown.zone = Zone.Stack,
+          LastKnown.pile = Nothing
         }
       ( " {\"characteristics\":"
           <> minimalJson

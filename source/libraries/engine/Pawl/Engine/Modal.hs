@@ -299,6 +299,7 @@ instancePool rename pool = case pool of
   Pool.SpellsAndPermanents -> pool
   Pool.PlayersAndPlaneswalkers -> pool
   Pool.CardsInExile -> pool
+  Pool.CardsInAnte -> pool
 
 -- CR 109.5's Scoped arm and a baked BoundPlayer name no slot and are untouched;
 -- InSlot's is the printed name `rename` rewrites.

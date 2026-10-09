@@ -43,6 +43,7 @@ codec = Fields.object $ do
   paidCosts <- Fields.defaulted "paidCosts" Map.empty (Common.multiset Keyword.codec) LastKnown.paidCosts
   controlClock <- Fields.defaulted "controlClock" Map.empty (Common.keyedList ControlClock.entry) LastKnown.controlClock
   zone <- Fields.required "zone" Zone.codec LastKnown.zone
+  pile <- Fields.defaulted "pile" Nothing (Common.maybe PlayerId.codec) LastKnown.pile
   pure
     LastKnown.MkLastKnown
       { LastKnown.characteristics = characteristics,
@@ -62,5 +63,6 @@ codec = Fields.object $ do
         LastKnown.protector = protector,
         LastKnown.paidCosts = paidCosts,
         LastKnown.controlClock = controlClock,
-        LastKnown.zone = zone
+        LastKnown.zone = zone,
+        LastKnown.pile = pile
       }

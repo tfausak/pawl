@@ -24,6 +24,7 @@ codec =
       -- Nullary: CR 400.1's shared zones have no per-player copy for a payload
       -- to select among.
       Arm.nullary "CardsInExile" Pool.CardsInExile,
+      Arm.nullary "CardsInAnte" Pool.CardsInAnte,
       Arm.payload "CreaturesAndCardsInGraveyard" ZoneScope.codec Pool.CreaturesAndCardsInGraveyard (\x -> case x of Pool.CreaturesAndCardsInGraveyard y -> Just y; _ -> Nothing)
     ]
 
@@ -39,4 +40,5 @@ tagOf x = case x of
   Pool.PlayersAndPlaneswalkers {} -> "PlayersAndPlaneswalkers"
   Pool.CardsInGraveyard {} -> "CardsInGraveyard"
   Pool.CardsInExile {} -> "CardsInExile"
+  Pool.CardsInAnte {} -> "CardsInAnte"
   Pool.CreaturesAndCardsInGraveyard {} -> "CreaturesAndCardsInGraveyard"

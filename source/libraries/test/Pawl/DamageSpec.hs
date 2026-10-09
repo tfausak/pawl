@@ -772,7 +772,9 @@ lastKnownRiderSpec s registry =
                     LastKnown.paidCosts = Map.empty,
                     -- CR 702.30a: nothing here asks about an echo window.
                     LastKnown.controlClock = Map.empty,
-                    LastKnown.zone = Zone.Battlefield
+                    LastKnown.zone = Zone.Battlefield,
+                    -- CR 400.1: on the battlefield, so in no player's pile.
+                    LastKnown.pile = Nothing
                   }
               humbled = S.withHumility humility equipped
               planted =

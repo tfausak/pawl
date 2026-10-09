@@ -65,6 +65,9 @@
               },
               "to": {
                 "type": "Hand"
+              },
+              "whose": {
+                "type": "You"
               }
             }
           },

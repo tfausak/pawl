@@ -280,7 +280,7 @@ objectsLeaveWith pid gs =
       owned = Map.keys (Map.filter (\obj -> Object.owner obj == pid && Object.zone obj /= Zone.Ante) (GameState.objects gs))
       leave :: GameState -> ObjectId -> GameState
       leave g oid =
-        let g1 = Game.removeFromZones pid oid g
+        let g1 = Game.removeFromZones oid g
             combat = Game.recordDefending oid (GameState.combat g1)
          in g1
               { GameState.objects = Map.delete oid (GameState.objects g1),
@@ -354,6 +354,9 @@ objectsLeaveWith pid gs =
                 -- this is the last moment it exists.
                 (Object.controlClock obj)
                 (Object.zone obj)
+                -- CR 400.1: the pile it left, read off the board it left, as the
+                -- rest of this record is.
+                (Game.pileHolderOf oid gs)
             )
       -- CR 603.6c's second trigger event: "when a phased-in permanent leaves the
       -- game because its owner leaves the game". Only those, which is CR 702.26k
@@ -549,18 +552,21 @@ givesControlOnEntryTo pid active =
 --
 --   1. CR 110.2's DEFAULT controller (Projection.defaultControllerOf):
 --      Object.enteredUnder where a rule recorded one, otherwise CR 108.4a's
---      Object.owner. Object.owner is baked at creation and never mutated, and
---      the first clause deleted every object `pid` owned. Object.enteredUnder is
---      written by three writers and no others (see Pawl.Types.Object):
---      Event.changeZoneAttaching for the effect that put a permanent onto the
---      battlefield (CR 110.2a), Pawl.Engine.Replacement's entry loop for a CR
---      616.1b rewrite of that, and Event.changeZoneCasting for the caster of a
---      spell (CR 405.4). Only the third writes a stack object, and what it
---      writes is a CARD being cast -- which `notACard` excludes -- so no object
---      this clause reaches can carry one. A battlefield permanent can
---      (Meandering Towershell returned under a thief who then leaves; Gather
---      Specimens' victim), and so can a spell cast off another player's card,
---      which is what clause 4 is for.
+--      Object.owner. Only CR 407.3's ante cards change Object.owner, and none
+--      names an object on the stack, so the first clause deleted every object
+--      `pid` owned. Object.enteredUnder is written by four writers and no
+--      others (see Pawl.Types.Object): Event.changeZoneAttaching for the effect
+--      that put a permanent onto the battlefield (CR 110.2a),
+--      Pawl.Engine.Replacement's entry loop for a CR 616.1b rewrite of that,
+--      Event.changeZoneCasting for the caster of a spell (CR 405.4), and
+--      Game.setOwner, which pins a permanent's default controller before an
+--      ante card changes its owner (CR 110.2). Only the third writes a stack
+--      object, and what it writes is a CARD being cast -- which `notACard`
+--      excludes -- so no object this clause reaches can carry one. A
+--      battlefield permanent can (Meandering Towershell returned under a thief
+--      who then leaves; Gather Specimens' victim; an artifact Timmerian Fiends
+--      gave away), and so can a spell cast off another player's card, which is
+--      what clause 4 is for.
 --   2. a stored layer-2 SetController, whose PlayerId is BAKED at resolution
 --      (CR 611.2c). The second clause deleted every stored effect whose payload
 --      is `pid`, whichever object it affects.
@@ -610,8 +616,8 @@ nonCardStackObjectsCease pid gs =
       theirs oid = Projection.controllerOf oid gs == Just pid && notACard oid
       cease g oid = case Game.lookupObject oid g of
         Nothing -> g
-        Just obj ->
-          let g1 = Game.removeFromZones (Object.owner obj) oid g
+        Just _ ->
+          let g1 = Game.removeFromZones oid g
            in g1 {GameState.objects = Map.delete oid (GameState.objects g1)}
    in List.foldl' cease gs (filter theirs (GameState.stack gs))
 

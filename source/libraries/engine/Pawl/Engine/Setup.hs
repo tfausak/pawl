@@ -532,7 +532,7 @@ createInCommandZone pid printingId = do
   oid <- createCard pid printingId
   State.modify' $ \gs ->
     let moved =
-          Game.insertIntoZone Zone.Command LibraryPosition.defaultValue pid oid (Game.removeFromZones pid oid gs)
+          Game.insertIntoZone Zone.Command LibraryPosition.defaultValue pid oid (Game.removeFromZones oid gs)
      in moved
           { GameState.objects =
               Map.adjust (\o -> o {Object.zone = Zone.Command}) oid (GameState.objects moved)
@@ -545,7 +545,7 @@ createInAttractionDeck :: PlayerId -> PrintingId.PrintingId -> Game ()
 createInAttractionDeck pid printingId = do
   oid <- createCard pid printingId
   State.modify' $ \gs ->
-    let moved = Game.removeFromZones pid oid gs
+    let moved = Game.removeFromZones oid gs
      in moved
           { GameState.objects = Map.adjust (\o -> o {Object.zone = Zone.Command}) oid (GameState.objects moved),
             GameState.attractionDecks = Map.insertWith (flip (Seq.><)) pid (Seq.singleton oid) (GameState.attractionDecks moved)
@@ -557,7 +557,7 @@ createInPlanarDeck :: PlayerId -> PrintingId.PrintingId -> Game ()
 createInPlanarDeck pid printingId = do
   oid <- createCard pid printingId
   State.modify' $ \gs ->
-    let moved = Game.removeFromZones pid oid gs
+    let moved = Game.removeFromZones oid gs
      in moved
           { GameState.objects = Map.adjust (\o -> o {Object.zone = Zone.Command}) oid (GameState.objects moved),
             GameState.planarDecks = Map.insertWith (flip (Seq.><)) pid (Seq.singleton oid) (GameState.planarDecks moved)
@@ -569,7 +569,7 @@ createInSchemeDeck :: PlayerId -> PrintingId.PrintingId -> Game ()
 createInSchemeDeck pid printingId = do
   oid <- createCard pid printingId
   State.modify' $ \gs ->
-    let moved = Game.removeFromZones pid oid gs
+    let moved = Game.removeFromZones oid gs
      in moved
           { GameState.objects = Map.adjust (\o -> o {Object.zone = Zone.Command}) oid (GameState.objects moved),
             GameState.schemeDecks = Map.insertWith (flip (Seq.><)) pid (Seq.singleton oid) (GameState.schemeDecks moved)
@@ -1466,8 +1466,8 @@ applyCrossings finalSub parent =
         -- no id crosses twice -- Event.bringInFrom drops the entry it
         -- spent, so a second wish cannot reach the same card.
         Nothing -> g
-        Just obj ->
-          let g1 = Game.removeFromZones (Object.owner obj) oid g
+        Just _ ->
+          let g1 = Game.removeFromZones oid g
               combat = GameState.combat g1
            in g1
                 { GameState.objects = Map.delete oid (GameState.objects g1),
@@ -1526,6 +1526,8 @@ applyCrossings finalSub parent =
                 -- this is the last moment it exists.
                 (Object.controlClock obj)
                 (Object.zone obj)
+                -- CR 400.1: the pile it left, `filed`'s board as above.
+                (Game.pileHolderOf oid g)
             )
       -- One crossing: file, delete, then record. The event LAST, so that
       -- Event.recordEvent's CR 603.10 sample is of the board immediately after
@@ -1641,10 +1643,13 @@ applyCrossings finalSub parent =
 -- never resurrect what objectsLeaveWith deleted. It stays correctly False for a
 -- player who merely decks out in a subgame that never reaches multiplayer:
 -- objectsLeaveWith never fires there, so their cards are still in `finalSub`
--- and `returned` has them. Owner is invariant across a card's life, so an
--- absent owner also implies this `oid` is missing -- no separate id check is
--- needed. CR 800.4n's ante cards are the exception, which is why both
--- `ownersPresentInSub` and `returned` skip them.
+-- and `returned` has them. An owner moves only by CR 407.3's ownership
+-- changers, so outside them an absent owner implies this `oid` is missing -- no
+-- separate id check is needed. CR 800.4n's ante cards are the exception, which
+-- is why both `ownersPresentInSub` and `returned` skip them.
+--
+-- Not implemented: a card whose owner changed inside the subgame, which the
+-- departed former owner's rebuilt library takes back as well (#4835).
 funnelBack :: GameState -> GameState -> GameState
 funnelBack finalSub parent =
   let -- CR 729.5 / CR 712.21, the same split startGameFromCards performs, in a

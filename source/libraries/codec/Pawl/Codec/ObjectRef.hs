@@ -87,7 +87,8 @@ codec =
           Arm.payload "AnyNumberMatching" AnyNumberMatching.codec ObjectRef.AnyNumberMatching (\x -> case x of ObjectRef.AnyNumberMatching y -> Just y; _ -> Nothing),
           Arm.payload "ChosenPermanent" ChosenPermanent.codec ObjectRef.ChosenPermanent (\x -> case x of ObjectRef.ChosenPermanent y -> Just y; _ -> Nothing),
           Arm.payload "SourceAndChosenPermanent" filterCodec ObjectRef.SourceAndChosenPermanent (\x -> case x of ObjectRef.SourceAndChosenPermanent y -> Just y; _ -> Nothing),
-          Arm.payload "AttachedToBound" AttachedToBound.codec ObjectRef.AttachedToBound (\x -> case x of ObjectRef.AttachedToBound y -> Just y; _ -> Nothing)
+          Arm.payload "AttachedToBound" AttachedToBound.codec ObjectRef.AttachedToBound (\x -> case x of ObjectRef.AttachedToBound y -> Just y; _ -> Nothing),
+          Arm.payload "FromAnywhere" SlotName.codec ObjectRef.FromAnywhere (\x -> case x of ObjectRef.FromAnywhere y -> Just y; _ -> Nothing)
         ]
 
 tagOf :: ObjectRef.ObjectRef -> String
@@ -123,3 +124,4 @@ tagOf x = case x of
   ObjectRef.ChosenPermanent {} -> "ChosenPermanent"
   ObjectRef.SourceAndChosenPermanent {} -> "SourceAndChosenPermanent"
   ObjectRef.AttachedToBound {} -> "AttachedToBound"
+  ObjectRef.FromAnywhere {} -> "FromAnywhere"

@@ -38,13 +38,16 @@ import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Zone as Zone
 
 data Object = MkObject
-  { owner :: PlayerId.PlayerId,
+  { -- | CR 108.3: who owns it. Written at construction and by CR 407.3's
+    -- ownership changers, through Game.setOwner alone.
+    owner :: PlayerId.PlayerId,
     -- | The player this incarnation arrived under the control of, by DEFAULT --
     -- the base a CR 613.1b layer-2 effect then overrides, written for the two
     -- arrivals CR 109.4 gives a controller: CR 110.2's battlefield entry and CR
     -- 405.4 / 601.2a's cast, which fixes a spell's controller as the card is put
     -- onto the stack (#83). Nothing is CR 108.4a's fallback to the owner, which
-    -- covers a token, a land played from hand and an ability (CR 113.8).
+    -- covers a token, a land played from hand and an ability (CR 113.8);
+    -- Game.setOwner pins it before an ownership change, so control stays put.
     --
     -- NOT a control-changing EFFECT: CR 800.4c distinguishes an effect that gives
     -- a player control of an object from the player who controlled it by default,
