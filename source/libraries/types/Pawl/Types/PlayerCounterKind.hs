@@ -2,8 +2,8 @@ module Pawl.Types.PlayerCounterKind where
 
 -- | CR 122.1: a marker on an object OR a player. Player counters are a DISJOINT
 -- domain from object CounterKind -- object-only kinds are CR 122.1a-e,g-h,
--- player-only ones CR 122.1f,i and CR 107.14 -- so this is its own type, keeping
--- "a +1/+1 counter on a player" unrepresentable.
+-- player-only ones CR 122.1f,i, CR 107.14 and CR 107.17 -- so this is its own
+-- type, keeping "a +1/+1 counter on a player" unrepresentable.
 --
 -- Like CounterKind and Keyword this is a CLASSIFICATION, not an effect identity:
 -- the rules core reads counts by kind (CR 704.5c, CR 107.14) and never cases on

@@ -1352,8 +1352,9 @@ asksFor asks ref = case asks of
     ObjectRef.ChosenCardInHand {} -> True
     _ -> False
   -- One arm and one only, for AsksTransformGather's reason: Resolve's
-  -- Effect.Pair and Effect.ModifyTarget arms route ObjectRef.ChosenPermanent
-  -- through chosenPermanentOf and read every other arm off the pure sweep.
+  -- Effect.Pair, Effect.ModifyTarget and Effect.PutSticker arms route
+  -- ObjectRef.ChosenPermanent through chosenPermanentOf and read every other arm
+  -- off the pure sweep.
   AsksChosenPermanent -> case ref of
     ObjectRef.ChosenPermanent {} -> True
     _ -> False
