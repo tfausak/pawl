@@ -1985,6 +1985,7 @@ modificationNames asking onAbility x = case x of
   Modification.ChangeSubtypeWord _changeSubtypeWord -> False
   Modification.ExchangeTextBoxes -> False
   Modification.AddNamesMatching filter_ -> filterNames asking filter_
+  Modification.SetName _cardName -> False
   Modification.InsertNameWords _nameInsertion -> False
   Modification.HasFullText fullText -> fullTextNames asking onAbility fullText
   Modification.SetController _playerId -> False

@@ -180,6 +180,7 @@ layer m = case m of
   -- green, since nothing else in this unit reads the layer directly.
   Modification.ExchangeTextBoxes -> Layer.Text
   Modification.AddNamesMatching _ -> Layer.Text
+  Modification.SetName _ -> Layer.Text
   Modification.InsertNameWords _ -> Layer.Text
   Modification.HasFullText _ -> Layer.Text
   Modification.SetController _ -> Layer.Control
@@ -629,6 +630,8 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
           let matching = Map.keysSet (Map.filter (\face -> Filter.matches context (viewOfCard face) f) (Game.referenceFaces gs))
               referenced = Map.findWithDefault Set.empty f (GameState.referenceNames gs)
            in pc {PC.names = Set.unions [matching, referenced, PC.names pc]}
+        -- CR 612.8: the object loses its names and has only this one.
+        Modification.SetName named -> pc {PC.names = Set.singleton named}
         -- CR 123.6b-c / 612.9: the sticker's word after the first @k@ words of
         -- each name the fold has reached (#N2), or the name of an object with
         -- none.
@@ -754,6 +757,7 @@ cardTypesAfter m types = case m of
   -- CR 612.1 / 612.5: the text box moves and the type line does not.
   Modification.ExchangeTextBoxes -> types
   Modification.AddNamesMatching _ -> types
+  Modification.SetName _ -> types
   Modification.InsertNameWords _ -> types
   -- CR 612.6 does write the type line, but off a card this function cannot
   -- see; nothing else in the one producer's effect grants a subtype.
@@ -1478,6 +1482,7 @@ freezeQuantities gs announcedOn source context m =
         Modification.ExchangeTextBoxes -> Just m
         -- The filter is judged against card faces, not quantities.
         Modification.AddNamesMatching _ -> Just m
+        Modification.SetName _ -> Just m
         Modification.InsertNameWords _ -> Just m
         -- The extra text's own quantities are its own, GainAbility's reason.
         Modification.HasFullText _ -> Just m
@@ -1532,6 +1537,7 @@ quantitiesOf m = case m of
   Modification.SwitchPowerToughness -> []
   Modification.ExchangeTextBoxes -> []
   Modification.AddNamesMatching _ -> []
+  Modification.SetName _ -> []
   Modification.InsertNameWords _ -> []
   Modification.HasFullText _ -> []
   Modification.AssignCombatDamageWithToughness -> []
@@ -1545,6 +1551,7 @@ quantitiesOf m = case m of
 referenceQuery :: Modification.Modification ability -> Maybe (Filter.Type.Filter Keyword)
 referenceQuery m = case m of
   Modification.AddNamesMatching f -> Just f
+  Modification.SetName _ -> Nothing
   Modification.InsertNameWords _ -> Nothing
   Modification.HasFullText _ -> Nothing
   Modification.SetBasePowerToughness _ -> Nothing
@@ -1648,6 +1655,7 @@ setsLandSubtype m = case m of
   Modification.SwitchPowerToughness -> False
   Modification.ExchangeTextBoxes -> False
   Modification.AddNamesMatching _ -> False
+  Modification.SetName _ -> False
   Modification.InsertNameWords _ -> False
   Modification.HasFullText _ -> False
   Modification.AssignCombatDamageWithToughness -> False
@@ -2864,6 +2872,7 @@ removesAbilities m = case m of
   -- at layer 3, so CR 613.1f's strip is not what it is.
   Modification.ExchangeTextBoxes -> False
   Modification.AddNamesMatching _ -> False
+  Modification.SetName _ -> False
   Modification.InsertNameWords _ -> False
   -- FALSE, ExchangeTextBoxes' posture: the abilities a static ability
   -- generates are gathered off the copiable values, which CR 612.6 leaves
@@ -4017,6 +4026,7 @@ modificationWrites m = case m of
   -- Writes PC.names, which no Aspect covers: dependency is within a layer (CR
   -- 613.8a), and no layer-3 effect's affected set reads a name.
   Modification.AddNamesMatching _ -> Set.empty
+  Modification.SetName _ -> Set.empty
   Modification.InsertNameWords _ -> Set.empty
   -- CR 612.6 writes the whole card: its type line, colour, keywords and
   -- power. Not Controller, which is layer 2's.
@@ -4095,6 +4105,7 @@ modificationReads m = case m of
   Modification.ExchangeTextBoxes -> Set.singleton Keywords
   -- Its filter is put to card faces outside the fold, never to this object.
   Modification.AddNamesMatching _ -> Set.empty
+  Modification.SetName _ -> Set.empty
   Modification.InsertNameWords _ -> Set.empty
   -- Reads a graveyard card's copiable values, never this object.
   Modification.HasFullText _ -> Set.empty
@@ -5886,6 +5897,7 @@ grantsKeywordWhere p m = case m of
   -- be answered here.
   Modification.ExchangeTextBoxes -> False
   Modification.AddNamesMatching _ -> False
+  Modification.SetName _ -> False
   Modification.InsertNameWords _ -> False
   -- CR 612.6 copies whatever keywords the top card prints, ExchangeTextBoxes'
   -- answer; its extra text is whole abilities, never a keyword.
@@ -5963,6 +5975,7 @@ grantsMintingType m = case m of
   -- CR 612.1: the exchange leaves the type line alone.
   Modification.ExchangeTextBoxes -> False
   Modification.AddNamesMatching _ -> False
+  Modification.SetName _ -> False
   Modification.InsertNameWords _ -> False
   -- Writes whatever type line the top card prints, which this function cannot
   -- see; True, since a wrong True costs only a projection. It is also what
@@ -6058,6 +6071,7 @@ grantsAbilityWhere p m = case m of
   Modification.SwitchPowerToughness -> False
   Modification.ExchangeTextBoxes -> False
   Modification.AddNamesMatching _ -> False
+  Modification.SetName _ -> False
   Modification.InsertNameWords _ -> False
   -- The extra text is the one quoted ability this arm hands out.
   Modification.HasFullText ft -> any (\g -> p g || grantedStaticWrites (grantsAbilityWhere p) g) (FullText.alsoHas ft)

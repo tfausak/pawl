@@ -3,6 +3,7 @@ module Pawl.Types.Modification where
 import qualified Data.Set as Set
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
@@ -389,6 +390,8 @@ data Modification ability
   | -- | layer 3, CR 613.1c / 612.6: this object has the full text of the top
     -- card of a graveyard (Volrath's Shapeshifter).
     HasFullText (FullText.FullText ability)
+  | -- | layer 3, CR 612.8: this object has only this name (Witness Protection).
+    SetName CardName.CardName
   | -- | layer 3, CR 123.6 / 612.9: a name sticker's word in this object's
     -- names. Engine-minted (Pawl.Engine.Projection.stickerGathered); no card
     -- authors it.

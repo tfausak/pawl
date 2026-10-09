@@ -3,6 +3,7 @@ module Pawl.Codec.Modification where
 import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.AbilityName as AbilityName
 import qualified Pawl.Codec.ActivationRestriction as ActivationRestriction
+import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.CastingPermission as CastingPermission
 import qualified Pawl.Codec.ChangeSubtypeWord as ChangeSubtypeWord
@@ -74,6 +75,7 @@ codec abilityCodec =
           Arm.nullary "ExchangeTextBoxes" Modification.ExchangeTextBoxes,
           Arm.payload "AddNamesMatching" (Filter.codec Keyword.codec) Modification.AddNamesMatching (\x -> case x of Modification.AddNamesMatching y -> Just y; _ -> Nothing),
           Arm.payload "HasFullText" (FullText.codec abilityCodec) Modification.HasFullText (\x -> case x of Modification.HasFullText y -> Just y; _ -> Nothing),
+          Arm.payload "SetName" CardName.codec Modification.SetName (\x -> case x of Modification.SetName y -> Just y; _ -> Nothing),
           Arm.payload "InsertNameWords" NameInsertion.codec Modification.InsertNameWords (\x -> case x of Modification.InsertNameWords y -> Just y; _ -> Nothing),
           Arm.nullary "SwitchPowerToughness" Modification.SwitchPowerToughness,
           Arm.nullary "AssignCombatDamageWithToughness" Modification.AssignCombatDamageWithToughness,
@@ -120,6 +122,7 @@ tagOf x = case x of
   Modification.ExchangeTextBoxes {} -> "ExchangeTextBoxes"
   Modification.AddNamesMatching {} -> "AddNamesMatching"
   Modification.HasFullText {} -> "HasFullText"
+  Modification.SetName {} -> "SetName"
   Modification.InsertNameWords {} -> "InsertNameWords"
   Modification.SwitchPowerToughness {} -> "SwitchPowerToughness"
   Modification.AssignCombatDamageWithToughness {} -> "AssignCombatDamageWithToughness"

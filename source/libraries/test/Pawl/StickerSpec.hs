@@ -486,3 +486,31 @@ spec s registry = Spec.describe s "Sticker" $ do
     Spec.assertBool s (Set.member (Text.pack "Goblin Otter Piker") shown) "CR 612.7 the Piker's name, with the word after its first"
     Spec.assertBool s (Set.member (Text.pack "Grizzly Otter Bears") shown) "and its own, Grizzly Otter Bears"
     Spec.assertBool s (Set.notMember (Text.pack "Goblin Piker") shown) "and no name without the word"
+  -- Review Focus 1, two boards differing in the order of one Aura and one
+  -- sticker: CR 613.7 orders the two layer-3 effects by timestamp.
+  Spec.it s "CR 123.6c/613.7 a later Witness Protection hides the word, and a sticker placed after it shows" $ do
+    sheets <- committedSheets
+    bears <- S.printingOf s registry "Grizzly Bears"
+    protection <- S.printingOf s registry "Witness Protection"
+    let (bearsId, g1) = S.addPermanent bears S.alice (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))
+        (laterAura, g2) = S.addPermanent protection S.alice (Sticker.put S.alice bearsId otter (Just 1) g1)
+        hidden = S.attach laterAura bearsId g2
+        (earlierAura, g3) = S.addPermanent protection S.alice g1
+        shown = Sticker.put S.alice bearsId otter (Just 1) (S.attach earlierAura bearsId g3)
+    Spec.assertEqWith s "CR 612.8/123.6c Witness Protection, later, leaves only Legitimate Businessperson" (nameTexts bearsId hidden) [Text.pack "Legitimate Businessperson"]
+    Spec.assertEqWith s "CR 613.7 a sticker placed after it reads Legitimate Otter Businessperson" (nameTexts bearsId shown) [Text.pack "Legitimate Otter Businessperson"]
+  -- Review Focus 1's copy half, CR 123.6c's second example: Mirrorweave makes
+  -- every other creature a copy of bob's Seeker.
+  Spec.it s "CR 123.6c It That Betrays Otter, as a copy of Seeker of the Way, is Seeker of the Otter Way" $ do
+    sheets <- committedSheets
+    betrays <- S.printingOf s registry "It That Betrays"
+    seeker <- S.printingOf s registry "Seeker of the Way"
+    mirrorweave <- S.printingOf s registry "Mirrorweave"
+    plains <- S.printingOf s registry "Plains"
+    let (betraysId, g1) = S.addPermanent betrays S.alice (mainPhaseForAlice (S.landsFor plains S.alice 4 (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))))
+        (seekerId, g2) = S.addPermanent seeker S.bob g1
+        stickered = Sticker.put S.alice betraysId otter (Just 3) g2
+        (weaveId, g3) = S.addHandCard mirrorweave S.alice stickered
+        copied = S.runPure (namingTarget seekerId) g3 (S.cast S.alice weaveId >> Stack.resolveTop)
+    Spec.assertEqWith s "CR 123.6c as a copy of Seeker of the Way it is Seeker of the Otter Way" (nameTexts betraysId copied) [Text.pack "Seeker of the Otter Way"]
+    Spec.assertEqWith s "before, It That Betrays Otter" (nameTexts betraysId stickered) [Text.pack "It That Betrays Otter"]

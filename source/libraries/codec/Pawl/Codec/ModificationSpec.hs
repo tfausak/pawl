@@ -13,6 +13,7 @@ import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.Activator as Activator
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
@@ -315,6 +316,12 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       " {\"type\":\"AddNamesMatching\",\"value\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"Not\",\"value\":{\"type\":\"HasSupertype\",\"value\":{\"type\":\"Legendary\"}}}]}} "
   -- layer 3, CR 612.6: Volrath's Shapeshifter's "full text of that card",
   -- here with no text of its own beside it.
+  Spec.it s "SetName carries the name" $
+    Common.assertCodec
+      s
+      codec
+      (Modification.SetName (CardName.MkCardName (Text.pack "Legitimate Businessperson")))
+      " {\"type\":\"SetName\",\"value\":\"Legitimate Businessperson\"} "
   Spec.it s "InsertNameWords carries the word and its position" $
     Common.assertCodec
       s
