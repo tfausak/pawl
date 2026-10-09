@@ -1490,7 +1490,8 @@ unearth cost =
           ArmDelayedTrigger.MkArmDelayedTrigger
             { ArmDelayedTrigger.name = unearthExileName,
               ArmDelayedTrigger.onset = Onset.Immediately,
-              ArmDelayedTrigger.duration = Nothing
+              ArmDelayedTrigger.duration = Nothing,
+              ArmDelayedTrigger.ability = Nothing
             }
       redirected =
         Effect.Replace
@@ -1813,7 +1814,8 @@ encore cost =
           ArmDelayedTrigger.MkArmDelayedTrigger
             { ArmDelayedTrigger.name = encoreSacrificeName,
               ArmDelayedTrigger.onset = Onset.Immediately,
-              ArmDelayedTrigger.duration = Nothing
+              ArmDelayedTrigger.duration = Nothing,
+              ArmDelayedTrigger.ability = Nothing
             }
    in ActivatedAbility.MkActivatedAbility
         { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.ExileThisFromGraveyard]},
@@ -5992,7 +5994,8 @@ myriad =
           ArmDelayedTrigger.MkArmDelayedTrigger
             { ArmDelayedTrigger.name = myriadExileName,
               ArmDelayedTrigger.onset = Onset.Immediately,
-              ArmDelayedTrigger.duration = Nothing
+              ArmDelayedTrigger.duration = Nothing,
+              ArmDelayedTrigger.ability = Nothing
             }
       anyToken = atLeastOneMatching (Scope.OverBound myriadTokenSlot) (Filter.And [])
    in TriggeredAbility.MkTriggeredAbility
@@ -6073,7 +6076,8 @@ mobilize n =
           ArmDelayedTrigger.MkArmDelayedTrigger
             { ArmDelayedTrigger.name = mobilizeSacrificeName,
               ArmDelayedTrigger.onset = Onset.Immediately,
-              ArmDelayedTrigger.duration = Nothing
+              ArmDelayedTrigger.duration = Nothing,
+              ArmDelayedTrigger.ability = Nothing
             }
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
@@ -6984,7 +6988,8 @@ decayed =
           ArmDelayedTrigger.MkArmDelayedTrigger
             { ArmDelayedTrigger.name = decayedSacrificeName,
               ArmDelayedTrigger.onset = Onset.Immediately,
-              ArmDelayedTrigger.duration = Nothing
+              ArmDelayedTrigger.duration = Nothing,
+              ArmDelayedTrigger.ability = Nothing
             }
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,

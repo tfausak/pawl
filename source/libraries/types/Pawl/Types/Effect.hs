@@ -537,10 +537,11 @@ data Effect card ability
     -- indefinitely (Switcheroo, Avarice Totem); one controller means the
     -- exchange does nothing.
     ExchangeControl ControlSides.ControlSides
-  | -- | CR 603.7: create the delayed triggered ability this card declares under
-    -- this name (Face.delayedAbilities), capturing the resolving object's
-    -- bindings so CR 603.7c's "it" survives this resolution.
-    ArmDelayedTrigger ArmDelayedTrigger.ArmDelayedTrigger
+  | -- | CR 603.7: create the delayed triggered ability the arm carries, or the
+    -- one this card declares under its name (Face.delayedAbilities), capturing
+    -- the resolving object's bindings so CR 603.7c's "it" survives this
+    -- resolution.
+    ArmDelayedTrigger (ArmDelayedTrigger.ArmDelayedTrigger ability)
   | -- | CR 611.1 / 613.11: install a stored player- or rules-modifying
     -- continuous effect on some players for a duration (Silence, Cease-Fire),
     -- with its controller baked in (CR 109.5).

@@ -214,10 +214,12 @@ data Face card = MkFace
     -- Pawl.Engine.Projection.triggeredAbilitiesOf.
     triggeredAbilities :: [TriggeredAbility.TriggeredAbility card (GrantedAbility.GrantedAbility card)],
     -- | CR 603.7: this face's DELAYED triggered abilities, keyed by name -- the
-    -- payloads an Effect.ArmDelayedTrigger in this face's own text arms. Card
-    -- DATA, not an opcode payload: Effect is first-order and non-recursive
-    -- (design.md section 1), and Effect -> TriggeredAbility -> Modal -> Mode ->
-    -- Effect is a genuine module cycle.
+    -- payloads an Effect.ArmDelayedTrigger in this face's own text arms by name.
+    -- An arm inside a QUOTED ability carries its payload instead
+    -- (Pawl.Types.ArmDelayedTrigger's `ability`, through Effect's ability
+    -- variable, which is how Effect -> TriggeredAbility -> Modal -> Mode ->
+    -- Effect stays out of the module graph), since the object using a
+    -- quotation is not the card that printed it.
     --
     -- Read straight from the card, never through the projection: a delayed
     -- ability is not ON the source object -- CR 603.7d gives it no source

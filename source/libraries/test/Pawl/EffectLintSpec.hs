@@ -28,7 +28,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Pawl.CardSpec (Framing (SourceHostFramed), MintedKind (MintedEmblem), anyFace, cardAuthoredEffects, cardFilters, cardReplacementEffects, cardResolutionEffects, conditionQuantities, copyTargetsRefs, durationConditions, effectFilters, effectMintedFaces, effectWithNested, enchantSlots, faceModals, frame, framedSlotsReadSingly, grantedActivatedAbilities, grantedModifications, grantedTriggeredAbilities, instantLine, mintedFaces, mintedFacesTagged, objectRefFilters, oneFaced, overFaces, replacementEffectRiders, restrictionFilters, spellLine, triggerConditionFilters, triggerConditionSlots, vanillaFace)
+import Pawl.CardSpec (Framing (SourceHostFramed), MintedKind (MintedEmblem), anyFace, cardAuthoredEffects, cardFilters, cardReplacementEffects, cardResolutionEffects, conditionQuantities, copyTargetsRefs, delayedDeclarations, durationConditions, effectFilters, effectMintedFaces, effectWithNested, enchantSlots, faceModals, frame, framedSlotsReadSingly, grantedActivatedAbilities, grantedModifications, grantedTriggeredAbilities, instantLine, mintedFaces, mintedFacesTagged, objectRefFilters, oneFaced, overFaces, replacementEffectRiders, restrictionFilters, spellLine, triggerConditionFilters, triggerConditionSlots, vanillaFace)
 import qualified Pawl.Codec.Card as Card.Codec
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Codec.Face as Face.Codec
@@ -2273,7 +2273,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
                   ]
               )
         clashes effects = clashesIn effects [] []
-        faceClashes card = clashesIn (cardResolutionEffects card) (fmap TriggeredAbility.condition (Map.elems (Face.delayedAbilities card))) (faceClausePlayerRefs card)
+        faceClashes card = clashesIn (cardResolutionEffects card) (fmap TriggeredAbility.condition (delayedDeclarations card)) (faceClausePlayerRefs card)
         offenders = filter (anyFace faceClashes . Printing.card) ps
         binds effect = case effect of
           Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ mSlot _ _ _) -> Maybe.isJust mSlot && not (movesAtMostOne ref)

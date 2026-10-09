@@ -645,9 +645,9 @@ anyNumberMatchingNames :: Asking -> AnyNumberMatching.AnyNumberMatching -> Bool
 anyNumberMatchingNames asking x = case x of
   AnyNumberMatching.MkAnyNumberMatching filter_ atMost -> filterNames asking filter_ || any (quantityNames asking) atMost
 
-armDelayedTriggerNames :: Asking -> ArmDelayedTrigger.ArmDelayedTrigger -> Bool
-armDelayedTriggerNames asking x = case x of
-  ArmDelayedTrigger.MkArmDelayedTrigger _name _onset duration -> any (durationNames asking) duration
+armDelayedTriggerNames :: Asking -> (ability -> Bool) -> ArmDelayedTrigger.ArmDelayedTrigger ability -> Bool
+armDelayedTriggerNames asking onAbility x = case x of
+  ArmDelayedTrigger.MkArmDelayedTrigger _name _onset duration ability -> any (durationNames asking) duration || any onAbility ability
 
 asCopyNames :: Asking -> (ability -> Bool) -> (effect -> Bool) -> AsCopy.AsCopy ability effect -> Bool
 asCopyNames asking onAbility onEffect x = case x of
@@ -1313,7 +1313,7 @@ effectNames asking onCard onAbility x = case x of
   Effect.GainControl durationRef -> durationRefNames asking durationRef
   Effect.GiveControl giveControl -> giveControlNames asking giveControl
   Effect.ExchangeControl controlSides -> controlSidesNames asking controlSides
-  Effect.ArmDelayedTrigger armDelayedTrigger -> armDelayedTriggerNames asking armDelayedTrigger
+  Effect.ArmDelayedTrigger armDelayedTrigger -> armDelayedTriggerNames asking onAbility armDelayedTrigger
   Effect.AffectPlayers affectPlayers -> affectPlayersNames asking affectPlayers
   Effect.RequireBlock requireBlock -> requireBlockNames asking requireBlock
   Effect.CantBeRegenerated cantBeRegenerated -> cantBeRegeneratedNames asking cantBeRegenerated

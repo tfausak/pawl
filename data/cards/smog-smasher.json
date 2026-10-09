@@ -1,45 +1,6 @@
 {
   "faces": [
     {
-      "delayedAbilities": {
-        "sacrifice them": {
-          "condition": {
-            "type": "StepBegins",
-            "value": {
-              "phase": {
-                "type": "Ending",
-                "value": {
-                  "type": "EndStep"
-                }
-              },
-              "scope": {
-                "type": "EachTurn"
-              }
-            }
-          },
-          "modal": {
-            "modes": [
-              {
-                "clauses": [
-                  {
-                    "effects": [
-                      {
-                        "type": "Sacrifice",
-                        "value": {
-                          "ref": {
-                            "type": "InSlot",
-                            "value": "them"
-                          }
-                        }
-                      }
-                    ]
-                  }
-                ]
-              }
-            ]
-          }
-        }
-      },
       "keywords": [
         {
           "type": "Menace"
@@ -157,6 +118,46 @@
                               {
                                 "type": "ArmDelayedTrigger",
                                 "value": {
+                                  "ability": {
+                                    "type": "Triggered",
+                                    "value": {
+                                      "condition": {
+                                        "type": "StepBegins",
+                                        "value": {
+                                          "phase": {
+                                            "type": "Ending",
+                                            "value": {
+                                              "type": "EndStep"
+                                            }
+                                          },
+                                          "scope": {
+                                            "type": "EachTurn"
+                                          }
+                                        }
+                                      },
+                                      "modal": {
+                                        "modes": [
+                                          {
+                                            "clauses": [
+                                              {
+                                                "effects": [
+                                                  {
+                                                    "type": "Sacrifice",
+                                                    "value": {
+                                                      "ref": {
+                                                        "type": "InSlot",
+                                                        "value": "them"
+                                                      }
+                                                    }
+                                                  }
+                                                ]
+                                              }
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  },
                                   "name": "sacrifice them"
                                 }
                               }

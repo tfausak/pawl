@@ -1946,7 +1946,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
           ArmDelayedTrigger.MkArmDelayedTrigger
             { ArmDelayedTrigger.name = sacrificeIt,
               ArmDelayedTrigger.onset = Onset.Immediately,
-              ArmDelayedTrigger.duration = Nothing
+              ArmDelayedTrigger.duration = Nothing,
+              ArmDelayedTrigger.ability = Nothing
             }
       )
       " {\"type\":\"ArmDelayedTrigger\",\"value\":{\"name\":\"sacrifice it\"}} "
@@ -1958,7 +1959,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
           ArmDelayedTrigger.MkArmDelayedTrigger
             { ArmDelayedTrigger.name = eachCombat,
               ArmDelayedTrigger.onset = Onset.Immediately,
-              ArmDelayedTrigger.duration = Just Duration.UntilEndOfTurn
+              ArmDelayedTrigger.duration = Just Duration.UntilEndOfTurn,
+              ArmDelayedTrigger.ability = Nothing
             }
       )
       " {\"type\":\"ArmDelayedTrigger\",\"value\":{\"name\":\"each combat\",\"duration\":{\"type\":\"UntilEndOfTurn\"}}} "
@@ -1970,7 +1972,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
           ArmDelayedTrigger.MkArmDelayedTrigger
             { ArmDelayedTrigger.name = returnIt,
               ArmDelayedTrigger.onset = Onset.FromYourNextTurn,
-              ArmDelayedTrigger.duration = Nothing
+              ArmDelayedTrigger.duration = Nothing,
+              ArmDelayedTrigger.ability = Nothing
             }
       )
       " {\"type\":\"ArmDelayedTrigger\",\"value\":{\"name\":\"return it\",\"onset\":{\"type\":\"FromYourNextTurn\"}}} "
@@ -1982,7 +1985,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
           ArmDelayedTrigger.MkArmDelayedTrigger
             { ArmDelayedTrigger.name = returnIt,
               ArmDelayedTrigger.onset = Onset.FromYourNextTurn,
-              ArmDelayedTrigger.duration = Just Duration.UntilEndOfTurn
+              ArmDelayedTrigger.duration = Just Duration.UntilEndOfTurn,
+              ArmDelayedTrigger.ability = Nothing
             }
       )
       " {\"type\":\"ArmDelayedTrigger\",\"value\":{\"name\":\"return it\",\"onset\":{\"type\":\"FromYourNextTurn\"},\"duration\":{\"type\":\"UntilEndOfTurn\"}}} "
