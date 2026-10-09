@@ -142,34 +142,11 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
       -- own stated answer there.
       playersOf ref = case ref of
         PlayerRef.Candidate -> fmap pure (mView >>= Filter.playerIdentity)
-        -- CR 608.2h reaches Count.playersFor's arm through the view passed here --
-        -- Spikeshell Harrier reads the speed of the player who controlled the
-        -- permanent its own earlier clause has already bounced, and a last-known
-        -- aware view is what still names them.
-        PlayerRef.ControllerOfBound _ -> Count.playersFor viewOf context gs ref
-        -- CR 108.3's owner, the arm above's route: Count.playersFor reads the
-        -- slot's owner off the same injected view.
-        PlayerRef.OwnerOfBound _ -> Count.playersFor viewOf context gs ref
-        -- The two arms above, baked, by the same route.
-        PlayerRef.ControllerOfObject _ -> Count.playersFor viewOf context gs ref
-        PlayerRef.OwnerOfObject _ -> Count.playersFor viewOf context gs ref
-        -- The arm above's route: Count.playersFor reads the slot the same way.
-        PlayerRef.ChosenPlayerOfBound _ -> Count.playersFor viewOf context gs ref
-        PlayerRef.EachPlayerExcept _ -> Count.playersFor viewOf context gs ref
-        PlayerRef.EachOpponentExcept _ -> Count.playersFor viewOf context gs ref
-        PlayerRef.Relative _ -> Count.playersFor viewOf context gs ref
-        PlayerRef.InSlot _ -> Count.playersFor viewOf context gs ref
-        -- InSlot's plural, answered there too: off the resolution's own slots, or
-        -- the source's bindings where the position supplies none.
-        PlayerRef.EachInSlot _ -> Count.playersFor viewOf context gs ref
-        PlayerRef.Specific _ -> Count.playersFor viewOf context gs ref
-        -- CR 508.6's set, folded there off the live combat record. The scalar arms
-        -- above still decline it, and not for want of an answer: each takes
-        -- `Just [pid]` and no more (see the LifeTotal arm), so a reference naming a
-        -- table's worth of players leaves them unanswered. Where it DOES read is a
-        -- scope's fold -- Synthetic Toll of the Siege's "for each player attacking
-        -- them" (Pawl.CountSpec).
-        PlayerRef.Attacking _ -> Count.playersFor viewOf context gs ref
+        -- Every other arm is Pawl.Engine.Players.named's, through the view
+        -- passed here -- CR 608.2h reaches a controller arm that way: Spikeshell
+        -- Harrier reads the speed of the player who controlled the permanent its
+        -- own earlier clause has already bounced.
+        _ -> Count.playersFor viewOf context gs ref
 
       -- Every entry onto the battlefield this log records for one id. A list and not
       -- a Maybe: CR 400.7 makes each arrival a new object, so at most one entry can

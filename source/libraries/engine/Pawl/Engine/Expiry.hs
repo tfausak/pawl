@@ -210,13 +210,18 @@ arm targets controller source duration gs = case duration of
 -- owner" is asked of a card already in exile, which CR 108.4 leaves with no
 -- controller, and CR 108.4a then answers with the owner.
 --
+-- Not cut to the controller's range: a window names a turn and affects nobody,
+-- which is what CR 801.10 cuts.
+--
 -- Candidate names nobody here: it is the member a per-player fold has reached,
 -- and the one fold that states such a window substitutes the member as Specific
 -- before arming (perSeat).
 seatOf :: Map.Map SlotName (Set.Set Recipient) -> PlayerId -> GameState -> PlayerRef.PlayerRef -> Maybe PlayerId
-seatOf targets controller gs ref = case Players.named (Players.resolution (`Projection.controllerWithLastKnown` gs) (`Projection.ownerWithLastKnown` gs) targets controller) gs ref of
-  Just [pid] -> Just pid
-  _ -> Nothing
+seatOf targets controller gs ref =
+  let given = Players.resolution (`Projection.controllerWithLastKnown` gs) (`Projection.ownerWithLastKnown` gs) targets controller gs
+   in case Players.named given {Players.reaches = const True} gs ref of
+        Just [pid] -> Just pid
+        _ -> Nothing
 
 -- CR 611.2a: "each opponent can't cast instant or sorcery spells during THAT
 -- PLAYER's next turn" (Sphinx's Decree) -- a window whose seat is the member a

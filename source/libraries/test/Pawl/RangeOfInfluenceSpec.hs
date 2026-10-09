@@ -15,7 +15,7 @@
 -- redirectDestination (CR 801.13), Pawl.Engine.Resolve.Slots'
 -- playerRefPlayers, zoneScopePlayers and battlefieldMatching,
 -- Pawl.Engine.Resolve.Effect's objectRefRecipients, Pawl.Engine.Count's
--- playersFor and the choice offers Game.reachableBy, Game.opponentsInReach and
+-- playersFor and the choice offers Pawl.Engine.Players.offer and
 -- Game.inRangeOf feed (CR 801.5a, 801.10, 801.11), and
 -- Pawl.Engine.Resolve.Effect's WinGame and DrawGame (CR 801.14,
 -- 801.15), and Pawl.Engine.Engine's checkMandatoryLoop (CR 801.16); and CR
@@ -34,6 +34,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
@@ -46,6 +47,7 @@ import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
+import Pawl.PreventionSpec (theAbility)
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -61,6 +63,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
+import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -439,6 +442,47 @@ spec s registry = Spec.describe s "Range of influence" $ do
            in (offered (S.withRange 1 board), offered board)
     Spec.assertEqWith s "CR 801.5a at range 1 tribute does not offer carol, and does at an unlimited range" (offeredFor snake forest 5) ([[S.bob, S.dave]], [[S.bob, S.carol, S.dave]])
     Spec.assertEqWith s "CR 801.5a at range 1 Null Chamber does not offer carol, and does at an unlimited range" (offeredFor chamber plains 4) ([[S.bob, S.dave]], [[S.bob, S.carol, S.dave]])
+
+  -- CR 801.5a for CR 303.4f's entry choice: alice's Replenish returns
+  -- Archnemesis ("Enchant opponent") and Pacifism ("Enchant creature") to the
+  -- battlefield, with a Goblin Piker under each of bob, carol and dave.
+  Spec.it s "CR 801.5a an Aura put onto the battlefield is offered only hosts within its chooser's range" $ do
+    plains <- S.printingOf s registry "Plains"
+    replenish <- S.printingOf s registry "Replenish"
+    archnemesis <- S.printingOf s registry "Archnemesis"
+    pacifism <- S.printingOf s registry "Pacifism"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (bobs, g0) = S.addPermanent piker S.bob (S.landsFor plains S.alice 4 S.fourPlayerGame)
+        (carols, g1) = S.addPermanent piker S.carol g0
+        (daves, g2) = S.addPermanent piker S.dave g1
+        (_, g3) = S.addGraveyardCard archnemesis S.alice g2
+        (_, g4) = S.addGraveyardCard pacifism S.alice g3
+        (spellId, board) = S.addHandCard replenish S.alice g4
+        recording :: Prompt.Prompt r -> State.State ([[PlayerId.PlayerId]], [[ObjectId.ObjectId]]) r
+        recording p = case p of
+          Prompt.ChooseOpponent _ _ _ offer -> State.modify' (\(ps, os) -> (ps <> [NonEmpty.toList offer], os)) >> pure (NonEmpty.head offer)
+          Prompt.ChooseAttachment _ _ _ offer -> State.modify' (\(ps, os) -> (ps, os <> [NonEmpty.toList offer])) >> pure (NonEmpty.head offer)
+          _ -> pure (S.identityAnswer p)
+        offered gs = State.execState (Engine.runGame recording (S.runPure S.identityAnswer (onMain gs) (S.cast S.alice spellId)) Engine.priorityLoop) ([], [])
+    Spec.assertEqWith s "CR 801.5a at range 1 Archnemesis is not offered carol" (fst (offered (S.withRange 1 board))) [[S.bob, S.dave]]
+    Spec.assertEqWith s "CR 801.5a at range 1 Pacifism is not offered carol's Piker" (snd (offered (S.withRange 1 board))) [[bobs, daves]]
+    Spec.assertEqWith s "at an unlimited range both offers hold carol" (offered board) ([[S.bob, S.carol, S.dave]], [[bobs, carols, daves]])
+
+  -- CR 801.10 for a chosen player: alice's Stuffy Doll chose erin, beside her
+  -- at five seats, and bob now controls it. Bob's {T} has the Doll deal 1 to
+  -- itself, and its trigger -- bob's -- would deal 1 to erin, two seats from bob.
+  Spec.it s "CR 801.10 a chosen player outside the controller's range is dealt no damage" $ do
+    doll <- S.printingOf s registry "Stuffy Doll"
+    let (dollId, g0) = S.addPermanent doll S.alice (Setup.emptyGame (S.alice NonEmpty.:| [S.bob, S.carol, S.dave, erin]))
+        chosen = g0 {GameState.objects = Map.adjust (\o -> o {Object.chosenPlayer = Just erin}) dollId (GameState.objects g0)}
+        stolen = S.giveControl dollId S.bob chosen
+        tapped gs =
+          let activated = S.runPure S.identityAnswer gs (Activate.activateAbility S.bob dollId (theAbility doll))
+           in resolveAll (snd (Engine.runGamePure S.identityAnswer activated Engine.settleForPriority))
+    Spec.assertBool s (Game.inRangeOf S.alice erin (S.withRange 1 stolen) && not (Game.inRangeOf S.bob erin (S.withRange 1 stolen))) "erin is in alice's range and outside bob's"
+    Spec.assertEqWith s "CR 801.10 at range 1 erin stays at 20" (S.lifeOf erin (tapped (S.withRange 1 stolen))) (Just 20)
+    Spec.assertEqWith s "and the Doll was dealt its 1" (fmap Object.damage (Game.lookupObject dollId (tapped (S.withRange 1 stolen)))) (Just 1)
+    Spec.assertEqWith s "at an unlimited range erin takes 1" (S.lifeOf erin (tapped stolen)) (Just 19)
 
   -- CR 104.2b / 801.14: alice's Felidar Sovereign ("At the beginning of your
   -- upkeep, if you have 40 or more life, you win the game.") at 40 life. At range

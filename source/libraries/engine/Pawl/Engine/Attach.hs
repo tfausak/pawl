@@ -35,6 +35,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
+import qualified Pawl.Engine.Players as Players
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.SourceContext as SourceContext
@@ -293,20 +294,28 @@ hostsFor context subject filter_ gs = hostsAmong (Set.toList (GameState.battlefi
 -- every player still in the game, CR 702.5d's enchant-player Aura (Curse of
 -- Death's Hold). Filter.CanHostSubject and attachmentFor are the whole test, so
 -- the Aura's own enchant ability decides which of them it may enchant.
+--
+-- CR 801.5a: the context's perspective is the chooser, and a player or object
+-- outside their range is not offered -- Players.table for the players, and
+-- Projection.objectInRangeGiven, CR 801.2d's controller, for the objects.
+-- Pawl.RangeOfInfluenceSpec's "CR 801.5a an Aura put onto the battlefield is
+-- offered only hosts within its chooser's range" proves both.
 entryHostsFor :: Filter.Context -> ObjectId -> GameState -> [Recipient]
 entryHostsFor context subject gs =
-  let graveyards = concatMap (\pid -> Game.zoneMembers Zone.Graveyard pid gs) (Game.stillPlaying gs)
-      objects = hostsAmong (Set.toList (GameState.battlefield gs) <> graveyards) context subject Filter.Type.CanHostSubject gs
-      players = filter (\pid -> Maybe.isJust (attachmentFor subject (Recipient.ToPlayer pid) gs)) (Game.stillPlaying gs)
+  let chooser = Filter.perspective context
+      grants = Projection.controlGrants gs
+      inReach oid = maybe True (\you -> Projection.objectInRangeGiven grants you oid gs) chooser
+      graveyards = concatMap (\pid -> Game.zoneMembers Zone.Graveyard pid gs) (Game.stillPlaying gs)
+      objects = filter inReach (hostsAmong (Set.toList (GameState.battlefield gs) <> graveyards) context subject Filter.Type.CanHostSubject gs)
+      players = filter (\pid -> Maybe.isJust (attachmentFor subject (Recipient.ToPlayer pid) gs)) (Players.table chooser gs)
    in fmap Recipient.ToObject objects <> fmap Recipient.ToPlayer players
 
 -- CR 303.4f's choice over entryHostsFor's offer, made by `chooser`, the player
 -- the Aura enters under.
 --
 -- Objects go to chooseHost's Prompt.ChooseAttachment, players to
--- Prompt.ChoosePlayer, or Prompt.ChooseOpponent when the offer leaves the
--- chooser out (Archnemesis' "enchant opponent") -- Target.chooserOf's posture.
--- Elided at one candidate and filtered, not trusted, as chooseHost is.
+-- Players.chooseOne, which asks Prompt.ChooseOpponent when the offer leaves the
+-- chooser out (Archnemesis' "enchant opponent").
 --
 -- An offer holding both is answered from the objects. CR 702.5d bars a
 -- player-enchanting Aura from every permanent, and no printed enchant ability
@@ -315,18 +324,7 @@ entryHostsFor context subject gs =
 chooseEntryHost :: PlayerId -> ObjectId -> [Recipient] -> Game (Maybe Recipient)
 chooseEntryHost chooser subject candidates =
   case (Maybe.mapMaybe Recipient.objectOf candidates, Maybe.mapMaybe Recipient.playerOf candidates) of
-    ([], first : rest) -> case rest of
-      [] -> pure (Just (Recipient.ToPlayer first))
-      second : more -> do
-        gs <- State.get
-        let offered = first NonEmpty.:| (second : more)
-            decider = Decide.deciderFor chooser gs
-            question =
-              if List.elem chooser (NonEmpty.toList offered)
-                then Prompt.ChoosePlayer decider chooser subject offered
-                else Prompt.ChooseOpponent decider chooser subject offered
-        answer <- Game.choose question
-        pure (Just (Recipient.ToPlayer (if List.elem answer (NonEmpty.toList offered) then answer else first)))
+    ([], players) -> fmap (fmap Recipient.ToPlayer) (Players.chooseOne chooser subject players)
     (objects, _) -> fmap (fmap Recipient.ToObject) (chooseHost chooser subject objects)
 
 -- hostsFor over the candidates the caller names.

@@ -2791,7 +2791,13 @@ legalMany slot legal = Set.toList (Map.findWithDefault Set.empty slot legal)
 -- 608.2b). In PlayerId order; a caller with an ordering rule imposes it.
 playerRefPlayers :: Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> PlayerRef -> [PlayerId]
 playerRefPlayers legal controller gs =
-  Maybe.fromMaybe [] . Players.named (Players.resolution (`Projection.controllerWithLastKnown` gs) (`Projection.ownerWithLastKnown` gs) legal controller) gs
+  Maybe.fromMaybe [] . Players.named (resolutionReads legal controller gs) gs
+
+-- What a resolution reads (Players.resolution), off CR 608.2h's last known
+-- controller and owner.
+resolutionReads :: Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> Players.Reads
+resolutionReads legal controller gs =
+  Players.resolution (`Projection.controllerWithLastKnown` gs) (`Projection.ownerWithLastKnown` gs) legal controller gs
 
 -- CR 109.2's battlefield, narrowed by an effect-borne Filter and sorted into CR
 -- 608.2f's APNAP order. ObjectRef.EachMatching's whole answer, and the

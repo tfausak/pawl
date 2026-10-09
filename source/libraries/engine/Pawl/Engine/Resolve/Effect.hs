@@ -65,6 +65,7 @@ import qualified Pawl.Engine.MoveDuration as MoveDuration
 import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.Planechase as Planechase
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
+import qualified Pawl.Engine.Players as Players
 import qualified Pawl.Engine.Plot as Plot
 import qualified Pawl.Engine.Populate as Populate
 import qualified Pawl.Engine.Prepare as Prepare
@@ -74,7 +75,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Recruit as Recruit
 import qualified Pawl.Engine.Replacement as Replacement
-import Pawl.Engine.Resolve.Slots (battlefieldMatching, boundSlots, conditionSlots, effectContext, effectObjectRefs, effectPlayerRefs, effectSlotObjects, effectViewOf, graveyardCardsOf, handCardsOf, legalMany, legalOne, libraryCardsOf, matchingFromAmong, objectRefObjects, overRelations, playerRefPlayers, replacementRowSlots, slotBindings, slotGroup, zoneScopePlayers)
+import Pawl.Engine.Resolve.Slots (battlefieldMatching, boundSlots, conditionSlots, effectContext, effectObjectRefs, effectPlayerRefs, effectSlotObjects, effectViewOf, graveyardCardsOf, handCardsOf, legalMany, legalOne, libraryCardsOf, matchingFromAmong, objectRefObjects, overRelations, playerRefPlayers, replacementRowSlots, resolutionReads, slotBindings, slotGroup, zoneScopePlayers)
 import qualified Pawl.Engine.Restamp as Restamp
 import qualified Pawl.Engine.Ring as Ring
 import qualified Pawl.Engine.Room as Room
@@ -660,11 +661,9 @@ oneSeat legal controller gs ref = case playerRefPlayers legal controller gs ref 
 -- to the whole table where no opponent is left. "Another" needs no exclusion of
 -- its own, Game.stillPlaying having already dropped the seat that left.
 --
--- Pawl.Engine.Target's chooserOf is the same question over CR 601.2c's
--- announcement, and its posture is the one followed here: elided at one
--- candidate, Prompt.ChooseOpponent where the offer cannot hold the controller
--- and Prompt.ChoosePlayer where it can, and an answer naming somebody never
--- offered filtered back to the first.
+-- The ask is Pawl.Engine.Players.chooseOne, every "choose a player" site's.
+-- The chooser reference is read WITHOUT Players.resolution's CR 801.10 cut, so
+-- a departed chooser is still named here and replaced.
 --
 -- CR 800.4f is the same situation for a COST and the opposite answer -- the cost
 -- is not paid, and nobody is asked in the departed player's place -- which is
@@ -703,28 +702,17 @@ chosenPermanentOf legal resolving controller source filter_ chooser = do
 askedChooser :: ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> PlayerRef -> Game (Maybe PlayerId)
 askedChooser source controller legal ref = do
   gs <- State.get
-  case playerRefPlayers legal controller gs ref of
+  case Maybe.fromMaybe [] (Players.named (resolutionReads legal controller gs) {Players.reaches = const True} gs ref) of
     [named]
       | List.elem named (Game.stillPlaying gs) -> pure (Just named)
       | otherwise ->
           let -- CR 801.5a: a player the controller chooses is one in range.
-              opponents = Game.opponentsInReach controller gs
+              opponents = Players.offer controller gs PlayerRelation.Opponent
               candidates =
                 if Game.areOpponents gs controller named && not (List.null opponents)
                   then opponents
-                  else Game.reachableBy controller gs
-           in case candidates of
-                [] -> pure Nothing
-                [sole] -> pure (Just sole)
-                first : second : rest -> do
-                  let offered = first NonEmpty.:| (second : rest)
-                      decider = Decide.deciderFor controller gs
-                      question =
-                        if List.elem controller (NonEmpty.toList offered)
-                          then Prompt.ChoosePlayer decider controller source offered
-                          else Prompt.ChooseOpponent decider controller source offered
-                  answer <- Game.choose question
-                  pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
+                  else Players.offer controller gs PlayerRelation.AnyPlayer
+           in Players.chooseOne controller source candidates
     _ -> pure Nothing
 
 -- CR 701.3a for several movers going to one destination together. CR 613.7m:
@@ -1096,12 +1084,14 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.EachPlayer -> fmap Recipient.ToPlayer (apnapPlayersOf (PlayerRef.Relative PlayerRelation.AnyPlayer) legal controller gs)
   ObjectRef.EachOpponent -> fmap Recipient.ToPlayer (apnapPlayersOf (PlayerRef.Relative PlayerRelation.Opponent) legal controller gs)
   -- CR 120.3a, one seat wide: the player the SOURCE chose as it entered (CR
-  -- 614.12a). Read off `source` (CR 113.7a), not `resolving`, which for a
-  -- triggered ability is the ability object and never carries the choice.
-  -- A source that has left answers through CR 608.2h's last known
-  -- information; one that never chose names nobody, which CR 101.3 ignores.
-  ObjectRef.ChosenPlayer ->
-    Maybe.maybeToList (fmap Recipient.ToPlayer (Game.chosenPlayerWithLastKnown source gs))
+  -- 614.12a), the printed noun for PlayerRef.ChosenPlayerOfBound over the
+  -- source's own slot (CR 113.7a) -- not `resolving`, which for a triggered
+  -- ability is the ability object and never carries the choice. So CR 608.2h's
+  -- last known information answers for a source that has left, and CR 801.10
+  -- cuts a chosen player outside the controller's range: Pawl.RangeOfInfluenceSpec's
+  -- "CR 801.10 a chosen player outside the controller's range is dealt no
+  -- damage" proves it.
+  ObjectRef.ChosenPlayer -> fmap Recipient.ToPlayer (apnapPlayersOf (PlayerRef.ChosenPlayerOfBound Binding.triggerSource) legal controller gs)
   -- CR 120.3a, at whatever width the reference has: the seats a PlayerRef names,
   -- which for Deflecting Palm's ControllerOfBound is CR 108.4's controller of the
   -- object a slot holds, read through CR 608.2h's last known information.
@@ -4467,36 +4457,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   --
   -- WHICH players are offered is the payload's PlayerScope, read through
   -- PlayerEffect.playersInScope against CR 109.5's "you" -- the resolving
-  -- controller -- so this arm classifies the choice and never names a card. That
-  -- fold is over Game.stillPlaying, so a seat that has left (CR 104.3a) is not
-  -- offered, and it is cut to the controller's range (CR 801.5a); CR 102.2
-  -- leaves "an opponent" nothing to decide at two seats, where "a player" there
-  -- has two candidates and must be asked. An answer naming
-  -- somebody never offered falls back to the first candidate, since the
-  -- instruction is mandatory. Nobody in scope binds nothing, so the following
-  -- sentence names no player and does nothing (CR 101.3).
-  --
-  -- The PROMPT is picked by whether the offer contains the chooser, which is
-  -- what separates Prompt.ChooseOpponent (whose haddock claims it never offers
-  -- them) from Prompt.ChoosePlayer -- a property of the candidate set rather
-  -- than of the scope's name, so no arm of PlayerScope can drift out of step
-  -- with it.
+  -- controller -- so this arm classifies the choice and never names a card: the
+  -- players still in the game within the controller's range (CR 102.1, 801.5a).
+  -- CR 102.2 leaves "an opponent" nothing to decide at two seats, where "a
+  -- player" there has two candidates and must be asked. The ask is
+  -- Players.chooseOne. Nobody in scope binds nothing, so the following sentence
+  -- names no player and does nothing (CR 101.3).
   Effect.ChoosePlayer choice -> do
     gs <- State.get
     let slot = ChoosePlayer.slot choice
-        candidates = filter (\pid -> Game.inRangeOf controller pid gs) (Maybe.fromMaybe [] (PlayerEffect.playersInScope (Just controller) gs (ChoosePlayer.scope choice)))
-    chosenPlayer <- case candidates of
-      [] -> pure Nothing
-      [sole] -> pure (Just sole)
-      first : second : rest -> do
-        let offered = first NonEmpty.:| (second : rest)
-            decider = Decide.deciderFor controller gs
-            question =
-              if List.elem controller (NonEmpty.toList offered)
-                then Prompt.ChoosePlayer decider controller source offered
-                else Prompt.ChooseOpponent decider controller source offered
-        answer <- Game.choose question
-        pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
+    chosenPlayer <- Players.chooseOne controller source (Maybe.fromMaybe [] (PlayerEffect.playersInScope (Just controller) gs (ChoosePlayer.scope choice)))
     Monad.forM_ chosenPlayer $ \pid -> State.modify' (bindPlayerSlot resolving slot (Set.singleton pid))
   -- ChoosePlayer's twin with the decision replaced by randomness (Ruhan of the
   -- Fomori's "choose an opponent at random", Strax, Sontaran Nurse's "choose a
@@ -4507,7 +4477,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   --
   -- WHICH players are offered is the payload's PlayerScope, read through the
   -- same PlayerEffect.playersInScope the deciding twin above reads, against CR
-  -- 109.5's "you" and cut to their range (CR 801.10) -- so the offer can hold
+  -- 109.5's "you" -- so the offer can hold
   -- the resolving controller (PlayerScope.Related AnyPlayer) and this arm still
   -- classifies rather than naming a card. Nobody in scope binds nothing (CR 101.3); CR 102.2 leaves
   -- PlayerScope.Related Opponent nothing to pick at two seats.
@@ -4524,7 +4494,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.ChoosePlayerAtRandom choice -> do
     gs <- State.get
     let slot = ChoosePlayerAtRandom.slot choice
-        candidates = filter (\pid -> Game.inRangeOf controller pid gs) (Maybe.fromMaybe [] (PlayerEffect.playersInScope (Just controller) gs (ChoosePlayerAtRandom.scope choice)))
+        candidates = Maybe.fromMaybe [] (PlayerEffect.playersInScope (Just controller) gs (ChoosePlayerAtRandom.scope choice))
     chosenPlayer <- case candidates of
       [] -> pure Nothing
       [sole] -> pure (Just sole)
@@ -6826,7 +6796,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.WinGame ref -> do
     gs <- State.get
     let winners = filter (`elem` Game.stillPlaying gs) (playerRefPlayers legal controller gs ref)
-        losers = Set.fromList [pid | winner <- winners, pid <- Game.opponentsInReach winner gs]
+        losers = Set.fromList [pid | winner <- winners, pid <- Players.offer winner gs PlayerRelation.Opponent]
     Departure.leaveGameTogether Departure.Type.Lost (filter (`Set.member` losers) (Game.apnapOrder gs))
   -- CR 104.4c with CR 801.15: the game is a draw for the controller and each
   -- player within their range, who leave it; everyone else plays on. Under an
@@ -11786,19 +11756,11 @@ applySurveil (pid, decision) = Monad.forM_ decision $ \(kept, toGraveyard) -> do
 --
 -- TWO choices, both the fatesealer's and in this order: which opponent, then how
 -- to split. The first is elided at one candidate (CR 102.2) and filtered rather
--- than trusted; the library's owner is asked neither. CR 102.1's opponents are
--- Game.stillPlaying's, so a seat that has left (CR 104.3a) is not offered.
+-- than trusted (Players.chooseOne); the library's owner is asked neither.
 fatesealOne :: ObjectId -> Integer -> PlayerId -> Game ()
 fatesealOne source n pid = do
   gs <- State.get
-  let opponents = Game.opponentsInReach pid gs
-  victim <- case opponents of
-    [] -> pure Nothing
-    [sole] -> pure (Just sole)
-    first : second : rest -> do
-      let offered = first NonEmpty.:| (second : rest)
-      answer <- Game.choose (Prompt.ChooseOpponent (Decide.deciderFor pid gs) pid source offered)
-      pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
+  victim <- Players.chooseOne pid source (Players.offer pid gs PlayerRelation.Opponent)
   Monad.forM_ victim $ \owner -> do
     -- Re-read rather than reusing the state the opponent choice was made
     -- against: a prompt is the one place this function yields.
@@ -11842,13 +11804,7 @@ fatesealOne source n pid = do
 clash :: ObjectId -> PlayerId -> Game Natural
 clash source controller = do
   gs <- State.get
-  chosen <- case Game.opponentsInReach controller gs of
-    [] -> pure Nothing
-    [sole] -> pure (Just sole)
-    first : second : rest -> do
-      let offered = first NonEmpty.:| (second : rest)
-      answer <- Game.choose (Prompt.ChooseOpponent (Decide.deciderFor controller gs) controller source offered)
-      pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
+  chosen <- Players.chooseOne controller source (Players.offer controller gs PlayerRelation.Opponent)
   case chosen of
     -- Every other seat has left (CR 104.2a): nobody to clash with, so rule
     -- 701.30b's instruction does nothing and nobody won.
