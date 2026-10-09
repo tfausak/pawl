@@ -5184,14 +5184,19 @@ tollOrderObservable charges = case filter (any orderSensitive . snd) charges of
 -- stopping at the first refusal. payInOrder's shape one level up, and the merge is
 -- that function's for its reason.
 --
--- Each tag makes CR 601.2h's two passes, payComponents' split, but the second is
--- paid here a part at a time, so that a part that moved a card into or out of a
--- library comes back as a stretch CR 733.1 forbids reversing
--- (`unreversibleStretch`): CR 508.1j's "in any order" lets a mill paid for one
--- tag finish before a LATER tag refuses, and the reversal that follows must keep
--- it. The scenario
+-- A part that moved a card into or out of a library comes back as a stretch CR
+-- 733.1 forbids reversing (`unreversibleStretch`): CR 508.1j's "in any order"
+-- lets a mill paid for one tag finish before a LATER tag refuses, and the
+-- reversal that follows must keep it. The scenario
 -- combat-cost/cr-733-1-a-card-milled-to-attack-stays-milled-when-a-later-toll-fails
 -- is the proof.
+--
+-- Not implemented: the payer's order WITHIN a tag. CR 508.1j and CR 509.1f say
+-- only "in any order", but each tag is split by payComponents' two passes
+-- (`paidInSecondPass`), so a mill is always paid after the tag's other parts.
+-- Not implemented either: keeping a reveal from a library standing when its part
+-- moved no card. Such a part falls in a reversed gap, so its Revealed events go
+-- back (#4862).
 payTagged :: PlayerId -> [(ObjectId, [CostComponent.CostComponent Keyword.Type.Keyword])] -> Game (Payment.Payment, [ManaWindow.ManaWindow])
 payTagged pid charges = case charges of
   [] -> pure (bindsNothing, [])
