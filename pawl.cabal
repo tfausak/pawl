@@ -262,6 +262,8 @@ library codec
     Pawl.Codec.Card
     Pawl.Codec.CardArrivedIn
     Pawl.Codec.CardArrivedInSpec
+    Pawl.Codec.CardIdentity
+    Pawl.Codec.CardIdentitySpec
     Pawl.Codec.CardLeavesZone
     Pawl.Codec.CardLeavesZoneSpec
     Pawl.Codec.CardName
@@ -2062,6 +2064,7 @@ library types
     Pawl.Types.CantSearchLibraries
     Pawl.Types.Card
     Pawl.Types.CardArrivedIn
+    Pawl.Types.CardIdentity
     Pawl.Types.CardLeavesZone
     Pawl.Types.CardName
     Pawl.Types.CardPutIntoGraveyard

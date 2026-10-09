@@ -13,11 +13,14 @@ import qualified Data.Set as Set
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Interchangeable as Interchangeable
+import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.CardIdentity as CardIdentity
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.GameSettings as GameSettings
@@ -30,6 +33,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Zone as Zone
 
 anteGame :: GameSettings.GameSettings
@@ -214,3 +218,29 @@ spec s registry = Spec.describe s "Ante" $ do
         zoneNow gs = fmap Object.zone (Game.currentIncarnation start gs >>= \oid -> Game.lookupObject oid gs)
     Spec.assertEqWith s "CR 400.7 it is followed into exile" (zoneNow after) (Just Zone.Exile)
     Spec.assertEqWith s "CR 800.4a and lost once it has left the game" (Game.currentIncarnation start (S.departs Departure.Type.Conceded S.alice after)) Nothing
+  -- CR 108.3: every card a game begins with is one card through every move,
+  -- and the player who began the game with it is its starting owner. Only
+  -- cards carry an identity, and no two share one.
+  Spec.it s "CR 108.3 every card a game starts with carries its own identity" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    let deck = Deck.fromCards (Map.singleton mountain 10)
+        (started, _) = startedWith anteGame ((S.alice, deck) NonEmpty.:| [(S.bob, deck)])
+        cards = filter (\obj -> case Object.source obj of Source.OfCard _ -> True; _ -> False) (Map.elems (GameState.objects started))
+        identities = fmap Object.identity cards
+        serials = fmap (fmap CardIdentity.serial) identities
+    Spec.assertEqWith s "CR 108.3 each card's starting owner is its owner" (fmap (fmap CardIdentity.startingOwner) identities) (fmap (Just . Object.owner) cards)
+    Spec.assertEqWith s "and no two cards share an identity" (Set.size (Set.fromList serials)) 20
+  -- Review Focus 4. A serial is bookkeeping no rule reads, so two Mountains
+  -- alice began the game with stay interchangeable, so a choice between them
+  -- is elided. One bob began the game with does not: the ownership report
+  -- tells it apart.
+  Spec.it s "CR 108.3 two cards differing only in their identity's serial are interchangeable, and not when their starting owners differ" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    let (a, g1) = S.addObjectIn Zone.Hand mountain S.alice (Setup.gameWith anteGame S.bothPlayers)
+        (b, g2) = S.addObjectIn Zone.Hand mountain S.alice g1
+        (c, g3) = S.addObjectIn Zone.Hand mountain S.alice g2
+        bobs obj = obj {Object.identity = fmap (\i -> i {CardIdentity.startingOwner = S.bob}) (Object.identity obj)}
+        g4 = g3 {GameState.objects = Map.adjust bobs c (GameState.objects g3)}
+        alike = Interchangeable.objects (Projection.projectAll g4) g4
+    Spec.assertEqWith s "two Mountains alice began the game with are interchangeable" (alike a b) True
+    Spec.assertEqWith s "one bob began the game with is not" (alike a c) False

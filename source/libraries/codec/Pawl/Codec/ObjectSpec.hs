@@ -10,6 +10,7 @@ import qualified Pawl.Codec.ProjectedCharacteristicsSpec as ProjectedCharacteris
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Binding as Binding
+import qualified Pawl.Types.CardIdentity as CardIdentity
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Color as Color
@@ -64,6 +65,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
       Object.codec
       Object.MkObject
         { Object.owner = PlayerId.MkPlayerId 1,
+          Object.identity = Nothing,
           Object.enteredUnder = Nothing,
           Object.source = Source.OfCard (PrintingId.MkPrintingId 2),
           Object.zone = Zone.Hand,
@@ -128,8 +130,8 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"timestamp\":3} "
       )
   -- Every axis away from the case above, so no two same-typed fields hold the
-  -- same value and a codec swapping a pair of them is caught: the six PlayerId
-  -- axes are six seats, the four Timestamp axes four numbers, and the four
+  -- same value and a codec swapping a pair of them is caught: the seven PlayerId
+  -- axes are seven seats, the four Timestamp axes four numbers, and the four
   -- Set PlayerId axes four different seats.
   --
   -- `counters` carries a kind at ZERO beside one at three. That is a state the
@@ -144,6 +146,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
       Object.codec
       Object.MkObject
         { Object.owner = PlayerId.MkPlayerId 1,
+          Object.identity = Just (CardIdentity.MkCardIdentity 9 (PlayerId.MkPlayerId 7)),
           Object.enteredUnder = Just (PlayerId.MkPlayerId 2),
           Object.source = Source.OfToken (PrintingId.MkPrintingId 3),
           Object.zone = Zone.Battlefield,
@@ -249,7 +252,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.exertedBy = Set.singleton (PlayerId.MkPlayerId 23),
           Object.activatedOnce = Map.singleton ActivatedAbilitySourceSpec.ability 1
         }
-      ( " {\"owner\":1,\"enteredUnder\":2,\"source\":{\"type\":\"OfToken\",\"value\":3}"
+      ( " {\"owner\":1,\"identity\":{\"serial\":9,\"startingOwner\":7},\"enteredUnder\":2,\"source\":{\"type\":\"OfToken\",\"value\":3}"
           <> ",\"zone\":{\"type\":\"Battlefield\"},\"tapped\":{\"type\":\"Tapped\"}"
           <> ",\"facing\":{\"type\":\"FaceDown\",\"value\":{\"reason\":{\"type\":\"Morphed\"},\"listed\":{}}}"
           <> ",\"flipped\":true,\"exiledFaceDown\":true,\"damage\":4"

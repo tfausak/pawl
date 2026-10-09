@@ -1073,6 +1073,7 @@ handAppend printing pid gs =
       obj =
         Object.MkObject
           { Object.owner = pid,
+            Object.identity = Just (Game.mintIdentity oid pid),
             Object.enteredUnder = Nothing,
             Object.source = Source.OfCard printingId,
             Object.zone = Zone.Hand,

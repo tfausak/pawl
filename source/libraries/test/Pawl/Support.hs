@@ -908,6 +908,7 @@ addToken card pid gs =
       obj =
         Object.MkObject
           { Object.owner = pid,
+            Object.identity = Nothing,
             Object.enteredUnder = Nothing,
             Object.source = Source.OfToken cardId,
             Object.zone = Zone.Battlefield,
@@ -983,6 +984,7 @@ addLibraryCard printing pid gs =
       obj =
         Object.MkObject
           { Object.owner = pid,
+            Object.identity = Just (Game.mintIdentity oid pid),
             Object.enteredUnder = Nothing,
             Object.source = Source.OfCard printingId,
             Object.zone = Zone.Library,
@@ -1063,6 +1065,7 @@ addGraveyardCard printing pid gs =
       obj =
         Object.MkObject
           { Object.owner = pid,
+            Object.identity = Just (Game.mintIdentity oid pid),
             Object.enteredUnder = Nothing,
             Object.source = Source.OfCard printingId,
             Object.zone = Zone.Graveyard,
@@ -1147,6 +1150,7 @@ addExiledCard printing pid gs =
       obj =
         Object.MkObject
           { Object.owner = pid,
+            Object.identity = Just (Game.mintIdentity oid pid),
             Object.enteredUnder = Nothing,
             Object.source = Source.OfCard printingId,
             Object.zone = Zone.Exile,
@@ -1236,6 +1240,7 @@ addHandCard printing pid gs =
       obj =
         Object.MkObject
           { Object.owner = pid,
+            Object.identity = Just (Game.mintIdentity oid pid),
             Object.enteredUnder = Nothing,
             Object.source = Source.OfCard printingId,
             Object.zone = Zone.Hand,
@@ -1334,6 +1339,7 @@ landsFor land pid n base =
             obj =
               Object.MkObject
                 { Object.owner = pid,
+                  Object.identity = Just (Game.mintIdentity oid pid),
                   Object.enteredUnder = Nothing,
                   Object.source = Source.OfCard landId,
                   Object.zone = Zone.Battlefield,
@@ -1408,6 +1414,7 @@ handOne printing base =
       obj =
         Object.MkObject
           { Object.owner = alice,
+            Object.identity = Just (Game.mintIdentity oid alice),
             Object.enteredUnder = Nothing,
             Object.source = Source.OfCard printingId,
             Object.zone = Zone.Hand,
@@ -1488,6 +1495,7 @@ pikerInHand land piker n ph =
       obj =
         Object.MkObject
           { Object.owner = alice,
+            Object.identity = Just (Game.mintIdentity oid alice),
             Object.enteredUnder = Nothing,
             Object.source = Source.OfCard pikerId,
             Object.zone = Zone.Hand,
@@ -2054,6 +2062,7 @@ oneMountainState mountain ph =
       obj =
         Object.MkObject
           { Object.owner = alice,
+            Object.identity = Just (Game.mintIdentity oid alice),
             Object.enteredUnder = Nothing,
             Object.source = Source.OfCard printingId,
             Object.zone = Zone.Hand,
@@ -2316,6 +2325,7 @@ spellOnStack printing pid gs =
       obj =
         Object.MkObject
           { Object.owner = pid,
+            Object.identity = Just (Game.mintIdentity oid pid),
             Object.enteredUnder = Nothing,
             Object.source = Source.OfCard printingId,
             Object.zone = Zone.Stack,

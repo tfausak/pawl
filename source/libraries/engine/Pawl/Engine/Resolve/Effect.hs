@@ -1379,6 +1379,8 @@ castableCopy caster original = do
             copy =
               (Object.newIncarnation obj)
                 { Object.source = Source.OfCardCopy printingId,
+                  -- CR 707.12 / 108.2: a copy of a card is no card.
+                  Object.identity = Nothing,
                   Object.owner = caster,
                   Object.zone = zone,
                   Object.timestamp = ts,
@@ -7586,6 +7588,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 copy =
                   obj
                     { Object.source = copySource,
+                      -- CR 707.10: a copy of a spell is no card.
+                      Object.identity = Nothing,
                       -- CR 707.10 puts the copy ONTO THE STACK, so the zone is the
                       -- opcode's own rather than the copied object's -- which the
                       -- guard above has already established was the stack.

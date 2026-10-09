@@ -177,6 +177,7 @@ gameSpec s registry = Spec.describe s "Game" $ do
       ( Just
           Object.MkObject
             { Object.owner = S.alice,
+              Object.identity = Just (Game.mintIdentity (ObjectId.MkObjectId 0) S.alice),
               Object.enteredUnder = Nothing,
               Object.source = Source.OfCard S.oneMountainPrintingId,
               Object.zone = Zone.Battlefield,
@@ -2084,6 +2085,7 @@ handBobBolt lightningBolt gs =
       obj =
         Object.MkObject
           { Object.owner = S.bob,
+            Object.identity = Just (Game.mintIdentity oid S.bob),
             Object.enteredUnder = Nothing,
             Object.source = Source.OfCard printingId,
             Object.zone = Zone.Hand,
@@ -2554,6 +2556,7 @@ restartOnStack mountain =
       abilObj =
         Object.MkObject
           { Object.owner = S.bob,
+            Object.identity = Nothing,
             Object.enteredUnder = Nothing,
             Object.source =
               Source.OfAbility

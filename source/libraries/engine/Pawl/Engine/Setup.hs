@@ -347,15 +347,16 @@ placeCard :: Zone.Zone -> PlayerId -> PrintingId.PrintingId -> GameState -> (Obj
 placeCard zone pid printingId gs =
   let (oid, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
-      obj = blankObject zone pid printingId ts
+      obj = blankObject oid zone pid printingId ts
       withObject = gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2)}
    in (oid, Game.insertIntoZone zone LibraryPosition.Bottom pid oid withObject)
 
 -- | A card's object as it first exists, before anything has happened to it.
-blankObject :: Zone.Zone -> PlayerId -> PrintingId.PrintingId -> Timestamp.Timestamp -> Object.Object
-blankObject zone pid printingId ts =
+blankObject :: ObjectId -> Zone.Zone -> PlayerId -> PrintingId.PrintingId -> Timestamp.Timestamp -> Object.Object
+blankObject oid zone pid printingId ts =
   Object.MkObject
     { Object.owner = pid,
+      Object.identity = Just (Game.mintIdentity oid pid),
       Object.enteredUnder = Nothing,
       Object.source = Source.OfCard printingId,
       Object.zone = zone,

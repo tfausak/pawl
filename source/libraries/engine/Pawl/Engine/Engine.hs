@@ -876,6 +876,7 @@ placeBorne srcId pending = do
       obj =
         Object.MkObject
           { Object.owner = controller,
+            Object.identity = Nothing,
             Object.enteredUnder = Nothing,
             Object.source =
               Source.OfTrigger
