@@ -1,0 +1,42 @@
+{
+  "description": "CR 508.3a Nihiloor drains the owner of each attacker an opponent owns",
+  "note": "alice attacks with bob's Gray Ogre, which she controls, carol's Grizzly Bears, which she also controls, and her own Savannah Lions. Two triggers, one per attacker an opponent owns, and each drains that creature's owner: alice gains 4, bob and carol lose 2 each. Her own Lions trigger nothing. All three attack bob, so carol's loss is her Bears' owner's and no defending player's. Life is read before combat damage.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Nihiloor", "label": "nihiloor" },
+          { "card": "Savannah Lions", "label": "lions", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Gray Ogre", "label": "ogre", "controller": "alice", "ready": true }
+        ]
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          { "card": "Grizzly Bears", "label": "bears", "controller": "alice", "ready": true }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$ogre", "$bears", "$lions"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "$ogre", "do": { "ChooseAttackTarget": "$bob" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "$bears", "do": { "ChooseAttackTarget": "$bob" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "$lions", "do": { "ChooseAttackTarget": "$bob" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTriggers": ["$nihiloor", "$nihiloor"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "View": { "of": "Stack", "is": [] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Life": { "player": "alice", "life": 24 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Life": { "player": "bob", "life": 18 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Life": { "player": "carol", "life": 18 } } }
+  ]
+}
