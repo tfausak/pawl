@@ -408,6 +408,9 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- keeps answerable. Harness the Storm whose spell was countered in
             -- response still knows the name it named.
             --
+            -- Not implemented: CR 608.2b's last sentence blanking a departed
+            -- sibling TARGET's name here, as slotAmount's bound below does (#4865).
+            --
             -- A THUNK, like the two above: one projection per bound object, paid
             -- for only by a filter that names the atom.
             Filter.slotNames = fmap (foldMap (foldMap (foldMap Filter.names . Projection.viewWithLastKnownAnywhere gs) . Recipient.objectOf)) targets,
@@ -417,6 +420,10 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- reader is what keeps a bound target that has since left the
             -- battlefield answerable rather than silently changing the sibling
             -- slot's legality at CR 608.2b.
+            --
+            -- Not implemented: CR 608.2b's last sentence blanking a departed
+            -- sibling TARGET's controller here, as slotAmount's bound below does
+            -- (#4865).
             --
             -- A KEY PER BOUND SLOT and no more, which is the distinction that
             -- atom's vacuous direction rests on: `fmap` leaves a slot the
