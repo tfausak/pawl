@@ -1,0 +1,50 @@
+{
+  "description": "CR 702.16i / 702.16e damage from an opponent's spell to the protected player is prevented, and from her own spell it is not",
+  "note": "alice controls Absolute Virtue. Her own Acidic Soil deals her 3, one per land, since the protection is from her opponents alone. bob's Acidic Soil on his turn deals her none, while bob and carol each take one per land they control.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Absolute Virtue", "label": "virtue" },
+          { "card": "Mountain", "label": "a1", "ready": true },
+          { "card": "Mountain", "label": "a2", "ready": true },
+          { "card": "Mountain", "label": "a3", "ready": true }
+        ],
+        "hand": [{ "card": "Acidic Soil", "label": "asoil" }],
+        "library": [{ "card": "Swamp" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Mountain", "label": "b1", "ready": true },
+          { "card": "Mountain", "label": "b2", "ready": true },
+          { "card": "Mountain", "label": "b3", "ready": true }
+        ],
+        "hand": [{ "card": "Acidic Soil", "label": "bsoil" }],
+        "library": [{ "card": "Swamp" }]
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          { "card": "Plains", "ready": true },
+          { "card": "Plains", "ready": true }
+        ],
+        "library": [{ "card": "Swamp" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$asoil", "mana": ["$a1", "$a2", "$a3"] } } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Life": { "player": "alice", "life": 17 } } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Life": { "player": "carol", "life": 18 } } },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "$bsoil", "mana": ["$b1", "$b2", "$b3"] } } }
+  ],
+  "final": [
+    { "Life": { "player": "alice", "life": 17 } },
+    { "Life": { "player": "bob", "life": 14 } },
+    { "Life": { "player": "carol", "life": 16 } }
+  ]
+}

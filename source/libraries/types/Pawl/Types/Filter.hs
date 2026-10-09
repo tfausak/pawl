@@ -318,6 +318,10 @@ data Filter keyword
   | -- | CR 702.16k: the candidate is an object the protection carrier's chosen
     -- player controls, or one they own that no other player controls.
     OfChosenPlayer
+  | -- | CR 702.16i / 702.16k: the candidate is an object a player relating thus
+    -- to the perspective controls, or owns while no player controls it; against
+    -- an aiming spell or ability, that its controller relates thus.
+    OfRelatedPlayer PlayerRelation.PlayerRelation
   | -- | CR 115.1: the candidate is a PLAYER who relates thus to the perspective
     -- -- "target opponent". Separate from ControlledBy, which asks who controls
     -- an object candidate rather than who the candidate is (CR 109.1, CR 108.4).

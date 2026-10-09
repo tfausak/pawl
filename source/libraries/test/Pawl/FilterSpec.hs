@@ -1152,6 +1152,26 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     Spec.it s "an aimer with no controller is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches ((chose 0) {Filter.aimingController = Just Nothing}) blackCreature Filter.Type.OfChosenPlayer)) "no perspective"
 
+  -- CR 702.16i / 702.16k: OfChosenPlayer's two halves and its aimer, for every
+  -- player relating thus to the perspective. `self`'s perspective is player 0,
+  -- who controls `blackCreature`; player 1 owns it.
+  Spec.describe s "OfRelatedPlayer" $ do
+    let opponents = Filter.Type.OfRelatedPlayer PlayerRelation.Opponent
+        from n = Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId n)) Nothing
+        loose = blackCreature {Filter.controller = Nothing}
+    Spec.it s "matches an object an opponent controls, and not one you control" $ do
+      Spec.assertBool s (Filter.matches (from 1) blackCreature opponents) "player 0 controls it, and is player 1's opponent"
+      Spec.assertBool s (not (Filter.matches self blackCreature opponents)) "player 0 controls it, and is the perspective"
+
+    Spec.it s "CR 108.4 matches an object an opponent owns only while nobody controls it" $ do
+      Spec.assertBool s (Filter.matches self loose opponents) "owned by player 1, uncontrolled"
+      Spec.assertBool s (not (Filter.matches (from 1) loose opponents)) "owned by the perspective"
+
+    Spec.it s "CR 702.16k an aiming controller answers in place of the candidate's" $ do
+      let aimedBy n = self {Filter.aimingController = Just (Just (PlayerId.MkPlayerId n))}
+      Spec.assertBool s (Filter.matches (aimedBy 1) blackCreature opponents) "an opponent aims a source the perspective controls"
+      Spec.assertBool s (not (Filter.matches (aimedBy 0) loose opponents)) "the perspective aims a source an opponent owns"
+
   Spec.describe s "IsAttacking" $ do
     Spec.it s "matches a view whose combat status says so" $ do
       Spec.assertBool s (Filter.matches self (blackCreature {Filter.attacking = True}) Filter.Type.IsAttacking) "attacking"

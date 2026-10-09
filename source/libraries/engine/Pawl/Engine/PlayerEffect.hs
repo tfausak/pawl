@@ -2787,19 +2787,33 @@ protectedFromTargeting rows caster pid gs =
 -- from the same quality redundant for the player case as much as the permanent
 -- one.
 protectedFrom :: ObjectId -> PlayerId -> GameState -> Bool
-protectedFrom oid pid gs = protectedFromGiven (applying pid gs) oid gs
+protectedFrom oid pid gs = protectedFromGiven (applying pid gs) Nothing oid gs
 
 -- protectedFrom against an already-gathered row list, for
--- protectedFromTargetingGiven's reason above.
-protectedFromGiven :: [(RowSource, PlayerEffect)] -> ObjectId -> GameState -> Bool
-protectedFromGiven rows oid gs =
+-- protectedFromTargetingGiven's reason above. `aimer` is Filter.aimingController:
+-- Just the controller of the spell or ability aiming at the player, for rule
+-- 702.16k's targeting clause, and Nothing at the Aura bar. Only Pawl.FilterSpec's
+-- "OfRelatedPlayer" aimer case observes it: no board in the pool aims an ability
+-- whose controller differs from its source's at a protected player.
+protectedFromGiven :: [(RowSource, PlayerEffect)] -> Maybe (Maybe PlayerId) -> ObjectId -> GameState -> Bool
+protectedFromGiven rows aimer oid gs =
   let stops (source, effect) = case effect of
-        -- CR 702.16a's quality, matched through the identity-blind
-        -- matchesObjectFrom against the object's projected view. Runed Halo's
-        -- chosen name is Filter.HasChosenName, answered off the row's source
-        -- (contextFor). CR 702.16j's "protection from everything" is the empty
-        -- conjunction, which matches every source.
-        PlayerEffect.HasProtectionFrom quality -> matchesObjectFrom source quality oid gs
+        -- CR 702.16a's quality, matched against the object's projected view.
+        -- Runed Halo's chosen name is Filter.HasChosenName, answered off the
+        -- row's source (contextFor). CR 702.16j's "protection from everything"
+        -- is the empty conjunction, which matches every source.
+        --
+        -- CR 109.5's "you" is the CARRIER's controller, as at rule 702.16e's
+        -- shield (Pawl.Engine.Replacement's fromProtectedPlayer), not the matched
+        -- object's: Absolute Virtue's "each of your opponents" names the
+        -- protected player's opponents, which the aiming spell's own controller
+        -- would make nobody. The cr-702-16i scenarios under
+        -- data/scenarios/cast-prohibition prove the targeting and Aura halves.
+        PlayerEffect.HasProtectionFrom quality ->
+          Filter.matches
+            ((contextFor (RowSource.object source >>= (`Projection.controllerOf` gs)) source gs) {Filter.aimingController = aimer})
+            (Projection.viewOfObject oid gs)
+            quality
         -- CR 702.18a and CR 702.11c are a different immunity, and a narrower
         -- one: they stop TARGETING alone, where rule 702.16 also bars an Aura
         -- and, by rule 702.16e, prevents damage. Read at their own gate

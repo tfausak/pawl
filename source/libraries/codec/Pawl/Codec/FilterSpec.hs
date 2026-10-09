@@ -405,6 +405,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.OfChosenPlayer
       " {\"type\":\"OfChosenPlayer\"} "
+  Spec.it s "OfRelatedPlayer" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.OfRelatedPlayer PlayerRelation.Opponent)
+      " {\"type\":\"OfRelatedPlayer\",\"value\":{\"type\":\"Opponent\"}} "
   Spec.it s "IsAttacking" $
     Common.assertCodec
       s

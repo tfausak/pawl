@@ -789,11 +789,12 @@ targetable pcs rowsOf perspective source sourceView gs recipient =
         -- hexproof narrow by WHO controls the spell, and protection by what the
         -- SOURCE is -- which is `source` here for the same reason
         -- `restrictedObject` reads `sourceView`, CR 702.16b naming a spell's
-        -- quality and an ability's source in one sentence.
+        -- quality and an ability's source in one sentence. `perspective` goes
+        -- along for rule 702.16k's targeting clause (Filter.aimingController).
         Recipient.ToPlayer pid ->
           let rows = rowsOf pid
            in not (PlayerEffect.protectedFromTargeting rows perspective pid gs)
-                && not (PlayerEffect.protectedFromGiven rows source gs)
+                && not (PlayerEffect.protectedFromGiven rows (Just perspective) source gs)
         Recipient.ToCreature oid -> restrictedObject oid
         Recipient.ToPlaneswalker oid -> restrictedObject oid
         Recipient.ToBattle oid -> restrictedObject oid
