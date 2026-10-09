@@ -20,6 +20,7 @@
 -- name and a mana cost, and that is all of it that is read.
 module Pawl.Engine.Room where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Maybe as Maybe
@@ -40,11 +41,8 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
-import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
-import qualified Pawl.Types.Payment as Payment
-import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Zone as Zone
@@ -177,20 +175,7 @@ unlock perform pid oid half = do
     else case filter ((== half) . Face.name) (lockedHalves oid before) of
       [] -> pure ()
       face : _ -> do
-        -- CR 118.13c, Pawl.Engine.FaceDown.turnFaceUp's announcement and for its
-        -- reasons. CR 116.2m's unlock cost is a locked half's mana cost, and no
-        -- printed Room half holds such a symbol -- Scryfall `t:room`,
-        -- 2026-09-01 -- so no prompt is raised today.
-        (announced, _) <- Cost.announce (PaymentSubject.Unlocking oid) ManaSpending.AsProduced pid oid pure (unlockCostOf face)
-        payment <- Cost.pay perform before PaymentMoment.OutsideResolution (PaymentSubject.Unlocking oid) Nothing ManaSpending.AsProduced pid oid announced
-        case payment of
-          -- CR 733.1's reversal, Pawl.Engine.Foretell.foretell's reason: this
-          -- special action IS the whole of what failed, so `before` goes to
-          -- Cost.pay and the reversal -- the payer's choice about the CR 605.3a
-          -- window included -- happens there.
-          Payment.Unpaid -> pure ()
-          -- Dropped, Pawl.Engine.Ignore's reason: CR 116.2m's special action
-          -- resolves nothing whose effects could read a slot.
-          -- CR 709.5e names the actor itself: the player who paid the unlock
-          -- cost is the one who unlocked the door.
-          Payment.Paid _ -> Event.unlockHalves pid oid (Set.singleton half)
+        paid <- Cost.payAction perform before (PaymentSubject.Unlocking oid) 0 pid oid (unlockCostOf face)
+        -- CR 709.5e names the actor itself: the player who paid the unlock cost
+        -- is the one who unlocked the door.
+        Monad.forM_ paid $ \_ -> Event.unlockHalves pid oid (Set.singleton half)

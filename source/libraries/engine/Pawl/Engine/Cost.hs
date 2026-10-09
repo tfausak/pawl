@@ -1878,7 +1878,7 @@ ceilingOf pid oid quantities gs =
 -- one step before CR 601.2f's total, rule 118.13b's immediately before a cost
 -- paid during a resolution is paid (Pawl.Engine.Resolve.Effect.payGatePaidBy), and rule
 -- 118.13c's immediately before a special action's cost is
--- (Pawl.Engine.FaceDown.turnFaceUp and its five siblings). `announceToll` below
+-- (`payAction`, every special action's). `announceToll` below
 -- is the same choice at a moment rule 118.13 states none for.
 --
 -- The life the announcement committed becomes a CostComponent.PayLife, making
@@ -4899,6 +4899,58 @@ announceSubstitutionsReading slots substituting pid oid cost = case Cost.mana co
 -- the gate and the payment agree about a waterbend cost.
 pay :: ManaAbilityPerformer.ManaAbilityPerformer -> GameState -> PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
 pay perform began moment subject announced spending pid oid cost = fmap fst (paySubstituting perform began [] moment subject announced spending pid oid (announceSubstitutions waterbendSubstitutions pid oid) cost)
+
+-- CR 116's special actions pay their costs here, every one of them, in the
+-- rules' order: gate at the least X (`actionPayableAt`), name CR 107.3d's X
+-- "immediately before they pay that cost", gate again at the named X, announce
+-- CR 118.13c's symbols, pay. Answers the X named (0 for a cost with none) when
+-- the cost was paid, and Nothing when the action does not happen.
+--
+-- `leastX` is CR 101.1's least legal X: 0, or a card's own ("Suspend X ... X
+-- can't be 0"). The X prompt's bound is advisory (Prompt.ChooseX) and states no
+-- ceiling, since no special action's cost prints one. REJECT-NOT-REPAIR,
+-- Cast.castProposed's posture: an X below the floor or one the board cannot pay
+-- takes the whole action away rather than being clamped. The gate at the named
+-- X is a fence and no test observes it: an X the board cannot pay also fails
+-- inside Cost.pay, whose reversal leaves the same state.
+--
+-- `before` is where the action began, and CR 733.1's reversal returns there
+-- inside Cost.pay, offering the payer back the mana abilities the CR 605.3a
+-- window activated: the special action IS the whole of what failed, so nothing
+-- is left for the caller to restore. Pawl.FaceDownSpec's "Reversal at a special
+-- action" group proves it. The payment's bound slots are dropped: a special
+-- action puts nothing on the stack (CR 116.1), so no resolving object can read
+-- one.
+--
+-- CR 601.2f's totalling is `pure`: that rule totals the cost of a spell being
+-- cast or an ability being activated, and a special action is neither, so the
+-- announced cost IS the cost paid and the announcement offers exactly what the
+-- gate measured (see #90). The announcement's Phyrexian count is discarded:
+-- rule 702.150a asks about the player who CAST the object.
+payAction :: ManaAbilityPerformer.ManaAbilityPerformer -> GameState -> PaymentSubject.PaymentSubject -> Natural -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game (Maybe Natural)
+payAction perform before subject leastX pid oid printed
+  | not (payableAt leastX) = pure Nothing
+  | otherwise = do
+      named <-
+        if hasVariable printed
+          then Game.choose (Prompt.ChooseX (Decide.deciderFor pid before) pid oid leastX (greatestPayableX Nothing payableAt printed))
+          else pure 0
+      if (hasVariable printed && named < leastX) || not (payableAt named)
+        then pure Nothing
+        else do
+          (announced, _) <- announce subject ManaSpending.AsProduced pid oid pure (substituteX named printed)
+          payment <- pay perform before PaymentMoment.OutsideResolution subject Nothing ManaSpending.AsProduced pid oid announced
+          pure $ case payment of
+            Payment.Unpaid -> Nothing
+            Payment.Paid _ -> Just named
+  where
+    payableAt x = actionPayableAt subject x pid oid printed before
+
+-- CR 107.3d: is a special action's cost payable with its X named as this
+-- number? Cost.canPay and not CR 601.2f's totalling, `payAction`'s reason. The
+-- substitution is the identity on a cost with no X.
+actionPayableAt :: PaymentSubject.PaymentSubject -> Natural -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Bool
+actionPayableAt subject x pid oid cost = canPay subject pid oid (substituteX x cost)
 
 -- `pay` with no announcement and the component criteria reading `slots`
 -- instead, `canPayReading`'s payment. No announcement, so CR 400.7d's record of

@@ -7595,7 +7595,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       (any (anyFace (any unrefusableAbility . Face.activatedAbilities) . Printing.card) ps)
       "and an activated ability whose X the board cannot refuse"
     Spec.assertEqWith s "every one of them states a maximum" (fmap (S.nameOf . Printing.card) offenders) []
-  -- The lint above, one rule over: Pawl.Engine.Suspend climbs the same ascending
+  -- The lint above, one rule over: Cost.payAction climbs the same ascending
   -- search for CR 107.3d's bound, and CR 702.62a's payload states no maximum for
   -- it to stop at, so a suspend cost whose X the board cannot refuse would climb
   -- forever. A card-data error rather than an engine one, caught here.
