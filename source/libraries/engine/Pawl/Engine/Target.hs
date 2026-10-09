@@ -378,7 +378,13 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- pass hands every slot the seed alone, so the union is what a
             -- dependent slot is offered, and selectionLegal is where an
             -- announcement naming one creature twice is rejected.
-            Filter.slotObjects = fmap (Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList) targets,
+            --
+            -- A GROUP binding joins the targets here, Binding.slotObjects' union:
+            -- a reflexive ability's captured environment (CR 603.7c) can hold
+            -- one, and Nihiloor's "the tapped creature's power" aims its slot's
+            -- computed bound at the creature its own ChoosePermanents bound.
+            -- Nihiloor's scenario "steals from each opponent" proves it.
+            Filter.slotObjects = Map.unionWith Set.union (fmap (Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList) targets) (Binding.withGroups Map.empty (Binding.groupsOf bindings)),
             -- EMPTY: CR 702.122d's prohibition is read where rule 702.122a's
             -- cost picks its candidates (Pawl.Engine.Cost.tapCandidates) and no
             -- target slot's Filter carries the atom, crew naming its Vehicle
@@ -508,7 +514,10 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- CR 607.2a's last exiled card is the MANA unit's, never a slot's.
             Filter.sourceLastExiled = Nothing
           }
-      evaluated = amount >>= Quantity.evaluate (Projection.fullView gs) base gs source
+      -- Through CR 608.2h's last-known reader, slotNames' reason: the object a
+      -- bound is aimed at is a reference, not the candidate being judged.
+      -- Nihiloor's scenario "measures a dead tapped creature" proves it.
+      evaluated = amount >>= Quantity.evaluate (Projection.viewWithLastKnownAnywhere gs) base gs source
    in -- CR 202.3 / 601.2c: the slot's own computed bound, evaluated
       -- against the context above and handed to Filter.ManaValueAtMostAmount,
       -- Filter.ManaValueEqualToAmount and Filter.PowerAtMostAmount.

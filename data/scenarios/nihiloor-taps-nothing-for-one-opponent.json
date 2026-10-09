@@ -1,0 +1,59 @@
+{
+  "description": "CR 603.12 / 608.2f Nihiloor tapping nothing for one opponent arms no reflexive for them",
+  "note": "Nihiloor taps the Hill Giant (power 3) for bob and nothing for carol, CR 608.2d's \"up to one\" answered with none. The Lions stay untapped, carol keeps her creatures, and the one reflexive, bob's, refuses carol's Bears and the Craw Wurm (power 6) and takes the Gray Ogre.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Plains", "label": "plains" },
+          { "card": "Island", "label": "island" },
+          { "card": "Swamp", "label": "swamp" },
+          { "card": "Swamp", "label": "swamp-2" },
+          { "card": "Swamp", "label": "swamp-3" },
+          { "card": "Hill Giant", "label": "giant" },
+          { "card": "Savannah Lions", "label": "lions" },
+          { "card": "Memnite", "label": "memnite" }
+        ],
+        "hand": [
+          { "card": "Nihiloor", "label": "nihiloor" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Gray Ogre", "label": "ogre" },
+          { "card": "Craw Wurm", "label": "wurm" }
+        ]
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          { "card": "Grizzly Bears", "label": "bears" },
+          { "card": "Hill Giant", "label": "carol-giant" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$nihiloor", "mana": ["$plains", "$island", "$swamp", "$swamp-2", "$swamp-3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Answer": { "prompt": "ChooseAnyNumberOfPermanents", "with": ["$giant"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Answer": { "prompt": "ChooseAnyNumberOfPermanents", "with": [] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "refuse": { "ChooseTargets": { "target": ["$bears"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "refuse": { "ChooseTargets": { "target": ["$wurm"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "target": ["$ogre"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "View": { "of": "Stack", "is": [] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "View": { "of": "Controller", "object": "$ogre", "is": "alice" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "View": { "of": "Controller", "object": "$bears", "is": "carol" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "View": { "of": "Controller", "object": "$wurm", "is": "bob" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "View": { "of": "Controller", "object": "$carol-giant", "is": "carol" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "$giant", "tapped": true } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "$lions", "tapped": false } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "$memnite", "tapped": false } } }
+  ]
+}
