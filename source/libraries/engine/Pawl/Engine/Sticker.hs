@@ -38,7 +38,7 @@ refsOn pid slot sheet =
 -- sheets that are on no object they own, in any zone.
 --
 -- Not implemented: a ruling on a stickered card that changed owners; its
--- stickers count only against its current owner (#N3).
+-- stickers count only against its current owner (#4888).
 available :: PlayerId -> Set.Set StickerKind.StickerKind -> GameState -> [StickerRef.StickerRef]
 available pid kinds gs = case Map.lookup pid (GameState.players gs) of
   Nothing -> []

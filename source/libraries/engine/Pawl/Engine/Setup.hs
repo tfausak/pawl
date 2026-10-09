@@ -870,8 +870,8 @@ anteFromLibraries seated = do
 -- brought means none chosen: that player plays without stickers.
 --
 -- Not implemented: CR 123.2a's at least ten unique sheets, which is deck
--- validation (#N1). Not implemented: a ruling on whether a Shahrazad subgame
--- (CR 729.2) plays with sticker sheets; this draws again there (#N2).
+-- validation (#4886). Not implemented: a ruling on whether a Shahrazad subgame
+-- (CR 729.2) plays with sticker sheets; this draws again there (#4887).
 drawStickerSheets :: [PlayerId] -> Game ()
 drawStickerSheets seated = Monad.forM_ seated $ \pid -> do
   gs <- State.get

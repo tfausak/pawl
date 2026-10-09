@@ -8,7 +8,7 @@ import qualified Pawl.Types.StickerKind as StickerKind
 -- | CR 123.3: the players `player` names each put an available sticker of
 -- one of `kinds` on each named object they own.
 --
--- Not implemented: CR 123.3d's move of a sticker already on an object (#N4).
+-- Not implemented: CR 123.3d's move of a sticker already on an object (#4889).
 data PutSticker = MkPutSticker
   { player :: PlayerRef.PlayerRef,
     ref :: ObjectRef.ObjectRef,
