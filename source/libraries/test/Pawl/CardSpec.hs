@@ -986,6 +986,7 @@ modificationCounts modification = case modification of
   -- Its Filter's Counts are reached through modificationFilters, GainEnchant's
   -- answer.
   Modification.AddNamesMatching _ -> []
+  Modification.InsertNameWords _ -> []
   -- The extra text descends as GainAbility's does; a PlayerRef holds no Count.
   Modification.HasFullText ft -> concatMap (modificationCounts . Modification.GainAbility) (FullText.alsoHas ft)
   -- Payload-free, both of them, so there is no Count to sweep.
@@ -4368,6 +4369,7 @@ modificationFilters modification = case modification of
   Modification.ExchangeTextBoxes -> []
   -- CR 612.7's filter is card text like GainEnchant's slot, and is swept.
   Modification.AddNamesMatching f -> unframed [f]
+  Modification.InsertNameWords _ -> []
   -- Nothing HERE, GainAbility's answer: grantedModifications hands the extra
   -- text to the outer granted-ability sweeps.
   Modification.HasFullText _ -> []

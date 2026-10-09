@@ -306,6 +306,8 @@ rewriteModification pairs m =
         -- CR 612.1 through the names' own Filter, printed on the granter (CR
         -- 612.3) as the enchant's is.
         Modification.AddNamesMatching f -> Modification.AddNamesMatching (Filter.rewrite [(from, to)] f)
+        -- A name sticker's word is no subtype word (CR 612.2).
+        Modification.InsertNameWords _ -> acc
         -- CR 612.1 over the whole quoted ability: the words are printed on the
         -- GRANTER, so a text change affecting it rewrites them before the grant.
         Modification.GainAbility a -> Modification.GainAbility (rewriteGrantedAbility [(from, to)] a)

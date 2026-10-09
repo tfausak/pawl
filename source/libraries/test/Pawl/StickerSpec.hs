@@ -20,6 +20,7 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.NameWords as NameWords
@@ -38,6 +39,7 @@ import qualified Pawl.Types.AbilitySticker as AbilitySticker
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Deck as Deck
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
@@ -441,3 +443,46 @@ spec s registry = Spec.describe s "Sticker" $ do
         art = StickerRef.MkStickerRef S.alice 2 StickerKind.Art 0
     Spec.assertEqWith s "Night, Slimy, Otter" (fmap (\ref -> Game.stickerWords ref gs) [night, slimy, otter]) (fmap (Just . Text.pack) ["Night", "Slimy", "Otter"])
     Spec.assertEqWith s "an art sticker has none" (Game.stickerWords art gs) Nothing
+  -- CR 123.6c's first example, with a committed word: Otter after Fae of
+  -- Wishes' second word. Exile to stack to exile is public to public (CR 123.5).
+  Spec.it s "CR 123.6c Fae of Otter Wishes is cast as Granted Otter and exiled as Fae of Otter Wishes again" $ do
+    sheets <- committedSheets
+    fae <- S.printingOf s registry "Fae of Wishes"
+    island <- S.printingOf s registry "Island"
+    let base = mainPhaseForAlice (S.landsFor island S.alice 4 (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)))
+        (faeId, exiled) = S.addExiledCard fae S.alice base
+        stickered = Sticker.put S.alice faeId otter (Just 2) exiled
+        granted = CardName.MkCardName (Text.pack "Granted")
+        casting = S.runPure S.identityAnswer stickered (Cast.castSpell S.manaPerformer S.alice faeId granted Facing.FaceUp)
+        resolved = S.runPure S.identityAnswer casting Stack.resolveTop
+        shown g = concatMap (\oid -> nameTexts oid g)
+    Spec.assertEqWith s "CR 123.6c in exile it is Fae of Otter Wishes" (nameTexts faeId stickered) [Text.pack "Fae of Otter Wishes"]
+    Spec.assertEqWith s "CR 123.6c on the stack it is Granted Otter" (shown casting (GameState.stack casting)) [Text.pack "Granted Otter"]
+    Spec.assertEqWith s "CR 123.6c/715.3d exiled again it is Fae of Otter Wishes" (shown resolved (Game.zoneMembers Zone.Exile S.alice resolved)) [Text.pack "Fae of Otter Wishes"]
+  -- Review Focus 2.
+  Spec.it s "CR 123.1/707.2 a Clone of Grizzly Otter Bears is named Grizzly Bears" $ do
+    sheets <- committedSheets
+    bears <- S.printingOf s registry "Grizzly Bears"
+    clone <- S.printingOf s registry "Clone"
+    let (bearsId, g1) = S.addPermanent bears S.alice (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))
+        stickered = Sticker.put S.alice bearsId otter (Just 1) g1
+        (_, staged) = S.spellOnStack clone S.alice stickered
+        cloned = S.settleSba (S.runPure (copying bearsId) staged Stack.resolveTop)
+        clones = [oid | oid <- Set.toList (GameState.battlefield cloned), Set.notMember oid (GameState.battlefield stickered)]
+    Spec.assertEqWith s "CR 707.2 the Clone is named Grizzly Bears" (fmap (\oid -> nameTexts oid cloned) clones) [[Text.pack "Grizzly Bears"]]
+    Spec.assertEqWith s "while the original is Grizzly Otter Bears" (nameTexts bearsId cloned) [Text.pack "Grizzly Otter Bears"]
+  -- Divergence 5 (#N2): the sticker is later than Spy Kit, so it reaches every
+  -- name Spy Kit gave. Goblin Piker is in the game, so its name is in the reference.
+  Spec.it s "CR 123.6c/612.7 a sticker placed after Spy Kit goes into every name its host has" $ do
+    sheets <- committedSheets
+    bears <- S.printingOf s registry "Grizzly Bears"
+    piker <- S.printingOf s registry "Goblin Piker"
+    kit <- S.printingOf s registry "Spy Kit"
+    let (bearsId, g1) = S.addPermanent bears S.alice (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))
+        (_, g2) = S.addPermanent piker S.bob g1
+        (kitId, g3) = S.addPermanent kit S.alice g2
+        stickered = Sticker.put S.alice bearsId otter (Just 1) (S.attach kitId bearsId g3)
+        shown = Set.fromList (nameTexts bearsId stickered)
+    Spec.assertBool s (Set.member (Text.pack "Goblin Otter Piker") shown) "CR 612.7 the Piker's name, with the word after its first"
+    Spec.assertBool s (Set.member (Text.pack "Grizzly Otter Bears") shown) "and its own, Grizzly Otter Bears"
+    Spec.assertBool s (Set.notMember (Text.pack "Goblin Piker") shown) "and no name without the word"

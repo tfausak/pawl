@@ -8,6 +8,7 @@ module Pawl.Engine.Projection where
 import qualified Control.Applicative as Applicative
 import qualified Data.Bifunctor as Bifunctor
 import qualified Data.Containers.ListUtils as ListUtils
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map.Strict (Map)
@@ -24,6 +25,7 @@ import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
+import qualified Pawl.Engine.NameWords as NameWords
 import Pawl.Engine.Projection.Rewrite (Modification, composeWordChanges, rewriteActivatedAbility, rewriteAffected, rewriteCharacteristicPT, rewriteCondition, rewriteMinted, rewriteModification, rewritePlayerStaticAbility, rewritePrintedReplacement, rewriteRuleAbilities, rewriteStaticAbility, rewriteTriggeredAbility)
 import Pawl.Engine.Projection.View (ControlGrant, abilitiesFromCharacteristics, abilityFaceOf, abilityFaceOfId, abilitySources, controlGrants, controllerOf, controllerOfGiven, copiableCharacteristics, copiableRuleAbilitiesOf, copiableSnapshotOf, copiableSpecialActionsOf, countersOf, definesColorless, definesEveryCreatureType, enchantedPlayerOf, functionsFromZone, grantedStaticAbilitiesOf, inSourceRangeGiven, staticAbilitiesOf, staticTimestampOf, viewOfCard, viewOfCharacteristics, withAnnouncedX)
 import qualified Pawl.Engine.Quantity as Quantity
@@ -83,6 +85,7 @@ import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
+import qualified Pawl.Types.NameInsertion as NameInsertion
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -102,6 +105,7 @@ import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
+import qualified Pawl.Types.StickerPlacement as StickerPlacement
 import qualified Pawl.Types.Subtype as Subtype.Type
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TargetSlot as TargetSlot
@@ -176,6 +180,7 @@ layer m = case m of
   -- green, since nothing else in this unit reads the layer directly.
   Modification.ExchangeTextBoxes -> Layer.Text
   Modification.AddNamesMatching _ -> Layer.Text
+  Modification.InsertNameWords _ -> Layer.Text
   Modification.HasFullText _ -> Layer.Text
   Modification.SetController _ -> Layer.Control
   Modification.SetControllerToSource -> Layer.Control
@@ -624,6 +629,11 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
           let matching = Map.keysSet (Map.filter (\face -> Filter.matches context (viewOfCard face) f) (Game.referenceFaces gs))
               referenced = Map.findWithDefault Set.empty f (GameState.referenceNames gs)
            in pc {PC.names = Set.unions [matching, referenced, PC.names pc]}
+        -- CR 123.6b-c / 612.9: the sticker's word after the first @k@ words of
+        -- each name the fold has reached (#N2), or the name of an object with
+        -- none.
+        Modification.InsertNameWords (NameInsertion.MkNameInsertion ws k) ->
+          pc {PC.names = if Set.null (PC.names pc) then Set.singleton (CardName.MkCardName ws) else Set.map (NameWords.insertAfter k ws) (PC.names pc)}
         -- CR 613.1b layer 2: controllerOf reads GameState.continuousEffects
         -- directly. Identity here to keep gather/project's walk total.
         Modification.SetController _ -> pc
@@ -744,6 +754,7 @@ cardTypesAfter m types = case m of
   -- CR 612.1 / 612.5: the text box moves and the type line does not.
   Modification.ExchangeTextBoxes -> types
   Modification.AddNamesMatching _ -> types
+  Modification.InsertNameWords _ -> types
   -- CR 612.6 does write the type line, but off a card this function cannot
   -- see; nothing else in the one producer's effect grants a subtype.
   Modification.HasFullText _ -> types
@@ -1467,6 +1478,7 @@ freezeQuantities gs announcedOn source context m =
         Modification.ExchangeTextBoxes -> Just m
         -- The filter is judged against card faces, not quantities.
         Modification.AddNamesMatching _ -> Just m
+        Modification.InsertNameWords _ -> Just m
         -- The extra text's own quantities are its own, GainAbility's reason.
         Modification.HasFullText _ -> Just m
         -- No quantity to freeze: two bare markers.
@@ -1520,6 +1532,7 @@ quantitiesOf m = case m of
   Modification.SwitchPowerToughness -> []
   Modification.ExchangeTextBoxes -> []
   Modification.AddNamesMatching _ -> []
+  Modification.InsertNameWords _ -> []
   Modification.HasFullText _ -> []
   Modification.AssignCombatDamageWithToughness -> []
   Modification.GrantsStationToughness -> []
@@ -1532,6 +1545,7 @@ quantitiesOf m = case m of
 referenceQuery :: Modification.Modification ability -> Maybe (Filter.Type.Filter Keyword)
 referenceQuery m = case m of
   Modification.AddNamesMatching f -> Just f
+  Modification.InsertNameWords _ -> Nothing
   Modification.HasFullText _ -> Nothing
   Modification.SetBasePowerToughness _ -> Nothing
   Modification.ModifyPowerToughness _ -> Nothing
@@ -1634,6 +1648,7 @@ setsLandSubtype m = case m of
   Modification.SwitchPowerToughness -> False
   Modification.ExchangeTextBoxes -> False
   Modification.AddNamesMatching _ -> False
+  Modification.InsertNameWords _ -> False
   Modification.HasFullText _ -> False
   Modification.AssignCombatDamageWithToughness -> False
   Modification.SetColor _ -> False
@@ -2375,7 +2390,8 @@ gatherGiven stripped functioning seed gs =
       bestows = bestowGathered gs
       castGrants = castGrantGathered gs
       encodings = encodedGathered gs
-   in withStaticGrants stripped setStripped functioning gs (stored <> static <> inCommand <> spells <> graveyards <> hands <> libraries <> exiles <> counters <> designations <> bestows <> castGrants <> encodings)
+      stickers = stickerGathered gs
+   in withStaticGrants stripped setStripped functioning gs (stored <> static <> inCommand <> spells <> graveyards <> hands <> libraries <> exiles <> counters <> designations <> bestows <> castGrants <> encodings <> stickers)
 
 -- CR 613.1f / 113.7: `base` with the effects of the static abilities that other
 -- static abilities grant appended -- Rune of Flight's "Equipped creature has
@@ -2848,6 +2864,7 @@ removesAbilities m = case m of
   -- at layer 3, so CR 613.1f's strip is not what it is.
   Modification.ExchangeTextBoxes -> False
   Modification.AddNamesMatching _ -> False
+  Modification.InsertNameWords _ -> False
   -- FALSE, ExchangeTextBoxes' posture: the abilities a static ability
   -- generates are gathered off the copiable values, which CR 612.6 leaves
   -- alone, so the full-text ability keeps generating the effect that
@@ -3041,6 +3058,28 @@ honeAffected =
           Filter.Type.HasAttached (Filter.Type.And [Filter.Type.IsSource, Filter.Type.HasSubtype Subtype.Type.Equipment])
         ]
     )
+
+-- CR 123.6 / 612.9 / 613.7k: each name sticker is a layer-3 effect on the
+-- object it is on, at the sticker's own timestamp, putting its word after the
+-- position recorded as it was placed. Every object: CR 612.9 reaches a card in
+-- any zone, and a hidden-zone move has already taken the sticker off (CR
+-- 123.5). Game.stickerWords answers Nothing for every other kind.
+stickerGathered :: GameState -> [Gathered]
+stickerGathered gs =
+  [ MkGathered
+      { gEffect = Nothing,
+        gSource = oid,
+        gAffected = Affected.TheseObjects (Set.singleton oid),
+        gLayer = Layer.Text,
+        gLowest = Layer.Text,
+        gTimestamp = StickerPlacement.timestamp placement,
+        gModification = Modification.InsertNameWords NameInsertion.MkNameInsertion {NameInsertion.word = ws, NameInsertion.after = k}
+      }
+  | (oid, obj) <- Map.toList (GameState.objects gs),
+    placement <- Foldable.toList (Object.stickers obj),
+    Just k <- [StickerPlacement.position placement],
+    Just ws <- [Game.stickerWords (StickerPlacement.sticker placement) gs]
+  ]
 
 -- CR 122.1a / 613.4c: +1/+1 and -1/-1 counters modify P/T in layer 7c, as one
 -- synthetic ModifyPowerToughness per KIND. CR 122.1b / 613.1f: a keyword counter
@@ -3978,6 +4017,7 @@ modificationWrites m = case m of
   -- Writes PC.names, which no Aspect covers: dependency is within a layer (CR
   -- 613.8a), and no layer-3 effect's affected set reads a name.
   Modification.AddNamesMatching _ -> Set.empty
+  Modification.InsertNameWords _ -> Set.empty
   -- CR 612.6 writes the whole card: its type line, colour, keywords and
   -- power. Not Controller, which is layer 2's.
   Modification.HasFullText _ -> Set.fromList [Types, Subtypes, Supertypes, Colors, Keywords, PowerA]
@@ -4055,6 +4095,7 @@ modificationReads m = case m of
   Modification.ExchangeTextBoxes -> Set.singleton Keywords
   -- Its filter is put to card faces outside the fold, never to this object.
   Modification.AddNamesMatching _ -> Set.empty
+  Modification.InsertNameWords _ -> Set.empty
   -- Reads a graveyard card's copiable values, never this object.
   Modification.HasFullText _ -> Set.empty
   -- Carries no Quantity: two bare markers.
@@ -5845,6 +5886,7 @@ grantsKeywordWhere p m = case m of
   -- be answered here.
   Modification.ExchangeTextBoxes -> False
   Modification.AddNamesMatching _ -> False
+  Modification.InsertNameWords _ -> False
   -- CR 612.6 copies whatever keywords the top card prints, ExchangeTextBoxes'
   -- answer; its extra text is whole abilities, never a keyword.
   Modification.HasFullText _ -> False
@@ -5921,6 +5963,7 @@ grantsMintingType m = case m of
   -- CR 612.1: the exchange leaves the type line alone.
   Modification.ExchangeTextBoxes -> False
   Modification.AddNamesMatching _ -> False
+  Modification.InsertNameWords _ -> False
   -- Writes whatever type line the top card prints, which this function cannot
   -- see; True, since a wrong True costs only a projection. It is also what
   -- opens replacementsAffecting's gate to the top card's replacement effects,
@@ -6015,6 +6058,7 @@ grantsAbilityWhere p m = case m of
   Modification.SwitchPowerToughness -> False
   Modification.ExchangeTextBoxes -> False
   Modification.AddNamesMatching _ -> False
+  Modification.InsertNameWords _ -> False
   -- The extra text is the one quoted ability this arm hands out.
   Modification.HasFullText ft -> any (\g -> p g || grantedStaticWrites (grantsAbilityWhere p) g) (FullText.alsoHas ft)
   Modification.AssignCombatDamageWithToughness -> False
