@@ -2792,9 +2792,9 @@ protectedFrom oid pid gs = protectedFromGiven (applying pid gs) Nothing oid gs
 -- protectedFrom against an already-gathered row list, for
 -- protectedFromTargetingGiven's reason above. `aimer` is Filter.aimingController:
 -- Just the controller of the spell or ability aiming at the player, for rule
--- 702.16k's targeting clause, and Nothing at the Aura bar. Only Pawl.FilterSpec's
--- "OfRelatedPlayer" aimer case observes it: no board in the pool aims an ability
--- whose controller differs from its source's at a protected player.
+-- 702.16k's targeting clause, and Nothing at the Aura bar. The cast-prohibition
+-- scenario "an opponent's ability still can't target the protected player once
+-- she steals its source in response" proves it.
 protectedFromGiven :: [(RowSource, PlayerEffect)] -> Maybe (Maybe PlayerId) -> ObjectId -> GameState -> Bool
 protectedFromGiven rows aimer oid gs =
   let stops (source, effect) = case effect of
