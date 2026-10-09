@@ -53,6 +53,7 @@ import qualified Pawl.Types.PhasedOut as PhasedOut
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
+import qualified Pawl.Types.ReturnEnding as ReturnEnding
 import qualified Pawl.Types.ReturnWatch as ReturnWatch
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TriggerSource as TriggerSource
@@ -403,11 +404,10 @@ affectedNames oid source gs affected = case affected of
 --
 --   * GameState.phasedOut (CR 702.26b), keyed by the phased-out permanent, its
 --     value the player it phased out under.
---   * GameState.exiledUntilMonarch (CR 725), keyed by the exiled incarnation,
---     its value the watching player and whether the crown has moved.
---   * GameState.movedUntilSourceLeaves (CR 610.3), keyed by the object a move
---     with a duration put in another zone, its value the source whose leaving
---     the battlefield brings it back plus the zone it came from.
+--   * GameState.movedUntil (CR 610.3), keyed by the object a move with a
+--     duration put in another zone, its value the event that brings it back --
+--     a source leaving the battlefield, or CR 725's watching player and whether
+--     the crown has moved -- plus the zone it came from.
 --   * GameState.haunting (CR 702.55b), keyed by the haunting card in exile, its
 --     value the object that card haunts.
 --   * GameState.encoded (CR 702.99b), keyed by the card with cipher in exile,
@@ -427,12 +427,12 @@ affectedNames oid source gs affected = case affected of
 --     activationsThisTurn (CR 602.2) and attacksInOwnLastTurn (CR 508.1a), by
 --     the object each entry names.
 --
--- phasedOut and exiledUntilMonarch can never name a CANDIDATE through the one
+-- phasedOut and a crowning watch can never name a CANDIDATE through the one
 -- caller (Pawl.Engine.Cost's mana-source window): both key on an object not on
--- the battlefield, and neither value holds an object at all. The CR 610.3 watch
--- is the opposite case on its value side and the reason it is searched rather
--- than assumed inert: the source it names IS on the battlefield while the watch
--- stands, so a permanent that owes an exiled card its return is not
+-- the battlefield, and neither value holds an object at all. A source-leaves
+-- watch is the opposite case on its value side and the reason it is searched
+-- rather than assumed inert: the source it names IS on the battlefield while the
+-- watch stands, so a permanent that owes an exiled card its return is not
 -- interchangeable with one that owes nothing. They are searched
 -- rather than required empty all the same, because "this row is about some other
 -- object" is the honest reading of the rule and requiring emptiness makes an
@@ -460,8 +460,7 @@ namedByRelation oid gs =
   let relates names = any (\(key, value) -> key == oid || Set.member oid (names value)) . Map.toList
       keyed = Map.member oid
    in relates phasedOutNames (GameState.phasedOut gs)
-        || relates monarchWatchNames (GameState.exiledUntilMonarch gs)
-        || relates returnWatchNames (GameState.movedUntilSourceLeaves gs)
+        || relates returnWatchNames (GameState.movedUntil gs)
         || relates Set.singleton (GameState.haunting gs)
         || relates Set.singleton (GameState.encoded gs)
         || relates (Set.singleton . ExileLink.source) (GameState.exiledWith gs)
@@ -493,18 +492,15 @@ phasedOutNames row = case row of
   PhasedOut.Indirectly _under -> Set.empty
   PhasedOut.Orphaned _under -> Set.empty
 
--- The objects a GameState.exiledUntilMonarch row names beyond its key: none. Its
--- value is a player and an event group. Positional for phasedOutNames' reason.
-monarchWatchNames :: MonarchWatch.MonarchWatch -> Set.Set ObjectId
-monarchWatchNames watch = case watch of
-  MonarchWatch.MkMonarchWatch _controller _due -> Set.empty
-
--- The object a GameState.movedUntilSourceLeaves row names beyond its key: CR
--- 610.3's source, whose leaving the battlefield ends the move. Positional for
+-- The objects a GameState.movedUntil row names beyond its key: CR 610.3's
+-- source, whose leaving the battlefield ends the move, and nothing for a CR 725
+-- crowning watch, whose value is a player and an event group. Positional for
 -- phasedOutNames' reason.
 returnWatchNames :: ReturnWatch.ReturnWatch -> Set.Set ObjectId
 returnWatchNames watch = case watch of
-  ReturnWatch.MkReturnWatch source _zone -> Set.singleton source
+  ReturnWatch.MkReturnWatch ending _zone -> case ending of
+    ReturnEnding.SourceLeaves source -> Set.singleton source
+    ReturnEnding.OpponentCrowned (MonarchWatch.MkMonarchWatch _controller _due) -> Set.empty
 
 -- The objects a GameState.exilePiles row names beyond its key: none. Its value is
 -- CR 406.4's pile stamp, which names a pile rather than an object. Positional for

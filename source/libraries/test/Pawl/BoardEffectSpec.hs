@@ -1465,7 +1465,7 @@ gloriousProtectorSpec s registry =
                   let phased = Phasing.phaseOut (PhasedOut.Directly S.alice) oid exiled
                       settled = S.runPure S.identityAnswer phased Engine.settleForPriority
                   Spec.assertEqWith s "the Bird Maiden is still in exile" (exiledNames settled) [Just (named "Bird Maiden")]
-                  Spec.assertEqWith s "and the watch still stands" (Map.size (GameState.movedUntilSourceLeaves settled)) 1
+                  Spec.assertEqWith s "and the watch still stands" (Map.size (GameState.movedUntil settled)) 1
 
 -- The Oblivion Ring family's opponent-facing half, which Glorious Protector above
 -- structurally cannot reach: its gather is "creatures YOU control", so every card

@@ -47,7 +47,6 @@ import qualified Pawl.Codec.LoggedEvent as LoggedEvent
 import qualified Pawl.Codec.Mana as Mana
 import qualified Pawl.Codec.ManaType as ManaType
 import qualified Pawl.Codec.ModifiedRoll as ModifiedRoll
-import qualified Pawl.Codec.MonarchWatch as MonarchWatch
 import qualified Pawl.Codec.Object as Object
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.OutsideObject as OutsideObject
@@ -215,8 +214,7 @@ codec resolve = Fields.object $ do
   castsBeforeThisTurn <- Fields.defaulted "castsBeforeThisTurn" Seq.empty (Common.seq SpellWasCast.codec) GameState.castsBeforeThisTurn
   attacksInOwnLastTurn <- Fields.defaulted "attacksInOwnLastTurn" Map.empty (Common.naturalMap PlayerId.codec (Common.seq AttackerDeclared.codec)) GameState.attacksInOwnLastTurn
   resolvedNames <- Fields.defaulted "resolvedNames" Map.empty (Common.naturalMap PlayerId.codec (Common.set CardName.codec)) GameState.resolvedNames
-  exiledUntilMonarch <- Fields.defaulted "exiledUntilMonarch" Map.empty (Common.naturalMap ObjectId.codec MonarchWatch.codec) GameState.exiledUntilMonarch
-  movedUntilSourceLeaves <- Fields.defaulted "movedUntilSourceLeaves" Map.empty (Common.naturalMap ObjectId.codec ReturnWatch.codec) GameState.movedUntilSourceLeaves
+  movedUntil <- Fields.defaulted "movedUntil" Map.empty (Common.naturalMap ObjectId.codec ReturnWatch.codec) GameState.movedUntil
   haunting <- Fields.defaulted "haunting" Map.empty (Common.naturalMap ObjectId.codec ObjectId.codec) GameState.haunting
   encoded <- Fields.defaulted "encoded" Map.empty (Common.naturalMap ObjectId.codec ObjectId.codec) GameState.encoded
   exiledWith <- Fields.defaulted "exiledWith" Map.empty (Common.naturalMap ObjectId.codec ExileLink.codec) GameState.exiledWith
@@ -329,8 +327,7 @@ codec resolve = Fields.object $ do
         GameState.castsBeforeThisTurn = castsBeforeThisTurn,
         GameState.attacksInOwnLastTurn = attacksInOwnLastTurn,
         GameState.resolvedNames = resolvedNames,
-        GameState.exiledUntilMonarch = exiledUntilMonarch,
-        GameState.movedUntilSourceLeaves = movedUntilSourceLeaves,
+        GameState.movedUntil = movedUntil,
         GameState.haunting = haunting,
         GameState.encoded = encoded,
         GameState.exiledWith = exiledWith,

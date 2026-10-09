@@ -863,7 +863,6 @@ effectObjectRefs effect = case effect of
   Effect.GiveGift -> []
   Effect.Train {} -> []
   Effect.ItBecomes {} -> []
-  Effect.ExileUntilMonarch {} -> []
   Effect.ExileHaunting {} -> []
   Effect.PlaySubgame {} -> []
   Effect.ChoosePlayer {} -> []
@@ -1082,7 +1081,6 @@ effectPlayerRefs effect = case effect of
   Effect.GiveGift -> []
   Effect.Train {} -> []
   Effect.ItBecomes {} -> []
-  Effect.ExileUntilMonarch {} -> []
   Effect.ExileHaunting {} -> []
   Effect.PlaySubgame {} -> []
   Effect.ChoosePlayer {} -> []
@@ -1497,7 +1495,6 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.GiveGift -> Map.empty
   Effect.Train slot -> oneSlot slot
   Effect.ItBecomes _ -> Map.empty
-  Effect.ExileUntilMonarch slot -> oneSlot slot
   Effect.ExileHaunting (ExileHaunting.MkExileHaunting card slot) -> joinSlots [oneSlot card, oneSlot slot]
   Effect.Attach slot -> oneSlot slot
   Effect.AttachAsThoughCreature slot -> oneSlot slot
@@ -2229,7 +2226,6 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.GiveGift -> True
   Effect.Train _ -> True
   Effect.ItBecomes _ -> True
-  Effect.ExileUntilMonarch _ -> True
   Effect.ExileHaunting (ExileHaunting.MkExileHaunting _ _) -> True
   Effect.Attach _ -> True
   Effect.AttachAsThoughCreature _ -> True
@@ -2477,7 +2473,6 @@ readsX =
         Effect.GiveGift -> False
         Effect.Train _ -> False
         Effect.ItBecomes _ -> False
-        Effect.ExileUntilMonarch _ -> False
         Effect.ExileHaunting {} -> False
         Effect.Attach _ -> False
         Effect.AttachAsThoughCreature _ -> False
@@ -2750,7 +2745,6 @@ boundSlots effect = case effect of
   Effect.GiveGift -> Set.empty
   Effect.Train _ -> Set.empty
   Effect.ItBecomes _ -> Set.empty
-  Effect.ExileUntilMonarch _ -> Set.empty
   Effect.ExileHaunting {} -> Set.empty
   Effect.Attach _ -> Set.empty
   Effect.AttachAsThoughCreature _ -> Set.empty

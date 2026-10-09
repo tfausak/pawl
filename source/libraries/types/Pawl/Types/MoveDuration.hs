@@ -14,4 +14,6 @@ data MoveDuration
   = -- | CR 610.3 (Glorious Protector): "until this creature leaves the
     -- battlefield", said of the ability's own source.
     UntilSourceLeavesTheBattlefield
+  | -- | CR 725 (Palace Jailer): "until an opponent becomes the monarch".
+    UntilAnOpponentBecomesTheMonarch
   deriving (Bounded, Enum, Eq, Ord, Show)

@@ -162,8 +162,7 @@ withoutAnnouncement before entry closed = do
   castsBeforeThisTurn <- one GameState.castsBeforeThisTurn
   attacksInOwnLastTurn <- one GameState.attacksInOwnLastTurn
   resolvedNames <- mapOf GameState.resolvedNames
-  exiledUntilMonarch <- mapOf GameState.exiledUntilMonarch
-  movedUntilSourceLeaves <- mapOf GameState.movedUntilSourceLeaves
+  movedUntil <- mapOf GameState.movedUntil
   haunting <- mapOf GameState.haunting
   encoded <- mapOf GameState.encoded
   exiledWith <- mapOf GameState.exiledWith
@@ -279,8 +278,7 @@ withoutAnnouncement before entry closed = do
         GameState.castsBeforeThisTurn = castsBeforeThisTurn,
         GameState.attacksInOwnLastTurn = attacksInOwnLastTurn,
         GameState.resolvedNames = resolvedNames,
-        GameState.exiledUntilMonarch = exiledUntilMonarch,
-        GameState.movedUntilSourceLeaves = movedUntilSourceLeaves,
+        GameState.movedUntil = movedUntil,
         GameState.haunting = haunting,
         GameState.encoded = encoded,
         GameState.exiledWith = exiledWith,

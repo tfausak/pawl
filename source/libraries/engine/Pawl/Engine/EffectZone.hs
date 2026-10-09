@@ -316,7 +316,6 @@ zoneFunctionedAgainst itself delayed effect = case effect of
   Effect.GiveGift -> Nothing
   Effect.Train _ -> Nothing
   Effect.ItBecomes _ -> Nothing
-  Effect.ExileUntilMonarch _ -> Nothing
   Effect.ExileHaunting {} -> Nothing
   Effect.Attach _ -> Nothing
   Effect.AttachAsThoughCreature _ -> Nothing

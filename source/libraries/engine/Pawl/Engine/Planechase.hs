@@ -151,8 +151,7 @@ ceasePlaneswalking gs =
   let walking oid = case fmap Object.source (Game.lookupObject oid gs) of
         Just (Source.OfInherentTrigger inherent) -> InherentTriggerSource.ability inherent == planeswalkingAbility
         _ -> False
-      cease g oid = maybe g (\_ -> let g1 = Game.removeFromZones oid g in g1 {GameState.objects = Map.delete oid (GameState.objects g1)}) (Game.lookupObject oid g)
-   in List.foldl' cease gs (filter walking (GameState.stack gs))
+   in List.foldl' (flip Game.cease) gs (filter walking (GameState.stack gs))
 
 -- CR 701.31b's second half: move the top card off the planar deck and turn it
 -- face up, which is joining GameState.command. A fresh timestamp, since its

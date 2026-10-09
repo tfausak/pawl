@@ -281,9 +281,7 @@ import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifiedRoll as ModifiedRoll
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
-import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.MoveCounters as MoveCounters
-import qualified Pawl.Types.MoveDuration as MoveDuration.Type
 import qualified Pawl.Types.MoveMana as MoveMana
 import qualified Pawl.Types.MoveSpread as MoveSpread
 import qualified Pawl.Types.MoveToZone as MoveToZone
@@ -3451,7 +3449,6 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.GiveGift -> False
   Effect.Train {} -> False
   Effect.ItBecomes {} -> False
-  Effect.ExileUntilMonarch {} -> False
   Effect.ExileHaunting {} -> False
   Effect.PlaySubgame {} -> False
   Effect.ChoosePlayer {} -> False
@@ -5147,17 +5144,18 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- single event cannot see it move between members.
             Monad.forM_ mBlocked (\blocked -> Combat.putOntoBattlefieldBlocking blocked newId)
             -- CR 610.3: a move with a duration is only half of a pair, so the
-            -- incarnation that arrived is registered against the source whose
-            -- leaving the battlefield ends it, and against the zone it came from
-            -- (rule 610.3's "its previous zone"). Pawl.Engine.MoveDuration is where
-            -- the second one-shot effect that reads this happens; nothing a card
-            -- prints performs it. Per ARRIVAL, which is CR 712.21c: a melded
+            -- incarnation that arrived is registered against the event that ends
+            -- it (Pawl.Engine.MoveDuration.endingOf), and against the zone it came
+            -- from (rule 610.3's "its previous zone"). Pawl.Engine.MoveDuration is
+            -- where the second one-shot effect that reads this happens; nothing a
+            -- card prints performs it. Per ARRIVAL, which is CR 712.21c: a melded
             -- permanent leaves as two cards and both come back.
             let watched = do
-                  Monad.guard (duration == Just MoveDuration.Type.UntilSourceLeavesTheBattlefield)
-                  fmap Object.zone (Game.lookupObject target before)
-            Monad.forM_ watched $ \from ->
-              State.modify' (\g -> g {GameState.movedUntilSourceLeaves = Map.insert newId (ReturnWatch.MkReturnWatch {ReturnWatch.source = source, ReturnWatch.zone = from}) (GameState.movedUntilSourceLeaves g)})
+                  lasting <- duration
+                  from <- fmap Object.zone (Game.lookupObject target before)
+                  pure (ReturnWatch.MkReturnWatch {ReturnWatch.ending = MoveDuration.endingOf lasting source controller, ReturnWatch.zone = from})
+            Monad.forM_ watched $ \watch ->
+              State.modify' (\g -> g {GameState.movedUntil = Map.insert newId watch (GameState.movedUntil g)})
             -- CR 400.7: which object's effect put this permanent onto the
             -- battlefield, for Filter.EnteredWithSource. Read off where the
             -- incarnation landed, so a redirected move records nothing.
@@ -5195,19 +5193,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           [only] -> State.modify' (bindSlot resolving slot only)
           _ -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList arrived))
      in do
-          -- CR 610.3b: the source has already left the battlefield since this
+          -- CR 610.3b: the specified event has already happened since this
           -- ability triggered, so the object doesn't move. CR 610.3a says the
           -- same of a spell or activated ability put onto the stack, and one
-          -- test answers both -- CR 400.7 makes the source one incarnation, so
-          -- "has it left" is the same question whichever rule asks it. Glorious
-          -- Protector's ruling is the printed statement of it: if it leaves the
-          -- battlefield before its triggered ability resolves, no creatures are
-          -- exiled.
+          -- test answers both -- for a source leaving the battlefield, CR 400.7
+          -- makes the source one incarnation, so "has it left" is the same
+          -- question whichever rule asks it. Glorious Protector's ruling is the
+          -- printed statement of it: if it leaves the battlefield before its
+          -- triggered ability resolves, no creatures are exiled.
           --
           -- Ahead of the GATHER, so the CR 608.2d choice is not put to anybody
           -- either: with nothing able to move, that question has no board behind
           -- it.
-          declined <- State.gets (\gs -> duration == Just MoveDuration.Type.UntilSourceLeavesTheBattlefield && MoveDuration.hasLeftTheBattlefield source gs)
+          declined <- State.gets (\gs -> any (\lasting -> MoveDuration.hasHappened lasting source gs) duration)
           Monad.unless declined $ do
             -- WHICH objects move, gathered first and moved second, so the CR 401.2
             -- and CR 401.4 questions between the two steps are asked of the whole
@@ -8821,29 +8819,6 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.Unattach ref -> do
     movers <- permanentsGathered legal resolving controller source ref
     Event.simultaneously (Monad.forM_ movers Event.detach)
-  Effect.ExileUntilMonarch slot ->
-    case legalOne slot legal of
-      Just recipient -> case Recipient.objectOf recipient of
-        Nothing -> pure ()
-        Just target -> do
-          -- CR 400.7: exile through the funnel and register the incarnation for
-          -- return when an opponent of `controller` (CR 102.2) BECOMES the
-          -- monarch. Armed undischarged whoever holds the crown now, so an
-          -- opponent who already holds it does not free the creature.
-          --
-          -- One watch per ARRIVAL, which is CR 712.21c: an effect that can find
-          -- the new object a melded permanent becomes finds both cards, and "the
-          -- same actions are taken upon each of them" -- so both come back when
-          -- an opponent becomes the monarch.
-          mNew <- Event.changeZoneReturning target Zone.Exile
-          Monad.forM_ mNew $ \newId -> do
-            let watch =
-                  MonarchWatch.MkMonarchWatch
-                    { MonarchWatch.controller = controller,
-                      MonarchWatch.due = Nothing
-                    }
-            State.modify' (\g -> g {GameState.exiledUntilMonarch = Map.insert newId watch (GameState.exiledUntilMonarch g)})
-      _ -> pure ()
   Effect.ExileHaunting (ExileHaunting.MkExileHaunting card slot) ->
     case legalOne slot legal of
       Just recipient -> case Recipient.objectOf recipient of

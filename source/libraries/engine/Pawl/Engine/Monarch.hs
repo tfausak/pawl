@@ -43,6 +43,8 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.ReturnEnding as ReturnEnding
+import qualified Pawl.Types.ReturnWatch as ReturnWatch
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
@@ -292,15 +294,16 @@ crown pid gs =
           -- 725.4 guarantees the crowned player is still in the game, so a
           -- departed controller is never crowned, and CR 800.2's teams are
           -- settled before the game begins. Nothing needs to be stored.
-          mark watch =
-            if Game.areOpponents gs (MonarchWatch.controller watch) pid && Maybe.isNothing (MonarchWatch.due watch)
-              then watch {MonarchWatch.due = Just (GameState.nextEventGroup gs)}
-              else watch
+          mark watch = case ReturnWatch.ending watch of
+            ReturnEnding.OpponentCrowned crowned
+              | Game.areOpponents gs (MonarchWatch.controller crowned) pid && Maybe.isNothing (MonarchWatch.due crowned) ->
+                  watch {ReturnWatch.ending = ReturnEnding.OpponentCrowned crowned {MonarchWatch.due = Just (GameState.nextEventGroup gs)}}
+            _ -> watch
        in Event.recordEvent
             (GameEvent.BecameMonarch pid)
             gs
               { GameState.monarch = Just pid,
-                GameState.exiledUntilMonarch = fmap mark (GameState.exiledUntilMonarch gs)
+                GameState.movedUntil = fmap mark (GameState.movedUntil gs)
               }
 
 -- CR 725.4: reassign the crown when the monarch leaves the game. Who takes it is

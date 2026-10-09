@@ -35,16 +35,16 @@ import qualified Pawl.Types.Zone as Zone
 --
 -- The MoveDuration is CR 610.3's "until", which makes the move one half of a
 -- pair: the resolver declines it outright when the event has already happened
--- (CR 610.3a, CR 610.3b) and registers what did move in
--- GameState.movedUntilSourceLeaves, whose sweep performs rule 610.3's second
--- one-shot effect. Nothing on a card returns the object, and nothing may:
--- writing the return as a second triggered ability puts it on the stack, where
--- rule 610.3 gives nobody a window to respond -- see #2626. The event it names
--- is the SOURCE leaving the battlefield, so the arm belongs on a permanent's
--- ability; a card stating it on an instant's or sorcery's effect states an event
--- that has already happened when the spell resolves (CR 608.1 puts the source on
--- the stack), and every such move is declined. Nothing lints that, as nothing
--- lints the placement one paragraph up.
+-- (CR 610.3a, CR 610.3b) and registers what did move in GameState.movedUntil,
+-- whose sweep performs rule 610.3's second one-shot effect. Nothing on a card
+-- returns the object, and nothing may: writing the return as a second triggered
+-- ability puts it on the stack, where rule 610.3 gives nobody a window to
+-- respond -- see #2626. UntilSourceLeavesTheBattlefield names the SOURCE leaving
+-- the battlefield, so that arm belongs on a permanent's ability; a card stating
+-- it on an instant's or sorcery's effect states an event that has already
+-- happened when the spell resolves (CR 608.1 puts the source on the stack), and
+-- every such move is declined. Nothing lints that, as nothing lints the
+-- placement one paragraph up.
 data MoveToZone ability = MkMoveToZone
   { ref :: ObjectRef.ObjectRef,
     zone :: Zone.Zone,

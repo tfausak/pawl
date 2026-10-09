@@ -53,12 +53,14 @@ import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
@@ -66,6 +68,8 @@ import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeInstance as ModeInstance
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
+import qualified Pawl.Types.MoveDuration as MoveDuration.Type
+import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -86,6 +90,7 @@ import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.Response as Response
+import qualified Pawl.Types.ReturnEnding as ReturnEnding
 import qualified Pawl.Types.ReturnWatch as ReturnWatch
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Sickness as Sickness
@@ -1613,13 +1618,13 @@ exileUntilMonarchSpec s registry = Spec.describe s "ExileUntilMonarch" $ do
             S.alice
             (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
             (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
-            (Effect.ExileUntilMonarch slot)
+            (jailerExile slot)
         exiled = snd (Engine.runGamePure S.identityAnswer base exile)
         settled = snd (Engine.runGamePure S.identityAnswer exiled MoveDuration.returnDue)
-    Spec.assertEqWith s "the watch was registered" (Map.size (GameState.exiledUntilMonarch exiled)) 1
+    Spec.assertEqWith s "the watch was registered" (Map.size (GameState.movedUntil exiled)) 1
     Spec.assertEqWith s "bob is still the monarch, unchanged" (GameState.monarch settled) (Just S.bob)
     Spec.assertEqWith s "nothing came back to the battlefield" (Set.size (GameState.battlefield settled)) 0
-    Spec.assertEqWith s "and the watch is still armed" (Map.size (GameState.exiledUntilMonarch settled)) 1
+    Spec.assertEqWith s "and the watch is still armed" (Map.size (GameState.movedUntil settled)) 1
   -- The whole arc, still two seats. The crown must actually CHANGE HANDS to an
   -- opponent before the creature comes back, and alice taking it herself in
   -- between must not discharge the watch.
@@ -1635,7 +1640,7 @@ exileUntilMonarchSpec s registry = Spec.describe s "ExileUntilMonarch" $ do
             S.alice
             (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
             (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
-            (Effect.ExileUntilMonarch slot)
+            (jailerExile slot)
         exiled = snd (Engine.runGamePure S.identityAnswer base exile)
         -- Palace Jailer's OTHER entry trigger: alice takes the crown. She is
         -- not her own opponent, so this must not return the creature. Through
@@ -1645,10 +1650,10 @@ exileUntilMonarchSpec s registry = Spec.describe s "ExileUntilMonarch" $ do
         alicesCrown = snd (Engine.runGamePure S.identityAnswer (Monarch.crown S.alice exiled) MoveDuration.returnDue)
         -- bob deals combat damage to the monarch (CR 725.3) and takes it back.
         bobsCrown = snd (Engine.runGamePure S.identityAnswer (Monarch.crown S.bob alicesCrown) MoveDuration.returnDue)
-    Spec.assertEqWith s "alice holding the crown does not discharge the watch" (Map.size (GameState.exiledUntilMonarch alicesCrown)) 1
+    Spec.assertEqWith s "alice holding the crown does not discharge the watch" (Map.size (GameState.movedUntil alicesCrown)) 1
     Spec.assertEqWith s "nor return the creature" (Set.size (GameState.battlefield alicesCrown)) 0
     Spec.assertEqWith s "bob retaking it does return the creature" (Set.size (GameState.battlefield bobsCrown)) 1
-    Spec.assertEqWith s "and discharges the watch" (Map.size (GameState.exiledUntilMonarch bobsCrown)) 0
+    Spec.assertEqWith s "and discharges the watch" (Map.size (GameState.movedUntil bobsCrown)) 0
   -- The crown VANISHING is not an opponent becoming the monarch. CR 725.1's
   -- ruling says the game keeps exactly one monarch once it has one, and the
   -- single way back to none is CR 725.4's last player standing leaving -- but
@@ -1665,12 +1670,12 @@ exileUntilMonarchSpec s registry = Spec.describe s "ExileUntilMonarch" $ do
             S.alice
             (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
             (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
-            (Effect.ExileUntilMonarch slot)
+            (jailerExile slot)
         exiled = snd (Engine.runGamePure S.identityAnswer base exile)
         -- CR 725.4's third sentence is the only way back to no monarch, and it
         -- crowns nobody, so this is a bare field write by construction.
         noMonarch = snd (Engine.runGamePure S.identityAnswer exiled {GameState.monarch = Nothing} MoveDuration.returnDue)
-    Spec.assertEqWith s "the watch is still armed" (Map.size (GameState.exiledUntilMonarch noMonarch)) 1
+    Spec.assertEqWith s "the watch is still armed" (Map.size (GameState.movedUntil noMonarch)) 1
     Spec.assertEqWith s "and nothing returned" (Set.size (GameState.battlefield noMonarch)) 0
   -- CR 610.3d across the two registers: a Banisher Priest-style source leaves,
   -- THEN an opponent is crowned, both before one settle, so the Priest's
@@ -1692,10 +1697,10 @@ exileUntilMonarchSpec s registry = Spec.describe s "ExileUntilMonarch" $ do
             S.alice
             (Map.singleton slot (Set.singleton (Recipient.ToCreature jailed)))
             (Map.singleton slot (Set.singleton (Recipient.ToCreature jailed)))
-            (Effect.ExileUntilMonarch slot)
+            (jailerExile slot)
         banish = do
           moved <- Event.changeZoneReturning held Zone.Exile
-          State.modify' (\g -> g {GameState.movedUntilSourceLeaves = Map.fromList [(m, ReturnWatch.MkReturnWatch source Zone.Battlefield) | m <- Foldable.toList moved]})
+          State.modify' (\g -> g {GameState.movedUntil = GameState.movedUntil g <> Map.fromList [(m, ReturnWatch.MkReturnWatch (ReturnEnding.SourceLeaves source) Zone.Battlefield) | m <- Foldable.toList moved]})
         settled =
           snd
             ( Engine.runGamePure S.identityAnswer base $ do
@@ -1707,7 +1712,7 @@ exileUntilMonarchSpec s registry = Spec.describe s "ExileUntilMonarch" $ do
             )
         arrivals = fmap snd (List.sort [(Object.timestamp obj, fmap S.nameOf (Game.cardOf oid settled)) | oid <- Set.toList (GameState.battlefield settled), Just obj <- [Game.lookupObject oid settled]])
     Spec.assertEqWith s "the Soul Warden came back before the Goblin Piker" arrivals [Just (S.printingName warden), Just (S.printingName piker)]
-    Spec.assertEqWith s "both watches are discharged" (Map.size (GameState.exiledUntilMonarch settled), Map.size (GameState.movedUntilSourceLeaves settled)) (0, 0)
+    Spec.assertEqWith s "both watches are discharged" (Map.size (GameState.movedUntil settled)) 0
 
   -- SYNTHETIC. "Synthetic Regency Swap" {1}{W} Sorcery: "Target player becomes
   -- the monarch. Then you become the monarch." Two crownings in ONE resolution,
@@ -1758,18 +1763,33 @@ exileUntilMonarchSpec s registry = Spec.describe s "ExileUntilMonarch" $ do
         toAlice = run S.alice
     -- The fixture really is what the test claims.
     Spec.assertEqWith s "alice holds the crown before the spell" (GameState.monarch withSpell) (Just S.alice)
-    Spec.assertEqWith s "exactly one creature is under the watch" (Map.size (GameState.exiledUntilMonarch withSpell)) 1
+    Spec.assertEqWith s "exactly one creature is under the watch" (Map.size (GameState.movedUntil withSpell)) 1
     Spec.assertEqWith s "and carol's Piker is off the battlefield" (S.creaturesInPlay S.carol withSpell) 0
     -- Run A, the behaviour this case exists to prove. CR 400.7 gives the
     -- returning card yet another id, so carol's creature COUNT is what survives.
     Spec.assertEqWith s "bob's reign inside the resolution freed the prisoner" (S.creaturesInPlay S.carol toBob) 1
     Spec.assertEqWith s "though the crown is back with alice, so no later look at the monarch could tell" (GameState.monarch toBob) (Just S.alice)
-    Spec.assertEqWith s "and the watch is discharged" (Map.size (GameState.exiledUntilMonarch toBob)) 0
+    Spec.assertEqWith s "and the watch is discharged" (Map.size (GameState.movedUntil toBob)) 0
     -- Run B: one different answer, and nothing else.
     Spec.assertEqWith s "alice crowning herself frees nobody" (S.creaturesInPlay S.carol toAlice) 0
     Spec.assertEqWith s "she is still the monarch" (GameState.monarch toAlice) (Just S.alice)
-    Spec.assertEqWith s "and the watch is still armed" (Map.size (GameState.exiledUntilMonarch toAlice)) 1
+    Spec.assertEqWith s "and the watch is still armed" (Map.size (GameState.movedUntil toAlice)) 1
     Spec.assertEqWith s "both runs resolved the spell" (length (GameState.stack toBob), length (GameState.stack toAlice)) (0, 0)
+
+-- Palace Jailer's exile as its card file spells it: CR 610.3's move with CR
+-- 725's ending, out of the slot's target and into exile.
+jailerExile :: SlotName.SlotName -> Effect.Effect card ability
+jailerExile slot =
+  Effect.MoveToZone
+    ( MoveToZone.MkMoveToZone
+        (ObjectRef.InSlot slot)
+        Zone.Exile
+        EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = Nothing, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.attachedTo = Nothing, EntryRiders.faceDown = Nothing, EntryRiders.noted = False, EntryRiders.characteristics = Seq.empty}
+        Nothing
+        Nothing
+        LibraryPlacement.defaultValue
+        (Just MoveDuration.Type.UntilAnOpponentBecomesTheMonarch)
+    )
 
 -- CR 603.5 / 608.2d: an OPTIONAL effect -- "you may" -- decided as the ability
 -- resolves, not as it is put on the stack.

@@ -91,6 +91,7 @@ import qualified Pawl.Types.CoinFlipR as CoinFlipR
 import qualified Pawl.Types.CoinFlipRewrite as CoinFlipRewrite
 import qualified Pawl.Types.CoinFlipped as CoinFlipped
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.CounterCause as CounterCause
@@ -5496,8 +5497,7 @@ beginsPhase selector pid = do
 -- object with a fresh id is created in the destination, carrying owner and
 -- source forward and resetting per-incarnation state. No-op if the id is unknown.
 -- The Game () wrapper the ~30 existing callers use; changeZoneReturning below
--- carries the same body but hands back the freshly-minted incarnation ids, which
--- Resolve's ExileUntilMonarch arm registers for its return sweep.
+-- carries the same body but hands back the freshly-minted incarnation ids.
 --
 -- IDS and not one id: CR 712.21 puts a melded permanent's two cards into the
 -- destination as one departure and two arrivals, so every returning door below
@@ -6002,12 +6002,16 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
             Just before | Maybe.isJust (Game.lookupObject oid before) -> before
             _ -> gs
           -- CR 608.2h: last known information -- the object as it exists in the
-          -- zone it is LEAVING, projected against the pre-move state. Forced
-          -- eagerly (Moved's snapshot field is strict) rather than left as a thunk
-          -- retaining the whole pre-move GameState for a turn. The price of an
-          -- honest history: a token has no printed card to re-derive from (CR
-          -- 111.1).
-          snapshot = Projection.project oid lki
+          -- zone it is LEAVING, read off `lki` by the one builder every road out
+          -- of the game shares (lastKnownFrom). The fallback to `obj` is
+          -- unreachable: `lki` is either `gs`, which this branch matched `Just
+          -- obj` against, or a batch board the guard above found it in.
+          known = lastKnownFrom lki oid (Maybe.fromMaybe obj (Game.lookupObject oid lki))
+          -- The projected half of the record. Forced eagerly (Moved's snapshot
+          -- field is strict) rather than left as a thunk retaining the whole
+          -- pre-move GameState for a turn. The price of an honest history: a
+          -- token has no printed card to re-derive from (CR 111.1).
+          snapshot = LastKnown.characteristics known
           -- CR 613.1b: the OTHER half of last known information, read from the
           -- same pre-move state. Control is not a characteristic (CR 109.3's
           -- list does not include it), so it cannot ride `snapshot`; it is kept
@@ -6015,21 +6019,13 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
           -- triggered" about sources that are already gone -- see
           -- eventTriggers below.
           --
-          -- The `Object.owner` fallback is unreachable rather than a guess:
-          -- Projection.controllerOfGiven returns a `Just` for any id that
-          -- resolves, and `oid` resolves in `lki` (either it is `gs`, which
-          -- this branch matched `Just obj` against, or the guard above found
-          -- it). It is written as a
-          -- fallback only because controllerOf's type is honest about ids that
-          -- do not.
-          --
           -- A second board walk on the same hot path as `snapshot` above
           -- (controllerOf rebuilds controlGrants, a walk of the battlefield).
           -- Measured on the tasty-bench suite, this commit's parent vs. this
           -- change (goldfish / casting / fighting / fighting-aura, 2p):
           -- 15.2/133/24.6/569 ms -> 15.5/134/25.2/575 ms -- every move inside
           -- one run-to-run stddev, so no gate was moved to buy it back.
-          lastController = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid lki)
+          lastController = LastKnown.controller known
       -- CR 614.4: replacements exist before the event, so the loop reads them from
       -- the PRE-MOVE state. CR 614.6: the modified event is what actually happens.
       --
@@ -6591,28 +6587,17 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                         -- CR 608.2h: the object ceases here, so this is the last
                         -- moment its information is known. Filed under the id it had
                         -- while it existed -- the id an ability on the stack still
-                        -- carries as its source (CR 113.7) -- and from the same
-                        -- `snapshot` the Moved event below records, so the two
-                        -- readings of "what was it" cannot drift apart.
+                        -- carries as its source (CR 113.7) -- and as the same
+                        -- record `snapshot` the Moved event below records is read
+                        -- from, so the two readings of "what was it" cannot drift
+                        -- apart.
                         --
-                        -- The counters come off `obj`, the PRE-MOVE object, and not
-                        -- off the incarnation `mkObj` builds: CR 122.2 makes them
-                        -- cease to exist on the zone change, so the last moment they
-                        -- can be recorded is this one.
-                        --
-                        -- The COPIABLE snapshot is taken here for the counters'
-                        -- reason: it is layer 1 (CR 613.1a) rather than the fold
-                        -- `snapshot` is, and the copy binding and face it reads live
-                        -- on `obj`, which is about to cease. No third board walk --
-                        -- it reads that binding or the printed face and stops.
-                        --
-                        -- What was ATTACHED is read off `lki`, the pre-batch board
-                        -- `snapshot` and `lastController` read, and not the live
-                        -- `gs`: in a simultaneous batch an Equipment with a lower
-                        -- id moves before its host, and the live board has already
+                        -- Read off `lki`, the pre-batch board, and not the live
+                        -- `gs`: in a simultaneous batch an Equipment with a lower id
+                        -- moves before its host, and the live board has already
                         -- forgotten it. Pawl.ZoneTriggerSpec's "the Equipment dying
                         -- in the same batch, ahead of its host" is the proof.
-                        GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Game.attachments oid lki) (Object.chosenNames obj) (Object.chosenPlayer obj) (Object.chosenColors obj) (Object.chosenSubtype obj) (Game.isAttacking oid gs) (Game.attackTargetOf oid gs) (Game.isBlocking oid gs) (Object.protector obj) (Object.paidCosts obj) (Object.controlClock obj) (Object.zone obj) (Game.pileHolderOf oid g)) (GameState.lastKnown g1),
+                        GameState.lastKnown = Map.insert oid known (GameState.lastKnown g1),
                         -- CR 608.2h's record for a STACK object, filed in the same
                         -- write and from the same board as `lastKnown` above, which
                         -- cannot keep it: rule 707.10 copies the DECISIONS, and CR
@@ -8224,11 +8209,7 @@ createTokens controller card copy n tapped entering attached = do
 -- row (grep "SacrificeToEnter", 2026-09-29), and Heart of Yavimaya copied by a
 -- token-copy effect would refute that.
 unmake :: ObjectId -> Game ()
-unmake oid = State.modify' $ \gs -> case Game.lookupObject oid gs of
-  Nothing -> gs
-  Just _ ->
-    let gs1 = Game.removeFromZones oid gs
-     in gs1 {GameState.objects = Map.delete oid (GameState.objects gs1)}
+unmake oid = State.modify' (Game.deleteObject oid)
 
 -- The tail createTokens and conjureOntoBattlefield share, run after every entry
 -- loop of a batch minted onto the battlefield. CR 613.7m: the batch entered
@@ -8735,16 +8716,123 @@ mergeable sid target gs = case (Game.lookupObject sid gs, Game.lookupObject targ
 -- that funnel reads them, off `obj` rather than off any incarnation, since nothing
 -- survives this write to read them from.
 forgetObject :: GameState -> ObjectId -> GameState
-forgetObject gs oid = case Game.lookupObject oid gs of
+forgetObject gs oid = case lastKnownRecord gs oid of
   Nothing -> gs
-  Just obj ->
-    let snapshot = Projection.project oid gs
-        lastController = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
-        cleared = Game.removeFromZones oid gs
-     in cleared
-          { GameState.objects = Map.delete oid (GameState.objects cleared),
-            GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Game.attachments oid gs) (Object.chosenNames obj) (Object.chosenPlayer obj) (Object.chosenColors obj) (Object.chosenSubtype obj) (Game.isAttacking oid gs) (Game.attackTargetOf oid gs) (Game.isBlocking oid gs) (Object.protector obj) (Object.paidCosts obj) (Object.controlClock obj) (Object.zone obj) (Game.pileHolderOf oid gs)) (GameState.lastKnown cleared)
+  Just known ->
+    let cleared = Game.deleteObject oid gs
+     in cleared {GameState.lastKnown = Map.insert oid known (GameState.lastKnown cleared)}
+
+-- | CR 608.2h: what an object was, read off one board -- the record filed as it
+-- ceases, under the id it had while it existed. Nothing for an id that board
+-- does not hold.
+--
+-- The ONE builder of a LastKnown: the zone-change funnel, forgetObject and
+-- leaveTheGame all file what this answers, so no road out of a zone or out of
+-- the game can come to remember an object differently.
+lastKnownRecord :: GameState -> ObjectId -> Maybe LastKnown.LastKnown
+lastKnownRecord gs oid = fmap (lastKnownFrom gs oid) (Game.lookupObject oid gs)
+
+-- lastKnownRecord for an object already in hand, which must be the one `gs`
+-- holds under `oid`.
+lastKnownFrom :: GameState -> ObjectId -> Object.Object -> LastKnown.LastKnown
+lastKnownFrom gs oid obj =
+  LastKnown.MkLastKnown
+    (Projection.project oid gs)
+    -- CR 613.1b, and the reason this record is what a departure's trigger is
+    -- read from: control is not a characteristic (CR 109.3), so it cannot ride
+    -- the projection, and CR 603.3a asks who controlled a source that is
+    -- already gone. The Object.owner fallback is unreachable rather than a
+    -- guess: Projection.controllerOf answers `Just` for any id that resolves.
+    (Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs))
+    -- CR 108.3, which no projection moves: read straight off the object.
+    (Object.owner obj)
+    (Object.source obj)
+    -- CR 122.2: counters cease to exist on the zone change, so this is the last
+    -- moment they can be recorded.
+    (Object.counters obj)
+    -- CR 613.1a's layer, read off the copy binding and face `obj` carries.
+    (copiedSnapshot oid gs)
+    -- CR 303.4b / 301.5a with the arrow turned round, taken while the answer
+    -- still exists (CR 603.10a).
+    (Game.attachments oid gs)
+    (Object.chosenNames obj)
+    (Object.chosenPlayer obj)
+    (Object.chosenColors obj)
+    (Object.chosenSubtype obj)
+    -- CR 508.1k / 509.1g.
+    (Game.isAttacking oid gs)
+    (Game.attackTargetOf oid gs)
+    (Game.isBlocking oid gs)
+    -- CR 310.9a: Nothing for everything that is not a battle.
+    (Object.protector obj)
+    -- CR 400.7d's cost record.
+    (Object.paidCosts obj)
+    -- CR 702.30a's echo window: per-incarnation, so this is the last moment it
+    -- exists.
+    (Object.controlClock obj)
+    (Object.zone obj)
+    -- CR 400.1: the pile it left.
+    (Game.pileHolderOf oid gs)
+
+-- | An object leaves the GAME rather than a zone -- CR 800.4a's first clause,
+-- or CR 729.4a's crossing into a subgame -- at the instant `asOf` describes,
+-- applied to the running state `g`. The one step both roads share: CR 608.2h's
+-- record and CR 604.2's handover are read off `asOf`, then the object is deleted
+-- from `g` with everything keyed on it.
+--
+-- What goes with it, each keyed on the departing id:
+--
+--   * its combat entries -- CR 506.4 removes a permanent from combat as it
+--     leaves the battlefield, and Game.ceaseAttacking keeps CR 508.5's defending
+--     player for it;
+--   * GameState.movedUntil (CR 610.3), GameState.haunting (CR 702.55b),
+--     GameState.encoded (CR 702.99b), GameState.exiledWith (CR 607.2a) and
+--     GameState.exilePiles (CR 406.4).
+--
+-- Only an entry whose KEY is the departing object goes. One whose VALUE names it
+-- stays: a source-leaves watch then returns its object at the next settle, which
+-- is what rule 610.3 asks for; rule 702.55b keeps naming the object a haunt
+-- ability targeted after it is gone; CR 702.99c's encoding is checked where it
+-- is read; and CR 607.2a's link keeps naming the object whose ability exiled a
+-- card, which is the whole of what Hoarding Dragon's dies trigger reads.
+--
+-- CR 604.2: a permanent leaving the game has left the battlefield, so a card
+-- whose text says its effect continues anyway -- Titania's Song -- hands that
+-- effect over as it goes. Gated on GameState.battlefield membership rather than
+-- Object.zone, which is CR 702.26b: a phased-out permanent was generating no
+-- effect there is anything to continue.
+--
+-- Records no event: when each departure's events are recorded, and which zones
+-- they name, is the caller's (leavingReveal is the CR 708.9 one).
+leaveTheGame :: GameState -> GameState -> ObjectId -> GameState
+leaveTheGame asOf g oid = case lastKnownRecord asOf oid of
+  Nothing -> g
+  Just known ->
+    let handover
+          | Set.member oid (GameState.battlefield asOf) = lingeringHandover oid (LastKnown.controller known) asOf
+          | otherwise = []
+        g1 = Game.ceaseAttacking oid (Game.deleteObject oid g)
+        combat = GameState.combat g1
+     in g1
+          { GameState.lastKnown = Map.insert oid known (GameState.lastKnown g1),
+            GameState.continuousEffects = handover <> GameState.continuousEffects g1,
+            GameState.combat = combat {Combat.struckFirst = fmap (Set.delete oid) (Combat.struckFirst combat)},
+            GameState.movedUntil = Map.delete oid (GameState.movedUntil g1),
+            GameState.haunting = Map.delete oid (GameState.haunting g1),
+            GameState.encoded = Map.delete oid (GameState.encoded g1),
+            GameState.exiledWith = Map.delete oid (GameState.exiledWith g1),
+            GameState.exilePiles = Map.delete oid (GameState.exilePiles g1)
           }
+
+-- | CR 708.9: the reveal a face-down permanent's owner owes as it leaves the
+-- game, read off `asOf`, the board it is leaving. Nothing for anything else,
+-- including a phased-out permanent (CR 702.26b, GameState.battlefield
+-- membership).
+leavingReveal :: GameState -> ObjectId -> Maybe GameEvent.GameEvent
+leavingReveal asOf oid = do
+  obj <- Game.lookupObject oid asOf
+  Monad.guard (Set.member oid (GameState.battlefield asOf) && Facing.isFaceDown (Object.facing obj))
+  revealedOn RevealCause.LeavingFaceDown (Object.owner obj) oid asOf
 
 -- CR 119.3: move one player's life total by this much, and record the CR 608.2i
 -- event of the matching sign. The write LoseLife, GainLife and
