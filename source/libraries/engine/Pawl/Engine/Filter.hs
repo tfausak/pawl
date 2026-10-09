@@ -3760,6 +3760,7 @@ readsSourcePower predicate = case predicate of
   Filter.HasChosenSubtype -> False
   Filter.IsLastExiledWithSource -> False
   Filter.OfChosenPlayer -> False
+  Filter.OfRelatedPlayer _ -> False
   Filter.IsPlayer _ -> False
   Filter.IsControllerOfBound _ -> False
   Filter.CardsInGraveyardAtLeast _ -> False
