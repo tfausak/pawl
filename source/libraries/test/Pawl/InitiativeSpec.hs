@@ -266,22 +266,6 @@ spec s registry = Spec.describe s "Initiative" $ do
     let apart = resolveAll answering (S.withEvents [combatDamageTo S.alice bobs, combatDamageTo S.alice second] hers)
     Spec.assertEqWith s "CR 603.2c the same damage in two groups is two takes" (takings apart) [S.bob, S.bob]
 
-  -- CR 726.2's "creatures A PLAYER controls", the batch's split: bob's and
-  -- carol's creatures connecting in ONE step are two occurrences, one per
-  -- damagers' controller, so each takes the initiative. Paired with the case
-  -- above, whose two damagers share a controller.
-  Spec.it s "CR 726.2 two players' creatures connecting in one step are one take each" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    undercity <- S.printingOf s registry "Undercity"
-    sneak <- S.printingOf s registry "Aarakocra Sneak"
-    let (bobs, carols, base) = board island piker undercity
-        (_, entering) = S.entersWithTrigger sneak S.alice base
-        hers = resolveAll answering entering
-        after = resolveAll answering (S.withGroupedEvents [[combatDamageTo S.alice bobs, combatDamageTo S.alice carols]] hers)
-    Spec.assertEqWith s "CR 603.2c bob and carol each took the initiative once" (List.sort (takings after)) [S.bob, S.carol]
-    Spec.assertEqWith s "the stack is empty, so nothing is still pending" (GameState.stack after) []
-
   -- CR 726.2 makes the hand-off "controlled by the player who had the initiative
   -- at the time the abilities triggered", so when the damage that triggers it
   -- also kills the holder, CR 800.4d keeps it off the stack and CR 726.4 alone
@@ -366,7 +350,7 @@ spec s registry = Spec.describe s "Initiative" $ do
     let (bobs, carols, base) = board island piker undercity
         (_, entering) = S.entersWithTrigger sneak S.alice base
         hers = resolveAll answering entering
-        after = resolveAll answering (S.withEvents [combatDamageTo S.alice bobs, combatDamageTo S.alice carols] hers)
+        after = resolveAll answering (S.withGroupedEvents [[combatDamageTo S.alice bobs, combatDamageTo S.alice carols]] hers)
     -- The rule, read at gameplay level: BOTH opponents ventured, so both triggers
     -- resolved. A grouping that collapsed the two controllers into one leaves
     -- whichever of them lost the race in no dungeon at all.
@@ -395,7 +379,7 @@ spec s registry = Spec.describe s "Initiative" $ do
         hers = resolveAll answering entering
         firstStrike = resolveAll answering (S.withEvents [combatDamageTo S.alice bobs] hers)
         regular = resolveAll answering (S.withEvents [combatDamageTo S.bob carols] firstStrike)
-        fused = resolveAll answering (S.withEvents [combatDamageTo S.alice bobs, combatDamageTo S.bob carols] hers)
+        fused = resolveAll answering (S.withGroupedEvents [[combatDamageTo S.alice bobs, combatDamageTo S.bob carols]] hers)
     Spec.assertEqWith s "the first batch handed it to bob" (GameState.initiative firstStrike) (Just S.bob)
     Spec.assertEqWith s "CR 726.2 the second batch, asked about the new holder, handed it to carol" (GameState.initiative regular) (Just S.carol)
     Spec.assertEqWith s "CR 701.49d so carol ventured too" (dungeonNamesOf S.carol regular) ["\"Undercity\""]
