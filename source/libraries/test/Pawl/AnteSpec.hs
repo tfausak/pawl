@@ -10,6 +10,7 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Pawl.Engine.Ante as Ante
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -113,6 +114,21 @@ spec s registry = Spec.describe s "Ante" $ do
         inAnte oid = fmap Object.zone (Game.lookupObject oid restarted) == Just Zone.Ante
     Spec.assertEqWith s "CR 407.2 two cards in the ante again, each really there" (Set.size (GameState.ante restarted), all inAnte (Set.toList (GameState.ante restarted))) (2, True)
     Spec.assertEqWith s "CR 727.2 and nobody's cards went missing" (ownedBy S.alice restarted, ownedBy S.bob restarted) (20, 20)
+  -- CR 727.1: a restarted game has no winner, so nothing is paid; CR 727.2:
+  -- ownership does not change, so a card alice took before the restart (the
+  -- write Darkpact makes) is still hers, and still reported as bob's to begin.
+  Spec.it s "CR 727.1/727.2 a restart pays nothing, and an ownership change outlives it" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    let deck = Deck.fromCards (Map.singleton mountain 20)
+        (anted, _) = startedWith anteGame ((S.alice, deck) NonEmpty.:| [(S.bob, deck)])
+    case anteOf S.bob anted of
+      [bobs] -> do
+        let taken = Game.setOwner bobs S.alice anted
+            restarted = S.runPure S.identityAnswer taken (Setup.restartGame S.performer Set.empty S.alice)
+        Spec.assertEqWith s "CR 727.2 the card alice took is reported, bob's to begin and hers now" (Map.elems (Ante.ownershipChanges restarted)) [(S.bob, S.alice)]
+        Spec.assertEqWith s "CR 727.1 nobody won the restarted game" (GameState.result restarted) Nothing
+        Spec.assertEqWith s "CR 727.2 and nothing else changed hands" (ownedBy S.alice restarted, ownedBy S.bob restarted) (21, 19)
+      other -> Spec.assertFailure s ("bob anted " <> show (length other) <> " cards")
   -- CR 729.2 moves the main-game libraries, and a seat whose library is empty
   -- brings nothing to ante.
   Spec.it s "CR 729.2/407.2 a subgame seat with no library antes nothing" $ do

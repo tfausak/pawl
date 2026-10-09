@@ -119,7 +119,8 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   `Priority`, `Zone` (a `player`'s `zone`, in order), `Colors`, `ManaPool`
   (a `player`'s), `Daytime` (`null` before either), and `Protector`,
   `Designations`, `RingBearer` and `Supertypes` (of an `object`),
-  `CommanderDamage` (a `player`'s, as `[name, amount]` pairs); an object is named as the
+  `CommanderDamage` (a `player`'s, as `[name, amount]` pairs), `OwnershipChanges`
+  (each card whose owner changed, as `[card, starting owner, owner]`); an object is named as the
   runner's messages name it, by label while it keeps one, and an ability on
   the stack as `"trigger of $source"` or `"ability of $source"`. A seat is
   named bare: `"player": "alice"`.
