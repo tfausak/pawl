@@ -1,0 +1,86 @@
+{
+  "description": "CR 706.5 two equal results are doubles (control)",
+  "note": "Two RollDie answers are the two dice, and no ChooseDieResult is scheduled, so a choice between the results would be an unscheduled prompt. 1 and 4: one +1/+1, lifelink off the second die, and no doubles.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Celebr-8000",
+            "label": "robot"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "RollDie",
+          "with": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "RollDie",
+          "with": 4
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "check": {
+        "Keywords": {
+          "object": "$robot",
+          "keyword": {
+            "type": "DoubleStrike"
+          },
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "check": {
+        "Keywords": {
+          "object": "$robot",
+          "keyword": {
+            "type": "Lifelink"
+          },
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$robot",
+          "power": 4,
+          "toughness": 4
+        }
+      }
+    }
+  ]
+}

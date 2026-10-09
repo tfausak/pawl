@@ -19,6 +19,12 @@ spec s = Spec.describe s "Pawl.Codec.DiceReading" $ do
       DiceReading.codec
       DiceReading.Total
       " {\"type\":\"Total\"} "
+  Spec.it s "Both" $
+    Common.assertCodec
+      s
+      DiceReading.codec
+      DiceReading.Both
+      " {\"type\":\"Both\"} "
   Spec.it s "round trips every constructor" $ Common.assertEnumCodec s DiceReading.codec
   Spec.it s "has a schema" $
     Common.assertHasSchema s DiceReading.codec
