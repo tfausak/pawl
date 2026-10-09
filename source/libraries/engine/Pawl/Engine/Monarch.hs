@@ -7,7 +7,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
-import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Mint as Mint
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Draw as Draw
@@ -28,43 +28,26 @@ import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.ReturnEnding as ReturnEnding
 import qualified Pawl.Types.ReturnWatch as ReturnWatch
 import qualified Pawl.Types.StepBegins as StepBegins
-import Pawl.Types.TriggerCondition (TriggerCondition)
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
-import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
-import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
-
--- An inherent triggered ability of one effect (Modal.single), with no
--- intervening "if" and no rider: the shape of CR 725.2's two abilities, CR
--- 726.2's three and CR 901.8's, none of whose quoted texts holds another
--- sentence. CR 702.179d's and CR 728.1's carry an "if" and build on it.
-oneEffect :: TriggerCondition -> Effect.Effect Card (GrantedAbility.GrantedAbility Card) -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
-oneEffect cond eff =
-  TriggeredAbility.MkTriggeredAbility
-    { TriggeredAbility.condition = cond,
-      TriggeredAbility.modal = Modal.single (Seq.singleton eff),
-      TriggeredAbility.intervening = Nothing,
-      TriggeredAbility.name = Nothing,
-      TriggeredAbility.limit = TriggerLimit.Unlimited
-    }
 
 -- CR 725.2's end step draw. Controller-scoped to the monarch, so
 -- ControllersTurn plus the monarch as "you" is exactly the monarch's own end
 -- step.
 endStepDraw :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 endStepDraw =
-  oneEffect
+  Mint.trigger
     (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Ending EndingStep.EndStep) Nothing TurnScope.ControllersTurn))
-    (Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1) Nothing))
+    (Seq.singleton (Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1) Nothing)))
 
 -- CR 725.2's crown steal. Controlled by the current monarch; makes a DIFFERENT
 -- player (the damager's controller) the monarch.
 crownSteal :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 crownSteal =
-  oneEffect
+  Mint.trigger
     TriggerCondition.CreatureDealtCombatDamageToMonarch
-    (Effect.BecomeMonarch MonarchTarget.ControllerOfSource)
+    (Seq.singleton (Effect.BecomeMonarch MonarchTarget.ControllerOfSource))
 
 -- CR 725.2: the monarch's inherent abilities, each paired with its controller,
 -- for Event.Trigger.inherentTriggers. Present only while there is a monarch,

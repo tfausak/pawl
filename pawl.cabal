@@ -1478,6 +1478,7 @@ library engine
     Pawl.Engine.ManaFilter
     Pawl.Engine.ManaRider
     Pawl.Engine.ManifestDread
+    Pawl.Engine.Mint
     Pawl.Engine.Modal
     Pawl.Engine.Monarch
     Pawl.Engine.MoveDuration

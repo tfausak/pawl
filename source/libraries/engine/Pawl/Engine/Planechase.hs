@@ -29,7 +29,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
-import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Mint as Mint
 import qualified Pawl.Engine.Plane as Plane
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
@@ -58,9 +58,7 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
-import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
-import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 
 -- | CR 901.3: this player's planar deck, top first.
 deckOf :: PlayerId -> GameState -> [ObjectId]
@@ -242,10 +240,4 @@ abilities gs = if isPlanechase gs then fmap (\pid -> (pid, planeswalkingAbility)
 -- die, planeswalk."
 planeswalkingAbility :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 planeswalkingAbility =
-  TriggeredAbility.MkTriggeredAbility
-    { TriggeredAbility.condition = TriggerCondition.PlayerRollsPlaneswalker PlayerRelation.You,
-      TriggeredAbility.modal = Modal.single (Seq.singleton Effect.Planeswalk),
-      TriggeredAbility.intervening = Nothing,
-      TriggeredAbility.name = Nothing,
-      TriggeredAbility.limit = TriggerLimit.Unlimited
-    }
+  Mint.trigger (TriggerCondition.PlayerRollsPlaneswalker PlayerRelation.You) (Seq.singleton Effect.Planeswalk)

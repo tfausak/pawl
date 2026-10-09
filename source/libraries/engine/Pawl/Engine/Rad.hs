@@ -29,7 +29,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
-import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Mint as Mint
 import qualified Pawl.Engine.Turn as Turn
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardType as CardType
@@ -132,7 +132,7 @@ ability =
       -- phase" -- the rule quantifies over turns, not over the players of one.
       TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins Phase.PrecombatMain Nothing TurnScope.ControllersTurn),
       TriggeredAbility.modal =
-        Modal.single . Seq.fromList $
+        Mint.oneMode . Seq.fromList $
           [ -- "that player mills a number of cards equal to the
             -- number of rad counters they have", counting the
             -- nonland cards it milled.

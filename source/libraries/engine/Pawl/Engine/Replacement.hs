@@ -44,6 +44,7 @@ import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mint as Mint
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
@@ -59,7 +60,6 @@ import Pawl.Types.CandidateId (CandidateId)
 import qualified Pawl.Types.CandidateId as CandidateId
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Card as Card.Type
-import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.CoinFlipR as CoinFlipR
 import qualified Pawl.Types.CoinFlipRewrite as CoinFlipRewrite
 import Pawl.Types.ControllerRelation (ControllerRelation)
@@ -109,12 +109,8 @@ import qualified Pawl.Types.LifeLossR as LifeLossR
 import qualified Pawl.Types.LifeLossRewrite as LifeLossRewrite
 import qualified Pawl.Types.MillCountR as MillCountR
 import qualified Pawl.Types.MillCountRewrite as MillCountRewrite
-import qualified Pawl.Types.Modal as Modal
-import qualified Pawl.Types.Mode as Mode
-import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
-import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PermanentCandidate as PermanentCandidate
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import Pawl.Types.PhaseSelector (PhaseSelector)
@@ -157,7 +153,6 @@ import qualified Pawl.Types.TokenLot as TokenLot
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
-import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
@@ -2579,17 +2574,7 @@ linkedCopyTrigger :: AsCopy.AsCopy ability (Effect.Effect Card (GrantedAbility.G
 linkedCopyTrigger asCopy
   | Seq.null (AsCopy.whenYouDo asCopy) = Nothing
   | otherwise =
-      Just
-        TriggeredAbility.MkTriggeredAbility
-          { TriggeredAbility.condition = TriggerCondition.Reflexive,
-            TriggeredAbility.modal =
-              Modal.MkModal
-                (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (AsCopy.whenYouDo asCopy))) Map.empty))
-                (ModeSelection.ChooseExactly 1),
-            TriggeredAbility.intervening = Nothing,
-            TriggeredAbility.name = Nothing,
-            TriggeredAbility.limit = TriggerLimit.Unlimited
-          }
+      Just (Mint.trigger TriggerCondition.Reflexive (AsCopy.whenYouDo asCopy))
 
 -- CR 614.1c / 701.20a: the cards a player may reveal from their hand to satisfy
 -- an "as this enters, you may reveal a [matching] card from your hand" ability

@@ -26,9 +26,10 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
-import Pawl.Engine.Monarch (oneEffect)
+import qualified Pawl.Engine.Mint as Mint
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Effect as Effect
@@ -59,9 +60,9 @@ ventureIntoUndercity = Effect.Venture (Just Subtype.Undercity)
 -- upkeep.
 upkeepVenture :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 upkeepVenture =
-  oneEffect
+  Mint.trigger
     (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn))
-    ventureIntoUndercity
+    (Seq.singleton ventureIntoUndercity)
 
 -- CR 726.2, second: "whenever one or more creatures a player controls deal
 -- combat damage to the player who has the initiative, the controller of those
@@ -69,14 +70,14 @@ upkeepVenture =
 -- designation to a DIFFERENT player.
 combatHandoff :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 combatHandoff =
-  oneEffect
+  Mint.trigger
     TriggerCondition.CreaturesDealtCombatDamageToInitiative
-    (Effect.TakeTheInitiative InitiativeTarget.ControllerOfSource)
+    (Seq.singleton (Effect.TakeTheInitiative InitiativeTarget.ControllerOfSource))
 
 -- CR 726.2, third: "whenever a player takes the initiative, that player ventures
 -- into Undercity". CR 726.5 is this ability's rule -- it fires on a re-take too.
 takeVenture :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
-takeVenture = oneEffect TriggerCondition.PlayerTookInitiative ventureIntoUndercity
+takeVenture = Mint.trigger TriggerCondition.PlayerTookInitiative (Seq.singleton ventureIntoUndercity)
 
 -- CR 726.2: the initiative's inherent abilities, each paired with its
 -- controller, for Event.Trigger.inherentTriggers.

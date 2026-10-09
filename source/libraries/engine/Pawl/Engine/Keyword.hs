@@ -13,6 +13,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Deploy as Deploy
 import qualified Pawl.Engine.Earthbend as Earthbend
+import qualified Pawl.Engine.Mint as Mint
 import qualified Pawl.Extra.Natural as Natural
 import Pawl.Types.AbilityName (AbilityName)
 import qualified Pawl.Types.AbilityName as AbilityName
@@ -131,8 +132,6 @@ import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Modal as Modal
-import qualified Pawl.Types.Mode as Mode
-import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
@@ -888,9 +887,7 @@ cycling cost searchFor =
    in ActivatedAbility.MkActivatedAbility
         { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.DiscardThis DiscardCause.ToPayCyclingCost]},
           ActivatedAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneMode (Seq.singleton effect),
           ActivatedAbility.maximumX = [],
           ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [],
@@ -929,9 +926,7 @@ reinforce n cost =
    in ActivatedAbility.MkActivatedAbility
         { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.DiscardThis DiscardCause.Ordinary]},
           ActivatedAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton reinforceTarget slot)))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeTargeting (Map.singleton reinforceTarget slot) (Seq.singleton effect),
           -- CR 702.77a states no timing restriction, which leaves CR 117.1b's
           -- default, and gives the ability outright with no "as long as".
           ActivatedAbility.maximumX = [],
@@ -1020,9 +1015,7 @@ craft spec =
    in ActivatedAbility.MkActivatedAbility
         { ActivatedAbility.cost = printed {Cost.components = Cost.components printed <> [CostComponent.ExileThis, CostComponent.ExileMaterials (Craft.materials spec)]},
           ActivatedAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeOf Map.empty (Seq.singleton clause),
           ActivatedAbility.maximumX = [],
           ActivatedAbility.minimumX = 0,
           -- CR 602.5d, rule 702.167a's "Activate only as a sorcery" -- scavenge's
@@ -1084,9 +1077,7 @@ searchForSameManaValue cost filter_ destination =
    in ActivatedAbility.MkActivatedAbility
         { ActivatedAbility.cost = cost,
           ActivatedAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneMode (Seq.singleton effect),
           ActivatedAbility.maximumX = [],
           ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
@@ -1181,9 +1172,7 @@ ninjutsu cost =
    in ActivatedAbility.MkActivatedAbility
         { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.ReturnPermanents returned]},
           ActivatedAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneMode (Seq.singleton effect),
           ActivatedAbility.maximumX = [],
           ActivatedAbility.minimumX = 0,
           -- Rule 702.49a states no timing restriction, which leaves CR 117.1b's
@@ -1522,9 +1511,7 @@ unearth cost =
    in ActivatedAbility.MkActivatedAbility
         { ActivatedAbility.cost = cost,
           ActivatedAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeOf Map.empty (Seq.singleton clause),
           ActivatedAbility.maximumX = [],
           ActivatedAbility.minimumX = 0,
           -- CR 602.5d, rule 702.84a's "Activate only as a sorcery" -- levelUp's
@@ -1584,16 +1571,7 @@ unearthExile =
               MoveToZone.placement = LibraryPlacement.defaultValue,
               MoveToZone.duration = Nothing
             }
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Ending EndingStep.EndStep) Nothing TurnScope.EachTurn),
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in Mint.trigger (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Ending EndingStep.EndStep) Nothing TurnScope.EachTurn)) (Seq.singleton effect)
 
 -- CR 702.128a: embalm's token copy is white, has no mana cost, and is a Zombie
 -- in addition to its other types.
@@ -1659,9 +1637,7 @@ graveyardTokenCopy exceptions cost =
    in ActivatedAbility.MkActivatedAbility
         { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.ExileThisFromGraveyard]},
           ActivatedAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton copied))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneMode (Seq.singleton copied),
           ActivatedAbility.maximumX = [],
           ActivatedAbility.minimumX = 0,
           -- CR 602.5d, the rules' "Activate only as a sorcery".
@@ -1703,9 +1679,7 @@ scavenge cost =
    in ActivatedAbility.MkActivatedAbility
         { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.ExileThisFromGraveyard]},
           ActivatedAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton scavengeTarget slot)))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeTargeting (Map.singleton scavengeTarget slot) (Seq.singleton effect),
           ActivatedAbility.maximumX = [],
           ActivatedAbility.minimumX = 0,
           -- CR 602.5d, rule 702.97a's "Activate only as a sorcery".
@@ -1821,9 +1795,7 @@ encore cost =
    in ActivatedAbility.MkActivatedAbility
         { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.ExileThisFromGraveyard]},
           ActivatedAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [loop, hasted, armed]))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneMode (Seq.fromList [loop, hasted, armed]),
           ActivatedAbility.maximumX = [],
           ActivatedAbility.minimumX = 0,
           -- CR 602.5d, rule 702.141a's "Activate only as a sorcery".
@@ -2172,9 +2144,7 @@ crew n =
                 Cost.components = [CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n criterion)]
               },
           ActivatedAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [becomes CardType.Artifact, becomes CardType.Creature]))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneMode (Seq.fromList [becomes CardType.Artifact, becomes CardType.Creature]),
           ActivatedAbility.maximumX = [],
           ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [],
@@ -2228,9 +2198,7 @@ saddle n =
                 Cost.components = [CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n criterion)]
               },
           ActivatedAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Designate (Designate.MkDesignate Designation.Saddled Binding.triggerSource Nothing))))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneMode (Seq.singleton (Effect.Designate (Designate.MkDesignate Designation.Saddled Binding.triggerSource Nothing))),
           ActivatedAbility.maximumX = [],
           ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
@@ -2299,9 +2267,7 @@ station =
                 Cost.components = [CostComponent.TapPermanents (TapPermanents.MkTapPermanents 1 criterion False)]
               },
           ActivatedAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton load))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneMode (Seq.singleton load),
           ActivatedAbility.maximumX = [],
           ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
@@ -2345,9 +2311,7 @@ levelUp cost =
    in ActivatedAbility.MkActivatedAbility
         { ActivatedAbility.cost = cost,
           ActivatedAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton gain))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneMode (Seq.singleton gain),
           ActivatedAbility.maximumX = [],
           ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
@@ -2376,9 +2340,7 @@ outlast cost =
    in ActivatedAbility.MkActivatedAbility
         { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.TapThis]},
           ActivatedAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton grow))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneMode (Seq.singleton grow),
           ActivatedAbility.maximumX = [],
           ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
@@ -2427,9 +2389,7 @@ equip payload =
    in ActivatedAbility.MkActivatedAbility
         { ActivatedAbility.cost = Equip.cost payload,
           ActivatedAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton equipTarget slot)))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeTargeting (Map.singleton equipTarget slot) (Seq.singleton effect),
           -- CR 702.6a's "Activate only as a sorcery", which CR 307.5 spells out.
           ActivatedAbility.maximumX = [],
           ActivatedAbility.minimumX = 0,
@@ -2470,9 +2430,7 @@ equipPlaneswalker cost =
    in ActivatedAbility.MkActivatedAbility
         { ActivatedAbility.cost = cost,
           ActivatedAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton equipTarget slot)))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeTargeting (Map.singleton equipTarget slot) (Seq.singleton effect),
           -- CR 702.6e's "Activate only as a sorcery", which CR 307.5 spells out.
           ActivatedAbility.maximumX = [],
           ActivatedAbility.minimumX = 0,
@@ -2513,9 +2471,7 @@ fortify cost =
    in ActivatedAbility.MkActivatedAbility
         { ActivatedAbility.cost = cost,
           ActivatedAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton fortifyTarget slot)))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeTargeting (Map.singleton fortifyTarget slot) (Seq.singleton effect),
           -- CR 702.67a's "Activate only as a sorcery", which CR 307.5 spells out.
           ActivatedAbility.maximumX = [],
           ActivatedAbility.minimumX = 0,
@@ -2559,9 +2515,7 @@ reconfigure cost =
    in ActivatedAbility.MkActivatedAbility
         { ActivatedAbility.cost = cost,
           ActivatedAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton reconfigureTarget slot)))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeTargeting (Map.singleton reconfigureTarget slot) (Seq.singleton effect),
           -- CR 702.151a's "Activate only as a sorcery", which CR 307.5 spells out.
           ActivatedAbility.maximumX = [],
           ActivatedAbility.minimumX = 0,
@@ -2591,9 +2545,7 @@ reconfigureOff cost =
   ActivatedAbility.MkActivatedAbility
     { ActivatedAbility.cost = cost,
       ActivatedAbility.modal =
-        Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Unattach (ObjectRef.EachMatching Filter.IsSource))))) Map.empty))
-          (ModeSelection.ChooseExactly 1),
+        Mint.oneMode (Seq.singleton (Effect.Unattach (ObjectRef.EachMatching Filter.IsSource))),
       ActivatedAbility.maximumX = [],
       ActivatedAbility.minimumX = 0,
       ActivatedAbility.restrictions =
@@ -2631,9 +2583,7 @@ auraSwap cost =
    in ActivatedAbility.MkActivatedAbility
         { ActivatedAbility.cost = cost,
           ActivatedAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeOf Map.empty (Seq.singleton (Clause.MkClause Nothing Nothing Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.singleton effect))),
           ActivatedAbility.maximumX = [],
           ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [],
@@ -4231,16 +4181,7 @@ whilePaid family modifications =
 blitzDraw :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 blitzDraw =
   let effect = Effect.Draw Draw.MkDraw {Draw.player = PlayerRef.Relative PlayerRelation.You, Draw.quantity = Quantity.Literal 1, Draw.slot = Nothing}
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.SelfDies,
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in Mint.trigger TriggerCondition.SelfDies (Seq.singleton effect)
 
 -- CR 702.161a: "During your turn, this permanent is an artifact creature in
 -- addition to its other types."
@@ -5820,9 +5761,7 @@ poisonous n =
           -- Lavarunner and Questing Beast print "to an opponent".
           TriggeredAbility.condition = TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer,
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneMode (Seq.singleton effect),
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -5871,9 +5810,7 @@ ingest =
           -- Lavarunner and Questing Beast print "to an opponent".
           TriggeredAbility.condition = TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer,
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneMode (Seq.singleton effect),
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -5929,16 +5866,7 @@ myriadExile =
               MoveToZone.placement = LibraryPlacement.defaultValue,
               MoveToZone.duration = Nothing
             }
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Combat CombatStep.EndOfCombat) Nothing TurnScope.EachTurn),
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in Mint.trigger (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Combat CombatStep.EndOfCombat) Nothing TurnScope.EachTurn)) (Seq.singleton effect)
 
 -- CR 702.116a. Battle cry's SelfAttacks EveryTime condition (CR 508.3a), over CR
 -- 608.2f's loop: one iteration per opponent other than the defending player,
@@ -6017,18 +5945,13 @@ myriad =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
           TriggeredAbility.modal =
-            Modal.MkModal
-              ( Seq.singleton
-                  ( Mode.MkMode
-                      ( Seq.fromList
-                          [ Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton loop),
-                            Clause.MkClause Nothing (Just anyToken) Nothing Optionality.Mandatory Nothing (Seq.singleton arm)
-                          ]
-                      )
-                      Map.empty
-                  )
-              )
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeOf
+              Map.empty
+              ( Seq.fromList
+                  [ Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton loop),
+                    Clause.MkClause Nothing (Just anyToken) Nothing Optionality.Mandatory Nothing (Seq.singleton arm)
+                  ]
+              ),
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -6095,16 +6018,7 @@ mobilize n =
               ArmDelayedTrigger.duration = Nothing,
               ArmDelayedTrigger.ability = Nothing
             }
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [spawn, arm]))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in Mint.trigger (TriggerCondition.SelfAttacks TriggerFrequency.EveryTime) (Seq.fromList [spawn, arm])
 
 -- The quantity mobilize's and firebending's N reads as the ability resolves
 -- (CR 608.2h). Power reads the triggered ability's source, the object carrying
@@ -6153,16 +6067,7 @@ firebending n =
               ManaAddition.rider = Nothing,
               ManaAddition.whenSpent = Nothing
             }
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton added))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in Mint.trigger (TriggerCondition.SelfAttacks TriggerFrequency.EveryTime) (Seq.singleton added)
 
 -- CR 702.86a. CR 508.3a is what "attacks" means -- being declared as an attacker
 -- -- so the condition is battle cry's SelfAttacks EveryTime.
@@ -6183,16 +6088,7 @@ annihilator n =
               (Filter.And [])
               (Quantity.Literal (toInteger n))
           )
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in Mint.trigger (TriggerCondition.SelfAttacks TriggerFrequency.EveryTime) (Seq.singleton effect)
 
 -- CR 702.91a, on annihilator's SelfAttacks EveryTime condition.
 --
@@ -6213,16 +6109,7 @@ battleCry =
               )
               Nothing
           )
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in Mint.trigger (TriggerCondition.SelfAttacks TriggerFrequency.EveryTime) (Seq.singleton effect)
 
 -- CR 702.58a's second half: "Whenever another creature enters, if this permanent
 -- has a +1/+1 counter on it, you may move a +1/+1 counter from this permanent
@@ -6259,9 +6146,7 @@ graft =
             TriggerCondition.PermanentEnters
               (Filter.And [Filter.HasCardType CardType.Creature, Filter.Not Filter.IsSource]),
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeOf Map.empty (Seq.singleton (Clause.MkClause Nothing Nothing Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.singleton effect))),
           TriggeredAbility.intervening =
             Just
               ( Condition.Compares
@@ -6354,9 +6239,7 @@ soulbondSelfEnters =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfEnters,
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeOf Map.empty (Seq.singleton clause),
           TriggeredAbility.intervening =
             Just
               ( Condition.All
@@ -6408,9 +6291,7 @@ soulbondOtherEnters =
                   ]
               ),
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeOf Map.empty (Seq.singleton clause),
           TriggeredAbility.intervening =
             Just
               ( Condition.All
@@ -6439,9 +6320,7 @@ evolve =
             TriggerCondition.PermanentEnters
               (Filter.And [Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.You]),
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneMode (Seq.singleton effect),
           TriggeredAbility.intervening = Just (Condition.Any [entrantExceeds Quantity.Power, entrantExceeds Quantity.Toughness]),
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -6485,9 +6364,7 @@ prowess =
                   SpellCast.copies = False
                 },
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneMode (Seq.singleton effect),
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -6535,9 +6412,7 @@ extort =
                   SpellCast.copies = False
                 },
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeOf Map.empty (Seq.singleton clause),
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -6597,9 +6472,7 @@ increment =
                   SpellCast.copies = False
                 },
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton grow))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneMode (Seq.singleton grow),
           TriggeredAbility.intervening = Just (Condition.All [isCreature, Condition.Any [spentExceeds Quantity.Power, spentExceeds Quantity.Toughness]]),
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -6626,16 +6499,7 @@ melee =
               (ObjectRef.EachMatching Filter.IsSource)
               Nothing
           )
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in Mint.trigger (TriggerCondition.SelfAttacks TriggerFrequency.EveryTime) (Seq.singleton effect)
 
 -- CR 702.23a. The condition is bushido's blocked half, CR 509.3c, which fires ONCE
 -- however many creatures blocked, where flanking's CR 509.3d fires once per
@@ -6658,16 +6522,7 @@ rampage n =
               (ObjectRef.EachMatching Filter.IsSource)
               Nothing
           )
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.SelfBecomesBlocked,
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in Mint.trigger TriggerCondition.SelfBecomesBlocked (Seq.singleton effect)
 
 -- CR 702.25a. CR 509.3d is the event -- "becomes blocked by a creature", once for
 -- each creature that blocks -- and NOT CR 509.3c's "becomes blocked", which fires
@@ -6683,18 +6538,11 @@ rampage n =
 -- whoever is blocking at resolution.
 flanking :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 flanking =
-  TriggeredAbility.MkTriggeredAbility
-    { TriggeredAbility.condition =
-        TriggerCondition.SelfBecomesBlockedBy
-          (Filter.And [Filter.HasCardType CardType.Creature, Filter.Not (Filter.HasKeyword Keyword.Flanking)]),
-      TriggeredAbility.modal =
-        Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton flankingEffect))) Map.empty))
-          (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing,
-      TriggeredAbility.name = Nothing,
-      TriggeredAbility.limit = TriggerLimit.Unlimited
-    }
+  Mint.trigger
+    ( TriggerCondition.SelfBecomesBlockedBy
+        (Filter.And [Filter.HasCardType CardType.Creature, Filter.Not (Filter.HasKeyword Keyword.Flanking)])
+    )
+    (Seq.singleton flankingEffect)
 
 -- The -1/-1 rule 702.25a hands the blocker, read out of the slot CR 509.3d bound.
 flankingEffect :: Effect.Effect Card (GrantedAbility.GrantedAbility Card)
@@ -6729,18 +6577,11 @@ exalted =
               (ObjectRef.InSlot Binding.attackingCreature)
               Nothing
           )
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition =
-            TriggerCondition.CreatureAttacksAlone
-              (Filter.And [Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.You]),
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in Mint.trigger
+        ( TriggerCondition.CreatureAttacksAlone
+            (Filter.And [Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.You])
+        )
+        (Seq.singleton effect)
 
 -- CR 702.45a, the one keyword whose sentence names TWO events: "blocks" is CR
 -- 509.3a and "becomes blocked" is CR 509.3c.
@@ -6775,16 +6616,7 @@ bushidoHalf condition n =
               (ObjectRef.EachMatching Filter.IsSource)
               Nothing
           )
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = condition,
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in Mint.trigger condition (Seq.singleton effect)
 
 -- CR 702.154a's second half, rule 702.154b's linked triggered ability: "when you
 -- do, this creature gets +X\/+0 until end of turn, where X is the tapped
@@ -6810,16 +6642,7 @@ enlistReflexive =
               (ObjectRef.EachMatching Filter.IsSource)
               Nothing
           )
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.Reflexive,
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in Mint.trigger TriggerCondition.Reflexive (Seq.singleton effect)
 
 -- CR 702.68a: bushidoHalf with the toughness bonus zeroed.
 --
@@ -6842,16 +6665,7 @@ frenzy n =
               (ObjectRef.EachMatching Filter.IsSource)
               Nothing
           )
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.SelfAttacksUnblocked,
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in Mint.trigger TriggerCondition.SelfAttacksUnblocked (Seq.singleton effect)
 
 -- CR 702.130a: bushido's CR 509.3c condition and annihilator's CR 508.5 player,
 -- read off GameEvent.AttackerBlocked through Binding.triggerPlayer. NOT the
@@ -6870,16 +6684,7 @@ afflict n =
               LifeLossCause.ByEffect
               Nothing
           )
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.SelfBecomesBlocked,
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in Mint.trigger TriggerCondition.SelfBecomesBlocked (Seq.singleton effect)
 
 -- CR 702.134a, the first minted ability that TARGETS. A REAL choice, since with
 -- two smaller attackers the rules leave which one open.
@@ -6899,9 +6704,7 @@ mentor =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton mentorTarget slot)))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeTargeting (Map.singleton mentorTarget slot) (Seq.singleton effect),
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -6928,18 +6731,11 @@ mentorTarget = SlotName.MkSlotName (Text.pack "mentored")
 training :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 training =
   let effect = Effect.Train Binding.triggerSource
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition =
-            TriggerCondition.SelfAttacksWithAnother
-              (Filter.And [Filter.HasCardType CardType.Creature, Filter.PowerGreaterThanSource]),
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in Mint.trigger
+        ( TriggerCondition.SelfAttacksWithAnother
+            (Filter.And [Filter.HasCardType CardType.Creature, Filter.PowerGreaterThanSource])
+        )
+        (Seq.singleton effect)
 
 -- CR 702.21a: ward [cost].
 --
@@ -6979,9 +6775,7 @@ ward w =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfBecomesTargeted PlayerRelation.Opponent,
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeOf Map.empty (Seq.singleton clause),
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -7007,16 +6801,7 @@ decayed =
               ArmDelayedTrigger.duration = Nothing,
               ArmDelayedTrigger.ability = Nothing
             }
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in Mint.trigger (TriggerCondition.SelfAttacks TriggerFrequency.EveryTime) (Seq.singleton effect)
 
 -- CR 603.7: the delayed triggered abilities the RULEBOOK declares, keyed by the
 -- name its own arming opcode names. Pawl.Engine.Resolve falls back to this map
@@ -7119,17 +6904,8 @@ atNextEndStep = atNextEndStepAll . Seq.singleton
 -- the order written, and warpExile's second effect reads the slot its first one
 -- bound, which a second clause would not see.
 atNextEndStepAll :: Seq.Seq (Effect.Effect Card (GrantedAbility.GrantedAbility Card)) -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
-atNextEndStepAll effects =
-  TriggeredAbility.MkTriggeredAbility
-    { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Ending EndingStep.EndStep) Nothing TurnScope.EachTurn),
-      TriggeredAbility.modal =
-        Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing effects)) Map.empty))
-          (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing,
-      TriggeredAbility.name = Nothing,
-      TriggeredAbility.limit = TriggerLimit.Unlimited
-    }
+atNextEndStepAll =
+  Mint.trigger (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Ending EndingStep.EndStep) Nothing TurnScope.EachTurn))
 
 -- CR 702.185a's second static ability: "if this spell's warp cost was paid, exile
 -- the permanent this spell becomes at the beginning of the next end step. Its
@@ -7196,16 +6972,7 @@ decayedSacrificeName = AbilityName.MkAbilityName (Text.pack "decayed")
 decayedSacrifice :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 decayedSacrifice =
   let effect = Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.triggerSource, SacrificeEffect.sacrificer = Sacrificer.EffectController, SacrificeEffect.sacrificed = Nothing}
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Combat CombatStep.EndOfCombat) Nothing TurnScope.EachTurn),
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in Mint.trigger (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Combat CombatStep.EndOfCombat) Nothing TurnScope.EachTurn)) (Seq.singleton effect)
 
 -- CR 702.39a's provoke, the first minted payload that creates a CR 509.1c blocking
 -- REQUIREMENT rather than changing a characteristic.
@@ -7232,9 +6999,7 @@ provoke =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.fromList [requirement, untap]))) (Map.singleton provokeTarget slot)))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeOf (Map.singleton provokeTarget slot) (Seq.singleton (Clause.MkClause Nothing Nothing Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.fromList [requirement, untap]))),
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -7266,9 +7031,7 @@ renown n =
           -- Lavarunner and Questing Beast print "to an opponent".
           TriggeredAbility.condition = TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer,
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [grow, designate]))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneMode (Seq.fromList [grow, designate]),
           TriggeredAbility.intervening =
             Just (Condition.Compares (Compares.MkCompares (Quantity.HasDesignation Designation.Renowned) Comparison.AtMost (Quantity.Literal 0))),
           TriggeredAbility.name = Nothing,
@@ -7285,16 +7048,7 @@ renown n =
 dethrone :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 dethrone =
   let grow = Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.InSlot Binding.triggerSource))
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.SelfAttacksPlayerWithMostLife,
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton grow))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in Mint.trigger TriggerCondition.SelfAttacksPlayerWithMostLife (Seq.singleton grow)
 
 -- CR 702.79a: persist. Its event is CR 700.4's dies, which is why the condition
 -- below is SelfDies.
@@ -7352,9 +7106,7 @@ returns kind =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfDies,
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton back))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneMode (Seq.singleton back),
           TriggeredAbility.intervening =
             Just (Condition.Compares (Compares.MkCompares (Quantity.ObjectCounters kind) Comparison.AtMost (Quantity.Literal 0))),
           TriggeredAbility.name = Nothing,
@@ -7376,9 +7128,7 @@ evoke =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfEnters,
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneMode (Seq.singleton effect),
           TriggeredAbility.intervening =
             Just (Condition.Compares (Compares.MkCompares (Quantity.CastUsing KeywordFamily.Evoke) Comparison.AtLeast (Quantity.Literal 1))),
           TriggeredAbility.name = Nothing,
@@ -7419,9 +7169,7 @@ gift something =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.SelfEnters,
       TriggeredAbility.modal =
-        Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [giftEffect something, Effect.GiveGift]))) Map.empty))
-          (ModeSelection.ChooseExactly 1),
+        Mint.oneMode (Seq.fromList [giftEffect something, Effect.GiveGift]),
       TriggeredAbility.intervening =
         Just (Condition.Compares (Compares.MkCompares (Quantity.TimesPaid (Keyword.Gift something)) Comparison.AtLeast (Quantity.Literal 1))),
       TriggeredAbility.name = Nothing,
@@ -7519,9 +7267,7 @@ paidTokenCopies keyword quantity exceptions =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfEnters,
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton copied))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneMode (Seq.singleton copied),
           TriggeredAbility.intervening =
             Just (Condition.Compares (Compares.MkCompares (Quantity.TimesPaid keyword) Comparison.AtLeast (Quantity.Literal 1))),
           TriggeredAbility.name = Nothing,
@@ -7568,16 +7314,7 @@ afterlife n =
               -- CR 111.2 under CR 109.5: the keyword ability's own controller.
               Create.creator = PlayerRef.Relative PlayerRelation.You
             }
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.SelfDies,
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton spawn))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in Mint.trigger TriggerCondition.SelfDies (Seq.singleton spawn)
 
 -- | CR 702.135a's token: 1/1 white and black Spirit creature with flying. Rule
 -- 702.135a names no name, so CR 111.4 supplies one -- "its subtype(s) plus the
@@ -7669,9 +7406,7 @@ ravenous =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfEnters,
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneMode (Seq.singleton effect),
           TriggeredAbility.intervening =
             Just
               ( Condition.Compares
@@ -7744,9 +7479,7 @@ fabricate n =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfEnters,
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeOf Map.empty (Seq.singleton clause),
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -7812,9 +7545,7 @@ backup (Backup.MkBackup n above) =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfEnters,
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode clauses (Map.singleton backupTarget slot)))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeOf (Map.singleton backupTarget slot) clauses,
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -7843,9 +7574,7 @@ exploit =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfEnters,
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeOf Map.empty (Seq.singleton clause),
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -7972,9 +7701,7 @@ attachToOwnToken token =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfEnters,
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeOf Map.empty (Seq.singleton clause),
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -8046,9 +7773,7 @@ predefinedArtifactToken name subtype mana effect =
     [ ActivatedAbility.MkActivatedAbility
         { ActivatedAbility.cost = Cost.MkCost {Cost.mana = mana, Cost.components = [CostComponent.TapThis, CostComponent.SacrificeThis]},
           ActivatedAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneMode (Seq.singleton effect),
           ActivatedAbility.maximumX = [],
           ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [],
@@ -8209,9 +7934,7 @@ hideaway n =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfEnters,
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.fromList [clause [look], clause [hide, allow], clause [rest]]) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeOf Map.empty (Seq.fromList [clause [look], clause [hide, allow], clause [rest]]),
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -8271,9 +7994,7 @@ soulshift n =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfDies,
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.singleton back))) (Map.singleton soulshiftTarget slot)))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeOf (Map.singleton soulshiftTarget slot) (Seq.singleton (Clause.MkClause Nothing Nothing Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.singleton back))),
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -8333,9 +8054,7 @@ partnerWith name =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfEnters,
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing (Optionality.Optional (PlayerRef.InSlot partnerWithTarget)) Nothing (Seq.singleton effect))) (Map.singleton partnerWithTarget slot)))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeOf (Map.singleton partnerWithTarget slot) (Seq.singleton (Clause.MkClause Nothing Nothing Nothing (Optionality.Optional (PlayerRef.InSlot partnerWithTarget)) Nothing (Seq.singleton effect))),
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -8364,9 +8083,7 @@ haunt =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfDies,
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton exile))) (Map.singleton hauntTarget slot)))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeTargeting (Map.singleton hauntTarget slot) (Seq.singleton exile),
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -8391,9 +8108,7 @@ hauntSpell =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfPutIntoGraveyardDuringResolution,
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton exile))) (Map.singleton hauntTarget slot)))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeTargeting (Map.singleton hauntTarget slot) (Seq.singleton exile),
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -8434,16 +8149,7 @@ miracle cost =
               OfferCast.controlWhileResolving = False,
               OfferCast.slot = Nothing
             }
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.SelfRevealedForMiracle,
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton offer))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in Mint.trigger TriggerCondition.SelfRevealedForMiracle (Seq.singleton offer)
 
 -- CR 702.94a's STATIC half: the cost of each distinct miracle ability, one per
 -- reveal the player may choose to make (CR 702.94b's "its miracle ability").
@@ -8508,7 +8214,7 @@ handTriggeredAbilitiesOf = triggeredAbilitiesOf . Map.fromSet (const 1)
 exileTriggeredAbilitiesOf :: Set Keyword -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
 exileTriggeredAbilitiesOf keywords = case suspendKeyword keywords of
   Nothing -> []
-  Just keyword -> [suspendUpkeep, suspendLastCounter keyword]
+  Just keyword -> [timeCounterUpkeep, suspendLastCounter keyword]
 
 -- CR 702.59a's ability, "a triggered ability that functions only while the card
 -- with recover is in a player's graveyard" -- the roster the graveyard scan in
@@ -8608,9 +8314,7 @@ recover cost =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.PermanentDies (Filter.And [Filter.HasCardType CardType.Creature, Filter.OwnedBy PlayerRelation.You]),
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.fromList [returned, exiled]) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeOf Map.empty (Seq.fromList [returned, exiled]),
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -8687,33 +8391,28 @@ stackCopyTrigger keyword = case keyword of
 -- 608.2h a Grapeshot countered under its own storm trigger is still copied".
 copiesOf :: Quantity.Quantity -> Modal.Modal Card (GrantedAbility.GrantedAbility Card)
 copiesOf quantity =
-  Modal.MkModal
+  Mint.oneModeOf
+    Map.empty
     ( Seq.singleton
-        ( Mode.MkMode
+        ( Clause.MkClause
+            Nothing
+            Nothing
+            Nothing
+            Optionality.Mandatory
+            Nothing
             ( Seq.singleton
-                ( Clause.MkClause
-                    Nothing
-                    Nothing
-                    Nothing
-                    Optionality.Mandatory
-                    Nothing
-                    ( Seq.singleton
-                        ( Effect.CopyStackObject
-                            CopyStackObject.MkCopyStackObject
-                              { CopyStackObject.ref = ObjectRef.EachOnStack Filter.IsSource,
-                                CopyStackObject.targets = CopyTargets.ChosenByController,
-                                CopyStackObject.quantity = quantity,
-                                CopyStackObject.copier = CopyStackObject.defaultCopier,
-                                CopyStackObject.exceptions = []
-                              }
-                        )
-                    )
+                ( Effect.CopyStackObject
+                    CopyStackObject.MkCopyStackObject
+                      { CopyStackObject.ref = ObjectRef.EachOnStack Filter.IsSource,
+                        CopyStackObject.targets = CopyTargets.ChosenByController,
+                        CopyStackObject.quantity = quantity,
+                        CopyStackObject.copier = CopyStackObject.defaultCopier,
+                        CopyStackObject.exceptions = []
+                      }
                 )
             )
-            Map.empty
         )
     )
-    (ModeSelection.ChooseExactly 1)
 
 -- CR 702.56a's and CR 702.153a's SECOND ability: "When you cast this spell, if a
 -- [replicate/casualty] cost was paid for it, copy it [for each time its replicate
@@ -8837,9 +8536,7 @@ demonstrate =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfCast,
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.fromList [yours, theirs]) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeOf Map.empty (Seq.fromList [yours, theirs]),
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -8953,9 +8650,7 @@ cascade =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfCast,
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.fromList [clause exile, clause offer, clause rest]) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeOf Map.empty (Seq.fromList [clause exile, clause offer, clause rest]),
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -9066,19 +8761,14 @@ ripple n =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfCast,
           TriggeredAbility.modal =
-            Modal.MkModal
-              ( Seq.singleton
-                  ( Mode.MkMode
-                      ( Seq.fromList
-                          [ clause (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) show_,
-                            clause Optionality.Mandatory offer,
-                            clause Optionality.Mandatory rest
-                          ]
-                      )
-                      Map.empty
-                  )
-              )
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeOf
+              Map.empty
+              ( Seq.fromList
+                  [ clause (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) show_,
+                    clause Optionality.Mandatory offer,
+                    clause Optionality.Mandatory rest
+                  ]
+              ),
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -9090,43 +8780,13 @@ ripple n =
 rippleRevealed :: SlotName.SlotName
 rippleRevealed = SlotName.MkSlotName (Text.pack "rippled")
 
--- "At the beginning of your upkeep, if this card is suspended, remove a time
--- counter from it."
---
--- TurnScope.ControllersTurn is rule 702.62a's "YOUR upkeep" (CR 603.3a), which
--- for a card in exile is its OWNER's: CR 108.4 gives such a card no controller
--- and CR 108.4a substitutes the owner, which is what
--- Pawl.Engine.Event.Trigger's exile scan hands over.
---
--- THE INTERVENING "IF" is CR 702.62b's definition of suspended read down to the
--- one conjunct this board can move: the card is in exile and has suspend by
--- construction -- the exile scan found it there, carrying the keyword -- so what
--- is left is the time counter, and CR 603.4 then keeps the ability off the stack
--- on an upkeep after the countdown is over. Vanishing's condition exactly.
---
--- ONE counter per instance, vanishing's reading: rule 702.62a removes a single
--- one.
-suspendUpkeep :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
-suspendUpkeep =
-  let effect = Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.Time (Quantity.Literal 1) Binding.triggerSource Nothing)
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn),
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Just suspendedNow,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
-
 -- CR 702.62b's "a card is suspended", named because rule 702.62a's intervening
 -- "if" is that definition and nothing else. Two of its three conjuncts are true
 -- by construction where this is read -- the exile scan found the card in exile,
 -- carrying the keyword -- so the counter is the whole of what a board can move.
 --
--- A REGRESSION FENCE rather than a proved line, vanishingUpkeep's CR 608.2a note
--- one rule over: an upkeep that resolves with the counters already gone removes
+-- A REGRESSION FENCE rather than a proved line, timeCounterUpkeep's CR 608.2a
+-- note: an upkeep that resolves with the counters already gone removes
 -- nothing and raises no event for the last-counter ability to watch, so dropping
 -- this leaves Pawl.SpecialActionSpec's Rift Bolt group green. It is written
 -- because CR 603.4 states it.
@@ -9189,9 +8849,7 @@ suspendLastCounter keyword =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfLastCounterRemoved (SelfCountersRemoved.MkSelfCountersRemoved {SelfCountersRemoved.kind = CounterKind.Time, SelfCountersRemoved.zone = Zone.Exile}),
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneMode (Seq.singleton effect),
           TriggeredAbility.intervening = Just stillExiled,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -9267,16 +8925,7 @@ reboundUpkeep =
               OfferCast.controlWhileResolving = False,
               OfferCast.slot = Nothing
             }
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn),
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in Mint.trigger (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn)) (Seq.singleton effect)
 
 -- The slot rule 702.88a's "this card" is bound into as the spell is exiled,
 -- becameSlot's position: CR 603.7c's environment, captured at the arming rather
@@ -9325,16 +8974,7 @@ cipherTrigger card =
               OfferCast.controlWhileResolving = False,
               OfferCast.slot = Nothing
             }
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer,
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in Mint.trigger (TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer) (Seq.singleton effect)
 
 -- CR 702.50a's "except for its epic ability", written into the copiable snapshot
 -- that Pawl.Engine.Resolve.finishSpell archives: the copy rule 702.50a's delayed
@@ -9394,16 +9034,7 @@ epicCopy =
               -- being epic's own sentence rather than CR 707.10's.
               CopyStackObject.exceptions = []
             }
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn),
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in Mint.trigger (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn)) (Seq.singleton effect)
 
 -- CR 702.192a: does this object have paradigm? hasEpic's membership, read off
 -- Projection.keywordsOf by Pawl.Engine.Resolve.applyParadigm for the same reason.
@@ -9448,16 +9079,7 @@ paradigmCopy =
               OfferCast.controlWhileResolving = False,
               OfferCast.slot = Nothing
             }
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins Phase.PrecombatMain Nothing TurnScope.ControllersTurn),
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in Mint.trigger (TriggerCondition.StepBegins (StepBegins.MkStepBegins Phase.PrecombatMain Nothing TurnScope.ControllersTurn)) (Seq.singleton effect)
 
 -- CR 702.35a's SECOND ability: "when this card is exiled this way, its owner may
 -- cast it by paying [cost] rather than paying its mana cost. If that player
@@ -9539,16 +9161,7 @@ madnessCast manaCost payload =
               MoveToZone.placement = LibraryPlacement.defaultValue,
               MoveToZone.duration = Nothing
             }
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.SelfExiledForMadness,
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [offer, toGraveyard]))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in Mint.trigger TriggerCondition.SelfExiledForMadness (Seq.fromList [offer, toGraveyard])
 
 -- CR 702.62a's last sentence: "If you cast a creature spell this way, it gains
 -- haste until you lose control of the spell or the permanent it becomes." The
@@ -9632,31 +9245,35 @@ youControlSource =
 -- them, which is also the order they fire in: the upkeep removal takes the last
 -- counter off, and the sacrifice watches that removal.
 vanishing :: [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
-vanishing = [vanishingUpkeep, vanishingLastCounter]
+vanishing = [timeCounterUpkeep, vanishingLastCounter]
 
 -- "At the beginning of your upkeep, if this permanent has a time counter on it,
--- remove a time counter from it."
+-- remove a time counter from it" -- rule 702.63a's vanishing upkeep -- and, word
+-- for word on a card in exile, rule 702.62a's suspend upkeep ("if this card is
+-- suspended"). One ability for both.
 --
--- TurnScope.ControllersTurn is rule 702.63a's "YOUR upkeep" (CR 603.3a).
+-- TurnScope.ControllersTurn is "YOUR upkeep" (CR 603.3a). For a suspended card
+-- in exile that is its OWNER's: CR 108.4 gives such a card no controller and CR
+-- 108.4a substitutes the owner, which is what Pawl.Engine.Event.Trigger's exile
+-- scan hands over.
 --
--- THE INTERVENING "IF" is renown's, one quantity over: rule 702.63a prints "if",
--- so CR 603.4 keeps the ability off the stack on an upkeep where the counters are
--- already gone. CR 608.2a's re-check is unobservable here, an instance that
--- resolved with the condition false removing nothing and raising no event.
+-- THE INTERVENING "IF" is renown's, one quantity over, and for suspend it is CR
+-- 702.62b's definition of suspended read down to the one conjunct a board can
+-- move (suspendedNow): CR 603.4 keeps the ability off the stack on an upkeep
+-- where the counters are already gone. CR 608.2a's re-check is unobservable
+-- here, an instance that resolved with the condition false removing nothing and
+-- raising no event.
 --
--- ONE counter per instance, not per counter present: rule 702.63a removes a single
--- one, and CR 702.63c is what makes a second instance remove a second.
-vanishingUpkeep :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
-vanishingUpkeep =
+-- ONE counter per instance, not per counter present: both rules remove a single
+-- one, and CR 702.63c is what makes a second instance of vanishing remove a
+-- second.
+timeCounterUpkeep :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+timeCounterUpkeep =
   let effect = Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.Time (Quantity.Literal 1) Binding.triggerSource Nothing)
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn),
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening =
-            Just (Condition.Compares (Compares.MkCompares (Quantity.ObjectCounters CounterKind.Time) Comparison.AtLeast (Quantity.Literal 1))),
+          TriggeredAbility.modal = Mint.oneMode (Seq.singleton effect),
+          TriggeredAbility.intervening = Just suspendedNow,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
@@ -9672,20 +9289,11 @@ vanishingUpkeep =
 vanishingLastCounter :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 vanishingLastCounter =
   let effect = Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.triggerSource, SacrificeEffect.sacrificer = Sacrificer.EffectController, SacrificeEffect.sacrificed = Nothing}
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.SelfLastCounterRemoved (SelfCountersRemoved.MkSelfCountersRemoved {SelfCountersRemoved.kind = CounterKind.Time, SelfCountersRemoved.zone = Zone.Battlefield}),
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in Mint.trigger (TriggerCondition.SelfLastCounterRemoved (SelfCountersRemoved.MkSelfCountersRemoved {SelfCountersRemoved.kind = CounterKind.Time, SelfCountersRemoved.zone = Zone.Battlefield})) (Seq.singleton effect)
 
 -- CR 702.176a's FOURTH ability: "at the beginning of your end step, if this
 -- permanent's impending cost was paid and it has a time counter on it, remove a
--- time counter from it". vanishingUpkeep's shape on the end step, with the
+-- time counter from it". timeCounterUpkeep's shape on the end step, with the
 -- intervening "if" (CR 603.4) widened to impendingHolds.
 impendingEndStep :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 impendingEndStep =
@@ -9693,15 +9301,13 @@ impendingEndStep =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Ending EndingStep.EndStep) Nothing TurnScope.ControllersTurn),
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneMode (Seq.singleton effect),
           TriggeredAbility.intervening = Just impendingHolds,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
--- CR 702.32a's SECOND ability, on vanishingUpkeep's trigger condition exactly.
+-- CR 702.32a's SECOND ability, on timeCounterUpkeep's trigger condition exactly.
 -- Rule 702.32a states NO intervening "if", so this fires on every one of its
 -- controller's upkeeps including the one where the pile is already empty; that
 -- firing is the whole of the rule's sacrifice.
@@ -9737,9 +9343,7 @@ fading =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn),
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.fromList [sacrificeClause, removeClause]) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeOf Map.empty (Seq.fromList [sacrificeClause, removeClause]),
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -9750,9 +9354,9 @@ fading =
 -- you may pay [cost] for each age counter on it. If you don't, sacrifice it."
 --
 -- TurnScope.ControllersTurn is rule 702.24a's "YOUR upkeep" (CR 603.3a),
--- vanishingUpkeep's scope.
+-- timeCounterUpkeep's scope.
 --
--- THE INTERVENING "IF" is rule 702.24a's own, and vanishingUpkeep's shape one
+-- THE INTERVENING "IF" is rule 702.24a's own, and timeCounterUpkeep's shape one
 -- question over: the rule prints "if", so CR 603.4 keeps the ability off the
 -- stack when the permanent has already gone and re-checks at resolution, which
 -- is what stops a permanent removed in response from being offered the cost.
@@ -9809,9 +9413,7 @@ cumulativeUpkeep cost =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn),
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.fromList [ageClause, upkeepClause]) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeOf Map.empty (Seq.fromList [ageClause, upkeepClause]),
           TriggeredAbility.intervening = Just onBattlefield,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -9872,9 +9474,7 @@ echo cost =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn),
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton sacrifice) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeOf Map.empty (Seq.singleton sacrifice),
           TriggeredAbility.intervening = Just cameUnderYourControl,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -9907,9 +9507,7 @@ modular =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfDies,
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.singleton effect))) (Map.singleton modularTarget slot)))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeOf (Map.singleton modularTarget slot) (Seq.singleton (Clause.MkClause Nothing Nothing Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.singleton effect))),
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -9994,9 +9592,7 @@ championEnters quality =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfEnters,
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.fromList [exile, sacrifice]) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeOf Map.empty (Seq.fromList [exile, sacrifice]),
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -10030,9 +9626,7 @@ championLeaves =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfLeavesTheBattlefield,
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeOf Map.empty (Seq.singleton clause),
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.name = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
