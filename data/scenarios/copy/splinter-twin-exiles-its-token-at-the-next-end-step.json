@@ -1,0 +1,30 @@
+{
+  "description": "CR 603.7a / 613.1f Splinter Twin's granted ability exiles its token at the next end step",
+  "note": "The delayed ability is written inside the Aura's quoted ability, and the creature using that ability is the Giant, whose own card declares nothing. A lookup that reads only the Giant's card arms nothing, so the token stays. Bob controls the Giant and alice the Aura (CR 303.4e). The pre-end-step checks show the token was made, so the later count of one Giant means it was exiled, not that it was never created.",
+  "board": {
+    "active": "bob",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Splinter Twin", "label": "twin", "attached": "giant" }],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Hill Giant", "label": "giant", "ready": true }],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Activate": { "object": "$giant" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Hill Giant", "count": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Keywords": { "object": "Hill Giant#2", "keyword": { "type": "Haste" }, "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Tapped": { "object": "$giant", "tapped": true } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": [] } },
+    { "turn": 2, "step": "Upkeep", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Hill Giant", "count": 1 } } },
+    { "turn": 2, "step": "Upkeep", "player": "alice", "check": { "View": { "of": "AttachedTo", "object": "$twin", "is": "$giant" } } }
+  ]
+}

@@ -16,11 +16,12 @@ spec s = Spec.describe s "Pawl.Codec.ArmDelayedTrigger" $ do
   Spec.it s "MkArmDelayedTrigger, both defaults elided" $
     Common.assertCodec
       s
-      ArmDelayedTrigger.codec
+      (ArmDelayedTrigger.codec Common.text)
       ( ArmDelayedTrigger.MkArmDelayedTrigger
           { ArmDelayedTrigger.name = AbilityName.MkAbilityName (Text.pack "sacrifice it"),
             ArmDelayedTrigger.onset = Onset.Immediately,
-            ArmDelayedTrigger.duration = Nothing
+            ArmDelayedTrigger.duration = Nothing,
+            ArmDelayedTrigger.ability = Nothing
           }
       )
       " {\"name\":\"sacrifice it\"} "
@@ -28,11 +29,12 @@ spec s = Spec.describe s "Pawl.Codec.ArmDelayedTrigger" $ do
   Spec.it s "MkArmDelayedTrigger, duration alone" $
     Common.assertCodec
       s
-      ArmDelayedTrigger.codec
+      (ArmDelayedTrigger.codec Common.text)
       ( ArmDelayedTrigger.MkArmDelayedTrigger
           { ArmDelayedTrigger.name = AbilityName.MkAbilityName (Text.pack "each combat"),
             ArmDelayedTrigger.onset = Onset.Immediately,
-            ArmDelayedTrigger.duration = Just Duration.UntilEndOfTurn
+            ArmDelayedTrigger.duration = Just Duration.UntilEndOfTurn,
+            ArmDelayedTrigger.ability = Nothing
           }
       )
       " {\"name\":\"each combat\",\"duration\":{\"type\":\"UntilEndOfTurn\"}} "
@@ -43,12 +45,27 @@ spec s = Spec.describe s "Pawl.Codec.ArmDelayedTrigger" $ do
   Spec.it s "MkArmDelayedTrigger, onset alone" $
     Common.assertCodec
       s
-      ArmDelayedTrigger.codec
+      (ArmDelayedTrigger.codec Common.text)
       ( ArmDelayedTrigger.MkArmDelayedTrigger
           { ArmDelayedTrigger.name = AbilityName.MkAbilityName (Text.pack "return it"),
             ArmDelayedTrigger.onset = Onset.FromYourNextTurn,
-            ArmDelayedTrigger.duration = Nothing
+            ArmDelayedTrigger.duration = Nothing,
+            ArmDelayedTrigger.ability = Nothing
           }
       )
       " {\"name\":\"return it\",\"onset\":{\"type\":\"FromYourNextTurn\"}} "
-  Spec.it s "has a schema" $ Common.assertHasSchema s ArmDelayedTrigger.codec
+  -- CR 603.7a: the declaration carried by the arm itself, Splinter Twin's quoted
+  -- "Exile that token at the beginning of the next end step".
+  Spec.it s "MkArmDelayedTrigger, carried ability" $
+    Common.assertCodec
+      s
+      (ArmDelayedTrigger.codec Common.text)
+      ( ArmDelayedTrigger.MkArmDelayedTrigger
+          { ArmDelayedTrigger.name = AbilityName.MkAbilityName (Text.pack "exile that token"),
+            ArmDelayedTrigger.onset = Onset.Immediately,
+            ArmDelayedTrigger.duration = Nothing,
+            ArmDelayedTrigger.ability = Just (Text.pack "at end step")
+          }
+      )
+      " {\"name\":\"exile that token\",\"ability\":\"at end step\"} "
+  Spec.it s "has a schema" $ Common.assertHasSchema s (ArmDelayedTrigger.codec Common.text)

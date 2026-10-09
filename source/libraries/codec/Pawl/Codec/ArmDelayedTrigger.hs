@@ -2,6 +2,7 @@
 
 module Pawl.Codec.ArmDelayedTrigger where
 
+import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.AbilityName as AbilityName
 import qualified Pawl.Codec.Duration as Duration
 import qualified Pawl.Codec.Onset as Onset
@@ -20,14 +21,19 @@ import qualified Pawl.Types.Onset as Onset
 -- not separate them. Two independently elided keys say the same thing without
 -- the arity puzzle: a stated duration alone and a stated onset alone are each
 -- just the one key.
-codec :: Codec.Codec ArmDelayedTrigger.ArmDelayedTrigger
-codec = Fields.object $ do
+--
+-- The carried `ability` is elided the same way, so an arm naming its card's
+-- declaration writes nothing more than it did.
+codec :: (Typeable.Typeable ability, Eq ability) => Codec.Codec ability -> Codec.Codec (ArmDelayedTrigger.ArmDelayedTrigger ability)
+codec abilityCodec = Fields.object $ do
   name <- Fields.required "name" AbilityName.codec ArmDelayedTrigger.name
   onset <- Fields.defaulted "onset" Onset.Immediately Onset.codec ArmDelayedTrigger.onset
   duration <- Fields.defaulted "duration" Nothing (Common.maybe Duration.codec) ArmDelayedTrigger.duration
+  ability <- Fields.defaulted "ability" Nothing (Common.maybe abilityCodec) ArmDelayedTrigger.ability
   pure
     ArmDelayedTrigger.MkArmDelayedTrigger
       { ArmDelayedTrigger.name = name,
         ArmDelayedTrigger.onset = onset,
-        ArmDelayedTrigger.duration = duration
+        ArmDelayedTrigger.duration = duration,
+        ArmDelayedTrigger.ability = ability
       }

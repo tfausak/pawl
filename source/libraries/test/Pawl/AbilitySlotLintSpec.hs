@@ -29,13 +29,14 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Pawl.CardSpec (anyFace, anyFaceOrMinted, cardAuthoredEffects, cardCounts, cardResolutionEffects, collectsEvidenceAsCost, createToken, declaresVariable, effectCounts, grantedActivatedAbilities, instantLine, lintMode, mintingSpell, modalActivated, modalSlotsOffend, oneEffectActivated, oneEffectTrigger, payGateBound, removesCountersAsCost, sacrificesAsCost, spellCostsOf, triggerConditionSlots, vanillaFace, waterbendsAsCost, withMinted)
+import Pawl.CardSpec (anyFace, anyFaceOrMinted, cardAuthoredEffects, cardCounts, cardResolutionEffects, collectsEvidenceAsCost, createToken, declaresVariable, delayedDeclarations, effectCounts, effectWithNested, grantedActivatedAbilities, grantedTriggeredAbilities, instantLine, lintMode, mintingSpell, modalActivated, modalSlotsOffend, oneEffectActivated, oneEffectTrigger, payGateBound, removesCountersAsCost, sacrificesAsCost, spellCostsOf, triggerConditionSlots, vanillaFace, waterbendsAsCost, withMinted)
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Event.Binding as Event
+import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword.Engine
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Resolve as Resolve
@@ -49,6 +50,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationProhibition as ActivationProhibition
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Chooser as Chooser
@@ -85,6 +87,7 @@ import qualified Pawl.Types.MoveCounters as MoveCounters
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.MovedKinds as MovedKinds
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PayBranch as PayBranch
 import qualified Pawl.Types.PayGate as PayGate
@@ -445,7 +448,13 @@ onsetOffends card =
   let scoped name = case Map.lookup name (Face.delayedAbilities card) of
         Nothing -> False
         Just ability -> Event.controllerTurnScoped (TriggeredAbility.condition ability)
-   in not (all scoped (Set.toList (Resolve.onsetGatedAbilities (cardAuthoredEffects card))))
+      -- A carried arm is held to the same pairing off the ability it carries.
+      carriedOffends effect = case effect of
+        Effect.ArmDelayedTrigger arm
+          | ArmDelayedTrigger.onset arm /= Onset.Immediately ->
+              maybe False (not . Event.controllerTurnScoped . TriggeredAbility.condition) (Game.carriedDelayedAbility arm)
+        _ -> False
+   in not (all scoped (Set.toList (Resolve.onsetGatedAbilities (cardAuthoredEffects card)))) || any carriedOffends (cardAuthoredEffects card)
 
 -- modalActivated's TRIGGERED twin, so the per-mode lint can be shown to hand
 -- `abilityBound` -- the condition's event slots and CR 109.5's `you` -- to EVERY
@@ -465,7 +474,7 @@ shadowsDefinedSlot :: Face.Face Card.Type.Card -> Bool
 shadowsDefinedSlot card =
   shadowsSlots
     (Resolve.definedSlots (cardAuthoredEffects card))
-    (Map.elems (Face.delayedAbilities card))
+    (delayedDeclarations card)
 
 modalTrigger ::
   TriggerCondition.TriggerCondition ->
@@ -586,6 +595,34 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
           Resolve.armedAbilities (cardAuthoredEffects card) /= Map.keysSet (Face.delayedAbilities card)
         offenders = filter (anyFace cardOffends . Printing.card) ps
     Spec.assertEqWith s "no dangling or unused delayed abilities" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 603.7a / 613.1f: an arm inside a QUOTED ability carries its delayed
+  -- ability rather than naming one, since the creature using the quotation is
+  -- not the card that printed it and Game.armedDelayedAbility would look the name
+  -- up on the wrong card. Splinter Twin and Sakashima the Impostor are the
+  -- printings.
+  Spec.it s "CR 603.7a every arm inside a quoted ability carries its delayed ability" $ do
+    ps <- S.allPrintings s
+    let quotedEffects card =
+          concatMap effectWithNested (concatMap (Modal.allEffects . ActivatedAbility.modal) (grantedActivatedAbilities card) <> concatMap (Modal.allEffects . TriggeredAbility.modal) (grantedTriggeredAbilities card))
+        namesOnly effect = case effect of
+          Effect.ArmDelayedTrigger arm -> Maybe.isNothing (ArmDelayedTrigger.ability arm)
+          _ -> False
+        cardOffends card = any namesOnly (quotedEffects card)
+        offenders = filter (anyFace cardOffends . Printing.card) ps
+    Spec.assertEqWith s "no quoted arm naming its delayed ability" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 603.7: what an arm carries is a delayed TRIGGERED ability, the only kind
+  -- Game.carriedDelayedAbility reads.
+  Spec.it s "CR 603.7 every carried delayed ability is a triggered one" $ do
+    ps <- S.allPrintings s
+    let notTriggered effect = case effect of
+          Effect.ArmDelayedTrigger arm -> case ArmDelayedTrigger.ability arm of
+            Just (GrantedAbility.Triggered _) -> False
+            Just _ -> True
+            Nothing -> False
+          _ -> False
+        cardOffends card = any notTriggered (cardAuthoredEffects card)
+        offenders = filter (anyFace cardOffends . Printing.card) ps
+    Spec.assertEqWith s "no carried ability of another kind" (fmap (S.nameOf . Printing.card) offenders) []
   -- CR 106.6 / 603.7a: a spend trigger fires when it is armed, the payment having
   -- already been the event (Pawl.Engine.Cost.armSpendTriggers), so the ability it
   -- names has to say so. Any other condition would wait for an event that never
@@ -690,7 +727,7 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
         -- announced, and a slot Event.eventBindingSlots names is bound by the
         -- match rather than available to it.
         conditionOffends bound ability = not (Set.isSubsetOf (Set.fromList (triggerConditionSlots (TriggeredAbility.condition ability))) bound)
-        cardOffends card = any (\ability -> abilityOffends card ability || conditionOffends (cardBound card) ability) (Map.elems (Face.delayedAbilities card))
+        cardOffends card = any (\ability -> abilityOffends card ability || conditionOffends (cardBound card) ability) (delayedDeclarations card)
         sweeps = anyFaceOrMinted cardOffends
         offenders = filter (sweeps . Printing.card) ps
         watching slot = modalTrigger (TriggerCondition.LoseControlOfBound slot) [lintMode [] []]

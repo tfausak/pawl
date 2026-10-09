@@ -250,7 +250,7 @@ codec cardCodec abilityCodec =
           Arm.payload "GainControl" DurationRef.codec Effect.GainControl (\x -> case x of Effect.GainControl y -> Just y; _ -> Nothing),
           Arm.payload "GiveControl" GiveControl.codec Effect.GiveControl (\x -> case x of Effect.GiveControl y -> Just y; _ -> Nothing),
           Arm.payload "ExchangeControl" ControlSides.codec Effect.ExchangeControl (\x -> case x of Effect.ExchangeControl y -> Just y; _ -> Nothing),
-          Arm.payload "ArmDelayedTrigger" ArmDelayedTrigger.codec Effect.ArmDelayedTrigger (\x -> case x of Effect.ArmDelayedTrigger y -> Just y; _ -> Nothing),
+          Arm.payload "ArmDelayedTrigger" (ArmDelayedTrigger.codec abilityCodec) Effect.ArmDelayedTrigger (\x -> case x of Effect.ArmDelayedTrigger y -> Just y; _ -> Nothing),
           Arm.payload "AffectPlayers" AffectPlayers.codec Effect.AffectPlayers (\x -> case x of Effect.AffectPlayers y -> Just y; _ -> Nothing),
           Arm.payload "RequireBlock" RequireBlock.codec Effect.RequireBlock (\x -> case x of Effect.RequireBlock y -> Just y; _ -> Nothing),
           Arm.payload "CantBeRegenerated" CantBeRegenerated.codec Effect.CantBeRegenerated (\x -> case x of Effect.CantBeRegenerated y -> Just y; _ -> Nothing),

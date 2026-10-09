@@ -17,10 +17,12 @@
 -- type.
 module Pawl.Engine.EffectZone where
 
+import Control.Applicative ((<|>))
 import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Types.AbilityName as AbilityName
@@ -71,21 +73,23 @@ import Pawl.Types.Zone (Zone)
 -- answers Nothing for it, which is the same answer the effect had before.
 --
 -- The DELAYED ABILITIES the reading is against -- CR 113.6m's final sentence
--- needs the text an Effect.ArmDelayedTrigger's name stands for, and the opcode
--- carries only the name (Pawl.Types.Face.delayedAbilities holds the payload,
--- Effect being first-order). Every caller supplies the map off the same card the
--- ability is read from, which is where Pawl.Engine.Game.declaredDelayedAbility
--- resolves the name at run time. Rule 702's own roster
+-- needs the text an Effect.ArmDelayedTrigger stands for. An arm inside a quoted
+-- ability carries it (Pawl.Engine.Game.carriedDelayedAbility); any other names
+-- it (Pawl.Types.Face.delayedAbilities holds the payload). Every caller supplies
+-- the map off the same card the ability is read from, which is where
+-- Pawl.Engine.Game.declaredDelayedAbility resolves the name at run time. Rule
+-- 702's own roster
 -- (Pawl.Engine.Keyword.mintedDelayedAbilities) is unioned in BEHIND that map, the
 -- order Pawl.Engine.Resolve.Effect's arm resolves a name in, so the two cannot
 -- disagree about what a minted name stands for. A regression fence rather than a
 -- proof: every move on that roster states no origin, so the walk answers Nothing
 -- for each with or without it.
 zoneFunctionedFrom :: Set.Set SlotName.SlotName -> Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Maybe Zone
-zoneFunctionedFrom itself delayed = zoneFunctionedAgainst itself (Map.union delayed Keyword.mintedDelayedAbilities)
+zoneFunctionedFrom itself delayed = zoneFunctionedAgainst itself (Just (Map.union delayed Keyword.mintedDelayedAbilities))
 
--- zoneFunctionedFrom's walk, against exactly the map it is given.
-zoneFunctionedAgainst :: Set.Set SlotName.SlotName -> Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Maybe Zone
+-- zoneFunctionedFrom's walk, against exactly the map it is given -- and Nothing
+-- inside a delayed ability's own effects, where no arm is read at all.
+zoneFunctionedAgainst :: Set.Set SlotName.SlotName -> Maybe (Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))) -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Maybe Zone
 zoneFunctionedAgainst itself delayed effect = case effect of
   -- Only an InSlot naming one of the `itself` slots can be "the object it's on".
   -- A swept set is never one object, so no sweeping arm can be; a library's
@@ -270,19 +274,22 @@ zoneFunctionedAgainst itself delayed effect = case effect of
   -- it decides -- the arm is the ability's only zone-relevant content, so without
   -- this the Amalgam functions on the battlefield, where it can never do its work.
   --
-  -- ONE LEVEL: the delayed ability's own effects are walked with an EMPTY map, so
-  -- a delayed ability that arms a second one contributes nothing. The rule says
-  -- "creates a delayed triggered ability whose effect moves the object", naming
-  -- the created ability's effect and not what that in turn creates, and the empty
-  -- map is also what makes this walk terminate on a card that arms itself.
+  -- ONE LEVEL: the delayed ability's own effects are walked with NO map, so a
+  -- delayed ability that arms a second one -- named or carried -- contributes
+  -- nothing. The rule says "creates a delayed triggered ability whose effect
+  -- moves the object", naming the created ability's effect and not what that in
+  -- turn creates, and the missing map is also what makes this walk terminate on
+  -- a card that arms itself.
   --
   -- Nothing for a name neither a face nor rule 702 declares, which is a card-data
   -- error rather than a rules question: Pawl.CardSpec's D4 dataflow lint rejects
   -- such a card, and the answer here is the same Nothing the arm gave before.
-  Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger {ArmDelayedTrigger.name = name}) ->
-    case Map.lookup name delayed of
+  Effect.ArmDelayedTrigger arm ->
+    case delayed of
       Nothing -> Nothing
-      Just ability -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedAgainst itself Map.empty) (Modal.allEffects (TriggeredAbility.modal ability)))
+      Just named -> case Game.carriedDelayedAbility arm <|> Map.lookup (ArmDelayedTrigger.name arm) named of
+        Nothing -> Nothing
+        Just ability -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedAgainst itself Nothing) (Modal.allEffects (TriggeredAbility.modal ability)))
   Effect.AffectPlayers {} -> Nothing
   Effect.RequireBlock {} -> Nothing
   Effect.CantBeRegenerated {} -> Nothing

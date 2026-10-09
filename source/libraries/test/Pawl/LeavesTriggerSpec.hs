@@ -38,26 +38,32 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
+import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.Modal as Modal
+import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.MutateSide as MutateSide
 import qualified Pawl.Types.Object as Object
@@ -85,6 +91,7 @@ import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerSource as TriggerSource
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.TypeLine as TypeLine
@@ -3222,7 +3229,7 @@ skullclampSpec s registry =
 -- about whether the ability triggers at all, and the end-step board cannot make
 -- it: the armed move names the graveyard, an Amalgam standing on the battlefield
 -- is not in one, and the board after the end step looks the same either way.
-prizedAmalgamSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+prizedAmalgamSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 prizedAmalgamSpec s registry =
   let endStep = Phase.Ending EndingStep.EndStep
       -- TriggerSpec's tokenSetSpec's step: the phase written and the CR 513.1
@@ -3263,6 +3270,29 @@ prizedAmalgamSpec s registry =
       -- placed, and resolves.
       throughEndStep gs = S.runPure S.identityAnswer (settle (beginEndStep gs)) Engine.priorityLoop
    in Spec.describe s "PrizedAmalgam" $ do
+        -- The same reading off an arm that CARRIES the delayed ability, which is
+        -- how the Amalgam's text would read quoted inside a grant (CR 613.1f)
+        -- and how Splinter Twin's and Sakashima the Impostor's arms are written.
+        -- Read against NO declarations, as a grant's host offers none, so only
+        -- the carried ability can pin the graveyard. A fence rather than a
+        -- whole-card proof: no printing grants an ability whose carried move
+        -- names a zone other than the battlefield.
+        Spec.it s "CR 113.6m a carried delayed return pins the graveyard with no declarations to read" $ do
+          amalgam <- S.printingOf s registry "Prized Amalgam"
+          let face = S.combinedFace amalgam
+              carry effect = case effect of
+                Effect.ArmDelayedTrigger arm -> Effect.ArmDelayedTrigger arm {ArmDelayedTrigger.ability = fmap GrantedAbility.Triggered (Map.lookup (ArmDelayedTrigger.name arm) (Face.delayedAbilities face))}
+                other -> other
+              quoted ability =
+                ability
+                  { TriggeredAbility.modal =
+                      (TriggeredAbility.modal ability)
+                        { Modal.modes = fmap (\mode -> mode {Mode.clauses = fmap (\clause -> clause {Clause.effects = fmap carry (Clause.effects clause)}) (Mode.clauses mode)}) (Modal.modes (TriggeredAbility.modal ability))
+                        }
+                  }
+              zonesOf = Event.zonesFunctionedIn (TypeLine.subtypes (Face.typeLine face)) Map.empty
+          Spec.assertEqWith s "the carried return pins the graveyard" (fmap (zonesOf . quoted) (Face.triggeredAbilities face)) [Set.singleton Zone.Graveyard]
+          Spec.assertEqWith s "where the bare name, unread, leaves the battlefield default" (fmap zonesOf (Face.triggeredAbilities face)) [Set.singleton Zone.Battlefield]
         -- The "ONLY" in "functions only in that zone", and the leg that reddens
         -- if the reading is left additive. One difference from the leg above:
         -- the Amalgam starts on the battlefield.
