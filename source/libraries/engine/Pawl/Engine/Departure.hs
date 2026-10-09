@@ -11,7 +11,6 @@
 -- so the event pipeline cannot reach the question through here.
 module Pawl.Engine.Departure where
 
-import Control.Applicative ((<|>))
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
@@ -776,12 +775,20 @@ outcomeAfterLeaving leaving gs = case Game.stillPlaying gs of
       [winner] -> Just (Result.Won winner)
       _ -> Nothing
 
+-- CR 104.1: the one door GameState.result is set through. A game ends the
+-- moment a result is reached, so a result already set is kept.
+settle :: Maybe Result -> GameState -> GameState
+settle outcome gs = case (GameState.result gs, outcome) of
+  (Nothing, Just result) -> gs {GameState.result = Just result}
+  _ -> gs
+
 -- CR 104.3a: leave the game IMMEDIATELY, and settle CR 104.2a right now rather
 -- than at the next state-based action check -- which is the whole distinction
 -- between 104.3a and 104.3b. An already-decided result is kept rather than
 -- overwritten: CR 104.1 says the game already ended the moment a result was set,
 -- and CR 104.2a's override describes the win itself, not a license to replace a
--- result the game already has. Pawl.Engine.Sba's pass settles the same way.
+-- result the game already has. settle keeps it, the door Pawl.Engine.Sba's pass
+-- shares.
 leaveGame :: Departure -> PlayerId -> Game ()
 leaveGame reason pid = leaveGameTogether reason [pid]
 
@@ -795,4 +802,4 @@ leaveGame reason pid = leaveGameTogether reason [pid]
 leaveGameTogether :: Departure -> [PlayerId] -> Game ()
 leaveGameTogether reason pids = do
   departTogether reason pids
-  State.modify' (\departed -> departed {GameState.result = GameState.result departed <|> outcomeAfterLeaving pids departed})
+  State.modify' (\departed -> settle (outcomeAfterLeaving pids departed) departed)

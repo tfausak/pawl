@@ -1281,7 +1281,7 @@ checkMandatoryLoop = do
       then do
         Departure.leaveGameTogether Departure.Type.Drew (filter (`Set.member` drawn) (Game.apnapOrder gs))
         State.modify' (\g -> g {GameState.lastChoice = GameState.nextTimestamp g})
-      else State.put gs {GameState.result = Just Result.Drawn}
+      else State.put (Departure.settle (Just Result.Drawn) gs)
 
 -- Ask the priority holder for an action until every still-playing player has
 -- passed in succession (CR 117.4). A full round of passes resolves the top of the
