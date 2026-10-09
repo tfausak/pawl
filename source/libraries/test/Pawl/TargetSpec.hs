@@ -1224,14 +1224,15 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
       Nothing -> Spec.assertFailure s "Murder should declare a target slot"
 
   -- The same sentence read the other way round: rule 702.16k's targeting clause
-  -- names the controller of the SPELL OR ABILITY, not the controller of the
-  -- object it comes from, and CR 113.8 with CR 109.5 fix an activated ability's
-  -- controller as the player who activated it. So stealing the source in
-  -- response does not hand the ability to the thief, and CR 608.2b's re-check
-  -- must still judge it against the player who activated it. An implementation
-  -- matching the quality against the source OBJECT -- which is what
-  -- Filter.OfChosenPlayer reads when no aimer is supplied -- finds the thief on
-  -- it and counters the ability instead.
+  -- names the controller of the SPELL OR ABILITY, and CR 113.8 with CR 109.5
+  -- fix an activated ability's controller as the player who activated it, so
+  -- stealing the source in response does not hand the ability to the thief.
+  -- But the clause widens rather than replaces the rule's first sentence: the
+  -- Nemesis has protection from each object the chosen player controls, and
+  -- rule 702.16b bars an ability from a SOURCE with that quality, as the card's
+  -- ruling reads it ("protection from each object controlled by that player").
+  -- So once the chosen player steals the source, CR 608.2b's re-check finds the
+  -- Nemesis an illegal target and the ability does nothing.
   --
   -- THREE SEATS, the case above's reason and then one more: carol activates, bob
   -- steals and is the seat the Nemesis chose, and alice owns the Nemesis, so no
@@ -1248,9 +1249,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- checked against Scryfall on 2026-09-15.
   --
   -- A PAIR OF BOARDS differing only in whether the Ray was cast, so the
-  -- weakening cannot be an ability that never worked, and a last row where bob
-  -- holds the Recluse himself -- the direction rule 702.16k does refuse.
-  Spec.it s "CR 702.16k a Saltfield Recluse stolen in response still weakens the Nemesis that chose the thief" $ do
+  -- unweakened Nemesis cannot be an ability that never worked, and a last row
+  -- where bob holds the Recluse himself.
+  Spec.it s "CR 702.16k / 702.16b a Saltfield Recluse the chosen player steals in response no longer weakens the Nemesis" $ do
     nemesis <- S.printingOf s registry "True-Name Nemesis"
     recluse <- S.printingOf s registry "Saltfield Recluse"
     rayOfCommand <- S.printingOf s registry "Ray of Command"
@@ -1269,9 +1270,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
             resolve gs = S.runPure S.identityAnswer gs Stack.resolveTop
         Spec.assertEqWith
           s
-          "CR 702.16k/113.8 the ability is still carol's, so the stolen Recluse weakens the Nemesis that chose bob"
+          "CR 702.16b/608.2b the Recluse is now bob's, so the ability does nothing to the Nemesis that chose him"
           (S.powerToughnessOf nemesisId (resolve stolen))
-          (Just (1, 1))
+          (Just (3, 1))
         Spec.assertEqWith s "and the Ray really moved the Recluse to bob" (Projection.controllerOf recluseId stolen) (Just S.bob)
         Spec.assertEqWith
           s

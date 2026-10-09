@@ -1,0 +1,31 @@
+{
+  "description": "CR 702.16i / 702.16b an opponent's spell can't target the protected player, and her own spell can",
+  "note": "Control: no Absolute Virtue, and bob's Bolt targets alice.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Mountain", "label": "a1", "ready": true }],
+        "library": [{ "card": "Swamp" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Mountain", "label": "b1", "ready": true }],
+        "hand": [{ "card": "Lightning Bolt", "label": "bbolt" }],
+        "library": [{ "card": "Swamp" }]
+      },
+      {
+        "name": "carol",
+        "library": [{ "card": "Swamp" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "$bbolt", "targets": ["$alice"], "mana": ["$b1"] } } }
+  ],
+  "final": [
+    { "Life": { "player": "alice", "life": 17 } }
+  ]
+}

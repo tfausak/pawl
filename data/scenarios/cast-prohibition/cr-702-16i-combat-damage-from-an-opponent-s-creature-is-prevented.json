@@ -1,0 +1,30 @@
+{
+  "description": "CR 702.16i / 702.16e combat damage from an opponent's creature to the protected player is prevented",
+  "note": "alice controls Absolute Virtue and bob's Goblin Piker attacks her. Combat damage rather than a burn spell, since CR 702.16b keeps her from being targeted at all. The twin attacks carol on the same board, who has no protection.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Absolute Virtue", "label": "virtue" }],
+        "library": [{ "card": "Swamp" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "piker", "ready": true }],
+        "library": [{ "card": "Swamp" }]
+      },
+      {
+        "name": "carol",
+        "library": [{ "card": "Swamp" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 2, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["$piker"] } },
+    { "turn": 2, "step": "DeclareAttackers", "player": "bob", "source": "$piker", "do": { "ChooseAttackTarget": "$alice" } },
+    { "turn": 2, "step": "DeclareBlockers", "player": "alice", "do": { "Block": {} } },
+    { "turn": 2, "step": "EndOfCombat", "player": "bob", "check": { "Life": { "player": "alice", "life": 20 } } }
+  ]
+}

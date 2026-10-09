@@ -1497,11 +1497,13 @@ data Context = MkContext
     -- siblings each have.
     carrierChosenPlayer :: Maybe PlayerId.PlayerId,
     -- CR 702.16b / CR 702.16k: the controller of the spell or ability being
-    -- AIMED, which rule 702.16k's targeting clause names in place of the source
+    -- AIMED, which rule 702.16k's targeting clause names beside the source
     -- object's -- "can't be targeted by spells or abilities the specified player
-    -- controls". Read by the one atom that asks who an object belongs to
-    -- (OfChosenPlayer), and filled by the one position that judges a protection
-    -- quality against an aiming object, Pawl.Engine.Target.targetable.
+    -- controls". Read by the two atoms that ask who an object belongs to
+    -- (OfChosenPlayer, OfRelatedPlayer), and filled by the one position that
+    -- judges a protection quality against an aiming object,
+    -- Pawl.Engine.Target.targetable, for a permanent and (through
+    -- Pawl.Engine.PlayerEffect.protectedFromGiven) a player alike.
     --
     -- Nothing in the other three positions rule 702.16 reads a quality in, and
     -- rightly: its damage clause names "sources controlled by the specified
@@ -1513,16 +1515,14 @@ data Context = MkContext
     -- whether an aiming spell or ability frames the match at all, and the inner
     -- is CR 109.5's "you" for it, which the caller may not know (see
     -- Pawl.Engine.Target's `perspective`). An unknown "you" names nobody and
-    -- matches nothing, the vacuous posture every player-referencing question here
-    -- takes.
+    -- adds nothing to the source's two halves, the vacuous posture every
+    -- player-referencing question here takes.
     --
     -- Not derivable from the aiming object's own view: CR 113.8 with CR 109.5
     -- fix an activated ability's controller as the player who activated it, so
-    -- a source stolen in response, or a card whose ability is activated from a
-    -- zone where CR 108.4 leaves it no controller at all, answers for the wrong
-    -- player. See
-    -- Pawl.TargetSpec's "CR 702.16k a Saltfield Recluse stolen in response still
-    -- weakens the Nemesis that chose the thief".
+    -- a source stolen in response keeps its activator here. The
+    -- cast-prohibition scenario "an opponent's ability still can't target the
+    -- protected player once she steals its source in response" proves it.
     aimingController :: Maybe (Maybe PlayerId.PlayerId),
     -- CR 105.2: the colours the SOURCE chose as it entered (CR 614.1c), for the
     -- atom that asks whether a candidate wears one (HasChosenColor, Gauntlet of
@@ -2031,15 +2031,21 @@ matches context view predicate = case predicate of
   -- object's characteristic values", so this arm is the one quality that asks who
   -- an object belongs to rather than what it looks like.
   --
-  -- Rule 702.16k's TARGETING clause names neither half: it asks who controls the
+  -- Rule 702.16k's TARGETING clause adds a third disjunct: the controller of the
   -- spell or ability doing the aiming, which is not the object this is matched
-  -- against at all, so where the context supplies that player it answers instead
-  -- of the two disjuncts. See aimingController.
+  -- against at all. It widens the two halves rather than replacing them: rule
+  -- 702.16b already bars an ability from a SOURCE the player controls, and the
+  -- True-Name Nemesis ruling reads the protection as "from each object
+  -- controlled by that player". See aimingController.
   Filter.OfChosenPlayer -> case carrierChosenPlayer context of
     Nothing -> False
-    Just pid -> case aimingController context of
-      Just aimer -> aimer == Just pid
-      Nothing -> controller view == Just pid || (owner view == Just pid && Maybe.isNothing (controller view))
+    Just pid -> ofPlayer (== Just pid) (aimingController context) view
+  -- Rule 702.16k's reading per player, for rule 702.16i's "each of your
+  -- opponents" (Absolute Virtue): the relation stands in for the chosen player,
+  -- read against the perspective, the protection carrier's controller.
+  Filter.OfRelatedPlayer relation -> case perspective context of
+    Nothing -> False
+    Just you -> ofPlayer (maybe False (PlayerRelation.holds (teams context) relation you)) (aimingController context) view
   -- CR 115.1's "target opponent". The same CR 102.3 reading the ControlledBy arm
   -- above argues for. Vacuously False for an object candidate,
   -- which has no playerIdentity, and for a match with no perspective.
@@ -2457,6 +2463,7 @@ rewrite pairs predicate = case predicate of
   Filter.HasChosenSubtype -> predicate
   Filter.IsLastExiledWithSource -> predicate
   Filter.OfChosenPlayer -> predicate
+  Filter.OfRelatedPlayer _ -> predicate
   Filter.IsPlayer _ -> predicate
   -- Untouched for IsPlayer's reason: CR 612.1 swaps a WORD in the text, and this
   -- atom names a slot rather than a subtype.
@@ -3223,6 +3230,7 @@ bakeBound players predicate = case predicate of
   Filter.HasChosenSubtype -> predicate
   Filter.IsLastExiledWithSource -> predicate
   Filter.OfChosenPlayer -> predicate
+  Filter.OfRelatedPlayer _ -> predicate
   Filter.IsPlayer _ -> predicate
   -- Untouched: CR 603.2's binding map holds PLAYERS, and this atom names a slot
   -- holding an OBJECT -- there is nothing here to substitute.
@@ -3409,6 +3417,7 @@ manaValueThresholds predicate = case predicate of
   Filter.HasChosenSubtype -> []
   Filter.IsLastExiledWithSource -> []
   Filter.OfChosenPlayer -> []
+  Filter.OfRelatedPlayer _ -> []
   Filter.IsPlayer _ -> []
   Filter.IsControllerOfBound _ -> []
   -- No threshold: the literal bounds a COUNT OF CARDS in a zone, not a mana
@@ -3598,6 +3607,7 @@ statesAQuality predicate = case predicate of
   -- asks whether a search's description is trivially true, and "a card that
   -- player owns" is not.
   Filter.OfChosenPlayer -> True
+  Filter.OfRelatedPlayer _ -> True
   Filter.IsPlayer _ -> True
   Filter.IsControllerOfBound _ -> True
   Filter.CardsInGraveyardAtLeast _ -> True
@@ -3787,3 +3797,12 @@ boundSlots = Const.getConst . overBoundSlots (Const.Const . Set.singleton)
 -- copies, and must come back unchanged.
 renameBound :: (SlotName.SlotName -> SlotName.SlotName) -> Filter.Filter Keyword.Type.Keyword -> Filter.Filter Keyword.Type.Keyword
 renameBound rename = Identity.runIdentity . overBoundSlots (Identity.Identity . rename)
+
+-- CR 702.16k's three disjuncts for the players `named` picks: the candidate's
+-- controller, its owner while no player controls it (CR 108.4), and the
+-- controller of the spell or ability aiming it, where one is.
+ofPlayer :: (Maybe PlayerId.PlayerId -> Bool) -> Maybe (Maybe PlayerId.PlayerId) -> View -> Bool
+ofPlayer named aimer view =
+  named (controller view)
+    || (named (owner view) && Maybe.isNothing (controller view))
+    || maybe False named aimer

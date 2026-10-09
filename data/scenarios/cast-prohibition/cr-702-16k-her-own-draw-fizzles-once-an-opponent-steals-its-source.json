@@ -1,0 +1,45 @@
+{
+  "description": "CR 702.16i / 702.16k / 702.16b the protected player's own ability can't target her once an opponent steals its source in response",
+  "note": "alice controls Absolute Virtue and aims her own Lore Weaver's draw at herself, which her protection allows. bob casts Ray of Command on the Weaver in response. At CR 608.2b the ability is still alice's, but its source is now an object her opponent controls, and rule 702.16b bars an ability from a source with the stated quality, so alice is an illegal target and draws nothing. A draw rather than a ping, since rule 702.16e would prevent damage from the stolen source whatever the targeting answered. The control file casts no Ray and alice draws two.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Absolute Virtue", "label": "virtue" },
+          { "card": "Lore Weaver", "label": "weaver", "ready": true },
+          { "card": "Island", "label": "a1", "ready": true },
+          { "card": "Island", "label": "a2", "ready": true },
+          { "card": "Plains", "label": "a3", "ready": true },
+          { "card": "Plains", "label": "a4", "ready": true },
+          { "card": "Plains", "label": "a5", "ready": true },
+          { "card": "Plains", "label": "a6", "ready": true },
+          { "card": "Plains", "label": "a7", "ready": true }
+        ],
+        "library": [{ "card": "Swamp" }, { "card": "Swamp" }, { "card": "Swamp" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Island", "label": "i1", "ready": true },
+          { "card": "Island", "label": "i2", "ready": true },
+          { "card": "Island", "label": "i3", "ready": true },
+          { "card": "Island", "label": "i4", "ready": true }
+        ],
+        "hand": [{ "card": "Ray of Command", "label": "ray" }],
+        "library": [{ "card": "Swamp" }]
+      },
+      {
+        "name": "carol",
+        "library": [{ "card": "Swamp" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "$weaver", "targets": ["$alice"], "mana": ["$a1", "$a2", "$a3", "$a4", "$a5", "$a6", "$a7"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "$ray", "targets": ["$weaver"], "mana": ["$i1", "$i2", "$i3", "$i4"] } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Swamp", "count": 0 } } }
+  ]
+}

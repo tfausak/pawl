@@ -283,6 +283,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.HasChosenSubtype -> 0
   Filter.Type.IsLastExiledWithSource -> 0
   Filter.Type.OfChosenPlayer -> 0
+  Filter.Type.OfRelatedPlayer _ -> 0
   Filter.Type.IsControllerOfBound _ -> 0
   -- Zero for the nullary atoms' reason, a payload over: CR 400.1's card count is
   -- a Natural, which holds no Filter for a card author to reach.

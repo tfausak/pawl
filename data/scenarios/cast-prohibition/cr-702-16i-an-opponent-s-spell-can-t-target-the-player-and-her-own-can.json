@@ -1,0 +1,39 @@
+{
+  "description": "CR 702.16i / 702.16b an opponent's spell can't target the protected player, and her own spell can",
+  "note": "alice controls Absolute Virtue. Her own Bolt at herself resolves, since the protection is from her opponents alone; bob's Bolt is refused at alice and, on the same mana, cast at carol. The control file removes the Virtue and bob's Bolt hits alice.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Absolute Virtue", "label": "virtue" },
+          { "card": "Mountain", "label": "a1", "ready": true }
+        ],
+        "hand": [{ "card": "Lightning Bolt", "label": "abolt" }],
+        "library": [{ "card": "Swamp" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Mountain", "label": "b1", "ready": true }],
+        "hand": [{ "card": "Lightning Bolt", "label": "bbolt" }],
+        "library": [{ "card": "Swamp" }]
+      },
+      {
+        "name": "carol",
+        "library": [{ "card": "Swamp" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$abolt", "targets": ["$alice"], "mana": ["$a1"] } } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Life": { "player": "alice", "life": 17 } } },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "refuse": { "Cast": { "object": "$bbolt", "targets": ["$alice"], "mana": ["$b1"] } } },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "$bbolt", "targets": ["$carol"], "mana": ["$b1"] } } }
+  ],
+  "final": [
+    { "Life": { "player": "alice", "life": 17 } },
+    { "Life": { "player": "carol", "life": 17 } }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "description": "CR 702.16i / 702.16c / 704.5m an opponent's Aura enchanting the player is buried once she gains protection from each of her opponents, and her own stays",
+  "note": "Two Curses of Vitality start attached to alice, one bob's and one her own. She casts Absolute Virtue, which can't be countered and so needs no answer; the state-based action buries bob's Curse alone.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Plains", "label": "a1", "ready": true },
+          { "card": "Plains", "label": "a2", "ready": true },
+          { "card": "Plains", "label": "a3", "ready": true },
+          { "card": "Plains", "label": "a4", "ready": true },
+          { "card": "Plains", "label": "a5", "ready": true },
+          { "card": "Plains", "label": "a6", "ready": true },
+          { "card": "Plains", "label": "a7", "ready": true },
+          { "card": "Island", "label": "a8", "ready": true },
+          { "card": "Curse of Vitality", "label": "acurse", "attached": "alice" }
+        ],
+        "hand": [{ "card": "Absolute Virtue", "label": "virtue" }],
+        "library": [{ "card": "Swamp" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Curse of Vitality", "label": "bcurse", "attached": "alice" }],
+        "library": [{ "card": "Swamp" }]
+      },
+      {
+        "name": "carol",
+        "library": [{ "card": "Swamp" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "View": { "of": "AttachedTo", "object": "$bcurse", "is": "alice" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$virtue", "mana": ["$a1", "$a2", "$a3", "$a4", "$a5", "$a6", "$a7", "$a8"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Curse of Vitality", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "View": { "of": "AttachedTo", "object": "$acurse", "is": "alice" } } }
+  ]
+}
