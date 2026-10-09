@@ -1138,7 +1138,7 @@ planeswalkerBattleSpec s registry = Spec.describe s "PlaneswalkerBattleInCombat"
         -- GAMEPLAY FIRST: without CR 506.4e the Elf attacks nothing and the
         -- defense stays at 5.
         Spec.assertEqWith s "CR 506.4e / 310.6: the Elf's 1 came off his defense" (S.counterOf CounterKind.Defense jaceId atEnd) 4
-        Spec.assertEqWith s "CR 701.3a: Luxior is on Jace" (Projection.hostOf luxiorId atEnd) (Just jaceId)
+        Spec.assertEqWith s "CR 701.3a: Luxior is on Jace" (Game.hostOf luxiorId atEnd) (Just jaceId)
         Spec.assertBool s (not (Projection.isPlaneswalkerOf jaceId atEnd)) "CR 613.1d: so he is no planeswalker"
         Spec.assertBool s (Projection.isBattleOf jaceId atEnd) "but still a battle"
         Spec.assertEqWith s "and his loyalty is untouched" (S.counterOf CounterKind.Loyalty jaceId atEnd) 5

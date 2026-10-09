@@ -2505,7 +2505,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _ _ _)
       | oid == bearer ->
           let viewOf = Projection.viewWithLastKnown bearer gs
-              context = SourceContext.withChoicesOf bearer gs (Filter.contextComparingPower (Game.teams gs) (Just you) bearer (Filter.power =<< viewOf bearer) (Filter.toughness =<< viewOf bearer))
+              context = SourceContext.framedBy bearer gs (Filter.contextComparingPower (Game.teams gs) (Just you) bearer (Filter.power =<< viewOf bearer) (Filter.toughness =<< viewOf bearer))
               -- Rule 702.149a's "OTHER". Not independently observable while the
               -- Filter's comparison is strict -- nothing has power greater than
               -- its own -- so dropping it leaves the suite green; it is here
@@ -2922,8 +2922,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- attacking records no AttackerDeclared, so it never reaches here.
   --
   -- The Filter's source is the bearer, so "equipped creature" is
-  -- HasAttached IsSource (Conjurer's Mantle). IsHostOfSource would answer False:
-  -- this context leaves Filter.Context.sourceAttachedTo unfilled.
+  -- HasAttached IsSource (Conjurer's Mantle).
   TriggerCondition.CreatureAttacks f -> case event of
     GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared attacker _ _ _ _) ->
       case Projection.viewWithLastKnown attacker gs attacker of
@@ -6018,8 +6017,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- the link is on the board to be read.
   TriggerCondition.AttachedCreatureBecomesTapped -> case event of
     GameEvent.BecameTapped tapped ->
-      let hostOfBearer = Object.attachedTo =<< Game.lookupObject bearer gs
-       in (Recipient.objectOf =<< hostOfBearer) == Just tapped
+      Game.hostOf bearer gs == Just tapped
     -- CR 701.26b's untap is the other transition of the same status, and no
     -- "becomes tapped" condition reads it.
     GameEvent.BecameUntapped _ -> False
@@ -6314,8 +6312,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.TappedForMana tapped ->
-      let hostOfBearer = Object.attachedTo =<< Game.lookupObject bearer gs
-       in (Recipient.objectOf =<< hostOfBearer) == Just (TappedForMana.permanent tapped)
+      Game.hostOf bearer gs == Just (TappedForMana.permanent tapped)
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False

@@ -31,6 +31,7 @@ import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Plane as Plane
 import qualified Pawl.Engine.Projection.Rewrite as Rewrite
 import qualified Pawl.Engine.Quantity as Quantity
+import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Star as Star
 import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Extra.Natural as Natural
@@ -763,7 +764,7 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- CR 701.3a / 301.5a: the same attachment as the HOST'S ID -- IsAttachedToSource
       -- compares it against the match's source, which this builder does not know.
       -- Not narrowed to the battlefield the way `attachedToView` is.
-      Filter.attachedTo = hostOf oid gs,
+      Filter.attachedTo = Game.hostOf oid gs,
       -- CR 701.3a: filled only by Resolve's AttachTarget arm, the one place that
       -- knows what is being moved.
       Filter.canHostSubject = False,
@@ -1842,7 +1843,7 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
       -- this seed from a token is CR 208.2's star. Pawl.CountSpec's Miming Slime
       -- group is what proves that.
       let seedViewOf = const Nothing
-          seedContext = Filter.contextFor (Game.teams gs) (controllerOf oid gs) (Just oid)
+          seedContext = SourceContext.sourceContext gs (controllerOf oid gs) oid
        in PC.MkProjectedCharacteristics
             { -- CR 709.4a: the names the object shows, which `face` cannot carry --
               -- Game.namesOf decides which halves show.
@@ -2195,7 +2196,7 @@ abilitiesFromCharacteristics :: Count.ViewOf -> ProjectedCharacteristics -> Obje
 abilitiesFromCharacteristics peers pc oid gs =
   let granted ability = case ActivatedAbility.condition ability of
         Nothing -> True
-        Just cond -> Condition.holds peers (Filter.contextFor (Game.teams gs) (controllerOf oid gs) (Just oid)) gs oid cond
+        Just cond -> Condition.holds peers (SourceContext.sourceContext gs (controllerOf oid gs) oid) gs oid cond
    in -- Rule 702's own activated abilities are appended here, minted from the
       -- POST-LAYER keyword map, so Humility takes crew away with the rest.
       --
@@ -2373,18 +2374,9 @@ controlGrants gs =
                 <> fmap (\(ts, sa) -> toGrant (max (Object.timestamp permObj) ts) sa) (filter (keeps . snd) (grantedStaticAbilitiesOf permId gs))
    in concatMap grantsOf (abilitySources gs)
 
--- CR 303.4b: WHICH object this one is attached to -- what an Aura "enchants".
--- Nothing where it is attached to nothing, and where it is attached to a PLAYER
--- (CR 303.4's other destination), which is why Affected.Attached and
--- Affected.AttachedPlayerControls are two arms. No projection at all, so a
--- caller inside the layer fold may ask it -- which is what lets
--- Filter.IsHostOfSource be answered anywhere a source and a GameState are in hand.
-hostOf :: ObjectId -> GameState -> Maybe ObjectId
-hostOf oid gs = Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf
-
 -- CR 303.4b's other destination: WHICH PLAYER this object is attached to --
--- what an enchant-player Aura "enchants". hostOf's twin, Nothing where the
--- object is attached to nothing or to an object. Like hostOf, no projection,
+-- what an enchant-player Aura "enchants". Game.hostOf's twin, Nothing where the
+-- object is attached to nothing or to an object. Like Game.hostOf, no projection,
 -- read live off Object.attachedTo, so controlNames below may ask it.
 enchantedPlayerOf :: ObjectId -> GameState -> Maybe PlayerId.PlayerId
 enchantedPlayerOf oid gs = Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.playerOf
@@ -2453,7 +2445,7 @@ layerTwo grants gs =
         Nothing -> True
         Just cond ->
           let src = ceSource e
-           in Condition.holds (Just . leanViewOf ctrl gs) ((Filter.contextFor (Game.teams gs) (ctrl src) (Just src)) {Filter.sourceAttachedTo = hostOf src gs}) gs src cond
+           in Condition.holds (Just . leanViewOf ctrl gs) (SourceContext.sourceContext gs (ctrl src) src) gs src cond
       outcome table e =
         let ctrl = controllerIn table
             named = if holdsIn ctrl e then controlNames ctrl gs (ceSource e) (ceAffected e) else Set.empty
@@ -2561,7 +2553,7 @@ controlNames :: (ObjectId -> Maybe PlayerId.PlayerId) -> GameState -> ObjectId -
 controlNames ctrl gs source a = case a of
   Affected.TheseObjects s -> s
   -- CR 303.4m: the source's own attachment, with no projection needed.
-  Affected.Attached -> maybe Set.empty Set.singleton (hostOf source gs)
+  Affected.Attached -> maybe Set.empty Set.singleton (Game.hostOf source gs)
   -- CR 611.3a: a static ability's effect is not locked in, so the set is
   -- re-derived from the battlefield at every projection and a permanent that
   -- enters later is in it. CR 613.1a/613.2c: layer 2 reads an object's COPIABLE
@@ -2618,7 +2610,7 @@ controlReaches ctrl gs source oid =
 matchesLeanly :: (ObjectId -> Maybe PlayerId.PlayerId) -> GameState -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
 matchesLeanly ctrl gs source f oid =
   Filter.matches
-    (Filter.contextFor (Game.teams gs) (ctrl source) (Just source))
+    (SourceContext.sourceContext gs (ctrl source) source)
     (leanViewOf ctrl gs oid)
     f
 

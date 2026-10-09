@@ -4260,9 +4260,8 @@ conditionFilters = concatMap quantityFilters . conditionQuantities
 -- CR 103.5b / CR 103.6: the Filter positions one hand action holds -- its effects'
 -- and its own gate's. The gate is a Condition like any other, so it is reached
 -- exactly as a static ability's "as long as" clause is.
--- UNFRAMED, unlike a static ability's CR 604.2 clause one field over:
--- Pawl.Engine.Mulligan.allows evaluates this one through Filter.contextFor, which
--- fills no sourceAttachedTo, so CR 303.4b's atom would answer nothing here.
+-- UNFRAMED, the conservative tag, unlike a static ability's CR 604.2 clause one
+-- field over: no card writes a hand action's gate in a framed position yet.
 handActionFilters :: HandAction.HandAction Card.Type.Card -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 handActionFilters action =
   concatMap effectFilters (HandAction.effects action)
@@ -5539,17 +5538,16 @@ blockPermissionFilters permission =
 --     (Pawl.Engine.Resolve.Slots.objectRefObjects), which fills
 --     Filter.Context.sourceAttachedTo and, being a resolution's own context,
 --     everything else effectContext fills too.
---   * StandingHostFramed -- the other positions that fill
---     Filter.Context.sourceAttachedTo, none of them inside a resolution: a static
+--   * StandingHostFramed -- the positions framed by their source outside a
+--     resolution: a static
 --     ability's CR 604.2 clause (Pawl.Engine.Projection.conditionHolds), a
 --     triggered ability's CR 603.4 clause
 --     (Pawl.Engine.Event.Trigger.interveningHolds and Pawl.Engine.Stack's CR
 --     608.2a re-check), and a printed PLAYER ability's own clause.
 --
---     Split off SourceHostFramed by #3320 over ONE field: CR 201.4's
---     Filter.HasChosenName is answerable at an effect's ObjectRef and nowhere
---     here, these three building their contexts through Filter.contextFor and
---     Filter.contextWithSlots, which leave sourceChosenNames empty. Not a general
+--     Split off SourceHostFramed by #3320 over ONE atom: CR 201.4's
+--     Filter.HasChosenName, which Pawl.Engine.SourceContext answers here too but
+--     whose lint admits only where a card asks. Not a general
 --     "these supply nothing" tag -- `hostFramed` treats the two alike, and the
 --     intervening "if" fills Filter.Context.slotObjects off the TRIGGER's
 --     bindings, which is why isBoundCounts admits it exactly as before.
@@ -5580,8 +5578,7 @@ blockPermissionFilters permission =
 --     position a card may write CR 709.4a's Filter.SameNameAsBound in (Hour of
 --     Glory): Resolve.Slots.objectRefObjects matches it through
 --     Resolve.Slots.effectContext, which fills the names. Not SourceHostFramed,
---     which the arm's siblings carry, because that arm overlays no
---     Filter.Context.sourceAttachedTo.
+--     which the arm's siblings carry, for the ObjectRef twin lint's sake.
 --   * MillTallyFramed -- CR 701.17's mill tally filter, one of the positions a
 --     card may write CR 201.4's Filter.HasChosenName in (Predict): the
 --     Effect.Mill arm reads the resolution's own context, which fills
@@ -5591,12 +5588,11 @@ blockPermissionFilters permission =
 --   * ClauseGateFramed -- a mode clause's own "if" (Clause.condition), read by
 --     Pawl.Engine.Resolve.gateHolds through Resolve.Slots.effectContext, so
 --     CR 205.3m's Filter.SharesCreatureTypeWithBound answers there (Mudbutton
---     Clanger). It overlays no Filter.Context.sourceAttachedTo.
+--     Clanger).
 --   * LifeLossAmountFramed -- CR 119.3's amount, which the Effect.LoseLife arm
 --     reads per recipient through Resolve.Slots.effectContext, so
 --     Filter.Context.slotNames is filled and CR 709.4a's
---     Filter.SameNameAsBound answers in its Count filter (Grim Reminder). It
---     overlays no Filter.Context.sourceAttachedTo.
+--     Filter.SameNameAsBound answers in its Count filter (Grim Reminder).
 --   * AffectedSetFramed -- a static ability's or a combat restriction's own
 --     affected set, matched by Pawl.Engine.Projection.affectsWith through
 --     affectedContext, which fills Filter.Context.sourceChosenColors and
@@ -5604,7 +5600,7 @@ blockPermissionFilters permission =
 --     Teferi's Moat).
 --   * ActivationCostFramed -- an activated ability's own cost, whose pools in
 --     Pawl.Engine.Cost and Pawl.Engine.Replacement.matchesPermanent fill the
---     same two fields off the source (SourceContext.withChoicesOf, Doom Cannon).
+--     same two fields off the source (SourceContext.framedBy, Doom Cannon).
 --   * ManaRestrictionFramed -- CR 106.6's restriction on the mana an ability
 --     adds, matched by Pawl.Engine.Mana.admitsUnder, which fills the source's
 --     CR 607.2d choices off the mana unit (Pillar of Origins, Throne of
@@ -5633,9 +5629,8 @@ data Framing
   | InTargetSlot
   | SourceHostFramed
   | -- | CR 604.2's, CR 603.4's and a printed player ability's own Filters: the
-    -- positions that fill Filter.Context.sourceAttachedTo without being inside a
-    -- resolution, so CR 201.4's chosen names are empty at all three. See the
-    -- overview above for the evaluators and for what the split buys.
+    -- positions framed by their source outside a resolution. See the overview
+    -- above for the evaluators and for what the split buys.
     StandingHostFramed
   | -- | A printed or granted PLAYER ability's own effect Filters, read through
     -- Pawl.Engine.PlayerEffect.contextFor off the row `applying` returns: the
@@ -5766,10 +5761,8 @@ data Framing
     -- resolution's own context (Resolve.Slots.effectContext), so
     -- Filter.Context.slotNames is filled.
     --
-    -- Not SourceHostFramed, which every other ObjectRef Filter carries: that arm
-    -- overlays no Filter.Context.sourceAttachedTo, so a CR 303.4b question is
-    -- unanswerable here where it is answerable at its siblings. Narrowing, and
-    -- no card in the pool loses a position by it.
+    -- Not SourceHostFramed, which every other ObjectRef Filter carries, for the
+    -- ObjectRef twin lint's sake.
     HandSweepFramed
   | -- | CR 608.2c's clause "if", evaluated in the resolution's own context. See
     -- the overview above.
@@ -6190,8 +6183,8 @@ effectFilters effect = case effect of
   -- Swift Silence's "all other spells" is an ObjectRef Filter like Destroy's,
   -- so the lint reaches it.
   -- Desertion's "if an artifact or creature spell" is no ObjectRef's filter:
-  -- the Counter arm matches it through Resolve.Slots.effectContext with no
-  -- host overlay, so it is Unframed.
+  -- the Counter arm matches it through Resolve.Slots.effectContext, but it is
+  -- Unframed, the conservative tag, until a card asks more of it.
   Effect.Counter (Counter.MkCounter ref _ _ instead) -> frame SourceHostFramed (objectRefFilters ref) <> fmap ((,) Unframed) (foldMap (Foldable.toList . CounterDestination.only) instead)
   -- All THREE positions: the ObjectRef carries Renegade Krasis' "each other
   -- creature you control with a +1/+1 counter on it", and a Filter there would
@@ -6640,11 +6633,10 @@ activatedAbilityFilters ability =
     -- CR 603.4's intervening "if" one field over.
     <> frame Unframed (concatMap conditionFilters (Maybe.maybeToList (ActivatedAbility.condition ability)))
     -- CR 602.5's rider. Unframed because Pawl.Engine.ActivationRestriction's
-    -- OnlyIf arm builds a plain Filter.contextFor: sourceAttachedTo, sourcePower
-    -- and slotAmount are Nothing there and slotObjects, slotNames and
-    -- slotControllers are empty. The tag is what FENCES the atoms that would read
-    -- those rather than leaving them silent -- CR 303.4b's IsHostOfSource, which
-    -- belongs to SourceHostFramed, and CR 709.4a's SameNameAsBound and CR 110.2's
+    -- OnlyIf arm reads no announcement: sourcePower and slotAmount are Nothing
+    -- there and slotObjects, slotNames and slotControllers are empty. The tag is
+    -- what FENCES the atoms that would read those rather than leaving them
+    -- silent -- CR 709.4a's SameNameAsBound and CR 110.2's
     -- SameControllerAsBound, which belong to InTargetSlot and whose vacuous
     -- directions differ (see the Framing haddock). The two source-power
     -- comparisons have no tag of their own and are fenced corpus-wide instead, by

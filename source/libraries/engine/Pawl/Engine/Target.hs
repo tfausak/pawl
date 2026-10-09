@@ -27,6 +27,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.QuantitySlot as QuantitySlot
+import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
@@ -321,11 +322,8 @@ slotContext pcs perspective unannounced bindings source amount gs =
       -- amounts beside them go to boundAmounts instead.
       targets = Binding.targetsOf bindings
       base =
-        Filter.MkContext
-          { Filter.teams = Game.teams gs,
-            Filter.perspective = perspective,
-            Filter.source = Just source,
-            Filter.sourcePower = Projection.powerWithLastKnownGiven pcs source gs,
+        (SourceContext.sourceContext gs perspective source)
+          { Filter.sourcePower = Projection.powerWithLastKnownGiven pcs source gs,
             Filter.sourceToughness = Nothing,
             -- Nothing: CR 702.85a's comparison is written into a resolution's own
             -- references (Pawl.Engine.Resolve.Slots.effectContext fills it), never
@@ -464,36 +462,10 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- choosing the target before the ability object holds a binding of its
             -- own. Read at both of CR 115's moments, like every field here.
             Filter.boundAmounts = Map.mapMaybe Binding.Type.amount bindings,
-            -- Nothing: CR 303.4b's atom names what the SOURCE enchants, and no
-            -- printing puts that in a target slot -- "enchanted creature" is a
-            -- reference the card already made rather than a choice CR 601.2c
-            -- leaves open. Pawl.CardSpec's position lint is what keeps that true,
-            -- and widening it here would be a capability no card asks for.
-            Filter.sourceAttachedTo = Nothing,
             -- Nothing: a target slot's filter sits in no Quantity, so nothing
             -- aims it at an object.
             Filter.evaluated = Nothing,
-            -- CR 400.7: what the source put onto the battlefield, for an enchant
-            -- ability naming it (Animate Dead). A THUNK, one scan of the relation.
-            Filter.sourceEntrants = Map.keysSet (Map.filter (== source) (GameState.enteredWith gs)),
-            -- THE one site that fills it, sourcePower's and slotAmount's sibling
-            -- above and for their reason: CR 702.140a's owner comparison lives in
-            -- a target slot's Filter -- the one rule 702.140a MINTS
-            -- (Pawl.Engine.Keyword.mutateTarget) -- and this is where one is
-            -- matched, at both of CR 115's moments.
-            --
-            -- Off Object.owner rather than off a projection or off `perspective`:
-            -- CR 108.3 fixes an owner when the game starts and no layer writes
-            -- one, while CR 109.5's "you" is the CONTROLLER, which is a different
-            -- player for a spell cast off somebody else's card. A source the
-            -- state no longer holds answers Nothing, and the atom answers False
-            -- on it; CR 608.2b reaches this while the spell is still on the
-            -- stack, so no last-known reader is wanted.
-            --
-            -- A THUNK, like its siblings: a slot whose filter never names the
-            -- atom pays for no lookup.
-            Filter.sourceOwner = fmap Object.owner (Game.lookupObject source gs),
-            -- Empty, sourceAttachedTo's reason one atom over: CR 201.4's name is
+            -- Empty, overriding the source's frame: CR 201.4's name is
             -- chosen while the spell RESOLVES (CR 608.2c), and a target slot is
             -- matched at CR 601.2c, before any of that has happened. So there is
             -- no chosen name here even for a source that will have one, and
@@ -510,15 +482,6 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- and a slot's own filter is judged against a candidate rather than
             -- against an aiming object -- so no atom here wants the aimer.
             Filter.aimingController = Nothing,
-            -- CR 607.2d links the source's "choose a color" to every ability
-            -- printed on it that names "the chosen color", a target slot's
-            -- filter included (Pentarch Paladin). Read through CR 608.2h's last
-            -- known information, since CR 608.2b re-asks the slot after the
-            -- source may have left (Pawl.TargetSpec's Pentarch Paladin group).
-            -- A THUNK, like its siblings.
-            Filter.sourceChosenColors = Game.chosenColorsWithLastKnown source gs,
-            -- The field above's sibling for "the chosen type" (From the Rubble).
-            Filter.sourceChosenSubtype = Game.chosenSubtypeWithLastKnown source gs,
             -- CR 607.2a's last exiled card is the MANA unit's, never a slot's.
             Filter.sourceLastExiled = Nothing
           }

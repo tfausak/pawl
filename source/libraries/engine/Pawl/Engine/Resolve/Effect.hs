@@ -5639,7 +5639,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           Just h -> maybe (pure ()) (exchange card . Just) (Attach.attachmentFor card h before)
           Nothing
             | Set.member Subtype.Aura (Projection.subtypesOf card before) -> do
-                let hosts = filter ((/= Just source) . Recipient.objectOf) (Attach.entryHostsFor (Filter.contextFor (Game.teams before) (Just controller) (Just card)) card before)
+                let hosts = filter ((/= Just source) . Recipient.objectOf) (Attach.entryHostsFor (SourceContext.sourceContext before (Just controller) card) card before)
                 entryHost <- Attach.chooseEntryHost controller card hosts
                 maybe (pure ()) (exchange card . Just) (entryHost >>= \h -> Attach.attachmentFor card h before)
             | otherwise -> exchange card Nothing

@@ -41,6 +41,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as View
+import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Types.ActiveActivationProhibition as ActiveActivationProhibition
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
@@ -167,7 +168,7 @@ arm targets controller source duration gs = case duration of
   -- one line below.
   Duration.ForAsLongAs cond ->
     let baked = Condition.bakeBound targets cond
-     in if Condition.holds (Projection.fullView gs) (Filter.contextFor (Game.teams gs) (Just controller) (Just source)) gs source baked
+     in if Condition.holds (Projection.fullView gs) (SourceContext.sourceContext gs (Just controller) source) gs source baked
           then Just (Expiry.While (While.MkWhile controller baked))
           else Nothing
   -- CR 500.5a / 511.2: "until end of combat" is the end of the combat PHASE, so
@@ -243,7 +244,7 @@ seatOf targets controller source gs ref = case ref of
       _ -> Nothing
     slotsOf pick = fmap (Set.fromList . Maybe.mapMaybe pick . Set.toList) targets
     context =
-      (Filter.contextWithSlots (Game.teams gs) (Just controller) (Just source) (slotsOf Recipient.objectOf))
+      ((SourceContext.sourceContext gs (Just controller) source) {Filter.slotObjects = slotsOf Recipient.objectOf})
         { Filter.slotPlayers = slotsOf Recipient.playerOf
         }
 
@@ -349,7 +350,7 @@ permissionOpen pid permission gs =
    in ExilePlayPermission.player permission == pid
         && begun gs (ExilePlayPermission.expiry permission)
         && all
-          (Condition.holds (Projection.fullView gs) (Filter.contextFor (Game.teams gs) (Just pid) (Just source)) gs source)
+          (Condition.holds (Projection.fullView gs) (SourceContext.sourceContext gs (Just pid) source) gs source)
           (ExilePlayPermission.condition permission)
 
 -- CR 514.2: "until end of turn" and "this turn" effects end during the cleanup
@@ -469,7 +470,7 @@ sweepConditional :: Game Bool
 sweepConditional = do
   gs <- State.get
   let survives source expiry = case expiry of
-        Expiry.While (While.MkWhile you cond) -> Condition.holds (Projection.fullView gs) (Filter.contextFor (Game.teams gs) (Just you) (Just source)) gs source cond
+        Expiry.While (While.MkWhile you cond) -> Condition.holds (Projection.fullView gs) (SourceContext.sourceContext gs (Just you) source) gs source cond
         Expiry.AtCleanup -> True
         Expiry.Never -> True
         -- Alchemy's "perpetually" lasts for the rest of the game, as Never does.

@@ -2917,7 +2917,7 @@ playerRefPlayers legal controller gs ref =
 -- `ControlledBy You`, read against CR 109.5's perspective.
 battlefieldMatching :: Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId -> ObjectId -> GameState -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
 battlefieldMatching legal resolving controller source gs filter_ =
-  let context = (effectContext gs controller source legal (slotBindings resolving gs)) {Filter.sourceAttachedTo = Projection.hostOf source gs}
+  let context = effectContext gs controller source legal (slotBindings resolving gs)
       viewOf = Projection.viewsOf gs
       -- CR 603.2's player slots baked in, exactly as Pawl.Engine.Target.bakeSlots
       -- does it for a MODE's target filter and off the same map: Filter.matches
@@ -3027,7 +3027,7 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard scope filter_) ->
     -- With CR 303.4b's host filled for Animate Dead's "return enchanted
     -- creature card".
-    let context = (effectContext gs controller source legal (slotBindings resolving gs)) {Filter.sourceAttachedTo = Projection.hostOf source gs}
+    let context = effectContext gs controller source legal (slotBindings resolving gs)
      in concatMap (\pid -> graveyardCardsOf context gs pid filter_) (zoneScopePlayers legal controller gs scope)
   -- CR 400.1's per-player zone again, but only the RESOLVING CONTROLLER's, so no
   -- scope to fold over and no APNAP order to impose. In the zone's own order,
@@ -3045,9 +3045,6 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- its sweep is Filter.SameNameAsBound over the target the FIRST clause exiled,
   -- so swapping in a bare Filter.contextFor exiles nothing. The sibling sweeps
   -- are written the same way for the reason spelled out at EachMatching above.
-  --
-  -- No sourceAttachedTo override, unlike EachMatching and EachCardInGraveyard:
-  -- no card in a hand names what its Aura's host is.
   ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand scope mFilter) ->
     let context = effectContext gs controller source legal (slotBindings resolving gs)
         held pid = case mFilter of
@@ -3388,7 +3385,7 @@ effectContext gs controller source legal bindings =
       -- name an earlier clause chose is part of the state a later one is read
       -- against -- Petra Sphinx's "if that card has the chosen name" over the
       -- card its own reveal bound. CR 608.2h's last-known reader is inside
-      -- withChoicesOf, for the source that has already left (Conjurer's Ban).
+      -- choicesOf, for the source that has already left (Conjurer's Ban).
       -- Brass Herald's "creature cards of the chosen type revealed this way" is
       -- the chosen subtype's proof (Pawl.ResolveSpec).
       (SourceContext.sourceContext gs (Just controller) source)
@@ -3432,7 +3429,7 @@ effectContext gs controller source legal bindings =
           -- is what makes the host's controller differ from its owner, and
           -- Pawl.AuraSpec's "CR 613.1b the host's controller is the projected
           -- one, not its owner" is the board that tells the two apart.
-          Filter.slotHostControllers = fmap (foldMap (\oid -> maybe Set.empty (\host -> if Set.member host (GameState.battlefield gs) then maybe Set.empty Set.singleton (Projection.controllerOf host gs) else Set.empty) (Projection.hostOf oid gs))) objects,
+          Filter.slotHostControllers = fmap (foldMap (\oid -> maybe Set.empty (\host -> if Set.member host (GameState.battlefield gs) then maybe Set.empty Set.singleton (Projection.controllerOf host gs) else Set.empty) (Game.hostOf oid gs))) objects,
           -- CR 205.3m's creature types off the same objects and the same
           -- reader, for slotNames' reason: Heirloom Blade's dead creature is
           -- read as it last existed (CR 603.10a), and a face-down one has none

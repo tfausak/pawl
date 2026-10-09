@@ -116,7 +116,7 @@ data LastKnown = MkLastKnown
     -- | CR 201.4: the card names that had been chosen for it -- the same
     -- Object.chosenNames the live object carried. What CR 608.2h answers for an
     -- ability whose source chose a name and then left the zone it was expected
-    -- to be in (Pawl.Engine.SourceContext.withChoicesOf).
+    -- to be in (Pawl.Engine.SourceContext.choicesOf).
     --
     -- Not a characteristic either -- CR 109.3's list has no chosen name -- and
     -- not recoverable from `characteristics` or `copiable`, since choosing a name

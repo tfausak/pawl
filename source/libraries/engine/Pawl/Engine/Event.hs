@@ -61,6 +61,7 @@ import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.Restamp as Restamp
 import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Engine.Saga as Saga
+import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Subtype as Subtype.Engine
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Integer as Integer
@@ -1440,7 +1441,7 @@ eligible predicate source pid gs =
       -- CR 608.2h: the source's power as it is now, or as it last existed, for
       -- a wish that compares against it (Synthetic Wishful Djinn's "power less
       -- than this creature's"). A thunk, Filter.Context.sourcePower's posture.
-      context = (Filter.contextFor (Game.teams gs) (Just pid) (Just source)) {Filter.sourcePower = Projection.powerWithLastKnownGiven Map.empty source gs}
+      context = (SourceContext.sourceContext gs (Just pid) source) {Filter.sourcePower = Projection.powerWithLastKnownGiven Map.empty source gs}
       matchesFace face = Filter.matches context (Projection.viewOfCard face) predicate
       admits printingId = case Game.cardOfPrinting printingId gs of
         Nothing -> False
@@ -3202,7 +3203,7 @@ apply batch candidate event =
           Nothing -> pure (Just event)
           Just controller -> do
             let entering oid2 = Set.member oid2 batch || Set.member oid2 (GameState.enteringSubjects gs)
-                hosts = filter (not . entering) (Attach.hostsFor (Filter.contextFor (Game.teams gs) (Just controller) (Just oid)) oid filter_ gs)
+                hosts = filter (not . entering) (Attach.hostsFor (SourceContext.sourceContext gs (Just controller) oid) oid filter_ gs)
             chosen <- Attach.chooseHost controller oid hosts
             -- CR 301.5e: no candidate leaves the Equipment on the battlefield
             -- unattached, and attachmentFor answering Nothing lands in the same
@@ -3440,7 +3441,7 @@ apply batch candidate event =
         let count = case n of
               Just printed -> printed
               Nothing ->
-                let context = Filter.contextFor (Game.teams gs) (Projection.controllerOf oid gs) (Just oid)
+                let context = SourceContext.sourceContext gs (Projection.controllerOf oid gs) oid
                     quantity = Quantity.Type.DamageDealtToPlayersThisTurn (PlayerRef.Relative PlayerRelation.Opponent)
                  in maybe 0 Integer.toNaturalSaturating (Quantity.evaluate (Projection.fullView gs) context gs oid quantity)
         Replacement.consume (ReplacementCandidate.identity candidate)
@@ -4656,7 +4657,7 @@ seatEnteringAura batch oid = do
   case Projection.controllerOf oid gs of
     Just controller | unattached && Set.member Subtype.Aura (Projection.subtypesOf oid gs) -> do
       let entering h = Set.member h batch || Set.member h (GameState.enteringSubjects gs)
-          hosts = filter (not . maybe False entering . Recipient.objectOf) (Attach.entryHostsFor (Filter.contextFor (Game.teams gs) (Just controller) (Just oid)) oid gs)
+          hosts = filter (not . maybe False entering . Recipient.objectOf) (Attach.entryHostsFor (SourceContext.sourceContext gs (Just controller) oid) oid gs)
       chosen <- Attach.chooseEntryHost controller oid hosts
       -- THE TAG the enchant slot produced, for changeZoneAttaching's reason:
       -- Sba.stillLegalEnchant compares the (pool, tag) pair.
@@ -4682,7 +4683,7 @@ pendingSacrifices chooser gs =
     Just obj <- [Game.lookupObject member gs],
     Object.zone obj /= Zone.Battlefield,
     (_, ReplacementEffect.EntryR (EntryR.MkEntryR pattern_ rewrite)) <- Projection.replacementsOf Zone.Battlefield member gs,
-    Filter.matches (Filter.contextFor (Game.teams gs) (Just controller) (Just member)) (Projection.viewOfObject member gs) pattern_,
+    Filter.matches (SourceContext.sourceContext gs (Just controller) member) (Projection.viewOfObject member gs) pattern_,
     (count, criterion) <- Maybe.maybeToList (Replacement.entryCostOf rewrite)
   ]
 
@@ -6542,7 +6543,7 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                     -- Aura's own enchant ability, so there is no resolution
                     -- whose slots the filter could name -- and CanHostSubject,
                     -- the whole filter here, names none.
-                    hosts = filter (not . maybe False (`Set.member` batch) . Recipient.objectOf) (Attach.entryHostsFor (Filter.contextFor (Game.teams gs) (Just chooser) (Just oid)) oid gs)
+                    hosts = filter (not . maybe False (`Set.member` batch) . Recipient.objectOf) (Attach.entryHostsFor (SourceContext.sourceContext gs (Just chooser) oid) oid gs)
                 chosen <- Attach.chooseEntryHost chooser oid hosts
                 -- THE TAG the Aura's own enchant slot produced, never a hand-built
                 -- ToObject: Sba.stillLegalEnchant compares the (pool, tag) pair, so

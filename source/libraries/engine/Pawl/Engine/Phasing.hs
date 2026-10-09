@@ -163,7 +163,7 @@ phaseOutSet fallback hosts gs =
       -- phases out indirectly" is the case that proves it, Clever Concealment
       -- naming a creature and its own Equipment in one announcement.
       status oid
-        | maybe False (`Set.member` leaving) (hostOf oid gs) = PhasedOut.Indirectly (heldBy fallback oid gs)
+        | maybe False (`Set.member` leaving) (Game.hostOf oid gs) = PhasedOut.Indirectly (heldBy fallback oid gs)
         -- CR 702.26a schedules the return by who controlled the permanent when it
         -- phased out, which is not necessarily who asked: Reality Ripple aimed at
         -- an opponent's creature phases it back in at THAT player's untap step.
@@ -214,7 +214,7 @@ closeOver :: Set.Set ObjectId -> Set.Set ObjectId -> GameState -> Set.Set Object
 closeOver candidates hosts gs =
   let riders =
         Set.filter
-          (\oid -> maybe False (`Set.member` hosts) (hostOf oid gs))
+          (\oid -> maybe False (`Set.member` hosts) (Game.hostOf oid gs))
           (Set.difference candidates hosts)
    in if Set.null riders then hosts else closeOver candidates (Set.union hosts riders) gs
 
@@ -224,12 +224,6 @@ isAttachment gs oid =
    in Set.member Subtype.Aura subtypes
         || Set.member Subtype.Equipment subtypes
         || Set.member Subtype.Fortification subtypes
-
--- What a permanent is attached to, when that is an object. CR 702.26g reaches
--- only object hosts: an Aura enchanting a PLAYER (CR 702.5d) has no permanent to
--- go with, and Recipient.objectOf answering Nothing is that sentence.
-hostOf :: ObjectId -> GameState -> Maybe ObjectId
-hostOf oid gs = Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf
 
 -- Who controls `oid` right now, for the row about to be written. Live, because
 -- the object is still on the battlefield at this moment -- CR 702.26e only takes

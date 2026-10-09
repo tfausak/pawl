@@ -4654,8 +4654,8 @@ honeCounterSpec s registry = Spec.describe s "HoneCounter" $ do
         onPiker = S.attach equip pikerId honed
     Spec.assertEqWith s "the uncrewed Vehicle has no power at all, so neither the counters nor the Equipment's own +2/+0 is visible on it" (Projection.powerOf vehicle onVehicle) Nothing
     Spec.assertEqWith s "the same Equipment on a creature: 2 + 2 + 2" (Projection.powerOf pikerId onPiker) (Just 6)
-    Spec.assertEqWith s "the Equipment is attached in the window this board reads" (Projection.hostOf equip onVehicle) (Just vehicle)
-    Spec.assertEqWith s "CR 704.5n closes it on the next state-based pass" (Projection.hostOf equip (S.settleSba onVehicle)) Nothing
+    Spec.assertEqWith s "the Equipment is attached in the window this board reads" (Game.hostOf equip onVehicle) (Just vehicle)
+    Spec.assertEqWith s "CR 704.5n closes it on the next state-based pass" (Game.hostOf equip (S.settleSba onVehicle)) Nothing
 
   -- CR 301.5f: an ability referring to the "equipped creature" refers to
   -- whatever CREATURE the permanent is attached to, so inside CR 704.5n's window
@@ -4687,8 +4687,8 @@ honeCounterSpec s registry = Spec.describe s "HoneCounter" $ do
     Spec.assertBool s (Projection.hasKeyword Keyword.Deathtouch pikerId onPiker) "the same Collar on a creature does grant deathtouch"
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Lifelink vehicle onVehicle)) "and the Collar's other keyword is gone with it"
     Spec.assertEqWith s "CR 208.3 masks the P/T half on the same host: the Bonesplitter's +2/+0 reads Nothing either way" (Projection.powerOf vehicle onVehicle) Nothing
-    Spec.assertEqWith s "the Collar is attached in the window this board reads" (Projection.hostOf collarId onVehicle) (Just vehicle)
-    Spec.assertEqWith s "CR 704.5n closes it on the next state-based pass" (Projection.hostOf collarId (S.settleSba onVehicle)) Nothing
+    Spec.assertEqWith s "the Collar is attached in the window this board reads" (Game.hostOf collarId onVehicle) (Just vehicle)
+    Spec.assertEqWith s "CR 704.5n closes it on the next state-based pass" (Game.hostOf collarId (S.settleSba onVehicle)) Nothing
 
   -- The whole card. Dwalin, Weaponmaster {1}{R/W} Legendary Creature -- Dwarf
   -- Warrior 2/1, "First strike" / "Whenever Dwalin enters or attacks, put a hone

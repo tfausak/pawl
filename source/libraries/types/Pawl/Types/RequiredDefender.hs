@@ -30,7 +30,7 @@ module Pawl.Types.RequiredDefender where
 data RequiredDefender
   = -- | CR 108.4 / 303.4m: the controller of the object the source is attached
     -- to. Names nobody when the source is attached to nothing, or to a player
-    -- (Pawl.Engine.Projection.View.hostOf answers Nothing for both).
+    -- (Pawl.Engine.Game.hostOf answers Nothing for both).
     ControllerOfAttached
   | -- | CR 109.5 / 102.3: an opponent of the source's controller holding the
     -- greatest life total among them (Galactus, Devourer of Worlds). Names every

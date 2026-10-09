@@ -25,7 +25,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import Pawl.Engine.Projection.Rewrite (Modification, composeWordChanges, rewriteActivatedAbility, rewriteAffected, rewriteCharacteristicPT, rewriteCondition, rewriteMinted, rewriteModification, rewritePlayerStaticAbility, rewritePrintedReplacement, rewriteRuleAbilities, rewriteStaticAbility, rewriteTriggeredAbility)
-import Pawl.Engine.Projection.View (ControlGrant, abilitiesFromCharacteristics, abilityFaceOf, abilityFaceOfId, abilitySources, controlGrants, controllerOf, controllerOfGiven, copiableCharacteristics, copiableRuleAbilitiesOf, copiableSnapshotOf, copiableSpecialActionsOf, countersOf, definesColorless, definesEveryCreatureType, enchantedPlayerOf, functionsFromZone, grantedStaticAbilitiesOf, hostOf, inSourceRangeGiven, lastKnownView, staticAbilitiesOf, staticTimestampOf, viewOfCard, viewOfCharacteristics, withAnnouncedX)
+import Pawl.Engine.Projection.View (ControlGrant, abilitiesFromCharacteristics, abilityFaceOf, abilityFaceOfId, abilitySources, controlGrants, controllerOf, controllerOfGiven, copiableCharacteristics, copiableRuleAbilitiesOf, copiableSnapshotOf, copiableSpecialActionsOf, countersOf, definesColorless, definesEveryCreatureType, enchantedPlayerOf, functionsFromZone, grantedStaticAbilitiesOf, inSourceRangeGiven, lastKnownView, staticAbilitiesOf, staticTimestampOf, viewOfCard, viewOfCharacteristics, withAnnouncedX)
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.RuleAbilities as RuleAbilities.Engine
 import qualified Pawl.Engine.Saga as Saga
@@ -214,7 +214,7 @@ layer m = case m of
 -- it. Every other arm ignores it.
 applyModification :: (ObjectId -> ProjectedCharacteristics) -> Count.ViewOf -> ObjectId -> Timestamp -> GameState -> ObjectId -> Set CardType.CardType -> Affected.Affected -> Modification -> ProjectedCharacteristics -> ProjectedCharacteristics
 applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
-  let context = Filter.contextFor (Game.teams gs) (controllerOf src gs) (Just src)
+  let context = SourceContext.sourceContext gs (controllerOf src gs) src
    in case m of
         -- CR 613.1f layer 6: a grant adds an ability, so two grants of the same
         -- keyword count twice. Keyword.grantedBy bakes the granter into CR
@@ -1018,7 +1018,7 @@ affectsWith grants peers source oid a partial gs = case a of
   -- CR 303.4m: read the SOURCE's attachment, not the candidate's. An unattached
   -- source, or one attached to a player, names no object (CR 702.5d's
   -- enchant-player Auras go through AttachedPlayerControls below).
-  Affected.Attached -> hostOf source gs == Just oid && inReach
+  Affected.Attached -> Game.hostOf source gs == Just oid && inReach
   Affected.Matching f ->
     let -- CR 109.5: "you" is the SOURCE's controller. Safe to force: controlGrants
         -- consults no liveness gate and so cannot re-enter this function.
@@ -2164,12 +2164,12 @@ carriesCondition sa =
 -- terminate.
 --
 -- CR 109.5: "you" is the SOURCE's controller, and the condition is evaluated
--- against the source. CR 303.4b: one of the four sites supplying the source's
--- host, read live off Object.attachedTo, so an Aura moved by CR 701.3a names its
--- new host on the next pass.
+-- against the source, framed by it (Pawl.Engine.SourceContext): its CR 303.4b
+-- host is read live, so an Aura moved by CR 701.3a names its new host on the
+-- next pass.
 conditionHolds :: [Gathered] -> GameState -> ObjectId -> Layer -> Condition.Type.Condition -> Bool
 conditionHolds cands gs src lowest =
-  Condition.holds (viewUpTo lowest cands gs) ((Filter.contextFor (Game.teams gs) (controllerOf src gs) (Just src)) {Filter.sourceAttachedTo = hostOf src gs}) gs src
+  Condition.holds (viewUpTo lowest cands gs) (SourceContext.sourceContext gs (controllerOf src gs) src) gs src
 
 -- CR 614.12: the board a determination about an entering permanent reads --
 -- this state with every materialized-but-not-entered permanent taken out of the
@@ -4365,7 +4365,7 @@ applyCharacteristicPT :: Count.ViewOf -> GameState -> ObjectId -> ProjectedChara
 applyCharacteristicPT viewOf gs oid pc = case PC.characteristicPT pc of
   Nothing -> pc
   Just cda ->
-    let context = Filter.contextFor (Game.teams gs) (controllerOf oid gs) (Just oid)
+    let context = SourceContext.sourceContext gs (controllerOf oid gs) oid
      in pc
           { PC.power = Just (Quantity.determine viewOf context gs oid (CharacteristicPT.power cda)),
             PC.toughness = Just (Quantity.determine viewOf context gs oid (CharacteristicPT.toughness cda))
@@ -5115,7 +5115,7 @@ replacementsOfGiven pcs zone oid gs =
 printedRowLives :: ObjectId -> GameState -> PrintedReplacement.PrintedReplacement card ability effect -> Bool
 printedRowLives oid gs pr = case PrintedReplacement.condition pr of
   Nothing -> True
-  Just cond -> Condition.holds (fullView gs) (Filter.contextFor (Game.teams gs) (controllerOf oid gs) (Just oid)) (boardAsEntering gs) oid cond
+  Just cond -> Condition.holds (fullView gs) (SourceContext.sourceContext gs (controllerOf oid gs) oid) (boardAsEntering gs) oid cond
 
 -- CR 113.6b: does this printed replacement row function from `zone`?
 -- functionsFromZone's twin for rows, with the same empty-set reading -- a row
