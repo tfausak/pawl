@@ -353,7 +353,7 @@ resolveSpellWith runSubgame oid = do
                             if taken
                               then payGateAdmits runSubgame oid oid effectController idx limbIdx (instanceView (Map.mapWithKey legalSlot (Binding.targetsOf (Object.bindings obj)))) (Just facing) Set.empty answers limb
                               else pure (False, answers)
-                          Monad.when admitted (asCostWhenNamed indexedClauses limbIdx (applyClauseEffects oid applyOne (Foldable.toList (Clause.effects limb))))
+                          Monad.when admitted (asCostWhenNamed indexedClauses limbIdx (applyClauseEffects oid oid applyOne (Foldable.toList (Clause.effects limb))))
                           after <- State.get
                           pure (answers2, recordTaken limb admitted before after limbIdx ran)
                   -- CR 608.2e's clause is the unit all four gates cover, so each
@@ -429,7 +429,7 @@ resolveSpellWith runSubgame oid = do
                                         answers
                                         clause
                                 else pure (False, answers)
-                            Monad.when admitted (asCostWhenNamed indexedClauses cIdx (applyClauseEffects oid applyOne (Foldable.toList (Clause.effects clause))))
+                            Monad.when admitted (asCostWhenNamed indexedClauses cIdx (applyClauseEffects oid oid applyOne (Foldable.toList (Clause.effects clause))))
                             after <- State.get
                             pure (answers2, picked2, recordTaken clause admitted before after cIdx ran)
                     )
@@ -837,7 +837,7 @@ resolveModesWith runSubgame stackId srcId modes = do
                       taken <- if gated then exercises stackId srcId effectController idx limbIdx boundHere legalHere (Just facing) Set.empty limb else pure False
                       before <- State.get
                       (admitted, answers2) <- if taken then payGateAdmits runSubgame stackId srcId effectController idx limbIdx (instanceView legal) (Just facing) Set.empty answers limb else pure (False, answers)
-                      Monad.when admitted (asCostWhenNamed indexedClauses limbIdx (applyClauseEffects srcId applyOne (Foldable.toList (Clause.effects limb))))
+                      Monad.when admitted (asCostWhenNamed indexedClauses limbIdx (applyClauseEffects stackId srcId applyOne (Foldable.toList (Clause.effects limb))))
                       after <- State.get
                       pure (answers2, recordTaken limb admitted before after limbIdx ran)
                in -- CR 608.2e's clause is what each gate covers. Run only when
@@ -899,7 +899,7 @@ resolveModesWith runSubgame stackId srcId modes = do
                             -- START-of-resolution slots.
                             before <- State.get
                             (admitted, answers2) <- if taken then payGateAdmits runSubgame stackId srcId effectController idx cIdx (instanceView legal) announced committed answers clause else pure (False, answers)
-                            Monad.when admitted (asCostWhenNamed indexedClauses cIdx (applyClauseEffects srcId applyOne (Foldable.toList (Clause.effects clause))))
+                            Monad.when admitted (asCostWhenNamed indexedClauses cIdx (applyClauseEffects stackId srcId applyOne (Foldable.toList (Clause.effects clause))))
                             after <- State.get
                             pure (answers2, picked2, recordTaken clause admitted before after cIdx ran)
                     )

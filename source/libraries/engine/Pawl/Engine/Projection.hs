@@ -34,6 +34,7 @@ import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AgainstLastCardExiledWith as AgainstLastCardExiledWith
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
@@ -97,6 +98,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementProvenance as ReplacementProvenance
 import qualified Pawl.Types.RuleAbilities as RuleAbilities
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
+import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype.Type
@@ -106,6 +108,7 @@ import qualified Pawl.Types.Times as Times
 import Pawl.Types.Timestamp (Timestamp (MkTimestamp))
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.UntapR as UntapR
 import qualified Pawl.Types.UntapRewrite as UntapRewrite
@@ -1255,18 +1258,39 @@ projectWithLastKnown oid gs = case lastKnownOf oid gs of
 -- and a conjured duplicate arm the text they carry rather than their printed
 -- card's, and a departed source answers with its last known text (CR 608.2h).
 -- Then the printed card's other faces (Game.declaredDelayedAbility), for the
--- face that turned away mid-resolution. data/scenarios/copy's and
--- data/scenarios/conjure's Harried Dronesmith scenarios prove the projected
--- half; the merged half is a regression fence, the printed fallback walking
--- every component too.
+-- face that turned away mid-resolution.
+--
+-- An ability object reads the declarations it froze instead
+-- (armedDelayedAbility), so this answers a spell's own text and a mana
+-- ability's WhenSpent. A regression fence for both: no board in the suite has a
+-- spell or a mana source whose projected declarations differ from its printed
+-- card's. The merged half is one too, the printed fallback walking every
+-- component as well.
 declaredDelayedAbility :: ObjectId -> AbilityName.AbilityName -> GameState -> Maybe (TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
 declaredDelayedAbility source name gs =
   Map.lookup name (PC.delayedAbilities (projectWithLastKnown source gs)) Applicative.<|> Game.declaredDelayedAbility source name gs
 
--- CR 603.7: the text an Effect.ArmDelayedTrigger stands for -- the one it
--- carries (Game.carriedDelayedAbility), else its name's (declaredDelayedAbility).
-armedDelayedAbility :: ObjectId -> ArmDelayedTrigger.ArmDelayedTrigger (GrantedAbility.GrantedAbility Card.Type.Card) -> GameState -> Maybe (TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
-armedDelayedAbility source arm gs = Game.carriedDelayedAbility arm Applicative.<|> declaredDelayedAbility source (ArmDelayedTrigger.name arm) gs
+-- CR 113.7a: the declarations an ability object freezes as it is put on the
+-- stack -- its source's projected ones (CR 707.2), with the source's last known
+-- text for a source already gone. data/scenarios/copy's and
+-- data/scenarios/conjure's Harried Dronesmith scenarios prove a copy's.
+delayedSnapshotOf :: ObjectId -> GameState -> Map.Map AbilityName.AbilityName (TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
+delayedSnapshotOf source gs = PC.delayedAbilities (projectWithLastKnown source gs)
+
+-- CR 603.7: the text an Effect.ArmDelayedTrigger stands for as `resolving`
+-- resolves -- the one it carries (Game.carriedDelayedAbility), else its name in
+-- the declarations an ability object froze on the stack (CR 113.7a), else its
+-- name on the source (declaredDelayedAbility), which is a spell's own text.
+-- data/scenarios/copy's Baboon Spirit and Mirrorweave scenario proves the
+-- frozen half.
+armedDelayedAbility :: ObjectId -> ObjectId -> ArmDelayedTrigger.ArmDelayedTrigger (GrantedAbility.GrantedAbility Card.Type.Card) -> GameState -> Maybe (TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
+armedDelayedAbility resolving source arm gs =
+  let name = ArmDelayedTrigger.name arm
+      frozen = case fmap Object.source (Game.lookupObject resolving gs) of
+        Just (Source.OfAbility activated) -> Map.lookup name (ActivatedAbilitySource.delayed activated)
+        Just (Source.OfTrigger triggered) -> Map.lookup name (TriggeredAbilitySource.delayed triggered)
+        _ -> Nothing
+   in Game.carriedDelayedAbility arm Applicative.<|> frozen Applicative.<|> declaredDelayedAbility source name gs
 
 -- powerGiven with the same fallback, on CR 608.2b's own sentence about target
 -- re-validation -- so a mentor (CR 702.134a) killed in response leaves its

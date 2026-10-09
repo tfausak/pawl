@@ -44,7 +44,8 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbilitySource" $ do
       ActivatedAbilitySource.codec
       ActivatedAbilitySource.MkActivatedAbilitySource
         { ActivatedAbilitySource.source = ObjectId.MkObjectId 5,
-          ActivatedAbilitySource.ability = ability
+          ActivatedAbilitySource.ability = ability,
+          ActivatedAbilitySource.delayed = Map.empty
         }
       " {\"source\":5,\"ability\":{\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]},\"modal\":{\"modes\":[{}]}}} "
   Spec.it s "has a schema" $
