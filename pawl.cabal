@@ -2370,6 +2370,7 @@ library types
     Pawl.Types.ManaRetention
     Pawl.Types.ManaRider
     Pawl.Types.ManaRiderEffect
+    Pawl.Types.ManaSegment
     Pawl.Types.ManaSpecification
     Pawl.Types.ManaSpending
     Pawl.Types.ManaSymbol

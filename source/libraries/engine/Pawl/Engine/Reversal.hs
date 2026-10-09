@@ -40,12 +40,12 @@ import qualified Pawl.Types.Player as Player
 -- Nothing where some leaf was written by BOTH sides to two different values,
 -- which is a state this function declines to invent -- except a pool, a life
 -- total and a count of counters, whose two changes add up (`pools`,
--- `playerWith`, `tally`). Where a pool's do not, the undone side's mana was
--- spent after it, and that Nothing is CR 733.1's "unless" clause
--- (Pawl.Engine.Cost.reverseIllegal). Any other Nothing is CONSERVATIVE rather
--- than a claim of impossibility: Pawl.Engine.Cost then leaves the activation
+-- `playerWith`, `tally`). Any other Nothing is CONSERVATIVE rather than a
+-- claim of impossibility: Pawl.Engine.Cost then leaves the activation
 -- standing, or reverses the whole action unasked, so the worst it can cost is
 -- the question.
+--
+-- Not implemented: summing any other leaf two sides wrote (#4860).
 --
 -- A TOTAL record construction, one bind per field, never a record update: a new
 -- GameState field is then a `-Wmissing-fields` error here rather than a leaf
@@ -506,11 +506,9 @@ tally before entry closed = case leaf before entry closed of
 
 -- CR 106.4's pools, each read as a multiset of units where `leaf` finds both
 -- sides wrote it: what the undone side added comes out of `closed` and what it
--- spent goes back. Nothing where an added unit is no longer there -- CR
--- 733.1's "unless mana from those abilities ... was spent on another mana
--- ability that wasn't reversed", where Pawl.Engine.Cost.composeReversal is
--- the caller. A unit has no identity beyond its fields (Pawl.Types.ManaUnit),
--- so which of two equal units was spent is not a fact to recover.
+-- spent goes back. Nothing where an added unit is no longer there. Whose mana
+-- paid for what is CR 733.1's "unless" clause, which a pool cannot tell and
+-- Pawl.Engine.Cost.reverseIllegal checks before this is asked.
 --
 -- An absent pool is an empty one, so a key goes through `leaf` whole first.
 pools :: (Ord k) => Map.Map k Mana.Mana -> Map.Map k Mana.Mana -> Map.Map k Mana.Mana -> Maybe (Map.Map k Mana.Mana)

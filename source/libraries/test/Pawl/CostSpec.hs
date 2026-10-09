@@ -5875,7 +5875,7 @@ partialReversalSpec s registry = Spec.describe s "Reversing some mana abilities"
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"
     let (spell, elvesId, tombId, gs) = partialReversalBoard mountain elves tomb piker
-        run decide = State.runState (Engine.runGame (reversingSome redType (const decide)) gs (S.cast S.alice spell)) ([elvesId, tombId], [])
+        run decide = State.runState (Engine.runGame (reversingSome [redType] (const decide)) gs (S.cast S.alice spell)) ([elvesId, tombId], [])
         ((_, keptElves), (_, asked)) = run (\oid -> if oid == tombId then OptionalDecision.Exercises else OptionalDecision.Declines)
         ((_, keptTomb), _) = run (\oid -> if oid == elvesId then OptionalDecision.Exercises else OptionalDecision.Declines)
     Spec.assertBool s (isTapped elvesId keptElves && not (isTapped tombId keptElves)) "the Elves stay tapped and the Tomb untaps"
@@ -5893,7 +5893,7 @@ partialReversalSpec s registry = Spec.describe s "Reversing some mana abilities"
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"
     let (spell, olderId, newerId, gs) = partialReversalBoard mountain tomb tomb piker
-        ((_, after), (_, asked)) = State.runState (Engine.runGame (reversingSome redType (const (\oid -> if oid == olderId then OptionalDecision.Exercises else OptionalDecision.Declines))) gs (S.cast S.alice spell)) ([olderId, newerId], [])
+        ((_, after), (_, asked)) = State.runState (Engine.runGame (reversingSome [redType] (const (\oid -> if oid == olderId then OptionalDecision.Exercises else OptionalDecision.Declines))) gs (S.cast S.alice spell)) ([olderId, newerId], [])
     Spec.assertBool s (isTapped newerId after && not (isTapped olderId after)) "the newer Tomb stays tapped and the older one untaps"
     Spec.assertEqWith s "CR 120.3a alice has taken the newer Tomb's 2 alone" (S.lifeOf S.alice after) (Just 18)
     Spec.assertEqWith s "and has its {C}{C} floating" (poolTypes S.alice after) [ManaType.Colorless, ManaType.Colorless]
@@ -5908,7 +5908,7 @@ partialReversalSpec s registry = Spec.describe s "Reversing some mana abilities"
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"
     let (spell, elvesId, skyshroudId, gs) = partialReversalBoard mountain elves skyshroud piker
-        run decide = State.runState (Engine.runGame (reversingSome redType (const decide)) gs (S.cast S.alice spell)) ([elvesId, skyshroudId], [])
+        run decide = State.runState (Engine.runGame (reversingSome [redType] (const decide)) gs (S.cast S.alice spell)) ([elvesId, skyshroudId], [])
         ((_, kept), (_, keptAsked)) = run (\oid -> if oid == skyshroudId then OptionalDecision.Declines else OptionalDecision.Exercises)
         ((_, reversed), (_, reversedAsked)) = run (const OptionalDecision.Exercises)
     Spec.assertBool s (isTapped elvesId kept) "the Elves stay tapped"
@@ -5927,7 +5927,7 @@ partialReversalSpec s registry = Spec.describe s "Reversing some mana abilities"
     let (spell, horseId, _, gs0) = partialReversalBoard mountain horse mountain piker
         gs = S.addCounter CounterKind.PlusOnePlusOne 4 horseId gs0
         counters g = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject horseId g)
-        ((_, after), (_, asked)) = State.runState (Engine.runGame (reversingSome redType (\i _ -> if i == 0 then OptionalDecision.Declines else OptionalDecision.Exercises)) gs (S.cast S.alice spell)) ([horseId, horseId], [])
+        ((_, after), (_, asked)) = State.runState (Engine.runGame (reversingSome [redType] (\i _ -> if i == 0 then OptionalDecision.Declines else OptionalDecision.Exercises)) gs (S.cast S.alice spell)) ([horseId, horseId], [])
     Spec.assertEqWith s "CR 122.1 the Workhorse has three counters, the kept activation's removal standing" (counters after) (Just 3)
     Spec.assertEqWith s "CR 106.4 and its {C} floats" (poolTypes S.alice after) [ManaType.Colorless]
     Spec.assertEqWith s "both activations are asked" asked [[horseId], [horseId]]
@@ -5941,11 +5941,43 @@ partialReversalSpec s registry = Spec.describe s "Reversing some mana abilities"
     let (spell, olderId, newerId, gs0) = partialReversalBoard mountain hub hub piker
         gs = S.addPlayerCounter PlayerCounterKind.Energy 2 S.alice gs0
         green = ManaType.Colored Color.Green
-        ((_, after), (_, asked)) = State.runState (Engine.runGame (reversingSome green (const (\oid -> if oid == olderId then OptionalDecision.Exercises else OptionalDecision.Declines))) gs (S.cast S.alice spell)) ([olderId, newerId], [])
+        ((_, after), (_, asked)) = State.runState (Engine.runGame (reversingSome [green] (const (\oid -> if oid == olderId then OptionalDecision.Exercises else OptionalDecision.Declines))) gs (S.cast S.alice spell)) ([olderId, newerId], [])
     Spec.assertBool s (isTapped newerId after && not (isTapped olderId after)) "the newer Hub stays tapped and the older one untaps"
     Spec.assertEqWith s "CR 122.1 alice has the older Hub's {E} back" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 1
     Spec.assertEqWith s "CR 106.4 and the newer Hub's {G} floats" (poolTypes S.alice after) [green]
     Spec.assertEqWith s "both Hubs are asked, newest first" asked [[newerId], [olderId]]
+
+  -- Mystic Gate's {W/U} paid with the Plains' {W}, and the Gate adds {W}{W}:
+  -- the pool still holds a {W} after it, but not the Plains'.
+  Spec.it s "CR 733.1 the Plains whose {W} paid a kept Mystic Gate is not offered back" $ do
+    plains <- S.printingOf s registry "Plains"
+    gate <- S.printingOf s registry "Mystic Gate"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    let (spell, plainsId, gateId, gs) = partialReversalBoard mountain plains gate piker
+        white = ManaType.Colored Color.White
+        run decide = State.runState (Engine.runGame (reversingSome [white, white] decide) gs (S.cast S.alice spell)) ([plainsId, gateId], [])
+        ((_, kept), (_, keptAsked)) = run (\_ oid -> if oid == gateId then OptionalDecision.Declines else OptionalDecision.Exercises)
+        ((_, reversed), (_, reversedAsked)) = run (\_ _ -> OptionalDecision.Exercises)
+    Spec.assertBool s (isTapped plainsId kept && isTapped gateId kept) "the Plains stays tapped beside the kept Gate"
+    Spec.assertEqWith s "CR 106.4 the Gate's {W}{W} floats" (poolTypes S.alice kept) [white, white]
+    Spec.assertEqWith s "only the Gate is asked" keptAsked [[gateId]]
+    Spec.assertBool s (not (isTapped plainsId reversed || isTapped gateId reversed)) "reversing the Gate too: both untap"
+    Spec.assertEqWith s "both asked, newest first" reversedAsked [[gateId], [plainsId]]
+
+  -- The Island tapped inside Mystic Gate's own window is an activation of its
+  -- own: the Gate reversed, the Island's {U} kept.
+  Spec.it s "CR 733.1 the Island that paid a reversed Mystic Gate can be kept" $ do
+    island <- S.printingOf s registry "Island"
+    gate <- S.printingOf s registry "Mystic Gate"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    let (spell, islandId, gateId, gs) = partialReversalBoard mountain island gate piker
+        blue = ManaType.Colored Color.Blue
+        ((_, after), (_, asked)) = State.runState (Engine.runGame (reversingSome [blue, blue] (\_ oid -> if oid == gateId then OptionalDecision.Exercises else OptionalDecision.Declines)) gs (S.cast S.alice spell)) ([gateId, islandId], [])
+    Spec.assertBool s (isTapped islandId after && not (isTapped gateId after)) "the Island stays tapped and the Gate untaps"
+    Spec.assertEqWith s "CR 106.4 the Island's {U} floats" (poolTypes S.alice after) [blue]
+    Spec.assertEqWith s "the Gate is asked first, then the Island" asked [[gateId], [islandId]]
 
 -- alice holds `card` with `first` and then `second` on her battlefield, and
 -- has priority in her precombat main phase. A Mountain beside them makes the
@@ -5960,10 +5992,11 @@ partialReversalBoard mountain first second card =
 
 -- CR 605.3a's windows answered off the queue in the state, each source taken
 -- when it is offered and every window closed once its head is not; a route
--- yielding `wanted` taken where one is offered, pinned rather than searched
--- for. CR 733.1's questions answered by `decide`, from how many were asked
--- before and the first source named, and recorded in order.
-reversingSome :: ManaType.ManaType -> (Int -> ObjectId.ObjectId -> OptionalDecision.OptionalDecision) -> Prompt.Prompt r -> State.State ([ObjectId.ObjectId], [[ObjectId.ObjectId]]) r
+-- yielding exactly `wanted` taken where one is offered, and a hybrid symbol
+-- announced as the first of `wanted`'s types offered, pinned rather than
+-- searched for. CR 733.1's questions answered by `decide`, from how many were
+-- asked before and the first source named, and recorded in order.
+reversingSome :: [ManaType.ManaType] -> (Int -> ObjectId.ObjectId -> OptionalDecision.OptionalDecision) -> Prompt.Prompt r -> State.State ([ObjectId.ObjectId], [[ObjectId.ObjectId]]) r
 reversingSome wanted decide p = case p of
   Prompt.ChooseManaSource _ _ candidates -> next candidates
   Prompt.ChooseExtraManaSource _ _ candidates -> next candidates
@@ -5971,7 +6004,8 @@ reversingSome wanted decide p = case p of
     (queue, asked) <- State.get
     State.put (queue, asked <> [NonEmpty.toList sources])
     pure (decide (length asked) (NonEmpty.head sources))
-  Prompt.ChooseManaYield _ _ _ candidates -> pure (Maybe.fromMaybe (NonEmpty.head candidates) (List.find ((==) [wanted] . fmap ManaUnit.manaType . Mana.yieldUnits) (NonEmpty.toList candidates)))
+  Prompt.ChooseManaYield _ _ _ candidates -> pure (Maybe.fromMaybe (NonEmpty.head candidates) (List.find ((==) wanted . fmap ManaUnit.manaType . Mana.yieldUnits) (NonEmpty.toList candidates)))
+  Prompt.AnnounceHybridHalf _ _ _ _ offers -> pure (Maybe.fromMaybe (NonEmpty.head offers) (List.find (`elem` wanted) (NonEmpty.toList offers)))
   _ -> pure (S.identityAnswer p)
   where
     next candidates = do
