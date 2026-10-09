@@ -484,6 +484,23 @@ spec s registry = Spec.describe s "Range of influence" $ do
     Spec.assertEqWith s "and the Doll was dealt its 1" (fmap Object.damage (Game.lookupObject dollId (tapped (S.withRange 1 stolen)))) (Just 1)
     Spec.assertEqWith s "at an unlimited range erin takes 1" (S.lifeOf erin (tapped stolen)) (Just 19)
 
+  -- CR 801.10 cuts whom an effect AFFECTS, not who decides: alice's Cut the
+  -- Tethers ("For each Spirit, return it to its owner's hand unless that player
+  -- pays {3}.") over carol's Accursed Spirit, which bob controls. The Spirit is
+  -- in alice's range by its controller (CR 801.2d) and its owner carol is not;
+  -- carol, with no mana, cannot pay (CR 118.3), so the Spirit returns.
+  Spec.it s "CR 801.10 a payer outside the controller's range is still offered the payment" $ do
+    island <- S.printingOf s registry "Island"
+    tethers <- S.printingOf s registry "Cut the Tethers"
+    spirit <- S.printingOf s registry "Accursed Spirit"
+    let (spiritId, g0) = S.addPermanent spirit S.carol (S.landsFor island S.alice 4 S.fourPlayerGame)
+        (spellId, board) = S.addHandCard tethers S.alice (S.giveControl spiritId S.bob g0)
+        cast gs = resolveAll (S.runPure S.identityAnswer (onMain gs) (S.cast S.alice spellId))
+        carolsHand gs = length (Game.zoneMembers Zone.Hand S.carol gs)
+    Spec.assertBool s (not (Game.inRangeOf S.alice S.carol (S.withRange 1 board))) "carol is outside alice's range"
+    Spec.assertEqWith s "CR 118.12 at range 1 carol does not pay, so the Spirit returns to her hand" (Set.member spiritId (GameState.battlefield (cast (S.withRange 1 board))), carolsHand (cast (S.withRange 1 board))) (False, 1)
+    Spec.assertEqWith s "and the same at an unlimited range" (Set.member spiritId (GameState.battlefield (cast board)), carolsHand (cast board)) (False, 1)
+
   -- CR 104.2b / 801.14: alice's Felidar Sovereign ("At the beginning of your
   -- upkeep, if you have 40 or more life, you win the game.") at 40 life. At range
   -- 1 only bob and dave, her opponents in range, lose; carol plays on.

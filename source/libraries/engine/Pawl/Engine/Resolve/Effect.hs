@@ -640,6 +640,23 @@ apnapPlayersOf ref legal controller gs =
   let named = playerRefPlayers legal controller gs ref
    in filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
 
+-- The players a PlayerRef names as DECIDERS -- a payer (CR 118.12), a "may"
+-- asker (CR 603.5), an either-or chooser (CR 608.2d), a chooser (askedChooser)
+-- -- read WITHOUT Players.resolution's CR 801.10 cut, which is for players the
+-- effect affects. A departed decider stays named, so CR 800.4f and 800.4g can
+-- answer for them. In PlayerId order.
+decidersOf :: Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> PlayerRef -> [PlayerId]
+decidersOf legal controller gs ref =
+  Maybe.fromMaybe [] (Players.named (resolutionReads legal controller gs) {Players.reaches = const True} gs ref)
+
+-- decidersOf in CR 101.4's APNAP order, apnapPlayersOf's ordering. Proved by
+-- Pawl.RangeOfInfluenceSpec's "CR 801.10 a payer outside the controller's
+-- range is still offered the payment" (Cut the Tethers).
+apnapDecidersOf :: PlayerRef -> Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> [PlayerId]
+apnapDecidersOf ref legal controller gs =
+  let named = decidersOf legal controller gs ref
+   in filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
+
 -- The ONE seat a PlayerRef names, for a designation CR 725.3 and CR 726.3 give
 -- to exactly one player at a time; a reference naming nobody or several moves
 -- nothing (CR 101.3).
@@ -662,8 +679,8 @@ oneSeat legal controller gs ref = case playerRefPlayers legal controller gs ref 
 -- its own, Game.stillPlaying having already dropped the seat that left.
 --
 -- The ask is Pawl.Engine.Players.chooseOne, every "choose a player" site's.
--- The chooser reference is read WITHOUT Players.resolution's CR 801.10 cut, so
--- a departed chooser is still named here and replaced.
+-- The chooser reference is read through decidersOf, so a departed chooser is
+-- still named here and replaced.
 --
 -- CR 800.4f is the same situation for a COST and the opposite answer -- the cost
 -- is not paid, and nobody is asked in the departed player's place -- which is
@@ -702,7 +719,7 @@ chosenPermanentOf legal resolving controller source filter_ chooser = do
 askedChooser :: ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> PlayerRef -> Game (Maybe PlayerId)
 askedChooser source controller legal ref = do
   gs <- State.get
-  case Maybe.fromMaybe [] (Players.named (resolutionReads legal controller gs) {Players.reaches = const True} gs ref) of
+  case decidersOf legal controller gs ref of
     [named]
       | List.elem named (Game.stillPlaying gs) -> pure (Just named)
       | otherwise ->
@@ -9075,7 +9092,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           g <- State.get
           name <- Game.choose (Prompt.ChooseCardName (Decide.deciderFor chooser g) chooser source restriction made) >>= Game.lookUpChosenName
           pure (made Seq.|> (chooser, name))
-    picked <- fmap (Set.fromList . fmap snd . Foldable.toList) (Monad.foldM ask Seq.empty (apnapPlayersOf ref legal controller gs))
+    picked <- fmap (Set.fromList . fmap snd . Foldable.toList) (Monad.foldM ask Seq.empty (apnapDecidersOf ref legal controller gs))
     -- CR 101.3: a reference naming NOBODY leaves nothing to do, so the write is
     -- skipped rather than assigning the empty set -- which would clear a name an
     -- earlier instruction chose, and the assignment above is the whole reason
@@ -12047,7 +12064,7 @@ branchSelects branch asked = case branch of
 -- its damage instead.
 --
 -- CR 101.4's APNAP order over the players the reference names, which is what
--- `apnapPlayersOf` imposes: rule 101.4b lets a later payer answer knowing what an
+-- `apnapDecidersOf` imposes: rule 101.4b lets a later payer answer knowing what an
 -- earlier one did. The board is re-read for each of them (payGatePaidBy's own
 -- State.get) rather than measured once, so a cost that changes the board -- CR
 -- 118.12's own "sacrifice this enchantment" -- is affordable to the next payer
@@ -12070,7 +12087,7 @@ payGatePaid runSubgame resolving source controller idx cIdx legal announced comm
           pure (earlier Seq.|> (payer, paid))
       )
       Seq.empty
-      (announcedOnly announced (apnapPlayersOf (PayGate.payer gate) legal controller gs))
+      (announcedOnly announced (apnapDecidersOf (PayGate.payer gate) legal controller gs))
   State.modify' (foldPaid resolving (foldr Binding.mergePaid Map.empty (Maybe.mapMaybe snd (Foldable.toList answered))))
   pure (Map.fromList [(payer, Maybe.isJust paid) | (payer, paid) <- Foldable.toList answered])
 
@@ -12101,7 +12118,7 @@ loopOffers :: Game Result -> ObjectId -> ObjectId -> PlayerId -> SlotName -> Map
 loopOffers runSubgame resolving source controller slot legal members gate = do
   gs <- State.get
   let legalFor member = Map.insert slot (Set.singleton member) legal
-      payersOf member = apnapPlayersOf (PayGate.payer gate) (legalFor member) controller gs
+      payersOf member = apnapDecidersOf (PayGate.payer gate) (legalFor member) controller gs
       order = Game.apnapOrder gs
       offers = [(payer, member) | payer <- order, member <- members, elem payer (payersOf member)]
       agreedBy payer answers = [taken | (p, _, Just taken) <- Foldable.toList answers, p == payer]
