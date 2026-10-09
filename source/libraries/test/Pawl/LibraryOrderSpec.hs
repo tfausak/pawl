@@ -1677,7 +1677,7 @@ exileUntilMonarchSpec s registry = Spec.describe s "ExileUntilMonarch" $ do
         noMonarch = snd (Engine.runGamePure S.identityAnswer exiled {GameState.monarch = Nothing} MoveDuration.returnDue)
     Spec.assertEqWith s "the watch is still armed" (Map.size (GameState.movedUntil noMonarch)) 1
     Spec.assertEqWith s "and nothing returned" (Set.size (GameState.battlefield noMonarch)) 0
-  -- CR 610.3d across the two registers: a Banisher Priest-style source leaves,
+  -- CR 610.3d across the two endings: a Banisher Priest-style source leaves,
   -- THEN an opponent is crowned, both before one settle, so the Priest's
   -- prisoner returns first. Driven at the sweep rather than through a game: the
   -- one printing that does both in one resolution, Heart-Shaped Herb, is not in

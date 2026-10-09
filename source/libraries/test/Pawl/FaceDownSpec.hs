@@ -155,6 +155,7 @@ import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Replacement as Replacement
+import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Natural as Natural
@@ -190,6 +191,7 @@ import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.OutsideDestination as OutsideDestination
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
@@ -2823,6 +2825,25 @@ unmaskingSpec s registry = Spec.describe s "Revealed as it leaves (CR 708.9)" $ 
     Spec.assertEqWith s "CR 708.9 the Witness drew one card" (libraryCount faceDownBoard - libraryCount left) 1
     Spec.assertEqWith s "a face-up Forest leaving with bob draws nothing" (libraryCount faceUpBoard - libraryCount control) 0
     Spec.assertEqWith s "CR 708.9 bob, the owner, revealed it" (departureReveals left) [S.bob]
+
+  -- CR 708.9's first sentence over CR 729.4a's crossing: a subgame's wish takes
+  -- bob's permanent, which moves from the main-game battlefield to a subgame
+  -- zone. Event.leavingReveal shared with the departure case above; the
+  -- negative leg is the same crossing with the Forest face up.
+  Spec.it s "CR 708.9 the Witness draws when a subgame takes a face-down permanent" $ do
+    faceDownBoard <- departureBoard s registry True
+    faceUpBoard <- departureBoard s registry False
+    let cross board = case Game.zoneMembers Zone.Battlefield S.bob board of
+          [taken] ->
+            let (_, crossedSub) = Event.bringInFrom OutsideDestination.Hand S.bob taken (Setup.subgameStateFrom S.alice board)
+             in S.runPure S.identityAnswer (Setup.applyCrossings crossedSub board) Engine.priorityLoop
+          _ -> board
+        crossed = cross faceDownBoard
+        control = cross faceUpBoard
+    Spec.assertEqWith s "CR 708.9 the Witness drew one card" (libraryCount faceDownBoard - libraryCount crossed) 1
+    Spec.assertEqWith s "a face-up Forest crossing draws nothing" (libraryCount faceUpBoard - libraryCount control) 0
+    Spec.assertEqWith s "CR 708.9 bob, the owner, revealed it" (departureReveals crossed) [S.bob]
+    Spec.assertEqWith s "setup: the crossing took bob's permanent out of the main game" (fmap (Game.zoneMembers Zone.Battlefield S.bob) [crossed, control]) [[], []]
 
 -- alice's main phase with priority: three Swamps for Murder, two Forests for
 -- Hauntwoods Shrieker, four Plains for Day of Judgment, Murder and Day of

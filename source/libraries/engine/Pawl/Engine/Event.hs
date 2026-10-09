@@ -6595,7 +6595,7 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                         -- Read off `lki`, the pre-batch board, and not the live
                         -- `gs`: in a simultaneous batch an Equipment with a lower id
                         -- moves before its host, and the live board has already
-                        -- forgotten it. Pawl.ZoneTriggerSpec's "the Equipment dying
+                        -- forgotten it. Pawl.LeavesTriggerSpec's "the Equipment dying
                         -- in the same batch, ahead of its host" is the proof.
                         GameState.lastKnown = Map.insert oid known (GameState.lastKnown g1),
                         -- CR 608.2h's record for a STACK object, filed in the same

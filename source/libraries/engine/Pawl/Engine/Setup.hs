@@ -1485,8 +1485,8 @@ applyCrossings finalSub parent =
       -- CR 708.9's first sentence: a face-down permanent moving from the
       -- battlefield to any other zone is revealed by its owner, and a subgame's
       -- zone is another zone. Recorded in the LeftTheGame's own group, ahead of
-      -- it, as Departure.objectsLeaveWith does. Pawl.SetupSpec's "CR 708.9 a
-      -- face-down permanent a subgame takes is revealed" proves it.
+      -- it, as Departure.objectsLeaveWith does. Pawl.FaceDownSpec's "CR 708.9 the
+      -- Witness draws when a subgame takes a face-down permanent" proves it.
       cross g oid =
         let gone = Event.leaveTheGame g g oid
             left zone = GameEvent.LeftTheGame (LeftTheGame.MkLeftTheGame oid zone)
