@@ -9,6 +9,7 @@
 -- Filter.IsPlayer atom, which reads Pawl.Engine.Filter's Context), Pawl.Engine's
 -- PlayerEffect.inScope (PlayerScope.Related Opponent), Pawl.Engine.Replacement's
 -- matchesZoneOwner (CR 400.3's owner, for a zone-change redirect) and
+-- matchesController (CR 102.4's "your team", for a counter replacement), and
 -- Pawl.Engine.Count's playersFor (the same PlayerRef under a Count).
 -- Pawl.BattleSpec holds the seventh, CR 310.12a's protector candidates, beside
 -- its siblings.
@@ -64,6 +65,8 @@ import qualified Pawl.Types.AttackOption as AttackOption
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.CounterCause as CounterCause
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure
 import qualified Pawl.Types.EndingStep as EndingStep
@@ -181,6 +184,30 @@ spec s registry = Spec.describe s "Teams" $ do
     Spec.assertEqWith s "and nothing of bob's was exiled" (length (Game.zoneMembers Zone.Exile S.bob alsoAfter)) 0
     Spec.assertEqWith s "CR 614.1a carol's was exiled instead" (length (Game.zoneMembers Zone.Exile S.carol alsoAfter)) 1
     Spec.assertEqWith s "and never reached carol's graveyard" (length (Game.zoneMembers Zone.Graveyard S.carol alsoAfter)) 0
+  -- CR 102.4's "your team" through Pawl.Engine.Replacement's matchesController,
+  -- the one replacement reader the cases above leave: Pir, Imaginative Rascal,
+  -- "If one or more counters would be put on a permanent your team controls,
+  -- that many plus one of each of those kinds of counters are put on that
+  -- permanent instead." Written PlayerRelation.YourTeam, judged by
+  -- PlayerRelation.holds like a filter's or a trigger's relation.
+  --
+  -- ONE board, three Pikers differing only in controller -- alice's (you), bob's
+  -- (her teammate) and carol's (her opponent) -- each given one +1/+1 counter by
+  -- the same cause, so carol's single counter cannot pass for want of a working
+  -- replacement: bob's and alice's get the extra one on the same board.
+  Spec.it s "CR 102.4 a your-team replacement reaches a teammate's permanent and not an opponent's" $ do
+    pir <- S.printingOf s registry "Pir, Imaginative Rascal"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, g0) = S.addPermanent pir S.alice (twoTeams S.fourPlayerGame)
+        (alices, g1) = S.addPermanent piker S.alice g0
+        (bobs, g2) = S.addPermanent piker S.bob g1
+        (carols, g3) = S.addPermanent piker S.carol g2
+        place oid = Event.putCounters (CounterCause.ByEffect S.alice) oid CounterKind.PlusOnePlusOne 1
+        after = S.runPure S.identityAnswer g3 (place bobs >> place carols >> place alices)
+        plusOnes oid = Map.findWithDefault 0 CounterKind.PlusOnePlusOne (maybe Map.empty Object.counters (Game.lookupObject oid after))
+    Spec.assertEqWith s "CR 102.4 bob, alice's teammate, is on her team: his Piker got two" (plusOnes bobs) 2
+    Spec.assertEqWith s "CR 102.3 carol, her opponent, is not: her Piker got one" (plusOnes carols) 1
+    Spec.assertEqWith s "CR 102.4 and alice's own Piker got two" (plusOnes alices) 2
   sharedTurnsSpec s registry
 
 -- CR 805.1: twoTeams with the shared team turns option on.

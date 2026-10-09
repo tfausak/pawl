@@ -42,7 +42,8 @@ data PlayerRelation
     Teammate
   | -- | CR 102.4's "your team": you and/or your teammates, which in a game not
     -- played between teams is just you. Pir, Imaginative Rascal's "a permanent
-    -- your team controls"; Pawl.TeamSpec's Pir group proves it.
+    -- your team controls"; Pawl.TeamSpec's "CR 102.4 a your-team replacement
+    -- reaches a teammate's permanent and not an opponent's" proves it.
     YourTeam
   deriving (Bounded, Enum, Eq, Ord, Show)
 
@@ -70,7 +71,8 @@ holds teams relation you candidate = case relation of
 
 -- | Does this relation hold whoever the perspective is -- so that a reader with
 -- no CR 109.5 "you" to supply can still answer it? Only AnyPlayer, which asks
--- the perspective nothing.
+-- the perspective nothing. Pawl.TargetSpec's "CR 702.18a shroud stops a
+-- casterless targeting and CR 702.11c hexproof does not" proves it.
 perspectiveFree :: PlayerRelation -> Bool
 perspectiveFree relation = case relation of
   You -> False

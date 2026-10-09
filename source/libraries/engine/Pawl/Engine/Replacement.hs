@@ -910,7 +910,7 @@ matchesPrinted viewOf gs event candidate =
         --
         -- Every producer but dredge installs a FLOATING row, whose "you" was baked
         -- when it resolved and survives the source leaving the battlefield --
-        -- which Ring of Ma'rûf's own cost makes it do. See relationHolds (#2662).
+        -- which Ring of Ma'rûf's own cost makes it do; see relationHolds and #2662.
         (ReplacementEffect.DrawR pat, ProposedEvent.WouldDraw pid) ->
           matchesPlayer gs candidate (DrawR.whose pat) pid
             && stocked gs (DrawR.rewrite pat) pid
@@ -1349,7 +1349,7 @@ matchesPutter gs candidate subject cause = case (subject, cause) of
 -- live, while a FLOATING row baked one at installation because CR 608.2n has
 -- already moved its source to another zone as a new object (CR 400.7). Reading
 -- the source instead unscopes such a row the moment the source leaves the
--- battlefield, and hands it to its owner on the way (#2662).
+-- battlefield, and hands it to its owner on the way; see #2662.
 --
 -- Nothing matches nothing, on either side, for every relation but AnyPlayer: an
 -- effect with no controller states no relation it could satisfy and has no
@@ -1378,8 +1378,9 @@ matchesPlayer :: GameState -> ReplacementCandidate -> ControllerRelation -> Play
 matchesPlayer gs candidate rel pid = relationHolds gs candidate rel (Just pid)
 
 -- CR 109.5 / 614.1: does `oid` satisfy this pattern's controller relation?
--- Controller-based, unlike matchesZoneOwner below. Pawl.TeamSpec's Pir,
--- Imaginative Rascal group proves the Related arm through this reader.
+-- Controller-based, unlike matchesZoneOwner below. Pawl.TeamSpec's "CR 102.4 a
+-- your-team replacement reaches a teammate's permanent and not an opponent's"
+-- proves the Related arm through this reader.
 matchesController :: GameState -> ReplacementCandidate -> ControllerRelation -> ObjectId -> Bool
 matchesController gs candidate rel oid = relationHolds gs candidate rel (Projection.controllerOf oid gs)
 
