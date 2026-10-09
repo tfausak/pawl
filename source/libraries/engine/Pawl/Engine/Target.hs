@@ -514,10 +514,16 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- CR 607.2a's last exiled card is the MANA unit's, never a slot's.
             Filter.sourceLastExiled = Nothing
           }
-      -- Through CR 608.2h's last-known reader, slotNames' reason: the object a
-      -- bound is aimed at is a reference, not the candidate being judged.
-      -- Nihiloor's scenario "measures a dead tapped creature" proves it.
-      evaluated = amount >>= Quantity.evaluate (Projection.viewWithLastKnownAnywhere gs) base gs source
+      -- CR 608.2h's last-known reader for an object the bound refers to but no
+      -- slot TARGETS -- Nihiloor's tapped creature, a group its own effect bound
+      -- -- and the live view for a sibling target, since CR 608.2b's last
+      -- sentence has the effect fail to determine any information about an
+      -- illegal target. Nihiloor's scenario "measures a dead tapped creature"
+      -- proves the first half and Synthetic Counted Verdict's "fails to count a
+      -- dead gauge" the second.
+      targeted = foldMap (Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList) targets
+      boundView oid = if Set.member oid targeted then Projection.fullView gs oid else Projection.viewWithLastKnownAnywhere gs oid
+      evaluated = amount >>= Quantity.evaluate boundView base gs source
    in -- CR 202.3 / 601.2c: the slot's own computed bound, evaluated
       -- against the context above and handed to Filter.ManaValueAtMostAmount,
       -- Filter.ManaValueEqualToAmount and Filter.PowerAtMostAmount.

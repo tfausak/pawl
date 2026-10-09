@@ -7705,14 +7705,25 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- and a copy given new targets (CR 707.10c) still carries the old group.
         -- A FENCE: no board in the suite arms a delayed ability off a retargeted copy.
         --
-        -- CR 603.7c's environment is also every name the instruction was handed
-        -- that the object does not hold: Effect.ForEach binds its member only in
-        -- the map handed down, so Nihiloor's "that player" lives nowhere else.
-        -- The object's own binding wins a shared name. Nihiloor's scenario
-        -- "steals from each opponent" proves it.
-        let bound = maybe Map.empty (Map.delete Binding.announcedTargets . Object.bindings) (Game.lookupObject resolving gs)
-            handedDown = Map.map (\recipients -> Binding.Type.empty {Binding.Type.targets = Just recipients}) (Map.filter (not . Set.null) (Map.withoutKeys legal (Map.keysSet bound)))
-            captured = Map.union bound handedDown
+        -- CR 603.7c's environment takes its RECIPIENTS from the map the
+        -- instruction was handed rather than off the object, exactly as the
+        -- instruction's siblings read them: Effect.ForEach binds its member only
+        -- there (Nihiloor's "that player"), a repeated mode's occurrence finds
+        -- its own slots there under their printed names (CR 700.2d), and CR
+        -- 608.2b has already dropped an illegal target from it. Every other
+        -- field of a slot the object holds is kept. Nihiloor's scenario "steals
+        -- from each opponent" proves the member. Overriding a name the object
+        -- ALSO holds is a REGRESSION FENCE: mutating it leaves the suite green,
+        -- since no pool card's delayed ability reads a target slot of a repeated
+        -- mode or one CR 608.2b re-validated away. Scryfall o:"same mode more
+        -- than once" (o:"next end step" or o:"when you do"), 2026-10-09, finds
+        -- one delayed ability, Cabaretti Confluence's, and its sacrifice names
+        -- the token rather than the target.
+        let bound = maybe Map.empty Object.bindings (Game.lookupObject resolving gs)
+            handedDown recipients binding = binding {Binding.Type.targets = if Set.null recipients then Nothing else Just recipients}
+            captured =
+              Map.delete Binding.announcedTargets . Map.filter (/= Binding.Type.empty) $
+                Map.union (Map.intersectionWith handedDown legal bound) (Map.union bound (Map.map (`handedDown` Binding.Type.empty) legal))
          in -- CR 603.7a's other end: the BOUNDARY, not a turn number, for one
             -- printed "on your next turn". Which turn that names is settled as
             -- that turn begins (Event.settleOnsets). CR 603.7b's stated duration:
