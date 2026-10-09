@@ -94,6 +94,7 @@ import Pawl.Types.ExtraTurn (ExtraTurn)
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.FloatingCandidate as FloatingCandidate
+import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -2223,13 +2224,8 @@ readsApplier re = case re of
   -- The card goes to the player the EVENT named and the filter and the reveal
   -- ride the effect, so GainLife's answer above carries over. The one value this
   -- rewrite reads off the CANDIDATE is `source`, which reaches nothing but the
-  -- Filter.Context Event.eligible scans the pool under.
-  --
-  -- Not implemented: two such rows alike in `effect` and unlike in `source` would
-  -- offer different cards if the card's filter named its own source, and
-  -- `readsSource` below answers False for this arm -- the one printing's filter
-  -- is `And []`, which names no source -- so the choice between them is elided
-  -- (#3215).
+  -- Filter.Context Event.eligible scans the pool under -- `readsSource`'s
+  -- question, not this one.
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.FromOutsideTheGame _)) -> False
   -- The miller is the seat the EVENT named and the count is the effect's own
   -- field, so GainLife's answer above carries over. The card returned rides the
@@ -2288,26 +2284,33 @@ readsApplier re = case re of
 -- `choose` folds `source` into its indistinguishability test exactly for the
 -- arms that answer True.
 --
--- Only rule 702.52a's dredge answers True today, and it answers True outright:
--- "return THIS CARD from your graveyard to your hand" names the row's own
--- source, so two dredgers in one graveyard return different cards and the
--- drawer must be asked which. Every other arm's use of `source` is a test run
--- BEFORE Event.apply -- `applies`, `scopes`, a Filter.Context -- which is the
--- argument the elision at #3215 rests on.
+-- Rule 702.52a's dredge answers True outright: "return THIS CARD from your
+-- graveyard to your hand" names the row's own source, so two dredgers in one
+-- graveyard return different cards and the drawer must be asked which. A
+-- draw-replacing wish answers True only where its filter reads the source's
+-- power; every other arm's use of `source` is a test run BEFORE Event.apply --
+-- `applies`, `scopes` -- which picks the candidates rather than what one does.
 --
 -- One arm per CONSTRUCTOR, with only DrawR's inner sum split: a new
 -- constructor breaks the build here, and a new REWRITE under an existing
 -- constructor is covered by that same argument until one of them names its own
--- source (#3215).
+-- source.
 readsSource :: ReplacementEffect Card (GrantedAbility.GrantedAbility Card) (Effect.Effect Card (GrantedAbility.GrantedAbility Card)) -> Bool
 readsSource effect = case effect of
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.Dredge _)) -> True
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.GainLife _)) -> False
   ReplacementEffect.DrawR (DrawR.MkDrawR _ DrawRewrite.YouDraw) -> False
-  -- Not implemented: the wish filter IS scanned under a Filter.Context naming
-  -- this candidate's source, so a filter that named it would make two such rows
-  -- differ; the one printing's is `And []` (#3215).
-  ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.FromOutsideTheGame _)) -> False
+  -- CR 616.1: Event.eligible scans the pool under a Filter.Context framed by
+  -- this candidate's source, and the source's power is the one thing in it that
+  -- a printed face can be told apart by -- every other source-relative atom
+  -- reads a field of the candidate (its identity, targets, host, combat or crew
+  -- record) that a card outside the game lacks, or a context field eligible
+  -- leaves empty. So two Synthetic Wishful Djinns of different power offer
+  -- different cards and the drawer is asked, while two Rings of Ma'rûf
+  -- (`And []`) offer the same and are not. Pawl.OutsideTheGameSpec's "CR 616.1
+  -- two Djinns of different power are a choice, and the answer decides what
+  -- arrives" and "CR 616.1 two Rings' wishes are not a choice" prove both.
+  ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.FromOutsideTheGame payload)) -> Filter.readsSourcePower (FromOutsideTheGame.filter payload)
   ReplacementEffect.ZoneChangeR {} -> False
   ReplacementEffect.EntryR {} -> False
   ReplacementEffect.DamageR {} -> False
