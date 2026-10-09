@@ -37,4 +37,6 @@ data View
   | -- | CR 903.10a: the combat damage each commander has dealt a player, by
     -- the commander's name.
     CommanderDamage
+  | -- | CR 108.3 / 407.3: each card whose owner changed, as `[card, starting owner, owner]`.
+    OwnershipChanges
   deriving (Bounded, Enum, Eq, Ord, Show)

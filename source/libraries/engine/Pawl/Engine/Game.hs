@@ -28,6 +28,7 @@ import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardIdentity as CardIdentity
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
@@ -648,6 +649,11 @@ pileHolderIn :: Maybe PlayerId -> ObjectId -> Map.Map PlayerId (Seq.Seq ObjectId
 pileHolderIn hint oid piles = case hint of
   Just pid | maybe False (Foldable.elem oid) (Map.lookup pid piles) -> Just pid
   _ -> fmap fst (List.find (Foldable.elem oid . snd) (Map.toList piles))
+
+-- | CR 108.3: a card's identity as it is first minted under `oid`, owned by
+-- `pid` -- the player who started the game with it or brought it in.
+mintIdentity :: ObjectId -> PlayerId -> CardIdentity.CardIdentity
+mintIdentity oid pid = CardIdentity.MkCardIdentity {CardIdentity.serial = ObjectId.unwrap oid, CardIdentity.startingOwner = pid}
 
 -- CR 108.3 / 407.3: this player now owns the object. A write on the object as
 -- it stands and not a zone change, so CR 400.7 mints nothing; CR 400.3 reads
@@ -2210,7 +2216,7 @@ componentIsToken component = case component of
 -- card nor a token (Pawl.Types.MergeComponent's OfSpellCopy arm), and only a
 -- card answers True here.
 --
--- Its two readers are the two rules that name a component's CARD --
+-- Two of its readers are the two rules that name a component's CARD --
 -- Pawl.Engine.Commander's rule 903.9c search for "the card that represents it
 -- and is a commander", and Pawl.Engine.Event's CR 903.9c split of a departing
 -- merged permanent -- so neither can find a commander in a copy interned to the
@@ -2252,6 +2258,10 @@ representComponent :: MergeComponent.MergeComponent -> Object -> Object
 representComponent component object =
   object
     { Object.source = sourceOfComponent component,
+      -- CR 108.2: a card component is a card, and a token or copy component is
+      -- not one (CR 111.6, CR 707.10). Not implemented: each card component
+      -- keeping its own identity rather than the merged object's (#4848).
+      Object.identity = if componentIsCard component then Object.identity object else Nothing,
       Object.duplicate = case component of
         MergeComponent.OfDuplicate duplicate -> Just (DuplicateCard.values duplicate)
         MergeComponent.OfCard _ -> Nothing

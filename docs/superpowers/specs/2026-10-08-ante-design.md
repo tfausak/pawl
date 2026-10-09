@@ -143,7 +143,8 @@ current incarnation. Bronze Tablet is two `SetOwner`s and not an exchange: its
 2004-10-04 ruling has a stolen Tablet's controller give back only the Tablet
 while still taking the other card. `newIncarnation` already carries `owner`
 forward. An ownership change is not a zone change and emits no event: unit 3's
-report reads `Object.startingOwner`, and the event log is cleared every turn.
+report reads each card's starting owner (`Object.identity`), and the event log
+is cleared every turn.
 Darkpact's "Exchange that card with the top card of your library" is
 `ExchangeWithTopOfLibrary`, an exchange of zones (CR 701.12d): the ante card
 goes to the top of its (new) owner's library and the top card to the ante, as
@@ -167,34 +168,53 @@ there, not handled.
 from the parent's copies on the reading that an owner never changes. A card
 whose owner changed inside the subgame breaks that for a departed former
 owner; telling the copies apart needs the card lineage #4829 needs, so it is
-filed and cited there.
+filed and cited there (#4835). Unit 3's card identity folds it in.
 
 ## Unit 3: the ownership report
 
-**Starting owner.** `Object.startingOwner`, set at construction to the CR
-108.3 owner and carried like `owner` through `newIncarnation`,
-`splitComponents`, `funnelBack` and `startGameFromCards`. Tokens are
-`Source.OfToken` and outside copies `OfCardCopy`: not cards, never reported.
+**Card identity.** `Object.identity :: Maybe CardIdentity`
+(`Pawl.Types.CardIdentity`): a serial, the number of the id the card was first
+minted under, and its CR 108.3 starting owner. Set where a card is minted
+(`Setup.blankObject`, `Event.cardObject`, a dungeon card; a melded permanent
+takes its first card's), carried by `newIncarnation`, a restart and a subgame,
+and `Nothing` for a token, emblem, ability or copy, including the three copies
+built by record update from a card's object. A bare `startingOwner` would serve
+the report alone; the serial is what lets `funnelBack` tell a subgame card from
+the parent card it came from, which the payout needs (below).
+`Interchangeable.objects` compares an identity by its starting owner only, since
+the serial differs between any two cards. A merged or melded permanent's cards
+come apart sharing one identity: filed, and the blocker of #4837.
 
-**Payout (CR 407.2).** When `GameState.result` becomes `Won pid`, every card
-in ante has its owner set to `pid` through the unit-2 opcode's write. A draw
-pays nothing; every card keeps its current owner. `TeamWon` pays nothing, an
-elision with an issue (above). A range-of-influence partial draw is a
-departure, and CR 800.4n keeps those players' ante cards in the game for the
-eventual winner.
+**Payout (CR 407.2).** A result is set through one door, `Departure.settle`
+(CR 104.1 keeps an earlier result), called by `Departure.leaveGameTogether`,
+`Sba`'s pass and `Engine.checkMandatoryLoop`; not `Engine.playGame`, which the
+scenario runner never runs. It calls `Ante.payOut`: on `Won pid` every card in
+the ante has its owner set to `pid` through `Game.setOwner`. It reads the ante
+zone, not `GameSettings.ante`. A draw pays nothing; every card keeps its
+current owner. `TeamWon` pays nothing, an elision with an issue (above). A
+range-of-influence partial draw is a departure, and CR 800.4n keeps those
+players' ante cards in the game for the eventual winner.
 
-**Report.** `Pawl.Engine.Ownership.changes :: GameState -> Map ObjectId
-(PlayerId, PlayerId)`, starting owner to final owner, for every card whose two
-differ, read after the payout. `Result` stays `Won | TeamWon | Drawn`: the
-subgame readers (`Engine`'s subgame outcome, `Resolve/Effect`'s winner slot)
-keep their shape.
+**Report.** `Pawl.Engine.Ante.ownershipChanges :: GameState -> Map ObjectId
+(PlayerId, PlayerId)`, starting owner to owner, for every card whose two
+differ, read after the payout; a scenario `View` (`OwnershipChanges`) renders
+it. It reads the cards still in the game, so a card that left with a departed
+owner (CR 800.4a) is missed: filed. `Result` stays `Won | TeamWon | Drawn`:
+the subgame readers (`Engine`'s subgame outcome, `Resolve/Effect`'s winner
+slot) keep their shape.
 
 **Subgames.** A subgame is a game: its payout runs when its result is set,
-before `Setup.funnelBack` returns cards to their owners' main-game libraries
-(CR 729.5). Ownership changes made in a subgame persist into the main game,
-because CR 729.5 returns each card by owner; CR 729.1b does not stop a card's
-owner travelling with it. A Karn restart pays nothing (CR 727.1, no winner),
-and CR 727.2 keeps ownership.
+inside the subgame's own state, before `Setup.funnelBack` returns cards to
+their owners' main-game libraries (CR 729.5). Ownership changes made in a
+subgame persist into the main game, because CR 729.5 returns each card by
+owner; CR 729.1b does not stop a card's owner travelling with it. With three or
+more seats, a departed player's ante card survives (CR 800.4n) and is paid to
+the winner, while `funnelBack` rebuilds that player's whole library from the
+parent: the card would exist twice. `funnelBack` therefore leaves out of the
+rebuild every parent card whose identity survived in the subgame, and returns
+a departed owner's survivor that came from their library (folds #4835). A
+survivor that came from outside the subgame stays #4829. A Karn restart pays
+nothing (CR 727.1, no winner), and CR 727.2 keeps ownership.
 
 ## Testing
 
@@ -213,9 +233,13 @@ Gameplay-level, one concern each, in the spec module the implementer's
   above; Bronze Tablet's refused payment swaps owners, and a stolen Tablet
   hands back only itself; Timmerian Fiends from exile under Leyline of the
   Void.
-- Unit 3: the winner owns every ante card and the report lists them; a draw
-  reports none; a Shahrazad subgame's ante goes to the subgame winner's
-  main-game library.
+- Unit 3: the winner owns every ante card and the report lists them (Amulet of
+  Quoz); a draw and a team win pay nothing; a player who draws leaves their ante
+  card to the eventual winner; a Darkpact-changed card is reported; a restart
+  pays nothing and keeps an earlier change; a three-seat Shahrazad subgame's
+  ante goes to the subgame winner's main-game library, once; a Twincast copy is
+  never reported; two cards differing only in their serial stay
+  interchangeable.
 
 Every proving test is mutated away per CLAUDE.md, the gameplay assertion named.
 
@@ -225,4 +249,4 @@ No. `Zone.Ante` is CR 400.1's zone list, the setup step and payout are CR
 407.2, the owner-only check is CR 407.4 on a zone move, and pile lookup is CR
 400.1. The nine cards' effects live in the open half; `SetOwner`,
 `ExchangeOwnership` and `ExchangeWithTopOfLibrary` are opcodes the core
-classifies, never inspects.
+classifies, never inspects. Unit 3's payout reads the ante zone and a `Result`.

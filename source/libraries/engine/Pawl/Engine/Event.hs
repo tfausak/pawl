@@ -1028,7 +1028,7 @@ mintCard :: PlayerId -> Maybe PlayerId -> PrintingId.PrintingId -> Zone -> Libra
 mintCard pid under printingId dest position tapped gs =
   let (oid, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
-      obj = cardObject pid under printingId dest tapped ts
+      obj = cardObject oid pid under printingId dest tapped ts
    in ( oid,
         Game.insertIntoZone
           dest
@@ -1047,7 +1047,7 @@ mintOutside :: PlayerId -> PrintingId.PrintingId -> GameState.GameState -> (Obje
 mintOutside pid printingId gs =
   let (oid, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
-      obj = (cardObject pid Nothing printingId Zone.Graveyard TapState.Untapped ts) {Object.source = Source.OfCardCopy printingId}
+      obj = (cardObject oid pid Nothing printingId Zone.Graveyard TapState.Untapped ts) {Object.source = Source.OfCardCopy printingId, Object.identity = Nothing}
    in ( oid,
         gs2
           { GameState.objects = Map.insert oid obj (GameState.objects gs2),
@@ -1057,10 +1057,11 @@ mintOutside pid printingId gs =
 
 -- The card object `mintCard` and `mintOutside` place, with every per-incarnation
 -- field at its no-memory value.
-cardObject :: PlayerId -> Maybe PlayerId -> PrintingId.PrintingId -> Zone -> TapState.TapState -> Timestamp.Timestamp -> Object.Object
-cardObject pid under printingId dest tapped ts =
+cardObject :: ObjectId -> PlayerId -> Maybe PlayerId -> PrintingId.PrintingId -> Zone -> TapState.TapState -> Timestamp.Timestamp -> Object.Object
+cardObject oid pid under printingId dest tapped ts =
   Object.MkObject
     { Object.owner = pid,
+      Object.identity = Just (Game.mintIdentity oid pid),
       Object.enteredUnder = under,
       Object.source = Source.OfCard printingId,
       Object.zone = dest,
@@ -1293,6 +1294,7 @@ createEmblem pid card = do
       let mkObj ts =
             Object.MkObject
               { Object.owner = pid,
+                Object.identity = Nothing,
                 Object.enteredUnder = Nothing,
                 Object.source = Source.OfEmblem emblemId,
                 Object.zone = Zone.Command,
@@ -1646,7 +1648,15 @@ bringInFrom destination pid outerId gs = case Map.lookup outerId (GameState.outs
   Nothing -> (Nothing, gs)
   Just entry ->
     let (zone, position) = arrivalOf destination
-        mint printingId (oids, g) = let (oid, g1) = mintCard pid Nothing printingId zone position TapState.Untapped g in (oids <> [oid], g1)
+        -- CR 108.3: each card keeps the identity it had out there. Not
+        -- implemented: each card of a melded or merged permanent keeping its
+        -- own (#4848).
+        kept obj = case OutsideObject.identity entry of
+          Just identity -> obj {Object.identity = Just identity}
+          Nothing -> obj
+        mint printingId (oids, g) =
+          let (oid, g1) = mintCard pid Nothing printingId zone position TapState.Untapped g
+           in (oids <> [oid], g1 {GameState.objects = Map.adjust kept oid (GameState.objects g1)})
         (minted, gs1) = Foldable.foldl' (flip mint) ([], gs) (OutsideObject.cards entry)
      in ( NonEmpty.nonEmpty minted,
           gs1
@@ -6249,6 +6259,8 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
               becomesToken printingId =
                 (Object.newIncarnation obj)
                   { Object.source = Source.OfToken printingId,
+                    -- CR 111.6: a token is no card.
+                    Object.identity = Nothing,
                     Object.bindings = foldMap (\pc -> Binding.setCopy pc Map.empty) (Game.copyStampOf obj)
                   }
               -- CR 400.7d and CR 107.3m: "the spell that became that permanent
@@ -8021,6 +8033,7 @@ createTokens controller card copy n tapped entering attached = do
             let mkObj ts =
                   Object.MkObject
                     { Object.owner = owner,
+                      Object.identity = Nothing,
                       Object.enteredUnder = Nothing,
                       Object.source = Source.OfToken tokenId,
                       Object.zone = Zone.Battlefield,
@@ -8306,6 +8319,10 @@ meld controller victims resultCard = do
                 -- one owner all of them share -- `meldable` checked that, since
                 -- CR 701.42b's pair has no other reading of "its owner".
                 Object.owner = owner,
+                -- CR 108.3: the first card's identity, read off the board before
+                -- forgetObject above. Not implemented: the melded permanent's
+                -- second card keeping its own identity (#4848).
+                Object.identity = Game.lookupObject (fst (NonEmpty.head melding)) gs >>= Object.identity,
                 -- CR 110.2a: "if an effect instructs a player to put an object
                 -- onto the battlefield, that object enters the battlefield under
                 -- that player's control", so the resolving controller is stamped

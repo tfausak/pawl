@@ -9,6 +9,7 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Codec.Binding as Binding
 import qualified Pawl.Codec.Card as Card
+import qualified Pawl.Codec.CardIdentity as CardIdentity
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.ClassLevel as ClassLevel
 import qualified Pawl.Codec.Color as Color
@@ -87,6 +88,7 @@ counterTimestamp = Fields.object $ do
 codec :: Codec.Codec Object.Object
 codec = Fields.object $ do
   owner <- Fields.required "owner" PlayerId.codec Object.owner
+  identity <- Fields.defaulted "identity" Nothing (Common.maybe CardIdentity.codec) Object.identity
   enteredUnder <- Fields.defaulted "enteredUnder" Nothing (Common.maybe PlayerId.codec) Object.enteredUnder
   source <- Fields.required "source" Source.codec Object.source
   zone <- Fields.required "zone" Zone.codec Object.zone
@@ -150,6 +152,7 @@ codec = Fields.object $ do
   pure
     Object.MkObject
       { Object.owner = owner,
+        Object.identity = identity,
         Object.enteredUnder = enteredUnder,
         Object.source = source,
         Object.zone = zone,

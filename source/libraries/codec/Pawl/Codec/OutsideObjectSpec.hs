@@ -5,6 +5,7 @@ import qualified Pawl.Codec.OutsideObject as OutsideObject
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.CardIdentity as CardIdentity
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.OutsideObject as OutsideObject
@@ -26,7 +27,8 @@ spec s = Spec.describe s "Pawl.Codec.OutsideObject" $ do
           { OutsideObject.owner = PlayerId.MkPlayerId 0,
             OutsideObject.printing = PrintingId.MkPrintingId 1,
             OutsideObject.facing = Facing.FaceUp,
-            OutsideObject.cards = PrintingId.MkPrintingId 1 NonEmpty.:| []
+            OutsideObject.cards = PrintingId.MkPrintingId 1 NonEmpty.:| [],
+            OutsideObject.identity = Nothing
           }
       )
       " {\"owner\":0,\"printing\":1,\"cards\":[1]} "
@@ -39,7 +41,8 @@ spec s = Spec.describe s "Pawl.Codec.OutsideObject" $ do
           { OutsideObject.owner = PlayerId.MkPlayerId 0,
             OutsideObject.printing = PrintingId.MkPrintingId 1,
             OutsideObject.facing = Facing.faceDown FaceDownReason.Manifested,
-            OutsideObject.cards = PrintingId.MkPrintingId 1 NonEmpty.:| []
+            OutsideObject.cards = PrintingId.MkPrintingId 1 NonEmpty.:| [],
+            OutsideObject.identity = Nothing
           }
       )
       " {\"owner\":0,\"printing\":1,\"facing\":{\"type\":\"FaceDown\",\"value\":{\"reason\":{\"type\":\"Manifested\"},\"listed\":{}}},\"cards\":[1]} "
@@ -53,8 +56,9 @@ spec s = Spec.describe s "Pawl.Codec.OutsideObject" $ do
           { OutsideObject.owner = PlayerId.MkPlayerId 0,
             OutsideObject.printing = PrintingId.MkPrintingId 3,
             OutsideObject.facing = Facing.FaceUp,
-            OutsideObject.cards = PrintingId.MkPrintingId 1 NonEmpty.:| [PrintingId.MkPrintingId 2]
+            OutsideObject.cards = PrintingId.MkPrintingId 1 NonEmpty.:| [PrintingId.MkPrintingId 2],
+            OutsideObject.identity = Just (CardIdentity.MkCardIdentity 5 (PlayerId.MkPlayerId 4))
           }
       )
-      " {\"owner\":0,\"printing\":3,\"cards\":[1,2]} "
+      " {\"owner\":0,\"printing\":3,\"cards\":[1,2],\"identity\":{\"serial\":5,\"startingOwner\":4}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

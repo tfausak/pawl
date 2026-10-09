@@ -36,6 +36,7 @@ import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.CardIdentity as CardIdentity
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.ExileLink as ExileLink
@@ -64,11 +65,12 @@ import qualified Pawl.Types.TriggerSource as TriggerSource
 -- player's choice for them.
 --
 --   * The objects are compared WHOLE, by Object's derived Eq over every field
---     but the timestamp. A field added to that record is therefore compared by
---     default, and can only ever make this answer False -- the opposite posture
---     to a hand-kept list of fields that must agree, which a new field would
---     leave unread. The timestamp is the one field two distinct objects never
---     share; what reads it is layeredBetween's question below.
+--     but the timestamp and an identity's serial. A field added to that record
+--     is therefore compared by default, and can only ever make this answer
+--     False -- the opposite posture to a hand-kept list of fields that must
+--     agree, which a new field would leave unread. The timestamp and the serial
+--     are the two fields two distinct objects never share; what reads the
+--     timestamp is layeredBetween's question below.
 --   * The projections must agree, which is what an Equipment or an Aura shows up
 --     in -- Bonesplitter's +2/+0 makes one Llanowar Elves a 3/1 and the other a
 --     1/1. So must what their two Filter views read off the turn's log (CR
@@ -83,7 +85,11 @@ import qualified Pawl.Types.TriggerSource as TriggerSource
 objects :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> ObjectId -> Bool
 objects pcs gs a b =
   let sameObject = case (Map.lookup a (GameState.objects gs), Map.lookup b (GameState.objects gs)) of
-        (Just x, Just y) -> x {Object.timestamp = Object.timestamp y} == y
+        -- An identity's serial is bookkeeping no rule reads; its starting owner
+        -- is not, since Ante.ownershipChanges tells two cards apart by it.
+        (Just x, Just y) ->
+          x {Object.timestamp = Object.timestamp y, Object.identity = Object.identity y} == y
+            && fmap CardIdentity.startingOwner (Object.identity x) == fmap CardIdentity.startingOwner (Object.identity y)
         _ -> False
       grants = Projection.View.controlGrants gs
       viewOf oid = Projection.viewOfObjectGiven pcs grants oid gs

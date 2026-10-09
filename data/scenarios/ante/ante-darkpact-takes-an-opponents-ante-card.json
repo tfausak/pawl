@@ -22,6 +22,7 @@
   "final": [
     { "View": { "of": "Zone", "player": "alice", "zone": "Library", "is": ["Hill Giant", "Mountain"] } },
     { "Count": { "player": "alice", "zone": "Ante", "card": "Island", "count": 1 } },
-    { "Count": { "player": "bob", "zone": "Ante", "card": "Hill Giant", "count": 0 } }
+    { "Count": { "player": "bob", "zone": "Ante", "card": "Hill Giant", "count": 0 } },
+    { "View": { "of": "OwnershipChanges", "is": [["Hill Giant", "bob", "alice"]] } }
   ]
 }

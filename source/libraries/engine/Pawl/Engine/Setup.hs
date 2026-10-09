@@ -26,6 +26,7 @@ import qualified Pawl.Engine.Scheme as Scheme
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Extra.Natural as Natural
+import qualified Pawl.Types.CardIdentity as CardIdentity
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Emperors as Emperors
@@ -347,15 +348,16 @@ placeCard :: Zone.Zone -> PlayerId -> PrintingId.PrintingId -> GameState -> (Obj
 placeCard zone pid printingId gs =
   let (oid, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
-      obj = blankObject zone pid printingId ts
+      obj = blankObject oid zone pid printingId ts
       withObject = gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2)}
    in (oid, Game.insertIntoZone zone LibraryPosition.Bottom pid oid withObject)
 
 -- | A card's object as it first exists, before anything has happened to it.
-blankObject :: Zone.Zone -> PlayerId -> PrintingId.PrintingId -> Timestamp.Timestamp -> Object.Object
-blankObject zone pid printingId ts =
+blankObject :: ObjectId -> Zone.Zone -> PlayerId -> PrintingId.PrintingId -> Timestamp.Timestamp -> Object.Object
+blankObject oid zone pid printingId ts =
   Object.MkObject
     { Object.owner = pid,
+      Object.identity = Just (Game.mintIdentity oid pid),
       Object.enteredUnder = Nothing,
       Object.source = Source.OfCard printingId,
       Object.zone = zone,
@@ -1267,7 +1269,7 @@ subgameStateFrom starter parent =
                   _ -> []
               | otherwise = fmap Game.printingOfComponent (filter Game.componentIsCard (Foldable.toList components))
          in case (Game.sourceIsToken source, Game.printingIdOfSource source, NonEmpty.nonEmpty arriving) of
-              (False, Just printingId, Just cards) -> Just (OutsideObject.MkOutsideObject (Object.owner obj) printingId (Object.facing obj) cards)
+              (False, Just printingId, Just cards) -> Just (OutsideObject.MkOutsideObject (Object.owner obj) printingId (Object.facing obj) cards (Object.identity obj))
               _ -> Nothing
    in parent
         { GameState.objects = movedObjects,
@@ -1622,7 +1624,7 @@ applyCrossings finalSub parent =
 -- when its departing player has only two opponents in the PARENT, so a
 -- departure inside it reaches CR 800.4a's Departure.objectsLeaveWith and
 -- deletes every object that player owned in the subgame -- leaving `returned`
--- nothing to funnel back for them. `recovered` and `recoveredCmd` restore
+-- nothing to funnel back for them but CR 800.4n's ante cards. `recovered` and `recoveredCmd` restore
 -- exactly that set from the parent's pre-subgame copies.
 --
 -- The guard is on the card's OWNER, not on the id merely being missing from
@@ -1645,11 +1647,9 @@ applyCrossings finalSub parent =
 -- objectsLeaveWith never fires there, so their cards are still in `finalSub`
 -- and `returned` has them. An owner moves only by CR 407.3's ownership
 -- changers, so outside them an absent owner implies this `oid` is missing -- no
--- separate id check is needed. CR 800.4n's ante cards are the exception, which
--- is why both `ownersPresentInSub` and `returned` skip them.
---
--- Not implemented: a card whose owner changed inside the subgame, which the
--- departed former owner's rebuilt library takes back as well (#4835).
+-- separate id check is needed. CR 800.4n's ante cards are the exception:
+-- `ownersPresentInSub` skips them, and a card that survived is returned from
+-- the subgame rather than rebuilt (`survived`).
 funnelBack :: GameState -> GameState -> GameState
 funnelBack finalSub parent =
   let -- CR 729.5 / CR 712.21, the same split startGameFromCards performs, in a
@@ -1709,20 +1709,25 @@ funnelBack finalSub parent =
       -- CR 800.4n: a departed owner's ante cards stay in the subgame, so they
       -- are not evidence the owner is still in it.
       ownersPresentInSub = Set.fromList (fmap Object.owner (filter (\obj -> Object.zone obj /= Zone.Ante) (Map.elems subObjects)))
+      -- Not implemented: a card whose owner changed in the subgame and that left
+      -- it with its new owner, whom the main game does not name (#4847).
       removedByDeparture oid = case Map.lookup oid (GameState.objects parent) of
         Nothing -> False
         Just obj -> Set.notMember (Object.owner obj) ownersPresentInSub
-      recoveredIds = Set.filter removedByDeparture movedIds
-      -- `recovered` rebuilds a departed owner's whole main-game library, the
-      -- original of a card they anted in the subgame among it, so that owner's
-      -- subgame objects -- only CR 800.4n's ante cards survive objectsLeaveWith
-      -- -- are not returned a second time.
-      --
-      -- Not implemented: telling an ante card that came from that library from
-      -- one that entered the subgame from outside it, which CR 729.5 would
-      -- return and this drops (#4829).
-      departedOwners = Set.fromList (Maybe.mapMaybe (\oid -> fmap Object.owner (Map.lookup oid (GameState.objects parent))) (Set.toList recoveredIds))
-      returned = fmap toLibraryCard (Map.filter (\obj -> isCard obj && Set.notMember (Object.owner obj) departedOwners) (Map.withoutKeys subObjects (Set.unions [subCmdIds, Map.keysSet subAttractions, Map.keysSet subPlanar, Map.keysSet subSchemes])))
+      departedIds = Set.filter removedByDeparture movedIds
+      -- CR 800.4n / 729.5: a departed owner's card still in the subgame -- an
+      -- ante card, whoever owns it now (CR 407.2, 407.3) -- goes home from the
+      -- subgame under its owner, and is not rebuilt from the parent as well.
+      -- The subgame's copy of a parent card shares its identity. One that came
+      -- in from outside the subgame needs no such care: a main-game card's
+      -- original is gone (applyCrossings), and a sideboard card is spent from
+      -- the pool below.
+      identitiesInSub = Set.fromList (Maybe.mapMaybe Object.identity (filter isCard (Map.elems subObjects)))
+      survived oid = case Map.lookup oid (GameState.objects parent) >>= Object.identity of
+        Just identity -> Set.member identity identitiesInSub
+        Nothing -> False
+      recoveredIds = Set.filter (not . survived) departedIds
+      returned = fmap toLibraryCard (Map.filter isCard (Map.withoutKeys subObjects (Set.unions [subCmdIds, Map.keysSet subAttractions, Map.keysSet subPlanar, Map.keysSet subSchemes])))
       recovered = fmap toLibraryCard (Map.restrictKeys (GameState.objects parent) (Set.difference recoveredIds (Set.union oldCmdIds oldSuppIds)))
       -- A supplementary deck whose owner departed inside the subgame goes back
       -- to being their deck, the commander's reason below.
@@ -1756,7 +1761,8 @@ funnelBack finalSub parent =
       -- neither startGameFromCards nor restartGame calls it), so what the subgame
       -- hands back differs from the parent's by exactly the cards it spent.
       --
-      -- A player who DEPARTED inside the subgame keeps the parent's pool instead.
+      -- A player who DEPARTED inside the subgame keeps the parent's pool instead,
+      -- less what survived it (below).
       -- CR 400.11b's second clause is the rule half: a card brought in remains in
       -- the game "until the game ends, their owner leaves the game, or a rule or
       -- effect removes them", so CR 800.4a's departure took every card they had
@@ -1776,7 +1782,9 @@ funnelBack finalSub parent =
       -- either game. That is the two rules read together rather than an oversight
       -- -- CR 729.4a took it out of the main game and CR 800.4a took it out of
       -- the subgame -- and Pawl.SetupSpec pins it. CR 800.4n's ante cards are
-      -- the exception: they stay in the subgame, see `departedOwners` (#4829).
+      -- the exception: they stay in the subgame and come home in `returned`,
+      -- so the pool gives up each one the subgame brought in from it
+      -- (`keptInSub`).
       -- For every other card, CR 729.5's funnel offers no
       -- third answer: it takes "cards they own that are in the subgame", and
       -- CR 800.4a removed this one before the subgame ended, so the rule's
@@ -1793,10 +1801,29 @@ funnelBack finalSub parent =
       -- from the parent's, departed seats included -- so that arm is the total
       -- reading of a partial map rather than a case with a rule behind it.
       carriedPools = Map.mapWithKey carryPool (GameState.players parent)
+      -- CR 400.11a / 729.5: a card this player brought in from their pool
+      -- during the subgame (minted above the parent's id supply, so with a
+      -- serial no parent card has) that survived it, whoever owns it now.
+      startedAt = ObjectId.unwrap (GameState.nextObjectId parent)
+      keptInSub pid =
+        Map.fromListWith
+          (+)
+          [ (printingId, 1 :: Natural)
+          | obj <- Map.elems returned,
+            Just identity <- [Object.identity obj],
+            CardIdentity.startingOwner identity == pid,
+            CardIdentity.serial identity >= startedAt,
+            Just printingId <- [Game.printingIdOfSource (Object.source obj)]
+          ]
+      -- The parent's count less the copies spent in the subgame that are still
+      -- in it; a spent copy that left with the player is back in the pool.
+      spendKept pid subPool printingId n =
+        let spent = Natural.minusSaturating n (Map.findWithDefault 0 printingId subPool)
+         in Natural.minusSaturating n (min spent (Map.findWithDefault 0 printingId (keptInSub pid)))
       carryPool pid player = case Map.lookup pid (GameState.players finalSub) of
         Nothing -> player
         Just inSub -> case Player.status inSub of
-          Status.Departed _ -> player
+          Status.Departed _ -> player {Player.outsideTheGame = Map.filter (> 0) (Map.mapWithKey (spendKept pid (Player.outsideTheGame inSub)) (Player.outsideTheGame player))}
           Status.Playing -> player {Player.outsideTheGame = Player.outsideTheGame inSub}
    in parent
         { GameState.objects = Map.unions [allReturned, toCommand, attractionsBack, planarBack, schemesBack, keptParentObjects],

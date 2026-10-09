@@ -482,6 +482,7 @@ handInPlay printing board =
       obj =
         Object.MkObject
           { Object.owner = S.alice,
+            Object.identity = Just (Game.mintIdentity oid S.alice),
             Object.enteredUnder = Nothing,
             Object.source = Source.OfCard printingId,
             Object.zone = Zone.Hand,

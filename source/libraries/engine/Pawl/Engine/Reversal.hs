@@ -352,6 +352,7 @@ withoutAnnouncement before entry closed = do
 objectWith :: Object -> Object -> Object -> Maybe Object
 objectWith before entry closed = do
   owner <- field Object.owner
+  identity <- field Object.identity
   enteredUnder <- field Object.enteredUnder
   source <- field Object.source
   zone <- field Object.zone
@@ -413,6 +414,7 @@ objectWith before entry closed = do
   pure
     Object.MkObject
       { Object.owner = owner,
+        Object.identity = identity,
         Object.enteredUnder = enteredUnder,
         Object.source = source,
         Object.zone = zone,

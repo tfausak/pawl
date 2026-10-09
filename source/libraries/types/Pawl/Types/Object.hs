@@ -7,6 +7,7 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.CardIdentity as CardIdentity
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Color as Color
@@ -38,9 +39,12 @@ import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Zone as Zone
 
 data Object = MkObject
-  { -- | CR 108.3: who owns it. Written at construction and by CR 407.3's
-    -- ownership changers, through Game.setOwner alone.
+  { -- | CR 108.3: who owns it. Written at construction, by CR 407.3's
+    -- ownership changers and by CR 407.2's payout, through Game.setOwner alone.
     owner :: PlayerId.PlayerId,
+    -- | CR 108.3: which card this is and who began the game owning it, kept
+    -- across CR 400.7; Nothing for an object no card represents (CR 111.6).
+    identity :: Maybe CardIdentity.CardIdentity,
     -- | The player this incarnation arrived under the control of, by DEFAULT --
     -- the base a CR 613.1b layer-2 effect then overrides, written for the two
     -- arrivals CR 109.4 gives a controller: CR 110.2's battlefield entry and CR
@@ -883,9 +887,9 @@ data Object = MkObject
 -- goes back to its no-memory value here, and nothing else is touched, so a field
 -- added to Object is reset everywhere exactly when it is added HERE.
 --
--- Leaves `owner`, `source` and `duplicate` alone, which are not per-incarnation
--- at all (CR 108.3), and `zone` and `timestamp`, which the caller is DECIDING
--- rather than forgetting. A caller overrides the rest the same way -- CR
+-- Leaves `owner`, `identity`, `source` and `duplicate` alone, which are not
+-- per-incarnation at all (CR 108.3), and `zone` and `timestamp`, which the
+-- caller is DECIDING rather than forgetting. A caller overrides the rest the same way -- CR
 -- 110.5b's "enters tapped", CR 708.4's face-down status and CR 701.3's
 -- attach-on-entry are choices the move makes about the new object.
 newIncarnation :: Object -> Object

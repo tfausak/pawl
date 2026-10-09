@@ -2,6 +2,7 @@
 
 module Pawl.Codec.OutsideObject where
 
+import qualified Pawl.Codec.CardIdentity as CardIdentity
 import qualified Pawl.Codec.Facing as Facing
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.PrintingId as PrintingId
@@ -19,10 +20,12 @@ codec = Fields.object $ do
   printing <- Fields.required "printing" PrintingId.codec OutsideObject.printing
   facing <- Fields.defaulted "facing" Facing.Type.FaceUp Facing.codec OutsideObject.facing
   cards <- Fields.required "cards" (Common.nonEmpty PrintingId.codec) OutsideObject.cards
+  identity <- Fields.defaulted "identity" Nothing (Common.maybe CardIdentity.codec) OutsideObject.identity
   pure
     OutsideObject.MkOutsideObject
       { OutsideObject.owner = owner,
         OutsideObject.printing = printing,
         OutsideObject.facing = facing,
-        OutsideObject.cards = cards
+        OutsideObject.cards = cards,
+        OutsideObject.identity = identity
       }
