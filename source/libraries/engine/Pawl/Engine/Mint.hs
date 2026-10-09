@@ -1,7 +1,6 @@
--- | Builders for the abilities the engine writes itself -- a keyword's
--- (CR 702), a designation's (CR 725, 726) or the rulebook's own (CR 728.1,
--- 901.8) -- rather than reads off a card. Its only imports are types, so
--- Pawl.Engine.Keyword and the modules beneath it can use it.
+-- | Builders for the abilities the engine writes itself rather than reads off a
+-- card: a keyword's, a designation's, the rulebook's own. Its only imports are
+-- types, so Pawl.Engine.Keyword and the modules beneath it can use it.
 module Pawl.Engine.Mint where
 
 import qualified Data.Map.Strict as Map

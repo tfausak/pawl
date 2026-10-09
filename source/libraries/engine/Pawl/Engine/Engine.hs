@@ -622,13 +622,13 @@ placePendingTriggers = do
       logged = Event.unscannedGrouped gs
       -- CR 725.2, 726.2, 702.179d, 728.1 and 901.8: the rulebook's inherent
       -- triggers hang on no object, and CR 309.4c's room abilities hang on a
-      -- dungeon card Event.gatherTriggers does not offer -- that scan reads the
-      -- command zone for CR 113.6p's list, an emblem and a vanguard card. So
-      -- Event.gatherTriggers, which asks each object what it triggers, has
-      -- nowhere to find any of them. Gathered apart through the same matcher,
-      -- from the SAME snapshot and before the watermark bump, then merged into
-      -- the one batch below: placing them after the ordered batch would make
-      -- them resolve first, by the engine's choice rather than the player's.
+      -- dungeon card whose room abilities CR 309.4c mints rather than prints.
+      -- So Event.gatherTriggers, which asks each object what its face
+      -- triggers, has nowhere to find any of them. Gathered apart through the
+      -- same matcher, from the SAME snapshot and before the watermark bump, then
+      -- merged into the one batch below: placing them after the ordered batch
+      -- would make them resolve first, by the engine's choice rather than the
+      -- player's.
       sourceless = Monarch.abilities gs <> Initiative.abilities gs <> Speed.abilities gs <> Rad.abilities gs <> Planechase.abilities gs
       inherent = Trigger.inherentTriggers (fmap (\(pid, ability) -> (TriggerSource.Sourceless, pid, ability)) sourceless <> Dungeon.abilities gs) logged gs
   -- The CR 603.10a look-back in Event.eventTriggers, over the same grouped
