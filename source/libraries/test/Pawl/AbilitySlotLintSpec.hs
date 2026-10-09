@@ -315,12 +315,11 @@ triggeredAbilityOffendsGiven inherited ability =
 -- another road -- one "doesn't go on the stack, so it can't be targeted,
 -- countered, or otherwise responded to. Rather, it resolves immediately after it
 -- is activated" -- so Cost.tapForManaWith pays the route's cost, adds the mana
--- and runs the rest through Resolve.performManaAbility (CR 405.6c). That binds
--- Binding.triggerSource and Binding.you and nothing else: the payment's own
--- bound slots are dropped, there being no ability object to write them onto. The
--- exemptions this lint grants beyond those two are therefore wider than a mana
--- ability gets, and no mana ability in the pool reads one, so applying the same
--- available side to one is uniformity rather than a claim.
+-- and runs the rest through Resolve.performManaAbility (CR 405.6c). The
+-- payment's bound slots price the YIELD -- Priest of Yawgmoth's "the sacrificed
+-- artifact's mana value" -- but the rest sees only Binding.triggerSource and
+-- Binding.you, so an exemption this lint grants is wider than a mana ability's
+-- other effects get (#4850).
 activatedAbilityOffends :: ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 activatedAbilityOffends ability =
   let announcedX =
@@ -343,6 +342,10 @@ activatedAbilityOffends ability =
         if exilesSelfAsCost (ActivatedAbility.cost ability)
           then Set.singleton Binding.exiledCard
           else Set.empty
+      exiledPermanents =
+        if exilesPermanentsAsCost (ActivatedAbility.cost ability)
+          then Set.singleton Binding.exiledPermanent
+          else Set.empty
       discarded =
         if discardsSelfAsCost (ActivatedAbility.cost ability)
           then Set.singleton Binding.discardedCard
@@ -351,7 +354,7 @@ activatedAbilityOffends ability =
         if removesCountersAsCost (ActivatedAbility.cost ability)
           then Set.singleton Binding.removedCounters
           else Set.empty
-   in modalSlotsOffend (Set.unions [Set.fromList [Binding.triggerSource, Binding.you, Binding.thisAbility], announcedX, sacrificed, tapped, tappedForTotal, exiled, discarded, removed, payGateBound (ActivatedAbility.modal ability)]) (ActivatedAbility.modal ability)
+   in modalSlotsOffend (Set.unions [Set.fromList [Binding.triggerSource, Binding.you, Binding.thisAbility], announcedX, sacrificed, tapped, tappedForTotal, exiled, exiledPermanents, discarded, removed, payGateBound (ActivatedAbility.modal ability)]) (ActivatedAbility.modal ability)
 
 -- Does this cost tap permanents the payer CHOOSES? sacrificesAsCost's shape, and
 -- the same reason: CR 601.2h's payment binds Binding.tappedPermanent
@@ -407,6 +410,17 @@ exilesSelfAsCost =
   let isExile component = case component of
         CostComponent.ExileThis -> True
         CostComponent.ExileThisFromGraveyard -> True
+        _ -> False
+   in any isExile . Cost.Type.components
+
+-- Does this cost EXILE permanents the payer CHOOSES? sacrificesAsCost's shape:
+-- CR 601.2h's payment binds Binding.exiledPermanent (Cost.payComponent's
+-- ExilePermanents arm), so Food Chain's "the exiled creature's mana value" is an
+-- ordinary slot read.
+exilesPermanentsAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
+exilesPermanentsAsCost =
+  let isExile component = case component of
+        CostComponent.ExilePermanents {} -> True
         _ -> False
    in any isExile . Cost.Type.components
 

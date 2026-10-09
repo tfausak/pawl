@@ -237,9 +237,9 @@ data Prompt r where
   -- covers the cost, or Nothing to pay; never elided, floating being
   -- observable, and collapsed as ChooseManaSource is.
   ChooseExtraManaSource :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt (Maybe ObjectId.ObjectId)
-  -- | CR 733.1: whether the mana abilities activated while making a reversed
-  -- action are reversed too; the mana stays in the pool either way (CR
-  -- 106.4). All or nothing rather than a subset (gap #3134).
+  -- | CR 733.1: whether one mana ability activated while making a reversed
+  -- action is reversed too, asked per activation, newest first
+  -- (Pawl.Engine.Cost.reverseIllegal).
   ReverseManaAbilities :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt OptionalDecision.OptionalDecision
   -- | CR 605.3b: which mana the source produces, as the mana ability resolves;
   -- candidates are deduplicated by the whole option (Mana.manaOptionsOf).
@@ -734,6 +734,9 @@ data Prompt r where
   -- how many (CR 118.1); ChooseTaps\' shape, answering as Response.ChoseReturns
   -- so a replay cannot tap what it should have returned.
   ChooseReturns :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt (Set.Set ObjectId.ObjectId)
+  -- | Which permanents are exiled to pay a cost naming how many (CR 118.1,
+  -- 406.2); ChooseReturns\' shape, answering as Response.ChoseExiles.
+  ChooseExiles :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt (Set.Set ObjectId.ObjectId)
   -- | CR 118.1 as a cost: which ONE permanent loses the counters of one kind a
   -- cost names (Zameck Guildmage). ChooseBlight's shape rather than ChooseTaps',
   -- the count being counters and not objects, and elided at one candidate.

@@ -872,6 +872,7 @@ withinOffer prompt chosen = case prompt of
   Prompt.Type.ChooseTapsForTotalPower _ _ _ objects _ -> all (`elem` objects) chosen
   Prompt.Type.ChooseTaps _ _ _ objects _ -> all (`elem` objects) chosen
   Prompt.Type.ChooseReturns _ _ _ objects _ -> all (`elem` objects) chosen
+  Prompt.Type.ChooseExiles _ _ _ objects _ -> all (`elem` objects) chosen
   Prompt.Type.ChooseCounterRemoval _ _ _ objects -> chosen `elem` objects
   Prompt.Type.ChooseCounterRemovalAmong _ _ _ _ bearers -> Map.isSubmapOfBy (<=) chosen bearers
   Prompt.Type.ChooseCounterRemovalAtLeast _ _ _ _ bearers -> Map.isSubmapOfBy (<=) chosen bearers

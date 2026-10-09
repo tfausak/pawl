@@ -7,6 +7,7 @@ import qualified Pawl.Codec.CountersFromThis as CountersFromThis
 import qualified Pawl.Codec.DiscardCards as DiscardCards
 import qualified Pawl.Codec.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Codec.ExileMaterials as ExileMaterials
+import qualified Pawl.Codec.ExilePermanents as ExilePermanents
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Codec.Rounding as Rounding
@@ -44,6 +45,7 @@ codec keywordCodec =
       Arm.payload "TapForTotalPower" (TapForTotalPower.codec keywordCodec) CostComponent.TapForTotalPower (\x -> case x of CostComponent.TapForTotalPower y -> Just y; _ -> Nothing),
       Arm.payload "TapPermanents" (TapPermanents.codec keywordCodec) CostComponent.TapPermanents (\x -> case x of CostComponent.TapPermanents y -> Just y; _ -> Nothing),
       Arm.payload "ReturnPermanents" (ReturnPermanents.codec keywordCodec) CostComponent.ReturnPermanents (\x -> case x of CostComponent.ReturnPermanents y -> Just y; _ -> Nothing),
+      Arm.payload "ExilePermanents" (ExilePermanents.codec keywordCodec) CostComponent.ExilePermanents (\x -> case x of CostComponent.ExilePermanents y -> Just y; _ -> Nothing),
       Arm.payload "DiscardCards" (DiscardCards.codec keywordCodec) CostComponent.DiscardCards (\x -> case x of CostComponent.DiscardCards y -> Just y; _ -> Nothing),
       -- The component carries a DiscardCause, but the WIRE does not: a card
       -- prints "Discard this card" and never says the discard is a cycle, which
@@ -81,6 +83,7 @@ codec keywordCodec =
       Arm.payload "Behold" (Behold.codec keywordCodec) CostComponent.Behold (\x -> case x of CostComponent.Behold y -> Just y; _ -> Nothing),
       Arm.payload "BeholdAndExile" (Filter.codec keywordCodec) CostComponent.BeholdAndExile (\x -> case x of CostComponent.BeholdAndExile y -> Just y; _ -> Nothing),
       Arm.payload "MillCards" Common.natural CostComponent.MillCards (\x -> case x of CostComponent.MillCards y -> Just y; _ -> Nothing),
+      Arm.payload "RevealTopOfLibrary" Common.natural CostComponent.RevealTopOfLibrary (\x -> case x of CostComponent.RevealTopOfLibrary y -> Just y; _ -> Nothing),
       Arm.nullary "ChooseOpponent" CostComponent.ChooseOpponent,
       Arm.payload "Waterbend" Common.natural CostComponent.Waterbend (\x -> case x of CostComponent.Waterbend y -> Just y; _ -> Nothing),
       Arm.nullary "WaterbendX" CostComponent.WaterbendX,
@@ -101,6 +104,7 @@ tagOf x = case x of
   CostComponent.TapForTotalPower {} -> "TapForTotalPower"
   CostComponent.TapPermanents {} -> "TapPermanents"
   CostComponent.ReturnPermanents {} -> "ReturnPermanents"
+  CostComponent.ExilePermanents {} -> "ExilePermanents"
   CostComponent.DiscardCards {} -> "DiscardCards"
   CostComponent.DiscardThis {} -> "DiscardThis"
   CostComponent.PutCardFromHandOntoBattlefield {} -> "PutCardFromHandOntoBattlefield"
@@ -129,6 +133,7 @@ tagOf x = case x of
   CostComponent.Behold {} -> "Behold"
   CostComponent.BeholdAndExile {} -> "BeholdAndExile"
   CostComponent.MillCards {} -> "MillCards"
+  CostComponent.RevealTopOfLibrary {} -> "RevealTopOfLibrary"
   CostComponent.ChooseOpponent {} -> "ChooseOpponent"
   CostComponent.Waterbend {} -> "Waterbend"
   CostComponent.WaterbendX {} -> "WaterbendX"

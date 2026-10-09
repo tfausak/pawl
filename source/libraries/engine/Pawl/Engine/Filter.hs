@@ -27,6 +27,7 @@ import qualified Pawl.Types.Emerge as Emerge
 import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.ExileMaterials as ExileMaterials
+import qualified Pawl.Types.ExilePermanents as ExilePermanents
 import qualified Pawl.Types.Expansion as Expansion
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ForetellCost as ForetellCost
@@ -3073,6 +3074,7 @@ rewriteComponent pairs component = case component of
   CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n criterion) -> CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n (rewrite pairs criterion))
   CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion sharing) -> CostComponent.TapPermanents (TapPermanents.MkTapPermanents n (rewrite pairs criterion) sharing)
   CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n criterion) -> CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n (rewrite pairs criterion))
+  CostComponent.ExilePermanents (ExilePermanents.MkExilePermanents n criterion) -> CostComponent.ExilePermanents (ExilePermanents.MkExilePermanents n (rewrite pairs criterion))
   CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) -> CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n (rewrite pairs criterion))
   CostComponent.ExileMaterials (ExileMaterials.MkExileMaterials n orMore criterion) -> CostComponent.ExileMaterials (ExileMaterials.MkExileMaterials n orMore (rewrite pairs criterion))
   CostComponent.ExileTopFromGraveyard criterion -> CostComponent.ExileTopFromGraveyard (rewrite pairs criterion)
@@ -3111,6 +3113,7 @@ rewriteComponent pairs component = case component of
   CostComponent.ExileThisFromGraveyard -> component
   CostComponent.ExileThis -> component
   CostComponent.MillCards _ -> component
+  CostComponent.RevealTopOfLibrary _ -> component
   CostComponent.ChooseOpponent -> component
   CostComponent.Waterbend _ -> component
   CostComponent.WaterbendInstead _ -> component

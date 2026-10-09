@@ -1,6 +1,6 @@
 {
   "description": "CR 733.1 what a nested window kept is offered again when the outer payment fails",
-  "note": "The Gate's {W/U} route opens a nested window that alice pays by tapping the Gate itself for {C} and the Island for {U}, which leaves the route's own {T} unpayable; she then stops, so the Piker's payment fails too. Two ReverseManaAbilities answers are scheduled and both are taken (one nested, one the cast's): keeping both leaves {C}{U} floating and both lands tapped.",
+  "note": "The Gate's {W/U} route opens a nested window that alice pays by tapping the Gate itself for {C} and the Island for {U}, which leaves the route's own {T} unpayable; she then stops, so the Piker's payment fails too. Four ReverseManaAbilities answers are scheduled and all are taken (one per source in the nested window, then one per source in the cast's): keeping both leaves {C}{U} floating and both lands tapped.",
   "board": {
     "seats": [
       {
@@ -82,6 +82,32 @@
               }
             ]
           ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ReverseManaAbilities",
+          "with": {
+            "type": "Declines"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ReverseManaAbilities",
+          "with": {
+            "type": "Declines"
+          }
         }
       }
     },

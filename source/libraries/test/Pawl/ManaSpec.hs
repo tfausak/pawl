@@ -1826,6 +1826,179 @@ phyrexianTowerSpec s registry = Spec.describe s "Phyrexian Tower" $ do
     Spec.assertEqWith s "with no Piker there is no {B}{B} and the cast fails" (countOf "Withered Wretch" without) 0
     Spec.assertEqWith s "and nothing was spent trying" (S.tappedCount S.alice without) 0
 
+-- CR 601.2h / 608.2h: Priest of Yawgmoth's "{T}, Sacrifice an artifact: Add an
+-- amount of {B} equal to the sacrificed artifact's mana value" reads a slot its
+-- own cost binds, so no offer can price it before the artifact is picked.
+-- Krark's Thumb (mana value 2) and Crucible of Worlds (3) are the artifacts,
+-- neither a mana source, so the Priest is the only supply on every board.
+priestOfYawgmothSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+priestOfYawgmothSpec s registry = Spec.describe s "Priest of Yawgmoth" $ do
+  let artifacts = do
+        priest <- S.printingOf s registry "Priest of Yawgmoth"
+        thumb <- S.printingOf s registry "Krark's Thumb"
+        crucible <- S.printingOf s registry "Crucible of Worlds"
+        let (priestId, g1) = S.addPermanent priest S.alice (Setup.emptyGame S.bothPlayers)
+            (thumbId, thumbOnly) = S.addPermanent thumb S.alice g1
+            (crucibleId, both) = S.addPermanent crucible S.alice thumbOnly
+        pure (priestId, thumbId, crucibleId, thumbOnly, both)
+      black = ManaType.Colored Color.Black
+      countOf name = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack name)) S.alice
+
+  Spec.it s "CR 608.2h it adds {B} equal to the mana value of the artifact it sacrificed" $ do
+    (priestId, thumbId, crucibleId, _, board) <- artifacts
+    Spec.assertEqWith s "sacrificing the Crucible of Worlds adds {B}{B}{B}" (tappedFor (sacrificing crucibleId) priestId board) [black, black, black]
+    Spec.assertEqWith s "sacrificing the Krark's Thumb adds {B}{B}" (tappedFor (sacrificing thumbId) priestId board) [black, black]
+    Spec.assertEqWith s "and the artifact goes" (countOf "Crucible of Worlds" (S.runPure (sacrificing crucibleId) board (S.tapForMana priestId))) 0
+
+  -- The supply walk counts the artifact the cast needs: {1}{B}{B} beside the
+  -- Crucible, and not beside the Thumb alone, the one difference between the
+  -- two boards.
+  Spec.it s "CR 601.2g Vampire Nighthawk is cast off a Priest that eats a Crucible of Worlds" $ do
+    nighthawk <- S.printingOf s registry "Vampire Nighthawk"
+    (_, _, crucibleId, thumbOnly, both) <- artifacts
+    let holding gs =
+          let (board, oid) = S.handOne nighthawk (gs {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
+           in S.castable S.alice oid board
+        resolved = castFrom (sacrificing crucibleId) both nighthawk
+    Spec.assertBool s (holding both) "{1}{B}{B} is offered beside a mana-value-3 artifact"
+    Spec.assertBool s (not (holding thumbOnly)) "and not beside a mana-value-2 one alone"
+    Spec.assertEqWith s "the Nighthawk resolved" (countOf "Vampire Nighthawk" resolved) 1
+    Spec.assertEqWith s "the Crucible paid for it" (countOf "Crucible of Worlds" resolved) 0
+    Spec.assertEqWith s "and the Thumb is still there" (countOf "Krark's Thumb" resolved) 1
+
+  -- CR 118.3 across two Priests: each supply claims only the artifacts that
+  -- give its yield, so the Crucible is not counted under both. Five is the
+  -- Crucible's 3 and the Thumb's 2; six would need the Crucible twice.
+  Spec.it s "CR 118.3 two Priests cannot both sacrifice the one Crucible of Worlds" $ do
+    priest <- S.printingOf s registry "Priest of Yawgmoth"
+    (_, _, _, _, both) <- artifacts
+    let twoPriests = snd (S.addPermanent priest S.alice both)
+        generic n = ManaCost.MkManaCost [ManaSymbol.Generic n]
+    Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice (generic 6) twoPriests)) "{6} would need the Crucible twice"
+    Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice (generic 5) twoPriests) "and {5} is the Crucible and the Thumb"
+
+  -- The same question on a WIDE board: eight artifacts of mana values 1 to 8
+  -- give each of three Priests eight yields, and the walk takes at most one per
+  -- Priest rather than every subset of the twenty-four. Twenty-one is the 8,
+  -- the 7 and the 6.
+  Spec.it s "CR 118.3 three Priests beside eight artifacts pay {21} and not {22}" $ do
+    priest <- S.printingOf s registry "Priest of Yawgmoth"
+    fodder <- traverse (S.printingOf s registry) ["Basilisk Collar", "Aegis of the Legion", "Crawlspace", "Damping Engine", "Clearwater Goblet", "Arachnoid", "Darksteel Gargoyle", "The Ten Rings"]
+    let board = alicePermanents (priest : priest : priest : fodder)
+        generic n = ManaCost.MkManaCost [ManaSymbol.Generic n]
+    Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice (generic 22) board)) "{22} would need one artifact twice"
+    Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice (generic 21) board) "and {21} is the three largest"
+
+  -- CR 608.2h on the Priest itself: Red Priest of Yawgmoth is an artifact, so
+  -- it may sacrifice itself, and its own mana value is read as it last was.
+  Spec.it s "CR 608.2h Red Priest of Yawgmoth sacrificing itself adds {R}{R}" $ do
+    redPriest <- S.printingOf s registry "Red Priest of Yawgmoth"
+    let (priestId, board) = S.addPermanent redPriest S.alice (Setup.emptyGame S.bothPlayers)
+        red = ManaType.Colored Color.Red
+    Spec.assertEqWith s "its own mana value, 2" (tappedFor (sacrificing priestId) priestId board) [red, red]
+    Spec.assertEqWith s "and it is gone" (countOf "Red Priest of Yawgmoth" (S.runPure (sacrificing priestId) board (S.tapForMana priestId))) 0
+
+  -- The same pricing over another characteristic: Furgul, Quag Nurturer's "equal
+  -- to the sacrificed creature's power", Craw Wurm's 6 against Grizzly Bears' 2.
+  Spec.it s "CR 608.2h Furgul, Quag Nurturer adds {G} equal to the sacrificed creature's power" $ do
+    furgul <- S.printingOf s registry "Furgul, Quag Nurturer"
+    wurm <- S.printingOf s registry "Craw Wurm"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    let (furgulId, g1) = S.addPermanent furgul S.alice (Setup.emptyGame S.bothPlayers)
+        (wurmId, g2) = S.addPermanent wurm S.alice g1
+        (bearsId, board) = S.addPermanent bears S.alice g2
+        green = ManaType.Colored Color.Green
+    Spec.assertEqWith s "sacrificing the Craw Wurm adds six {G}" (tappedFor (sacrificing wurmId) furgulId board) (replicate 6 green)
+    Spec.assertEqWith s "sacrificing the Grizzly Bears adds two" (tappedFor (sacrificing bearsId) furgulId board) [green, green]
+
+-- CR 406.2 / 608.2h / 105.4: Food Chain's "Exile a creature you control: Add X
+-- mana of any one color, where X is 1 plus the exiled creature's mana value.
+-- Spend this mana only to cast creature spells." The cost exiles, the count
+-- reads the exiled creature as it last was, and the colour is chosen once the
+-- count is known.
+foodChainSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+foodChainSpec s registry = Spec.describe s "Food Chain" $ do
+  let board = do
+        chain <- S.printingOf s registry "Food Chain"
+        stag <- S.printingOf s registry "Axebane Stag"
+        myr <- S.printingOf s registry "Alpha Myr"
+        let (chainId, g1) = S.addPermanent chain S.alice (Setup.emptyGame S.bothPlayers)
+            (stagId, g2) = S.addPermanent stag S.alice g1
+            (myrId, gs) = S.addPermanent myr S.alice g2
+        pure (chainId, stagId, myrId, gs)
+      countOf name = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack name)) S.alice
+      -- Exiles `victim`, and picks the yield all of `color`; every candidate the
+      -- yield prompt offered is recorded.
+      feeding :: ObjectId.ObjectId -> Color.Color -> Prompt.Prompt r -> State.State [[ManaType.ManaType]] r
+      feeding victim color p = case p of
+        Prompt.ChooseExiles _ _ _ candidates _ -> pure (Set.filter (== victim) (Set.fromList candidates))
+        Prompt.ChooseManaYield _ _ _ candidates -> do
+          State.modify' (<> fmap (fmap ManaUnit.manaType . Mana.yieldUnits) (NonEmpty.toList candidates))
+          pure (Maybe.fromMaybe (NonEmpty.head candidates) (List.find (all ((== ManaType.Colored color) . ManaUnit.manaType) . Mana.yieldUnits) (NonEmpty.toList candidates)))
+        _ -> pure (S.identityAnswer p)
+      activated victim color chainId gs = State.runState (Engine.runGame (feeding victim color) gs (S.tapForMana chainId)) []
+
+  Spec.it s "CR 608.2h exiling Axebane Stag adds eight mana of the colour chosen after it" $ do
+    (chainId, stagId, _, gs) <- board
+    let ((_, afterRed), asked) = activated stagId Color.Red chainId gs
+        ((_, afterGreen), _) = activated stagId Color.Green chainId gs
+    Spec.assertEqWith s "eight red, 1 plus the Stag's 7" (poolTypes S.alice afterRed) (replicate 8 (ManaType.Colored Color.Red))
+    Spec.assertEqWith s "eight green when green is the answer" (poolTypes S.alice afterGreen) (replicate 8 (ManaType.Colored Color.Green))
+    Spec.assertEqWith s "the five colours were offered at eight each, so the count was known when asked" asked (fmap (replicate 8 . ManaType.Colored) [Color.White, Color.Blue, Color.Black, Color.Red, Color.Green])
+    Spec.assertEqWith s "and the Stag is gone" (countOf "Axebane Stag" afterRed) 0
+
+  -- CR 106.6: the mana pays a creature spell and not Divination, off one board.
+  Spec.it s "CR 106.6 Food Chain's mana casts Ancient Carp and not Divination" $ do
+    carp <- S.printingOf s registry "Ancient Carp"
+    divination <- S.printingOf s registry "Divination"
+    (_, _, _, gs) <- board
+    let holding printing =
+          let (held, oid) = S.handOne printing (gs {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
+           in S.castable S.alice oid held
+    Spec.assertBool s (holding carp) "{4}{U} off the Stag's eight"
+    Spec.assertBool s (not (holding divination)) "and {2}{U} not, it being no creature spell"
+
+  -- A WIDE board: five each of nine creatures of mana values 0 to 8. The supply
+  -- walk takes Food Chain's yields only in the colours a cast names and at most
+  -- as many activations as it demands mana, so it stays small.
+  Spec.it s "CR 118.3 Food Chain beside forty-five creatures still answers at once" $ do
+    chain <- S.printingOf s registry "Food Chain"
+    creatures <- traverse (S.printingOf s registry) ["Crimson Kobolds", "Aegis Turtle", "Alpha Myr", "Alaborn Trooper", "Axebane Beast", "Ancient Carp", "Alpha Tyrranax", "Axebane Stag", "Ancient Brontodon"]
+    brontodon <- S.printingOf s registry "Ancient Brontodon"
+    progenitus <- S.printingOf s registry "Progenitus"
+    divination <- S.printingOf s registry "Divination"
+    let wide = alicePermanents (chain : concatMap (replicate 5) creatures)
+        holding printing =
+          let (held, oid) = S.handOne printing (wide {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
+           in S.castable S.alice oid held
+    Spec.assertBool s (holding brontodon) "{6}{G}{G} is offered"
+    Spec.assertBool s (holding progenitus) "{W}{W}{U}{U}{B}{B}{R}{R}{G}{G}, every colour twice, is offered"
+    Spec.assertBool s (not (holding divination)) "and Divination is not"
+
+  -- The colours made of SEVERAL blocks: Crimson Kobolds' mana value is 0, so
+  -- each exile adds one mana, and Alpha Myr's 2 makes three. Progenitus wants
+  -- two of each colour: the Myr's three cover one, and the other four take two
+  -- Kobolds each. Eight Kobolds are exactly enough and seven are not, the one
+  -- difference between the boards; the Myr is what makes the yields differ by
+  -- creature, so the colours are covered rather than collapsed.
+  Spec.it s "CR 118.3 an Alpha Myr and eight Crimson Kobolds feed Progenitus through Food Chain and seven do not" $ do
+    chain <- S.printingOf s registry "Food Chain"
+    myr <- S.printingOf s registry "Alpha Myr"
+    kobolds <- S.printingOf s registry "Crimson Kobolds"
+    progenitus <- S.printingOf s registry "Progenitus"
+    let holding n =
+          let (held, oid) = S.handOne progenitus ((alicePermanents (chain : myr : replicate n kobolds)) {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
+           in S.castable S.alice oid held
+    Spec.assertBool s (holding 8) "the Myr's three for one colour, two Kobolds for each of the others"
+    Spec.assertBool s (not (holding 7)) "and seven Kobolds leave a colour short"
+
+-- Answers Prompt.ChooseSacrifices with `victim` alone, and defers everything
+-- else to S.identityAnswer.
+sacrificing :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+sacrificing victim p = case p of
+  Prompt.ChooseSacrifices _ _ _ candidates _ _ -> Set.filter (== victim) (Set.fromList candidates)
+  _ -> S.identityAnswer p
+
 -- CR 106.12: to "tap [a permanent] for mana" is to activate a mana ability of
 -- that permanent that includes {T} in its activation cost. Blood Pet ({B}
 -- Creature -- Thrull, "Sacrifice this creature: Add {B}.") is the pool's first
@@ -3710,6 +3883,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   wellspringSpec s registry
   manaConfluenceSpec s registry
   phyrexianTowerSpec s registry
+  priestOfYawgmothSpec s registry
+  foodChainSpec s registry
   bloodPetSpec s registry
   ashnodsAltarSpec s registry
   workhorseSpec s registry

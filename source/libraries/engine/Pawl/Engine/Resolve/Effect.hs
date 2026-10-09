@@ -518,11 +518,14 @@ targetSlotsOf obj oid gs face =
 -- a verdict, and a clause with no arm never compares.
 --
 -- Effect.ForEach's body (below) runs its instructions through this SAME fold,
--- reset per member rather than carried across members. Synthetic Communal Toll
--- (data/cards/synthetic-communal-toll.json) stands in for Nihiloor's "for each
--- opponent, tap up to one untapped creature you control. When you do, ..."
--- (#3166); Pawl.ResolveSpec's "CR 608.2f / 603.12 a reflexive armed inside a
--- ForEach reads only that member's own instruction" is the case that proves it.
+-- reset per member rather than carried across members. Nihiloor's "for each
+-- opponent, tap up to one untapped creature you control. When you do, ..." is
+-- the printed shape, but cannot observe it: a reflexive armed off a tap that
+-- tapped nothing has no creature to measure its target by, so it has no legal
+-- target either way. Synthetic Communal Toll
+-- (data/cards/synthetic-communal-toll.json) can; Pawl.ResolveSpec's "CR 608.2f /
+-- 603.12 a reflexive armed inside a ForEach reads only that member's own
+-- instruction" is the case that proves it.
 --
 -- Only the instruction IMMEDIATELY before the arm is asked about. A reflexive
 -- naming an earlier one ("do A. do B. when you do A this way") is written as its
@@ -5942,7 +5945,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- The member is bound HERE, in the map handed down, never onto the
         -- resolving object, which scopes it to this iteration. OUTERMOST, so the
         -- loop's own name wins; `m` beats `defined`, since `m` is the CR 608.2b
-        -- re-validated map and shadowing it would skip a re-validation.
+        -- re-validated map and shadowing it would skip a re-validation. A
+        -- delayed ability armed in the body captures it from that map
+        -- (Effect.ArmDelayedTrigger's arm).
         withMember member defined m = Map.insert slot (Set.singleton member) (Map.union m defined)
         bindingsOf gs = maybe Map.empty Object.bindings (Game.lookupObject resolving gs)
         -- Whatever those names held BEFORE the loop, to be put back at each
@@ -7703,7 +7708,26 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- Binding.announcedTargets is left behind: it serves CR 601.2h's payment,
         -- and a copy given new targets (CR 707.10c) still carries the old group.
         -- A FENCE: no board in the suite arms a delayed ability off a retargeted copy.
-        let captured = maybe Map.empty (Map.delete Binding.announcedTargets . Object.bindings) (Game.lookupObject resolving gs)
+        --
+        -- CR 603.7c's environment takes its RECIPIENTS from the map the
+        -- instruction was handed rather than off the object, exactly as the
+        -- instruction's siblings read them: Effect.ForEach binds its member only
+        -- there (Nihiloor's "that player"), a repeated mode's occurrence finds
+        -- its own slots there under their printed names (CR 700.2d), and CR
+        -- 608.2b has already dropped an illegal target from it. Every other
+        -- field of a slot the object holds is kept. Nihiloor's scenario "steals
+        -- from each opponent" proves the member. Overriding a name the object
+        -- ALSO holds is a REGRESSION FENCE: mutating it leaves the suite green,
+        -- since no pool card's delayed ability reads a target slot of a repeated
+        -- mode or one CR 608.2b re-validated away. Scryfall o:"same mode more
+        -- than once" (o:"next end step" or o:"when you do"), 2026-10-09, finds
+        -- one delayed ability, Cabaretti Confluence's, and its sacrifice names
+        -- the token rather than the target.
+        let bound = maybe Map.empty Object.bindings (Game.lookupObject resolving gs)
+            handedDown recipients binding = binding {Binding.Type.targets = if Set.null recipients then Nothing else Just recipients}
+            captured =
+              Map.delete Binding.announcedTargets . Map.filter (/= Binding.Type.empty) $
+                Map.union (Map.intersectionWith handedDown legal bound) (Map.union bound (Map.map (`handedDown` Binding.Type.empty) legal))
          in -- CR 603.7a's other end: the BOUNDARY, not a turn number, for one
             -- printed "on your next turn". Which turn that names is settled as
             -- that turn begins (Event.settleOnsets). CR 603.7b's stated duration:
@@ -11167,11 +11191,10 @@ performTriggeredManaAbility runSubgame pending = case PendingTrigger.source pend
 --
 -- Not implemented: an object of the ability's own to carry slots the bindings
 -- below do not. A slot read that misses them falls through to the source
--- PERMANENT's bindings instead. Exact for the pool as it stands -- CR 605.1a
--- leaves a mana ability no targets to have bound, and the other slots
--- Pawl.CardSpec's activatedAbilityOffends admits a read of are ones the payment
--- binds and Cost.tapForManaWith's Paid branch drops, which no mana ability in
--- data/cards/ reads (#3124).
+-- PERMANENT's bindings instead. CR 605.1a leaves a mana ability no targets to
+-- have bound; the other slots Pawl.AbilitySlotLintSpec's activatedAbilityOffends
+-- admits a read of are the ones its cost's payment binds, which reach the yield
+-- (Cost.tapForManaWith) and not these effects (#4850).
 performManaAbilityEffects :: Game Result -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> Game (Map.Map SlotName (Set Recipient))
 performManaAbilityEffects runSubgame source controller =
   -- CR 109.5's "you" is the player who activated the ability, and the reserved

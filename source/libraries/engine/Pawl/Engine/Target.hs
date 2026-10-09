@@ -378,7 +378,13 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- pass hands every slot the seed alone, so the union is what a
             -- dependent slot is offered, and selectionLegal is where an
             -- announcement naming one creature twice is rejected.
-            Filter.slotObjects = fmap (Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList) targets,
+            --
+            -- A GROUP binding joins the targets here, Binding.slotObjects' union:
+            -- a reflexive ability's captured environment (CR 603.7c) can hold
+            -- one, and Nihiloor's "the tapped creature's power" aims its slot's
+            -- computed bound at the creature its own ChoosePermanents bound.
+            -- Nihiloor's scenario "steals from each opponent" proves it.
+            Filter.slotObjects = Map.unionWith Set.union (fmap (Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList) targets) (Binding.withGroups Map.empty (Binding.groupsOf bindings)),
             -- EMPTY: CR 702.122d's prohibition is read where rule 702.122a's
             -- cost picks its candidates (Pawl.Engine.Cost.tapCandidates) and no
             -- target slot's Filter carries the atom, crew naming its Vehicle
@@ -402,6 +408,9 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- keeps answerable. Harness the Storm whose spell was countered in
             -- response still knows the name it named.
             --
+            -- Not implemented: CR 608.2b's last sentence blanking a departed
+            -- sibling TARGET's name here, as slotAmount's bound below does (#4865).
+            --
             -- A THUNK, like the two above: one projection per bound object, paid
             -- for only by a filter that names the atom.
             Filter.slotNames = fmap (foldMap (foldMap (foldMap Filter.names . Projection.viewWithLastKnownAnywhere gs) . Recipient.objectOf)) targets,
@@ -411,6 +420,10 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- reader is what keeps a bound target that has since left the
             -- battlefield answerable rather than silently changing the sibling
             -- slot's legality at CR 608.2b.
+            --
+            -- Not implemented: CR 608.2b's last sentence blanking a departed
+            -- sibling TARGET's controller here, as slotAmount's bound below does
+            -- (#4865).
             --
             -- A KEY PER BOUND SLOT and no more, which is the distinction that
             -- atom's vacuous direction rests on: `fmap` leaves a slot the
@@ -508,7 +521,16 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- CR 607.2a's last exiled card is the MANA unit's, never a slot's.
             Filter.sourceLastExiled = Nothing
           }
-      evaluated = amount >>= Quantity.evaluate (Projection.fullView gs) base gs source
+      -- CR 608.2h's last-known reader for an object the bound refers to but no
+      -- slot TARGETS -- Nihiloor's tapped creature, a group its own effect bound
+      -- -- and the live view for a sibling target, since CR 608.2b's last
+      -- sentence has the effect fail to determine any information about an
+      -- illegal target. Nihiloor's scenario "measures a dead tapped creature"
+      -- proves the first half and Synthetic Counted Verdict's "fails to count a
+      -- dead gauge" the second.
+      targeted = foldMap (Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList) targets
+      boundView oid = if Set.member oid targeted then Projection.fullView gs oid else Projection.viewWithLastKnownAnywhere gs oid
+      evaluated = amount >>= Quantity.evaluate boundView base gs source
    in -- CR 202.3 / 601.2c: the slot's own computed bound, evaluated
       -- against the context above and handed to Filter.ManaValueAtMostAmount,
       -- Filter.ManaValueEqualToAmount and Filter.PowerAtMostAmount.

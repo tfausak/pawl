@@ -13,6 +13,7 @@ import qualified Data.Ord as Ord
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Claim as Claim
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Count as Count
@@ -36,10 +37,13 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.Activations as Activations
 import qualified Pawl.Types.Activator as Activator
+import qualified Pawl.Types.Binding as Binding.Type
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import Pawl.Types.Claim (Claim)
+import qualified Pawl.Types.Claim as Claim.Type
+import qualified Pawl.Types.ClaimAxis as ClaimAxis
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import Pawl.Types.Cost (Cost)
@@ -47,6 +51,7 @@ import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.ExileLink as ExileLink
+import qualified Pawl.Types.ExilePermanents as ExilePermanents
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -90,6 +95,8 @@ import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SourceChoices as SourceChoices
 import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
@@ -97,6 +104,7 @@ import qualified Pawl.Types.SpendTrigger as SpendTrigger
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.WhenSpent as WhenSpent
+import qualified Pawl.Types.Zone as Zone
 
 -- | Asked of a mana ability's OWN activation cost: HOW MANY TIMES may this
 -- player activate it, for the ability on this object? CR 602.2b is why the
@@ -454,7 +462,13 @@ manaYieldsOfGiven pcs oid gs = ListUtils.nubOrd (fmap (Mana.MkMana . yieldUnits)
 -- rather than tidiness: "the type of mana a permanent could produce" is defined
 -- to IGNORE whether the ability's costs could be paid, so manaTypesOf has to go
 -- on answering the ungated question.
-manaSuppliesGiven :: Capacity -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> GameState -> [(Activations.Activations, Mana, ManaCost)]
+--
+-- The FOURTH element is what this yield's own activation spends, and the
+-- first what its ROUTE's does; they differ only for a yield priced per
+-- sacrifice candidate (`perCandidate` below), whose own claim names just the
+-- candidates that give it. sourceOptions groups by the route, so such yields
+-- are one choice of at most one of them per activation.
+manaSuppliesGiven :: Capacity -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> GameState -> [(Activations.Activations, Mana, ManaCost, Activations.Activations)]
 manaSuppliesGiven capacity pcs pid oid gs =
   let -- Applied HERE and not left to the caller: this is the one reader of a
       -- route's yield on the supply side, so wrapping it once is what makes the
@@ -465,34 +479,65 @@ manaSuppliesGiven capacity pcs pid oid gs =
       supply = supplyCapacity capacity
       measured option =
         ( supply ForOffer pcs pid oid (ManaOption.cost option) (ManaOption.restrictions option) (ManaOption.ability option) gs,
-          -- CR 106.4: the PAYER's share alone. A route whose AddMana names
-          -- somebody else fills that player's pool and not this one's, so
-          -- counting its units here would offer a cast the payment cannot make
-          -- -- the direction that matters, since overstating supply offers an
-          -- unpayable spell where understating it only refuses a payable one.
-          -- Yurlok of Scorch Thrash's "Each player adds {B}{R}{G}" names the
-          -- payer among the rest, so its share is the whole yield; a route
-          -- naming an opponent alone supplies nothing.
-          --
-          -- `pid` stands in for the CONTROLLER recipientsOf resolves against,
-          -- and is one: CR 109.4a and CR 113.8 make the player activating a
-          -- mana ability its controller, whoever controls the permanent.
-          --
-          -- Still a supply of NO units rather than no supply at all: the
-          -- triple carries what the activation spends, and an empty yield is
-          -- just a source that adds this player nothing.
-          --
-          -- CR 608.2d: a recipient the route's own clauses CHOOSE names the
-          -- payer wherever the payer is among the players offered, since the
-          -- payer activates it and may choose themself -- Spectral
-          -- Searchlight's ruling, "You may choose yourself". Pawl.ManaSpec's
-          -- Spectral Searchlight group casts off that supply.
-          Mana.MkMana (concatMap (\(ref, mana) -> if List.elem pid (recipientsOf pid (choosable option) gs ref) then unitsOf mana else []) (Map.toList (ManaOption.yield option))),
+          payerShare option,
           -- CR 118.6's Nothing never survives the filter below, supplyCapacity
           -- answering 0 for it, so the empty stand-in is unreachable rather than
           -- a claim that such a route costs nothing.
           Maybe.fromMaybe (ManaCost.MkManaCost []) (Cost.mana (ManaOption.cost option))
         )
+      payerShare option =
+        -- CR 106.4: the PAYER's share alone. A route whose AddMana names
+        -- somebody else fills that player's pool and not this one's, so
+        -- counting its units here would offer a cast the payment cannot make
+        -- -- the direction that matters, since overstating supply offers an
+        -- unpayable spell where understating it only refuses a payable one.
+        -- Yurlok of Scorch Thrash's "Each player adds {B}{R}{G}" names the
+        -- payer among the rest, so its share is the whole yield; a route
+        -- naming an opponent alone supplies nothing.
+        --
+        -- `pid` stands in for the CONTROLLER recipientsOf resolves against,
+        -- and is one: CR 109.4a and CR 113.8 make the player activating a
+        -- mana ability its controller, whoever controls the permanent.
+        --
+        -- Still a supply of NO units rather than no supply at all: the
+        -- triple carries what the activation spends, and an empty yield is
+        -- just a source that adds this player nothing.
+        --
+        -- CR 608.2d: a recipient the route's own clauses CHOOSE names the
+        -- payer wherever the payer is among the players offered, since the
+        -- payer activates it and may choose themself -- Spectral
+        -- Searchlight's ruling, "You may choose yourself". Pawl.ManaSpec's
+        -- Spectral Searchlight group casts off that supply.
+        Mana.MkMana (concatMap (\(ref, mana) -> if List.elem pid (recipientsOf pid (choosable option) gs ref) then unitsOf mana else []) (Map.toList (ManaOption.yield option)))
+      -- CR 601.2h / 608.2h on the supply side: a yield reading the permanent
+      -- its cost sacrifices or exiles -- Priest of Yawgmoth's "equal to the
+      -- sacrificed artifact's mana value", Food Chain's "1 plus the exiled
+      -- creature's mana value" -- is one supply per yield some candidate gives,
+      -- each claiming only the candidates that give it, so the walk can count
+      -- the artifact a cast actually needs and cannot count it twice. Offered,
+      -- it reads none, which would supply nothing at all. Pawl.ManaSpec's
+      -- Priest of Yawgmoth group casts off this supply.
+      --
+      -- Not implemented: a yield reading any other slot its cost binds, which
+      -- is supplied as the offer prices it (#4855).
+      perCandidate option =
+        let (activations, share, manaCost) = measured option
+            readsSlot slot = any (\(clause, _) -> any (Set.member slot . Quantity.objectSlots . ManaAddition.count) (Maybe.mapMaybe ManaAbility.manaProduced (Foldable.toList (Clause.effects clause)))) (ManaOption.steps option)
+            -- The slot each one-object removal of the cost binds its object
+            -- under (Pawl.Engine.Cost.payComponent's arms).
+            removalSlot component = case component of
+              CostComponent.Sacrifice sacrifice | Sacrifice.count sacrifice == 1 -> Just Binding.sacrificedPermanent
+              CostComponent.ExilePermanents exiled | ExilePermanents.count exiled == 1 -> Just Binding.exiledPermanent
+              _ -> Nothing
+            onBattlefield = filter ((==) (ClaimAxis.Removal Zone.Battlefield) . Claim.Type.axis) (Activations.claims activations)
+         in case (Maybe.mapMaybe removalSlot (Cost.components (ManaOption.cost option)), onBattlefield) of
+              ([slot], [claim])
+                | readsSlot slot && Claim.Type.count claim == 1 && Maybe.isNothing (Claim.Type.threshold claim) ->
+                    let pricedFor candidate = [payerShare priced | (offered, priced) <- manaRepricingsGiven (Binding.paidObjects slot (Set.singleton (Recipient.ToObject candidate))) pcs oid gs, offered == option]
+                        byYield = Map.fromListWith Set.union [(yield, Set.singleton candidate) | candidate <- Set.toList (Claim.Type.pool claim), yield <- pricedFor candidate]
+                        narrowed candidates = activations {Activations.claims = fmap (\other -> if other == claim then other {Claim.Type.pool = candidates} else other) (Activations.claims activations)}
+                     in [(activations, yield, manaCost, narrowed candidates) | (yield, candidates) <- Map.toList byYield, not (null (unitsOf yield))]
+              _ -> [(activations, share, manaCost, activations)]
       choosable option =
         Map.fromList
           [ (ChoosePlayer.slot choice, Set.singleton pid)
@@ -504,12 +549,12 @@ manaSuppliesGiven capacity pcs pid oid gs =
       -- Lazy, and forced only for a permanent mixing open and closed routes:
       -- manaSourcesGiven hands this nothing else pid does not control.
       controls = not (any (openToAnyone . ManaOption.ability) options) || Projection.controllerOf oid gs == Just pid
-      counted = fmap measured (filter (permitsRoute controls . ManaOption.ability) options)
-      available = filter (\(activations, _, _) -> Activations.times activations > 0) counted
-      yieldOf (_, yield, _) = yield
+      counted = concatMap perCandidate (filter (permitsRoute controls . ManaOption.ability) options)
+      available = filter (\(activations, _, _, _) -> Activations.times activations > 0) counted
+      yieldOf (_, yield, _, _) = yield
       -- Ordered so `maximumBy` prefers the larger count, and a mana-free route
       -- over a mana-eating one at equal counts.
-      rankOf (activations, _, manaCost) = (Activations.times activations, null (ManaCost.unwrap manaCost))
+      rankOf (activations, _, manaCost, _) = (Activations.times activations, null (ManaCost.unwrap manaCost))
    in fmap
         (\yield -> List.maximumBy (Ord.comparing rankOf) (filter ((==) yield . yieldOf) available))
         (ListUtils.nubOrd (fmap yieldOf available))
@@ -549,7 +594,23 @@ manaOptionsOf = manaOptionsOfGiven Map.empty
 
 -- The same options against a pre-projected board (#200).
 manaOptionsOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [ManaOption]
-manaOptionsOfGiven pcs oid gs =
+manaOptionsOfGiven pcs oid gs = ListUtils.nubOrd (fmap fst (pricedOptionsGiven Map.empty pcs oid gs))
+
+-- CR 601.2h / 608.2h: each option as OFFERED beside the same option priced with
+-- the slots its cost's payment bound -- Priest of Yawgmoth's "equal to the
+-- sacrificed artifact's mana value", which no offer can know before the player
+-- picks the artifact. One pair per colour choice, so an offer that collapsed
+-- several (a count of none is the same option in every colour) still names each
+-- choice it now stands for. Read on the board the activation BEGAN on, where the
+-- sacrificed artifact is still the permanent CR 608.2h's last-known information
+-- describes. Pawl.Engine.Cost.tapForManaWith and manaSuppliesGiven read it.
+manaRepricingsGiven :: Map.Map SlotName.SlotName Binding.Type.Binding -> Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [(ManaOption, ManaOption)]
+manaRepricingsGiven paid pcs oid gs = ListUtils.nubOrd (pricedOptionsGiven paid pcs oid gs)
+
+-- Both prices off ONE traversal of the colour choices, so a pair's halves are
+-- the same choice. Unshared: manaOptionsOfGiven forces the offered half alone.
+pricedOptionsGiven :: Map.Map SlotName.SlotName Binding.Type.Binding -> Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [(ManaOption, ManaOption)]
+pricedOptionsGiven paid pcs oid gs =
   let tags = productionTagsGiven pcs oid gs
       choices = sourceChoicesOf oid gs
       lastExiled = lastExiledWith oid gs
@@ -596,7 +657,9 @@ manaOptionsOfGiven pcs oid gs =
       -- offers has to measure it here. Pawl.Engine.Resolve.Effect's AddMana arm
       -- evaluates the same quantity for an addition that resolves off the stack,
       -- and manaSuppliesGiven measures CR 605.3a's offer off this very yield, so
-      -- all three read one number and no board can tell them apart.
+      -- all three read one number and no board can tell them apart -- save a
+      -- count reading a slot the cost binds, which the payment and the supply
+      -- read off the PRICED half instead (manaRepricingsGiven).
       --
       -- The perspective is the source's CONTROLLER (CR 109.5 / 110.2), which is
       -- what makes "you control" mean the player who would tap it; an object
@@ -604,8 +667,12 @@ manaOptionsOfGiven pcs oid gs =
       -- filter then matches nobody. A NEGATIVE count adds nothing (CR 107.1b's
       -- game value floors at a count of none), and an undeterminable one reads 0
       -- for Quantity.determineWith's reason.
+      --
+      -- The PRICED half reads the same quantity with the payment's slots bound,
+      -- and an offer reading one of them reads 0.
       countContext = Filter.contextFor (Game.teams gs) (Projection.controllerOf oid gs) (Just oid)
-      howMany addition = max 0 (Integer.toIntSaturating (Maybe.fromMaybe 0 (Quantity.evaluate (Projection.fullView gs) countContext gs oid (ManaAddition.count addition))))
+      pricedContext = countContext {Filter.slotObjects = Binding.slotObjects paid, Filter.boundAmounts = Map.mapMaybe Binding.Type.amount paid}
+      howManyIn context addition = max 0 (Integer.toIntSaturating (Maybe.fromMaybe 0 (Quantity.evaluate (Projection.fullView gs) context gs oid (ManaAddition.count addition))))
       -- CR 105.4's choice is per INSTRUCTION, so the count replicates the unit
       -- AFTER the type is picked: an addition of two AnyColor offers five options
       -- here, not twenty-five. Loot, the Pathfinder's "{G}, {T}: Add three mana
@@ -628,25 +695,26 @@ manaOptionsOfGiven pcs oid gs =
       pooled = List.foldl' (\acc (ref, units) -> Map.insertWith (\new old -> Mana.MkMana (unitsOf old <> unitsOf new)) ref (Mana.MkMana units) acc) Map.empty
       expand (cost, restrictions, ability, clauses) =
         let indexed = zip [0 :: Int ..] clauses
-         in fmap
-              ( \parts ->
-                  ManaOption.MkManaOption
+            build howMany picks =
+              let parts = fmap (\(i, (addition, run)) -> (i, (ManaAddition.player addition, concat (replicate (howMany addition) run)))) picks
+               in ManaOption.MkManaOption
                     { ManaOption.cost = cost,
                       ManaOption.restrictions = restrictions,
                       ManaOption.ability = ability,
                       ManaOption.yield = pooled (fmap snd parts),
                       ManaOption.steps = fmap (\(i, (clause, _)) -> (clause, pooled [part | (j, part) <- parts, j == i])) indexed
                     }
-              )
-              (traverse (\(i, addition) -> fmap ((,) i . (,) (ManaAddition.player addition)) (additionUnits addition)) [(i, addition) | (i, (_, additions)) <- indexed, addition <- additions])
+         in fmap
+              (\picks -> (build (howManyIn countContext) picks, build (howManyIn pricedContext) picks))
+              (traverse (\(i, addition) -> fmap ((,) i . (,) addition) (additionRuns addition)) [(i, addition) | (i, (_, additions)) <- indexed, addition <- additions])
       -- CR 106.5: an addition of an undefined type -- CR 607.2d's chosen colour
       -- with none chosen -- adds no mana, and the activation is still one the
       -- player may make. Resolve.Effect's AddMana arm answers the same. A
       -- settled run is repeated whole by the count (CR 607.2e's noted mana).
-      additionUnits addition = case produced oid gs (ManaAddition.production addition) of
-        Settles run -> [concat (replicate (howMany addition) (fmap (unitFor addition) run))]
-        Offers types -> fmap (replicate (howMany addition) . unitFor addition) (NonEmpty.toList types)
-   in ListUtils.nubOrd (concatMap expand (manaRoutesOfGiven pcs oid gs))
+      additionRuns addition = case produced oid gs (ManaAddition.production addition) of
+        Settles run -> [fmap (unitFor addition) run]
+        Offers types -> fmap (\manaType -> [unitFor addition manaType]) (NonEmpty.toList types)
+   in concatMap expand (manaRoutesOfGiven pcs oid gs)
 
 -- Every unit one option adds, whoever gets it, in printed order within each
 -- recipient's share (Pawl.Types.ManaOption.yield).
@@ -2078,15 +2146,21 @@ data SourceOption = MkSourceOption
   }
   deriving (Eq, Ord, Show)
 
-sourceOptions :: [SpendManaAsThough.SpendManaAsThough] -> (ManaUnit -> Set.Set PaymentSubject.PaymentSubject) -> ([Claim] -> Bool) -> [(Activations.Activations, Mana, ManaCost)] -> [[SourceOption]]
-sourceOptions clauses admitting contends supplies =
-  let -- Grouped by what ONE activation costs, which is what lets k activations of
+--
+-- `demanded` and `needs` bound the EXCLUSIVE groups below, and only them: how
+-- many mana every payment on the board could ask for at most, and for each type
+-- some typed demand names, how many typed demands on the board could take it
+-- (payableResolutionsGiven's `demandBound` and `typedNeeds`).
+sourceOptions :: [SpendManaAsThough.SpendManaAsThough] -> (ManaUnit -> Set.Set PaymentSubject.PaymentSubject) -> ([Claim] -> Bool) -> Natural -> Map.Map ManaType Natural -> [(Activations.Activations, Mana, ManaCost, Activations.Activations)] -> [[SourceOption]]
+sourceOptions clauses admitting contends demanded needs supplies =
+  let relevant = Map.keysSet needs
+      -- Grouped by what ONE activation costs, which is what lets k activations of
       -- the group take k alternatives independently.
       groups =
         Map.toList
           ( Map.fromListWith
               (flip (<>))
-              (fmap (\(activations, yield, manaCost) -> ((activations, manaCost), [unitsOf yield])) supplies)
+              (fmap (\(activations, yield, manaCost, own) -> ((activations, manaCost), [(unitsOf yield, own)])) supplies)
           )
       -- CR 106.6 joins the key the narrow yields are unioned by, so the collapse
       -- never unions a mana one payment admits with one it does not into a supply
@@ -2105,13 +2179,25 @@ sourceOptions clauses admitting contends supplies =
          in case ListUtils.nubOrd (filter (not . null) (unions <> apart)) of
               [] -> [[]]
               some -> some
-      optionsFor ((activations, manaCost), yields) =
-        let claims = Activations.claims activations
+      optionsFor ((activations, manaCost), entries) =
+        let yields = fmap fst entries
+            claims = Activations.claims activations
             life = Activations.life activations
             energy = Activations.energy activations
             times = Activations.times activations
             contended = contends claims
-            alternatives = alternativesOf yields
+            -- A yield whose own claim is narrower than its route's (Priest of
+            -- Yawgmoth's, per sacrifice candidate) is an alternative carrying
+            -- that claim: never unioned with another, since each spends a
+            -- different object, and taking k of them claims what each one does.
+            -- One activation of the Priest is then none or exactly one of its
+            -- yields, rather than one group per yield multiplying the boards.
+            -- Pawl.ManaSpec's Priest of Yawgmoth group is the proof.
+            exclusive = any ((/= activations) . snd) entries
+            alternatives =
+              if exclusive
+                then exclusiveAlternatives entries
+                else fmap (\alternative -> ((alternative, claims), times)) (alternativesOf yields)
             eats = not (null (ManaCost.unwrap manaCost))
             -- A mana-EATING option is always worth taking fewer times, for the same
             -- reason a claiming or a life-paying one is: what it does not activate
@@ -2119,27 +2205,141 @@ sourceOptions clauses admitting contends supplies =
             -- shortcut below rests on a board's clauses only ever GROWING as
             -- supplies are added, which stops being true the moment an option adds
             -- a demand as well.
+            --
+            -- An exclusive group is taken at most `demanded` times: every one of
+            -- its alternatives adds mana, so a board taking more activations
+            -- than there are mana to demand leaves one unused, and dropping it
+            -- frees its claim. Nor more than its alternatives' own claims allow.
+            ceiling_ = if exclusive then minimum [times, demanded, sum (fmap snd alternatives)] else times
             counts =
               if not eats && (null claims || not contended) && life == 0 && energy == 0
-                then [times]
-                else [0 .. times]
+                then [ceiling_]
+                else [0 .. ceiling_]
             -- CR 107.4e's hybrid and CR 107.4f's Phyrexian inside a mana ability's
             -- OWN cost, resolved the way the cost being paid is: one option per
             -- resolution, so the board picks. ManaSpending.AsProduced because rule
             -- 118.14's permission is granted for a CAST, and this is an activation.
             resolved = if eats then resolutions ManaSpending.AsProduced manaCost else [([], 0, 0)]
+            free = not eats && (null claims || not contended) && life == 0 && energy == 0
+         in case (exclusive && free, coverOptions ceiling_ entries) of
+              (True, Just covered) -> covered
+              _ -> do
+                k <- counts
+                taken <- boundedMultisets k alternatives
+                (demands, generic, owed) <- resolved
+                pure
+                  MkSourceOption
+                    { optionSupplies = concatMap fst taken,
+                      optionDemands = concat (List.genericReplicate k (demands <> List.genericReplicate generic anyTypeDemand)),
+                      optionClaims = if exclusive then concatMap snd taken else Claim.scale k claims,
+                      optionLife = k * (life + owed),
+                      optionEnergy = k * energy
+                    }
+      -- An exclusive group that is FREE -- no mana, life or energy, and claims no
+      -- other group or the cost meets -- whose every yield is units of one type:
+      -- Food Chain's "X mana of any one color", which pairs every amount with
+      -- every colour. Its options are found by what each colour has to COVER
+      -- rather than by enumerating colours, and that is exact:
+      --
+      --   * which candidates: the `count` largest. Swapping a block for an
+      --     unused larger one of the same colour only adds units, and nothing
+      --     else claims them.
+      --   * which colours: for each type a typed demand names, the blocks whose
+      --     units serve it. A block serving none of them serves only generic
+      --     demands, as every colour does, so it takes any one. A block serving
+      --     a type can be re-matched so the type's units come from as few blocks
+      --     as possible, so the blocks a type takes leave it short once their
+      --     smallest is dropped (at most its need). And one block meeting the
+      --     whole need may as well be the smallest such: swapping it with
+      --     whoever holds that one hands them a larger block.
+      --
+      -- Pawl.ManaSpec's Food Chain group casts Progenitus off forty-five
+      -- creatures, which every colour in every amount made billions of boards.
+      -- Nothing for any other group, which the enumeration above takes.
+      --
+      -- Not implemented: covering a group whose claims another group or the
+      -- cost contests -- a second Food Chain, a Blood Pet or an Ashnod's Altar
+      -- beside it -- which the enumeration takes and may not finish (#4858).
+      coverOptions count entries =
+        let raw = [(fmap (rewriteSupply clauses . supplyOf admitting) (List.genericTake demanded units), Activations.claims own) | (units, own) <- entries, not (null units)]
+            single units = case units of
+              first : rest | all ((== supplyTypes first) . supplyTypes) rest && all (\u -> supplyTags u == supplyTags first && supplyAdmits u == supplyAdmits first) rest -> Just (Natural.length units, (supplyTags first, supplyAdmits first), supplyTypes first)
+              _ -> Nothing
+            widened = zipWith (\x y -> x {Claim.Type.pool = Set.union (Claim.Type.pool x) (Claim.Type.pool y)})
          in do
-              k <- counts
-              taken <- multisets k alternatives
-              (demands, generic, owed) <- resolved
-              pure
-                MkSourceOption
-                  { optionSupplies = concat taken,
-                    optionDemands = concat (List.genericReplicate k (demands <> List.genericReplicate generic anyTypeDemand)),
-                    optionClaims = Claim.scale k claims,
-                    optionLife = k * (life + owed),
-                    optionEnergy = k * energy
-                  }
+              described <- traverse (\(units, own) -> fmap (\(amount, rest, types) -> ((amount, rest), (own, Map.singleton types units))) (single units)) raw
+              let classes = List.sortOn (\(amount, _, _, _) -> Ord.Down amount) [(amount, own, colours, Claim.repeats own) | ((amount, _), (own, colours)) <- Map.toList (Map.fromListWith (\(a, x) (b, y) -> (widened a b, Map.union x y)) described)]
+                  -- The `count` largest blocks, as how many of each class.
+                  taking _ [] = []
+                  taking left ((amount, own, colours, limit) : rest) = let n = min left limit in (amount, own, colours, n) : taking (left - n) rest
+                  blocks = filter (\(_, _, _, n) -> n > 0) (taking count classes)
+                  served manaType = List.find (Set.member manaType . fst) . Map.toList
+                  -- Every way one type may take blocks out of what is left, as how
+                  -- many of each class: none, the smallest block meeting the whole
+                  -- need alone, or blocks short of it that stay short once their
+                  -- smallest is dropped.
+                  covers manaType need available =
+                    let offering = [(i, amount) | (i, (amount, _, colours, n)) <- zip [0 :: Int ..] available, n > 0, Maybe.isJust (served manaType colours)]
+                        whole = take 1 (reverse [i | (i, amount) <- offering, amount >= need])
+                        short = [(i, amount) | (i, amount) <- offering, amount < need]
+                        partial picked total = case picked of
+                          [] -> [[]]
+                          (i, amount) : rest -> [List.genericReplicate m i <> more | m <- [0 .. maybe 0 (\(_, _, _, n) -> n) (Maybe.listToMaybe (drop i available))], m == 0 || total + m * amount - amount < need, more <- partial rest (total + m * amount)]
+                        irredundant chosen = case List.sort [amount | i <- chosen, (j, amount) <- short, j == i] of
+                          [] -> True
+                          smallest : _ -> sum [amount | i <- chosen, (j, amount) <- short, j == i] - smallest < need
+                     in [[i] | i <- whole] <> filter irredundant (partial short (0 :: Natural))
+                  takeOut chosen available = [(amount, own, colours, n - Natural.length (filter (== i) chosen)) | (i, (amount, own, colours, n)) <- zip [0 :: Int ..] available]
+                  assign pending available = case pending of
+                    [] -> [[(i, Nothing) | (i, (_, _, _, n)) <- zip [0 :: Int ..] available, _ <- [1 .. n]]]
+                    (manaType, need) : rest -> do
+                      chosen <- covers manaType need available
+                      more <- assign rest (takeOut chosen available)
+                      pure (fmap (\i -> (i, Just manaType)) chosen <> more)
+                  blockOf (i, colour) = case Maybe.listToMaybe (drop i blocks) of
+                    Nothing -> ([], [])
+                    Just (_, own, colours, _) -> case (`served` colours) =<< colour of
+                      Just (_, units) -> (units, own)
+                      Nothing -> (foldMap snd (Maybe.listToMaybe (Map.toList colours)), own)
+                  option assignment =
+                    MkSourceOption
+                      { optionSupplies = concatMap (fst . blockOf) assignment,
+                        optionDemands = [],
+                        optionClaims = concatMap (snd . blockOf) assignment,
+                        optionLife = 0,
+                        optionEnergy = 0
+                      }
+              pure (ListUtils.nubOrd (fmap option (assign (Map.toList needs) blocks)))
+      -- An exclusive group's alternatives, cut down to the ones a board could
+      -- tell apart, which is exact rather than a prune:
+      --
+      --   * a yield's units past `demanded` serve nothing, so they are dropped;
+      --   * two alternatives alike in what each unit could serve -- the types
+      --     some demand names, whether any type at all, the tags and the
+      --     payments admitting it -- are one, claiming either's candidates;
+      --   * and one whose every unit serves strictly less than another's, on
+      --     the same claims, is never the better choice: Food Chain's red where
+      --     only green is demanded.
+      --
+      -- What survives is Food Chain's few amounts in the colours a cast names,
+      -- rather than every amount in all five; Pawl.ManaSpec's Food Chain group
+      -- is the wide board that proves it stays small. Each carries how many
+      -- times its own claims let it be taken (Claim.repeats).
+      exclusiveAlternatives entries =
+        let raw = [(fmap (rewriteSupply clauses . supplyOf admitting) (List.genericTake demanded units), Activations.claims own) | (units, own) <- entries, not (null units)]
+            normal supply = (Set.intersection (supplyTypes supply) relevant, not (Set.null (supplyTypes supply)), supplyTags supply, supplyAdmits supply)
+            widened = zipWith (\x y -> x {Claim.Type.pool = Set.union (Claim.Type.pool x) (Claim.Type.pool y)})
+            merged = Map.elems (Map.fromListWith (\(units, a) (_, b) -> (units, widened a b)) [(fmap normal units, (units, own)) | (units, own) <- raw])
+            uniform units = case units of
+              first : rest -> if all ((== normal first) . normal) rest then Just (normal first) else Nothing
+              [] -> Nothing
+            dominates (better, betterClaims) (worse, worseClaims) =
+              betterClaims == worseClaims
+                && length better == length worse
+                && case (uniform better, uniform worse) of
+                  (Just (typesB, anyB, tagsB, admitsB), Just (typesW, anyW, tagsW, admitsW)) -> anyB == anyW && tagsB == tagsW && admitsB == admitsW && Set.isProperSubsetOf typesW typesB
+                  _ -> False
+         in [(alternative, Claim.repeats (snd alternative)) | alternative <- merged, not (any (`dominates` alternative) merged)]
       collapsed admits units =
         if null units
           then []
@@ -2158,13 +2358,15 @@ sourceOptions clauses admitting contends supplies =
       none = MkSourceOption {optionSupplies = [], optionDemands = [], optionClaims = [], optionLife = 0, optionEnergy = 0}
    in fmap (\group -> case ListUtils.nubOrd (optionsFor group) of [] -> [none]; some -> some) groups
 
--- Every multiset of `k` elements drawn from `xs`, each once, as a list in `xs`'
--- order: C(k + m - 1, m - 1) of them for m elements.
-multisets :: Natural -> [a] -> [[a]]
-multisets k xs = case (k, xs) of
+-- Every multiset of `k` elements drawn from `xs`, each taken at most its own
+-- number of times, as a list in `xs`' order, the most of each first: C(k + m -
+-- 1, m - 1) of them for m elements no limit binds. An exclusive group's
+-- alternative can be taken only as often as its own claims allow.
+boundedMultisets :: Natural -> [(a, Natural)] -> [[a]]
+boundedMultisets k xs = case (k, xs) of
   (0, _) -> [[]]
   (_, []) -> []
-  (_, x : rest) -> fmap (x :) (multisets (k - 1) xs) <> multisets k rest
+  (_, (x, limit) : rest) -> [List.genericReplicate n x <> more | n <- reverse [0 .. min k limit], more <- boundedMultisets (k - n) rest]
 
 -- The resolutions of `cost` this player could actually pay right now, in
 -- `resolutions`' order -- so the head costs the least life of any of them, which
@@ -2332,7 +2534,7 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed comm
       -- GROUPWISE, one entry per sourceOptions group plus `claimed`, so one
       -- group's own claims meeting each other is not contention --
       -- Cost.repeatsOf has already measured that, and it is what `times` is.
-      groupClaimsOf supplies = fmap (Activations.claims . fst) (ListUtils.nubOrd (fmap (\(activations, _, manaCost) -> (activations, manaCost)) supplies))
+      groupClaimsOf supplies = fmap (Activations.claims . fst) (ListUtils.nubOrd (fmap (\(activations, _, manaCost, _) -> (activations, manaCost)) supplies))
       contested = Claim.contested (claimed : concatMap groupClaimsOf suppliesPer)
       energyHeld = Game.energyOf pid gs
       -- Each option paired with the SOURCE it came from, which is what says
@@ -2342,7 +2544,21 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed comm
       -- ABILITY, so one payment may activate several of a permanent's. Skyshroud
       -- Elf's {G} pays its own {1} (data/scenarios'
       -- skyshroud-elf-green-buys-red is the proof).
-      options = concat (zipWith (\oid supplies -> fmap (fmap ((,) oid)) (sourceOptions clauses (admitting . producedDuring subject) (Claim.contends contested) supplies)) sources suppliesPer)
+      -- What every payment on a board could demand at most: the cost's largest
+      -- resolution, and each mana-eating group's largest taken as often as it
+      -- can be. With the types its typed demands name, this is what bounds an
+      -- exclusive group (sourceOptions).
+      costResolutions = resolutions spending cost
+      demandSize (demands, generic, _) = Natural.length demands + generic
+      eatingResolutions = [(Activations.times activations, resolutions ManaSpending.AsProduced manaCost) | supplies <- suppliesPer, (activations, manaCost) <- ListUtils.nubOrd [(activations, manaCost) | (activations, _, manaCost, _) <- supplies], not (null (ManaCost.unwrap manaCost))]
+      demandBound = List.foldl' max 0 (fmap demandSize costResolutions) + sum [times * List.foldl' max 0 (fmap demandSize ways) | (times, ways) <- eatingResolutions]
+      -- For each type, how many typed demands could take it at most: the
+      -- cost's largest count over its resolutions, and each mana-eating group's
+      -- taken as often as it can be. A hybrid counts toward both its halves.
+      needsOf (demands, _, _) = Map.fromListWith (+) [(manaType, 1 :: Natural) | demand <- demands, demand /= anyTypeDemand, manaType <- Set.toList (demandTypes demand)]
+      mostOf ways = List.foldl' (Map.unionWith max) Map.empty (fmap needsOf ways)
+      typedNeeds = Map.unionsWith (+) (mostOf costResolutions : [fmap (* times) (mostOf ways) | (times, ways) <- eatingResolutions])
+      options = concat (zipWith (\oid supplies -> fmap (fmap ((,) oid)) (sourceOptions clauses (admitting . producedDuring subject) (Claim.contends contested) demandBound typedNeeds supplies)) sources suppliesPer)
       -- One option taken from each group, appended to the pool: `sequenceA` over
       -- the list applicative is that product, and it is [[]] -- one board, the
       -- pool alone -- when the player controls no source at all. Each board
@@ -2478,7 +2694,7 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed comm
                in maybe False (\most -> count wanted_ <= count pooled + most) (best net)
                     && all hallBound (List.subsequences (Set.toList (Set.fromList wanted_)))
          in (not searching || bounded) && any fits boards
-   in filter payable (resolutions spending cost)
+   in filter payable costResolutions
 
 -- The least life any payable resolution of this cost costs, or Nothing when none
 -- is payable. `resolutions` is sorted by life ascending and payableResolutions

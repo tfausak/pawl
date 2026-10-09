@@ -156,6 +156,7 @@ deciderOf prompt = case prompt of
   Prompt.ChooseTapsForTotalPower decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseTaps decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseReturns decider _ _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseExiles decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseAttachment decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseTurnUpAttachment decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseCost decider _ _ _ -> Just (Decider.unwrap decider)
@@ -323,6 +324,7 @@ kindOf prompt = Text.pack $ case prompt of
   Prompt.ChooseTapsForTotalPower {} -> "ChooseTapsForTotalPower"
   Prompt.ChooseTaps {} -> "ChooseTaps"
   Prompt.ChooseReturns {} -> "ChooseReturns"
+  Prompt.ChooseExiles {} -> "ChooseExiles"
   Prompt.ChooseAttachment {} -> "ChooseAttachment"
   Prompt.ChooseTurnUpAttachment {} -> "ChooseTurnUpAttachment"
   Prompt.ChooseCost {} -> "ChooseCost"
