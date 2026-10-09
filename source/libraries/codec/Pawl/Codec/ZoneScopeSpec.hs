@@ -5,6 +5,7 @@ import qualified Pawl.Codec.ZoneScope as ZoneScope
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.ZoneScope as ZoneScope
@@ -15,7 +16,7 @@ spec s = Spec.describe s "Pawl.Codec.ZoneScope" $ do
     Common.assertCodec
       s
       ZoneScope.codec
-      (ZoneScope.Scoped PlayerScope.You)
+      (ZoneScope.Scoped (PlayerScope.Related PlayerRelation.You))
       " {\"type\":\"Scoped\",\"value\":{\"type\":\"You\"}} "
   Spec.it s "InSlot" $
     Common.assertCodec

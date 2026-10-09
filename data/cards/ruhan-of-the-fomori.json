@@ -70,7 +70,7 @@
                         "type": "ChoosePlayerAtRandom",
                         "value": {
                           "scope": {
-                            "type": "Opponents"
+                            "type": "Opponent"
                           },
                           "slot": "opponent"
                         }

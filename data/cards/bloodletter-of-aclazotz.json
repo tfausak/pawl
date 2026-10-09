@@ -73,7 +73,7 @@
             "value": {
               "matching": {
                 "whose": {
-                  "type": "Opponents"
+                  "type": "Opponent"
                 }
               },
               "rewrite": {

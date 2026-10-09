@@ -6,6 +6,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.DrawR as DrawR
 import qualified Pawl.Types.DrawRewrite as DrawRewrite
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.DrawR" $ do
@@ -14,6 +15,6 @@ spec s = Spec.describe s "Pawl.Codec.DrawR" $ do
     Common.assertCodec
       s
       DrawR.codec
-      (DrawR.MkDrawR ControllerRelation.Yours (DrawRewrite.GainLife 5))
-      " {\"whose\":{\"type\":\"Yours\"},\"rewrite\":{\"type\":\"GainLife\",\"value\":5}} "
+      (DrawR.MkDrawR (ControllerRelation.Related PlayerRelation.You) (DrawRewrite.GainLife 5))
+      " {\"whose\":{\"type\":\"You\"},\"rewrite\":{\"type\":\"GainLife\",\"value\":5}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s DrawR.codec

@@ -305,7 +305,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   -- are both restricted and both still in the game, so the two readings disagree
   -- -- a gated walk reaches dave, an ungated one stops at bob.
   --
-  -- The board is also where PlayerScope.You is observable on this axis: each
+  -- The board is also where PlayerScope.Related You is observable on this axis: each
   -- Jared restricts its OWN controller, so carol and dave are untouched by either.
   Spec.it s "CR 725.4 the walk itself skips a still-playing seat that can't become the monarch" $ do
     jared <- S.printingOf s registry "Jared Carthalion, True Heir"

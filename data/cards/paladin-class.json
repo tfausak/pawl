@@ -144,7 +144,7 @@
             }
           },
           "scope": {
-            "type": "Opponents"
+            "type": "Opponent"
           }
         }
       ],

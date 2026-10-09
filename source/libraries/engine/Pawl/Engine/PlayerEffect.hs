@@ -126,16 +126,14 @@ import qualified Pawl.Types.Zone as Zone
 --
 -- The board comes in because two arms' membership is a fact about it rather than
 -- about the two players: PlayerScope.ControllingMostPermanents reads who leads,
--- and PlayerScope.Opponents reads CR 808.1's teams. Each is computed inside the
+-- and PlayerScope.Related Opponent reads CR 808.1's teams. Each is computed inside the
 -- arm that asks, so a scope that names neither pays nothing.
 inScope :: PlayerId -> PlayerId -> GameState -> PlayerScope -> Bool
 inScope pid controller gs scope = case scope of
-  PlayerScope.You -> pid == controller
-  -- CR 102.3's every player not on the controller's team, which in a
-  -- free-for-all (CR 806.1) and at two seats (CR 102.2) is every other player.
-  PlayerScope.Opponents -> Game.areOpponents gs controller pid
-  -- Thalia's ruling: "including your own".
-  PlayerScope.EachPlayer -> True
+  -- PlayerRelation.holds, the judge every player-naming position shares: CR
+  -- 102.3's opponents are every player not on the controller's team, and
+  -- AnyPlayer includes the controller (Thalia's ruling: "including your own").
+  PlayerScope.Related relation -> PlayerRelation.holds (Game.teams gs) relation controller pid
   PlayerScope.ControllingMostPermanents -> permanentLeader gs == Just pid
 
 -- The same question over a CARRIER's affected set rather than over a bare scope:
@@ -198,7 +196,7 @@ permanentLeader gs =
 -- seat.
 --
 -- Nothing is an ABSENT perspective, which is CR 109.5's "you" with nobody to be
--- -- the vacuous posture every player-referencing Filter atom takes. EachPlayer
+-- -- the vacuous posture every player-referencing Filter atom takes. AnyPlayer
 -- is answerable anyway, because it never asks the perspective a question: "target
 -- card in a graveyard" names the whole table whoever is reading it.
 -- ControllingMostPermanents is answerable for that same reason, one arm further
@@ -208,9 +206,9 @@ playersInScope perspective gs scope =
   let everyone = Game.stillPlaying gs
       relative = fmap (\you -> filter (\pid -> inScope pid you gs scope) everyone) perspective
    in case scope of
-        PlayerScope.You -> relative
-        PlayerScope.Opponents -> relative
-        PlayerScope.EachPlayer -> Just everyone
+        PlayerScope.Related relation
+          | PlayerRelation.perspectiveFree relation -> Just everyone
+          | otherwise -> relative
         PlayerScope.ControllingMostPermanents -> Just (Maybe.maybeToList (permanentLeader gs))
 
 -- CR 707.2a: the player abilities this permanent's copiable rules text gives it
@@ -384,7 +382,7 @@ printedRows gs =
 -- CR 116.2d's WHO: is `pid` a player whose game the permanent `oid` is changing
 -- right now? That is the rule's own reading of who may take the special action
 -- to ignore it -- every printed producer offers it to exactly the players its
--- static ability affects, whether that is "any player" over an EachPlayer scope
+-- static ability affects, whether that is "any player" over an AnyPlayer scope
 -- (Leonin Arbiter) or the one player a narrower scope reaches (Damping Engine's
 -- "that player").
 --
@@ -2689,7 +2687,7 @@ playLandPiles pid gs =
 --
 -- A Nothing caster is a question with no CR 109.5 "you" in it. Hexproof does not
 -- stop it -- nobody's opponent -- while shroud stops it anyway, because
--- EachPlayer never asks the caster a question. That is exactly the carve-out
+-- AnyPlayer never asks the caster a question. That is exactly the carve-out
 -- playersInScope above already makes for the same constructor, and it is the
 -- rules answer too: CR 702.18a names no player at all.
 --
@@ -2708,10 +2706,8 @@ protectedFromTargeting rows caster pid gs =
         PlayerEffect.CantBeTargetedBy scope -> case caster of
           Just who -> inScope who pid gs scope
           Nothing -> case scope of
-            PlayerScope.EachPlayer -> True
-            PlayerScope.Opponents -> False
-            PlayerScope.You -> False
-            -- Unlike EachPlayer, this one does ask the caster a question -- "is
+            PlayerScope.Related relation -> PlayerRelation.holdsFor (Game.teams gs) relation (Just pid) Nothing
+            -- Unlike AnyPlayer, this one does ask the caster a question -- "is
             -- the caster the player controlling the most permanents?" -- and a
             -- sourceless spell or ability is nobody, so it is not that player.
             PlayerScope.ControllingMostPermanents -> False
@@ -3715,8 +3711,8 @@ cantBeCountered pid oid gs =
 --
 -- Gathered from EVERY still-playing player rather than from one, because
 -- `applying` is indexed by player and this effect is not. That reading is EXACT
--- for PlayerScope.EachPlayer, the scope Spider-Punk's possessive-free sentence
--- writes: EachPlayer is in scope for everybody, so "some player has it applying"
+-- for PlayerScope.Related AnyPlayer, the scope Spider-Punk's possessive-free sentence
+-- writes: AnyPlayer is in scope for everybody, so "some player has it applying"
 -- and "it applies" are the same fact. Duplicated rows are why the caller folds
 -- with `any` and not with a count.
 --
@@ -3805,7 +3801,7 @@ unpreventable gs =
 -- choice rather than applying it inertly.
 --
 -- Gathered from EVERY still-playing player, and read LIVE, for the two reasons
--- `unpreventable` gives: PlayerScope.EachPlayer is the only scope a card may
+-- `unpreventable` gives: PlayerScope.Related AnyPlayer is the only scope a card may
 -- pair with this carrier (Pawl.CardSpec lints it), so "some player has it
 -- applying" and "it applies" are the same fact.
 unredirectable :: GameState -> [(Maybe ObjectId, DamagePattern.DamagePattern)]

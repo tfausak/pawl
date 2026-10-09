@@ -1711,7 +1711,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   --
   -- THREE SEATS, because two collapse the reading under test: with alice and bob
   -- alone, "bob's graveyard" and "not the caster's graveyard" pick out the same
-  -- cards, so a pool that had scoped itself to PlayerScope.Opponents would pass.
+  -- cards, so a pool that had scoped itself to PlayerScope.Related Opponent would pass.
   -- carol's card is the one only the slot scoping can exclude.
   --
   -- The three runs differ in EXACTLY ONE thing apiece: which graveyard the

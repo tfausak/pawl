@@ -12,6 +12,7 @@ import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.SourceChoices as SourceChoices
 import qualified Pawl.Types.Timestamp as Timestamp
@@ -32,10 +33,10 @@ spec s = Spec.describe s "Pawl.Codec.ActivePlayerEffect" $ do
           ActivePlayerEffect.choices = SourceChoices.MkSourceChoices {SourceChoices.names = Set.empty, SourceChoices.colors = Set.empty, SourceChoices.subtype = Nothing},
           ActivePlayerEffect.timestamp = Timestamp.MkTimestamp 3,
           ActivePlayerEffect.expiry = Expiry.AtCleanup,
-          ActivePlayerEffect.scope = AffectedPlayers.Scoped PlayerScope.Opponents,
+          ActivePlayerEffect.scope = AffectedPlayers.Scoped (PlayerScope.Related PlayerRelation.Opponent),
           ActivePlayerEffect.effect = PlayerEffect.CantCastSpells
         }
-      " {\"source\":1,\"controller\":2,\"choices\":{},\"timestamp\":3,\"expiry\":{\"type\":\"AtCleanup\"},\"scope\":{\"type\":\"Scoped\",\"value\":{\"type\":\"Opponents\"}},\"effect\":{\"type\":\"CantCastSpells\"}} "
+      " {\"source\":1,\"controller\":2,\"choices\":{},\"timestamp\":3,\"expiry\":{\"type\":\"AtCleanup\"},\"scope\":{\"type\":\"Scoped\",\"value\":{\"type\":\"Opponent\"}},\"effect\":{\"type\":\"CantCastSpells\"}} "
   -- The Named arm, which is the half no printed carrier has: the seat CR 601.2c
   -- chose, baked as the effect began. It differs from `controller`, so an
   -- encoder writing the controller into both fields could not pass.
@@ -64,9 +65,9 @@ spec s = Spec.describe s "Pawl.Codec.ActivePlayerEffect" $ do
           ActivePlayerEffect.choices = SourceChoices.MkSourceChoices {SourceChoices.names = Set.singleton (CardName.MkCardName (Text.pack "Shock")), SourceChoices.colors = Set.empty, SourceChoices.subtype = Nothing},
           ActivePlayerEffect.timestamp = Timestamp.MkTimestamp 11,
           ActivePlayerEffect.expiry = Expiry.AtCleanup,
-          ActivePlayerEffect.scope = AffectedPlayers.Scoped PlayerScope.EachPlayer,
+          ActivePlayerEffect.scope = AffectedPlayers.Scoped (PlayerScope.Related PlayerRelation.AnyPlayer),
           ActivePlayerEffect.effect = PlayerEffect.CantCastSpells
         }
-      " {\"source\":9,\"controller\":10,\"choices\":{\"names\":[\"Shock\"]},\"timestamp\":11,\"expiry\":{\"type\":\"AtCleanup\"},\"scope\":{\"type\":\"Scoped\",\"value\":{\"type\":\"EachPlayer\"}},\"effect\":{\"type\":\"CantCastSpells\"}} "
+      " {\"source\":9,\"controller\":10,\"choices\":{\"names\":[\"Shock\"]},\"timestamp\":11,\"expiry\":{\"type\":\"AtCleanup\"},\"scope\":{\"type\":\"Scoped\",\"value\":{\"type\":\"AnyPlayer\"}},\"effect\":{\"type\":\"CantCastSpells\"}} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s ActivePlayerEffect.codec

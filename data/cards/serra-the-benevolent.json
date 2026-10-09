@@ -224,7 +224,7 @@
                                           "type": "ByDamage"
                                         },
                                         "whose": {
-                                          "type": "Yours"
+                                          "type": "You"
                                         }
                                       },
                                       "rewrite": {

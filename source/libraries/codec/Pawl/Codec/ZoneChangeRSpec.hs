@@ -7,6 +7,7 @@ import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
@@ -23,7 +24,7 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChangeR" $ do
               ZoneChangePattern.MkZoneChangePattern
                 { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
                   ZoneChangePattern.whatObject = Filter.And [],
-                  ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
+                  ZoneChangePattern.whoseObject = ControllerRelation.Related PlayerRelation.AnyPlayer,
                   ZoneChangePattern.whenDiscarded = Nothing,
                   ZoneChangePattern.duringResolution = False
                 },
@@ -46,7 +47,7 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChangeR" $ do
               ZoneChangePattern.MkZoneChangePattern
                 { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
                   ZoneChangePattern.whatObject = Filter.IsSource,
-                  ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
+                  ZoneChangePattern.whoseObject = ControllerRelation.Related PlayerRelation.AnyPlayer,
                   ZoneChangePattern.whenDiscarded = Nothing,
                   ZoneChangePattern.duringResolution = False
                 },
@@ -69,7 +70,7 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChangeR" $ do
               ZoneChangePattern.MkZoneChangePattern
                 { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
                   ZoneChangePattern.whatObject = Filter.And [],
-                  ZoneChangePattern.whoseObject = ControllerRelation.Yours,
+                  ZoneChangePattern.whoseObject = ControllerRelation.Related PlayerRelation.You,
                   ZoneChangePattern.whenDiscarded = Just DiscardCause.ByEffect,
                   ZoneChangePattern.duringResolution = False
                 },
@@ -80,5 +81,5 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChangeR" $ do
             ZoneChangeR.optional = True
           }
       )
-      " {\"matching\":{\"whenDestination\":{\"type\":\"Graveyard\"},\"whoseObject\":{\"type\":\"Yours\"},\"whenDiscarded\":{\"type\":\"ByEffect\"}},\"destination\":{\"type\":\"Library\"},\"position\":{\"type\":\"Top\"},\"optional\":true} "
+      " {\"matching\":{\"whenDestination\":{\"type\":\"Graveyard\"},\"whoseObject\":{\"type\":\"You\"},\"whenDiscarded\":{\"type\":\"ByEffect\"}},\"destination\":{\"type\":\"Library\"},\"position\":{\"type\":\"Top\"},\"optional\":true} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ZoneChangeR.codec

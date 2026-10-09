@@ -7,7 +7,7 @@
 -- attackableOpponents (CR 506.2a), Pawl.Engine.Resolve's playerRefPlayers
 -- (PlayerRef.Relative Opponent), Pawl.Engine.Target's slot filter (the
 -- Filter.IsPlayer atom, which reads Pawl.Engine.Filter's Context), Pawl.Engine's
--- PlayerEffect.inScope (PlayerScope.Opponents), Pawl.Engine.Replacement's
+-- PlayerEffect.inScope (PlayerScope.Related Opponent), Pawl.Engine.Replacement's
 -- matchesZoneOwner (CR 400.3's owner, for a zone-change redirect) and
 -- Pawl.Engine.Count's playersFor (the same PlayerRef under a Count).
 -- Pawl.BattleSpec holds the seventh, CR 310.12a's protector candidates, beside
@@ -139,7 +139,7 @@ spec s registry = Spec.describe s "Teams" $ do
       "CR 802.2 the defending players are the other team"
       (Combat.Type.defenders (GameState.combat settled))
       [S.carol, S.dave]
-  -- CR 702.11c through Pawl.Engine.PlayerEffect.inScope's PlayerScope.Opponents,
+  -- CR 702.11c through Pawl.Engine.PlayerEffect.inScope's PlayerScope.Related Opponent,
   -- which is the reader neither the PlayerRef nor the target-slot case above
   -- touches: "'Hexproof' on a player means 'You can't be the target of spells or
   -- abilities your opponents control.'"
@@ -159,7 +159,7 @@ spec s registry = Spec.describe s "Teams" $ do
         Spec.assertBool s (Set.member (Recipient.ToPlayer S.bob) (legalFor S.alice)) "CR 102.3 alice, bob's teammate, may still bolt him"
         Spec.assertBool s (not (Set.member (Recipient.ToPlayer S.bob) (legalFor S.carol))) "CR 702.11c carol, his opponent, may not"
         Spec.assertBool s (Set.member (Recipient.ToPlayer S.bob) (legalFor S.bob)) "and bob may bolt himself"
-  -- CR 102.3 through the zone-owner reader of ControllerRelation.Opponents,
+  -- CR 102.3 through the zone-owner reader of ControllerRelation.Related Opponent,
   -- Pawl.Engine.Replacement's matchesZoneOwner (judged, like its siblings, by
   -- relationHolds), which the three cases above do not reach: a zone change
   -- asks who OWNS the moving card (CR 400.3), not who controls anything.

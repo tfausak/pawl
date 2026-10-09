@@ -6,10 +6,10 @@ import qualified Pawl.Types.LifeLossCause as LifeLossCause
 -- | CR 614.1a: which life losses a life-total replacement intercepts -- WHOSE
 -- life total, and what CAUSED the loss.
 --
--- Worship is Yours ("your life total") and ByDamage ("damage that would reduce
+-- Worship is Related You ("your life total") and ByDamage ("damage that would reduce
 -- it"); Bloodletter of Aclazotz is Opponents ("an opponent") and no cause at all
 -- ("would lose life", which its own reminder text spells out as reaching damage
--- too); Ashiok, Wicked Manipulator is Yours and ByPayment ("if you would pay
+-- too); Ashiok, Wicked Manipulator is Related You and ByPayment ("if you would pay
 -- life").
 --
 -- No field here is about HOW MUCH life would be lost, and no printing needs one:

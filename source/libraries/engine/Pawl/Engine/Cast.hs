@@ -3780,7 +3780,7 @@ installCastFromGraveyard caster keywords castFor spellId gs0 =
                   ActiveReplacement.source = spellId,
                   -- CR 109.5: the caster. Nothing in CR 702.34a's exile reads it
                   -- -- the pattern is Filter.IsSource under
-                  -- ControllerRelation.Anyones, and neither consults the
+                  -- ControllerRelation.Related AnyPlayer, and neither consults the
                   -- perspective the row supplies -- but the row carries it as
                   -- every other row does, and a redirect that named a
                   -- Filter.ControlledBy would.

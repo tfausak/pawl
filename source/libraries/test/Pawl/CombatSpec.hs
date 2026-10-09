@@ -1731,7 +1731,7 @@ aimedAttackRestrictionSpec s registry = Spec.describe s "AimedAttackRestriction"
       ([pikerId], [archonId]) -> do
         -- The PAIRED positive, on the same permanents: the Archon under alice's
         -- control protects alice, who is not being attacked, so bob is fair game
-        -- again. Discriminates PlayerScope.You from EachPlayer, which would bar
+        -- again. Discriminates PlayerScope.Related You from AnyPlayer, which would bar
         -- the attack on either board.
         let freed = S.giveControl archonId S.alice gs
         Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [pikerId] gs)) "CR 802.3a: the Piker may not be declared attacking bob"

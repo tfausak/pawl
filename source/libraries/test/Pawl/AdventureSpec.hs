@@ -147,7 +147,7 @@ spec s registry = Spec.describe s "Adventure" $ do
   -- CR 715.3a's "only the alternative characteristics are evaluated to see if it
   -- can be cast", read for the COST rather than for the mana cost alone. Thalia,
   -- Guardian of Thraben's "noncreature spells cost {1} more to cast"
-  -- (EachPlayer-scoped, so her own controller pays it) is what makes CR 601.2f's
+  -- (AnyPlayer-scoped, so her own controller pays it) is what makes CR 601.2f's
   -- adjustments visible from the OFFER side: the Adventure is a Sorcery and is
   -- taxed, the creature half is a Creature and is not, and both offers come off
   -- ONE card sitting in ONE hand.

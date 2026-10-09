@@ -67,7 +67,7 @@ data Chooser
     -- possessive "each player ... their graveyard" is. The PlayerScope beside
     -- this is therefore the outer bound the sentence puts on which graveyards
     -- the instruction reaches rather than a second answer to "whose" -- a
-    -- sentence that puts none writes EachPlayer, and a chooser the scope does not
+    -- sentence that puts none writes AnyPlayer, and a chooser the scope does not
     -- name is offered nothing.
     BoundInSlot SlotName.SlotName
   deriving (Eq, Ord, Show)

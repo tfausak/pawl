@@ -17,6 +17,7 @@ import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Layout as Layout
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TokenPlus as TokenPlus
@@ -32,36 +33,36 @@ spec s = Spec.describe s "Pawl.Codec.TokenR" $ do
       s
       codec
       ( TokenR.MkTokenR
-          { TokenR.matching = TokenPattern.MkTokenPattern {TokenPattern.whose = ControllerRelation.Yours, TokenPattern.whatToken = Filter.And []},
+          { TokenR.matching = TokenPattern.MkTokenPattern {TokenPattern.whose = ControllerRelation.Related PlayerRelation.You, TokenPattern.whatToken = Filter.And []},
             TokenR.scaling = Just (Scaling.Multiply 2),
             TokenR.plus = Nothing
           }
       )
-      " {\"matching\":{\"whose\":{\"type\":\"Yours\"}},\"scaling\":{\"type\":\"Multiply\",\"value\":2}} "
+      " {\"matching\":{\"whose\":{\"type\":\"You\"}},\"scaling\":{\"type\":\"Multiply\",\"value\":2}} "
   -- CR 614.1a: Queen Allenal of Ruadach appends a token and scales nothing.
   Spec.it s "an append with no scaling" $
     Common.assertCodec
       s
       codec
       ( TokenR.MkTokenR
-          { TokenR.matching = TokenPattern.MkTokenPattern {TokenPattern.whose = ControllerRelation.Yours, TokenPattern.whatToken = Filter.HasCardType CardType.Creature},
+          { TokenR.matching = TokenPattern.MkTokenPattern {TokenPattern.whose = ControllerRelation.Related PlayerRelation.You, TokenPattern.whatToken = Filter.HasCardType CardType.Creature},
             TokenR.scaling = Nothing,
             TokenR.plus = Just (TokenPlus.One soldier)
           }
       )
-      " {\"matching\":{\"whose\":{\"type\":\"Yours\"},\"whatToken\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"plus\":{\"type\":\"One\",\"value\":{\"faces\":[{\"name\":\"Soldier Token\",\"typeLine\":{\"types\":[{\"type\":\"Creature\"}]}}]}}} "
+      " {\"matching\":{\"whose\":{\"type\":\"You\"},\"whatToken\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"plus\":{\"type\":\"One\",\"value\":{\"faces\":[{\"name\":\"Soldier Token\",\"typeLine\":{\"types\":[{\"type\":\"Creature\"}]}}]}}} "
   -- CR 614.1a: Chatterfang, Squirrel General appends one per token created.
   Spec.it s "an append sized by the event" $
     Common.assertCodec
       s
       codec
       ( TokenR.MkTokenR
-          { TokenR.matching = TokenPattern.MkTokenPattern {TokenPattern.whose = ControllerRelation.Yours, TokenPattern.whatToken = Filter.And []},
+          { TokenR.matching = TokenPattern.MkTokenPattern {TokenPattern.whose = ControllerRelation.Related PlayerRelation.You, TokenPattern.whatToken = Filter.And []},
             TokenR.scaling = Nothing,
             TokenR.plus = Just (TokenPlus.ThatMany soldier)
           }
       )
-      " {\"matching\":{\"whose\":{\"type\":\"Yours\"}},\"plus\":{\"type\":\"ThatMany\",\"value\":{\"faces\":[{\"name\":\"Soldier Token\",\"typeLine\":{\"types\":[{\"type\":\"Creature\"}]}}]}}} "
+      " {\"matching\":{\"whose\":{\"type\":\"You\"}},\"plus\":{\"type\":\"ThatMany\",\"value\":{\"faces\":[{\"name\":\"Soldier Token\",\"typeLine\":{\"types\":[{\"type\":\"Creature\"}]}}]}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec
 
 -- A one-face creature token with every other field at the value

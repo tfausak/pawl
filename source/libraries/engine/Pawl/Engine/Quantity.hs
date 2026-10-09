@@ -1178,7 +1178,7 @@ grantsStationToughnessFor viewOf gs you =
 -- first: attacking an opponent's planeswalker or a battle they protect is not
 -- attacking that opponent, which melee's own ruling states outright.
 --
--- CR 102.3's opponents, the reading Pawl.Types.PlayerScope.Opponents and
+-- CR 102.3's opponents, the reading Pawl.Types.PlayerScope.Related Opponent and
 -- Count.playersFor already share: every player not on that player's team, which
 -- at two seats (CR 102.2) and in a free-for-all (CR 806.1) is every other player.
 attackedOpponent :: Teams.Teams -> PlayerId.PlayerId -> AttackTarget.AttackTarget -> Bool

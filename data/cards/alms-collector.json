@@ -37,7 +37,7 @@
                 "type": "EachDrawOne"
               },
               "whose": {
-                "type": "Opponents"
+                "type": "Opponent"
               }
             }
           }

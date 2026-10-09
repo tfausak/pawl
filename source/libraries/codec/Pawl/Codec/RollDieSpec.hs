@@ -5,6 +5,7 @@ import qualified Pawl.Codec.RollDie as RollDie
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.DiceReading as DiceReading
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.RollDie as RollDie
@@ -25,7 +26,7 @@ spec s = Spec.describe s "Pawl.Codec.RollDie" $ do
           RollDie.reading = DiceReading.ChooseOne,
           RollDie.slot = SlotName.MkSlotName (Text.pack "result"),
           RollDie.other = Nothing,
-          RollDie.roller = PlayerScope.You,
+          RollDie.roller = PlayerScope.Related PlayerRelation.You,
           RollDie.highest = Nothing,
           RollDie.store = Nothing
         }
@@ -43,7 +44,7 @@ spec s = Spec.describe s "Pawl.Codec.RollDie" $ do
           RollDie.reading = DiceReading.ChooseOne,
           RollDie.slot = SlotName.MkSlotName (Text.pack "result"),
           RollDie.other = Nothing,
-          RollDie.roller = PlayerScope.You,
+          RollDie.roller = PlayerScope.Related PlayerRelation.You,
           RollDie.highest = Nothing,
           RollDie.store = Nothing
         }
@@ -62,7 +63,7 @@ spec s = Spec.describe s "Pawl.Codec.RollDie" $ do
           RollDie.reading = DiceReading.ChooseOne,
           RollDie.slot = SlotName.MkSlotName (Text.pack "chosen"),
           RollDie.other = Just (SlotName.MkSlotName (Text.pack "other")),
-          RollDie.roller = PlayerScope.You,
+          RollDie.roller = PlayerScope.Related PlayerRelation.You,
           RollDie.highest = Nothing,
           RollDie.store = Nothing
         }
@@ -80,7 +81,7 @@ spec s = Spec.describe s "Pawl.Codec.RollDie" $ do
           RollDie.reading = DiceReading.Total,
           RollDie.slot = SlotName.MkSlotName (Text.pack "total"),
           RollDie.other = Nothing,
-          RollDie.roller = PlayerScope.You,
+          RollDie.roller = PlayerScope.Related PlayerRelation.You,
           RollDie.highest = Nothing,
           RollDie.store = Nothing
         }
@@ -98,11 +99,11 @@ spec s = Spec.describe s "Pawl.Codec.RollDie" $ do
           RollDie.reading = DiceReading.ChooseOne,
           RollDie.slot = SlotName.MkSlotName (Text.pack "result"),
           RollDie.other = Nothing,
-          RollDie.roller = PlayerScope.EachPlayer,
+          RollDie.roller = PlayerScope.Related PlayerRelation.AnyPlayer,
           RollDie.highest = Just (SlotName.MkSlotName (Text.pack "highest")),
           RollDie.store = Nothing
         }
-      " {\"highest\":\"highest\",\"roller\":{\"type\":\"EachPlayer\"},\"sides\":20,\"slot\":\"result\"} "
+      " {\"highest\":\"highest\",\"roller\":{\"type\":\"AnyPlayer\"},\"sides\":20,\"slot\":\"result\"} "
   -- CR 706.8a's store, Centaur of Attention's wire form: the field elides
   -- everywhere else.
   Spec.it s "five dice stored on the permanent" $
@@ -116,7 +117,7 @@ spec s = Spec.describe s "Pawl.Codec.RollDie" $ do
           RollDie.reading = DiceReading.ChooseOne,
           RollDie.slot = SlotName.MkSlotName (Text.pack "result"),
           RollDie.other = Nothing,
-          RollDie.roller = PlayerScope.You,
+          RollDie.roller = PlayerScope.Related PlayerRelation.You,
           RollDie.highest = Nothing,
           RollDie.store = Just (SlotName.MkSlotName (Text.pack "self"))
         }

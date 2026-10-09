@@ -61,6 +61,7 @@ import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerEffect as PlayerEffect.Type
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
@@ -177,7 +178,7 @@ vedalkenOrrerySpec s registry =
       Spec.assertBool s (any isPlay (Action.legalActions S.alice ownTurn)) "playable on her own turn"
       Spec.assertBool s (not (any isPlay (Action.legalActions S.alice board))) "not on bob's"
 
-    -- CR 109.5 / PlayerScope.You: the Orrery says "you", so alice's does nothing
+    -- CR 109.5 / PlayerScope.Related You: the Orrery says "you", so alice's does nothing
     -- for bob. The pair differs only in who controls it.
     Spec.it s "CR 109.5 alice's Orrery does not widen bob's window" $ do
       mountain <- S.printingOf s registry "Mountain"
@@ -450,7 +451,7 @@ yawgmothsWillSpec s registry =
           Spec.assertEqWith s "it is not back in the graveyard" (Game.zoneMembers Zone.Graveyard S.alice resolved) []
           Spec.assertEqWith s "it was exiled instead, beside the Will" (length (Game.zoneMembers Zone.Exile S.alice resolved)) 2
 
-        -- CR 109.5 / PlayerScope.You: alice's Will does nothing for bob, whose
+        -- CR 109.5 / PlayerScope.Related You: alice's Will does nothing for bob, whose
         -- board is hers in every other respect. Asked of the typed question as
         -- well as of the gate, because CR 307.1's sorcery window is shut for bob
         -- on alice's turn and would refuse his cast on its own.
@@ -559,7 +560,7 @@ playing wanted action = case action of
 
 -- Crucible of Worlds {3} Artifact: "You may play lands from your graveyard." The
 -- unrestricted producer of PlayerEffect.PlayLandsFromGraveyard -- one sentence, a
--- static ability of a battlefield permanent, PlayerScope.You, and nothing else on
+-- static ability of a battlefield permanent, PlayerScope.Related You, and nothing else on
 -- the card -- where Yawgmoth's Will above grants the same arm from the stored CR
 -- 611.2c carrier with a duration on it.
 crucibleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -736,7 +737,7 @@ garruksHordeSpec s registry =
 
         -- CR 601.3's OTHER limb, on the new road: a permission widens the zone
         -- and a prohibition still closes it. Grafdigger's Cage is the pair's
-        -- second permanent, under BOB, so the refusal is its PlayerScope.EachPlayer
+        -- second permanent, under BOB, so the refusal is its PlayerScope.Related AnyPlayer
         -- rather than anything about who controls the Horde. Pawl.CastSpec's
         -- Grafdigger's Cage group proves the same disjunct on the mid-search road.
         Spec.it s "CR 601.3 a prohibition still closes the zone the permission opened" $ do
@@ -1065,7 +1066,7 @@ jaredSpec s registry =
           let after = etbResolved jaredId gs
           Spec.assertEqWith s "bob is the monarch" (GameState.monarch after) (Just S.bob)
           Spec.assertEqWith s "one stored CR 611.2c effect" (fmap ActivePlayerEffect.effect (GameState.playerEffects after)) [PlayerEffect.Type.CantBecomeMonarch]
-          Spec.assertEqWith s "scoped to its controller" (fmap ActivePlayerEffect.scope (GameState.playerEffects after)) [AffectedPlayers.Scoped PlayerScope.You]
+          Spec.assertEqWith s "scoped to its controller" (fmap ActivePlayerEffect.scope (GameState.playerEffects after)) [AffectedPlayers.Scoped (PlayerScope.Related PlayerRelation.You)]
           Spec.assertEqWith s "who is alice" (fmap ActivePlayerEffect.controller (GameState.playerEffects after)) [S.alice]
           Spec.assertBool s (PlayerEffect.prohibitsBecomingMonarch S.alice after) "so alice can't become the monarch"
           Spec.assertBool s (not (PlayerEffect.prohibitsBecomingMonarch S.bob after)) "and bob still can"
@@ -1125,7 +1126,7 @@ jaredSpec s registry =
 -- The three cards bob holds are the discriminating set: the Bolt differs from the
 -- Piker in PARITY alone, and the Disaster differs from the Piker in the VARIABLE
 -- alone -- same seat, same mana, same moment, same even mana value. alice's own
--- Piker is the SCOPE control, since no EachPlayer reading of the ability could
+-- Piker is the SCOPE control, since no AnyPlayer reading of the ability could
 -- leave it castable.
 --
 -- Returns (alice's Piker, bob's Piker, bob's Bolt, bob's Disaster, board).

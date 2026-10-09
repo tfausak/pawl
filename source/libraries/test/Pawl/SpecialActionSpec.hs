@@ -184,7 +184,7 @@ takeThenPass wanted prompt = case prompt of
   _ -> pure (S.identityAnswer prompt)
 
 -- alice's board for CR 116.2d: nine Forests, a Leonin Arbiter SHE controls --
--- its "players" is possessive-free, so PlayerScope.EachPlayer stops her own
+-- its "players" is possessive-free, so PlayerScope.Related AnyPlayer stops her own
 -- searches too -- one Forest left in her library and a Rampant Growth in hand to
 -- go and get it with. Nine lands is four ignores or four Growths over, so no
 -- case below can fail for want of mana.
@@ -1834,7 +1834,7 @@ spec s registry = do
   perpetualLoss s registry
 
 -- CR 116.2d again, on the two axes Leonin Arbiter cannot reach: WHO the action is
--- offered to (its own scope is EachPlayer, so every seat is offered it) and how
+-- offered to (its own scope is AnyPlayer, so every seat is offered it) and how
 -- far ONE NAME reaches. Damping Engine (ULG 124) narrows the first, and its one
 -- printed sentence declares two player abilities that carry one name -- so one
 -- payment covers both, which is what makes "this effect" the sentence rather than
@@ -1986,7 +1986,7 @@ leoninArbiter s registry = Spec.describe s "CR 116.2d Leonin Arbiter" $ do
     Spec.assertBool s (any isPlay (Action.legalActions S.alice broke)) "the control: that same board still offers a land play"
   -- The WHO conjunct read the other way, and the pair Damping Engine's cases are
   -- the other half of: Leonin Arbiter's own prohibition is possessive-free
-  -- (EachPlayer), so it affects every seat and every seat is offered the action --
+  -- (AnyPlayer), so it affects every seat and every seat is offered the action --
   -- the Arbiter's controller included. A gate that offered it only to the
   -- controller, or only to an opponent, fails here while every case above passes.
   Spec.it s "CR 116.2d an EachPlayer prohibition offers the action to every seat" $ do

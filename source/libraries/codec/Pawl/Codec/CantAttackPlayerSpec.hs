@@ -9,12 +9,13 @@ import qualified Pawl.Types.AttackTargetKind as AttackTargetKind
 import qualified Pawl.Types.CantAttackPlayer as CantAttackPlayer
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.CantAttackPlayer" $ do
   -- CR 508.1c's attacking pairwise restriction, Vow of Flight's payload. The
-  -- scope is You rather than EachPlayer, which is the value that would read the
+  -- scope is You rather than AnyPlayer, which is the value that would read the
   -- same as a blanket "can't attack" on any board, and the kinds are two of CR
   -- 506.3's three, which is what a one-element list would not distinguish from
   -- a sorted singleton.
@@ -24,7 +25,7 @@ spec s = Spec.describe s "Pawl.Codec.CantAttackPlayer" $ do
       CantAttackPlayer.codec
       ( CantAttackPlayer.MkCantAttackPlayer
           { CantAttackPlayer.affected = Affected.Matching (Filter.HasCardType CardType.Creature),
-            CantAttackPlayer.defenders = PlayerScope.You,
+            CantAttackPlayer.defenders = PlayerScope.Related PlayerRelation.You,
             CantAttackPlayer.kinds = Set.fromList [AttackTargetKind.OfPlayer, AttackTargetKind.OfPlaneswalker],
             CantAttackPlayer.unless = Nothing,
             CantAttackPlayer.name = Nothing

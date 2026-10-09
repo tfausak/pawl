@@ -387,7 +387,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
     Spec.assertEqWith s "the instant reached bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
     Spec.assertEqWith s "and nothing was exiled" (length (Game.zoneMembers Zone.Exile S.bob after)) 0
 
-  -- CONTROL for ControllerRelation.Opponents, which CR 400.3 makes an OWNER
+  -- CONTROL for ControllerRelation.Related Opponent, which CR 400.3 makes an OWNER
   -- test: Anafenza's controller loses her own creatures to her own graveyard.
   Spec.it s "CR 614.1a Anafenza does not exile her own controller's dying creature" $ do
     anafenza <- S.printingOf s registry "Anafenza, the Foremost"

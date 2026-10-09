@@ -136,7 +136,7 @@ celestialDawnSpec s registry = Spec.describe s "Celestial Dawn" $ do
     Spec.assertBool s (not (payable S.alice snowCost plainBoard)) "the nonsnow white mana does not pay {S}"
     Spec.assertBool s (payable S.alice snowCost snowBoard) "and the snow one does, so the tags rode through"
 
-  -- CR 613.11 through the carrier's PlayerScope.You: "you may spend" is one
+  -- CR 613.11 through the carrier's PlayerScope.Related You: "you may spend" is one
   -- player's permission, and a rewrite applied to the table would be invisible on
   -- a one-seat board. Bob's board is alice's with the pool seated under him
   -- instead, so the two differ only in whose mana it is.

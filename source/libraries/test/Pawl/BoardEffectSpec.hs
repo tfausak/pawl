@@ -593,7 +593,7 @@ skullwinderSpec s registry =
             "and the Snake itself is on the battlefield"
             (List.sort (fmap (\oid -> fmap S.nameOf (Game.cardOf oid after)) (filter (\oid -> fmap S.nameOf (Game.cardOf oid after) /= named "Forest") (Set.toList (GameState.battlefield after)))))
             [named "Skullwinder"]
-        -- CR 102.2 / 608.2d: PlayerScope.Opponents leaves the CONTROLLER out of
+        -- CR 102.2 / 608.2d: PlayerScope.Related Opponent leaves the CONTROLLER out of
         -- the offer, so an answerer naming alice is answering a question she was
         -- never put -- the offer is filtered and the first opponent takes it.
         -- The board is the headline's, one answerer apart. A scope that admitted

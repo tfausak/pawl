@@ -28,7 +28,7 @@
                     "type": "ShuffleIntoLibrary",
                     "value": {
                       "library": {
-                        "type": "EachPlayer"
+                        "type": "AnyPlayer"
                       },
                       "refs": [
                         {
@@ -37,7 +37,7 @@
                             "hands": {
                               "type": "Scoped",
                               "value": {
-                                "type": "EachPlayer"
+                                "type": "AnyPlayer"
                               }
                             }
                           }
@@ -52,7 +52,7 @@
                             "graveyards": {
                               "type": "Scoped",
                               "value": {
-                                "type": "EachPlayer"
+                                "type": "AnyPlayer"
                               }
                             }
                           }

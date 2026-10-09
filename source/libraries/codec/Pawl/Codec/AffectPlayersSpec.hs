@@ -7,6 +7,7 @@ import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -20,9 +21,9 @@ spec s = Spec.describe s "Pawl.Codec.AffectPlayers" $ do
       AffectPlayers.codec
       ( AffectPlayers.MkAffectPlayers
           { AffectPlayers.duration = Duration.UntilEndOfTurn,
-            AffectPlayers.players = AffectedPlayers.Scoped PlayerScope.Opponents,
+            AffectPlayers.players = AffectedPlayers.Scoped (PlayerScope.Related PlayerRelation.Opponent),
             AffectPlayers.effect = PlayerEffect.CantCastSpells
           }
       )
-      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"players\":{\"type\":\"Scoped\",\"value\":{\"type\":\"Opponents\"}},\"effect\":{\"type\":\"CantCastSpells\"}} "
+      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"players\":{\"type\":\"Scoped\",\"value\":{\"type\":\"Opponent\"}},\"effect\":{\"type\":\"CantCastSpells\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s AffectPlayers.codec

@@ -1833,9 +1833,7 @@ installDamageRow targets slots controller source duration kind rewrite uses ride
 bakeRelation :: Map.Map SlotName (Set PlayerId) -> ControllerRelation.ControllerRelation -> ControllerRelation.ControllerRelation
 bakeRelation players rel = case rel of
   ControllerRelation.InSlot slot -> ControllerRelation.Among (Map.findWithDefault Set.empty slot players)
-  ControllerRelation.Yours -> rel
-  ControllerRelation.Anyones -> rel
-  ControllerRelation.Opponents -> rel
+  ControllerRelation.Related _ -> rel
   ControllerRelation.EnchantedPlayers -> rel
   ControllerRelation.Among _ -> rel
 
@@ -4497,9 +4495,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- WHICH players are offered is the payload's PlayerScope, read through the
   -- same PlayerEffect.playersInScope the deciding twin above reads, against CR
   -- 109.5's "you" and cut to their range (CR 801.10) -- so the offer can hold
-  -- the resolving controller (PlayerScope.EachPlayer) and this arm still
+  -- the resolving controller (PlayerScope.Related AnyPlayer) and this arm still
   -- classifies rather than naming a card. Nobody in scope binds nothing (CR 101.3); CR 102.2 leaves
-  -- PlayerScope.Opponents nothing to pick at two seats.
+  -- PlayerScope.Related Opponent nothing to pick at two seats.
   --
   -- ONE prompt where the deciding twin picks between two: Prompt.RandomPlayer
   -- carries no Decider, so there is no promise about the chooser for a second

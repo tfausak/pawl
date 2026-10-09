@@ -27,7 +27,7 @@
                   "type": "IsToken"
                 },
                 "whose": {
-                  "type": "Yours"
+                  "type": "You"
                 }
               },
               "plus": {

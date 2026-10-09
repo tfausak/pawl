@@ -6,6 +6,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 
@@ -21,7 +22,7 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChangePattern" $ do
       ZoneChangePattern.MkZoneChangePattern
         { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
           ZoneChangePattern.whatObject = Filter.And [],
-          ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
+          ZoneChangePattern.whoseObject = ControllerRelation.Related PlayerRelation.AnyPlayer,
           ZoneChangePattern.whenDiscarded = Nothing,
           ZoneChangePattern.duringResolution = False
         }
@@ -36,11 +37,11 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChangePattern" $ do
       ZoneChangePattern.MkZoneChangePattern
         { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
           ZoneChangePattern.whatObject = Filter.And [Filter.HasCardType CardType.Creature, Filter.Not Filter.IsToken],
-          ZoneChangePattern.whoseObject = ControllerRelation.Opponents,
+          ZoneChangePattern.whoseObject = ControllerRelation.Related PlayerRelation.Opponent,
           ZoneChangePattern.whenDiscarded = Nothing,
           ZoneChangePattern.duringResolution = False
         }
-      " {\"whatObject\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"Not\",\"value\":{\"type\":\"IsToken\"}}]},\"whenDestination\":{\"type\":\"Graveyard\"},\"whoseObject\":{\"type\":\"Opponents\"}} "
+      " {\"whatObject\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"Not\",\"value\":{\"type\":\"IsToken\"}}]},\"whenDestination\":{\"type\":\"Graveyard\"},\"whoseObject\":{\"type\":\"Opponent\"}} "
   -- CR 702.34a's "instead of putting it anywhere else": no destination named,
   -- which is the default, so the whole pattern is the empty object.
   Spec.it s "MkZoneChangePattern (flashback, any destination)" $
@@ -50,7 +51,7 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChangePattern" $ do
       ZoneChangePattern.MkZoneChangePattern
         { ZoneChangePattern.whenDestination = Nothing,
           ZoneChangePattern.whatObject = Filter.IsSource,
-          ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
+          ZoneChangePattern.whoseObject = ControllerRelation.Related PlayerRelation.AnyPlayer,
           ZoneChangePattern.whenDiscarded = Nothing,
           ZoneChangePattern.duringResolution = False
         }
@@ -63,7 +64,7 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChangePattern" $ do
       ZoneChangePattern.MkZoneChangePattern
         { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
           ZoneChangePattern.whatObject = Filter.IsSource,
-          ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
+          ZoneChangePattern.whoseObject = ControllerRelation.Related PlayerRelation.AnyPlayer,
           ZoneChangePattern.whenDiscarded = Nothing,
           ZoneChangePattern.duringResolution = True
         }
