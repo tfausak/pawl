@@ -861,8 +861,9 @@ anteFromLibraries seated = do
   Monad.when playing (Monad.forM_ seated anteOne)
 
 -- CR 103.2d / 123.2: each player who brought more than three sticker sheets
--- has three drawn at random; three or fewer are all chosen, which is exact for
--- CR 123.2b's limited three. Randomness, so Prompt.RandomStickerSheet, one draw
+-- has three drawn at random; three or fewer are all chosen. A limited player's
+-- "up to three" (CR 123.2b) is chosen as the deck is built, so Deck.stickerSheets
+-- is that choice. Randomness, so Prompt.RandomStickerSheet, one draw
 -- at a time over the undrawn positions, filtered rather than trusted. None
 -- brought means none chosen: that player plays without stickers.
 --

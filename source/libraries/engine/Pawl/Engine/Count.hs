@@ -1445,7 +1445,8 @@ viewOfSnapshot deploy mController mOwner isToken counters snapshot =
       -- "greatest number of counters among creatures that died this turn"
       -- (Pawl.CountSpec) is what reads it.
       Filter.counters = counters,
-      -- CR 123.1: a snapshot records no sticker, `designations`' posture.
+      -- Not implemented: CR 608.2h's record of a departed object's stickers
+      -- (#4890).
       Filter.stickerKinds = Seq.empty,
       -- CR 701.54b: a designation, which a ProjectedCharacteristics does not carry
       -- and never could -- CR 109.3's characteristic list has no room for one. So a

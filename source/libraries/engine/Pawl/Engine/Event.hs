@@ -8551,6 +8551,10 @@ meldable victims gs = do
 -- sides read again through Projection.copiableCharacteristicsTurned, which
 -- Game.turnFaceOver swaps in when the merged permanent transforms -- for the
 -- flipped reading's reason.
+--
+-- Not implemented: CR 123.5b's stickers on the merging spell joining the merged
+-- permanent, and CR 613.7k's restamp of the host's stickers at the merge
+-- (#872).
 merge :: ObjectId -> ObjectId -> MutateSide.MutateSide -> Game Bool
 merge sid target side = do
   gs <- State.get

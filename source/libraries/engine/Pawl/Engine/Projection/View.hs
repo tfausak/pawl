@@ -745,8 +745,8 @@ viewOfCharacteristics peers oid pc controller counters gs =
           && not (Game.isFrontFaceUp oid gs)
           && maybe True (Seq.null . Game.componentsOf . Object.source) (Game.lookupObject oid gs),
       Filter.counters = counters,
-      -- CR 123.1: off the object, live, `designations`' posture; CR 608.2h's
-      -- record keeps none.
+      -- CR 123.1: off the object, live, `designations`' posture. Not
+      -- implemented: CR 608.2h's record of a departed object's stickers (#4890).
       Filter.stickerKinds = foldMap (fmap (StickerRef.kind . StickerPlacement.sticker) . Object.stickers) (Game.lookupObject oid gs),
       -- CR 701.54b: a designation rather than a characteristic. Nothing for an id
       -- naming no object -- a designation dies with the permanent (CR 400.7).
