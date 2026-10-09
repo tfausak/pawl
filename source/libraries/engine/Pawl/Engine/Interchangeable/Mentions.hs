@@ -988,6 +988,7 @@ costComponentNames asking onKeyword x = case x of
   CostComponent.Behold behold -> beholdNames asking behold
   CostComponent.BeholdAndExile filter_ -> filterNames asking filter_
   CostComponent.MillCards _natural -> False
+  CostComponent.RevealTopOfLibrary _natural -> False
   CostComponent.ChooseOpponent -> False
   CostComponent.Waterbend _natural -> False
   CostComponent.WaterbendInstead _natural -> False
