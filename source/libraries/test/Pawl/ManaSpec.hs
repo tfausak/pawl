@@ -1877,6 +1877,40 @@ priestOfYawgmothSpec s registry = Spec.describe s "Priest of Yawgmoth" $ do
     Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice (generic 6) twoPriests)) "{6} would need the Crucible twice"
     Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice (generic 5) twoPriests) "and {5} is the Crucible and the Thumb"
 
+  -- The same question on a WIDE board: eight artifacts of mana values 1 to 8
+  -- give each of three Priests eight yields, and the walk takes at most one per
+  -- Priest rather than every subset of the twenty-four. Twenty-one is the 8,
+  -- the 7 and the 6.
+  Spec.it s "CR 118.3 three Priests beside eight artifacts pay {21} and not {22}" $ do
+    priest <- S.printingOf s registry "Priest of Yawgmoth"
+    fodder <- traverse (S.printingOf s registry) ["Basilisk Collar", "Aegis of the Legion", "Crawlspace", "Damping Engine", "Clearwater Goblet", "Arachnoid", "Darksteel Gargoyle", "The Ten Rings"]
+    let board = alicePermanents (priest : priest : priest : fodder)
+        generic n = ManaCost.MkManaCost [ManaSymbol.Generic n]
+    Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice (generic 22) board)) "{22} would need one artifact twice"
+    Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice (generic 21) board) "and {21} is the three largest"
+
+  -- CR 608.2h on the Priest itself: Red Priest of Yawgmoth is an artifact, so
+  -- it may sacrifice itself, and its own mana value is read as it last was.
+  Spec.it s "CR 608.2h Red Priest of Yawgmoth sacrificing itself adds {R}{R}" $ do
+    redPriest <- S.printingOf s registry "Red Priest of Yawgmoth"
+    let (priestId, board) = S.addPermanent redPriest S.alice (Setup.emptyGame S.bothPlayers)
+        red = ManaType.Colored Color.Red
+    Spec.assertEqWith s "its own mana value, 2" (tappedFor (sacrificing priestId) priestId board) [red, red]
+    Spec.assertEqWith s "and it is gone" (countOf "Red Priest of Yawgmoth" (S.runPure (sacrificing priestId) board (S.tapForMana priestId))) 0
+
+  -- The same pricing over another characteristic: Furgul, Quag Nurturer's "equal
+  -- to the sacrificed creature's power", Craw Wurm's 6 against Grizzly Bears' 2.
+  Spec.it s "CR 608.2h Furgul, Quag Nurturer adds {G} equal to the sacrificed creature's power" $ do
+    furgul <- S.printingOf s registry "Furgul, Quag Nurturer"
+    wurm <- S.printingOf s registry "Craw Wurm"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    let (furgulId, g1) = S.addPermanent furgul S.alice (Setup.emptyGame S.bothPlayers)
+        (wurmId, g2) = S.addPermanent wurm S.alice g1
+        (bearsId, board) = S.addPermanent bears S.alice g2
+        green = ManaType.Colored Color.Green
+    Spec.assertEqWith s "sacrificing the Craw Wurm adds six {G}" (tappedFor (sacrificing wurmId) furgulId board) (replicate 6 green)
+    Spec.assertEqWith s "sacrificing the Grizzly Bears adds two" (tappedFor (sacrificing bearsId) furgulId board) [green, green]
+
 -- Answers Prompt.ChooseSacrifices with `victim` alone, and defers everything
 -- else to S.identityAnswer.
 sacrificing :: ObjectId.ObjectId -> Prompt.Prompt r -> r

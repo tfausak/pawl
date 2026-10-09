@@ -461,7 +461,13 @@ manaYieldsOfGiven pcs oid gs = ListUtils.nubOrd (fmap (Mana.MkMana . yieldUnits)
 -- rather than tidiness: "the type of mana a permanent could produce" is defined
 -- to IGNORE whether the ability's costs could be paid, so manaTypesOf has to go
 -- on answering the ungated question.
-manaSuppliesGiven :: Capacity -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> GameState -> [(Activations.Activations, Mana, ManaCost)]
+--
+-- The FOURTH element is what this yield's own activation spends, and the
+-- first what its ROUTE's does; they differ only for a yield priced per
+-- sacrifice candidate (`perCandidate` below), whose own claim names just the
+-- candidates that give it. sourceOptions groups by the route, so such yields
+-- are one choice of at most one of them per activation.
+manaSuppliesGiven :: Capacity -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> GameState -> [(Activations.Activations, Mana, ManaCost, Activations.Activations)]
 manaSuppliesGiven capacity pcs pid oid gs =
   let -- Applied HERE and not left to the caller: this is the one reader of a
       -- route's yield on the supply side, so wrapping it once is what makes the
@@ -511,9 +517,9 @@ manaSuppliesGiven capacity pcs pid oid gs =
       -- Priest of Yawgmoth group casts off this supply.
       --
       -- Not implemented: a yield reading any other slot its cost binds, which
-      -- is supplied as the offer prices it (#4851).
+      -- is supplied as the offer prices it (#4851, #4855).
       perCandidate option =
-        let whole@(activations, _, manaCost) = measured option
+        let (activations, share, manaCost) = measured option
             readsSacrificed = any (\(clause, _) -> any (Set.member Binding.sacrificedPermanent . Quantity.objectSlots . ManaAddition.count) (Maybe.mapMaybe ManaAbility.manaProduced (Foldable.toList (Clause.effects clause)))) (ManaOption.steps option)
             sacrifices = [() | CostComponent.Sacrifice sacrifice <- Cost.components (ManaOption.cost option), Sacrifice.count sacrifice == 1]
             onBattlefield = filter ((==) (ClaimAxis.Removal Zone.Battlefield) . Claim.Type.axis) (Activations.claims activations)
@@ -523,8 +529,8 @@ manaSuppliesGiven capacity pcs pid oid gs =
                     let pricedFor candidate = [payerShare priced | (offered, priced) <- manaRepricingsGiven (Binding.paidObjects Binding.sacrificedPermanent (Set.singleton (Recipient.ToObject candidate))) pcs oid gs, offered == option]
                         byYield = Map.fromListWith Set.union [(yield, Set.singleton candidate) | candidate <- Set.toList (Claim.Type.pool claim), yield <- pricedFor candidate]
                         narrowed candidates = activations {Activations.claims = fmap (\other -> if other == claim then other {Claim.Type.pool = candidates} else other) (Activations.claims activations)}
-                     in [(narrowed candidates, yield, manaCost) | (yield, candidates) <- Map.toList byYield]
-              _ -> [whole]
+                     in [(activations, yield, manaCost, narrowed candidates) | (yield, candidates) <- Map.toList byYield, not (null (unitsOf yield))]
+              _ -> [(activations, share, manaCost, activations)]
       choosable option =
         Map.fromList
           [ (ChoosePlayer.slot choice, Set.singleton pid)
@@ -537,11 +543,11 @@ manaSuppliesGiven capacity pcs pid oid gs =
       -- manaSourcesGiven hands this nothing else pid does not control.
       controls = not (any (openToAnyone . ManaOption.ability) options) || Projection.controllerOf oid gs == Just pid
       counted = concatMap perCandidate (filter (permitsRoute controls . ManaOption.ability) options)
-      available = filter (\(activations, _, _) -> Activations.times activations > 0) counted
-      yieldOf (_, yield, _) = yield
+      available = filter (\(activations, _, _, _) -> Activations.times activations > 0) counted
+      yieldOf (_, yield, _, _) = yield
       -- Ordered so `maximumBy` prefers the larger count, and a mana-free route
       -- over a mana-eating one at equal counts.
-      rankOf (activations, _, manaCost) = (Activations.times activations, null (ManaCost.unwrap manaCost))
+      rankOf (activations, _, manaCost, _) = (Activations.times activations, null (ManaCost.unwrap manaCost))
    in fmap
         (\yield -> List.maximumBy (Ord.comparing rankOf) (filter ((==) yield . yieldOf) available))
         (ListUtils.nubOrd (fmap yieldOf available))
@@ -2133,7 +2139,7 @@ data SourceOption = MkSourceOption
   }
   deriving (Eq, Ord, Show)
 
-sourceOptions :: [SpendManaAsThough.SpendManaAsThough] -> (ManaUnit -> Set.Set PaymentSubject.PaymentSubject) -> ([Claim] -> Bool) -> [(Activations.Activations, Mana, ManaCost)] -> [[SourceOption]]
+sourceOptions :: [SpendManaAsThough.SpendManaAsThough] -> (ManaUnit -> Set.Set PaymentSubject.PaymentSubject) -> ([Claim] -> Bool) -> [(Activations.Activations, Mana, ManaCost, Activations.Activations)] -> [[SourceOption]]
 sourceOptions clauses admitting contends supplies =
   let -- Grouped by what ONE activation costs, which is what lets k activations of
       -- the group take k alternatives independently.
@@ -2141,7 +2147,7 @@ sourceOptions clauses admitting contends supplies =
         Map.toList
           ( Map.fromListWith
               (flip (<>))
-              (fmap (\(activations, yield, manaCost) -> ((activations, manaCost), [unitsOf yield])) supplies)
+              (fmap (\(activations, yield, manaCost, own) -> ((activations, manaCost), [(unitsOf yield, own)])) supplies)
           )
       -- CR 106.6 joins the key the narrow yields are unioned by, so the collapse
       -- never unions a mana one payment admits with one it does not into a supply
@@ -2160,13 +2166,25 @@ sourceOptions clauses admitting contends supplies =
          in case ListUtils.nubOrd (filter (not . null) (unions <> apart)) of
               [] -> [[]]
               some -> some
-      optionsFor ((activations, manaCost), yields) =
-        let claims = Activations.claims activations
+      optionsFor ((activations, manaCost), entries) =
+        let yields = fmap fst entries
+            claims = Activations.claims activations
             life = Activations.life activations
             energy = Activations.energy activations
             times = Activations.times activations
             contended = contends claims
-            alternatives = alternativesOf yields
+            -- A yield whose own claim is narrower than its route's (Priest of
+            -- Yawgmoth's, per sacrifice candidate) is an alternative carrying
+            -- that claim: never unioned with another, since each spends a
+            -- different object, and taking k of them claims what each one does.
+            -- One activation of the Priest is then none or exactly one of its
+            -- yields, rather than one group per yield multiplying the boards.
+            -- Pawl.ManaSpec's Priest of Yawgmoth group is the proof.
+            exclusive = any ((/= activations) . snd) entries
+            alternatives =
+              if exclusive
+                then [(fmap (rewriteSupply clauses . supplyOf admitting) units, Activations.claims own) | (units, own) <- entries, not (null units)]
+                else fmap (\alternative -> (alternative, claims)) (alternativesOf yields)
             eats = not (null (ManaCost.unwrap manaCost))
             -- A mana-EATING option is always worth taking fewer times, for the same
             -- reason a claiming or a life-paying one is: what it does not activate
@@ -2189,9 +2207,9 @@ sourceOptions clauses admitting contends supplies =
               (demands, generic, owed) <- resolved
               pure
                 MkSourceOption
-                  { optionSupplies = concat taken,
+                  { optionSupplies = concatMap fst taken,
                     optionDemands = concat (List.genericReplicate k (demands <> List.genericReplicate generic anyTypeDemand)),
-                    optionClaims = Claim.scale k claims,
+                    optionClaims = if exclusive then concatMap snd taken else Claim.scale k claims,
                     optionLife = k * (life + owed),
                     optionEnergy = k * energy
                   }
@@ -2387,7 +2405,7 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed comm
       -- GROUPWISE, one entry per sourceOptions group plus `claimed`, so one
       -- group's own claims meeting each other is not contention --
       -- Cost.repeatsOf has already measured that, and it is what `times` is.
-      groupClaimsOf supplies = fmap (Activations.claims . fst) (ListUtils.nubOrd (fmap (\(activations, _, manaCost) -> (activations, manaCost)) supplies))
+      groupClaimsOf supplies = fmap (Activations.claims . fst) (ListUtils.nubOrd (fmap (\(activations, _, manaCost, _) -> (activations, manaCost)) supplies))
       contested = Claim.contested (claimed : concatMap groupClaimsOf suppliesPer)
       energyHeld = Game.energyOf pid gs
       -- Each option paired with the SOURCE it came from, which is what says

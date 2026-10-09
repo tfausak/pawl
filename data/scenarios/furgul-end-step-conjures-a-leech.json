@@ -1,0 +1,24 @@
+{
+  "description": "Furgul, Quag Nurturer conjures a Slimy Dualleech at alice's end step when she controls no Leeches",
+  "note": "The 'Otherwise' clause hangs off the conjure not happening, so the Dualleech it just made gets no counter. furgul-end-step-grows-a-leech is the other branch, its board differing only in the Leech already there.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Furgul, Quag Nurturer", "label": "furgul" }],
+        "library": [{ "card": "Grizzly Bears" }, { "card": "Grizzly Bears" }]
+      },
+      {
+        "name": "bob",
+        "library": [{ "card": "Grizzly Bears" }, { "card": "Grizzly Bears" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PostcombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "EndStep", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Slimy Dualleech", "count": 1 } } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Counters": { "object": "Slimy Dualleech", "kind": { "type": "PlusOnePlusOne" }, "count": 0 } } }
+  ]
+}
