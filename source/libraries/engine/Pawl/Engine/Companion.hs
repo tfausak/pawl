@@ -16,6 +16,7 @@
 -- through.
 module Pawl.Engine.Companion where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
@@ -42,13 +43,10 @@ import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.ManaCost as ManaCost
-import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.OutsideCard as OutsideCard
 import qualified Pawl.Types.OutsideDestination as OutsideDestination
 import qualified Pawl.Types.OutsideObject as OutsideObject
-import qualified Pawl.Types.Payment as Payment
-import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
@@ -239,29 +237,19 @@ take perform pid = do
     else case Map.lookup pid (GameState.players before) >>= Player.companion of
       Nothing -> pure ()
       Just card -> do
-        -- CR 118.13c, Pawl.Engine.Foretell.foretell's announcement and for its
-        -- reasons. CR 116.2g fixes this cost at {3}, so no symbol here is ever
-        -- payable in multiple ways and no prompt is ever raised.
+        -- `before` is taken ahead of `freshObjectId`, which bumps
+        -- GameState.nextObjectId, so CR 733.1's reversal inside Cost.payAction
+        -- puts the counter back with the rest. Nothing observes it either way:
+        -- an object id is opaque and the counter only ever rises.
         noSource <- State.state Game.freshObjectId
-        (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid noSource pure actionCost
-        payment <- Cost.pay perform before PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid noSource announced
-        case payment of
-          -- CR 733.1's reversal, Pawl.Engine.Foretell.foretell's reason: this
-          -- special action IS the whole of what failed, so `before` goes to
-          -- Cost.pay and the reversal -- the payer's choice about the CR 605.3a
-          -- window included -- happens there. Alone among the special actions
-          -- this one writes before the payment: `freshObjectId` above bumps
-          -- GameState.nextObjectId, which a payer who keeps their mana keeps too.
-          -- Nothing observes it -- an object id is opaque and the counter only
-          -- ever rises -- and reversing puts it back with the rest.
-          Payment.Unpaid -> pure ()
-          Payment.Paid _ -> do
-            -- CR 702.139a names the hand, which is the whole of what the
-            -- destination says here: this is the rulebook's own action, not a
-            -- card's sentence.
-            _ <- Event.bringChosen OutsideDestination.Hand False pid [card]
-            State.modify' $ \gs ->
-              gs
-                { GameState.players =
-                    Map.adjust (\p -> p {Player.companionTaken = True}) pid (GameState.players gs)
-                }
+        paid <- Cost.payAction perform before PaymentSubject.ForNeither 0 pid noSource actionCost
+        Monad.forM_ paid $ \_ -> do
+          -- CR 702.139a names the hand, which is the whole of what the
+          -- destination says here: this is the rulebook's own action, not a
+          -- card's sentence.
+          _ <- Event.bringChosen OutsideDestination.Hand False pid [card]
+          State.modify' $ \gs ->
+            gs
+              { GameState.players =
+                  Map.adjust (\p -> p {Player.companionTaken = True}) pid (GameState.players gs)
+              }

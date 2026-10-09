@@ -68,11 +68,8 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
-import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
-import qualified Pawl.Types.Payment as Payment
-import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -223,11 +220,7 @@ canTurnFaceUp pid procedure oid gs =
 -- filter turnFaceUp offers its choice through. A cost with an X in it is
 -- payable when it is payable with X chosen as zero (CR 107.3d).
 payable :: PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payable = payableAtX 0
-
--- CR 107.3d: is this cost payable with its X chosen as this number?
-payableAtX :: Natural -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payableAtX x pid oid gs cost = Cost.canPay (PaymentSubject.TurningFaceUp oid) pid oid (Cost.substituteX x cost) gs
+payable pid oid gs cost = Cost.actionPayableAt (PaymentSubject.TurningFaceUp oid) 0 pid oid cost gs
 
 -- Every way this player may turn a permanent face up right now, in battlefield
 -- order -- what Action.TurnFaceUp is built from.
@@ -288,40 +281,12 @@ turnFaceUp perform pid procedure oid = do
           answer <- Game.choose (Prompt.ChooseCost (Decide.deciderFor pid before) pid oid offered)
           pure (List.find (== answer) offered)
       Monad.forM_ chosen $ \cost -> do
-        -- CR 107.3d: the X in a special action's cost is chosen "immediately
-        -- before they pay that cost", Pawl.Engine.Plot.plot's prompt and for its
-        -- reasons: the bound is advisory, and an answer the board cannot pay
-        -- takes the whole action away. Nothing where the cost has no X.
-        announcedX <-
-          if Cost.hasVariable cost
-            then fmap Just (Game.choose (Prompt.ChooseX (Decide.deciderFor pid before) pid oid 0 (Cost.greatestPayableX Nothing (\x -> payableAtX x pid oid before cost) cost)))
-            else pure Nothing
-        Monad.when (payableAtX (Maybe.fromMaybe 0 announcedX) pid oid before cost) $ do
-          -- CR 118.13c: a symbol payable in multiple ways is announced by the player
-          -- taking the special action "immediately before they pay that cost" -- after
-          -- the gate above, since what is announced is how to pay a cost already
-          -- chosen, and before the mana window Cost.pay opens.
-          --
-          -- CR 601.2f's totalling is `pure`, Pawl.Engine.Resolve.Effect.payGatePaidBy's
-          -- reason: pawl gathers cost adjustments for a SPELL (Pawl.Engine.Cast) and
-          -- for an ACTIVATION (Pawl.Engine.Activate) and nowhere else, and CR 601.2f
-          -- is a casting rule that reaches no special action, so the announced cost IS
-          -- the cost that will be paid and this offer stays exactly as permissive as
-          -- the payability gate above. Discarded, Pawl.Engine.Activate's reason: rule
-          -- 702.150a asks about the player who CAST the object.
-          (announced, _) <- Cost.announce (PaymentSubject.TurningFaceUp oid) ManaSpending.AsProduced pid oid pure (Cost.substituteX (Maybe.fromMaybe 0 announcedX) cost)
-          payment <- Cost.pay perform before PaymentMoment.OutsideResolution (PaymentSubject.TurningFaceUp oid) Nothing ManaSpending.AsProduced pid oid announced
-          case payment of
-            -- CR 733.1's reversal, Pawl.Engine.Foretell.foretell's reason: this
-            -- special action IS the whole of what failed, so `before` goes to
-            -- Cost.pay and the reversal -- the payer's choice about the CR 605.3a
-            -- window included -- happens there.
-            Payment.Unpaid -> pure ()
-            -- The payment's bound slots are dropped, Pawl.Engine.Ignore's reason:
-            -- turning a permanent face up resolves nothing. The PRINTED cost rides
-            -- the proposed event, since CR 702.37b's megamorph row compares it
-            -- against the card's; the X rides beside it.
-            Payment.Paid _ -> performTurnFaceUp (Just (procedure, cost)) announcedX oid
+        paid <- Cost.payAction perform before (PaymentSubject.TurningFaceUp oid) 0 pid oid cost
+        -- The PRINTED cost rides the proposed event, since CR 702.37b's
+        -- megamorph row compares it against the card's; the X rides beside it,
+        -- and nothing where the cost has no X.
+        Monad.forM_ paid $ \announcedX ->
+          performTurnFaceUp (Just (procedure, cost)) (if Cost.hasVariable cost then Just announcedX else Nothing) oid
 
 -- CR 701.40g and CR 701.58g, one sentence each and the same sentence: "if a
 -- manifested [cloaked] permanent that's represented by an instant or sorcery

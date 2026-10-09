@@ -24,11 +24,9 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.Map.Strict as Map
-import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
-import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
@@ -44,14 +42,10 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
-import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
-import qualified Pawl.Types.Payment as Payment
-import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import Pawl.Types.PlayerId (PlayerId)
-import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 702.170a / 702.170f: every plot cost `pid` may plot this object for from
@@ -111,11 +105,7 @@ canPlot :: PlayerId -> ObjectId -> Cost Keyword -> GameState -> Bool
 canPlot pid oid cost gs =
   elem cost (plotCostsOf pid oid gs)
     && Turn.sorcerySpeedWindow pid gs
-    && payableAtX 0 pid oid cost gs
-
--- CR 107.3d: is this plot cost payable with X named as this number?
-payableAtX :: Natural -> PlayerId -> ObjectId -> Cost Keyword -> GameState -> Bool
-payableAtX x pid oid cost = Cost.canPay PaymentSubject.ForNeither pid oid (Cost.substituteX x cost)
+    && Cost.actionPayableAt PaymentSubject.ForNeither 0 pid oid cost gs
 
 -- Every (card, cost) this player may plot right now -- what Action.Plot is built
 -- from, and the shape Room.unlockable and FaceDown.turnableFaceUp have. The
@@ -146,9 +136,7 @@ plottable pid gs =
 -- mints none, so the card plotted from the top is exiled wherever it went.
 --
 -- CR 107.3d's X, which a mana cost granted as a plot cost can hold, is named
--- "immediately before they pay that cost", Suspend.suspend's prompt and for its
--- reasons: the bound is advisory, and an answer the board cannot pay takes the
--- whole action away.
+-- in Cost.payAction, with CR 118.13c's announcement and CR 733.1's reversal.
 --
 -- The stamp is written onto the id the move RETURNS and never onto `oid`, the
 -- reading Resolve.finishSpell gives CR 715.3d's permission: CR 400.7 mints a
@@ -168,35 +156,14 @@ plottable pid gs =
 plot :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> ObjectId -> Cost Keyword -> Game ()
 plot perform pid oid printed = do
   before <- State.get
-  if not (canPlot pid oid printed before)
-    then pure ()
-    else do
-      announcedX <-
-        if Cost.hasVariable printed
-          then Game.choose (Prompt.ChooseX (Decide.deciderFor pid before) pid oid 0 (Cost.greatestPayableX Nothing (\x -> payableAtX x pid oid printed before) printed))
-          else pure 0
-      if not (payableAtX announcedX pid oid printed before)
-        then pure ()
-        else do
-          -- CR 118.13c, Pawl.Engine.FaceDown.turnFaceUp's announcement and for
-          -- its reasons: a granted plot cost is a card's mana cost, which can
-          -- hold a symbol payable in more than one way.
-          (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure (Cost.substituteX announcedX printed)
-          payment <- Cost.pay perform before PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
-          case payment of
-            -- CR 733.1's reversal, Pawl.Engine.Foretell.foretell's reason: this
-            -- special action IS the whole of what failed, so `before` goes to
-            -- Cost.pay and the reversal -- the payer's choice about the CR 605.3a
-            -- window included -- happens there.
-            Payment.Unpaid -> pure ()
-            -- Dropped, Pawl.Engine.Foretell's reason exactly: the card is exiled
-            -- and the later cast pays its own cost.
-            Payment.Paid _ -> do
-              -- One stamp per arrival: the funnel answers with more than one only
-              -- for a melded permanent leaving the battlefield (CR 712.21), and
-              -- this special action exiles a card from a hand or a library.
-              exiled <- Event.changeZoneReturning oid Zone.Exile
-              Monad.forM_ exiled (State.modify' . becomePlotted)
+  Monad.when (canPlot pid oid printed before) $ do
+    paid <- Cost.payAction perform before PaymentSubject.ForNeither 0 pid oid printed
+    -- One stamp per arrival: the funnel answers with more than one only for a
+    -- melded permanent leaving the battlefield (CR 712.21), and this special
+    -- action exiles a card from a hand or a library.
+    Monad.forM_ paid $ \_ -> do
+      exiled <- Event.changeZoneReturning oid Zone.Exile
+      Monad.forM_ exiled (State.modify' . becomePlotted)
 
 -- "It becomes a plotted card" -- the stamp and the event together, which is the
 -- WHOLE of what becoming plotted is.

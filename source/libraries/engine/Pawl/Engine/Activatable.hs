@@ -488,8 +488,9 @@ payableCost aimable = payableCostAt aimable 0
 -- totalled while still spelled {2/R} would hide the generic reduction the
 -- announcement exposes.
 payableCostAt :: [(Map.Map SlotName (Natural, Natural), Map.Map SlotName (Set.Set ObjectId))] -> Natural -> Maybe Keyword -> Maybe (Set.Set ManaType.ManaType) -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payableCostAt aimable x stamp spendable pid srcId gs cost =
-  aimingSomewhere (\adjustments -> Cost.plusComponents adjustments (Cost.substituteX x cost)) aimable stamp (Cost.loyaltyKindOf cost) pid srcId gs (\slots adjustments -> let totalled = Cost.plusComponents adjustments (Cost.substituteX x cost) in Cost.canPaySomeCompletion slots (PaymentSubject.Activating srcId stamp spendable) ManaSpending.AsProduced pid srcId (Cost.totalManas adjustments) (Cost.waterbendSubstitutions (Cost.Type.components totalled) slots pid srcId gs) totalled gs)
+payableCostAt aimable x stamp spendable pid srcId gs =
+  let pcs = Projection.projectAll gs
+   in payableCostAtGiven aimable (Cost.supplyManaSourcesGiven (Projection.controlGrants gs) pcs pid gs) pcs x stamp spendable pid srcId gs
 
 -- The same predicate on a board the caller already walked -- see
 -- Cost.canPaySomeCompletionGiven.
