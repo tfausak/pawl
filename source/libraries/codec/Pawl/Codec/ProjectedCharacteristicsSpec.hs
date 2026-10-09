@@ -10,6 +10,7 @@ import qualified Pawl.Codec.ProjectedCharacteristics as PC
 import qualified Pawl.Codec.RuleAbilitiesSpec as RuleAbilitiesSpec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.Card as Card.Type
@@ -86,6 +87,7 @@ testCharacteristics =
       PC.activatedAbilities = [],
       PC.replacementEffects = [],
       PC.triggeredAbilities = [FaceSpec.minimalTriggeredAbility],
+      PC.delayedAbilities = Map.singleton (AbilityName.MkAbilityName (Text.pack "later")) FaceSpec.minimalTriggeredAbility,
       PC.enchant = [TargetSlot.required Pool.Creatures Nothing],
       PC.castingPermissions = [CastingPermission.CastFromLibraryWhileSearching],
       -- Pawl.Codec.RuleAbilitiesSpec's own fixture, which is where the twelve
@@ -148,6 +150,7 @@ testCharacteristicsJson =
     <> "\"specialActions\":[{\"type\":\"DiscardThisAnyTime\"}],"
     <> "\"triggeredAbilities\":[{\"condition\":{\"type\":\"SelfEnters\"},"
     <> "\"modal\":{\"modes\":[{}]}}],"
+    <> "\"delayedAbilities\":{\"later\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}}},"
     <> "\"enchant\":[{\"pool\":{\"type\":\"Creatures\"}}],"
     <> "\"castingPermissions\":[{\"type\":\"CastFromLibraryWhileSearching\"}],"
     <> "\"ruleAbilities\":"
@@ -201,6 +204,7 @@ minimalCharacteristics =
       PC.activatedAbilities = [],
       PC.replacementEffects = [],
       PC.triggeredAbilities = [],
+      PC.delayedAbilities = Map.empty,
       PC.enchant = [],
       PC.castingPermissions = [],
       PC.ruleAbilities = mempty,

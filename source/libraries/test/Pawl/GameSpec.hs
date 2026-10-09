@@ -2559,7 +2559,8 @@ restartOnStack mountain =
               Source.OfAbility
                 ActivatedAbilitySource.MkActivatedAbilitySource
                   { ActivatedAbilitySource.source = ObjectId.MkObjectId 0,
-                    ActivatedAbilitySource.ability = ability
+                    ActivatedAbilitySource.ability = ability,
+                    ActivatedAbilitySource.delayed = Map.empty
                   },
             Object.zone = Zone.Stack,
             Object.tapped = TapState.Untapped,

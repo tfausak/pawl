@@ -1549,11 +1549,10 @@ faceOfWithLastKnown oid gs = case fmap Object.facing (lookupObject oid gs) of
     card <- cardOfWithLastKnown oid gs
     Just (resolveFaceFor (lookupLayerOne oid gs) card)
 
--- CR 603.7: the delayed triggered abilities declared on the face `oid` is
--- showing, empty for an id with no face to read. The lookup CR 113.6m's final
--- sentence needs -- Pawl.Engine.EffectZone.zoneFunctionedFrom has an
--- Effect.ArmDelayedTrigger's NAME and this is where the name's text lives, for
--- an arm that does not carry it (carriedDelayedAbility).
+-- CR 603.7: the delayed triggered abilities declared on the PRINTED face `oid`
+-- is showing, empty for an id with no face to read -- declaredDelayedAbility's
+-- first arm. A copy's are its copiable values' instead (CR 707.2), which
+-- PC.delayedAbilities carries.
 --
 -- Through faceOfWithLastKnown, so a departed permanent's ability is read against
 -- the same declarations it carried while it existed (CR 608.2h). The face-up
@@ -1594,9 +1593,9 @@ delayedAbilitiesOf oid gs = Map.unions (fmap Face.delayedAbilities (facesOfWithL
 -- an under-component's declaration is found: delayedAbilitiesOf walks the
 -- faces that are up and cardsOfWithLastKnown the cards behind them.
 --
--- Not implemented: a copy's copiable values (CR 707.2). Both arms read the
--- printed card, so a Clone of a card that arms a delayed ability by name finds
--- nothing (#4840).
+-- The PRINTED card's, and so the fallback behind
+-- Pawl.Engine.Projection.declaredDelayedAbility, which reads the projected
+-- text first (CR 707.2).
 declaredDelayedAbility :: ObjectId -> AbilityName.AbilityName -> GameState -> Maybe (TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card))
 declaredDelayedAbility source name gs =
   let onFace = Map.lookup name (delayedAbilitiesOf source gs)
@@ -1617,13 +1616,6 @@ carriedDelayedAbility :: ArmDelayedTrigger.ArmDelayedTrigger (GrantedAbility.Gra
 carriedDelayedAbility arm = case ArmDelayedTrigger.ability arm of
   Just (GrantedAbility.Triggered ability) -> Just ability
   _ -> Nothing
-
--- CR 603.7: the text an Effect.ArmDelayedTrigger stands for -- the one it
--- carries, else its name's declaration on the source's own card
--- (declaredDelayedAbility). data/scenarios/copy's Splinter Twin and Sakashima
--- scenarios prove the carried half.
-armedDelayedAbility :: ObjectId -> ArmDelayedTrigger.ArmDelayedTrigger (GrantedAbility.GrantedAbility Card) -> GameState -> Maybe (TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card))
-armedDelayedAbility source arm gs = carriedDelayedAbility arm Applicative.<|> declaredDelayedAbility source (ArmDelayedTrigger.name arm) gs
 
 -- CR 702.140e: the faces of every card representing `oid`, topmost first -- one
 -- face for an ordinary object, and a merged permanent's whole stack. The one

@@ -1,0 +1,325 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Frenetic Sliver",
+      "oracleText": "All Slivers have \"{0}: If this permanent is on the battlefield, flip a coin. If you win the flip, exile this permanent and return it to the battlefield under its owner's control at the beginning of the next end step. If you lose the flip, sacrifice it.\"",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "HasSubtype",
+              "value": {
+                "type": "Sliver"
+              }
+            }
+          },
+          "modifications": [
+            {
+              "type": "GainAbility",
+              "value": {
+                "type": "Activated",
+                "value": {
+                  "cost": {
+                    "mana": []
+                  },
+                  "modal": {
+                    "modes": [
+                      {
+                        "clauses": [
+                          {
+                            "condition": {
+                              "type": "Compares",
+                              "value": {
+                                "comparison": {
+                                  "type": "AtLeast"
+                                },
+                                "measured": {
+                                  "type": "Count",
+                                  "value": {
+                                    "aggregation": {
+                                      "type": "Members"
+                                    },
+                                    "filter": {
+                                      "type": "IsSource"
+                                    },
+                                    "scope": {
+                                      "type": "InZone",
+                                      "value": {
+                                        "player": {
+                                          "type": "EachPlayer"
+                                        },
+                                        "zone": {
+                                          "type": "Battlefield"
+                                        }
+                                      }
+                                    }
+                                  }
+                                },
+                                "threshold": {
+                                  "type": "Literal",
+                                  "value": 1
+                                }
+                              }
+                            },
+                            "effects": [
+                              {
+                                "type": "FlipCoin",
+                                "value": {
+                                  "slot": "flip"
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "condition": {
+                              "type": "All",
+                              "value": [
+                                {
+                                  "type": "Compares",
+                                  "value": {
+                                    "comparison": {
+                                      "type": "AtLeast"
+                                    },
+                                    "measured": {
+                                      "type": "Count",
+                                      "value": {
+                                        "aggregation": {
+                                          "type": "Members"
+                                        },
+                                        "filter": {
+                                          "type": "IsSource"
+                                        },
+                                        "scope": {
+                                          "type": "InZone",
+                                          "value": {
+                                            "player": {
+                                              "type": "EachPlayer"
+                                            },
+                                            "zone": {
+                                              "type": "Battlefield"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "threshold": {
+                                      "type": "Literal",
+                                      "value": 1
+                                    }
+                                  }
+                                },
+                                {
+                                  "type": "Compares",
+                                  "value": {
+                                    "comparison": {
+                                      "type": "Exactly"
+                                    },
+                                    "measured": {
+                                      "type": "InSlot",
+                                      "value": "flip"
+                                    },
+                                    "threshold": {
+                                      "type": "Literal",
+                                      "value": 1
+                                    }
+                                  }
+                                }
+                              ]
+                            },
+                            "effects": [
+                              {
+                                "type": "MoveToZone",
+                                "value": {
+                                  "ref": {
+                                    "type": "InSlot",
+                                    "value": "self"
+                                  },
+                                  "slot": "exiled",
+                                  "zone": {
+                                    "type": "Exile"
+                                  }
+                                }
+                              },
+                              {
+                                "type": "ArmDelayedTrigger",
+                                "value": {
+                                  "ability": {
+                                    "type": "Triggered",
+                                    "value": {
+                                      "condition": {
+                                        "type": "StepBegins",
+                                        "value": {
+                                          "phase": {
+                                            "type": "Ending",
+                                            "value": {
+                                              "type": "EndStep"
+                                            }
+                                          },
+                                          "scope": {
+                                            "type": "EachTurn"
+                                          }
+                                        }
+                                      },
+                                      "modal": {
+                                        "modes": [
+                                          {
+                                            "clauses": [
+                                              {
+                                                "effects": [
+                                                  {
+                                                    "type": "MoveToZone",
+                                                    "value": {
+                                                      "origin": {
+                                                        "type": "Exile"
+                                                      },
+                                                      "ref": {
+                                                        "type": "InSlot",
+                                                        "value": "exiled"
+                                                      },
+                                                      "riders": {
+                                                        "underOwner": true
+                                                      },
+                                                      "zone": {
+                                                        "type": "Battlefield"
+                                                      }
+                                                    }
+                                                  }
+                                                ]
+                                              }
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  },
+                                  "name": "return it"
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "condition": {
+                              "type": "All",
+                              "value": [
+                                {
+                                  "type": "Compares",
+                                  "value": {
+                                    "comparison": {
+                                      "type": "AtLeast"
+                                    },
+                                    "measured": {
+                                      "type": "Count",
+                                      "value": {
+                                        "aggregation": {
+                                          "type": "Members"
+                                        },
+                                        "filter": {
+                                          "type": "IsSource"
+                                        },
+                                        "scope": {
+                                          "type": "InZone",
+                                          "value": {
+                                            "player": {
+                                              "type": "EachPlayer"
+                                            },
+                                            "zone": {
+                                              "type": "Battlefield"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "threshold": {
+                                      "type": "Literal",
+                                      "value": 1
+                                    }
+                                  }
+                                },
+                                {
+                                  "type": "Compares",
+                                  "value": {
+                                    "comparison": {
+                                      "type": "Exactly"
+                                    },
+                                    "measured": {
+                                      "type": "InSlot",
+                                      "value": "flip"
+                                    },
+                                    "threshold": {
+                                      "type": "Literal",
+                                      "value": 0
+                                    }
+                                  }
+                                }
+                              ]
+                            },
+                            "effects": [
+                              {
+                                "type": "Sacrifice",
+                                "value": {
+                                  "ref": {
+                                    "type": "InSlot",
+                                    "value": "self"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Sliver"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

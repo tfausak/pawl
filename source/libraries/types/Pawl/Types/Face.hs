@@ -221,9 +221,9 @@ data Face card = MkFace
     -- Effect stays out of the module graph), since the object using a
     -- quotation is not the card that printed it.
     --
-    -- Read straight from the card, never through the projection: a delayed
-    -- ability is not ON the source object -- CR 603.7d gives it no source
-    -- permanent to lose, so layer 6 cannot strip it.
+    -- Read through the projection's copiable values (PC.delayedAbilities), so a
+    -- copy arms the text it copied (CR 707.2) -- but never stripped by layer
+    -- 6: a delayed ability is not ON the source object (CR 603.7d).
     delayedAbilities :: Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility card (GrantedAbility.GrantedAbility card)),
     -- | CR 309.4: this face's rooms, topmost first -- the room graph of a dungeon
     -- card, and empty for every card that is not a dungeon. The CardSpec lint

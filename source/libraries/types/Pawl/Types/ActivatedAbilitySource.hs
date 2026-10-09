@@ -1,9 +1,12 @@
 module Pawl.Types.ActivatedAbilitySource where
 
+import qualified Data.Map.Strict as Map
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 
 -- | CR 602: an activated ability on the stack -- the source permanent's id plus
 -- the ability. The ability travels with the object so it resolves even if the
@@ -21,6 +24,12 @@ import qualified Pawl.Types.ObjectId as ObjectId
 -- a codec needs. Pawl.Types.Source is what this is an arm of.
 data ActivatedAbilitySource = MkActivatedAbilitySource
   { source :: ObjectId.ObjectId,
-    ability :: ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)
+    ability :: ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card),
+    -- | CR 113.7a / 603.7: the delayed abilities the source's rules text
+    -- declared as this object was put on the stack (PC.delayedAbilities),
+    -- frozen with it: the ability exists independently of its source, so a copy
+    -- effect or text change on the source afterwards does not change what its
+    -- arms create.
+    delayed :: Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card))
   }
   deriving (Eq, Ord, Show)

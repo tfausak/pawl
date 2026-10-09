@@ -533,12 +533,13 @@ targetSlotsOf obj oid gs face =
 -- creates no reflexive" proves the draw is not what it reads.
 applyClauseEffects ::
   ObjectId ->
+  ObjectId ->
   (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game ()) ->
   [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] ->
   Game ()
-applyClauseEffects source applyOne =
+applyClauseEffects resolving source applyOne =
   let step previous effect = do
-        arms <- State.gets (armsReflexive source effect)
+        arms <- State.gets (armsReflexive resolving source effect)
         let skipped = arms && maybe False (not . uncurry happenedBetween) previous
         before <- State.get
         Monad.unless skipped (applyOne effect)
@@ -608,16 +609,16 @@ happenedBetween before after =
         || comparable before /= comparable after
 
 -- CR 603.12: does this instruction create a REFLEXIVE triggered ability? The arm
--- is resolved exactly as the arm itself resolves it (Game.armedDelayedAbility,
+-- is resolved exactly as the arm itself resolves it (Projection.armedDelayedAbility,
 -- then rule 702's minted roster), and the answer is the created ability's own
 -- CLASSIFICATION -- its trigger condition -- never which card armed it.
-armsReflexive :: ObjectId -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> GameState -> Bool
-armsReflexive source effect gs = case effect of
+armsReflexive :: ObjectId -> ObjectId -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> GameState -> Bool
+armsReflexive resolving source effect gs = case effect of
   Effect.ArmDelayedTrigger arm ->
     maybe
       False
       ((== TriggerCondition.Reflexive) . TriggeredAbility.condition)
-      (Game.armedDelayedAbility source arm gs <|> Keyword.mintedDelayedAbility (ArmDelayedTrigger.name arm))
+      (Projection.armedDelayedAbility resolving source arm gs <|> Keyword.mintedDelayedAbility (ArmDelayedTrigger.name arm))
   _ -> False
 
 -- The players a PlayerRef names, in CR 101.4's APNAP order -- playerRefPlayers
@@ -6028,6 +6029,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- do, ..." is the shape: the reflexive is that opponent's own tap, not the
               -- previous opponent's.
               applyClauseEffects
+                resolving
                 source
                 ( \eff -> do
                     defined <- State.gets (\gs -> Map.restrictKeys (Binding.targetsOf (bindingsOf gs)) bodyDefined)
@@ -7685,7 +7687,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- id `source` names. CR 603.7: a rule 702 keyword has no card text to declare
     -- the far end in, so a name a minted ability arms resolves against rule 702's
     -- own roster instead; the two namespaces are kept disjoint by Pawl.CardSpec.
-    case Game.armedDelayedAbility source arm gs <|> Keyword.mintedDelayedAbility name of
+    case Projection.armedDelayedAbility resolving source arm gs <|> Keyword.mintedDelayedAbility name of
       -- For a CARD's name the dataflow lint makes a dangling one a failing test,
       -- and this arm only keeps the executor total. A MINTED name has no such
       -- lint, so a forgotten roster row lands here and does nothing.
@@ -11364,7 +11366,7 @@ applyLoopBody runSubgame resolving source controller legal chosen bodyDefined bo
   let applyOne effect = do
         defined <- State.gets (\gs -> Map.restrictKeys (Binding.targetsOf (slotBindings resolving gs)) bodyDefined)
         applyEffectWith runSubgame resolving source controller (Map.union legal defined) (Map.union chosen defined) effect
-   in applyClauseEffects source applyOne (Foldable.toList body)
+   in applyClauseEffects resolving source applyOne (Foldable.toList body)
 
 -- A loop's per-run scope (CR 608.2c): the slots its body defines put back to
 -- what the resolving object held before the first run, so a run that binds

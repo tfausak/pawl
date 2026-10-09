@@ -547,12 +547,13 @@ manaSuppliesGiven capacity pcs pid oid gs =
         (ListUtils.nubOrd (fmap yieldOf available))
 
 -- CR 603.7a / 106.6a: the delayed ability a Pawl.Types.WhenSpent creates as
--- one mana is produced, its text read off the source's card now (CR 603.7c).
+-- one mana is produced, its text read off the source's rules text now (CR
+-- 603.7c).
 -- Nothing for a name the card does not declare, which Pawl.AbilitySlotLintSpec
 -- keeps unreachable.
 spendTriggerOf :: PlayerId -> ObjectId -> GameState -> WhenSpent.WhenSpent -> Maybe SpendTrigger.SpendTrigger
 spendTriggerOf controller source gs whenSpent = do
-  ability <- Game.declaredDelayedAbility source (WhenSpent.ability whenSpent) gs
+  ability <- Projection.declaredDelayedAbility source (WhenSpent.ability whenSpent) gs
   pure
     SpendTrigger.MkSpendTrigger
       { SpendTrigger.casts = WhenSpent.casts whenSpent,
