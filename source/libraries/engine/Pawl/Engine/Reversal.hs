@@ -410,6 +410,7 @@ objectWith before entry closed = do
   exertedBy <- field Object.exertedBy
   activatedOnce <- field Object.activatedOnce
   paired <- field Object.paired
+  stickers <- field Object.stickers
   duplicate <- field Object.duplicate
   pure
     Object.MkObject
@@ -472,6 +473,7 @@ objectWith before entry closed = do
         Object.exertedBy = exertedBy,
         Object.activatedOnce = activatedOnce,
         Object.paired = paired,
+        Object.stickers = stickers,
         Object.duplicate = duplicate
       }
   where

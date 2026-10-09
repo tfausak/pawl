@@ -15,6 +15,7 @@ data-dir: data
 data-files:
   cards/*.json
   scenarios/**/*.json
+  sticker-sheets/*.json
 
 extra-doc-files:
   CHANGELOG.md
@@ -91,6 +92,7 @@ library codec
     Pawl.Codec.AbilityKindSpec
     Pawl.Codec.AbilityName
     Pawl.Codec.AbilityNameSpec
+    Pawl.Codec.AbilitySticker
     Pawl.Codec.AbilityTriggered
     Pawl.Codec.AbilityTriggeredSpec
     Pawl.Codec.ActivatedAbility
@@ -968,6 +970,7 @@ library codec
     Pawl.Codec.PileSpec
     Pawl.Codec.Placement
     Pawl.Codec.PlacementSpec
+    Pawl.Codec.PlacesSticker
     Pawl.Codec.PlanarDieFace
     Pawl.Codec.PlanarDieFaceSpec
     Pawl.Codec.PlanarDieRolled
@@ -1024,6 +1027,7 @@ library codec
     Pawl.Codec.PowerSpec
     Pawl.Codec.PowerToughnessIs
     Pawl.Codec.PowerToughnessIsSpec
+    Pawl.Codec.PowerToughnessSticker
     Pawl.Codec.PreventAllDamage
     Pawl.Codec.PreventAllDamageSpec
     Pawl.Codec.Prevention
@@ -1055,6 +1059,7 @@ library codec
     Pawl.Codec.PutCountersFrom
     Pawl.Codec.PutCountersFromSpec
     Pawl.Codec.PutCountersSpec
+    Pawl.Codec.PutSticker
     Pawl.Codec.Quantity
     Pawl.Codec.QuantitySpec
     Pawl.Codec.RandomCardInGraveyard
@@ -1224,6 +1229,13 @@ library codec
     Pawl.Codec.StepBeganSpec
     Pawl.Codec.StepBegins
     Pawl.Codec.StepBeginsSpec
+    Pawl.Codec.StickerKind
+    Pawl.Codec.StickerKindSpec
+    Pawl.Codec.StickerPlacement
+    Pawl.Codec.StickerPut
+    Pawl.Codec.StickerRef
+    Pawl.Codec.StickerSheet
+    Pawl.Codec.StickerSheetSpec
     Pawl.Codec.StoredResult
     Pawl.Codec.StoredResultSpec
     Pawl.Codec.Subtype
@@ -1509,6 +1521,7 @@ library engine
     Pawl.Engine.SplitSecond
     Pawl.Engine.Stack
     Pawl.Engine.Star
+    Pawl.Engine.Sticker
     Pawl.Engine.Subtype
     Pawl.Engine.Summoning
     Pawl.Engine.Suspend
@@ -1729,6 +1742,7 @@ library registry
     Pawl.Ingest
     Pawl.Oracle
     Pawl.Registry
+    Pawl.StickerSheets
 
 -- Scenarios: a board, a timeline of decisions and checks, and the runner that
 -- plays one against the engine. The boundary through which anything other than
@@ -1943,6 +1957,7 @@ library test
     Pawl.SpeedSpec
     Pawl.SplitSecondSpec
     Pawl.StationSpec
+    Pawl.StickerSpec
     Pawl.Support
     Pawl.TargetPerPlayerSpec
     Pawl.TargetSpec
@@ -1973,6 +1988,7 @@ library types
     Pawl.Types.AbilityAddsMana
     Pawl.Types.AbilityKind
     Pawl.Types.AbilityName
+    Pawl.Types.AbilitySticker
     Pawl.Types.AbilityTriggered
     Pawl.Types.Action
     Pawl.Types.ActivatedAbility
@@ -2470,6 +2486,7 @@ library types
     Pawl.Types.Pile
     Pawl.Types.PileDraw
     Pawl.Types.Placement
+    Pawl.Types.PlacesSticker
     Pawl.Types.PlanarDieFace
     Pawl.Types.PlanarDieRolled
     Pawl.Types.Player
@@ -2498,6 +2515,7 @@ library types
     Pawl.Types.Pool
     Pawl.Types.Power
     Pawl.Types.PowerToughnessIs
+    Pawl.Types.PowerToughnessSticker
     Pawl.Types.PreventAllDamage
     Pawl.Types.Prevention
     Pawl.Types.PreventionRider
@@ -2517,6 +2535,7 @@ library types
     Pawl.Types.Prototype
     Pawl.Types.PutCounters
     Pawl.Types.PutCountersFrom
+    Pawl.Types.PutSticker
     Pawl.Types.Quantity
     Pawl.Types.RandomCardInGraveyard
     Pawl.Types.RandomCardInHand
@@ -2616,6 +2635,11 @@ library types
     Pawl.Types.Status
     Pawl.Types.StepBegan
     Pawl.Types.StepBegins
+    Pawl.Types.StickerKind
+    Pawl.Types.StickerPlacement
+    Pawl.Types.StickerPut
+    Pawl.Types.StickerRef
+    Pawl.Types.StickerSheet
     Pawl.Types.StoredResult
     Pawl.Types.Subtype
     Pawl.Types.SubtypeFamily

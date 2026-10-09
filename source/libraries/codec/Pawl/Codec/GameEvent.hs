@@ -50,6 +50,7 @@ import qualified Pawl.Codec.SchemeSetInMotion as SchemeSetInMotion
 import qualified Pawl.Codec.SpellWasCast as SpellWasCast
 import qualified Pawl.Codec.SpellWasCopied as SpellWasCopied
 import qualified Pawl.Codec.StepBegan as StepBegan
+import qualified Pawl.Codec.StickerPut as StickerPut
 import qualified Pawl.Codec.TappedForMana as TappedForMana
 import qualified Pawl.Codec.Transformed as Transformed
 import qualified Pawl.Codec.TriggeredAbilitySource as TriggeredAbilitySource
@@ -159,6 +160,7 @@ codec =
       Arm.payload "Waterbent" PlayerId.codec GameEvent.Waterbent (\x -> case x of GameEvent.Waterbent y -> Just y; _ -> Nothing),
       Arm.payload "Airbent" PlayerId.codec GameEvent.Airbent (\x -> case x of GameEvent.Airbent y -> Just y; _ -> Nothing),
       Arm.payload "Firebent" PlayerId.codec GameEvent.Firebent (\x -> case x of GameEvent.Firebent y -> Just y; _ -> Nothing),
+      Arm.payload "StickerPut" StickerPut.codec GameEvent.StickerPut (\x -> case x of GameEvent.StickerPut y -> Just y; _ -> Nothing),
       -- CR 608.2n. The source object and the ability, which is the pair CR
       -- 707.10b counts by, so the payload is the same record Pawl.Types.Source's
       -- own OfAbility arm carries.
@@ -252,5 +254,6 @@ tagOf x = case x of
   GameEvent.Waterbent {} -> "Waterbent"
   GameEvent.Airbent {} -> "Airbent"
   GameEvent.Firebent {} -> "Firebent"
+  GameEvent.StickerPut {} -> "StickerPut"
   GameEvent.ActivatedAbilityResolved {} -> "ActivatedAbilityResolved"
   GameEvent.TriggeredAbilityResolved {} -> "TriggeredAbilityResolved"

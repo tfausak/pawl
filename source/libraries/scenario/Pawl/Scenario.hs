@@ -825,6 +825,7 @@ withinOffer prompt chosen = case prompt of
   Prompt.Type.ChooseEnchantmentTypeSwap _ _ _ _ forbidden -> Set.notMember (snd chosen) forbidden
   Prompt.Type.RandomFirstPlayer players -> chosen `elem` players
   Prompt.Type.RandomObject objects -> chosen `elem` objects
+  Prompt.Type.RandomStickerSheet slots -> chosen `elem` slots
   Prompt.Type.ChooseDieResult _ _ _ results -> toInteger chosen < toInteger (length results)
   Prompt.Type.ChooseCoinResult _ _ faces -> chosen `elem` faces
   Prompt.Type.ChooseDiscard _ _ cards _ -> all (`elem` cards) chosen
@@ -845,6 +846,7 @@ withinOffer prompt chosen = case prompt of
   Prompt.Type.ChooseCardInHand _ _ _ cards -> chosen `elem` cards
   Prompt.Type.ChooseCardsFromAmong _ _ _ cards _ -> all (`elem` cards) chosen
   Prompt.Type.ChooseDungeon _ _ dungeons -> chosen `elem` dungeons
+  Prompt.Type.ChooseSticker _ _ _ offered -> chosen `elem` offered
   Prompt.Type.ChooseCompanion _ _ companions -> all (`elem` companions) chosen
   Prompt.Type.ChooseRoom _ _ _ rooms -> chosen `elem` rooms
   Prompt.Type.ChooseHalf _ _ _ names -> chosen `elem` names

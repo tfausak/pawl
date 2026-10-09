@@ -21,6 +21,7 @@ import qualified Pawl.Codec.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Codec.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Codec.PermanentsBecomeTargeted as PermanentsBecomeTargeted
 import qualified Pawl.Codec.PermanentsDealCombatDamageToPlayer as PermanentsDealCombatDamageToPlayer
+import qualified Pawl.Codec.PlacesSticker as PlacesSticker
 import qualified Pawl.Codec.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Codec.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Codec.PlayerDrawsNthCard as PlayerDrawsNthCard
@@ -213,7 +214,8 @@ codec =
           Arm.payload "PlayerEarthbends" PlayerRelation.codec TriggerCondition.PlayerEarthbends (\x -> case x of TriggerCondition.PlayerEarthbends y -> Just y; _ -> Nothing),
           Arm.payload "PlayerWaterbends" PlayerRelation.codec TriggerCondition.PlayerWaterbends (\x -> case x of TriggerCondition.PlayerWaterbends y -> Just y; _ -> Nothing),
           Arm.payload "PlayerAirbends" PlayerRelation.codec TriggerCondition.PlayerAirbends (\x -> case x of TriggerCondition.PlayerAirbends y -> Just y; _ -> Nothing),
-          Arm.payload "PlayerFirebends" PlayerRelation.codec TriggerCondition.PlayerFirebends (\x -> case x of TriggerCondition.PlayerFirebends y -> Just y; _ -> Nothing)
+          Arm.payload "PlayerFirebends" PlayerRelation.codec TriggerCondition.PlayerFirebends (\x -> case x of TriggerCondition.PlayerFirebends y -> Just y; _ -> Nothing),
+          Arm.payload "PlacesSticker" PlacesSticker.codec TriggerCondition.PlacesSticker (\x -> case x of TriggerCondition.PlacesSticker y -> Just y; _ -> Nothing)
         ]
 
 tagOf :: TriggerCondition.TriggerCondition -> String
@@ -373,3 +375,4 @@ tagOf x = case x of
   TriggerCondition.PlayerWaterbends {} -> "PlayerWaterbends"
   TriggerCondition.PlayerAirbends {} -> "PlayerAirbends"
   TriggerCondition.PlayerFirebends {} -> "PlayerFirebends"
+  TriggerCondition.PlacesSticker {} -> "PlacesSticker"

@@ -13,6 +13,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.StickerKind as StickerKind
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.Zone as Zone
@@ -642,6 +643,12 @@ data Filter keyword
     -- 122.1b's keyword counters making CounterKind unenumerable, and a separate
     -- nullary atom rather than a Maybe payload on HasCounters above, see #994.
     HasCountersOfAnyKind
+  | -- | CR 123.6-123.9: does the CANDIDATE have a sticker of this kind on it
+    -- (Proficient Pyrodancer's "with an art sticker on it")? Uncharacteristic,
+    -- HasCounters' reason.
+    HasSticker StickerKind.StickerKind
+  | -- | CR 123.4: is the CANDIDATE stickered, any kind, now?
+    Stickered
   | -- | CR 602.1 / 605.1a: does the CANDIDATE have one or more activated
     -- abilities that aren't mana abilities? Tsabo's Web's "each land with an
     -- activated ability that isn't a mana ability". The abilities it reads are

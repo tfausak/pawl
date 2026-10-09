@@ -1,6 +1,7 @@
 module Pawl.Codec.PlayerSpec where
 
 import qualified Data.Map as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Player as Player
@@ -44,6 +45,8 @@ spec s = Spec.describe s "Pawl.Codec.Player" $ do
           Player.commanderDamage = Map.empty,
           Player.dungeons = Set.empty,
           Player.outsideTheGame = Map.empty,
+          Player.stickerSheets = Seq.empty,
+          Player.chosenStickerSheets = Set.empty,
           Player.completedDungeons = 0,
           Player.completedDungeonNames = Set.empty,
           Player.startingDeck = Map.empty,
@@ -81,6 +84,8 @@ spec s = Spec.describe s "Pawl.Codec.Player" $ do
           Player.commanderDamage = Map.singleton (PrintingId.MkPrintingId 7) 8,
           Player.dungeons = Set.fromList [PrintingId.MkPrintingId 9, PrintingId.MkPrintingId 11],
           Player.outsideTheGame = Map.singleton (PrintingId.MkPrintingId 12) 13,
+          Player.stickerSheets = Seq.empty,
+          Player.chosenStickerSheets = Set.fromList [0, 2],
           Player.completedDungeons = 10,
           Player.completedDungeonNames = Set.fromList [CardName.MkCardName (Text.pack "Tomb of Annihilation"), CardName.MkCardName (Text.pack "Undercity")],
           Player.startingDeck = Map.singleton (PrintingId.MkPrintingId 14) 15,
@@ -94,7 +99,7 @@ spec s = Spec.describe s "Pawl.Codec.Player" $ do
           <> ",\"ringTemptations\":3,\"speed\":4"
           <> ",\"designations\":[{\"type\":\"CitysBlessing\"},{\"type\":\"EnduringStory\"}]"
           <> ",\"commander\":[5,17],\"commanderCasts\":{\"5\":6,\"17\":19}"
-          <> ",\"commanderDamage\":{\"7\":8},\"dungeons\":[9,11],\"outsideTheGame\":{\"12\":13},\"completedDungeons\":10,\"completedDungeonNames\":[\"Tomb of Annihilation\",\"Undercity\"]"
+          <> ",\"commanderDamage\":{\"7\":8},\"dungeons\":[9,11],\"outsideTheGame\":{\"12\":13},\"chosenStickerSheets\":[0,2],\"completedDungeons\":10,\"completedDungeonNames\":[\"Tomb of Annihilation\",\"Undercity\"]"
           <> ",\"startingDeck\":{\"14\":15},\"companion\":{\"type\":\"InPool\",\"value\":16},\"companionTaken\":true"
           <> ",\"graveyardOrder\":{\"type\":\"Matters\"}} "
       )

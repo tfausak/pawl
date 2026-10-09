@@ -14,6 +14,7 @@ import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.PlayerRelation as PlayerRelation
 import qualified Pawl.Codec.ProductionTag as ProductionTag
 import qualified Pawl.Codec.SlotName as SlotName
+import qualified Pawl.Codec.StickerKind as StickerKind
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.Supertype as Supertype
 import qualified Pawl.Codec.Zone as Zone
@@ -164,6 +165,8 @@ codec keywordCodec =
       Arm.payload "HasDesignation" Designation.codec Filter.HasDesignation (\x -> case x of Filter.HasDesignation y -> Just y; _ -> Nothing),
       Arm.payload "HasCounters" (CounterKind.codec keywordCodec) Filter.HasCounters (\x -> case x of Filter.HasCounters y -> Just y; _ -> Nothing),
       Arm.nullary "HasCountersOfAnyKind" Filter.HasCountersOfAnyKind,
+      Arm.payload "HasSticker" StickerKind.codec Filter.HasSticker (\x -> case x of Filter.HasSticker y -> Just y; _ -> Nothing),
+      Arm.nullary "Stickered" Filter.Stickered,
       Arm.nullary "HasNonManaActivatedAbility" Filter.HasNonManaActivatedAbility,
       Arm.nullary "HasActivatedAbility" Filter.HasActivatedAbility,
       Arm.payload "IsInZone" Zone.codec Filter.IsInZone (\x -> case x of Filter.IsInZone y -> Just y; _ -> Nothing),
@@ -292,6 +295,8 @@ tagOf x = case x of
   Filter.HasDesignation {} -> "HasDesignation"
   Filter.HasCounters {} -> "HasCounters"
   Filter.HasCountersOfAnyKind {} -> "HasCountersOfAnyKind"
+  Filter.HasSticker {} -> "HasSticker"
+  Filter.Stickered {} -> "Stickered"
   Filter.HasNonManaActivatedAbility {} -> "HasNonManaActivatedAbility"
   Filter.HasActivatedAbility {} -> "HasActivatedAbility"
   Filter.IsInZone {} -> "IsInZone"

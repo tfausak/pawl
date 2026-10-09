@@ -90,6 +90,8 @@ import qualified Pawl.Types.RollAdjustment as RollAdjustment
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SearchPlace as SearchPlace
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.StickerKind as StickerKind
+import qualified Pawl.Types.StickerRef as StickerRef
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TimeTravelChoice as TimeTravelChoice
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
@@ -1284,6 +1286,20 @@ combatReplaySpec s =
           -- CR 309.2a again: with nothing recorded, the head is what the engine
           -- would have entered.
           Spec.assertEqWith s "a short transcript enters the first offered" (Replay.defaultAnswer p) a
+        -- CR 103.2d: the sheet randomness drew is part of the transcript.
+        Spec.it s "RandomStickerSheet round-trips through the transcript" $ do
+          let p = Prompt.RandomStickerSheet (0 NonEmpty.:| [3])
+          Spec.assertEqWith s "drawing the second round trips" (Replay.decode p (Replay.encode p 3)) (Just 3)
+          Spec.assertEqWith s "drawing the first round trips" (Replay.decode p (Replay.encode p 0)) (Just 0)
+          Spec.assertEqWith s "a short transcript draws the first offered" (Replay.defaultAnswer p) 0
+        -- CR 123.3: which sticker the placer chose is a decision.
+        Spec.it s "ChooseSticker round-trips through the transcript" $ do
+          let a = StickerRef.MkStickerRef S.alice 0 StickerKind.Art 0
+              b = StickerRef.MkStickerRef S.alice 1 StickerKind.Art 2
+              p = Prompt.ChooseSticker decider S.alice (ObjectId.MkObjectId 7) (a NonEmpty.:| [b])
+          Spec.assertEqWith s "choosing the second round trips" (Replay.decode p (Replay.encode p b)) (Just b)
+          Spec.assertEqWith s "choosing the first round trips" (Replay.decode p (Replay.encode p a)) (Just a)
+          Spec.assertEqWith s "a short transcript places the first offered" (Replay.defaultAnswer p) a
         -- CR 103.2b: whether a player revealed a companion before the game began,
         -- and which, is a decision, so it has to survive a transcript like any
         -- other.

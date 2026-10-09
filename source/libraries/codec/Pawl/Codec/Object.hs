@@ -33,6 +33,7 @@ import qualified Pawl.Codec.RoomHalf as RoomHalf
 import qualified Pawl.Codec.RoomIndex as RoomIndex
 import qualified Pawl.Codec.Sickness as Sickness
 import qualified Pawl.Codec.Source as Source
+import qualified Pawl.Codec.StickerPlacement as StickerPlacement
 import qualified Pawl.Codec.StoredResult as StoredResult
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.TapState as TapState
@@ -120,6 +121,7 @@ codec = Fields.object $ do
   ringBearerFor <- Fields.defaulted "ringBearerFor" Nothing (Common.maybe PlayerId.codec) Object.ringBearerFor
   paired <- Fields.defaulted "paired" Nothing (Common.maybe Pairing.codec) Object.paired
   duplicate <- Fields.defaulted "duplicate" Nothing (Common.maybe ProjectedCharacteristics.codec) Object.duplicate
+  stickers <- Fields.defaulted "stickers" Seq.empty (Common.seq StickerPlacement.codec) Object.stickers
   protector <- Fields.defaulted "protector" Nothing (Common.maybe PlayerId.codec) Object.protector
   ventureRoom <- Fields.defaulted "ventureRoom" Nothing (Common.maybe RoomIndex.codec) Object.ventureRoom
   classLevel <- Fields.defaulted "classLevel" Nothing (Common.maybe ClassLevel.codec) Object.classLevel
@@ -183,6 +185,7 @@ codec = Fields.object $ do
         Object.preparedCopyOf = preparedCopyOf,
         Object.ringBearerFor = ringBearerFor,
         Object.duplicate = duplicate,
+        Object.stickers = stickers,
         Object.paired = paired,
         Object.protector = protector,
         Object.ventureRoom = ventureRoom,

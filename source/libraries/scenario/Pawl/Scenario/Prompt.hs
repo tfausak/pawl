@@ -26,6 +26,7 @@ deciderOf prompt = case prompt of
   Prompt.Shuffle {} -> Nothing
   Prompt.RandomFirstPlayer {} -> Nothing
   Prompt.RandomObject {} -> Nothing
+  Prompt.RandomStickerSheet {} -> Nothing
   Prompt.RandomPlayer {} -> Nothing
   Prompt.RandomCard {} -> Nothing
   Prompt.ChooseConjuredCard decider _ _ -> Just (Decider.unwrap decider)
@@ -83,6 +84,7 @@ deciderOf prompt = case prompt of
   Prompt.ChooseCardFromAmong decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseCardsFromAmong decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseDungeon decider _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseSticker decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseCompanion decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseFromOutsideTheGame decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseRoom decider _ _ _ -> Just (Decider.unwrap decider)
@@ -194,6 +196,7 @@ kindOf prompt = Text.pack $ case prompt of
   Prompt.Shuffle {} -> "Shuffle"
   Prompt.RandomFirstPlayer {} -> "RandomFirstPlayer"
   Prompt.RandomObject {} -> "RandomObject"
+  Prompt.RandomStickerSheet {} -> "RandomStickerSheet"
   Prompt.RandomPlayer {} -> "RandomPlayer"
   Prompt.RandomCard {} -> "RandomCard"
   Prompt.ChooseConjuredCard {} -> "ChooseConjuredCard"
@@ -251,6 +254,7 @@ kindOf prompt = Text.pack $ case prompt of
   Prompt.ChooseCardFromAmong {} -> "ChooseCardFromAmong"
   Prompt.ChooseCardsFromAmong {} -> "ChooseCardsFromAmong"
   Prompt.ChooseDungeon {} -> "ChooseDungeon"
+  Prompt.ChooseSticker {} -> "ChooseSticker"
   Prompt.ChooseCompanion {} -> "ChooseCompanion"
   Prompt.ChooseFromOutsideTheGame {} -> "ChooseFromOutsideTheGame"
   Prompt.ChooseRoom {} -> "ChooseRoom"

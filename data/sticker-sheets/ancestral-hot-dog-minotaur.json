@@ -1,0 +1,42 @@
+{
+  "abilities": [
+    {
+      "keywords": [
+        {
+          "type": "Afflict",
+          "value": 2
+        }
+      ],
+      "tickets": 2
+    },
+    {
+      "keywords": [
+        {
+          "type": "Flying"
+        }
+      ],
+      "tickets": 3
+    }
+  ],
+  "art": 3,
+  "name": "Ancestral Hot Dog Minotaur",
+  "names": [
+    "Ancestral",
+    "Hot Dog",
+    "Minotaur"
+  ],
+  "number": 23,
+  "oracleText": "{TK}{TK} — Afflict 2 (Whenever this creature becomes blocked, defending player loses 2 life.)\n{TK}{TK}{TK} — Flying\n{TK}{TK} — 1/4\n{TK}{TK}{TK}{TK}{TK} — 8/6",
+  "powerToughness": [
+    {
+      "power": 1,
+      "tickets": 2,
+      "toughness": 4
+    },
+    {
+      "power": 8,
+      "tickets": 5,
+      "toughness": 6
+    }
+  ]
+}

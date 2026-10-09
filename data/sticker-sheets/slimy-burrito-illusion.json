@@ -1,0 +1,42 @@
+{
+  "abilities": [
+    {
+      "keywords": [
+        {
+          "type": "Bushido",
+          "value": 2
+        }
+      ],
+      "tickets": 2
+    },
+    {
+      "keywords": [
+        {
+          "type": "DoubleStrike"
+        }
+      ],
+      "tickets": 3
+    }
+  ],
+  "art": 3,
+  "name": "Slimy Burrito Illusion",
+  "names": [
+    "Slimy",
+    "Burrito",
+    "Illusion"
+  ],
+  "number": 9,
+  "oracleText": "{TK}{TK} — Bushido 2 (Whenever this creature blocks or becomes blocked, it gets +2/+2 until end of turn.)\n{TK}{TK}{TK} — Double strike\n{TK}{TK} — 2/4\n{TK}{TK}{TK}{TK} — 5/6",
+  "powerToughness": [
+    {
+      "power": 2,
+      "tickets": 2,
+      "toughness": 4
+    },
+    {
+      "power": 5,
+      "tickets": 4,
+      "toughness": 6
+    }
+  ]
+}

@@ -822,6 +822,7 @@ damageOf event = case event of
   GameEvent.Waterbent _ -> Nothing
   GameEvent.Airbent _ -> Nothing
   GameEvent.Firebent _ -> Nothing
+  GameEvent.StickerPut _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.TriggeredAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
@@ -912,6 +913,7 @@ revealOf event = case event of
   GameEvent.Waterbent _ -> Nothing
   GameEvent.Airbent _ -> Nothing
   GameEvent.Firebent _ -> Nothing
+  GameEvent.StickerPut _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.TriggeredAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
@@ -1066,6 +1068,7 @@ cardObject oid pid under printingId dest tapped ts =
       Object.warped = Nothing,
       Object.preparedCopyOf = Nothing,
       Object.ringBearerFor = Nothing,
+      Object.stickers = Seq.empty,
       Object.duplicate = Nothing,
       Object.paired = Nothing,
       Object.protector = Nothing,
@@ -1299,6 +1302,7 @@ createEmblem pid card = do
                 Object.warped = Nothing,
                 Object.preparedCopyOf = Nothing,
                 Object.ringBearerFor = Nothing,
+                Object.stickers = Seq.empty,
                 Object.duplicate = Nothing,
                 Object.paired = Nothing,
                 Object.protector = Nothing,
@@ -6420,7 +6424,11 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                     -- BATTLEFIELD ONLY, `paidCosts`' gate and for its reason: rule
                     -- 400.7d speaks about a permanent, and a countered gift spell
                     -- becomes a card whose enters trigger never fires.
-                    Object.chosenPlayer = if resolvedOnto then Object.chosenPlayer obj else Nothing
+                    Object.chosenPlayer = if resolvedOnto then Object.chosenPlayer obj else Nothing,
+                    -- CR 123.5 / 400.7m: stickers stay on an object moving to
+                    -- a public zone and apply to the new object; a hidden zone
+                    -- drops them. Restamped after placeObject (CR 613.7k).
+                    Object.stickers = if Game.isHiddenZone dest then Seq.empty else Object.stickers obj
                   }
               -- CR 604.2's override, handed over as the permanent leaves the
               -- battlefield. lingeringHandover below is the whole of it; this
@@ -6667,10 +6675,14 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                   -- way in, so the two agree about which component the
                   -- designation can sit on.
                   (commandComponents, destComponents) = Seq.partition (\component -> Game.componentIsCard component && Just (Game.printingOfComponent component) == splitOff) components
+                  -- Not implemented: CR 123.5c. A melded or merged permanent's
+                  -- stickers are dropped from every split object, the leading
+                  -- one included, rather than kept on the one its owner
+                  -- chooses (#872).
                   asComponent zone mComponent ts =
                     ( case mComponent of
                         Nothing -> mkObj entrySeed ts
-                        Just component -> Game.representComponent component (mkObj entrySeed ts)
+                        Just component -> (Game.representComponent component (mkObj entrySeed ts)) {Object.stickers = Seq.empty}
                     )
                       { Object.zone = zone
                       }
@@ -6688,6 +6700,8 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                     c Seq.:< cs -> (Just c, cs)
               start <- State.gets GameState.nextTimestamp
               newId <- placeObject pid (asComponent dest leading) dest position
+              -- CR 613.7k.
+              State.modify' (Game.restampStickers newId)
               trailingIds0 <- Monad.forM trailing (\component -> placeObject pid (asComponent dest (Just component)) dest position)
               -- CR 712.21b / 730.3b: "if a player exiles a melded permanent, that
               -- player determines the relative timestamp order of the two cards",
@@ -7694,6 +7708,8 @@ attachVia legality subject destination = do
   case legality subject destination gs of
     Nothing -> pure ()
     Just attachment -> Monad.unless (fmap Object.attachedTo (Game.lookupObject subject gs) == Just (Just attachment)) $ do
+      -- Not implemented: CR 613.7k's sticker restamp after this CR 613.7e
+      -- timestamp (#872).
       let (ts, gs1) = Game.freshTimestamp gs
           move o = o {Object.attachedTo = Just attachment, Object.timestamp = ts}
       State.put gs1 {GameState.objects = Map.adjust move subject (GameState.objects gs1)}
@@ -8044,6 +8060,7 @@ createTokens controller card copy n tapped entering attached = do
                       Object.warped = Nothing,
                       Object.preparedCopyOf = Nothing,
                       Object.ringBearerFor = Nothing,
+                      Object.stickers = Seq.empty,
                       Object.duplicate = Nothing,
                       Object.paired = Nothing,
                       Object.protector = Nothing,
@@ -8326,6 +8343,8 @@ meld controller victims resultCard = do
                 Object.warped = Nothing,
                 Object.preparedCopyOf = Nothing,
                 Object.ringBearerFor = Nothing,
+                -- Not implemented: CR 123.5a's stickers on a melded permanent (#872).
+                Object.stickers = Seq.empty,
                 Object.duplicate = Nothing,
                 Object.paired = Nothing,
                 Object.protector = Nothing,
@@ -8536,6 +8555,10 @@ meldable victims gs = do
 -- sides read again through Projection.copiableCharacteristicsTurned, which
 -- Game.turnFaceOver swaps in when the merged permanent transforms -- for the
 -- flipped reading's reason.
+--
+-- Not implemented: CR 123.5b's stickers on the merging spell joining the merged
+-- permanent, and CR 613.7k's restamp of the host's stickers at the merge
+-- (#872).
 merge :: ObjectId -> ObjectId -> MutateSide.MutateSide -> Game Bool
 merge sid target side = do
   gs <- State.get
@@ -9247,6 +9270,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.PlayerWaterbends _ -> False
   TriggerCondition.PlayerAirbends _ -> False
   TriggerCondition.PlayerFirebends _ -> False
+  TriggerCondition.PlacesSticker _ -> False
   -- CR 706.1 names no turn either.
   TriggerCondition.PlayerRollsDice _ -> False
   TriggerCondition.PlayerRollsResult _ -> False
@@ -9862,6 +9886,7 @@ abilityTriggeredOf event = case event of
   GameEvent.Waterbent _ -> Nothing
   GameEvent.Airbent _ -> Nothing
   GameEvent.Firebent _ -> Nothing
+  GameEvent.StickerPut _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.TriggeredAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing

@@ -187,6 +187,7 @@ import qualified Pawl.Types.PreventNextDamageInstance as PreventNextDamageInstan
 import qualified Pawl.Types.ProliferateR as ProliferateR
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
+import qualified Pawl.Types.PutSticker as PutSticker
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.RandomCardInGraveyard as RandomCardInGraveyard
 import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
@@ -898,6 +899,7 @@ effectObjectRefs effect = case effect of
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ refs) -> NonEmpty.toList refs
   Effect.Ante (Ante.MkAnte _ ref _) -> [ref]
+  Effect.PutSticker (PutSticker.MkPutSticker _ ref _) -> [ref]
   Effect.SetOwner (SetOwner.MkSetOwner _ ref) -> [ref]
   Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership one other) -> [one, other]
   Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary ref _) -> [ref]
@@ -1120,6 +1122,7 @@ effectPlayerRefs effect = case effect of
   Effect.TakeExtraTurn takeExtraTurn -> [TakeExtraTurn.player takeExtraTurn]
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named _) -> Maybe.maybeToList named
   Effect.Ante (Ante.MkAnte player _ _) -> [player]
+  Effect.PutSticker (PutSticker.MkPutSticker player _ _) -> [player]
   Effect.SetOwner (SetOwner.MkSetOwner player _) -> [player]
   Effect.ExchangeOwnership {} -> []
   Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary _ player) -> [player]
@@ -1528,6 +1531,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.TakeExtraTurn takeExtraTurn -> quantitySlots (TakeExtraTurn.count takeExtraTurn)
   Effect.ShuffleIntoLibrary {} -> Map.empty
   Effect.Ante {} -> Map.empty
+  Effect.PutSticker {} -> Map.empty
   Effect.SetOwner {} -> Map.empty
   Effect.ExchangeOwnership {} -> Map.empty
   Effect.ExchangeWithTopOfLibrary {} -> Map.empty
@@ -2239,6 +2243,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.TakeExtraTurn takeExtraTurn -> Quantity.slotsAreExhaustive (TakeExtraTurn.count takeExtraTurn)
   Effect.ShuffleIntoLibrary {} -> True
   Effect.Ante {} -> True
+  Effect.PutSticker {} -> True
   Effect.SetOwner {} -> True
   Effect.ExchangeOwnership {} -> True
   Effect.ExchangeWithTopOfLibrary {} -> True
@@ -2490,6 +2495,7 @@ readsX =
         Effect.TakeExtraTurn takeExtraTurn -> Quantity.readsX (TakeExtraTurn.count takeExtraTurn)
         Effect.ShuffleIntoLibrary {} -> False
         Effect.Ante {} -> False
+        Effect.PutSticker {} -> False
         Effect.SetOwner {} -> False
         Effect.ExchangeOwnership {} -> False
         Effect.ExchangeWithTopOfLibrary {} -> False
@@ -2518,6 +2524,7 @@ boundSlots effect = case effect of
   Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ _ mSlot _ _ _) -> foldMap Set.singleton mSlot
   -- MoveToZone's reason: the anted incarnations (CR 400.7).
   Effect.Ante (Ante.MkAnte _ _ mSlot) -> foldMap Set.singleton mSlot
+  Effect.PutSticker {} -> Set.empty
   Effect.SetOwner {} -> Set.empty
   Effect.ExchangeOwnership {} -> Set.empty
   Effect.ExchangeWithTopOfLibrary {} -> Set.empty

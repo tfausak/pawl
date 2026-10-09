@@ -78,6 +78,8 @@ import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.SpellWasCopied as SpellWasCopied
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.StepBegan as StepBegan
+import qualified Pawl.Types.StickerKind as StickerKind
+import qualified Pawl.Types.StickerPut as StickerPut
 import qualified Pawl.Types.TappedForMana as TappedForMana
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Transformed as Transformed
@@ -848,6 +850,12 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.Firebent (PlayerId.MkPlayerId 9))
       " {\"type\":\"Firebent\",\"value\":9} "
+  Spec.it s "StickerPut" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.StickerPut (StickerPut.MkStickerPut (PlayerId.MkPlayerId 9) (ObjectId.MkObjectId 3) StickerKind.Art))
+      " {\"type\":\"StickerPut\",\"value\":{\"placer\":9,\"object\":3,\"kind\":{\"type\":\"Art\"}}} "
   -- CR 608.2n. The source object and the ability, in that order, which is the
   -- pair CR 707.10b counts by: a swap would file the resolution under the
   -- ability's own id.

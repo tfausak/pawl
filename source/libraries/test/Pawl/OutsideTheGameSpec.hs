@@ -39,6 +39,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
@@ -355,7 +356,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
               Deck.conspiracies = Map.empty,
               Deck.attractions = Map.empty,
               Deck.planes = Set.empty,
-              Deck.schemes = Map.empty
+              Deck.schemes = Map.empty,
+              Deck.stickerSheets = Seq.empty
             }
         after = S.runPure S.identityAnswer (Setup.emptyGame S.bothPlayers) (Setup.createDeck S.alice deck)
         heldBy pid = traverse (\(i, n) -> fmap (\p -> (p, n)) (Game.printingOf i after)) (Map.toList (poolOf pid after))

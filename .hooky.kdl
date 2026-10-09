@@ -31,7 +31,7 @@ hook json {
         check_args check
         fix_args fix
     }
-    files "data/cards/*.json"
+    files "data/cards/*.json" "data/sticker-sheets/*.json"
 }
 
 hook nix {
