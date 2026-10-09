@@ -59,7 +59,7 @@
                     "type": "ShuffleIntoLibrary",
                     "value": {
                       "library": {
-                        "type": "AnyPlayer"
+                        "type": "EachPlayer"
                       },
                       "refs": [
                         {
