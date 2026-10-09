@@ -1719,6 +1719,9 @@ sourceOfWithLastKnown oid gs = case lookupObject oid gs of
 -- and the gate is turnFaceOver's own, kept so that a road that later does cannot
 -- silently restamp a face-down card in exile, whose stamp names its
 -- Pawl.Types.Pile.
+--
+-- Not implemented: CR 613.7k's sticker restamp after this CR 613.7f timestamp
+-- (#872).
 turnFacing :: Facing.Facing -> ObjectId -> GameState -> GameState
 turnFacing facing oid gs =
   let (ts, stamped) = freshTimestamp gs
@@ -1779,6 +1782,9 @@ isDoubleFacedPermanent oid gs = case lookupObject oid gs of
 -- Reads the object's OWN card (cardOf), never a projected one, which is the
 -- footing Object.face is stored on: CR 712.9's first Example turns on a Clone
 -- being a one-faced card whatever it copied, and that is the same read.
+--
+-- Not implemented: CR 613.7k's sticker restamp after this CR 613.7g timestamp
+-- (#872).
 turnFaceOver :: Timestamp.Timestamp -> ObjectId -> GameState -> GameState
 turnFaceOver now oid gs = case (turnsTo oid gs, lookupObject oid gs) of
   (Just name, Just object) ->

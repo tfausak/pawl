@@ -718,6 +718,9 @@ startGameFromCards perform exemptions = do
       -- through the same Object.newIncarnation, so that a field added later
       -- cannot be forgotten on one path and reset on the other.
       toLibraryCard obj = (Object.newIncarnation obj) {Object.zone = Zone.Library}
+      -- Not implemented: CR 123.5's stickers on a card kept in a command zone
+      -- across a restart (CR 727.2) or carried into a subgame's (CR 729.2c);
+      -- both are dropped here (#4887).
       toCommandCard obj = (Object.newIncarnation obj) {Object.zone = Zone.Command}
       rebuilt = Map.filter isCard (Map.withoutKeys (GameState.objects gs) exempt)
       -- CR 903.6: "each player puts their commander from their deck face up into
@@ -1623,6 +1626,8 @@ funnelBack finalSub parent =
       -- hand-written zone move outside Event.changeZone, performing that
       -- funnel's per-incarnation reset through the one shared function.
       toLibraryCard obj = (Object.newIncarnation obj) {Object.zone = Zone.Library}
+      -- Not implemented: CR 123.5's stickers on a commander carried back to the
+      -- main game's command zone (CR 729.5c); they are dropped here (#4887).
       toCommandCard obj = (Object.newIncarnation obj) {Object.zone = Zone.Command}
       -- CR 729.5's own exclusion: "all traditional cards they own that are in the
       -- subgame OTHER THAN those in the subgame command zone". So the library

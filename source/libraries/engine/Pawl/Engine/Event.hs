@@ -6675,8 +6675,10 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                   -- way in, so the two agree about which component the
                   -- designation can sit on.
                   (commandComponents, destComponents) = Seq.partition (\component -> Game.componentIsCard component && Just (Game.printingOfComponent component) == splitOff) components
-                  -- Not implemented: CR 123.5c's owner choosing which split object
-                  -- keeps the stickers (#872).
+                  -- Not implemented: CR 123.5c. A melded or merged permanent's
+                  -- stickers are dropped from every split object, the leading
+                  -- one included, rather than kept on the one its owner
+                  -- chooses (#872).
                   asComponent zone mComponent ts =
                     ( case mComponent of
                         Nothing -> mkObj entrySeed ts
@@ -7706,6 +7708,8 @@ attachVia legality subject destination = do
   case legality subject destination gs of
     Nothing -> pure ()
     Just attachment -> Monad.unless (fmap Object.attachedTo (Game.lookupObject subject gs) == Just (Just attachment)) $ do
+      -- Not implemented: CR 613.7k's sticker restamp after this CR 613.7e
+      -- timestamp (#872).
       let (ts, gs1) = Game.freshTimestamp gs
           move o = o {Object.attachedTo = Just attachment, Object.timestamp = ts}
       State.put gs1 {GameState.objects = Map.adjust move subject (GameState.objects gs1)}
