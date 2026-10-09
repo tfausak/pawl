@@ -32,10 +32,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.IgnoredAbility as IgnoredAbility
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
-import qualified Pawl.Types.ManaSpending as ManaSpending
 import Pawl.Types.ObjectId (ObjectId)
-import qualified Pawl.Types.Payment as Payment
-import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.SpecialAction as SpecialAction
@@ -153,33 +150,18 @@ ignore perform pid oid name = do
   case ignoreCostOf oid name before of
     Nothing -> pure ()
     Just cost -> do
-      -- CR 118.13c, Pawl.Engine.FaceDown.turnFaceUp's announcement and for its
-      -- reasons. CR 116.2d's cost is the one the permission's own sentence
-      -- names, and none of the four producers writes a hybrid or Phyrexian
-      -- symbol into it, so no prompt is raised today. A printing that did would
-      -- be the one to refute that.
-      (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure cost
-      payment <- Cost.pay perform before PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
-      case payment of
-        -- CR 733.1's reversal, Pawl.Engine.Foretell.foretell's reason: this
-        -- special action IS the whole of what failed, so `before` goes to
-        -- Cost.pay and the reversal -- the payer's choice about the CR 605.3a
-        -- window included -- happens there.
-        Payment.Unpaid -> pure ()
-        -- The payment's bound slots are dropped: CR 116.2d's special action puts
-        -- nothing on the stack, so there is no resolving object whose effects
-        -- could read one.
-        Payment.Paid _ ->
-          State.modify'
-            ( \gs ->
-                gs
-                  { GameState.ignoredAbilities =
-                      IgnoredAbility.MkIgnoredAbility
-                        { IgnoredAbility.player = pid,
-                          IgnoredAbility.source = oid,
-                          IgnoredAbility.ability = name,
-                          IgnoredAbility.expiry = Expiry.AtCleanup
-                        }
-                        : GameState.ignoredAbilities gs
-                  }
-            )
+      paid <- Cost.payAction perform before PaymentSubject.ForNeither 0 pid oid cost
+      Monad.forM_ paid $ \_ ->
+        State.modify'
+          ( \gs ->
+              gs
+                { GameState.ignoredAbilities =
+                    IgnoredAbility.MkIgnoredAbility
+                      { IgnoredAbility.player = pid,
+                        IgnoredAbility.source = oid,
+                        IgnoredAbility.ability = name,
+                        IgnoredAbility.expiry = Expiry.AtCleanup
+                      }
+                      : GameState.ignoredAbilities gs
+                }
+          )

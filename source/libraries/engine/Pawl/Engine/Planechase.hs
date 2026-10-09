@@ -49,7 +49,6 @@ import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.ManaCost as ManaCost
-import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
@@ -57,8 +56,6 @@ import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Optionality as Optionality
-import qualified Pawl.Types.Payment as Payment
-import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import Pawl.Types.PendingTrigger (PendingTrigger)
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
@@ -238,14 +235,11 @@ roll perform pid = do
   before <- State.get
   Monad.when (canRoll pid before) $ do
     noSource <- State.state Game.freshObjectId
-    (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid noSource pure (rollCost pid before)
-    payment <- Cost.pay perform before PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid noSource announced
-    case payment of
-      Payment.Unpaid -> pure ()
-      Payment.Paid _ -> do
-        rolled <- Game.ask (Prompt.RollDie 6)
-        State.modify' (Event.recordEvent (GameEvent.DiceRolled pid))
-        State.modify' (Event.recordEvent (GameEvent.PlanarDieRolled (PlanarDieRolled.MkPlanarDieRolled pid (faceOf rolled))))
+    paid <- Cost.payAction perform before PaymentSubject.ForNeither 0 pid noSource (rollCost pid before)
+    Monad.forM_ paid $ \_ -> do
+      rolled <- Game.ask (Prompt.RollDie 6)
+      State.modify' (Event.recordEvent (GameEvent.DiceRolled pid))
+      State.modify' (Event.recordEvent (GameEvent.PlanarDieRolled (PlanarDieRolled.MkPlanarDieRolled pid (faceOf rolled))))
 
 -- | CR 901.8: the planeswalking ability, "Whenever you roll the Planeswalker
 -- symbol on the planar die, planeswalk." It has no source and its roller
