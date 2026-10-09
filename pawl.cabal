@@ -1940,6 +1940,7 @@ library test
     Pawl.SpeedSpec
     Pawl.SplitSecondSpec
     Pawl.StationSpec
+    Pawl.StickerSpec
     Pawl.Support
     Pawl.TargetPerPlayerSpec
     Pawl.TargetSpec

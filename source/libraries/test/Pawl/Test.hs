@@ -788,6 +788,7 @@ import qualified Pawl.SpecialActionSpec
 import qualified Pawl.SpeedSpec
 import qualified Pawl.SplitSecondSpec
 import qualified Pawl.StationSpec
+import qualified Pawl.StickerSpec
 import qualified Pawl.TargetPerPlayerSpec
 import qualified Pawl.TargetSpec
 import qualified Pawl.TeamSpec
@@ -1504,6 +1505,7 @@ spec s registry = do
   Pawl.ConjureSpec.spec s registry
   Pawl.ConspiracySpec.spec s registry
   Pawl.AnteSpec.spec s registry
+  Pawl.StickerSpec.spec s registry
   Pawl.CopySpec.spec s registry
   Pawl.CopySpec.copySpellSpec s registry
   Pawl.CopySpec.stirCopySpec s registry

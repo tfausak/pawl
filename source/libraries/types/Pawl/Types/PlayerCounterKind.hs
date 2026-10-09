@@ -17,6 +17,7 @@ module Pawl.Types.PlayerCounterKind where
 -- kind of counter you have" (CR 701.10e) is one GainPlayerCounters per kind.
 data PlayerCounterKind
   = Energy -- CR 107.14
+  | Ticket -- CR 107.17
   | Poison -- CR 122.1f
   | -- | CR 122.1i. The one player counter the rules attach a whole ABILITY to:
     -- "one or more rad counters on a player cause a triggered ability to trigger
