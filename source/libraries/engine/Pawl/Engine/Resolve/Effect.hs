@@ -8423,7 +8423,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- that stole the crown by connecting is routinely dead by the time this
           -- resolves -- it traded with its blocker in the same damage step -- and
           -- a live read would crown nobody. Same reading as
-          -- Event.combatDamagerAgainst, which bound the slot.
+          -- Event.Binding.combatDamagerOn, which admitted the damager.
           MonarchTarget.ControllerOfSource ->
             Map.lookup Binding.triggerSource chosen
               >>= Binding.onlyOne

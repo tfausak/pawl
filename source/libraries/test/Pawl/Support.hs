@@ -1880,6 +1880,19 @@ withEvents events gs =
       GameState.battlefieldWhenTriggered = Map.empty
     }
 
+-- | withEvents with each inner list ONE group: what a funnel bracketed by
+-- Event.simultaneously records, as Pawl.Engine.Damage.dealWave brackets a CR
+-- 510.2 combat damage step. CR 603.2c batches per group, so a test of a "one or
+-- more" condition needs this, where withEvents makes each event its own.
+withGroupedEvents :: [[GameEvent.GameEvent]] -> GameState.GameState -> GameState.GameState
+withGroupedEvents groups gs =
+  let logged = withEvents (concat groups) gs
+      numbered = concat (zipWith (fmap . const . EventGroup.MkEventGroup) [0 ..] groups)
+   in logged
+        { GameState.events = Seq.fromList (zipWith (\group entry -> entry {LoggedEvent.group = group}) numbered (Foldable.toList (GameState.events logged))),
+          GameState.nextEventGroup = EventGroup.MkEventGroup (Natural.length groups)
+        }
+
 -- Set the monarch directly, for tests that need the designation without
 -- resolving the effect that grants it.
 -- The monarch designation, seeded straight onto the board. NOT a crowning: it

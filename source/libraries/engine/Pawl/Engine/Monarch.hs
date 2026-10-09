@@ -3,7 +3,6 @@ module Pawl.Engine.Monarch where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
-import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -11,11 +10,9 @@ import qualified Data.Set as Set
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
-import qualified Pawl.Engine.Turn as Turn
-import Pawl.Types.Binding (Binding)
 import Pawl.Types.Card (Card)
-import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
@@ -26,16 +23,12 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
-import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Modal as Modal
-import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
-import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.Object as Object
-import qualified Pawl.Types.Optionality as Optionality
 import Pawl.Types.PendingTrigger (PendingTrigger)
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.Phase as Phase
@@ -46,34 +39,26 @@ import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.ReturnEnding as ReturnEnding
 import qualified Pawl.Types.ReturnWatch as ReturnWatch
 import qualified Pawl.Types.Sickness as Sickness
-import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
-import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.TapState as TapState
 import Pawl.Types.TriggerCondition (TriggerCondition)
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerLimit as TriggerLimit
-import qualified Pawl.Types.TriggerSource as TriggerSource
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.Zone as Zone
 
--- A single-mode, single-effect triggered ability (the shape all monarch
--- inherent abilities take): one Mode with no targets, forced (ChooseExactly 1).
--- intervening = Nothing because CR 725.2 states neither ability with an "if"
--- clause. Stack.resolveTop's OfInherentTrigger arm applies CR 608.2a's
--- resolution recheck to any inherent ability that HAS one (CR 702.179d's does),
--- so this is a fact about rule 725.2 rather than a licence the arm relies on.
+-- An inherent triggered ability of one effect (Modal.single), with no
+-- intervening "if" and no rider: the shape of CR 725.2's two abilities, CR
+-- 726.2's three and CR 901.8's, none of whose quoted texts holds another
+-- sentence. CR 702.179d's and CR 728.1's carry an "if" and build on it.
 oneEffect :: TriggerCondition -> Effect.Effect Card (GrantedAbility.GrantedAbility Card) -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 oneEffect cond eff =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = cond,
-      TriggeredAbility.modal =
-        Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton eff))) Map.empty))
-          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.modal = Modal.single (Seq.singleton eff),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.name = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -96,65 +81,23 @@ crownSteal =
     TriggerCondition.CreatureDealtCombatDamageToMonarch
     (Effect.BecomeMonarch MonarchTarget.ControllerOfSource)
 
--- The monarch's inherent abilities, present only while there is a monarch.
-monarchAbilities :: [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
-monarchAbilities = [endStepDraw, crownSteal]
-
--- CR 725.2: match one inherent ability against one LOGGED event for the given
--- monarch (who is the ability's controller), yielding the placed ability's
--- binding environment. Sourceless -- no bearer, so this is a dedicated matcher
--- rather than Event.matchesTrigger.
+-- CR 725.2: the monarch's inherent abilities, each paired with its controller,
+-- for Event.Trigger.inherentTriggers. Present only while there is a monarch,
+-- and controlled by "the player who was the monarch at the time the abilities
+-- triggered", which is the monarch read here.
 --
--- LoggedEvent and not GameEvent, because the crown steal needs the event's group:
--- Event.combatDamagerAgainst reads the damager off CR 603.10's sample for that
--- group, so a creature the same step's state-based actions have already destroyed
--- still steals the crown.
-inherentMatch :: PlayerId -> TriggerCondition -> GameState -> LoggedEvent.LoggedEvent -> Maybe (Map SlotName.SlotName Binding)
-inherentMatch monarch cond gs logged =
-  let -- The monarch is the seat this scope is read against: CR 725.2 makes these
-      -- inherent abilities "controlled by the player who was the monarch at the
-      -- time the abilities triggered", so they are the "you" CR 109.5 would give a
-      -- printed one.
-      scopeOk s a = Turn.turnScopeAdmits gs s a monarch
-   in case (cond, LoggedEvent.event logged) of
-        (TriggerCondition.StepBegins (StepBegins.MkStepBegins wanted _ scope), GameEvent.StepBegan (StepBegan.MkStepBegan began active))
-          | began == wanted && scopeOk scope active -> Just Map.empty
-        -- CR 725.2: bind the damaging creature under the reserved trigger-source slot
-        -- so Effect.BecomeMonarch ControllerOfSource crowns THAT creature's
-        -- controller. The whole match is Event.combatDamagerAgainst's, which screens
-        -- the event shape as well as the damager.
-        (TriggerCondition.CreatureDealtCombatDamageToMonarch, _) ->
-          fmap (\(oid, _) -> Binding.setTriggerSource oid Map.empty) (Event.combatDamagerAgainst monarch gs logged)
-        _ -> Nothing
-
--- CR 725.1/725.2: the inherent triggers that fire on this batch of events, as
--- ordinary PendingTriggers whose source is TriggerSource.Sourceless -- which is
--- what lets Engine.placePendingTriggers merge them into the one batch CR 603.3b
--- orders. Empty when there is no monarch (the abilities do not exist).
---
--- Not routed through Event.gatherTriggers, for the reason inherentMatch exists:
--- these abilities have no bearer, so the scan that walks the battlefield has
--- nowhere to find them. Skipping Event.interveningHolds costs nothing because
--- CR 603.4 applies to neither ability (see oneEffect); an inherent ability that
--- does carry an "if" checks it in its own gatherer, as Pawl.Engine.Speed does.
---
--- The monarch is read LIVE, where the damager comes off CR 603.10's sample, and
--- that is sound: inside one settle only CR 725.4's departure hand-off can move
--- the crown between the damage and this scan, and the steal it would then have
--- gathered is controlled by the departed monarch (CR 725.2's "the player who
--- was the monarch at the time"), which CR 800.4d keeps off the stack -- so the
--- active player holds the crown either way. Proved by Pawl.EventTriggerSpec's
--- "CR 725.4/800.4d lethal combat damage to the monarch crowns the active
--- player, not the damager's controller".
-inherentMonarchPending :: [LoggedEvent.LoggedEvent] -> GameState -> [PendingTrigger]
-inherentMonarchPending events gs = case GameState.monarch gs of
+-- The monarch is read LIVE, where the crown steal's damager comes off CR
+-- 603.10's sample, and that is sound: inside one settle only CR 725.4's
+-- departure hand-off can move the crown between the damage and the gather, and
+-- the steal it would then have gathered is controlled by the departed monarch,
+-- whom CR 800.4d keeps off the stack -- so the active player holds the crown
+-- either way. Proved by Pawl.EventTriggerSpec's "CR 725.4/800.4d lethal combat
+-- damage to the monarch crowns the active player, not the damager's
+-- controller".
+abilities :: GameState -> [(PlayerId, TriggeredAbility Card (GrantedAbility.GrantedAbility Card))]
+abilities gs = case GameState.monarch gs of
   Nothing -> []
-  Just m ->
-    let matchEvent ab ev = case inherentMatch m (TriggeredAbility.condition ab) gs ev of
-          Nothing -> Nothing
-          Just b -> Just (PendingTrigger.MkPendingTrigger TriggerSource.Sourceless m ab b Nothing Nothing 1)
-        forAbility ab = Maybe.mapMaybe (matchEvent ab) events
-     in concatMap forAbility monarchAbilities
+  Just monarch -> [(monarch, endStepDraw), (monarch, crownSteal)]
 
 -- Mint a sourceless inherent trigger onto the stack: the Engine.placeOne arm
 -- for EVERY TriggerSource.Sourceless entry, called once CR 603.3b has fixed the

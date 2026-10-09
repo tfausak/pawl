@@ -615,28 +615,18 @@ placePendingTriggers :: Game Bool
 placePendingTriggers = do
   gs <- State.get
   let evs = Event.unscannedEvents gs
-      -- The same events with their CR 608.2f groups still on them, which the two
-      -- gatherers below need and the ones after them do not: CR 725.2's and CR
-      -- 726.2's combat-damage abilities read the damager off Event.battlefieldAt,
-      -- the board as it stood immediately after the damage.
+      -- The same events with their CR 608.2f groups still on them, which every
+      -- gatherer below but the last two reads: a group's CR 603.10 sample is
+      -- the board as it stood immediately after the group's events.
       logged = Event.unscannedGrouped gs
-      -- CR 725.2: the monarch's inherent triggers hang on no object, so
-      -- Event.gatherTriggers -- which asks each battlefield permanent what it
-      -- triggers -- has nowhere to find them. Gathered separately, from the SAME
-      -- snapshot and before the watermark bump, then merged into the one batch
-      -- below: placing them after the ordered batch would make them resolve
-      -- first, by the engine's choice rather than the player's.
-      inherent = Monarch.inherentMonarchPending logged gs
-      -- CR 726.2's three, gathered for the reason above. Empty while no player
-      -- has the initiative, except for its third ability, which is gathered from
-      -- the take itself.
-      initiative = Initiative.inherentPending logged gs
-      -- CR 702.179d, another of the rulebook's inherent abilities, gathered for
-      -- the reason above. At most one entry, and only for the active player.
-      revving = Speed.inherentPending evs gs
-      -- CR 728.1, another, gathered for the same reason. At most one entry, and
-      -- only for the active player.
-      irradiated = Rad.inherentPending evs gs
+      -- CR 725.2, 726.2, 702.179d and 728.1: the rulebook's inherent triggers
+      -- hang on no object, so Event.gatherTriggers -- which asks each object
+      -- what it triggers -- has nowhere to find them. Gathered apart through
+      -- the same matcher, from the SAME snapshot and before the watermark bump,
+      -- then merged into the one batch below: placing them after the ordered
+      -- batch would make them resolve first, by the engine's choice rather than
+      -- the player's.
+      inherent = Trigger.inherentTriggers (Monarch.abilities gs <> Initiative.abilities gs <> Speed.abilities gs <> Rad.abilities gs) logged gs
       -- CR 901.8's planeswalking ability, another inherent one with no source,
       -- gathered for the same reason.
       planeswalking = Planechase.inherentPending evs gs
@@ -647,7 +637,7 @@ placePendingTriggers = do
       -- TriggerSource.OfObject and go through placeBorne.
       entered = Dungeon.roomPending evs gs
   -- The CR 603.10a look-back in Event.eventTriggers, over the same grouped
-  -- snapshot the two gatherers above took.
+  -- snapshot inherentTriggers took.
   -- Not in the `let` because it can ASK -- CR 603.7b's second sentence is a
   -- question for the controller of a delayed entry that matched two simultaneous
   -- occurrences -- and it is asked BEFORE the watermark below moves, so the game
@@ -676,12 +666,12 @@ placePendingTriggers = do
   --
   -- Only `pending` is filtered. CR 605.1b's conditions are all EVENT conditions
   -- (ManaAbility.triggersFromMana), so no state trigger, no delayed entry and
-  -- none of the five inherent gathers above can produce one.
+  -- neither inherent gather above can produce one.
   --
   -- CR 605.5a: the EVENT that fired it decides too, so a trigger watching mana
   -- added by an ability that resolved (Caged Sun off Crumbling Vestige) is no
   -- mana ability and is placed here like any other.
-  gathered <- reactions (filter (\p -> not (ManaAbility.isTriggeredManaAbility (PendingTrigger.firedBy p) (PendingTrigger.ability p))) pending <> inherent <> initiative <> revving <> irradiated <> planeswalking <> entered)
+  gathered <- reactions (filter (\p -> not (ManaAbility.isTriggeredManaAbility (PendingTrigger.firedBy p) (PendingTrigger.ability p))) pending <> inherent <> planeswalking <> entered)
   -- CR 603.3b's two sentences, run one after the other rather than ordered
   -- together and placed at the end: the rule's first sentence PUTS its abilities
   -- on the stack before its second is reached, which is observable both in the

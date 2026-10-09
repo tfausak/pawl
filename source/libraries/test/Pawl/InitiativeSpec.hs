@@ -245,7 +245,9 @@ spec s registry = Spec.describe s "Initiative" $ do
   -- The paired control is the case above, whose board differs in exactly one
   -- thing: how many of bob's creatures dealt the damage. A per-damager reading
   -- gives bob two takes, and CR 726.5 makes the second one venture him again --
-  -- so the marker, not just the count, tells the two apart.
+  -- so the marker, not just the count, tells the two apart. The same two
+  -- damage events in two groups -- two damage steps -- are two trigger events
+  -- (CR 603.2c), which is the batch's other edge.
   Spec.it s "CR 726.2 two of one player's creatures connecting is one take and one venture" $ do
     island <- S.printingOf s registry "Island"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -255,12 +257,14 @@ spec s registry = Spec.describe s "Initiative" $ do
         (second, withSecond) = S.addPermanent piker S.bob base
         (_, entering) = S.entersWithTrigger sneak S.alice withSecond
         hers = resolveAll answering entering
-        after = resolveAll answering (S.withEvents [combatDamageTo S.alice bobs, combatDamageTo S.alice second] hers)
+        after = resolveAll answering (S.withGroupedEvents [[combatDamageTo S.alice bobs, combatDamageTo S.alice second]] hers)
     Spec.assertEqWith s "bob's marker is on the topmost room, so he ventured exactly once" (markerOf S.bob after) (Just RoomIndex.topmost)
-    -- ONE, where a per-damager reading records two: S.withEvents rewrote the log
+    -- ONE, where a per-damager reading records two: the fixture rewrote the log
     -- before the damage, so every entry here is the damage's doing.
     Spec.assertEqWith s "CR 726.2 exactly one take was recorded for bob's two creatures" (takings after) [S.bob]
     Spec.assertEqWith s "and he holds the initiative" (GameState.initiative after) (Just S.bob)
+    let apart = resolveAll answering (S.withEvents [combatDamageTo S.alice bobs, combatDamageTo S.alice second] hers)
+    Spec.assertEqWith s "CR 603.2c the same damage in two groups is two takes" (takings apart) [S.bob, S.bob]
 
   -- CR 726.2 makes the hand-off "controlled by the player who had the initiative
   -- at the time the abilities triggered", so when the damage that triggers it
@@ -346,7 +350,7 @@ spec s registry = Spec.describe s "Initiative" $ do
     let (bobs, carols, base) = board island piker undercity
         (_, entering) = S.entersWithTrigger sneak S.alice base
         hers = resolveAll answering entering
-        after = resolveAll answering (S.withEvents [combatDamageTo S.alice bobs, combatDamageTo S.alice carols] hers)
+        after = resolveAll answering (S.withGroupedEvents [[combatDamageTo S.alice bobs, combatDamageTo S.alice carols]] hers)
     -- The rule, read at gameplay level: BOTH opponents ventured, so both triggers
     -- resolved. A grouping that collapsed the two controllers into one leaves
     -- whichever of them lost the race in no dungeon at all.
@@ -375,7 +379,7 @@ spec s registry = Spec.describe s "Initiative" $ do
         hers = resolveAll answering entering
         firstStrike = resolveAll answering (S.withEvents [combatDamageTo S.alice bobs] hers)
         regular = resolveAll answering (S.withEvents [combatDamageTo S.bob carols] firstStrike)
-        fused = resolveAll answering (S.withEvents [combatDamageTo S.alice bobs, combatDamageTo S.bob carols] hers)
+        fused = resolveAll answering (S.withGroupedEvents [[combatDamageTo S.alice bobs, combatDamageTo S.bob carols]] hers)
     Spec.assertEqWith s "the first batch handed it to bob" (GameState.initiative firstStrike) (Just S.bob)
     Spec.assertEqWith s "CR 726.2 the second batch, asked about the new holder, handed it to carol" (GameState.initiative regular) (Just S.carol)
     Spec.assertEqWith s "CR 701.49d so carol ventured too" (dungeonNamesOf S.carol regular) ["\"Undercity\""]

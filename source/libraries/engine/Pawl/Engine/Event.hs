@@ -47,7 +47,7 @@ import qualified Pawl.Engine.CounterRestriction as CounterRestriction
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.EntryRestriction as EntryRestriction
 import Pawl.Engine.Event.Match (matchesTriggerGiven)
-import Pawl.Engine.Event.Trigger (battlefieldAt, battlefieldCandidates, delayedArmed, delayedPending, eventTriggers, interveningHolds, isReflexive, participants, reflexiveFiring, stateTriggers)
+import Pawl.Engine.Event.Trigger (battlefieldCandidates, delayedArmed, delayedPending, eventTriggers, interveningHolds, isReflexive, participants, reflexiveFiring, stateTriggers)
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -74,7 +74,6 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Arrival as Arrival
 import qualified Pawl.Types.ArrivalEnd as ArrivalEnd
 import qualified Pawl.Types.AsCopy as AsCopy
-import qualified Pawl.Types.BattlefieldCandidate as BattlefieldCandidate
 import qualified Pawl.Types.BecameAttached as BecameAttached
 import qualified Pawl.Types.BecameTarget as BecameTarget
 import qualified Pawl.Types.BecameUnattached as BecameUnattached
@@ -102,7 +101,6 @@ import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Countering as Countering
 import Pawl.Types.DamageEvent (DamageEvent)
 import qualified Pawl.Types.DamageEvent as DamageEvent
-import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
@@ -312,32 +310,6 @@ involveActedOn event gs
     controllerOf oid = case Projection.controllerOf oid gs of
       Just pid -> Just pid
       Nothing -> LastKnown.controller <$> Map.lookup oid (GameState.lastKnown gs)
-
--- CR 725.2 / CR 726.2: the creature that dealt this logged event's COMBAT damage
--- to `victim`, paired with who controlled it. Nothing for any other event, and
--- Nothing for a source that was not a creature then.
---
--- Read off `battlefieldAt` and not the live board -- CR 603.10's first sentence,
--- not its look-back: the damager is judged as it stood immediately after the
--- damage, and the CR 704.5g destruction that kills a trampler its blocker traded
--- with is a LATER event. Engine.performSettle runs that state-based action before
--- placePendingTriggers, and changeZone mints a fresh id, so a live read finds
--- nothing at all where the rules find a creature (CR 608.2h says the same from the
--- other side). Proved by Pawl.InitiativeSpec's "CR 726.2 a trampler that trades
--- with its blocker still hands the initiative over".
---
--- Both halves come from the ONE sample, so "was it a creature?" and "whose was
--- it?" cannot be answered about two different boards.
-combatDamagerAgainst :: PlayerId -> GameState -> LoggedEvent.LoggedEvent -> Maybe (ObjectId, PlayerId)
-combatDamagerAgainst victim gs logged = case LoggedEvent.event logged of
-  GameEvent.DamageDealt ev
-    | DamageEvent.kind ev == DamageKind.Combat && DamageEvent.target ev == Recipient.ToPlayer victim ->
-        case Map.lookup (DamageEvent.source ev) (battlefieldAt (LoggedEvent.group logged) gs) of
-          Just candidate
-            | Set.member CardType.Creature (PC.cardTypes (BattlefieldCandidate.characteristics candidate)) ->
-                Just (DamageEvent.source ev, BattlefieldCandidate.controller candidate)
-          _ -> Nothing
-  _ -> Nothing
 
 -- CR 704.3 / CR 608.2f: run `body` as ONE event, so every event it records
 -- shares an EventGroup and CR 603.10a's look-back can tell "at the same time"

@@ -206,7 +206,7 @@ resolveOneWith runSubgame = do
           -- CR 608.2a says so rather than because anything observes it: rule
           -- 702.179d admits one trigger a turn and nothing else in the pool moves
           -- a player's speed, so the answer cannot change between the CR 603.4
-          -- check in Pawl.Engine.Speed and this one. The two are mutually
+          -- check in Event.interveningHolds and this one. The two are mutually
           -- redundant, not jointly redundant -- Pawl.SpeedSpec's "speed stops at
           -- 4" case fails when BOTH are removed.
           --

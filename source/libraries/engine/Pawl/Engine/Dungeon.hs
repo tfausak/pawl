@@ -118,7 +118,7 @@ roomAbility room dungeonRoom =
 -- the player who owns the dungeon card that is that ability's source").
 --
 -- Gathered here rather than by Event.gatherTriggers for the reason
--- Monarch.inherentMonarchPending is: that scan asks each BATTLEFIELD permanent
+-- Event.Trigger.inherentTriggers is: that scan asks each BATTLEFIELD permanent
 -- what it triggers, plus the graveyards, the just-cast spell and -- under CR
 -- 113.6p -- the EMBLEMS and VANGUARD CARDS in the command zone, which a dungeon
 -- card is neither.
