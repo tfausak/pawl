@@ -30,6 +30,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Resolve.Slots as Slots
+import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.SplitSecond as SplitSecond
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
@@ -2746,7 +2747,7 @@ clauseAppliesAt :: PlayerId -> ObjectId -> GameState -> Clause.Clause Card.Type.
 clauseAppliesAt pid sid gs clause = case Clause.condition clause of
   Nothing -> True
   Just condition
-    | isCastAnnouncementCondition condition -> Condition.holds (Projection.fullView gs) (Filter.contextFor (Game.teams gs) (Just pid) (Just sid)) gs sid condition
+    | isCastAnnouncementCondition condition -> Condition.holds (Projection.fullView gs) (SourceContext.sourceContext gs (Just pid) sid) gs sid condition
     | otherwise -> True
 
 -- CR 702.33g/702.113b judged BEFORE CR 601.2b's cost is even announced, which is

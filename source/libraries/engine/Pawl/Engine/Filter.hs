@@ -1384,28 +1384,16 @@ data Context = MkContext
     -- candidate -- the division sourcePower makes against `source`. View.attachedTo
     -- is the same read in the other direction, per candidate.
     --
-    -- Supplied by the caller for sourcePower's reason -- this module holds no game
-    -- state and cannot read an object's attachment -- and by five:
-    -- Pawl.Engine.Projection.conditionHolds for CR 604.2's "as long as" clause,
-    -- Pawl.Engine.Event.Trigger.interveningHolds for CR 603.4's "if" clause,
-    -- Pawl.Engine.Stack for CR 608.2a's re-check of that same clause,
-    -- Pawl.Engine.Resolve.Slots.objectRefObjects for an effect naming the host, and
-    -- Pawl.Engine.PlayerEffect.matchesObjectFrom for a printed player ability's
-    -- own criterion (Oppressive Rays), which takes it off the row
-    -- Pawl.Engine.PlayerEffect.applying returns.
+    -- Filled, live off the board (Pawl.Engine.Game.hostOf), by
+    -- Pawl.Engine.SourceContext with every other source-derived field, so every
+    -- position framed by its source answers it (Ray of Frost, Oppressive Rays,
+    -- Pariah).
     --
-    -- No laziness ARGUMENT, unlike sourcePower and defendingPlayer: filling it is a
-    -- map lookup and a Recipient read (Pawl.Engine.Projection.View.hostOf), with no
-    -- projection behind it at all, so a filter that omits the atom saves nothing by
-    -- leaving it unforced.
-    --
-    -- Nothing wherever the atom cannot appear, which contextFor below is the
-    -- spelling of, and the atom answers False on that Nothing -- its own arm's
-    -- choice, not a rule about this record, slotControllers above being the field
-    -- whose atom chooses True instead. What keeps
-    -- a card out of those positions is Pawl.CardSpec's "CR 303.4b no card asks
-    -- IsHostOfSource where the source's host is unknown", the sweep sourcePower's
-    -- and slotNames' siblings each have.
+    -- Nothing in contextFor below, and the atom answers False on that Nothing --
+    -- its own arm's choice, not a rule about this record, slotControllers above
+    -- being the field whose atom chooses True instead. What keeps a card out of
+    -- the positions read through a bare contextFor is Pawl.FilterPositionLintSpec's
+    -- "CR 303.4b no card asks IsHostOfSource where the source's host is unknown".
     sourceAttachedTo :: Maybe ObjectId.ObjectId,
     -- The object the surrounding Quantity is evaluated against, which
     -- IsAttachedToEvaluated compares a candidate's host with. Filled by
@@ -1414,40 +1402,32 @@ data Context = MkContext
     -- IsAttachedToEvaluated outside a Count" keeps a card to the filled position.
     evaluated :: Maybe ObjectId.ObjectId,
     -- CR 400.7: the objects an effect of the SOURCE put onto the battlefield, as
-    -- those objects, for EnteredWithSource. Filled from GameState.enteredWith by
-    -- Pawl.Engine.Target.slotContext, where an enchant ability is matched; empty
-    -- everywhere else, and the atom then matches nothing. LAZY: filling it scans
-    -- the relation.
+    -- those objects, for EnteredWithSource (Animate Dead's enchant ability). Filled
+    -- from GameState.enteredWith by Pawl.Engine.SourceContext; empty in contextFor
+    -- below, and the atom then matches nothing. LAZY: filling it scans the
+    -- relation.
     sourceEntrants :: Set.Set ObjectId.ObjectId,
     -- CR 108.3: the OWNER of the SOURCE, for the one atom that compares a
     -- candidate's owner against it (SameOwnerAsSource, CR 702.140a's "with the
-    -- same owner as this spell"). sourceNames' sibling, though CR 109.3 makes an
-    -- owner no characteristic, and undrivable from `source` here for that
-    -- field's reason -- this module holds no game state -- so the caller that has
-    -- the board supplies it.
+    -- same owner as this spell"). Off Object.owner rather than off `perspective`:
+    -- CR 109.5's "you" is the CONTROLLER, a different player for a spell cast off
+    -- somebody else's card. Filled by Pawl.Engine.SourceContext; the atom is
+    -- MINTED by the rule (Pawl.Engine.Keyword.mutateTarget) into a target slot,
+    -- and Pawl.FilterPositionLintSpec's "CR 702.140a no card writes a
+    -- source-owner comparison" keeps card data from writing it.
     --
-    -- ONE filler: Pawl.Engine.Target.slotContext, the one site that matches a
-    -- TARGET SLOT's Filter, which both of CR 115's moments (CR 601.2c's choosing
-    -- and CR 608.2b's re-check) reach. Rule 702.140a's slot is the only position
-    -- the atom is written in, and it is MINTED by the rule
-    -- (Pawl.Engine.Keyword.mutateTarget) rather than by card data.
-    --
-    -- Nothing wherever the atom cannot appear, and the atom answers False on that
-    -- Nothing. What keeps a card out of those positions is
-    -- Pawl.FilterPositionLintSpec's "CR 702.140a no card writes a source-owner
-    -- comparison", the sweep SameNameAsSource's own lint is.
+    -- Nothing in contextFor below and for a source the state no longer holds,
+    -- and the atom answers False on that Nothing.
     sourceOwner :: Maybe PlayerId.PlayerId,
     -- CR 201.4: the names the SOURCE has chosen, for the one atom that compares a
-    -- candidate's against them (HasChosenName, Ancient Vendetta). Supplied by the
-    -- caller for slotNames' reason -- this module holds no game state and cannot
-    -- read an object's chosen names -- by Pawl.Engine.SourceContext wherever it
-    -- fills sourceChosenColors below, which includes
-    -- Pawl.Engine.Resolve.Slots.effectContext, the context every position of a
-    -- resolution goes through (CR 608.2c's choice during a resolution -- Ancient
-    -- Vendetta's search, Predict's tally, Petra Sphinx's revealed card), and by
-    -- Pawl.Engine.Replacement.candidateContext, where the atom is written by rule
-    -- 702.16e's MINTED player-protection shield rather than by card data (CR
-    -- 614.1c's as-enters choice, Runed Halo).
+    -- candidate's against them (HasChosenName, Ancient Vendetta). Filled by
+    -- Pawl.Engine.SourceContext with the source's other choices, so every
+    -- position framed by its source answers it: a resolution's (CR 608.2c's
+    -- choice during a resolution -- Ancient Vendetta's search, Predict's tally,
+    -- Petra Sphinx's revealed card) and a replacement row's, where rule
+    -- 702.16e's MINTED shield writes it (CR 614.1c's as-enters choice, Runed
+    -- Halo), among them. Pawl.Engine.Target.slotContext empties it again: a
+    -- target slot is matched at CR 601.2c, before a resolution's choice.
     --
     -- The SOURCE's and not a slot's, which is what separates it from slotNames
     -- above: CR 201.4's name is not an object, so no slot ever holds it, and
@@ -1459,17 +1439,15 @@ data Context = MkContext
     -- Vendetta's search sees the name its own earlier clause chose. That is the
     -- stale-read shape this field exists on the far side of.
     --
-    -- EMPTY in contextFor below and so in contextWithSlots and
-    -- contextComparingPower too, so the atom is vacuously False in every position
-    -- those fillers do not reach -- an empty intersection, which is this atom's
-    -- arm answering rather than a posture the record enforces; slotControllers'
+    -- EMPTY in contextFor below, so the atom is vacuously False wherever no
+    -- source frames the read -- an empty intersection, which is this atom's arm
+    -- answering rather than a posture the record enforces; slotControllers'
     -- atom answers True on ITS unfilled read. What keeps a card out of those
     -- positions is Pawl.FilterPositionLintSpec's "CR 201.4 no card asks
-    -- HasChosenName outside an admitted position" -- a fence over CARD data,
-    -- which the replacement filler above is not. That lint is an ALLOWLIST,
-    -- narrower than where this field is filled: it admits three resolution
-    -- positions and refuses every standing one, which is what Pawl.CardSpec's
-    -- StandingHostFramed exists to keep apart from an effect's own ObjectRef.
+    -- HasChosenName outside an admitted position". That lint is an ALLOWLIST,
+    -- narrower than where this field is filled: it refuses every standing
+    -- position, which is what Pawl.CardSpec's StandingHostFramed exists to keep
+    -- apart from an effect's own ObjectRef.
     sourceChosenNames :: Set.Set CardName.CardName,
     -- CR 702.16k: the player chosen (CR 614.1c) by the permanent whose
     -- PROTECTION ability wrote the filter being matched, for the one atom that
@@ -1529,19 +1507,11 @@ data Context = MkContext
     -- CR 105.2: the colours the SOURCE chose as it entered (CR 614.1c), for the
     -- atom that asks whether a candidate wears one (HasChosenColor, Gauntlet of
     -- Power) and the quantity that counts them (Quantity.ChosenColorsItIs). CR 607.2d links the choosing ability to every ability printed
-    -- beside it that names "the chosen color", so the positions that fill it are
-    -- the ones such an ability's filter is matched in. All but one go through
-    -- Pawl.Engine.SourceContext, which fills every choice at once: the affected
-    -- set (Pawl.Engine.Projection.affectedContext, a combat restriction's too:
-    -- Teferi's Moat), a trigger condition
-    -- (Pawl.Engine.Event.Match, Kindred Discovery), CR 603.4's intervening "if"
-    -- and its re-check (Pawl.Engine.Event.Trigger.interveningHolds,
-    -- Pawl.Engine.Stack.interveningStillHolds, Tablet of the Guilds), a
-    -- resolution's own filters
-    -- (Pawl.Engine.Resolve.Slots.effectContext, Brass Herald) and the cost pools
-    -- of Pawl.Engine.Cost and Pawl.Engine.Replacement.matchesPermanent. The other
-    -- is Pawl.Engine.Target.slotContext's target slot (Pentarch Paladin), which
-    -- builds its record by hand. CR 106.6's mana restriction reads it off the
+    -- beside it that names "the chosen color", so every position framed by its
+    -- source fills it: Pawl.Engine.SourceContext fills every choice at once
+    -- (Caged Sun's affected set, Pentarch Paladin's target slot, Kindred
+    -- Discovery's trigger condition, Tablet of the Guilds' intervening "if",
+    -- Brass Herald's resolution, Doom Cannon's cost). CR 106.6's mana restriction reads it off the
     -- MANA UNIT instead (Pawl.Engine.Mana.admitsUnder, Throne of Eldraine), for
     -- sourceChosenSubtype's reason below. A static grant's bare protection quality
     -- (Cho-Manno's Blessing) never reaches it: Pawl.Engine.Keyword.grantedBy
@@ -1553,11 +1523,10 @@ data Context = MkContext
     -- per-incarnation (CR 707.6 does not copy it), so two Gauntlets naming two
     -- colours answer differently on the one board.
     --
-    -- Empty in contextFor below and so in contextWithSlots and
-    -- contextComparingPower too, so the atom is vacuously False in every other
-    -- position. What keeps a card out of those is Pawl.FilterPositionLintSpec's
-    -- "CR 607.2d no card asks HasChosenColor or HasChosenSubtype outside an
-    -- admitted position".
+    -- Empty in contextFor below, so the atom is vacuously False wherever no
+    -- source frames the read. What keeps a card out of those positions is
+    -- Pawl.FilterPositionLintSpec's "CR 607.2d no card asks HasChosenColor or
+    -- HasChosenSubtype outside an admitted position".
     sourceChosenColors :: Set.Set Color.Color,
     -- CR 205.3: the subtype the SOURCE chose as it entered (CR 614.1c), for the
     -- one atom that asks whether a candidate wears it (HasChosenSubtype). Filled
@@ -1669,11 +1638,12 @@ slotOneObject slot context = case Set.toList (Map.findWithDefault Set.empty slot
 -- only card-written one is a CR 508.1c gate, which
 -- Pawl.Engine.CombatRestriction.inForce evaluates through contextFor instead.
 --
--- The source's host stays Nothing on both callers for the same reason: neither
--- position is one CR 303.4b's atom may be written into, which is what
--- Pawl.CardSpec's position lint enforces.
+-- The source-derived fields are Nothing until a caller frames the record by
+-- its source (Pawl.Engine.SourceContext.framedBy), as CR 702.149a's trigger
+-- match does; CR 509.1b's pairwise restriction is framed by the creature being
+-- compared, not by an ability's source, and leaves them unfilled.
 contextComparingPower :: Teams.Teams -> Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Maybe Integer -> Context
-contextComparingPower t p s n o = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, sourceToughness = o, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayers = [], recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, evaluated = Nothing, sourceEntrants = Set.empty, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColors = Set.empty, sourceChosenSubtype = Nothing, sourceLastExiled = Nothing}
+contextComparingPower t p s n o = (contextFor t p (Just s)) {sourcePower = n, sourceToughness = o}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the

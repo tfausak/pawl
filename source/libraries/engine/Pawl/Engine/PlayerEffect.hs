@@ -298,7 +298,7 @@ printedRows gs =
               Just c ->
                 Condition.holds
                   (Projection.fullView gs)
-                  ((Filter.contextFor (Game.teams gs) (Just controller) (Just oid)) {Filter.recipient = Just pid})
+                  ((SourceContext.sourceContext gs (Just controller) oid) {Filter.recipient = Just pid})
                   gs
                   oid
                   (Condition.forCandidate pid (if null changes then c else Projection.rewriteCondition changes c))
@@ -1180,14 +1180,12 @@ prohibitsAttackingWithCreatures pid gs =
 -- False -- which is what Lava Burst's self-naming redirection clause needs.
 -- CR 303.4b's atom still answers False for the usual stored row, but by the
 -- BOARD rather than by fiat: an instant's source is in a graveyard enchanting
--- nothing by the time the row is read, and `sourceAttachedTo` below is a live
--- lookup that finds no host for it.
+-- nothing by the time the row is read, and its host is a live lookup
+-- (Pawl.Engine.SourceContext) that finds none.
 --
--- The source's HOST comes off the board here rather than riding in the row,
--- because it is a map lookup with no projection behind it
--- (Pawl.Engine.Filter.sourceAttachedTo says so) and reading it live is what CR
--- 611.2c asks for: an Aura moved to another creature taxes the new one from that
--- moment.
+-- The source's HOST comes off the board here rather than riding in the row:
+-- reading it live is what CR 611.2c asks for, so an Aura moved to another
+-- creature taxes the new one from that moment.
 matchesObjectFrom :: RowSource -> Filter Keyword -> ObjectId -> GameState -> Bool
 matchesObjectFrom src filter_ oid gs =
   Filter.matches (contextFrom src oid gs) (Projection.viewOfObject oid gs) filter_
@@ -1215,7 +1213,7 @@ contextFrom src oid gs = contextFor (Projection.controllerOf oid gs) src gs
 -- contextFrom with the perspective supplied, which matchesObjectFor above is the
 -- one caller of.
 --
--- A printed row's CR 607.2d choices come from SourceContext.withChoicesOf, read
+-- A printed row's CR 607.2d choices come from SourceContext.framedBy, read
 -- through CR 608.2h's last known information. A stored row's are its own
 -- instead, baked as it began (RowSource.choices): CR 608.2h determines them
 -- once, so Cheering Fanatic naming a second card leaves the first row's alone
@@ -1227,10 +1225,8 @@ contextFrom src oid gs = contextFor (Projection.controllerOf oid gs) src gs
 contextFor :: Maybe PlayerId -> RowSource -> GameState -> Filter.Context
 contextFor you row gs =
   let src = RowSource.object row
-      choose = case RowSource.choices row of
-        Just baked -> SourceContext.withChoices baked
-        Nothing -> maybe id (`SourceContext.withChoicesOf` gs) src
-   in (choose (Filter.contextFor (Game.teams gs) you src)) {Filter.sourceAttachedTo = src >>= \s -> Projection.hostOf s gs}
+      frame s = SourceContext.framedWith (Maybe.fromMaybe (SourceContext.choicesOf s gs) (RowSource.choices row)) s gs
+   in maybe id frame src (Filter.contextFor (Game.teams gs) you src)
 
 -- CR 601.3a's LOOKAHEAD, asked of a prohibition that matches the spell as it
 -- stands: could a choice still to be made during this spell's proposal cause the

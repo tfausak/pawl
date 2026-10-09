@@ -22,6 +22,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Requirement as Requirement
+import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.AttackTarget as AttackTarget
@@ -195,7 +196,7 @@ instances candidates targets gs =
           -- 613.1b's layer 2), for the reason every other field here is: the
           -- Aura can be moved and the host's controller can change, and CR
           -- 613.11 puts this effect after every layer.
-          case Projection.hostOf source gs >>= \host -> Projection.controllerOf host gs of
+          case Game.hostOf source gs >>= \host -> Projection.controllerOf host gs of
             Nothing -> []
             Just pid -> filter (== AttackTarget.OfPlayer pid) targets
         Just RequiredDefender.OpponentWithMostLife ->
@@ -282,7 +283,7 @@ instances candidates targets gs =
         Just condition ->
           Condition.holds
             (Projection.fullView gs)
-            (Filter.contextFor (Game.teams gs) (Projection.controllerOf source gs) (Just source))
+            (SourceContext.sourceContext gs (Projection.controllerOf source gs) source)
             gs
             source
             (if null changes then condition else Projection.rewriteCondition changes condition)
@@ -310,7 +311,7 @@ instances candidates targets gs =
       -- as Pawl.Engine.CombatRestriction.storedSubjects reads a prohibition's.
       fromStored active =
         let target = ActiveAttackRequirement.defender active
-            context = Filter.contextFor (Game.teams gs) (Just (ActiveAttackRequirement.controller active)) (Just (ActiveAttackRequirement.source active))
+            context = SourceContext.sourceContext gs (Just (ActiveAttackRequirement.controller active)) (ActiveAttackRequirement.source active)
             creatures = case ActiveAttackRequirement.attacker active of
               RestrictedCreatures.Named oid -> filter (== oid) candidates
               RestrictedCreatures.Matching f -> filter (\oid -> Filter.matches context (Projection.viewOfObject oid gs) f) candidates

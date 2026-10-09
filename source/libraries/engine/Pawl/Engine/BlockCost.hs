@@ -25,6 +25,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
+import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Types.BlockCost as BlockCost
 import qualified Pawl.Types.Cost as Cost
@@ -98,7 +99,7 @@ costsOn blocker blocked gs =
       shareOf source bc = case BlockCost.perBlocker bc of
         PerCreature.Fixed cost -> [cost]
         PerCreature.Counted quantity ->
-          let context = Filter.contextFor (Game.teams gs) (Projection.controllerOf source gs) (Just source)
+          let context = SourceContext.sourceContext gs (Projection.controllerOf source gs) source
               generic n = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic (Integer.toNaturalSaturating n)])) []
            in Maybe.maybeToList (fmap generic (Quantity.evaluate (Projection.fullView gs) context gs source quantity))
       -- CR 509.1b: "can't block [these] creatures unless", so the cost is owed

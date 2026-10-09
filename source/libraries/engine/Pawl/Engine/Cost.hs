@@ -462,7 +462,7 @@ candidateCostsGiven permitted pid name oid gs =
                 Just cond ->
                   Condition.holds
                     (Projection.fullView gs)
-                    (Filter.contextFor (Game.teams gs) (Just pid) (Just oid))
+                    (SourceContext.sourceContext gs (Just pid) oid)
                     gs
                     oid
                     cond
@@ -1113,7 +1113,7 @@ selfReductions targets pid oid gs =
   let -- CR 109.5: the perspective is the would-be controller, `pid` -- not
       -- Projection.controllerOf, which answers Nothing for a card in a hand.
       -- The source is the spell itself, the reduction being printed on it.
-      context = Filter.contextFor (Game.teams gs) (Just pid) (Just oid)
+      context = SourceContext.sourceContext gs (Just pid) oid
       -- CR 601.2f: a conditional reduction is asked here, as the total is
       -- determined, against the same perspective as its count.
       applies reduction =
@@ -1865,7 +1865,7 @@ maximumX pid oid face = ceilingOf pid oid (Face.maximumX face)
 -- as a face's are, off the ability's source and its activator.
 ceilingOf :: PlayerId -> ObjectId -> [Quantity.Type.Quantity] -> GameState -> Maybe Natural
 ceilingOf pid oid quantities gs =
-  let context = Filter.contextFor (Game.teams gs) (Just pid) (Just oid)
+  let context = SourceContext.sourceContext gs (Just pid) oid
       evaluated quantity = Integer.toNaturalSaturating (Maybe.fromMaybe 0 (Quantity.evaluate (Projection.fullView gs) context gs oid quantity))
    in case fmap evaluated quantities of
         [] -> Nothing
@@ -2407,7 +2407,7 @@ countersOn kind oid gs =
 -- something else under Maskwood Nexus (Pawl.CostSpec's Putrid Raptor pair).
 discardCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 discardCandidates slots pid oid criterion gs =
-  let context = SourceContext.withChoicesOf oid gs (Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots)
+  let context = SourceContext.framedBy oid gs (Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots)
       viewOf = Projection.viewsOf gs
       matches candidate = Filter.matches context (viewOf candidate) criterion
    in filter (\candidate -> candidate /= oid && not (Game.beingCast gs candidate) && matches candidate) (Game.zoneMembers Zone.Hand pid gs)
@@ -2463,7 +2463,7 @@ revealFromHandCandidates = discardCandidates
 -- the battlefield half cannot read the criterion differently.
 beholdCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 beholdCandidates slots pid oid criterion gs =
-  let context = SourceContext.withChoicesOf oid gs (Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots)
+  let context = SourceContext.framedBy oid gs (Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots)
       viewOf = Projection.viewsOf gs
       matches candidate = Filter.matches context (viewOf candidate) criterion
    in revealFromHandCandidates slots pid oid criterion gs
@@ -2522,7 +2522,7 @@ beholdObjects slots pid oid n criterion = do
 -- escape cost can exile.
 exileCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 exileCandidates slots pid oid criterion gs =
-  let context = SourceContext.withChoicesOf oid gs (Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots)
+  let context = SourceContext.framedBy oid gs (Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots)
       viewOf = Projection.viewsOf gs
       matches candidate = Filter.matches context (viewOf candidate) criterion
    in filter (\candidate -> not (Game.beingCast gs candidate) && matches candidate) (Game.zoneMembers Zone.Graveyard pid gs)
@@ -2543,7 +2543,7 @@ exileCandidates slots pid oid criterion gs =
 -- leave the ExileThis component nothing to exile.
 materialCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 materialCandidates slots pid oid criterion gs =
-  let context = SourceContext.withChoicesOf oid gs (Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots)
+  let context = SourceContext.framedBy oid gs (Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots)
       viewOf = Projection.viewsOf gs
       matches candidate = candidate /= oid && Filter.matches context (viewOf candidate) criterion
    in filter matches (List.sort (Projection.controls pid gs))
@@ -2602,10 +2602,10 @@ tapCandidates slots pid oid criterion gs =
       -- sourceManaValue by -- and empty where the object is gone, which the atom
       -- already answers False for.
       --
-      -- CR 607.2d, the source's entry choices (SourceContext.withChoicesOf), for
+      -- CR 607.2d, the source's entry choices (SourceContext.framedBy), for
       -- a criterion naming "the chosen type" -- matchesPermanent's reading.
       context =
-        SourceContext.withChoicesOf
+        SourceContext.framedBy
           oid
           gs
           (Filter.contextCrewing (Game.teams gs) (Just pid) (Just oid) slots (CrewRestriction.cantCrew (Set.toList (GameState.battlefield gs)) gs))
@@ -4324,7 +4324,7 @@ aimingSignature pid oid gs cost
   -- one slot excludes, but not the overlap of two excluded slots beside a third.
   | Set.size (Set.fromList (concatMap excludedSlots criteria)) > 1 || any ((> 1) . length . excludedSlots) criteria = Nothing
   | otherwise =
-      let context = Filter.contextFor (Game.teams gs) (Just pid) (Just oid)
+      let context = SourceContext.sourceContext gs (Just pid) oid
           wanted = Maybe.mapMaybe CostReduction.whichTargets (selfSentences pid oid gs)
           claims = claimsOf Map.empty pid oid (Cost.components cost) gs
           computed = any targetComputed (Cost.components cost)
@@ -6151,7 +6151,7 @@ tapForManaWith perform window inFlight refused activator oid = do
                     _ -> pure (Mana.unitsOf mana)
                   happens clause = do
                     gsNow <- State.get
-                    let context = Filter.contextFor (Game.teams gsNow) (Just controller) (Just oid)
+                    let context = SourceContext.sourceContext gsNow (Just controller) oid
                     pure (maybe True (Condition.holds (Projection.viewWithLastKnownAnywhere gsNow) context gsNow oid) (Clause.condition clause))
                   gated cIdx answers clause = case Clause.payGate clause of
                     Nothing -> pure (True, answers)

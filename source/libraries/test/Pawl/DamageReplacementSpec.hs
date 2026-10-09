@@ -25,7 +25,6 @@ import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
-import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -2580,7 +2579,7 @@ pariahSpec s registry = Spec.describe s "Pariah (CR 614.9)" $ do
     Spec.assertEqWith s "the 3 is marked on the enchanted creature instead" (S.damageOf host atAlice) (Just 3)
     Spec.assertEqWith s "and none of it on the creature beside it" (S.damageOf bystander atAlice) (Just 0)
     -- The proxy, after the behaviour.
-    Spec.assertEqWith s "setup: the Aura is attached to the host" (Projection.hostOf aura gs) (Just host)
+    Spec.assertEqWith s "setup: the Aura is attached to the host" (Game.hostOf aura gs) (Just host)
   -- THE CONTROL on the player half: bob is not CR 109.5's "you", so the same
   -- source's damage reaches him. A redirect that ignored `whoRecipient` would
   -- have moved this onto alice's creature too.

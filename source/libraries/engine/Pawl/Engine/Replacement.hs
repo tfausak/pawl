@@ -444,7 +444,7 @@ collect sources floating =
         Just condition ->
           Condition.holds
             (Projection.fullView sources)
-            (Filter.contextWithSlots (Game.teams sources) (Just (ActiveReplacement.controller active)) (Just (ActiveReplacement.source active)) (ActiveReplacement.slots active))
+            ((SourceContext.sourceContext sources (Just (ActiveReplacement.controller active)) (ActiveReplacement.source active)) {Filter.slotObjects = ActiveReplacement.slots active})
             (Projection.boardAsEntering sources)
             (ActiveReplacement.source active)
             condition
@@ -1224,7 +1224,7 @@ admitsEntry gs oid rewrite = case rewrite of
   -- handoff -- so "this turn" costs nothing here.
   EntryRewrite.Bloodthirst Nothing -> True
   EntryRewrite.Bloodthirst (Just _) ->
-    let context = Filter.contextFor (Game.teams gs) (Projection.controllerOf oid gs) (Just oid)
+    let context = SourceContext.sourceContext gs (Projection.controllerOf oid gs) oid
      in maybe False (> 0) (Quantity.evaluate (Projection.fullView gs) context gs oid (Quantity.Type.PlayersDealtDamageThisTurn (PlayerRef.Relative PlayerRelation.Opponent)))
   -- CR 702.150a's own first condition, the ability's rather than the pattern's:
   -- "If this permanent WOULD ENTER WITH ONE OR MORE LOYALTY COUNTERS ON IT". The
@@ -1616,13 +1616,13 @@ matchesZoneOwner gs src you rel oid = relationHolds gs src you rel (fmap Object.
 -- Treasures you control" names the payer -- and Nothing for a counter pattern,
 -- which names whose permanent through its own field.
 --
--- The source's entry choices ride along (SourceContext.withChoicesOf), CR 607.2d's
+-- The source's frame rides along (SourceContext.framedBy), CR 607.2d's
 -- link from "choose a creature type" to a cost printed beside it: Doom Cannon's
 -- "Sacrifice a creature of the chosen type" (Pawl.CostSpec's Doom Cannon group).
 matchesPermanent :: (ObjectId -> Filter.View) -> GameState -> Maybe PlayerId -> Map.Map SlotName.SlotName (Set ObjectId) -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
 matchesPermanent viewOf gs you slots source filter_ oid =
   let base = Filter.contextWithSlots (Game.teams gs) you source slots
-      context = maybe base (\asking -> SourceContext.withChoicesOf asking gs base) source
+      context = maybe base (\asking -> SourceContext.framedBy asking gs base) source
    in Filter.matches context (viewOf oid) filter_
 
 -- CR 701.21a: the permanents this player may sacrifice for a Filter, ascending --
@@ -1762,20 +1762,12 @@ matchesFiltered viewOf gs candidate filter_ oid =
 -- ability mints a row.
 candidateContext :: GameState -> ReplacementCandidate -> Filter.Context
 candidateContext gs candidate =
-  ( maybe
-      (SourceContext.withChoicesOf (ReplacementCandidate.source candidate) gs)
-      SourceContext.withChoices
-      (ReplacementCandidate.choices candidate)
-      ( Filter.contextWithSlots
-          (Game.teams gs)
-          (ReplacementCandidate.controller candidate)
-          (Just (ReplacementCandidate.source candidate))
-          (ReplacementCandidate.slots candidate)
-      )
-  )
-    { Filter.sourceAttachedTo = Projection.hostOf (ReplacementCandidate.source candidate) gs,
-      Filter.carrierChosenPlayer = Game.lookupObject (ReplacementCandidate.source candidate) gs >>= Object.chosenPlayer
-    }
+  let source = ReplacementCandidate.source candidate
+      choices = Maybe.fromMaybe (SourceContext.choicesOf source gs) (ReplacementCandidate.choices candidate)
+   in (SourceContext.framedWith choices source gs (SourceContext.sourceContext gs (ReplacementCandidate.controller candidate) source))
+        { Filter.slotObjects = ReplacementCandidate.slots candidate,
+          Filter.carrierChosenPlayer = Game.lookupObject source gs >>= Object.chosenPlayer
+        }
 
 -- CR 614.12 for a token that does not exist yet: a lot's token is judged off
 -- the characteristics it would have on the battlefield -- its given text, or
@@ -2604,7 +2596,7 @@ applyCopyExceptions this own exceptions snapshot =
 -- supplying Nothing would silently answer False if one did.
 legalCopyTargets :: Set ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> Zone.Zone -> ObjectId -> GameState -> [ObjectId]
 legalCopyTargets batch filter_ zone self gs =
-  let context = Filter.contextFor (Game.teams gs) (Projection.controllerOf self gs) (Just self)
+  let context = SourceContext.sourceContext gs (Projection.controllerOf self gs) self
       viewOf = Projection.viewsOf gs
       eligible oid =
         oid /= self
@@ -3129,7 +3121,7 @@ preventable viewOf gs de = not (any (\(src, pat) -> matchesDamagePattern viewOf 
 -- carried. Shared by the two questions of that shape so they cannot disagree
 -- about what "you" and IsSource mean.
 patternContext :: GameState -> Maybe ObjectId -> Filter.Context
-patternContext gs src = Filter.contextFor (Game.teams gs) (src >>= \oid -> Projection.controllerOf oid gs) src
+patternContext gs src = maybe id (`SourceContext.framedBy` gs) src (Filter.contextFor (Game.teams gs) (src >>= \oid -> Projection.controllerOf oid gs) src)
 
 -- CR 614.9: is this rewrite a REDIRECTION -- "dealt instead to another permanent
 -- or player"? The classification `redirectable` below is gated on, in the genre

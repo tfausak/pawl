@@ -353,54 +353,45 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsBlockedBySource -> 0
   Filter.Type.HasDesignation _ -> 0
 
--- Does this position's evaluator supply CR 303.4b's host? Two constructors
--- answer yes, for the reason ReplacementRowFramed gives.
-hostFramed :: Framing -> Bool
-hostFramed framing = case framing of
+-- Does this position's evaluator frame its context by the SOURCE, through
+-- Pawl.Engine.SourceContext? Those are the positions that answer every
+-- source-derived atom: CR 303.4b's host and CR 607.2d's choices alike.
+sourceFramed :: Framing -> Bool
+sourceFramed framing = case framing of
   SourceHostFramed -> True
-  -- The three positions #3320 split off SourceHostFramed keep its answer here:
-  -- what the split is about is CR 201.4's chosen names, not CR 303.4b's host,
-  -- which all four evaluators supply.
   StandingHostFramed -> True
   PlayerEffectFramed -> True
   ReplacementRowFramed -> True
+  InTargetSlot -> True
+  MintedTargetSlot -> True
+  SearchFramed -> True
+  MillTallyFramed -> True
+  HandSweepFramed -> True
+  ClauseGateFramed -> True
+  LifeLossAmountFramed -> True
+  AffectedSetFramed -> True
+  ActivationCostFramed -> True
+  TriggerConditionFramed -> True
+  SlotlessCostFramed -> True
+  AttachDestination -> True
+  EntryAttachDestination -> True
   -- The stored CR 611.2c row's: a resolved spell has no permanent behind it to
   -- be attached to anything.
   StoredPlayerEffectFramed -> False
-  Unframed -> False
-  AttachDestination -> False
-  EntryAttachDestination -> False
-  InTargetSlot -> False
-  SearchFramed -> False
-  OutsideTheGameFramed -> False
-  KeywordFramed -> False
-  -- Pawl.Engine.Filter.contextFor leaves `sourceAttachedTo` empty too, so a CR
-  -- 303.4b question is as unanswerable here as a slot one.
-  SlotlessCostFramed -> False
-  -- Pawl.Engine.Target.slotContext leaves it empty as well, so the minted equip
-  -- ability's quality cannot ask a CR 303.4b question either.
-  MintedTargetSlot -> False
-  -- Pawl.Engine.Resolve.Slots.effectContext fills it only where the caller
-  -- overlays it (Resolve.Slots.objectRefObjects), and the mill arm does not, so
-  -- the tally cannot ask a CR 303.4b question either.
-  MillTallyFramed -> False
-  -- The hand sweep is the one ObjectRef position whose arm overlays no
-  -- `sourceAttachedTo`: no card in a hand names what its Aura's host is
-  -- (Pawl.Engine.Resolve.Slots.objectRefObjects).
-  HandSweepFramed -> False
-  -- Pawl.Engine.Resolve.gateHolds takes effectContext as it stands, with no
-  -- host overlay.
-  ClauseGateFramed -> False
-  -- The LoseLife arm takes effectContext as it stands too.
-  LifeLossAmountFramed -> False
-  -- Pawl.Engine.Projection.affectedContext, the cost pools and
-  -- Pawl.Engine.Mana.admitsUnder all build on Filter.contextFor or
-  -- contextWithSlots and overlay no host.
-  AffectedSetFramed -> False
-  ActivationCostFramed -> False
+  -- Pawl.Engine.Mana.admitsUnder frames its context by no source: the mana's
+  -- source may be gone by the time it is spent (CR 106.6a).
   ManaRestrictionFramed -> False
-  -- Pawl.Engine.SourceContext.sourceContext overlays no host either.
-  TriggerConditionFramed -> False
+  -- Conservative, KeywordFramed's posture: refusing the atom only narrows what
+  -- a card may write. A keyword's own Filter is matched against an aiming
+  -- object at CR 702.16b and CR 702.11d (Pawl.Engine.Target.targetable), whose
+  -- host is not the carrier's.
+  KeywordFramed -> False
+  -- The candidate is a printed face with no identity, so the atom is False
+  -- whatever the context holds.
+  OutsideTheGameFramed -> False
+  -- Conservative for KeywordFramed's reason: everything else, some of it read
+  -- with no source at all.
+  Unframed -> False
 
 -- How many CR 701.3a atoms this card carries in a position framed by an attach
 -- -- Effect.AttachTarget's destination, Effect.AttachTargetToEach's,
@@ -707,15 +698,12 @@ hasChosenNameTag = Text.pack "HasChosenName"
 -- what Ancient Vendetta, Predict, Petra Sphinx, Null Chamber, Conjurer's Ban and
 -- Runed Halo legitimately have.
 --
--- SourceHostFramed and not `hostFramed`: since #3320 that tag means an effect's
+-- SourceHostFramed and not `sourceFramed`: since #3320 that tag means an effect's
 -- ObjectRef and nothing else, which is what makes it admissible here. The
 -- positions it used to share the tag with carry StandingHostFramed and are
--- REJECTED -- CR 604.2's clause is read outside a resolution, through
--- Filter.contextFor, where sourceChosenNames is empty. CR 603.4's intervening
--- "if" shares that tag although Pawl.Engine.SourceContext fills its context, so
--- it is rejected too.
--- The self-test below plants the atom in a static condition and expects the
--- offence.
+-- REJECTED, though Pawl.Engine.SourceContext fills their contexts: no card asks
+-- a chosen name in a CR 604.2 or CR 603.4 clause yet. The self-test below plants
+-- the atom in a static condition and expects the offence.
 --
 -- An ALLOWLIST rather than "wherever Filter.Context.sourceChosenNames is filled",
 -- sameNameAsBoundCounts' posture and for its reason: since #2992 the field is
@@ -728,21 +716,10 @@ hasChosenNameCounts card =
    in (total True, total False)
 
 -- CR 201.4's chosen name is answerable only where Filter.Context.sourceChosenNames
--- is filled: by Pawl.Engine.SourceContext -- in Pawl.Engine.Resolve.Slots.effectContext,
--- which all but one of a resolution's positions go through (the search filter,
--- the mill tally and an ObjectRef's own Filter among them), a trigger condition,
--- an affected set, a cost criterion, a replacement row
--- (Pawl.Engine.Replacement.candidateContext, where rule 702.16e's minted shield
--- is the only filter written) and a player effect's own Filter
--- (Pawl.Engine.PlayerEffect.contextFor). Filter.contextFor, Filter.contextWithSlots,
--- Filter.contextComparingPower and
--- Pawl.Engine.Target.admittedGiven all leave it empty, so Filter.HasChosenName in
--- a target slot or a static ability's CR 604.2 condition is a silent False
--- rather than a rejected card. This is where that is made loud -- the three condition
--- positions through StandingHostFramed, which #3320 split off SourceHostFramed
--- precisely so this allowlist could refuse them. A triggered ability's CR 603.4
--- intervening "if" shares that tag, and is refused with them although its
--- context is filled (Pawl.Engine.Event.Trigger.interveningHolds).
+-- is filled: every source-framed position (`sourceFramed`) but a target slot,
+-- which Pawl.Engine.Target.slotContext empties for CR 601.2c's reason. Read
+-- through a bare Filter.contextFor it is a silent False rather than a rejected
+-- card, and this is where that is made loud.
 --
 -- The positions hasChosenNameCounts admits are narrower than that, on
 -- purpose: see its own note. So a card rejected here is not necessarily one the
@@ -778,50 +755,25 @@ hasChosenSubtypeTag = Text.pack "HasChosenSubtype"
 -- positions, and how many anywhere else. The second number is the offence.
 --
 -- A SPELL's own positions are moved to the second number although they are
--- admitted: the context reads the choice off the source, and a spell is never
--- the object CR 614.1c's "as this enters" choice was made for, so the atom there
--- would be a silent False.
-chosenValueCounts :: [Framing] -> Text.Text -> Face.Face Card.Type.Card -> (Int, Int)
+-- admitted: the context reads the answer off the source, and a spell is never
+-- the object CR 614.1c's "as this enters" choice was made for, nor attached to
+-- anything, so the atom there would be a silent False.
+chosenValueCounts :: (Framing -> Bool) -> Text.Text -> Face.Face Card.Type.Card -> (Int, Int)
 chosenValueCounts admitted tag card =
   let total keep pairs = sum (fmap (\(_, f) -> filterAtoms tag f) (filter (keep . fst) pairs))
-      inSpell = total (`elem` admitted) (modalFilters (Face.spell card))
-   in (total (`elem` admitted) (cardFilters card) - inSpell, total (`notElem` admitted) (cardFilters card) + inSpell)
+      inSpell = total admitted (modalFilters (Face.spell card))
+   in (total admitted (cardFilters card) - inSpell, total (not . admitted) (cardFilters card) + inSpell)
 
 -- CR 105.2's chosen colour is answerable only where Filter.Context.sourceChosenColors
--- is filled: a static ability's or a combat restriction's affected set
--- (Pawl.Engine.Projection.affectsWith),
--- an ability's target slot (Pawl.Engine.Target.slotContext), an activated
--- ability's cost (Pawl.Engine.Cost's pools and
--- Pawl.Engine.Replacement.matchesPermanent), a trigger condition
--- (Pawl.Engine.Event.Match) and every position of a resolution
--- (Pawl.Engine.Resolve.Slots.effectContext) -- plus a static grant's bare
--- protection quality (grantedChosenColors) and CR 106.6's mana restriction,
--- which Pawl.Engine.Mana.admitsUnder fills off the mana unit (Throne of
--- Eldraine). Everywhere else -- a CR 604.2
--- clause, an attach destination -- it is a silent False. A CR 603.4 clause is
--- filled (Tablet of the Guilds reads its colours there through
--- Quantity.ChosenColorsItIs) but shares StandingHostFramed with CR 604.2's, so
--- the atom is refused there too.
+-- is filled: every source-framed position (sourceFramed), plus a static grant's
+-- bare protection quality (grantedChosenColors) and CR 106.6's mana
+-- restriction, which Pawl.Engine.Mana.admitsUnder fills off the mana unit
+-- (Throne of Eldraine). Everywhere else it is a silent False.
 hasChosenColorCounts :: Face.Face Card.Type.Card -> (Int, Int)
 hasChosenColorCounts card =
-  let (framed, elsewhere) = chosenValueCounts (ManaRestrictionFramed : chosenValuePositions) hasChosenColorTag card
+  let (framed, elsewhere) = chosenValueCounts (\framing -> framing == ManaRestrictionFramed || sourceFramed framing) hasChosenColorTag card
       granted = grantedChosenColors card
    in (framed + granted, elsewhere - granted)
-
--- The positions both chosen-value lints admit.
-chosenValuePositions :: [Framing]
-chosenValuePositions =
-  [ AffectedSetFramed,
-    InTargetSlot,
-    ActivationCostFramed,
-    TriggerConditionFramed,
-    SourceHostFramed,
-    SearchFramed,
-    MillTallyFramed,
-    HandSweepFramed,
-    ClauseGateFramed,
-    LifeLossAmountFramed
-  ]
 
 -- CR 607.2d's "protection from the chosen color" granted by a STATIC ability:
 -- the one keyword position the colour is answered at, since
@@ -841,7 +793,7 @@ grantedChosenColors card =
 -- which Pawl.Engine.Mana.admitsUnder answers off the mana unit (Pillar of
 -- Origins). The colour has no such reading, so the two lists differ.
 hasChosenSubtypeCounts :: Face.Face Card.Type.Card -> (Int, Int)
-hasChosenSubtypeCounts = chosenValueCounts (ManaRestrictionFramed : chosenValuePositions) hasChosenSubtypeTag
+hasChosenSubtypeCounts = chosenValueCounts (\framing -> framing == ManaRestrictionFramed || sourceFramed framing) hasChosenSubtypeTag
 
 -- CR 607.2a's last-exiled atom, spelled once.
 isLastExiledWithSourceTag :: Text.Text
@@ -851,7 +803,7 @@ isLastExiledWithSourceTag = Text.pack "IsLastExiledWithSource"
 -- Pawl.Engine.Mana.admitsUnder fills Filter.Context.sourceLastExiled off the
 -- mana unit (Ice Cauldron); everywhere else it is a silent False.
 isLastExiledWithSourceCounts :: Face.Face Card.Type.Card -> (Int, Int)
-isLastExiledWithSourceCounts = chosenValueCounts [ManaRestrictionFramed] isLastExiledWithSourceTag
+isLastExiledWithSourceCounts = chosenValueCounts (== ManaRestrictionFramed) isLastExiledWithSourceTag
 
 -- Two offences under one name, hasChosenNameOffends' two: an atom outside the
 -- admitted positions, or the traversal and the codec disagreeing about how many
@@ -1074,21 +1026,20 @@ hostOfSourceTag = Text.pack "IsHostOfSource"
 
 -- How many CR 303.4b atoms this card carries in a position whose evaluator
 -- supplies the source's host, and how many anywhere else. The second number is the
--- offence; the first is what Ray of Frost legitimately has three of.
+-- offence; the first is what Ray of Frost legitimately has three of. A spell's
+-- own positions count as elsewhere, chosenValueCounts' rule: a spell is attached
+-- to nothing.
 hostOfSourceCounts :: Face.Face Card.Type.Card -> (Int, Int)
-hostOfSourceCounts card =
-  let total wanted = sum (fmap (\(_, f) -> filterAtoms hostOfSourceTag f) (filter (\(framing, _) -> hostFramed framing == wanted) (cardFilters card)))
-   in (total True, total False)
+hostOfSourceCounts = chosenValueCounts sourceFramed hostOfSourceTag
 
 -- CR 303.4b's "enchanted" is answerable only where Filter.Context.sourceAttachedTo
--- is filled, which is the positions `hostFramed` admits and nothing else:
--- Filter.contextFor, Filter.contextWithSlots and
--- Filter.contextComparingPower all leave it Nothing, so Filter.IsHostOfSource in an
--- affected set, a target slot or a search filter is a silent False rather than a
--- rejected card. This is where that is made loud.
+-- is filled, which is the positions `sourceFramed` admits and nothing else:
+-- Filter.contextFor leaves it Nothing, so Filter.IsHostOfSource read through a
+-- bare one is a silent False rather than a rejected card. This is where that is
+-- made loud.
 --
 -- Two offences under one name, for canHostSubjectOffends' two reasons: the
--- traversal found the atom outside those three positions, or the traversal and the
+-- traversal found the atom outside those positions, or the traversal and the
 -- codec disagree about how many the card holds -- the second being a blind spot in
 -- cardFilters, in which an atom would be reported as zero rather than as an
 -- offence. The second disjunct is a REGRESSION FENCE for sameNameAsBoundOffends'
@@ -1926,7 +1877,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "and the same atom in a slot that names one is not" (counts (planted (TargetSlot.withAmount (Quantity.Type.Literal 2)))) (1, 0)
   -- CR 303.4b's Filter.IsHostOfSource is CR 709.4a's atom one axis over again:
   -- answerable only where Filter.Context.sourceAttachedTo is filled, which is the
-  -- positions `hostFramed` admits. See hostOfSourceOffends for the two offences.
+  -- positions `sourceFramed` admits. See hostOfSourceOffends for the two offences.
   Spec.it s "CR 303.4b no card asks IsHostOfSource where the source's host is unknown" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace hostOfSourceOffends . Printing.card) ps
@@ -2003,8 +1954,8 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
       (sum (fmap (uncurry (+) . hostOfSourceCounts . S.combinedFace) ps))
       11
     -- The rejected side, which the sweep above cannot show while the pool has no
-    -- offender: the same atom planted in a target slot -- the position a card
-    -- author would most plausibly reach for -- IS counted as elsewhere.
+    -- offender: the same atom planted in a SPELL's target slot -- the position a
+    -- card author would most plausibly reach for -- IS counted as elsewhere.
     piker <- S.printingOf s registry "Goblin Piker"
     let buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.IsHostOfSource]]
         planted =
@@ -2226,7 +2177,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
   -- quotes it, so a quoting position's promise is not inherited by the keyword's
   -- text -- which matters because counterKindFilters is reached from positions
   -- that promise more than a keyword can keep: a CR 614.1 replacement ROW, whose
-  -- `hostFramed` is True, and a MODE's target-slot amount, which is InTargetSlot.
+  -- `sourceFramed` is True, and a MODE's target-slot amount, which is InTargetSlot.
   Spec.it s "CR 702 a keyword's own filter is framed by the keyword and not by whatever quotes it" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let base = S.combinedFace piker
@@ -3435,8 +3386,8 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         printing <- S.printingOf s registry name
         Spec.assertEqWith s (name <> "'s atoms are framed by " <> position) (counts (S.combinedFace printing)) expected
   -- The rejecting direction, for both atoms: each buried under all three
-  -- combinators and planted in positions that cannot answer, then in the ones
-  -- that can.
+  -- combinators and planted in a spell's positions, which cannot answer, then
+  -- in source-framed ones, which can.
   Spec.it s "the lint itself catches HasChosenColor and HasChosenSubtype outside an admitted position" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
@@ -3462,17 +3413,17 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
             }
         rejected f =
           [ ("a spell's target slot", base {Face.spell = spellOf [] (aimed f)}),
-            ("a spell's own filter", base {Face.spell = spellOf [Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching f) Regenerability.Regenerable Nothing Nothing Nothing)] Map.empty}),
-            ( "CR 603.4's intervening clause",
-              base {Face.triggeredAbilities = [(oneEffectTrigger TriggerCondition.SelfEnters draw) {TriggeredAbility.intervening = Just (Condition.Type.Compares (Compares.MkCompares (Quantity.Type.Count (Count.Type.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer))) f Aggregation.Members)) Comparison.AtLeast (Quantity.Type.Literal 1)))}]}
-            )
+            ("a spell's own filter", base {Face.spell = spellOf [Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching f) Regenerability.Regenerable Nothing Nothing Nothing)] Map.empty})
           ]
         accepted f =
           [ ("a static ability's affected set", affecting f),
             ("an activated ability's target slot", withAbility (\a -> a {ActivatedAbility.modal = spellOf [] (aimed f)})),
             ("an activated ability's sacrifice cost", withAbility (\a -> a {ActivatedAbility.cost = (ActivatedAbility.cost a) {Cost.Type.components = [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 f)]}})),
             ("CR 603.6a's trigger condition", base {Face.triggeredAbilities = [oneEffectTrigger (TriggerCondition.PermanentEnters f) draw]}),
-            ("a triggered ability's own filter", base {Face.triggeredAbilities = [oneEffectTrigger TriggerCondition.SelfEnters (Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching f) Regenerability.Regenerable Nothing Nothing Nothing))]})
+            ("a triggered ability's own filter", base {Face.triggeredAbilities = [oneEffectTrigger TriggerCondition.SelfEnters (Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching f) Regenerability.Regenerable Nothing Nothing Nothing))]}),
+            ( "CR 603.4's intervening clause",
+              base {Face.triggeredAbilities = [(oneEffectTrigger TriggerCondition.SelfEnters draw) {TriggeredAbility.intervening = Just (Condition.Type.Compares (Compares.MkCompares (Quantity.Type.Count (Count.Type.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer))) f Aggregation.Members)) Comparison.AtLeast (Quantity.Type.Literal 1)))}]}
+            )
           ]
         draw = Effect.Draw (Draw.MkDraw (PlayerRef.InSlot Binding.you) (Quantity.Type.Literal 1) Nothing)
     Monad.forM_

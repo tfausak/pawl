@@ -613,6 +613,14 @@ isBlocking oid gs =
   let c = GameState.combat gs
    in Set.member oid (Combat.blockingNothing c) || any (Set.member oid) (Map.elems (Combat.blockers c))
 
+-- CR 303.4b: WHICH object this one is attached to -- what an Aura "enchants".
+-- Nothing where it is attached to nothing, and where it is attached to a PLAYER
+-- (CR 303.4's other destination), which is why Affected.Attached and
+-- Affected.AttachedPlayerControls are two arms. No projection at all, so a
+-- caller inside the layer fold may ask it.
+hostOf :: ObjectId -> GameState -> Maybe ObjectId
+hostOf oid gs = lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf
+
 -- CR 303.4b / 301.5a with the arrow turned round: the permanents attached to
 -- this one. pawl keeps the link on the ATTACHED permanent, so there is nothing
 -- to look up from this side and the answer is a sweep of the battlefield --
@@ -626,7 +634,7 @@ isBlocking oid gs =
 attachments :: ObjectId -> GameState -> Set.Set ObjectId
 attachments oid gs =
   Set.filter
-    (\attacher -> (lookupObject attacher gs >>= Object.attachedTo >>= Recipient.objectOf) == Just oid)
+    (\attacher -> hostOf attacher gs == Just oid)
     (GameState.battlefield gs)
 
 -- CR 400.1: the player whose library, hand or graveyard holds this card -- its

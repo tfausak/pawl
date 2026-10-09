@@ -57,7 +57,7 @@ data ActivePlayerEffect = MkActivePlayerEffect
     -- own effect is ever read. That is not a reason to drop it:
     -- Pawl.Engine.PlayerEffect.applying hands it to every consumer, and CR
     -- 608.2h's last-known record is filed under exactly this id, which is what
-    -- lets Pawl.Engine.SourceContext.withChoicesOf still answer its chosen colour
+    -- lets Pawl.Engine.SourceContext.choicesOf still answer its chosen colour
     -- and subtype. A dead id equals no live candidate, so Filter.IsSource simply
     -- answers False for one.
     source :: ObjectId.ObjectId,

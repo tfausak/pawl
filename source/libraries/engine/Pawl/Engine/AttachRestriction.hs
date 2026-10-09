@@ -62,6 +62,7 @@ import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Types.AttachRestriction as AttachRestriction
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -164,7 +165,7 @@ barredBy mint pcs subject host gs =
                 -- CR 702.16k: the carrier is the row's source, which for a row
                 -- rule 702.16 minted is the protected host itself -- the same
                 -- frame this function's haddock states for the minted case.
-                (Filter.contextFor (Game.teams gs) (Projection.controllerOf source gs) (Just source))
+                (SourceContext.sourceContext gs (Projection.controllerOf source gs) source)
                   { Filter.carrierChosenPlayer = Game.lookupObject source gs >>= Object.chosenPlayer
                   }
                 subjectView

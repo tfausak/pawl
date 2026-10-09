@@ -32,6 +32,7 @@ import qualified Pawl.Engine.Keyword as Keyword.Engine
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Requirement as Requirement
+import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Summoning as Summoning
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Integer as Integer
@@ -1249,7 +1250,7 @@ landwalkAllowsGiven grants pcs attacker gs =
       -- CR 109.5's "you" for the criterion is the ATTACKER's controller and the
       -- source is the attacker, the pairing every keyword-borne Filter takes.
       -- Hoisted, since it does not vary per candidate.
-      context = Filter.contextFor (Game.teams gs) (Projection.controllerOfGiven grants attacker gs) (Just attacker)
+      context = SourceContext.sourceContext gs (Projection.controllerOfGiven grants attacker gs) attacker
       -- The land-ness is asked HERE and never by the criterion: every clause of CR
       -- 702.14c reads "at least one LAND". Load-bearing where the criterion names
       -- no land type at all -- Vectis Gloves' artifact landwalk, Dryad

@@ -15,6 +15,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Filter as Filter.Engine
+import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Interchangeable.Mentions as Mentions
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection.View
@@ -389,7 +390,7 @@ affectedNames oid source gs affected = case affected of
   Affected.Matching criterion -> Mentions.filterNames (unread oid) criterion
   Affected.MatchingAnywhere criterion -> Mentions.filterNames (unread oid) criterion
   Affected.MatchingOffBattlefield criterion -> Mentions.filterNames (unread oid) criterion
-  Affected.Attached -> (Map.lookup source (GameState.objects gs) >>= Object.attachedTo >>= Recipient.objectOf) == Just oid
+  Affected.Attached -> Game.hostOf source gs == Just oid
   Affected.AttachedPlayerControls criterion -> Mentions.filterNames (unread oid) criterion
   -- CR 611.3d: applied by storing a TheseObjects row (Event.permissionRiders),
   -- and Pawl.Engine.Projection applies this template to nothing.

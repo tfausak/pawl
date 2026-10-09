@@ -12,12 +12,11 @@ module Pawl.Engine.BlockRequirement where
 
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Condition as Condition
-import qualified Pawl.Engine.Filter as Filter
-import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Requirement as Requirement
+import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import Pawl.Types.GameState (GameState)
@@ -188,7 +187,7 @@ instances able candidates attackers gs =
         Just condition ->
           Condition.holds
             (Projection.fullView gs)
-            (Filter.contextFor (Game.teams gs) (Projection.controllerOf source gs) (Just source))
+            (SourceContext.sourceContext gs (Projection.controllerOf source gs) source)
             gs
             source
             (if null changes then condition else Projection.rewriteCondition changes condition)

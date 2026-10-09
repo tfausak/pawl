@@ -3807,13 +3807,11 @@ interveningHolds gs pending =
     (Just cond, TriggerSource.OfObject oid) ->
       Condition.holds
         (Projection.viewWithLastKnownAnywhere gs)
-        -- CR 303.4b's host rides in beside the slots, for the reason they do:
-        -- Ray of Frost's "if enchanted creature is red" is about the SOURCE's
-        -- attachment rather than about the event, and so do the source's CR
-        -- 607.2d choices (Tablet of the Guilds' "the chosen colors"). Stack's CR
-        -- 608.2a re-check supplies the same fields so the two checks cannot
-        -- disagree.
-        (SourceContext.withChoicesOf oid gs (Filter.contextWithSlots (Game.teams gs) (Just (PendingTrigger.controller pending)) (Just oid) (Binding.slotObjects (PendingTrigger.bindings pending))) {Filter.sourceAttachedTo = Projection.hostOf oid gs, Filter.slotPlayers = Binding.slotPlayers (PendingTrigger.bindings pending), Filter.boundAmounts = Condition.inheritedX (TriggeredAbility.condition (PendingTrigger.ability pending)) oid gs})
+        -- The SOURCE's frame, slots beside it: Ray of Frost's "if enchanted
+        -- creature is red" asks the source's CR 303.4b host and Tablet of the
+        -- Guilds' "the chosen colors" its CR 607.2d choices. Stack's CR 608.2a
+        -- re-check builds the same record so the two checks cannot disagree.
+        ((SourceContext.sourceContext gs (Just (PendingTrigger.controller pending)) oid) {Filter.slotObjects = Binding.slotObjects (PendingTrigger.bindings pending), Filter.slotPlayers = Binding.slotPlayers (PendingTrigger.bindings pending), Filter.boundAmounts = Condition.inheritedX (TriggeredAbility.condition (PendingTrigger.ability pending)) oid gs})
         gs
         oid
         cond

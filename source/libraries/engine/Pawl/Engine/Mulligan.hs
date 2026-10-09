@@ -11,9 +11,9 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
-import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Extra.Natural as Natural
@@ -123,7 +123,7 @@ actionsFor field pid gs =
 allows :: PlayerId -> ObjectId -> HandAction.HandAction Card.Card -> GameState.GameState -> Bool
 allows pid oid action gs = case HandAction.condition action of
   Nothing -> True
-  Just condition -> Condition.holds (Projection.fullView gs) (Filter.contextFor (Game.teams gs) (Just pid) (Just oid)) gs oid condition
+  Just condition -> Condition.holds (Projection.fullView gs) (SourceContext.sourceContext gs (Just pid) oid) gs oid condition
 
 -- CR 103.6b: is this action the rule's reveal -- does taking it reveal the
 -- granting card itself? The one kind of action CR 103.6b caps, so the one

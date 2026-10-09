@@ -37,6 +37,7 @@ import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Filter as Filter.Type
@@ -45,7 +46,6 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
-import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Prompt as Prompt
@@ -332,7 +332,7 @@ chooseEntryHost chooser subject candidates =
 -- hostsFor over the candidates the caller names.
 hostsAmong :: [ObjectId] -> Filter.Context -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 hostsAmong candidates context subject filter_ gs =
-  let host = Game.lookupObject subject gs >>= Object.attachedTo >>= Recipient.objectOf
+  let host = Game.hostOf subject gs
       viewOf oid =
         (Projection.viewOfObject oid gs)
           { Filter.canHostSubject = Maybe.isJust (attachmentFor subject (Recipient.ToObject oid) gs)
@@ -405,7 +405,7 @@ groupHostsFor context subjects filter_ gs =
 -- slots it could name.
 turnUpHosts :: PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 turnUpHosts controller aura filter_ gs =
-  hostsFor (Filter.contextFor (Game.teams gs) (Just controller) (Just aura)) aura (Filter.Type.And [filter_, Filter.Type.CanHostSubject]) gs
+  hostsFor (SourceContext.sourceContext gs (Just controller) aura) aura (Filter.Type.And [filter_, Filter.Type.CanHostSubject]) gs
 
 -- Which of the offered destinations the player picks, or Nothing when the text
 -- admits none (CR 609.3: the effect does as much as it can, and that is nothing).

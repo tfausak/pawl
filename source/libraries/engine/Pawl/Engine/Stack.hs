@@ -237,7 +237,7 @@ resolveOneWith runSubgame = do
 -- one thing for a borne trigger and another for an inherent one. The two arms
 -- differ only in which id stands in for the source -- the bearer for a borne
 -- ability, the ability object itself for an inherent one -- and passing
--- Projection.hostOf that id is right either way: CR 303.4 attaches nothing to an
+-- Game.hostOf that id is right either way: CR 303.4 attaches nothing to an
 -- ability object, so the field is Nothing for the inherent arm however it is
 -- filled.
 --
@@ -260,7 +260,7 @@ interveningStillHolds :: GameState.GameState -> Object.Object -> ObjectId -> Tri
 interveningStillHolds gs obj srcId trigger =
   Condition.holds
     (Projection.viewWithLastKnownAnywhere gs)
-    (SourceContext.withChoicesOf srcId gs (Filter.contextWithSlots (Game.teams gs) (Just (Object.owner obj)) (Just srcId) (Binding.slotObjects (Object.bindings obj))) {Filter.sourceAttachedTo = Projection.hostOf srcId gs, Filter.slotPlayers = Binding.slotPlayers (Object.bindings obj), Filter.boundAmounts = Condition.inheritedX trigger srcId gs})
+    ((SourceContext.sourceContext gs (Just (Object.owner obj)) srcId) {Filter.slotObjects = Binding.slotObjects (Object.bindings obj), Filter.slotPlayers = Binding.slotPlayers (Object.bindings obj), Filter.boundAmounts = Condition.inheritedX trigger srcId gs})
     gs
     srcId
 
