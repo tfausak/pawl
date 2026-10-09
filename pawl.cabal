@@ -91,6 +91,7 @@ library codec
     Pawl.Codec.AbilityKindSpec
     Pawl.Codec.AbilityName
     Pawl.Codec.AbilityNameSpec
+    Pawl.Codec.AbilitySticker
     Pawl.Codec.AbilityTriggered
     Pawl.Codec.AbilityTriggeredSpec
     Pawl.Codec.ActivatedAbility
@@ -1024,6 +1025,7 @@ library codec
     Pawl.Codec.PowerSpec
     Pawl.Codec.PowerToughnessIs
     Pawl.Codec.PowerToughnessIsSpec
+    Pawl.Codec.PowerToughnessSticker
     Pawl.Codec.PreventAllDamage
     Pawl.Codec.PreventAllDamageSpec
     Pawl.Codec.Prevention
@@ -1222,6 +1224,12 @@ library codec
     Pawl.Codec.StepBeganSpec
     Pawl.Codec.StepBegins
     Pawl.Codec.StepBeginsSpec
+    Pawl.Codec.StickerKind
+    Pawl.Codec.StickerKindSpec
+    Pawl.Codec.StickerPlacement
+    Pawl.Codec.StickerRef
+    Pawl.Codec.StickerSheet
+    Pawl.Codec.StickerSheetSpec
     Pawl.Codec.StoredResult
     Pawl.Codec.StoredResultSpec
     Pawl.Codec.Subtype
@@ -1971,6 +1979,7 @@ library types
     Pawl.Types.AbilityAddsMana
     Pawl.Types.AbilityKind
     Pawl.Types.AbilityName
+    Pawl.Types.AbilitySticker
     Pawl.Types.AbilityTriggered
     Pawl.Types.Action
     Pawl.Types.ActivatedAbility
@@ -2496,6 +2505,7 @@ library types
     Pawl.Types.Pool
     Pawl.Types.Power
     Pawl.Types.PowerToughnessIs
+    Pawl.Types.PowerToughnessSticker
     Pawl.Types.PreventAllDamage
     Pawl.Types.Prevention
     Pawl.Types.PreventionRider
@@ -2613,6 +2623,10 @@ library types
     Pawl.Types.Status
     Pawl.Types.StepBegan
     Pawl.Types.StepBegins
+    Pawl.Types.StickerKind
+    Pawl.Types.StickerPlacement
+    Pawl.Types.StickerRef
+    Pawl.Types.StickerSheet
     Pawl.Types.StoredResult
     Pawl.Types.Subtype
     Pawl.Types.SubtypeFamily

@@ -582,6 +582,8 @@ import qualified Pawl.Codec.StaticAbilitySpec
 import qualified Pawl.Codec.StatusSpec
 import qualified Pawl.Codec.StepBeganSpec
 import qualified Pawl.Codec.StepBeginsSpec
+import qualified Pawl.Codec.StickerKindSpec
+import qualified Pawl.Codec.StickerSheetSpec
 import qualified Pawl.Codec.StoredResultSpec
 import qualified Pawl.Codec.SubtypeFamilySpec
 import qualified Pawl.Codec.SubtypeSpec
@@ -1324,6 +1326,8 @@ spec s registry = do
   Pawl.Codec.PileDrawSpec.spec s
   Pawl.Codec.PlayPermissionOriginSpec.spec s
   Pawl.Codec.PlayerCounterKindSpec.spec s
+  Pawl.Codec.StickerKindSpec.spec s
+  Pawl.Codec.StickerSheetSpec.spec s
   Pawl.Codec.PlayerAttacksPlayerSpec.spec s
   Pawl.Codec.PlayerAttacksWithSpec.spec s
   Pawl.Codec.PlayerCounterTallySpec.spec s
