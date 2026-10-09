@@ -2147,12 +2147,14 @@ data SourceOption = MkSourceOption
   deriving (Eq, Ord, Show)
 
 --
--- `demanded` and `relevant` bound the EXCLUSIVE groups below, and only them:
--- how many mana every payment on the board could ask for at most, and every
--- type some typed demand on it names (payableResolutionsGiven's `demandBound`).
-sourceOptions :: [SpendManaAsThough.SpendManaAsThough] -> (ManaUnit -> Set.Set PaymentSubject.PaymentSubject) -> ([Claim] -> Bool) -> Natural -> Set.Set ManaType -> [(Activations.Activations, Mana, ManaCost, Activations.Activations)] -> [[SourceOption]]
-sourceOptions clauses admitting contends demanded relevant supplies =
-  let -- Grouped by what ONE activation costs, which is what lets k activations of
+-- `demanded` and `needs` bound the EXCLUSIVE groups below, and only them: how
+-- many mana every payment on the board could ask for at most, and for each type
+-- some typed demand names, how many typed demands on the board could take it
+-- (payableResolutionsGiven's `demandBound` and `typedNeeds`).
+sourceOptions :: [SpendManaAsThough.SpendManaAsThough] -> (ManaUnit -> Set.Set PaymentSubject.PaymentSubject) -> ([Claim] -> Bool) -> Natural -> Map.Map ManaType Natural -> [(Activations.Activations, Mana, ManaCost, Activations.Activations)] -> [[SourceOption]]
+sourceOptions clauses admitting contends demanded needs supplies =
+  let relevant = Map.keysSet needs
+      -- Grouped by what ONE activation costs, which is what lets k activations of
       -- the group take k alternatives independently.
       groups =
         Map.toList
@@ -2218,18 +2220,92 @@ sourceOptions clauses admitting contends demanded relevant supplies =
             -- resolution, so the board picks. ManaSpending.AsProduced because rule
             -- 118.14's permission is granted for a CAST, and this is an activation.
             resolved = if eats then resolutions ManaSpending.AsProduced manaCost else [([], 0, 0)]
+            free = not eats && (null claims || not contended) && life == 0 && energy == 0
+         in case (exclusive && free, coverOptions ceiling_ entries) of
+              (True, Just covered) -> covered
+              _ -> do
+                k <- counts
+                taken <- boundedMultisets k alternatives
+                (demands, generic, owed) <- resolved
+                pure
+                  MkSourceOption
+                    { optionSupplies = concatMap fst taken,
+                      optionDemands = concat (List.genericReplicate k (demands <> List.genericReplicate generic anyTypeDemand)),
+                      optionClaims = if exclusive then concatMap snd taken else Claim.scale k claims,
+                      optionLife = k * (life + owed),
+                      optionEnergy = k * energy
+                    }
+      -- An exclusive group that is FREE -- no mana, life or energy, and claims no
+      -- other group or the cost meets -- whose every yield is units of one type:
+      -- Food Chain's "X mana of any one color", which pairs every amount with
+      -- every colour. Its options are found by what each colour has to COVER
+      -- rather than by enumerating colours, and that is exact:
+      --
+      --   * which candidates: the `count` largest. Swapping a block for an
+      --     unused larger one of the same colour only adds units, and nothing
+      --     else claims them.
+      --   * which colours: for each type a typed demand names, the blocks whose
+      --     units serve it. A block serving none of them serves only generic
+      --     demands, as every colour does, so it takes any one. A block serving
+      --     a type can be re-matched so the type's units come from as few blocks
+      --     as possible, so the blocks a type takes leave it short once their
+      --     smallest is dropped (at most its need). And one block meeting the
+      --     whole need may as well be the smallest such: swapping it with
+      --     whoever holds that one hands them a larger block.
+      --
+      -- Pawl.ManaSpec's Food Chain group casts Progenitus off forty-five
+      -- creatures, which every colour in every amount made billions of boards.
+      -- Nothing for any other group, which the enumeration above takes.
+      coverOptions count entries =
+        let raw = [(fmap (rewriteSupply clauses . supplyOf admitting) (List.genericTake demanded units), Activations.claims own) | (units, own) <- entries, not (null units)]
+            single units = case units of
+              first : rest | all ((== supplyTypes first) . supplyTypes) rest && all (\u -> supplyTags u == supplyTags first && supplyAdmits u == supplyAdmits first) rest -> Just (Natural.length units, (supplyTags first, supplyAdmits first), supplyTypes first)
+              _ -> Nothing
+            widened = zipWith (\x y -> x {Claim.Type.pool = Set.union (Claim.Type.pool x) (Claim.Type.pool y)})
          in do
-              k <- counts
-              taken <- boundedMultisets k alternatives
-              (demands, generic, owed) <- resolved
-              pure
-                MkSourceOption
-                  { optionSupplies = concatMap fst taken,
-                    optionDemands = concat (List.genericReplicate k (demands <> List.genericReplicate generic anyTypeDemand)),
-                    optionClaims = if exclusive then concatMap snd taken else Claim.scale k claims,
-                    optionLife = k * (life + owed),
-                    optionEnergy = k * energy
-                  }
+              described <- traverse (\(units, own) -> fmap (\(amount, rest, types) -> ((amount, rest), (own, Map.singleton types units))) (single units)) raw
+              let classes = List.sortOn (\(amount, _, _, _) -> Ord.Down amount) [(amount, own, colours, Claim.repeats own) | ((amount, _), (own, colours)) <- Map.toList (Map.fromListWith (\(a, x) (b, y) -> (widened a b, Map.union x y)) described)]
+                  -- The `count` largest blocks, as how many of each class.
+                  taking _ [] = []
+                  taking left ((amount, own, colours, limit) : rest) = let n = min left limit in (amount, own, colours, n) : taking (left - n) rest
+                  blocks = filter (\(_, _, _, n) -> n > 0) (taking count classes)
+                  served manaType = List.find (Set.member manaType . fst) . Map.toList
+                  -- Every way one type may take blocks out of what is left, as how
+                  -- many of each class: none, the smallest block meeting the whole
+                  -- need alone, or blocks short of it that stay short once their
+                  -- smallest is dropped.
+                  covers manaType need available =
+                    let offering = [(i, amount) | (i, (amount, _, colours, n)) <- zip [0 :: Int ..] available, n > 0, Maybe.isJust (served manaType colours)]
+                        whole = take 1 (reverse [i | (i, amount) <- offering, amount >= need])
+                        short = [(i, amount) | (i, amount) <- offering, amount < need]
+                        partial picked total = case picked of
+                          [] -> [[]]
+                          (i, amount) : rest -> [List.genericReplicate m i <> more | m <- [0 .. maybe 0 (\(_, _, _, n) -> n) (Maybe.listToMaybe (drop i available))], m == 0 || total + m * amount - amount < need, more <- partial rest (total + m * amount)]
+                        irredundant chosen = case List.sort [amount | i <- chosen, (j, amount) <- short, j == i] of
+                          [] -> True
+                          smallest : _ -> sum [amount | i <- chosen, (j, amount) <- short, j == i] - smallest < need
+                     in [[i] | i <- whole] <> filter irredundant (partial short (0 :: Natural))
+                  takeOut chosen available = [(amount, own, colours, n - Natural.length (filter (== i) chosen)) | (i, (amount, own, colours, n)) <- zip [0 :: Int ..] available]
+                  assign pending available = case pending of
+                    [] -> [[(i, Nothing) | (i, (_, _, _, n)) <- zip [0 :: Int ..] available, _ <- [1 .. n]]]
+                    (manaType, need) : rest -> do
+                      chosen <- covers manaType need available
+                      more <- assign rest (takeOut chosen available)
+                      pure (fmap (\i -> (i, Just manaType)) chosen <> more)
+                  blockOf (i, colour) = case Maybe.listToMaybe (drop i blocks) of
+                    Nothing -> ([], [])
+                    Just (_, own, colours, _) -> case (`served` colours) =<< colour of
+                      Just (_, units) -> (units, own)
+                      Nothing -> (foldMap snd (Maybe.listToMaybe (Map.toList colours)), own)
+                  option assignment =
+                    MkSourceOption
+                      { optionSupplies = concatMap (fst . blockOf) assignment,
+                        optionDemands = [],
+                        optionClaims = concatMap (snd . blockOf) assignment,
+                        optionLife = 0,
+                        optionEnergy = 0
+                      }
+              pure (ListUtils.nubOrd (fmap option (assign (Map.toList needs) blocks)))
       -- An exclusive group's alternatives, cut down to the ones a board could
       -- tell apart, which is exact rather than a prune:
       --
@@ -2472,8 +2548,13 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed comm
       demandSize (demands, generic, _) = Natural.length demands + generic
       eatingResolutions = [(Activations.times activations, resolutions ManaSpending.AsProduced manaCost) | supplies <- suppliesPer, (activations, manaCost) <- ListUtils.nubOrd [(activations, manaCost) | (activations, _, manaCost, _) <- supplies], not (null (ManaCost.unwrap manaCost))]
       demandBound = List.foldl' max 0 (fmap demandSize costResolutions) + sum [times * List.foldl' max 0 (fmap demandSize ways) | (times, ways) <- eatingResolutions]
-      typedRelevant = Set.unions [demandTypes demand | (demands, _, _) <- costResolutions <> concatMap snd eatingResolutions, demand <- demands, demand /= anyTypeDemand]
-      options = concat (zipWith (\oid supplies -> fmap (fmap ((,) oid)) (sourceOptions clauses (admitting . producedDuring subject) (Claim.contends contested) demandBound typedRelevant supplies)) sources suppliesPer)
+      -- For each type, how many typed demands could take it at most: the
+      -- cost's largest count over its resolutions, and each mana-eating group's
+      -- taken as often as it can be. A hybrid counts toward both its halves.
+      needsOf (demands, _, _) = Map.fromListWith (+) [(manaType, 1 :: Natural) | demand <- demands, demand /= anyTypeDemand, manaType <- Set.toList (demandTypes demand)]
+      mostOf ways = List.foldl' (Map.unionWith max) Map.empty (fmap needsOf ways)
+      typedNeeds = Map.unionsWith (+) (mostOf costResolutions : [fmap (* times) (mostOf ways) | (times, ways) <- eatingResolutions])
+      options = concat (zipWith (\oid supplies -> fmap (fmap ((,) oid)) (sourceOptions clauses (admitting . producedDuring subject) (Claim.contends contested) demandBound typedNeeds supplies)) sources suppliesPer)
       -- One option taken from each group, appended to the pool: `sequenceA` over
       -- the list applicative is that product, and it is [[]] -- one board, the
       -- pool alone -- when the player controls no source at all. Each board

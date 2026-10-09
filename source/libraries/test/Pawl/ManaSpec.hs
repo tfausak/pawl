@@ -1965,13 +1965,32 @@ foodChainSpec s registry = Spec.describe s "Food Chain" $ do
     chain <- S.printingOf s registry "Food Chain"
     creatures <- traverse (S.printingOf s registry) ["Crimson Kobolds", "Aegis Turtle", "Alpha Myr", "Alaborn Trooper", "Axebane Beast", "Ancient Carp", "Alpha Tyrranax", "Axebane Stag", "Ancient Brontodon"]
     brontodon <- S.printingOf s registry "Ancient Brontodon"
+    progenitus <- S.printingOf s registry "Progenitus"
     divination <- S.printingOf s registry "Divination"
     let wide = alicePermanents (chain : concatMap (replicate 5) creatures)
         holding printing =
           let (held, oid) = S.handOne printing (wide {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
            in S.castable S.alice oid held
     Spec.assertBool s (holding brontodon) "{6}{G}{G} is offered"
+    Spec.assertBool s (holding progenitus) "{W}{W}{U}{U}{B}{B}{R}{R}{G}{G}, every colour twice, is offered"
     Spec.assertBool s (not (holding divination)) "and Divination is not"
+
+  -- The colours made of SEVERAL blocks: Crimson Kobolds' mana value is 0, so
+  -- each exile adds one mana, and Alpha Myr's 2 makes three. Progenitus wants
+  -- two of each colour: the Myr's three cover one, and the other four take two
+  -- Kobolds each. Eight Kobolds are exactly enough and seven are not, the one
+  -- difference between the boards; the Myr is what makes the yields differ by
+  -- creature, so the colours are covered rather than collapsed.
+  Spec.it s "CR 118.3 an Alpha Myr and eight Crimson Kobolds feed Progenitus through Food Chain and seven do not" $ do
+    chain <- S.printingOf s registry "Food Chain"
+    myr <- S.printingOf s registry "Alpha Myr"
+    kobolds <- S.printingOf s registry "Crimson Kobolds"
+    progenitus <- S.printingOf s registry "Progenitus"
+    let holding n =
+          let (held, oid) = S.handOne progenitus ((alicePermanents (chain : myr : replicate n kobolds)) {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
+           in S.castable S.alice oid held
+    Spec.assertBool s (holding 8) "the Myr's three for one colour, two Kobolds for each of the others"
+    Spec.assertBool s (not (holding 7)) "and seven Kobolds leave a colour short"
 
 -- Answers Prompt.ChooseSacrifices with `victim` alone, and defers everything
 -- else to S.identityAnswer.
