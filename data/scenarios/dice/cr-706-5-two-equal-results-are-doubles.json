@@ -1,0 +1,86 @@
+{
+  "description": "CR 706.5 two equal results are doubles",
+  "note": "Two RollDie answers are the two dice, and no ChooseDieResult is scheduled, so a choice between the results would be an unscheduled prompt. 1 and 1: each result of 1 is its own +1/+1, and the pair is doubles. Control: 1 and 4, the same first die. Control 2: 6 and 6, doubles of a result no striation pumps.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Celebr-8000",
+            "label": "robot"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "RollDie",
+          "with": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "RollDie",
+          "with": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "check": {
+        "Keywords": {
+          "object": "$robot",
+          "keyword": {
+            "type": "DoubleStrike"
+          },
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$robot",
+          "power": 5,
+          "toughness": 5
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "check": {
+        "Keywords": {
+          "object": "$robot",
+          "keyword": {
+            "type": "Lifelink"
+          },
+          "count": 0
+        }
+      }
+    }
+  ]
+}

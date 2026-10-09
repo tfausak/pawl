@@ -34,9 +34,10 @@
 -- result, with a life cost and a once-each-turn budget.
 -- CR 706.3c's "Roll again" is the NINTH, Delina, Wild Mage, at the end of
 -- the file -- the roll inside Effect.Repeat, asked only on the 15--20 striation.
--- Left out: no CR 706.5 doubles (#3243). CR 706.1's roll does record its event,
--- but the trigger
--- reading it lives in Pawl.EventTriggerSpec beside the other condition cases.
+-- CR 706.5's doubles, two results each read on their own and compared, is
+-- Celebr-8000's, in data\/scenarios\/dice\/. CR 706.1's roll does record its
+-- event, but the trigger reading it lives in Pawl.EventTriggerSpec beside the
+-- other condition cases.
 --
 -- THE ASSERTED QUANTITY on the DRAGON's boards is how many Treasure tokens alice
 -- controls once combat damage has been dealt. It is the roll's result made

@@ -39,7 +39,8 @@ import qualified Pawl.Types.SlotName as SlotName
 --
 -- `other` binds "the other result" -- the one result the roller did not choose,
 -- for a card that reads both from one instruction (Valiant Endeavor's "create a
--- number of ... tokens equal to the other result"). Meaningful only where the
+-- number of ... tokens equal to the other result"), or the second die's result
+-- where `reading` takes each on its own. Meaningful only where the
 -- instruction rolled exactly TWO dice, which is the only count any printing
 -- words that way; Pawl.CardSpec's lint holds data\/cards\/ to it, and at any
 -- other count the slot is left unbound. Bound from the rolls actually made
@@ -55,10 +56,12 @@ import qualified Pawl.Types.SlotName as SlotName
 -- appears when that card does.
 --
 -- `reading` is how `slot` reads the results where the instruction threw more
--- than one: the roller's choice of one (the Endeavor cycle), or their total
+-- than one: the roller's choice of one (the Endeavor cycle), their total
 -- (Neverwinter Hydra's "the total of those results"), which asks nothing and
--- binds zero where no die was thrown. `other` is meaningful only beside the
--- choice.
+-- binds zero where no die was thrown, or each of two results on its own
+-- (Celebr-8000), which asks nothing either and binds the second die's result
+-- at `other`. `other` is meaningful beside the choice and the pair, never the
+-- total.
 --
 -- CR 706.3's results table is NOT a field here and never will be: a striation
 -- is a Pawl.Types.Clause of the same mode whose `condition` compares this slot

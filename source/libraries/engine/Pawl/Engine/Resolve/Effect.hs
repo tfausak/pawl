@@ -4636,6 +4636,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- CR 706.4's total: every result read at once, so there is nothing to
         -- choose, and the total of no dice is zero rather than unbound.
         (Nothing, DiceReading.Total) -> pure (Just (sum results))
+        -- CR 706.4's text reading each of two results on its own: no choice
+        -- (Celebr-8000 prints none), the first die rolled at `slot` and the
+        -- second at `other`. The card's readers are symmetric in the two, so
+        -- which die lands where is unobservable. Any other number of results
+        -- leaves both unbound, `other`'s posture below.
+        (Nothing, DiceReading.Both) -> case results of
+          [first, second] -> do
+            Foldable.for_ (RollDie.other rollDie) $ \other -> State.modify' (bindAmountSlot resolving source other second)
+            pure (Just first)
+          _ -> pure Nothing
         (Nothing, DiceReading.ChooseOne) -> Monad.forM (NonEmpty.nonEmpty results) $ \offered -> do
           gs <- State.get
           -- CR 706.4: WHICH result the instruction uses, where it threw more
