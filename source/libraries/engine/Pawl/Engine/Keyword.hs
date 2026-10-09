@@ -11,6 +11,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Deploy as Deploy
 import qualified Pawl.Engine.Earthbend as Earthbend
 import qualified Pawl.Extra.Natural as Natural
 import Pawl.Types.AbilityName (AbilityName)
@@ -1866,6 +1867,22 @@ encoreSacrifice = atNextEndStep (Effect.Sacrifice SacrificeEffect.MkSacrificeEff
 -- triggeredAbilitiesOf's reason.
 battlefieldAbilitiesOf :: Map Keyword Natural -> [ActivatedAbility Card (GrantedAbility.GrantedAbility Card)]
 battlefieldAbilitiesOf counts = concatMap (uncurry battlefieldAbilitiesFor) (Map.toAscList counts)
+
+-- CR 602.1: every activated ability an object HAS, the one roster every view
+-- builder reads. `abilities` is its own list beside rule 702's battlefield mint,
+-- which the caller takes through CR 612's text changes where it has any; then
+-- the hand and graveyard mints, and CR 804.2's ability where `deploys`.
+--
+-- HAS, not can activate here: CR 113.6 says where an ability FUNCTIONS, so crew
+-- is an ability of a Vehicle card in a deck (CR 702.122a) as cycling is of a
+-- card on the battlefield. Pawl.CompanionSpec's Consulate Dreadnought case is
+-- the board.
+activatedAbilitiesOf :: Bool -> Set Keyword -> [ActivatedAbility Card (GrantedAbility.GrantedAbility Card)] -> [ActivatedAbility Card (GrantedAbility.GrantedAbility Card)]
+activatedAbilitiesOf deploys keywords abilities =
+  abilities
+    <> handAbilitiesOf keywords
+    <> graveyardAbilitiesOf keywords
+    <> [Deploy.ability | deploys]
 
 -- Exhaustive, exactly as handAbilitiesFor is, and for the same reason.
 battlefieldAbilitiesFor :: Keyword -> Natural -> [ActivatedAbility Card (GrantedAbility.GrantedAbility Card)]

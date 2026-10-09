@@ -45,7 +45,6 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
@@ -101,7 +100,7 @@ crossed before after n = before < n && n <= after
 readAheadRestricted :: PC.ProjectedCharacteristics -> GameState -> ObjectId -> Bool
 readAheadRestricted pc gs oid =
   Map.member Keyword.ReadAhead (PC.keywords pc)
-    && any ((== Just oid) . Game.enteredBattlefield . LoggedEvent.event) (GameState.events gs)
+    && Game.enteredThisTurn oid gs
 
 -- | CR 714.2b narrowed by CR 702.155a: does a chapter ability numbered `n` trigger
 -- off a placement taking its Saga's lore counters from `before` to `after`?

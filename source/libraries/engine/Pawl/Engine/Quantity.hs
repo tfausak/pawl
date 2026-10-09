@@ -1018,7 +1018,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- turn is 0, which is a number and not a failure.
         Quantity.EnteredThisTurn ->
           fmap
-            (\oid -> if any ((== Just oid) . Game.enteredBattlefield . LoggedEvent.event) (GameState.events gs) then 1 else 0)
+            (\oid -> if Game.enteredThisTurn oid gs then 1 else 0)
             mOid
         -- CR 400.7 / 400.3 read as a 0/1: did the object this evaluation is aimed at
         -- enter the battlefield out of the named player's copy of the named zone?

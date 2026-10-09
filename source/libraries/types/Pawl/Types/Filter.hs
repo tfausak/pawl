@@ -430,7 +430,7 @@ data Filter keyword
     -- this turn -- Venerated Loxodon's "each creature that convoked it", read
     -- back off GameEvent.Convoked. CrewedSourceThisTurn's relation one keyword
     -- over, and one hop longer: that event names the SPELL, which CR 400.7 ends
-    -- as it resolves, so Pawl.Engine.Projection.View's convokedThisTurnOf follows
+    -- as it resolves, so Pawl.Engine.Count.convokedThisTurn follows
     -- it onto the permanent that spell became -- CR 400.7d, which lets an ability
     -- of a permanent reference what costs were paid to cast the spell it was.
     ConvokedSourceThisTurn

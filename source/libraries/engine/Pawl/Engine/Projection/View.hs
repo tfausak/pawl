@@ -5,7 +5,6 @@
 module Pawl.Engine.Projection.View where
 
 import Control.Applicative ((<|>))
-import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -29,7 +28,6 @@ import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Plane as Plane
-import qualified Pawl.Engine.Projection.Rewrite as Rewrite
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Star as Star
@@ -39,7 +37,6 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AttackTarget as AttackTarget
-import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
@@ -47,14 +44,11 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
-import qualified Pawl.Types.Convoking as Convoking
 import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.CounterKind as CounterKind
-import qualified Pawl.Types.Crewing as Crewing
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
-import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -63,13 +57,10 @@ import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
-import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaUnit as ManaUnit
-import qualified Pawl.Types.Milled as Milled
 import qualified Pawl.Types.Modification as Modification
-import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -81,7 +72,6 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RuleAbilities as RuleAbilities
-import qualified Pawl.Types.Saddling as Saddling
 import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
 import qualified Pawl.Types.Sickness as Sickness
 import Pawl.Types.SlotName (SlotName)
@@ -95,20 +85,6 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.Zone as Zone
-import qualified Pawl.Types.ZoneChange as ZoneChange
-
--- The view CR 608.2h's record answers with: viewWithLastKnownAnywhere's body,
--- shared with the ability-source read in viewOfCharacteristics, which needs it
--- at ITS caller's depth rather than fullView's.
-lastKnownView :: Count.ViewOf -> ObjectId -> GameState -> LastKnown.LastKnown -> Filter.View
-lastKnownView peers oid gs lk =
-  (viewOfCharacteristics peers oid (LastKnown.characteristics lk) (Just (LastKnown.controller lk)) (LastKnown.counters lk) gs)
-    { Filter.owner = Just (LastKnown.owner lk),
-      Filter.token = Game.sourceIsToken (LastKnown.source lk),
-      Filter.attacking = LastKnown.attacking lk,
-      Filter.blocking = LastKnown.blocking lk,
-      Filter.paidCosts = LastKnown.paidCosts lk
-    }
 
 -- The characteristics view of a printed card, from the FACE alone. The axes that
 -- only an OBJECT can have are Nothing or empty, and each says so at its field.
@@ -300,17 +276,13 @@ viewOfCard face =
           -- CR 202.1a's mana cost is paid for a SPELL -- `manaSpentTagColors` above,
           -- same sentence.
           Filter.manaSpentAmount = 0,
-          -- CR 602.1 / 605.1a off the PRINTED face: the card's printed abilities
-          -- plus rule 702's HAND ones (CR 702.29b, CR 702.77b) and GRAVEYARD ones
-          -- (CR 702.84a, 702.128a, 702.129a), not the battlefield ones, which are
-          -- minted from the post-layer keyword map.
-          Filter.nonManaActivatedAbility =
-            not
-              ( all
-                  ManaAbility.isManaAbility
-                  (Face.activatedAbilities face <> Keyword.handAbilitiesOf (Face.keywordSet face) <> Keyword.graveyardAbilitiesOf (Face.keywordSet face))
-              ),
-          -- CR 602.1 over the same three lists, without CR 605.1a's exclusion --
+          -- CR 602.1 / 605.1a off the PRINTED face, through the roster every view
+          -- builder reads (Keyword.activatedAbilitiesOf): the printed abilities
+          -- and rule 702's, battlefield ones included -- a Vehicle card HAS crew
+          -- (CR 702.122a). No text change reaches a printed face, and CR 804.2
+          -- gives its ability to a creature on the battlefield only.
+          Filter.nonManaActivatedAbility = not (all ManaAbility.isManaAbility (printedAbilitiesOf face)),
+          -- CR 602.1 over the same roster, without CR 605.1a's exclusion --
           -- Zirda, the Dawnwaker's companion condition is read here, since a card
           -- outside the game has no object to project.
           --
@@ -318,12 +290,17 @@ viewOfCard face =
           -- view builder shares: a Mountain must answer the same here as it does
           -- on the battlefield.
           Filter.hasActivatedAbility =
-            not (null (Face.activatedAbilities face <> Keyword.handAbilitiesOf (Face.keywordSet face) <> Keyword.graveyardAbilitiesOf (Face.keywordSet face)))
+            not (null (printedAbilitiesOf face))
               || Subtype.intrinsicManaAbility (TypeLine.types typeLine) (TypeLine.subtypes typeLine),
           -- CR 702.184c reaches a permanent's CONTROLLER; this builder describes
           -- a printed FACE with no controller and no board to grant it one.
           Filter.grantsStationToughness = False
         }
+
+-- viewOfCard's activated-ability roster: the face's own list and rule 702's.
+printedAbilitiesOf :: Face.Face Card.Type.Card -> [ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
+printedAbilitiesOf face =
+  Keyword.activatedAbilitiesOf False (Face.keywordSet face) (Face.activatedAbilities face <> Keyword.battlefieldAbilitiesOf (Face.keywords face))
 
 -- CR 108.1 / 400.11: does a card of the Oracle card reference, which no game
 -- holds, match the filter a conjure picks over it by
@@ -369,84 +346,6 @@ printedToughness face = case Face.characteristicPT face of
     Just (Quantity.Type.Literal n) -> Just n
     Just Quantity.Type.Star -> Just 0
     _ -> Nothing
-
--- CR 508.3a: does this event record THIS object being declared as an attacker?
--- Only Combat.declareAttackers appends one, so CR 508.4's creature put onto the
--- battlefield attacking stays out.
-declaredIt :: ObjectId -> GameEvent.GameEvent -> Bool
-declaredIt oid event = case event of
-  GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared declared _ _ _ _) -> declared == oid
-  _ -> False
-
--- CR 701.17a: does this event record THIS object as one of a mill's cards? Only
--- Resolve's Mill arm appends one, so a surveil's or an explore's bin stays out.
-milledIt :: ObjectId -> GameEvent.GameEvent -> Bool
-milledIt oid event = case event of
-  GameEvent.Milled (Milled.MkMilled _ cards) -> Foldable.elem oid cards
-  _ -> False
-
--- CR 702.122c: if this event records a crewing THIS object paid for, which
--- Vehicle it crewed. GameEvent.Crewed, written as the cost is paid, so a crew
--- ability that never resolves still leaves the relation behind.
-crewedByIt :: ObjectId -> GameEvent.GameEvent -> Maybe ObjectId
-crewedByIt oid event = case event of
-  GameEvent.Crewed crewed
-    | Set.member oid (Crewing.crewedBy crewed) -> Just (Crewing.vehicle crewed)
-  _ -> Nothing
-
--- CR 702.171c: crewedByIt one keyword over -- if this event records a saddling
--- THIS object paid for, which Mount it saddled.
-saddledByIt :: ObjectId -> GameEvent.GameEvent -> Maybe ObjectId
-saddledByIt oid event = case event of
-  GameEvent.Saddled saddled
-    | Set.member oid (Saddling.saddledBy saddled) -> Just (Saddling.mount saddled)
-  _ -> Nothing
-
--- CR 702.51c: which spells did this object convoke, and which permanents did
--- those spells become? GameEvent.Convoked is written as the cast's cost is paid
--- and names the SPELL, which CR 400.7 ends the moment it resolves -- so a
--- permanent's own entry trigger asking "each creature that convoked it"
--- (Venerated Loxodon) would find nothing to compare against. The BECAME hop is
--- CR 400.7d -- "an ability of a permanent can reference information about the
--- spell that became that permanent as it resolved, including what costs were
--- paid to cast that spell" -- and the becoming is read off the same log:
--- Pawl.Engine.Event records the stack-to-battlefield move as a GameEvent.Moved
--- whose `departed` is the spell.
---
--- Both ends are kept, so an effect that reads the relation while the spell is
--- still on the stack answers too. A spell that never resolved contributes only
--- itself.
-convokedThisTurnOf :: ObjectId -> GameState -> Set.Set ObjectId
-convokedThisTurnOf oid gs =
-  let events = fmap LoggedEvent.event (Foldable.toList (GameState.events gs))
-      spells = Maybe.mapMaybe (convokedByIt oid) events
-   in Set.fromList (concatMap (\spell -> spell : becamePermanents spell events) spells)
-
--- CR 400.7d's "the spell that became that permanent", asked the other way
--- round: the permanents one object became by resolving off the stack, read
--- off the move log. A list rather than a Maybe for CR 712.21's several arrivals,
--- which no permanent spell reaches today.
-becamePermanents :: ObjectId -> [GameEvent.GameEvent] -> [ObjectId]
-becamePermanents spell events =
-  [ arrival
-  | GameEvent.Moved m <- events,
-    let zc = Moved.change m,
-    ZoneChange.departed zc == spell,
-    ZoneChange.to zc == Zone.Battlefield,
-    -- "as it resolved": a countered card put onto the battlefield instead
-    -- (Desertion) is not the permanent the spell became.
-    Moved.duringResolution m,
-    arrival <- Foldable.toList (Moved.arrivals m)
-  ]
-
--- CR 702.51c: if this event records a convoking THIS object paid for, which
--- spell it convoked. GameEvent.Convoked, written as the cost is paid, so a spell
--- that is countered still leaves the relation behind.
-convokedByIt :: ObjectId -> GameEvent.GameEvent -> Maybe ObjectId
-convokedByIt oid event = case event of
-  GameEvent.Convoked convoked
-    | Set.member oid (Convoking.convokedBy convoked) -> Just (Convoking.spell convoked)
-  _ -> Nothing
 
 -- CR 302.6: has `controller` had this object under their control continuously
 -- since their most recent turn began? Object.sickness is the engine's record of
@@ -501,7 +400,7 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- CR 108.3 / 110.2 / 111.2: read off the OBJECT rather than through the
       -- `controller` parameter, since layer 2 has already moved control and
       -- nothing moves ownership. Nothing for an id naming nothing, which CR 608.2b
-      -- wants of a gone target; viewWithLastKnownAnywhere writes CR 608.2h's answer
+      -- wants of a gone target; Count.lastKnownView gives CR 608.2h's answer
       -- over it for the readers owed one.
       Filter.owner = fmap Object.owner (Game.lookupObject oid gs),
       -- CR 400.1 off the OBJECT beside its owner, and for `owner`'s reason: CR
@@ -527,7 +426,7 @@ viewOfCharacteristics peers oid pc controller counters gs =
       Filter.identity = Just oid,
       Filter.playerIdentity = Nothing,
       -- CR 508.1k: a combat status, not a characteristic (CR 109.3). CR 506.4 takes
-      -- a departed creature out of the record, so lastKnownView above writes CR
+      -- a departed creature out of the record, so Count.lastKnownView writes CR
       -- 608.2h's answer over this one.
       Filter.attacking = Game.isAttacking oid gs,
       -- CR 508.1b: the same map's VALUE, kept only when it names a player. A
@@ -691,53 +590,26 @@ viewOfCharacteristics peers oid pc controller counters gs =
         _ -> Nothing,
       -- CR 509.1g: likewise. Combat.blockers is keyed by ATTACKER, so blocking is
       -- membership in some attacker's set rather than a key lookup. CR 506.4 takes
-      -- a departed creature out of the record, so viewWithLastKnownAnywhere writes
+      -- a departed creature out of the record, so Count.lastKnownView gives
       -- CR 608.2h's answer over this one too.
       Filter.blocking = Game.isBlocking oid gs,
       -- CR 509.1h: the key lookup the line above is careful not to be. Stays True
       -- once every creature blocking it has left combat.
       Filter.blocked = Map.member oid (Combat.blockers (GameState.combat gs)),
       Filter.blockers = Map.findWithDefault Set.empty oid (Combat.blockers (GameState.combat gs)),
-      -- CR 608.2i: from the turn's event log, which CR 511.3 does not clear.
-      Filter.attackedThisTurn = any (declaredIt oid . LoggedEvent.event) (GameState.events gs),
-      -- CR 508.1a / 509.1a: from the COMBAT record, which CR 511.3 does clear --
-      -- and not from that same log, which cannot answer it. CR 508.1k and CR
-      -- 509.1g put the AttackerDeclared and BecameBlocking events after the
-      -- payment these two are read during, so a fold over them would be False
-      -- for exactly the creatures being declared.
-      Filter.declaredAttackerThisCombat = Set.member oid (Combat.declaredAttackers (GameState.combat gs)),
-      -- CR 508.3b: the same record's other half, indexed by TARGET rather than by
-      -- attacker. A permanent is named as AttackTarget.OfPlaneswalker or
-      -- AttackTarget.OfBattle; Pawl.Engine.Count.playerView answers CR 508.3b's
-      -- third subject off the same set.
-      Filter.declaredAttackedThisCombat =
-        Set.member (AttackTarget.OfPlaneswalker oid) (Combat.declaredAttacked (GameState.combat gs))
-          || Set.member (AttackTarget.OfBattle oid) (Combat.declaredAttacked (GameState.combat gs)),
-      Filter.declaredBlockerThisCombat = Set.member oid (Combat.declaredBlockers (GameState.combat gs)),
-      -- CR 701.17a / 608.2i: the same log, read for the mills.
-      Filter.milledThisTurn = any (milledIt oid . LoggedEvent.event) (GameState.events gs),
-      -- CR 120.1 / 608.2i: the same log again, read for the damage. Never
-      -- Object.damage -- CR 120.6 removes the marks on a regeneration, CR
-      -- 701.69a heals them away and CR 120.3d/120.3e mark none at all for wither
-      -- or infect, and any such creature was still dealt damage this turn.
-      Filter.dealtDamageThisTurn = any ((== Just oid) . Game.damagedObject . LoggedEvent.event) (GameState.events gs),
-      -- CR 400.7 / 608.2i: the same log again, read for the entries, keyed on
-      -- the ARRIVAL's id as Pawl.Engine.Quantity's EnteredThisTurn arm is.
-      Filter.enteredThisTurn = any ((== Just oid) . Game.enteredBattlefield . LoggedEvent.event) (GameState.events gs),
-      -- CR 702.122c / 608.2i: the same log once more, read for the crewings this
-      -- candidate paid for. The VEHICLES, which is the half of the relation a
-      -- candidate can answer; Pawl.Engine.Filter's CrewedSourceThisTurn compares
-      -- them against the source it is evaluating for.
-      Filter.crewedThisTurn = Set.fromList (Maybe.mapMaybe (crewedByIt oid . LoggedEvent.event) (Foldable.toList (GameState.events gs))),
-      -- CR 702.51c / 608.2i: the same log once more, read for the spells this
-      -- candidate convoked -- and for the permanents those spells became, which
-      -- is the hop `crewedThisTurn` above does not need. Pawl.Engine.Filter's
-      -- ConvokedSourceThisTurn compares the set against the source it is
-      -- evaluating for.
-      Filter.convokedThisTurn = convokedThisTurnOf oid gs,
-      -- CR 702.171c / 608.2i: `crewedThisTurn` above's read, for the Mounts
-      -- this candidate saddled.
-      Filter.saddledThisTurn = Set.fromList (Maybe.mapMaybe (saddledByIt oid . LoggedEvent.event) (Foldable.toList (GameState.events gs))),
+      -- CR 608.2i: what this object did this turn and this combat, off the
+      -- turn's log and the combat record. Each reader is shared with
+      -- Count.lastKnownView, which asks it of an id that has ceased.
+      Filter.attackedThisTurn = Count.attackedThisTurn oid gs,
+      Filter.declaredAttackerThisCombat = Count.declaredAttackerThisCombat oid gs,
+      Filter.declaredAttackedThisCombat = Count.declaredAttackedThisCombat oid gs,
+      Filter.declaredBlockerThisCombat = Count.declaredBlockerThisCombat oid gs,
+      Filter.milledThisTurn = Count.milledThisTurn oid gs,
+      Filter.dealtDamageThisTurn = Count.dealtDamageThisTurn oid gs,
+      Filter.enteredThisTurn = Game.enteredThisTurn oid gs,
+      Filter.crewedThisTurn = Count.crewedThisTurn oid gs,
+      Filter.convokedThisTurn = Count.convokedThisTurn oid gs,
+      Filter.saddledThisTurn = Count.saddledThisTurn oid gs,
       -- CR 302.6: Object.sickness, compared against the PROJECTED controller
       -- rather than read as a bare flag -- rule 302.6's subject is a player, so
       -- `Settled` names one, and Pawl.Engine.Engine.checkControlContinuity drops a
@@ -776,7 +648,7 @@ viewOfCharacteristics peers oid pc controller counters gs =
       Filter.canAttachToSubject = False,
       -- CR 111.6: fixed for the life of the object (CR 400.7). False for an id
       -- naming nothing, which CR 608.2b wants of a gone TARGET;
-      -- viewWithLastKnownAnywhere writes CR 608.2h's answer over it for the
+      -- Count.lastKnownView gives CR 608.2h's answer over it for the
       -- readers owed one, exactly as `owner` above has it.
       Filter.token = Game.isToken oid gs,
       -- CR 903.3, read off the owner's designation for `token` above's reason: it
@@ -804,7 +676,7 @@ viewOfCharacteristics peers oid pc controller counters gs =
         Game.abilitySourceOf oid gs >>= \src ->
           if Map.member src (GameState.objects gs)
             then peers src
-            else fmap (lastKnownView peers src gs) (Map.lookup src (GameState.lastKnown gs)),
+            else fmap (Count.lastKnownView peers src gs) (Map.lookup src (GameState.lastKnown gs)),
       Filter.tapped = Game.isTapped oid gs,
       -- CR 110.5's other status, and the only site that fills the field. Read off
       -- Object.facing, never off the projection: CR 110.5a says status is not a
@@ -885,7 +757,7 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- gone.
       Filter.classLevel = Game.lookupObject oid gs >>= Object.classLevel,
       -- CR 601.2b: read live off the object. For one that has left its zone,
-      -- lastKnownView overrides this with LastKnown.paidCosts, so the CR 608.2h
+      -- Count.lastKnownView overrides this with LastKnown.paidCosts, so the CR 608.2h
       -- path answers "kicked" for a kicked spell that has left the stack.
       Filter.paidCosts = foldMap Object.paidCosts (Game.lookupObject oid gs),
       -- CR 702.104b: read live off the object, with no last-known override --
@@ -924,9 +796,9 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- neighbour's reason.
       --
       -- CR 305.6's intrinsic ability is a disjunct here and not a member of that
-      -- list, because abilitiesFromCharacteristics mints rule 702's abilities (and
-      -- CR 804.2's) and not rule 305's: what it folds is PC.activatedAbilities
-      -- plus the keyword map, and no layer writes "{T}: Add {R}" onto a Mountain. Read off the
+      -- list, because Count.abilitiesOf mints rule 702's abilities (and CR
+      -- 804.2's) and not rule 305's: what it folds is PC.activatedAbilities plus
+      -- the keyword map, and no layer writes "{T}: Add {R}" onto a Mountain. Read off the
       -- PROJECTION, so a land that lost its basic land type in layer 4 has lost
       -- the ability with it (CR 305.7) and one that lost all its abilities in
       -- layer 6 has too (CR 613.1f).
@@ -2182,12 +2054,8 @@ functionsFromZone zone sa =
    in Set.null zones || Set.member zone zones
 
 -- abilitiesGiven with the projection already in hand -- the half
--- viewOfCharacteristics calls.
---
--- CR 702.29b and CR 702.77b are why handAbilitiesOf is in this list, and CR
--- 702.84a why graveyardAbilitiesOf is beside it: a cycling, reinforce, unearth,
--- scavenge, embalm, eternalize or encore ability exists in every zone, so the
--- object HAS it here; it just cannot be activated here (CR 113.6m).
+-- viewOfCharacteristics calls. Count.abilitiesOf's roster, which every view
+-- builder reads, narrowed by each ability's CR 604.2 grant condition.
 --
 -- CR 613.1: the gate's board comes in as a parameter. Taking fullView here would
 -- not terminate for a caller inside the fold -- it re-enters `gather`, with no
@@ -2197,35 +2065,10 @@ abilitiesFromCharacteristics peers pc oid gs =
   let granted ability = case ActivatedAbility.condition ability of
         Nothing -> True
         Just cond -> Condition.holds peers (SourceContext.sourceContext gs (controllerOf oid gs) oid) gs oid cond
-   in -- Rule 702's own activated abilities are appended here, minted from the
-      -- POST-LAYER keyword map, so Humility takes crew away with the rest.
-      --
-      -- The battlefield mint takes the object's CR 612 text changes through
-      -- Rewrite.rewriteMinted, mintedTriggeredAbilitiesOf's road: aura swap's
-      -- "an Aura card" is rule 702.65a's own word, and Pawl.AuraSpec's "CR 612.1
-      -- an Aura swap changed to Background" pair proves it.
-      --
-      -- The hand and graveyard mints take none, since no text change can reach
-      -- them where they function: CR 400.7 ends one when its object changes
-      -- zones, and every "change the text" printing names a spell or a
-      -- permanent, or a card type word rather than a subtype (Scryfall
-      -- `o:"change the text" include:extras`, 2026-10-06, Deceptive Divination
-      -- the one card-type hit). A card in a hand or graveyard changed by a
-      -- subtype swap would refute it.
-      filter
-        granted
-        ( PC.activatedAbilities pc
-            <> Rewrite.rewriteMinted Rewrite.rewriteActivatedAbility Keyword.battlefieldAbilitiesOf pc
-            <> Keyword.handAbilitiesOf (Map.keysSet (PC.keywords pc))
-            <> Keyword.graveyardAbilitiesOf (Map.keysSet (PC.keywords pc))
-            -- CR 804.2's, minted off the POST-LAYER types for the same reason, and
-            -- for a creature on the battlefield only (CR 109.2) -- or, for an id
-            -- that has ceased, one whose CR 608.2h record was filed there.
-            <> [ Deploy.ability
-               | Deploy.grants (GameSettings.deployCreatures (GameState.settings gs)) pc,
-                 lastZoneOf oid gs == Just Zone.Battlefield
-               ]
-        )
+      -- CR 804.2's for a creature on the battlefield only (CR 109.2), or, for an
+      -- id that has ceased, one whose CR 608.2h record was filed there.
+      deploys = Deploy.grants (maybe False (Count.deployIn gs) (lastZoneOf oid gs)) pc
+   in filter granted (Count.abilitiesOf deploys pc)
 
 -- CR 115.1: what a stack object TARGETS -- the recipients under its declared
 -- target slots, which is CR 601.2c's (602.2b's, 603.3d's) announcement read live

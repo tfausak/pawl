@@ -57,7 +57,7 @@ data LastKnown = MkLastKnown
     -- proved by Pawl.ConditionSpec's "the entrant killed between the two checks
     -- still grows the Knight"; WHICH player it names is a regression fence, the
     -- Knight's clause reading "a graveyard" over every player and so never asking.
-    -- Pawl.Engine.Projection.viewWithLastKnownAnywhere is the one reader.
+    -- Pawl.Engine.Count.lastKnownView is the one reader.
     owner :: !PlayerId.PlayerId,
     -- | CR 608.2h: what KIND of object it was and the card behind it -- the same
     -- Object.source the live object carried, copied as it ceased.
