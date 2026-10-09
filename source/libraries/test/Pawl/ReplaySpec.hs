@@ -750,6 +750,17 @@ combatReplaySpec s =
             "a ChooseTaps transcript entry does not answer it"
             (Replay.decode p (Replay.encode (Prompt.ChooseTaps decider S.alice oid [oid, ObjectId.MkObjectId 8] 1) answer))
             Nothing
+        -- The same payload once more, over an exile: a return entry must not
+        -- answer it.
+        Spec.it s "ChooseExiles records and replays a Set ObjectId" $ do
+          let p = Prompt.ChooseExiles decider S.alice oid [oid, ObjectId.MkObjectId 8] 1
+              answer = Set.singleton (ObjectId.MkObjectId 8)
+          Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
+          Spec.assertEqWith
+            s
+            "a ChooseReturns transcript entry does not answer it"
+            (Replay.decode p (Replay.encode (Prompt.ChooseReturns decider S.alice oid [oid, ObjectId.MkObjectId 8] 1) answer))
+            Nothing
         Spec.it s "defaultAnswer returns the first `count` offered, in order" $
           Spec.assertEqWith
             s

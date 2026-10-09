@@ -231,6 +231,7 @@ costMovesLibraryCard component = case component of
   CostComponent.Sacrifice {} -> False
   CostComponent.ReturnThis -> False
   CostComponent.ReturnPermanents {} -> False
+  CostComponent.ExilePermanents {} -> False
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileThis -> False
   CostComponent.ExileCardsFromGraveyard {} -> False

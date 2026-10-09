@@ -475,6 +475,16 @@ sacrificedPermanent = SlotName.MkSlotName (Text.pack "thatSacrificedPermanent")
 returnedPermanent :: SlotName
 returnedPermanent = SlotName.MkSlotName (Text.pack "thatReturnedPermanent")
 
+-- CR 601.2h: the reserved slot under which the permanents a COST payment
+-- exiled are bound -- Food Chain's "the exiled creature". returnedPermanent's
+-- posture: the ids as they were BEFORE the move, so every read is CR 608.2h's
+-- last known information of the permanent, not the card in exile.
+--
+-- Not a target, so the same CR 608.2b posture and the same "no card's
+-- targetSlots may name it" sweep as sacrificedPermanent above.
+exiledPermanent :: SlotName
+exiledPermanent = SlotName.MkSlotName (Text.pack "thatExiledPermanent")
+
 -- CR 601.2h: the reserved slot under which the card a COST payment exiled the
 -- object the cost is on is bound -- what CR 702.167a's "Return this card to the
 -- battlefield" names after craft's "Exile this permanent".
