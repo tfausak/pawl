@@ -246,10 +246,9 @@ spec s registry = Spec.describe s "Ante" $ do
         serials = fmap (fmap CardIdentity.serial) identities
     Spec.assertEqWith s "CR 108.3 each card's starting owner is its owner" (fmap (fmap CardIdentity.startingOwner) identities) (fmap (Just . Object.owner) cards)
     Spec.assertEqWith s "and no two cards share an identity" (Set.size (Set.fromList serials)) 20
-  -- Review Focus 4. A serial is bookkeeping no rule reads, so two Mountains
-  -- alice began the game with stay interchangeable, so a choice between them
-  -- is elided. One bob began the game with does not: the ownership report
-  -- tells it apart.
+  -- A serial is bookkeeping no rule reads, so two Mountains alice began the
+  -- game with stay interchangeable and a choice between them is elided. One
+  -- bob began the game with does not: the ownership report tells it apart.
   Spec.it s "CR 108.3 two cards differing only in their identity's serial are interchangeable, and not when their starting owners differ" $ do
     mountain <- S.printingOf s registry "Mountain"
     let (a, g1) = S.addObjectIn Zone.Hand mountain S.alice (Setup.gameWith anteGame S.bothPlayers)

@@ -2224,7 +2224,7 @@ componentIsToken component = case component of
 -- card nor a token (Pawl.Types.MergeComponent's OfSpellCopy arm), and only a
 -- card answers True here.
 --
--- Its two readers are the two rules that name a component's CARD --
+-- Two of its readers are the two rules that name a component's CARD --
 -- Pawl.Engine.Commander's rule 903.9c search for "the card that represents it
 -- and is a commander", and Pawl.Engine.Event's CR 903.9c split of a departing
 -- merged permanent -- so neither can find a commander in a copy interned to the
@@ -2266,6 +2266,10 @@ representComponent :: MergeComponent.MergeComponent -> Object -> Object
 representComponent component object =
   object
     { Object.source = sourceOfComponent component,
+      -- CR 108.2: a card component is a card, and a token or copy component is
+      -- not one (CR 111.6, CR 707.10). Not implemented: each card component
+      -- keeping its own identity rather than the merged object's (#4848).
+      Object.identity = if componentIsCard component then Object.identity object else Nothing,
       Object.duplicate = case component of
         MergeComponent.OfDuplicate duplicate -> Just (DuplicateCard.values duplicate)
         MergeComponent.OfCard _ -> Nothing

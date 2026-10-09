@@ -8312,7 +8312,8 @@ meld controller victims resultCard = do
                 -- CR 701.42b's pair has no other reading of "its owner".
                 Object.owner = owner,
                 -- CR 108.3: the first card's identity, read off the board before
-                -- forgetObject above.
+                -- forgetObject above. Not implemented: the melded permanent's
+                -- second card keeping its own identity (#4848).
                 Object.identity = Game.lookupObject (fst (NonEmpty.head melding)) gs >>= Object.identity,
                 -- CR 110.2a: "if an effect instructs a player to put an object
                 -- onto the battlefield, that object enters the battlefield under

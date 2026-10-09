@@ -109,6 +109,7 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Ante as Ante
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
@@ -1236,6 +1237,26 @@ copySpellSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "bob gains only his own 6" (S.lifeOf S.bob after) (Just 26)
         Spec.assertEqWith s "carol gains nothing" (S.lifeOf S.carol after) (Just 20)
         Spec.assertEqWith s "and the stack is empty" (length (GameState.stack after)) 0
+  -- Twincast's copy is built from bob's spell's object and is owned by alice,
+  -- its copier (CR 707.10). A copy is no card, so it carries no identity, and
+  -- the ownership report cannot mistake it for a card bob began the game with
+  -- and alice now owns.
+  Spec.it s "CR 707.10 a copy of a spell is no card, so the ownership report never lists it" $ do
+    island <- S.printingOf s registry "Island"
+    twincast <- S.printingOf s registry "Twincast"
+    renewedFaith <- S.printingOf s registry "Renewed Faith"
+    plains <- S.printingOf s registry "Plains"
+    let lands = S.landsFor plains S.bob 3 (S.landsFor island S.alice 2 S.threePlayerGame)
+        (withTwincast, twincastId) = S.handOne twincast lands
+        (faithId, board) = handAppend renewedFaith S.bob withTwincast
+        castFaith = snd (Engine.runGamePure S.identityAnswer board (S.cast S.bob faithId))
+    case topOfStack castFaith of
+      Nothing -> Spec.assertFailure s "Renewed Faith never reached the stack"
+      Just faithSpell -> do
+        let cast = snd (Engine.runGamePure (pinTarget (Recipient.ToObject faithSpell)) castFaith (S.cast S.alice twincastId))
+            copied = resolveOne S.identityAnswer cast
+        Spec.assertEqWith s "CR 707.10 the copy and bob's spell are on the stack" (length (GameState.stack copied)) 2
+        Spec.assertEqWith s "CR 108.3 and no card's owner has changed" (Ante.ownershipChanges copied) Map.empty
   -- CR 707.9's exception riding CR 707.10's opcode, on Double Major {G}{U}
   -- Instant, "Copy target creature spell you control, except it isn't legendary
   -- if the spell is legendary" (Oracle text verified 2026-09-14) --
