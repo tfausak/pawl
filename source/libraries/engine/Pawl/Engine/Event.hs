@@ -1648,7 +1648,15 @@ bringInFrom destination pid outerId gs = case Map.lookup outerId (GameState.outs
   Nothing -> (Nothing, gs)
   Just entry ->
     let (zone, position) = arrivalOf destination
-        mint printingId (oids, g) = let (oid, g1) = mintCard pid Nothing printingId zone position TapState.Untapped g in (oids <> [oid], g1)
+        -- CR 108.3: each card keeps the identity it had out there. Not
+        -- implemented: each card of a melded or merged permanent keeping its
+        -- own (#4848).
+        kept obj = case OutsideObject.identity entry of
+          Just identity -> obj {Object.identity = Just identity}
+          Nothing -> obj
+        mint printingId (oids, g) =
+          let (oid, g1) = mintCard pid Nothing printingId zone position TapState.Untapped g
+           in (oids <> [oid], g1 {GameState.objects = Map.adjust kept oid (GameState.objects g1)})
         (minted, gs1) = Foldable.foldl' (flip mint) ([], gs) (OutsideObject.cards entry)
      in ( NonEmpty.nonEmpty minted,
           gs1

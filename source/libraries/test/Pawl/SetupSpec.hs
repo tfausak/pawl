@@ -1092,7 +1092,7 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
         outerId = ObjectId.MkObjectId 9001
         parent =
           g2
-            { GameState.outsideObjects = Map.singleton outerId (OutsideObject.MkOutsideObject S.alice printingId Facing.FaceUp (printingId NonEmpty.:| []))
+            { GameState.outsideObjects = Map.singleton outerId (OutsideObject.MkOutsideObject S.alice printingId Facing.FaceUp (printingId NonEmpty.:| []) Nothing)
             }
         sub0 = Setup.subgameStateFrom S.alice parent
         (_, crossedSub) = Event.bringInFrom OutsideDestination.Hand S.alice outerId sub0

@@ -33,6 +33,7 @@ import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.OutsideDestination as OutsideDestination
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -182,6 +183,52 @@ spec s registry = Spec.describe s "Ante" $ do
         Spec.assertEqWith s "CR 729.5 bob's main-game library is rebuilt without it" (length (Game.zoneMembers Zone.Library S.bob back)) 8
         Spec.assertEqWith s "CR 729.5 and alice's holds it" (length (Game.zoneMembers Zone.Library S.alice back)) 10
       other -> Spec.assertFailure s ("bob anted " <> show (length other) <> " cards")
+  -- CR 108.3 / 729.4a: a card alice took from bob in the main game (its
+  -- identity says bob began the game with it) is wished into a subgame from
+  -- her hand. It is the same card in there, so the report still lists it once
+  -- it comes home (CR 729.5).
+  Spec.it s "CR 729.4a a card brought into a subgame from the main game keeps its identity" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    let stock pid gs0 = foldr (\_ gs -> snd (S.addLibraryCard mountain pid gs)) gs0 (replicate 9 ())
+        (bearsId, g1) = S.addObjectIn Zone.Hand bears S.alice (stock S.carol (stock S.bob (stock S.alice (Setup.gameWith anteGame S.threePlayers))))
+        bobs obj = obj {Object.identity = fmap (\i -> i {CardIdentity.startingOwner = S.bob}) (Object.identity obj)}
+        parent = g1 {GameState.objects = Map.adjust bobs bearsId (GameState.objects g1)}
+        sub = S.runPure S.identityAnswer (Setup.subgameStateFrom S.alice parent) (Setup.startGameFromCards S.performer Set.empty)
+        (_, crossed) = Event.bringInFrom OutsideDestination.Hand S.alice bearsId sub
+        back = Setup.funnelBack crossed (Setup.applyCrossings crossed parent)
+    Spec.assertEqWith s "CR 108.3 the Bears are still bob's to begin and alice's now" (Map.elems (Ante.ownershipChanges back)) [(S.bob, S.alice)]
+  -- CR 800.4n / 729.5: bob wishes his own main-game Jeweled Bird into a
+  -- three-seat subgame, antes it, and concedes. The Bird stays in the subgame,
+  -- and at its end goes to his main-game library with the rest of his cards.
+  Spec.it s "CR 729.5 a departed player's ante card from the main game goes to their main-game library" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    bird <- S.printingOf s registry "Jeweled Bird"
+    let stock pid gs0 = foldr (\_ gs -> snd (S.addLibraryCard mountain pid gs)) gs0 (replicate 9 ())
+        (birdId, parent) = S.addObjectIn Zone.Hand bird S.bob (stock S.carol (stock S.bob (stock S.alice (Setup.gameWith anteGame S.threePlayers))))
+        sub = S.runPure S.identityAnswer (Setup.subgameStateFrom S.alice parent) (Setup.startGameFromCards S.performer Set.empty)
+    case Event.bringInFrom OutsideDestination.Hand S.bob birdId sub of
+      (Just (inSub NonEmpty.:| []), crossed) -> do
+        let anted = S.departs Departure.Type.Conceded S.bob (S.runPure S.identityAnswer crossed (Event.changeZone inSub Zone.Ante))
+            back = Setup.funnelBack anted (Setup.applyCrossings anted parent)
+        Spec.assertEqWith s "CR 729.5 bob's main-game library holds his nine and the Bird" (length (Game.zoneMembers Zone.Library S.bob back)) 10
+      _ -> Spec.assertFailure s "the Bird was not brought in"
+  -- The same from bob's sideboard (CR 400.11a): the Bird goes to his library,
+  -- and so is no longer in his pool.
+  Spec.it s "CR 729.5 a departed player's ante card from their sideboard goes to their main-game library, not back to the pool" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    bird <- S.printingOf s registry "Jeweled Bird"
+    let stock pid gs0 = foldr (\_ gs -> snd (S.addLibraryCard mountain pid gs)) gs0 (replicate 9 ())
+        (birdPrinting, g1) = Game.intern bird (stock S.carol (stock S.bob (stock S.alice (Setup.gameWith anteGame S.threePlayers))))
+        pooled p = p {Player.outsideTheGame = Map.singleton birdPrinting 1}
+        parent = g1 {GameState.players = Map.adjust pooled S.bob (GameState.players g1)}
+        sub = S.runPure S.identityAnswer (Setup.subgameStateFrom S.alice parent) (Setup.startGameFromCards S.performer Set.empty)
+        (inSub, brought) = Event.bringIn OutsideDestination.Hand S.bob birdPrinting sub
+        anted = S.departs Departure.Type.Conceded S.bob (S.runPure S.identityAnswer brought (Event.changeZone inSub Zone.Ante))
+        back = Setup.funnelBack anted (Setup.applyCrossings anted parent)
+        poolOf pid gs = foldMap Player.outsideTheGame (Map.lookup pid (GameState.players gs))
+    Spec.assertEqWith s "CR 729.5 bob's main-game library holds his nine and the Bird" (length (Game.zoneMembers Zone.Library S.bob back)) 10
+    Spec.assertEqWith s "CR 400.11a and his pool no longer does" (poolOf S.bob back) Map.empty
   -- CR 729.5: a subgame played for ante antes one card from each library, and
   -- at its end each still-playing owner's ante card goes into their main-game
   -- library with the rest of their cards; the main game's own ante is untouched.
