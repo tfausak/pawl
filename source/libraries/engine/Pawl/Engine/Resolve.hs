@@ -28,7 +28,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Replacement as Replacement
-import Pawl.Engine.Resolve.Effect (announcedOnly, apnapPlayersOf, applyClauseEffects, applyEffectWith, branchSelects, clauseIsImpossible, gateAffordable, happenedBetween, noSubgame, payGatePaid, targetSlotsOf)
+import Pawl.Engine.Resolve.Effect (announcedOnly, apnapDecidersOf, applyClauseEffects, applyEffectWith, branchSelects, clauseIsImpossible, gateAffordable, happenedBetween, noSubgame, payGatePaid, targetSlotsOf)
 import Pawl.Engine.Resolve.Slots (boundSlots, effectContext, slotsAreExhaustive, slotsOf)
 import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Target as Target
@@ -1099,7 +1099,7 @@ chosenBranch resolving source controller idx cIdx legal eligible limbOf picked c
             offered <- Monad.filterM eligible (NonEmpty.toList branches)
             memo <- case offered of
               [] -> pure (False, Map.empty)
-              [forced] -> pure (False, Map.fromList (fmap (\chooser -> (chooser, forced)) (apnapPlayersOf (OrElse.chooser orElse) legal controller gs)))
+              [forced] -> pure (False, Map.fromList (fmap (\chooser -> (chooser, forced)) (apnapDecidersOf (OrElse.chooser orElse) legal controller gs)))
               _ ->
                 -- CR 101.4b: each chooser is told the branches the choosers
                 -- before them announced.
@@ -1121,7 +1121,7 @@ chosenBranch resolving source controller idx cIdx legal eligible limbOf picked c
                         pure (made Seq.|> (chooser, announcedHere))
                     )
                     Seq.empty
-                    (apnapPlayersOf (OrElse.chooser orElse) legal controller gs)
+                    (apnapDecidersOf (OrElse.chooser orElse) legal controller gs)
             let (announced, committed) = settled memo
             pure (announced, committed, Map.insert key memo picked)
 
@@ -1228,7 +1228,7 @@ villainousPass resolving controller idx legal orElse limbs performLimb acc0 = do
           Monad.foldM (\faced _ -> face chooser faced) seat (List.replicate times ())
       )
       (acc0, Seq.empty)
-      (apnapPlayersOf (OrElse.chooser orElse) legal controller gs)
+      (apnapDecidersOf (OrElse.chooser orElse) legal controller gs)
   where
     face chooser (acc, made) = do
       gs1 <- State.get
@@ -1247,8 +1247,8 @@ villainousPass resolving controller idx legal orElse limbs performLimb acc0 = do
 -- mode, so a "may" printed on one sentence leaves its neighbours alone.
 --
 -- WHO is asked is the Optionality's own PlayerRef, resolved like every other
--- (playerRefPlayers for the membership) and ordered by CR 101.4 through
--- apnapPlayersOf. Every printed "you may" names the resolving controller -- CR
+-- (decidersOf for the membership, so no CR 801.10 cut) and ordered by CR 101.4
+-- through apnapDecidersOf. Every printed "you may" names the resolving controller -- CR
 -- 405.4 for a spell, CR 113.8 for an ability -- and Jungle Wayfinder's "each
 -- player may" names the whole table. Each of them is asked through
 -- Decide.deciderFor, so a player controlled under CR 723.1 has their controller
@@ -1319,7 +1319,7 @@ exercises resolving source controller idx cIdx bound legal announced committed c
                   pure (made Seq.|> (pid, decision))
               )
               Seq.empty
-              (filter able (announcedOnly announced (apnapPlayersOf asker legal controller gs)))
+              (filter able (announcedOnly announced (apnapDecidersOf asker legal controller gs)))
           let accepted = Set.fromList [pid | (pid, OptionalDecision.Exercises) <- Foldable.toList answers]
           State.modify' (bindPlayersSlot resolving Binding.mayPlayers accepted)
           pure (not (Set.null accepted))

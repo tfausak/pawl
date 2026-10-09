@@ -1,20 +1,25 @@
 module Pawl.Engine.Players where
 
+import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackingPlayers as AttackingPlayers
 import qualified Pawl.Types.Combat as Combat
+import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Prompt as Prompt
 import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.SlotName (SlotName)
@@ -40,23 +45,39 @@ data Reads = MkReads
     -- | CR 613.1b's controller of an object, as this position sees it.
     controllerOf :: ObjectId -> Maybe PlayerId,
     -- | CR 108.3's owner of an object, as this position sees it.
-    ownerOf :: ObjectId -> Maybe PlayerId
+    ownerOf :: ObjectId -> Maybe PlayerId,
+    -- | The players a relation is judged over: CR 801.10 / 801.11's 'table'
+    -- for a spell or ability, every player still in the game where no range
+    -- applies (Pawl.Engine.PlayerEffect.zoneOwners).
+    roster :: [PlayerId],
+    -- | CR 801.10: whether an answer read off a slot, an object or a choice
+    -- still reaches this position. A resolution cuts it to its 'table'; a
+    -- position that names a turn or a count rather than affecting anyone does
+    -- not cut.
+    reaches :: PlayerId -> Bool
   }
 
 -- | What a RESOLUTION reads (CR 608.2): its controller as "you", the slots it
 -- filled (CR 608.2b's legal ones), and the controller and owner reads the
 -- caller supplies -- CR 608.2h's last known information, from a module that
--- sees the projection.
-resolution :: (ObjectId -> Maybe PlayerId) -> (ObjectId -> Maybe PlayerId) -> Map.Map SlotName (Set Recipient) -> PlayerId -> Reads
-resolution controllerRead ownerRead slots controller =
-  MkReads
-    { perspective = Just controller,
-      bound = True,
-      slotPlayers = \slot -> fmap (Maybe.mapMaybe Recipient.playerOf . Set.toList) (Map.lookup slot slots),
-      slotObject = \slot -> Map.lookup slot slots >>= Binding.onlyOne >>= Recipient.objectOf,
-      controllerOf = controllerRead,
-      ownerOf = ownerRead
-    }
+-- sees the projection. CR 801.10: every answer is cut to the controller's
+-- 'table', so a player the clause names through an object or a choice --
+-- Stuffy Doll's chosen player under another controller -- is not affected
+-- from out of range. Pawl.RangeOfInfluenceSpec's "CR 801.10 a chosen player
+-- outside the controller's range is dealt no damage" proves it.
+resolution :: (ObjectId -> Maybe PlayerId) -> (ObjectId -> Maybe PlayerId) -> Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> Reads
+resolution controllerRead ownerRead slots controller gs =
+  let reached = table (Just controller) gs
+   in MkReads
+        { perspective = Just controller,
+          bound = True,
+          slotPlayers = \slot -> fmap (Maybe.mapMaybe Recipient.playerOf . Set.toList) (Map.lookup slot slots),
+          slotObject = \slot -> Map.lookup slot slots >>= Binding.onlyOne >>= Recipient.objectOf,
+          controllerOf = controllerRead,
+          ownerOf = ownerRead,
+          roster = reached,
+          reaches = (`elem` reached)
+        }
 
 -- | CR 102.1 / 801.10 / 801.11: the players still in the game that the
 -- perspective reaches. A departed player keeps their row in GameState.players,
@@ -74,28 +95,71 @@ table viewer gs = maybe (Game.stillPlaying gs) (`Game.reachableBy` gs) viewer
 -- departed player through their last known information rather than dropping
 -- them -- Specific's posture.
 related :: Maybe PlayerId -> GameState -> PlayerRelation.PlayerRelation -> Maybe [PlayerId]
-related viewer gs relation = case viewer of
+related viewer gs = relatedAmong (table viewer gs) viewer gs
+
+-- | 'related' over a roster the caller names, for a position whose table is
+-- not the perspective's range ('roster').
+relatedAmong :: [PlayerId] -> Maybe PlayerId -> GameState -> PlayerRelation.PlayerRelation -> Maybe [PlayerId]
+relatedAmong players viewer gs relation = case viewer of
   Just you -> case relation of
     PlayerRelation.You -> Just [you]
-    _ -> Just (filter (PlayerRelation.holds (Game.teams gs) relation you) (table viewer gs))
+    _ -> Just (filter (PlayerRelation.holds (Game.teams gs) relation you) players)
   Nothing
-    | PlayerRelation.perspectiveFree relation -> Just (table viewer gs)
+    | PlayerRelation.perspectiveFree relation -> Just players
     | otherwise -> Nothing
+
+-- | CR 801.5a: the players @you@ may be offered for "choose a player" in this
+-- relation -- still in the game (CR 102.1), within range, and standing in the
+-- relation. THE candidate list every "choose a player" or "choose an
+-- opponent" builds; 'chooseOne' asks it.
+offer :: PlayerId -> GameState -> PlayerRelation.PlayerRelation -> [PlayerId]
+offer you gs = Maybe.fromMaybe [] . related (Just you) gs
+
+-- | CR 608.2d / 614.12a / 601.2c: @chooser@ picks one of the candidates, for
+-- @source@. Nothing at no candidate (CR 101.3); elided at one, the options
+-- being indistinguishable. Prompt.ChoosePlayer where the offer holds the
+-- chooser and Prompt.ChooseOpponent where it cannot, so the prompt follows the
+-- candidate set rather than any scope's name. The answer is FILTERED rather
+-- than trusted, falling back to the first candidate, since every caller's
+-- instruction is mandatory. Hexproof and shroud do not enter into it: a choice
+-- is not a target (CR 115.10a).
+chooseOne :: PlayerId -> ObjectId -> [PlayerId] -> Game (Maybe PlayerId)
+chooseOne chooser source candidates = case candidates of
+  [] -> pure Nothing
+  [sole] -> pure (Just sole)
+  first : second : rest -> do
+    gs <- State.get
+    let offered = first NonEmpty.:| (second : rest)
+        decider = Decide.deciderFor chooser gs
+        question =
+          if elem chooser offered
+            then Prompt.ChoosePlayer decider chooser source offered
+            else Prompt.ChooseOpponent decider chooser source offered
+    answer <- Game.choose question
+    pure (Just (if elem answer offered then answer else first))
 
 -- | The players a PlayerRef names, in PlayerId order, or Nothing where the
 -- position cannot answer it. THE one reading of every PlayerRef arm; a caller
 -- with an ordering rule imposes it, and a caller with no use for
 -- "unanswerable" reads Nothing as nobody.
 named :: Reads -> GameState -> PlayerRef.PlayerRef -> Maybe [PlayerId]
-named given gs ref =
+named given gs ref = case ref of
+  -- The baked seat, uncut: see 'namedUncut'.
+  PlayerRef.Specific _ -> namedUncut given gs ref
+  _ -> fmap (filter (reaches given)) (namedUncut given gs ref)
+
+-- | 'named' before CR 801.10's cut on what the position reaches.
+namedUncut :: Reads -> GameState -> PlayerRef.PlayerRef -> Maybe [PlayerId]
+namedUncut given gs ref =
   let you = perspective given
+      related' = relatedAmong (roster given) you gs
       -- CR 702.26b: a baked object that is phased out names nothing.
       unlessPhasedOut oid = if Map.member oid (GameState.phasedOut gs) then Nothing else Just oid
       -- A slot naming nobody excludes nobody; with no bindings at all, nothing
       -- was there to exclude anybody.
       excluding name = if bound given then Just (Maybe.fromMaybe [] (slotPlayers given name)) else Nothing
    in case ref of
-        PlayerRef.Relative relation -> related you gs relation
+        PlayerRef.Relative relation -> related' relation
         -- Every player minus every player the slot names (CR 104.2c's winning
         -- team is several). A source that existed and then ceased, which CR
         -- 729.5 leaves a resumed resolution holding, is not looked up: the
@@ -104,12 +168,12 @@ named given gs ref =
         -- Subgame Tithe case proves it.
         PlayerRef.EachPlayerExcept name -> do
           excluded <- excluding name
-          fmap (filter (`notElem` excluded)) (related you gs PlayerRelation.AnyPlayer)
+          fmap (filter (`notElem` excluded)) (related' PlayerRelation.AnyPlayer)
         -- CR 702.116a's "each opponent other than defending player": the arm
         -- above narrowed by CR 102.2 / 102.3.
         PlayerRef.EachOpponentExcept name -> do
           excluded <- excluding name
-          fmap (filter (`notElem` excluded)) (related you gs PlayerRelation.Opponent)
+          fmap (filter (`notElem` excluded)) (related' PlayerRelation.Opponent)
         -- ONE player or none: declining a slot that names several is CR
         -- 601.2c's own answer, the one Binding.onlyOne gives every other such
         -- reader. A slot's target is in range already (CR 801.4).
@@ -170,4 +234,4 @@ named given gs ref =
             _ -> Nothing
           let sentAt = Map.keys (Map.filter (== AttackTarget.OfPlayer attacked) (Combat.attackers (GameState.combat gs)))
               attackers = Maybe.mapMaybe (controllerOf given) sentAt
-          fmap (filter (`elem` attackers)) (related you gs relation)
+          fmap (filter (`elem` attackers)) (related' relation)
