@@ -1,0 +1,46 @@
+{
+  "description": "CR 608.2b Synthetic Counted Verdict fails to count a gauge target that died in response",
+  "note": "Synthetic Counted Verdict: \"Tap up to three target creatures you control, then destroy target creature with mana value equal to the number of those creatures.\" alice aims it with two Typhoid Rats at bob's Goblin Piker (mana value 2), and bob Bolts a Rat in response. CR 608.2b's last sentence: the effect fails to determine any information about the dead, now illegal, Rat, so the count is 1, the Piker is an illegal target at mana value 2, and it survives. Counting the Rat from last known information would make the count 2 and destroy the Piker.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Swamp", "label": "swamp" },
+          { "card": "Swamp", "label": "swamp-2" },
+          { "card": "Swamp", "label": "swamp-3" },
+          { "card": "Swamp", "label": "swamp-4" },
+          { "card": "Typhoid Rats", "label": "rat" },
+          { "card": "Typhoid Rats", "label": "rat-2" }
+        ],
+        "hand": [
+          { "card": "Synthetic Counted Verdict", "label": "verdict" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain" },
+          { "card": "Goblin Piker", "label": "piker" }
+        ],
+        "hand": [
+          { "card": "Lightning Bolt", "label": "bolt" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$verdict", "targetsBySlot": { "gauge": ["$rat", "$rat-2"], "victim": ["$piker"] }, "mana": ["$swamp", "$swamp-2", "$swamp-3", "$swamp-4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "$bolt", "targets": ["$rat"], "mana": ["$mountain"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Typhoid Rats", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "View": { "of": "Stack", "is": [] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "$rat-2", "tapped": true } } }
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "description": "CR 603.12 / 608.2f Nihiloor's reflexive for each opponent steals from that opponent, measured against the creature tapped for them",
+  "note": "Nihiloor taps the Hill Giant (power 3) for bob and the Savannah Lions (power 2) for carol. Each reflexive reads its own loop member and its own tapped creature: bob's refuses carol's Bears and bob's Craw Wurm (power 6) and takes the Gray Ogre; carol's refuses bob's Ogre and carol's Hill Giant (power 3, above the Lions' 2) and takes carol's Bears. A reflexive that lost its loop member would find no legal target at all; one that read the other iteration's tapped creature would let carol's Giant through.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Plains", "label": "plains" },
+          { "card": "Island", "label": "island" },
+          { "card": "Swamp", "label": "swamp" },
+          { "card": "Swamp", "label": "swamp-2" },
+          { "card": "Swamp", "label": "swamp-3" },
+          { "card": "Hill Giant", "label": "giant" },
+          { "card": "Savannah Lions", "label": "lions" },
+          { "card": "Memnite", "label": "memnite" }
+        ],
+        "hand": [
+          { "card": "Nihiloor", "label": "nihiloor" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Gray Ogre", "label": "ogre" },
+          { "card": "Craw Wurm", "label": "wurm" }
+        ]
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          { "card": "Grizzly Bears", "label": "bears" },
+          { "card": "Hill Giant", "label": "carol-giant" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$nihiloor", "mana": ["$plains", "$island", "$swamp", "$swamp-2", "$swamp-3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Answer": { "prompt": "ChooseAnyNumberOfPermanents", "with": ["$giant"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Answer": { "prompt": "ChooseAnyNumberOfPermanents", "with": ["$lions"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTriggers": ["Nihiloor", "Nihiloor"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "refuse": { "ChooseTargets": { "target": ["$bears"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "refuse": { "ChooseTargets": { "target": ["$wurm"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "target": ["$ogre"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "refuse": { "ChooseTargets": { "target": ["$ogre"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "refuse": { "ChooseTargets": { "target": ["$carol-giant"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "target": ["$bears"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "View": { "of": "Stack", "is": [] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "View": { "of": "Controller", "object": "$ogre", "is": "alice" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "View": { "of": "Controller", "object": "$bears", "is": "alice" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "View": { "of": "Controller", "object": "$wurm", "is": "bob" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "View": { "of": "Controller", "object": "$carol-giant", "is": "carol" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "$giant", "tapped": true } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "$lions", "tapped": true } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "$memnite", "tapped": false } } }
+  ]
+}
