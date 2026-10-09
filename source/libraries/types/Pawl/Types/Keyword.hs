@@ -102,9 +102,10 @@ data Keyword
     -- prohibitions are proved by Pawl.DamageSpec's, Pawl.TargetSpec's,
     -- Pawl.CombatSpec's and Pawl.AuraSpec's "CR 702.16k" cases.
     --
-    -- Not implemented: a LINT over the "from each" shorthands of rules 702.16h
-    -- and 702.16i, which expand to one instance of this constructor per quality
-    -- and so are a transcription nothing checks (#3200).
+    -- Rule 702.16h's "protection from each [characteristic]" is one instance
+    -- per quality, no variant constructor: Spectra Ward and Iridescent Angel
+    -- write it, and Pawl.CardSpec's "CR 702.16h" lint checks that each names
+    -- its whole domain.
     --
     -- Rule 702.16n's exception is the payload's second field rather than a
     -- variant constructor: Spectra Ward and White Ward write it, and
