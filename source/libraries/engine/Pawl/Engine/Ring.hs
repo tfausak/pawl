@@ -345,7 +345,8 @@ theRingSacrificesTheBlocker =
               ArmDelayedTrigger.onset = Onset.Immediately,
               -- CR 603.7b's default, spelled as the absence that rule words it as:
               -- "at end of combat" states no duration, so it fires once.
-              ArmDelayedTrigger.duration = Nothing
+              ArmDelayedTrigger.duration = Nothing,
+              ArmDelayedTrigger.ability = Nothing
             }
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.PermanentBecomesBlockedBy yourRingBearer,

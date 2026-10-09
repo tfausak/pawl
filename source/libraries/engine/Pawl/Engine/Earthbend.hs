@@ -107,7 +107,8 @@ arm =
     ArmDelayedTrigger.MkArmDelayedTrigger
       { ArmDelayedTrigger.name = returnName,
         ArmDelayedTrigger.onset = Onset.Immediately,
-        ArmDelayedTrigger.duration = Nothing
+        ArmDelayedTrigger.duration = Nothing,
+        ArmDelayedTrigger.ability = Nothing
       }
 
 -- | The name rule 701.66a's delayed ability is filed under on

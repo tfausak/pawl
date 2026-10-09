@@ -1,0 +1,53 @@
+{
+  "description": "CR 707.9a / 603.7a a Clone of Sakashima the Impostor keeps its quoted ability, and the Clone returns to hand at the next end step",
+  "note": "The delayed ability is written inside Sakashima's quoted ability, which the Clone gets through the copiable values (CR 707.9a). The Clone's own card declares no delayed ability, so a lookup that reads only the card of the creature using the ability arms nothing, and the Clone stays on the battlefield. The legend rule keeps the Clone, so the only Sakashima left on the battlefield is the Clone.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "i1", "ready": true },
+          { "card": "Island", "label": "i2", "ready": true },
+          { "card": "Island", "label": "i3", "ready": true },
+          { "card": "Island", "label": "i4", "ready": true },
+          { "card": "Island", "label": "i5", "ready": true },
+          { "card": "Island", "label": "i6", "ready": true },
+          { "card": "Island", "label": "i7", "ready": true },
+          { "card": "Island", "label": "i8", "ready": true },
+          { "card": "Island", "label": "i9", "ready": true },
+          { "card": "Island", "label": "i10", "ready": true },
+          { "card": "Island", "label": "i11", "ready": true },
+          { "card": "Island", "label": "i12", "ready": true },
+          { "card": "Hill Giant", "label": "giant", "ready": true }
+        ],
+        "hand": [
+          { "card": "Sakashima the Impostor", "label": "sakashima" },
+          { "card": "Clone", "label": "clone" }
+        ],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      },
+      {
+        "name": "bob",
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$sakashima", "mana": ["$i1", "$i2", "$i3", "$i4", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "$giant" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$clone", "mana": ["$i5", "$i6", "$i7", "$i8", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "Sakashima the Impostor" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Answer": { "prompt": "ChooseLegend", "with": "Clone" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Sakashima the Impostor", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "Clone", "mana": ["$i9", "$i10", "$i11", "$i12"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Sakashima the Impostor", "count": 1 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": [] } },
+    { "turn": 2, "step": "Upkeep", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Clone", "count": 1 } } },
+    { "turn": 2, "step": "Upkeep", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Sakashima the Impostor", "count": 0 } } }
+  ]
+}

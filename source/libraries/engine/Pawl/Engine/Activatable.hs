@@ -122,10 +122,10 @@ abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) 
   -- your graveyard to the battlefield" is payable by a Skeleton standing on the
   -- battlefield, and only this filter stops it being offered there.
   --
-  -- Not implemented: a delayed trigger declared by the GRANTOR of a granted
-  -- ability. The delayed map is the HOST's own face while the abilities are the
-  -- PROJECTED ones, so such a name resolves to nothing here and takes CR 113.6's
-  -- battlefield default, as it does at resolution (#3661).
+  -- The delayed map is the HOST's own face while the abilities are the
+  -- PROJECTED ones. A granted ability's arm carries its delayed ability
+  -- (Pawl.AbilitySlotLintSpec's quoted-arm lint) and EffectZone reads it off the
+  -- arm, so the host's map never has to hold the grantor's text.
   -- Pawl.Engine.Event.battlefieldAbilitiesOf carries the same pairing and the
   -- same note.
   Just Zone.Battlefield -> filter (functionsIn (Game.delayedAbilitiesOf oid gs) Zone.Battlefield) (Projection.abilitiesGiven pcs oid gs)

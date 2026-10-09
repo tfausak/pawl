@@ -90,11 +90,12 @@ import qualified Pawl.Types.WhenSpent as WhenSpent
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 603.7: the delayed abilities an effect list ARMS, by name -- an AddMana's
--- spend trigger among them, which its payment arms (CR 106.6).
+-- spend trigger among them, which its payment arms (CR 106.6). An arm carrying
+-- its own ability (ArmDelayedTrigger.ability) names nothing the card declares.
 armedAbilities :: [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> Set AbilityName
 armedAbilities effects =
   let named effect = case effect of
-        Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger name _ _) -> Just name
+        Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger name _ _ Nothing) -> Just name
         Effect.AddMana addition -> fmap WhenSpent.ability (ManaAddition.whenSpent addition)
         Effect.Firebend addition -> fmap WhenSpent.ability (ManaAddition.whenSpent addition)
         _ -> Nothing
@@ -105,8 +106,8 @@ armedAbilities effects =
 onsetGatedAbilities :: [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> Set AbilityName
 onsetGatedAbilities effects =
   let named effect = case effect of
-        Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger _ Onset.Immediately _) -> Nothing
-        Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger name _ _) -> Just name
+        Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger _ Onset.Immediately _ _) -> Nothing
+        Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger name _ _ Nothing) -> Just name
         _ -> Nothing
    in Set.fromList (Maybe.mapMaybe named effects)
 

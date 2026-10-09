@@ -60,6 +60,101 @@
                           "type": "Legendary"
                         }
                       ]
+                    },
+                    {
+                      "type": "GainAbility",
+                      "value": {
+                        "type": "Activated",
+                        "value": {
+                          "cost": {
+                            "mana": [
+                              {
+                                "type": "Generic",
+                                "value": 2
+                              },
+                              {
+                                "type": "OfType",
+                                "value": {
+                                  "type": "Colored",
+                                  "value": {
+                                    "type": "Blue"
+                                  }
+                                }
+                              },
+                              {
+                                "type": "OfType",
+                                "value": {
+                                  "type": "Colored",
+                                  "value": {
+                                    "type": "Blue"
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          "modal": {
+                            "modes": [
+                              {
+                                "clauses": [
+                                  {
+                                    "effects": [
+                                      {
+                                        "type": "ArmDelayedTrigger",
+                                        "value": {
+                                          "ability": {
+                                            "type": "Triggered",
+                                            "value": {
+                                              "condition": {
+                                                "type": "StepBegins",
+                                                "value": {
+                                                  "phase": {
+                                                    "type": "Ending",
+                                                    "value": {
+                                                      "type": "EndStep"
+                                                    }
+                                                  },
+                                                  "scope": {
+                                                    "type": "EachTurn"
+                                                  }
+                                                }
+                                              },
+                                              "modal": {
+                                                "modes": [
+                                                  {
+                                                    "clauses": [
+                                                      {
+                                                        "effects": [
+                                                          {
+                                                            "type": "MoveToZone",
+                                                            "value": {
+                                                              "ref": {
+                                                                "type": "InSlot",
+                                                                "value": "self"
+                                                              },
+                                                              "zone": {
+                                                                "type": "Hand"
+                                                              }
+                                                            }
+                                                          }
+                                                        ]
+                                                      }
+                                                    ]
+                                                  }
+                                                ]
+                                              }
+                                            }
+                                          },
+                                          "name": "return sakashima"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                      }
                     }
                   ]
                 }
