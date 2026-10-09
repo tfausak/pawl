@@ -30,7 +30,7 @@
 --
 -- The last group takes the OTHER road in: Ring of Ma'rûf's CR 614.6 draw
 -- replacement, whose rewrite reaches the same `bringInto` the resolution arm
--- does.
+-- does, and Synthetic Wishful Djinn's, two of which put CR 616.1's choice.
 module Pawl.OutsideTheGameSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
