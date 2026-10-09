@@ -1878,7 +1878,7 @@ ceilingOf pid oid quantities gs =
 -- one step before CR 601.2f's total, rule 118.13b's immediately before a cost
 -- paid during a resolution is paid (Pawl.Engine.Resolve.Effect.payGatePaidBy), and rule
 -- 118.13c's immediately before a special action's cost is
--- (Pawl.Engine.FaceDown.turnFaceUp and its five siblings). `announceToll` below
+-- (`payAction`, every special action's). `announceToll` below
 -- is the same choice at a moment rule 118.13 states none for.
 --
 -- The life the announcement committed becomes a CostComponent.PayLife, making
@@ -4910,7 +4910,9 @@ pay perform began moment subject announced spending pid oid cost = fmap fst (pay
 -- can't be 0"). The X prompt's bound is advisory (Prompt.ChooseX) and states no
 -- ceiling, since no special action's cost prints one. REJECT-NOT-REPAIR,
 -- Cast.castProposed's posture: an X below the floor or one the board cannot pay
--- takes the whole action away rather than being clamped.
+-- takes the whole action away rather than being clamped. The gate at the named
+-- X is a fence and no test observes it: an X the board cannot pay also fails
+-- inside Cost.pay, whose reversal leaves the same state.
 --
 -- `before` is where the action began, and CR 733.1's reversal returns there
 -- inside Cost.pay, offering the payer back the mana abilities the CR 605.3a
@@ -4923,7 +4925,8 @@ pay perform began moment subject announced spending pid oid cost = fmap fst (pay
 -- CR 601.2f's totalling is `pure`: that rule totals the cost of a spell being
 -- cast or an ability being activated, and a special action is neither, so the
 -- announced cost IS the cost paid and the announcement offers exactly what the
--- gate measured (see #90).
+-- gate measured (see #90). The announcement's Phyrexian count is discarded:
+-- rule 702.150a asks about the player who CAST the object.
 payAction :: ManaAbilityPerformer.ManaAbilityPerformer -> GameState -> PaymentSubject.PaymentSubject -> Natural -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game (Maybe Natural)
 payAction perform before subject leastX pid oid printed
   | not (payableAt leastX) = pure Nothing
