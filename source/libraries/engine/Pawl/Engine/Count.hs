@@ -382,6 +382,7 @@ bakePerspective viewOf context gs candidate predicate =
         Filter.Type.HasChosenSubtype -> predicate
         Filter.Type.IsLastExiledWithSource -> predicate
         Filter.Type.OfChosenPlayer -> predicate
+        Filter.Type.OfRelatedPlayer _ -> predicate
         Filter.Type.IsPlayer _ -> predicate
         Filter.Type.IsAttacking -> predicate
         -- Untouched for ControlledBy's reason: the relation is answered against the

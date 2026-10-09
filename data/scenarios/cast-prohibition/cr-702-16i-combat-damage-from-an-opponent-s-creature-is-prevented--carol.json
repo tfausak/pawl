@@ -1,0 +1,29 @@
+{
+  "description": "CR 702.16i / 702.16e combat damage from an opponent's creature to the protected player is prevented",
+  "note": "Twin: the same board, and the Piker attacks carol, who takes its 2.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Absolute Virtue", "label": "virtue" }],
+        "library": [{ "card": "Swamp" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "piker", "ready": true }],
+        "library": [{ "card": "Swamp" }]
+      },
+      {
+        "name": "carol",
+        "library": [{ "card": "Swamp" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 2, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["$piker"] } },
+    { "turn": 2, "step": "DeclareAttackers", "player": "bob", "source": "$piker", "do": { "ChooseAttackTarget": "$carol" } },
+    { "turn": 2, "step": "EndOfCombat", "player": "bob", "check": { "Life": { "player": "carol", "life": 18 } } }
+  ]
+}

@@ -474,6 +474,7 @@ filterNames asking criterion = case criterion of
   Filter.HasChosenSubtype -> False
   Filter.IsLastExiledWithSource -> False
   Filter.OfChosenPlayer -> False
+  Filter.OfRelatedPlayer _ -> False
   Filter.IsPlayer _relation -> False
   Filter.IsControllerOfBound slot -> slotNames asking slot
   Filter.ControlsMoreThanYou _margin nested -> filterNames asking nested

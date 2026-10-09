@@ -758,14 +758,12 @@ targetable pcs rowsOf perspective source sourceView gs recipient =
             -- ability doing the protecting belongs to `oid`.
             --
             -- Rule 702.16k's targeting clause names the controller of the SPELL
-            -- OR ABILITY rather than the source object's, so `perspective` --
+            -- OR ABILITY as well as the source object's, so `perspective` --
             -- CR 109.5's "you" for the thing being aimed, which CR 113.8 fixes
             -- as the player who activated it -- goes in beside the quality.
-            -- Without it a source stolen in response, or one that has left for a
-            -- zone CR 108.4 leaves it no controller in, answers for the wrong
-            -- player. See
-            -- Pawl.TargetSpec's "CR 702.16k a Saltfield Recluse stolen in
-            -- response still weakens the Nemesis that chose the thief".
+            -- Pawl.TargetSpec's "CR 702.16k / 702.16b a Saltfield Recluse the
+            -- chosen player steals in response no longer weakens the Nemesis"
+            -- proves the source half still answers.
             protects =
               Filter.matches
                 (Filter.contextFor (Game.teams gs) controller (Just source))
@@ -790,11 +788,12 @@ targetable pcs rowsOf perspective source sourceView gs recipient =
         -- hexproof narrow by WHO controls the spell, and protection by what the
         -- SOURCE is -- which is `source` here for the same reason
         -- `restrictedObject` reads `sourceView`, CR 702.16b naming a spell's
-        -- quality and an ability's source in one sentence.
+        -- quality and an ability's source in one sentence. `perspective` goes
+        -- along for rule 702.16k's targeting clause (Filter.aimingController).
         Recipient.ToPlayer pid ->
           let rows = rowsOf pid
            in not (PlayerEffect.protectedFromTargeting rows perspective pid gs)
-                && not (PlayerEffect.protectedFromGiven rows source gs)
+                && not (PlayerEffect.protectedFromGiven rows (Just perspective) source gs)
         Recipient.ToCreature oid -> restrictedObject oid
         Recipient.ToPlaneswalker oid -> restrictedObject oid
         Recipient.ToBattle oid -> restrictedObject oid

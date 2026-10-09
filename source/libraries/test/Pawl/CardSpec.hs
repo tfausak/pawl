@@ -4987,6 +4987,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.IsLastExiledWithSource -> []
   -- Reads no slot at all: rule 702.16k's player arrives on Filter.Context.
   Filter.Type.OfChosenPlayer -> []
+  Filter.Type.OfRelatedPlayer _ -> []
   Filter.Type.IsPlayer _ -> []
   -- The one arm with an answer: the candidate is the controller of the object
   -- the slot names (CR 608.2h), read through slotOneObject.

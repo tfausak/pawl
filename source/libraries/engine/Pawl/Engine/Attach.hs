@@ -143,6 +143,10 @@ attachmentWith equippable src destination gs
   -- so Pawl.Engine.Sba.fallsOff is the gate the pool actually drives. Written
   -- because CR 101.2 makes the "can't" beat rule 701.3a's permission below,
   -- exactly as the object case above is.
+  --
+  -- Not implemented: an Aura card asked about before it enters (CR 303.4f's
+  -- gate) has no controller yet, so this judges it as its owner's rather than
+  -- as the player it will enter under (#4868).
   | Maybe.maybe False (\pid -> PlayerEffect.protectedFrom src pid gs) (Recipient.playerOf destination) = Nothing
   -- CR 301.5, "it can't legally be attached to anything that isn't a creature" --
   -- which is also why a player destination falls to Nothing here rather than

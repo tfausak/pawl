@@ -1140,17 +1140,40 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
       Spec.assertBool s (not (Filter.matches (chose 0) aPlayer Filter.Type.OfChosenPlayer)) "player"
 
     -- CR 702.16k's targeting clause, which names the aiming spell or ability's
-    -- controller instead of either half above: both rows are `blackCreature`,
-    -- controlled by player 0, and only the aimer moves.
-    Spec.it s "CR 702.16k an aiming controller answers in place of the candidate's" $ do
+    -- controller BESIDE the two halves above, rule 702.16b still barring an
+    -- ability from a source the chosen player controls. `loose` matches neither
+    -- half for player 0, so there only the aimer moves.
+    Spec.it s "CR 702.16k an aiming controller widens the two halves" $ do
       let aimedBy n = (chose 0) {Filter.aimingController = Just (Just (PlayerId.MkPlayerId n))}
-      Spec.assertBool s (Filter.matches (aimedBy 0) blackCreature Filter.Type.OfChosenPlayer) "the chosen player is aiming"
-      Spec.assertBool s (not (Filter.matches (aimedBy 1) blackCreature Filter.Type.OfChosenPlayer)) "somebody else is, though the chosen player controls the source"
+      Spec.assertBool s (Filter.matches (aimedBy 0) loose Filter.Type.OfChosenPlayer) "the chosen player is aiming"
+      Spec.assertBool s (not (Filter.matches (aimedBy 1) loose Filter.Type.OfChosenPlayer)) "somebody else is, at a source neither half names"
+      Spec.assertBool s (Filter.matches (aimedBy 1) blackCreature Filter.Type.OfChosenPlayer) "somebody else is, at a source the chosen player controls"
 
     -- CR 109.5's absent "you", the posture every player-referencing atom here
     -- takes: an aiming object whose controller is unknown names nobody.
-    Spec.it s "an aimer with no controller is vacuously false" $ do
-      Spec.assertBool s (not (Filter.matches ((chose 0) {Filter.aimingController = Just Nothing}) blackCreature Filter.Type.OfChosenPlayer)) "no perspective"
+    Spec.it s "an aimer with no controller adds nothing" $ do
+      Spec.assertBool s (not (Filter.matches ((chose 0) {Filter.aimingController = Just Nothing}) loose Filter.Type.OfChosenPlayer)) "no perspective"
+
+  -- CR 702.16i / 702.16k: OfChosenPlayer's two halves and its aimer, for every
+  -- player relating thus to the perspective. `self`'s perspective is player 0,
+  -- who controls `blackCreature`; player 1 owns it.
+  Spec.describe s "OfRelatedPlayer" $ do
+    let opponents = Filter.Type.OfRelatedPlayer PlayerRelation.Opponent
+        from n = Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId n)) Nothing
+        loose = blackCreature {Filter.controller = Nothing}
+    Spec.it s "matches an object an opponent controls, and not one you control" $ do
+      Spec.assertBool s (Filter.matches (from 1) blackCreature opponents) "player 0 controls it, and is player 1's opponent"
+      Spec.assertBool s (not (Filter.matches self blackCreature opponents)) "player 0 controls it, and is the perspective"
+
+    Spec.it s "CR 108.4 matches an object an opponent owns only while nobody controls it" $ do
+      Spec.assertBool s (Filter.matches self loose opponents) "owned by player 1, uncontrolled"
+      Spec.assertBool s (not (Filter.matches (from 1) loose opponents)) "owned by the perspective"
+
+    Spec.it s "CR 702.16k an aiming controller widens the two halves" $ do
+      let aimedBy n = self {Filter.aimingController = Just (Just (PlayerId.MkPlayerId n))}
+      Spec.assertBool s (Filter.matches (aimedBy 1) blackCreature opponents) "an opponent aims a source the perspective controls"
+      Spec.assertBool s (not (Filter.matches (aimedBy 0) blackCreature opponents)) "the perspective aims a source she controls"
+      Spec.assertBool s (Filter.matches (aimedBy 0) loose opponents) "the perspective aims a source an opponent owns and nobody controls"
 
   Spec.describe s "IsAttacking" $ do
     Spec.it s "matches a view whose combat status says so" $ do

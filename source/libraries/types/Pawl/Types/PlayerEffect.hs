@@ -109,8 +109,9 @@ data PlayerEffect
     -- be the target of spells or abilities controlled by the players the scope
     -- names -- the shroud and hexproof scopes respectively.
     CantBeTargetedBy PlayerScope.PlayerScope
-  | -- | CR 702.16a / 702.16j / The Stasis Coffin, Runed Halo: this player has
-    -- protection from the quality the Filter states. Rule 702.16e's prevention
+  | -- | CR 702.16a / 702.16j / The Stasis Coffin, Runed Halo, Absolute Virtue:
+    -- this player has protection from the quality the Filter states. Rule
+    -- 702.16e's prevention
     -- reaches the player through Pawl.Engine.PlayerEffect.protectionCarriers,
     -- proven by Pawl.CastProhibitionSpec's "CR 702.16e" Runed Halo case.
     HasProtectionFrom (Filter.Filter Keyword.Keyword)

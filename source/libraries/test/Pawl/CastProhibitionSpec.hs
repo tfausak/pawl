@@ -1465,8 +1465,8 @@ runedHaloSpec s registry =
       Spec.assertEqWith s "with no such split card in the game, alice takes 4" (S.lifeOf S.alice absent) (fmap (subtract 4) (S.lifeOf S.alice beforeAbsent))
 
 -- The Stasis Coffin {3} Legendary Artifact: "{2}, {T}, Exile The Stasis Coffin:
--- You gain protection from everything until your next turn." The pool's one card
--- that gives a PLAYER protection from a quality the CARD states
+-- You gain protection from everything until your next turn." A card that gives
+-- a PLAYER protection from a quality the CARD states
 -- (PlayerEffect.HasProtectionFrom), where Runed Halo above states CR 201.4's
 -- chosen name instead -- and CR 702.16j's "everything" is that quality written as
 -- the empty conjunction.

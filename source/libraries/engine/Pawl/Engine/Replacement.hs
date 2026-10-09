@@ -328,10 +328,10 @@ collect sources floating =
       --
       -- CR 109.5's "you" is the CARRIER's controller, not the protected player --
       -- the two differ the moment a scope wider than PlayerScope.You appears --
-      -- and nothing the pool writes in the row reads it: Runed Halo's quality is
-      -- Filter.HasChosenName, which reads the carrier's own chosen names off the
-      -- Context rather than a perspective, The Stasis Coffin's is the empty
-      -- conjunction, and the recipient side is a baked id.
+      -- and Absolute Virtue's Filter.OfRelatedPlayer reads it, as
+      -- PlayerEffect.protectedFromGiven's targeting and Aura bars do. Runed
+      -- Halo's Filter.HasChosenName and The Stasis Coffin's empty conjunction
+      -- read none, and the recipient side is a baked id.
       --
       -- That atom is also why Runed Halo's effect value no longer varies with
       -- WHICH names the carrier holds, where the literal disjunction it replaced
