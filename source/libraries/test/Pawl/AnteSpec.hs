@@ -2,7 +2,9 @@
 
 -- Covers CR 407's ante: Pawl.Engine.Setup's CR 407.2 step, Effect.Ante's CR
 -- 407.4 owner check (Pawl.Engine.Resolve.Effect), CR 800.4n in
--- Pawl.Engine.Departure, and Pawl.Engine.Ante's CR 407.3 bar.
+-- Pawl.Engine.Departure, and Pawl.Engine.Ante's CR 407.3 bar, CR 407.2 payout
+-- and CR 108.3 ownership report, with the card identity
+-- (Pawl.Types.CardIdentity) the report reads.
 module Pawl.AnteSpec where
 
 import qualified Control.Monad as Monad

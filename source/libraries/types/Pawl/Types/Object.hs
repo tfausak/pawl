@@ -39,8 +39,8 @@ import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Zone as Zone
 
 data Object = MkObject
-  { -- | CR 108.3: who owns it. Written at construction and by CR 407.3's
-    -- ownership changers, through Game.setOwner alone.
+  { -- | CR 108.3: who owns it. Written at construction, by CR 407.3's
+    -- ownership changers and by CR 407.2's payout, through Game.setOwner alone.
     owner :: PlayerId.PlayerId,
     -- | CR 108.3: which card this is and who began the game owning it, kept
     -- across CR 400.7; Nothing for an object no card represents (CR 111.6).
