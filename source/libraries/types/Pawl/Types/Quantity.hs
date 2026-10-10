@@ -77,7 +77,7 @@ data Quantity
     -- against.
     --
     -- Not implemented: a letter condition on the count, "with eight or more
-    -- letters" (#N3).
+    -- letters" (#4902).
     NameStickers
   | -- | CR 208.2 / 208.2a: the printed star -- notation, which the projection
     -- seed substitutes (Projection.baseCharacteristics) and evaluate answers

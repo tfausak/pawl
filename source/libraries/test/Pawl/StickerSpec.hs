@@ -518,7 +518,7 @@ spec s registry = Spec.describe s "Sticker" $ do
         clones = [oid | oid <- Set.toList (GameState.battlefield cloned), Set.notMember oid (GameState.battlefield stickered)]
     Spec.assertEqWith s "CR 707.2 the Clone is named Grizzly Bears" (fmap (\oid -> nameTexts oid cloned) clones) [[Text.pack "Grizzly Bears"]]
     Spec.assertEqWith s "while the original is Grizzly Otter Bears" (nameTexts bearsId cloned) [Text.pack "Grizzly Otter Bears"]
-  -- Divergence 5 (#N2): the sticker is later than Spy Kit, so it reaches every
+  -- Divergence 5 (#4901): the sticker is later than Spy Kit, so it reaches every
   -- name Spy Kit gave. Goblin Piker is in the game, so its name is in the reference.
   Spec.it s "CR 123.6c/612.7 a sticker placed after Spy Kit goes into every name its host has" $ do
     sheets <- committedSheets

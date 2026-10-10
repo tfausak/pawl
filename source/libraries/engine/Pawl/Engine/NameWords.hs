@@ -23,7 +23,7 @@ wordCount = Natural.length . wordsOf
 
 -- | CR 123.6b-c: @word@ after the first @k@ words, or at the end of a name
 -- with fewer. A blank stays, and the word goes before a blank that follows
--- word k, pawl's reading (#N1).
+-- word k, pawl's reading (#4900).
 insertAfter :: Natural -> Text.Text -> CardName.CardName -> CardName.CardName
 insertAfter k word name =
   let go :: Natural -> [Text.Text] -> [Text.Text]
