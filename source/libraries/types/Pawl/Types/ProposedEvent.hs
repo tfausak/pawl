@@ -80,7 +80,7 @@ data ProposedEvent
     -- regeneration shield may be applied to THIS destruction, which is where
     -- Terror's "It can't be regenerated" lives. CR 701.19c's lasting prohibition
     -- (Hurr Jackal) reaches the same field, Event.resolveDestruction folding a
-    -- standing Pawl.Types.ActiveUnregeneratable in before the event is proposed.
+    -- standing Pawl.Types.ActiveObjectProhibition in before the event is proposed.
     --
     -- The DestructionCause beside it is the same shape of fact one rule further
     -- on: CR 122.1c's replacement reaches a destruction only when an EFFECT is

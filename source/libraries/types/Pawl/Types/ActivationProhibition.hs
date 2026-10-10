@@ -35,8 +35,8 @@ import qualified Pawl.Types.Affected as Affected
 -- neither of those can say.
 --
 -- The STORED counterpart -- a prohibition a resolution puts on a permanent for a
--- duration, Deadlock Trap's "this turn" -- is Pawl.Types.ForbidActivation and
--- the Pawl.Types.ActiveActivationProhibition rows it leaves; both roads meet at
+-- duration, Deadlock Trap's "this turn" -- is Pawl.Types.Prohibit and the
+-- Pawl.Types.ActiveObjectProhibition rows it leaves; both roads meet at
 -- Pawl.Engine.ActivationProhibition.cantActivate.
 --
 -- Gathered LIVE from the battlefield on every activation window and never

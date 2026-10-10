@@ -23,7 +23,7 @@
                   {
                     "effects": [
                       {
-                        "type": "ForbidBlock",
+                        "type": "Prohibit",
                         "value": {
                           "duration": {
                             "type": "UntilEndOfTurn"
@@ -31,6 +31,9 @@
                           "ref": {
                             "type": "InSlot",
                             "value": "target"
+                          },
+                          "what": {
+                            "type": "Block"
                           }
                         }
                       }

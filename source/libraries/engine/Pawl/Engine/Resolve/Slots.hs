@@ -45,7 +45,6 @@ import qualified Pawl.Types.AttackingPlayers as AttackingPlayers
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.Binding as Binding.Type
 import qualified Pawl.Types.Blight as Blight.Type
-import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CastRepetition as CastRepetition
 import qualified Pawl.Types.ChangeText as ChangeText
@@ -127,11 +126,8 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ForEachNumber as ForEachNumber
-import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBeingBlocked as ForbidBeingBlocked
-import qualified Pawl.Types.ForbidBlock as ForbidBlock
-import qualified Pawl.Types.ForbidUntap as ForbidUntap
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.FromReference as FromReference
 import qualified Pawl.Types.GainControl as GainControl
@@ -182,6 +178,7 @@ import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Types.PreventNextDamageInstance as PreventNextDamageInstance
+import qualified Pawl.Types.Prohibit as Prohibit
 import qualified Pawl.Types.ProliferateR as ProliferateR
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
@@ -821,7 +818,7 @@ effectObjectRefs effect = case effect of
   Effect.AffectPlayers {} -> []
   -- CR 509.1a's two sides, the creature required to block and what it blocks.
   Effect.RequireBlock (RequireBlock.MkRequireBlock _ blocker attacker) -> [blocker, attacker]
-  Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated _ ref) -> [ref]
+  Effect.Prohibit (Prohibit.MkProhibit _ _ ref) -> [ref]
   -- Both sides, each only when a ref names it: the attacker's Matching arm is a
   -- Filter, and a defender naming players is effectPlayerRefs'.
   Effect.RequireAttack (RequireAttack.MkRequireAttack _ attacker defender) ->
@@ -832,10 +829,6 @@ effectObjectRefs effect = case effect of
       <> case defender of
         AttackTargetRef.Players _ -> []
         AttackTargetRef.Permanents ref -> [ref]
-  Effect.ForbidBlock (ForbidBlock.MkForbidBlock _ ref) -> [ref]
-  -- ForbidBlock's one axis again, one rule away.
-  Effect.ForbidActivation (ForbidActivation.MkForbidActivation _ ref) -> [ref]
-  Effect.ForbidUntap (ForbidUntap.MkForbidUntap _ ref) -> [ref]
   -- One side only, and only when a ref names it: the Matching arm is a Filter
   -- (CR 611.2c's class), and what the attack is aimed at is effectPlayerRefs'.
   Effect.ForbidAttack (ForbidAttack.MkForbidAttack _ affected _) -> case affected of
@@ -1048,19 +1041,16 @@ effectPlayerRefs effect = case effect of
   -- what puts Sen Triplets' "that player's hand" slot into slotsOf's answer.
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers _ _ playerEffect) -> PlayerEffect.playerRefsIn playerEffect
   Effect.RequireBlock {} -> []
-  Effect.CantBeRegenerated {} -> []
+  Effect.Prohibit {} -> []
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ defender) -> case defender of
     AttackTargetRef.Players ref -> ref : durationPlayerRefs duration
     AttackTargetRef.Permanents _ -> durationPlayerRefs duration
-  Effect.ForbidBlock {} -> []
   -- The players a slot names, where the restriction is aimed at them (Chaos
   -- Dragon's "those players").
   Effect.ForbidAttack (ForbidAttack.MkForbidAttack _ _ aimedAt) -> case fmap AimedAt.defenders aimedAt of
     Just (AimedPlayers.EachInSlot slot) -> [PlayerRef.EachInSlot slot]
     _ -> []
   Effect.ForbidBeingBlocked {} -> []
-  Effect.ForbidActivation {} -> []
-  Effect.ForbidUntap {} -> []
   Effect.CreateEmblem {} -> []
   Effect.BecomeMonarch {} -> []
   Effect.TakeTheInitiative {} -> []
@@ -1453,13 +1443,10 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
       (affectedPlayersSlots affected)
       (joinSlots (fmap (\slot -> Map.singleton slot SlotArity.Many) (PlayerEffect.boundRecipientSlots playerEffect)))
   Effect.RequireBlock {} -> Map.empty
-  Effect.CantBeRegenerated {} -> Map.empty
-  Effect.ForbidBlock {} -> Map.empty
+  Effect.Prohibit {} -> Map.empty
   Effect.ForbidAttack {} -> Map.empty
   -- The class is a FILTER read, RequireAttack's Matching arm below.
   Effect.ForbidBeingBlocked (ForbidBeingBlocked.MkForbidBeingBlocked duration f) -> joinTwo (durationSlots duration) (filterSlotsOf f)
-  Effect.ForbidActivation {} -> Map.empty
-  Effect.ForbidUntap {} -> Map.empty
   -- CR 508.1b's two sides are reported at the head when a ref names the
   -- creatures; a Matching class is a FILTER read, Search's, and the Duration is
   -- ModifyTarget's -- Taunt's "target player" is read by both and nothing else.
@@ -2184,16 +2171,9 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration _ _) ->
     Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
   -- RequireBlock's reason, one axis narrower.
-  Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration _) ->
-    Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
-  -- CantBeRegenerated's reason again.
-  Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration _) ->
+  Effect.Prohibit (Prohibit.MkProhibit _ duration _) ->
     Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
   Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration _ _) ->
-    Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
-  Effect.ForbidActivation (ForbidActivation.MkForbidActivation duration _) ->
-    Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
-  Effect.ForbidUntap (ForbidUntap.MkForbidUntap duration _) ->
     Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
   -- slotsOf reports the Duration and the class's Filter, ModifyTarget's and
   -- Search's readings.
@@ -2445,12 +2425,9 @@ readsX =
         Effect.ArmDelayedTrigger {} -> False
         Effect.AffectPlayers {} -> False
         Effect.RequireBlock {} -> False
-        Effect.CantBeRegenerated {} -> False
-        Effect.ForbidBlock {} -> False
+        Effect.Prohibit {} -> False
         Effect.ForbidAttack {} -> False
         Effect.ForbidBeingBlocked {} -> False
-        Effect.ForbidActivation {} -> False
-        Effect.ForbidUntap {} -> False
         Effect.RequireAttack {} -> False
         Effect.CreateEmblem {} -> False
         Effect.BecomeMonarch {} -> False
@@ -2721,12 +2698,9 @@ boundSlots effect = case effect of
   Effect.ArmDelayedTrigger {} -> Set.empty
   Effect.AffectPlayers {} -> Set.empty
   Effect.RequireBlock {} -> Set.empty
-  Effect.CantBeRegenerated {} -> Set.empty
-  Effect.ForbidBlock {} -> Set.empty
+  Effect.Prohibit {} -> Set.empty
   Effect.ForbidAttack {} -> Set.empty
   Effect.ForbidBeingBlocked {} -> Set.empty
-  Effect.ForbidActivation {} -> Set.empty
-  Effect.ForbidUntap {} -> Set.empty
   Effect.RequireAttack {} -> Set.empty
   Effect.CreateEmblem {} -> Set.empty
   Effect.BecomeMonarch {} -> Set.empty

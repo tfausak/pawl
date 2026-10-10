@@ -14,7 +14,7 @@ import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 -- Nothing@; Chronomantic Escape's is @ForbidAttack UntilYourNextTurn (Matching
 -- creature) (Just (AimedAt (Scoped You) {OfPlayer}))@.
 --
--- Two axes where Pawl.Types.ForbidBlock has one, and Pawl.Types.RestrictedCreatures
+-- Two axes where Pawl.Types.Prohibit has one, and Pawl.Types.RestrictedCreatures
 -- where it has an ObjectRef: CR 611.2c makes "creatures can't attack you" a class
 -- rather than a set, and a class cannot be enumerated once at resolution.
 --

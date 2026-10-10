@@ -69,7 +69,6 @@ import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.ActiveCopy as ActiveCopy
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
-import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Arrival as Arrival
 import qualified Pawl.Types.ArrivalEnd as ArrivalEnd
@@ -195,6 +194,7 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import Pawl.Types.Prevention (Prevention)
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.PrintingId as PrintingId
+import qualified Pawl.Types.Prohibition as Prohibition
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.ProliferateR as ProliferateR
 import qualified Pawl.Types.ProliferateRewrite as ProliferateRewrite
@@ -4679,7 +4679,7 @@ resolveDestruction asOf cause regenerability oid = do
 -- the replacement pass disagree about which board they are on.
 strengthen :: GameState -> ObjectId -> Regenerability.Regenerability -> Regenerability.Regenerability
 strengthen gs oid regenerability =
-  if any ((== oid) . ActiveUnregeneratable.object) (GameState.unregeneratables gs)
+  if Set.member oid (Game.prohibitedObjects Prohibition.Regenerate gs)
     then Regenerability.CantBeRegenerated
     else regenerability
 

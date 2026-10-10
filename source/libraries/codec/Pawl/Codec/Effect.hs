@@ -23,7 +23,6 @@ import qualified Pawl.Codec.AttachBound as AttachBound
 import qualified Pawl.Codec.AttachTarget as AttachTarget
 import qualified Pawl.Codec.BecomeCopy as BecomeCopy
 import qualified Pawl.Codec.Blight as Blight
-import qualified Pawl.Codec.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.CastOffer as CastOffer
 import qualified Pawl.Codec.ChangeText as ChangeText
@@ -61,11 +60,8 @@ import qualified Pawl.Codec.Fight as Fight
 import qualified Pawl.Codec.FlipCoin as FlipCoin
 import qualified Pawl.Codec.ForEach as ForEach
 import qualified Pawl.Codec.ForEachNumber as ForEachNumber
-import qualified Pawl.Codec.ForbidActivation as ForbidActivation
 import qualified Pawl.Codec.ForbidAttack as ForbidAttack
 import qualified Pawl.Codec.ForbidBeingBlocked as ForbidBeingBlocked
-import qualified Pawl.Codec.ForbidBlock as ForbidBlock
-import qualified Pawl.Codec.ForbidUntap as ForbidUntap
 import qualified Pawl.Codec.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Codec.GainControl as GainControl
 import qualified Pawl.Codec.GrantLookAtExiled as GrantLookAtExiled
@@ -91,6 +87,7 @@ import qualified Pawl.Codec.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Codec.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Codec.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Codec.PreventNextDamageInstance as PreventNextDamageInstance
+import qualified Pawl.Codec.Prohibit as Prohibit
 import qualified Pawl.Codec.PutCounters as PutCounters
 import qualified Pawl.Codec.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Codec.PutSticker as PutSticker
@@ -255,11 +252,8 @@ codec cardCodec abilityCodec =
           Arm.payload "ArmDelayedTrigger" (ArmDelayedTrigger.codec abilityCodec) Effect.ArmDelayedTrigger (\x -> case x of Effect.ArmDelayedTrigger y -> Just y; _ -> Nothing),
           Arm.payload "AffectPlayers" AffectPlayers.codec Effect.AffectPlayers (\x -> case x of Effect.AffectPlayers y -> Just y; _ -> Nothing),
           Arm.payload "RequireBlock" RequireBlock.codec Effect.RequireBlock (\x -> case x of Effect.RequireBlock y -> Just y; _ -> Nothing),
-          Arm.payload "CantBeRegenerated" CantBeRegenerated.codec Effect.CantBeRegenerated (\x -> case x of Effect.CantBeRegenerated y -> Just y; _ -> Nothing),
           Arm.payload "RequireAttack" RequireAttack.codec Effect.RequireAttack (\x -> case x of Effect.RequireAttack y -> Just y; _ -> Nothing),
-          Arm.payload "ForbidBlock" ForbidBlock.codec Effect.ForbidBlock (\x -> case x of Effect.ForbidBlock y -> Just y; _ -> Nothing),
-          Arm.payload "ForbidActivation" ForbidActivation.codec Effect.ForbidActivation (\x -> case x of Effect.ForbidActivation y -> Just y; _ -> Nothing),
-          Arm.payload "ForbidUntap" ForbidUntap.codec Effect.ForbidUntap (\x -> case x of Effect.ForbidUntap y -> Just y; _ -> Nothing),
+          Arm.payload "Prohibit" Prohibit.codec Effect.Prohibit (\x -> case x of Effect.Prohibit y -> Just y; _ -> Nothing),
           Arm.payload "ForbidAttack" ForbidAttack.codec Effect.ForbidAttack (\x -> case x of Effect.ForbidAttack y -> Just y; _ -> Nothing),
           Arm.payload "ForbidBeingBlocked" ForbidBeingBlocked.codec Effect.ForbidBeingBlocked (\x -> case x of Effect.ForbidBeingBlocked y -> Just y; _ -> Nothing),
           Arm.payload "CreateEmblem" cardCodec Effect.CreateEmblem (\x -> case x of Effect.CreateEmblem y -> Just y; _ -> Nothing),
@@ -433,11 +427,8 @@ tagOf x = case x of
   Effect.ArmDelayedTrigger {} -> "ArmDelayedTrigger"
   Effect.AffectPlayers {} -> "AffectPlayers"
   Effect.RequireBlock {} -> "RequireBlock"
-  Effect.CantBeRegenerated {} -> "CantBeRegenerated"
   Effect.RequireAttack {} -> "RequireAttack"
-  Effect.ForbidBlock {} -> "ForbidBlock"
-  Effect.ForbidActivation {} -> "ForbidActivation"
-  Effect.ForbidUntap {} -> "ForbidUntap"
+  Effect.Prohibit {} -> "Prohibit"
   Effect.ForbidAttack {} -> "ForbidAttack"
   Effect.ForbidBeingBlocked {} -> "ForbidBeingBlocked"
   Effect.CreateEmblem {} -> "CreateEmblem"

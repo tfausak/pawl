@@ -19,7 +19,7 @@ import qualified Pawl.Types.Timestamp as Timestamp
 --
 -- OUTSIDE the layer system (CR 613.11), and `controller` is STORED, both for
 -- ActiveAttackProhibition's reasons. `timestamp` is stored for
--- ActiveBlockProhibition's reason, and nothing observes it.
+-- ActiveObjectProhibition's reason, and nothing observes it.
 --
 -- Runtime-only: card data writes Pawl.Types.ForbidBeingBlocked, never one of
 -- these. It has a codec (Pawl.Codec.ActiveEvasion) because a game in progress

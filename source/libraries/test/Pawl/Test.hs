@@ -39,17 +39,14 @@ import qualified Pawl.Codec.ActivationProhibitionSpec
 import qualified Pawl.Codec.ActivationRestrictionSpec
 import qualified Pawl.Codec.ActivationSpec
 import qualified Pawl.Codec.ActivatorSpec
-import qualified Pawl.Codec.ActiveActivationProhibitionSpec
 import qualified Pawl.Codec.ActiveAttackProhibitionSpec
 import qualified Pawl.Codec.ActiveAttackRequirementSpec
-import qualified Pawl.Codec.ActiveBlockProhibitionSpec
 import qualified Pawl.Codec.ActiveBlockRequirementSpec
 import qualified Pawl.Codec.ActiveCopySpec
 import qualified Pawl.Codec.ActiveEvasionSpec
+import qualified Pawl.Codec.ActiveObjectProhibitionSpec
 import qualified Pawl.Codec.ActivePlayerEffectSpec
 import qualified Pawl.Codec.ActiveReplacementSpec
-import qualified Pawl.Codec.ActiveUnregeneratableSpec
-import qualified Pawl.Codec.ActiveUntapProhibitionSpec
 import qualified Pawl.Codec.AffectPlayersSpec
 import qualified Pawl.Codec.AffectedPlayersSpec
 import qualified Pawl.Codec.AffectedSpec
@@ -106,7 +103,6 @@ import qualified Pawl.Codec.BoardSpec
 import qualified Pawl.Codec.CandidateIdSpec
 import qualified Pawl.Codec.CantAttackPlayerSpec
 import qualified Pawl.Codec.CantBeBlockedBySpec
-import qualified Pawl.Codec.CantBeRegeneratedSpec
 import qualified Pawl.Codec.CantBlockCreaturesSpec
 import qualified Pawl.Codec.CantSearchLibrariesSpec
 import qualified Pawl.Codec.CardArrivedInSpec
@@ -309,11 +305,8 @@ import qualified Pawl.Codec.FlipCoinSpec
 import qualified Pawl.Codec.FloatingCandidateSpec
 import qualified Pawl.Codec.ForEachNumberSpec
 import qualified Pawl.Codec.ForEachSpec
-import qualified Pawl.Codec.ForbidActivationSpec
 import qualified Pawl.Codec.ForbidAttackSpec
 import qualified Pawl.Codec.ForbidBeingBlockedSpec
-import qualified Pawl.Codec.ForbidBlockSpec
-import qualified Pawl.Codec.ForbidUntapSpec
 import qualified Pawl.Codec.ForetellCostSpec
 import qualified Pawl.Codec.FromOutsideTheGameSpec
 import qualified Pawl.Codec.FromReferenceSpec
@@ -496,6 +489,8 @@ import qualified Pawl.Codec.PrintedReplacementSpec
 import qualified Pawl.Codec.PrintingIdSpec
 import qualified Pawl.Codec.PrintingSpec
 import qualified Pawl.Codec.ProductionTagSpec
+import qualified Pawl.Codec.ProhibitSpec
+import qualified Pawl.Codec.ProhibitionSpec
 import qualified Pawl.Codec.ProjectedCharacteristicsSpec
 import qualified Pawl.Codec.ProliferateRSpec
 import qualified Pawl.Codec.ProliferateRewriteSpec
@@ -885,16 +880,13 @@ spec s registry = do
   Pawl.Codec.ActivatorSpec.spec s
   Pawl.Codec.ActiveAttackProhibitionSpec.spec s
   Pawl.Codec.ActiveAttackRequirementSpec.spec s
-  Pawl.Codec.ActiveActivationProhibitionSpec.spec s
-  Pawl.Codec.ActiveBlockProhibitionSpec.spec s
   Pawl.Codec.ActiveBlockRequirementSpec.spec s
   Pawl.Codec.ActiveCopySpec.spec s
   Pawl.Codec.ActivePlayerEffectSpec.spec s
   Pawl.Codec.SourceChoicesSpec.spec s
   Pawl.Codec.ActiveReplacementSpec.spec s
-  Pawl.Codec.ActiveUnregeneratableSpec.spec s
-  Pawl.Codec.ActiveUntapProhibitionSpec.spec s
   Pawl.Codec.ActiveEvasionSpec.spec s
+  Pawl.Codec.ActiveObjectProhibitionSpec.spec s
   Pawl.Codec.ActivateManaAbilitiesSpec.spec s
   Pawl.Codec.AffectPlayersSpec.spec s
   Pawl.Codec.AffectedPlayersSpec.spec s
@@ -953,7 +945,6 @@ spec s registry = do
   Pawl.Codec.CantAttackPlayerSpec.spec s
   Pawl.Codec.CantBeBlockedBySpec.spec s
   Pawl.Codec.CantBlockCreaturesSpec.spec s
-  Pawl.Codec.CantBeRegeneratedSpec.spec s
   Pawl.Codec.CantSearchLibrariesSpec.spec s
   Pawl.Codec.CardArrivedInSpec.spec s
   Pawl.Codec.CardLeavesZoneSpec.spec s
@@ -1156,9 +1147,6 @@ spec s registry = do
   Pawl.Codec.ForetellCostSpec.spec s
   Pawl.Codec.MadnessCostSpec.spec s
   Pawl.Codec.ForbidAttackSpec.spec s
-  Pawl.Codec.ForbidActivationSpec.spec s
-  Pawl.Codec.ForbidBlockSpec.spec s
-  Pawl.Codec.ForbidUntapSpec.spec s
   Pawl.Codec.ForbidBeingBlockedSpec.spec s
   Pawl.Codec.FromOutsideTheGameSpec.spec s
   Pawl.Codec.FromReferenceSpec.spec s
@@ -1359,6 +1347,8 @@ spec s registry = do
   Pawl.Codec.PrintingIdSpec.spec s
   Pawl.Codec.PrintingSpec.spec s
   Pawl.Codec.ProductionTagSpec.spec s
+  Pawl.Codec.ProhibitSpec.spec s
+  Pawl.Codec.ProhibitionSpec.spec s
   Pawl.Codec.ProjectedCharacteristicsSpec.spec s
   Pawl.Codec.MoveCountersSpec.spec s
   Pawl.Codec.MoveManaSpec.spec s

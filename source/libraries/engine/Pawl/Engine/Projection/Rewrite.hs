@@ -46,7 +46,6 @@ import qualified Pawl.Types.BlockPermission as BlockPermission
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.CantAttackPlayer as CantAttackPlayer
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
-import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.CantBlockCreatures as CantBlockCreatures
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
@@ -130,11 +129,8 @@ import qualified Pawl.Types.FaceDownState as FaceDownState
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ForEachNumber as ForEachNumber
-import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBeingBlocked as ForbidBeingBlocked
-import qualified Pawl.Types.ForbidBlock as ForbidBlock
-import qualified Pawl.Types.ForbidUntap as ForbidUntap
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.FromReference as FromReference
 import qualified Pawl.Types.FullText as FullText
@@ -186,6 +182,7 @@ import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Types.PreventNextDamageInstance as PreventNextDamageInstance
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
+import qualified Pawl.Types.Prohibit as Prohibit
 import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.PutCounters as PutCounters
@@ -916,14 +913,8 @@ rewriteEffect pairs effect = case effect of
         }
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration blocker attacker) ->
     Effect.RequireBlock (RequireBlock.MkRequireBlock (rewriteDuration pairs duration) (rewriteObjectRef pairs blocker) (rewriteObjectRef pairs attacker))
-  Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration ref) ->
-    Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated (rewriteDuration pairs duration) (rewriteObjectRef pairs ref))
-  Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration ref) ->
-    Effect.ForbidBlock (ForbidBlock.MkForbidBlock (rewriteDuration pairs duration) (rewriteObjectRef pairs ref))
-  Effect.ForbidActivation (ForbidActivation.MkForbidActivation duration ref) ->
-    Effect.ForbidActivation (ForbidActivation.MkForbidActivation (rewriteDuration pairs duration) (rewriteObjectRef pairs ref))
-  Effect.ForbidUntap (ForbidUntap.MkForbidUntap duration ref) ->
-    Effect.ForbidUntap (ForbidUntap.MkForbidUntap (rewriteDuration pairs duration) (rewriteObjectRef pairs ref))
+  Effect.Prohibit (Prohibit.MkProhibit what duration ref) ->
+    Effect.Prohibit (Prohibit.MkProhibit what (rewriteDuration pairs duration) (rewriteObjectRef pairs ref))
   -- CR 612.1 reaches the creatures' words on either arm -- a Named ref's Filters
   -- and a Matching class's -- and not the AimedAt: a PlayerScope prints no word
   -- a text-changing effect reaches, and the kinds are CR 506.3's list.
