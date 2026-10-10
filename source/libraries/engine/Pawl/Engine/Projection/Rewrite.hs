@@ -324,6 +324,9 @@ rewriteModification pairs m =
         -- Carries no word: the abilities are the linked cards', read at
         -- projection time, and the restrictions name none.
         Modification.GainCraftMaterialAbilities _ -> acc
+        -- Carries no word: the abilities are the stickers', read at projection
+        -- time.
+        Modification.GainAbilitiesOfStickers -> acc
         -- Carries no word: the type is read off the source at projection time.
         Modification.SetLandSubtypeToChosen -> acc
         -- A control op carries no subtype word either.

@@ -951,6 +951,7 @@ modificationCounts modification = case modification of
   Modification.GainAbilitiesOfSource _ -> []
   -- The rider's CR 602.5 conditions; the abilities are the linked cards'.
   Modification.GainCraftMaterialAbilities extra -> concatMap conditionCounts (concatMap restrictionConditions extra)
+  Modification.GainAbilitiesOfStickers -> []
   Modification.LoseAllAbilities -> []
   -- Carries a name, which reaches no Count.
   Modification.LoseNamedAbility _ -> []
@@ -4338,6 +4339,7 @@ modificationFilters modification = case modification of
   Modification.GainAbilitiesOfSource _ -> []
   -- The rider's CR 602.5 conditions, as a printed ability's are swept.
   Modification.GainCraftMaterialAbilities extra -> frame Unframed (concatMap conditionFilters (concatMap restrictionConditions extra))
+  Modification.GainAbilitiesOfStickers -> []
   Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> foldMap quantityFilters p <> foldMap quantityFilters t
   Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> quantityFilters p <> quantityFilters t
   Modification.Intensify n -> quantityFilters n
@@ -7526,12 +7528,12 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- replacement effects above: Lost in the Maze's "tap X target creatures"
         -- names its count at the announcement made for the spell that became the
         -- enchantment, so the {X} that face declares is what makes the count
-        -- answerable. Only this condition, CR 107.3m's own, and only through the
-        -- slot -- an effect of the same ability reading X is already
-        -- Resolve.readsX's.
+        -- answerable. Only this condition, CR 107.3m's own, through the slot or
+        -- through an effect (Pin Collection's "ticket cost X or less", bound by
+        -- Engine.placeBorne's enteredX).
         entersTriggerReadsX c =
           any
-            (\ability -> TriggeredAbility.condition ability == TriggerCondition.SelfEnters && modalReadsAnnouncedX (TriggeredAbility.modal ability))
+            (\ability -> TriggeredAbility.condition ability == TriggerCondition.SelfEnters && (modalReadsAnnouncedX (TriggeredAbility.modal ability) || Resolve.readsX (Modal.allEffects (TriggeredAbility.modal ability))))
             (Face.triggeredAbilities c)
         -- CR 107.3m's reader that no card writes: a KEYWORD whose minted CR 614.1c
         -- row carries the announcement (ravenous, CR 702.156a, on Jacked Rabbit).

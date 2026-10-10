@@ -46,6 +46,7 @@ codec abilityCodec =
           Arm.payload "GainCastingPermission" CastingPermission.codec Modification.GainCastingPermission (\x -> case x of Modification.GainCastingPermission y -> Just y; _ -> Nothing),
           Arm.payload "GainAbilitiesOfSource" (Common.set Keyword.codec) Modification.GainAbilitiesOfSource (\x -> case x of Modification.GainAbilitiesOfSource y -> Just y; _ -> Nothing),
           Arm.payload "GainCraftMaterialAbilities" (Common.list ActivationRestriction.codec) Modification.GainCraftMaterialAbilities (\x -> case x of Modification.GainCraftMaterialAbilities y -> Just y; _ -> Nothing),
+          Arm.nullary "GainAbilitiesOfStickers" Modification.GainAbilitiesOfStickers,
           Arm.nullary "LoseAllAbilities" Modification.LoseAllAbilities,
           Arm.payload "LoseNamedAbility" AbilityName.codec Modification.LoseNamedAbility (\x -> case x of Modification.LoseNamedAbility y -> Just y; _ -> Nothing),
           Arm.payload "LoseKeyword" Keyword.codec Modification.LoseKeyword (\x -> case x of Modification.LoseKeyword y -> Just y; _ -> Nothing),
@@ -93,6 +94,7 @@ tagOf x = case x of
   Modification.GainCastingPermission {} -> "GainCastingPermission"
   Modification.GainAbilitiesOfSource {} -> "GainAbilitiesOfSource"
   Modification.GainCraftMaterialAbilities {} -> "GainCraftMaterialAbilities"
+  Modification.GainAbilitiesOfStickers -> "GainAbilitiesOfStickers"
   Modification.LoseAllAbilities {} -> "LoseAllAbilities"
   Modification.LoseNamedAbility {} -> "LoseNamedAbility"
   Modification.LoseKeyword {} -> "LoseKeyword"

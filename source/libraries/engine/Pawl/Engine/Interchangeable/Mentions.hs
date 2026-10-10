@@ -1964,6 +1964,7 @@ modificationNames asking onAbility x = case x of
   Modification.GainAbility ability -> onAbility ability
   Modification.GainAbilitiesOfSource keyword -> any (keywordNames asking) keyword
   Modification.GainCraftMaterialAbilities items -> any (activationRestrictionNames asking) items
+  Modification.GainAbilitiesOfStickers -> False
   Modification.LoseAllAbilities -> False
   Modification.LoseNamedAbility _abilityName -> False
   Modification.LoseKeyword keyword -> keywordNames asking keyword

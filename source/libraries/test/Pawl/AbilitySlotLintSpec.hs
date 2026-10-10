@@ -858,9 +858,16 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
             [ if any collectsEvidenceAsCost (spellCostsOf face) then Set.singleton Binding.collectedEvidence else Set.empty,
               if any waterbendsAsCost (spellCostsOf face) then Set.singleton Binding.waterbendCost else Set.empty
             ]
+        -- CR 107.3m: an enters-the-battlefield trigger's effects read the X
+        -- announced for the spell (Engine.placeBorne's enteredX), so a face
+        -- whose spell cost declares X may read it there (Pin Collection).
+        enteredX face ability =
+          if TriggeredAbility.condition ability == TriggerCondition.SelfEnters && any declaresVariable (spellCostsOf face)
+            then Set.singleton Binding.variableX
+            else Set.empty
         -- Per face over withMinted, so a minted face inherits only what its OWN
         -- costs bound.
-        cardOffends face = any (triggeredAbilityOffendsGiven (inherited face)) (Face.triggeredAbilities face)
+        cardOffends face = any (\ability -> triggeredAbilityOffendsGiven (inherited face <> enteredX face ability) ability) (Face.triggeredAbilities face)
         sweeps = anyFaceOrMinted cardOffends
         offenders = filter (sweeps . Printing.card) ps
         -- Rule 702.70a's shape, as a targetless read of "that player".

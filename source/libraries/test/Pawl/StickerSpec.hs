@@ -230,6 +230,15 @@ placingRef x onto ref p = case p of
     pure (if List.elem ref offered then ref else NonEmpty.head offered)
   _ -> placing onto p
 
+-- alice casts Pin Collection with X = `x` and everything resolves under
+-- `placingRef x Nothing ref`; the permanent it became, the board and what was
+-- offered.
+castPin :: Printing.Printing -> Natural -> StickerRef.StickerRef -> GameState.GameState -> (Maybe ObjectId.ObjectId, GameState.GameState, Offers)
+castPin pin x ref gs0 =
+  let (card, board) = S.addHandCard pin S.alice (mainPhaseForAlice gs0)
+      ((_, after), offers) = State.runState (Engine.runGame (placingRef x Nothing ref) board (S.cast S.alice card >> drain)) (MkOffers [] [] 0)
+   in (List.find (\oid -> Set.notMember oid (GameState.battlefield board)) (Set.toList (GameState.battlefield after)), after, offers)
+
 -- Settle and resolve until the stack is empty.
 drain :: Game.Type.Game ()
 drain = do
@@ -942,3 +951,44 @@ spec s registry = Spec.describe s "Sticker" $ do
           _ -> (((), board), Map.empty)
     Spec.assertEqWith s "CR 509.1c bob's Piker must block the Bears" (fmap (\r -> (ActiveBlockRequirement.blocker r, ActiveBlockRequirement.attacker r)) (GameState.blockRequirements after)) [(pikerId, bearsId)]
     Spec.assertEqWith s "CR 115.1 the attacker slot offers only the Bears" (Map.lookup (SlotName.MkSlotName (Text.pack "attacker")) offered) (Just [bearsId])
+  -- Review Focus 3's waiver and cap: five tickets would pay for any of them.
+  Spec.it s "CR 123.3c Pin Collection with X=3 offers seven ability stickers, spends no ticket, and its Bears flies" $ do
+    sheets <- committedSheets
+    pin <- S.printingOf s registry "Pin Collection"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    plains <- S.printingOf s registry "Plains"
+    let (bearsId, g1) = S.addPermanent bears S.alice (S.addPlayerCounter PlayerCounterKind.Ticket 5 S.alice (S.landsFor plains S.alice 4 (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))))
+        (pinId, after, offers) = castPin pin 3 hotDogFlying g1
+        equipped = maybe after (\p -> S.attach p bearsId after) pinId
+    Spec.assertEqWith s "CR 123.7 the Bears it equips flies and is a 3/3" (Projection.hasKeyword Keyword.Flying bearsId equipped, Projection.powerOf bearsId equipped) (True, Just 3)
+    Spec.assertEqWith s "CR 123.3c alice still has five tickets" (S.playerCounterOf PlayerCounterKind.Ticket S.alice after) 5
+    Spec.assertEqWith s "CR 123.3c every ability sticker costing three or less is offered, deathtouch and lifelink's four is not" (concat (take 1 (stickers offers))) [nightMenace, aliceSticker 0 StickerKind.Ability 1, aliceSticker 1 StickerKind.Ability 0, aliceSticker 1 StickerKind.Ability 1, aliceSticker 2 StickerKind.Ability 0, aliceSticker 3 StickerKind.Ability 0, hotDogFlying]
+  Spec.it s "CR 608.2d Pin Collection with X=1 asks no may" $ do
+    sheets <- committedSheets
+    pin <- S.printingOf s registry "Pin Collection"
+    plains <- S.printingOf s registry "Plains"
+    let (pinId, after, offers) = castPin pin 1 hotDogFlying (S.landsFor plains S.alice 4 (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)))
+    Spec.assertEqWith s "CR 608.2d alice was not asked" (mays offers) 0
+    Spec.assertEqWith s "and Pin Collection is not stickered" (fmap (\p -> fmap (Seq.length . Object.stickers) (Game.lookupObject p after)) pinId) (Just (Just 0))
+  -- Review Focus 4. Shadowspear's loss locks its set as it resolves (CR
+  -- 611.2c); the Bears enters after it, so only Pin's grant can make it
+  -- indestructible, and Pin itself is not.
+  Spec.it s "CR 123.7a Shadowspear strips Pin Collection's indestructible, and a Bears it equips afterwards survives Murder" $ do
+    sheets <- withJuggler
+    pin <- S.printingOf s registry "Pin Collection"
+    spear <- S.printingOf s registry "Shadowspear"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    murder <- S.printingOf s registry "Murder"
+    swamp <- S.printingOf s registry "Swamp"
+    let base = withSheets sheets (S.landsFor swamp S.bob 4 (Setup.gameWith GameSettings.plain S.bothPlayers))
+        (pinId, g1) = S.addPermanent pin S.alice base
+        (spearId, g2) = S.addPermanent spear S.bob (Sticker.put S.alice pinId jugglerIndestructible Nothing g1)
+        bobsTurn = g2 {GameState.activePlayer = S.bob, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.bob}
+        stripped = case Activatable.abilitiesFor spearId bobsTurn of
+          lose : _ -> S.runPure S.identityAnswer bobsTurn (Activate.activateAbility S.bob spearId lose >> Stack.resolveTop)
+          [] -> bobsTurn
+        (bearsId, g3) = S.addPermanent bears S.alice stripped
+        (murderId, g4) = S.addHandCard murder S.bob (S.attach pinId bearsId g3)
+        murdered = S.settleSba (S.runPure (namingTarget bearsId) g4 (S.cast S.bob murderId >> Stack.resolveTop))
+    Spec.assertEqWith s "CR 123.7a/702.12b the Bears survives Murder" (Set.member bearsId (GameState.battlefield murdered)) True
+    Spec.assertEqWith s "CR 613.1f Shadowspear took Pin Collection's indestructible" (Projection.hasKeyword Keyword.Indestructible pinId murdered) False

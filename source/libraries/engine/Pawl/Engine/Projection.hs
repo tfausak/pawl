@@ -144,6 +144,7 @@ layer m = case m of
   Modification.GainAbility _ -> Layer.Ability
   Modification.GainAbilitiesOfSource _ -> Layer.Ability
   Modification.GainCraftMaterialAbilities _ -> Layer.Ability
+  Modification.GainAbilitiesOfStickers -> Layer.Ability
   Modification.LoseAllAbilities -> Layer.Ability
   -- CR 613.1f again, and the same layer as the wipe above: what differs is the
   -- SCOPE of the removal, never when it applies.
@@ -357,6 +358,14 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
               gained = foldMap (\material -> fmap (named material) (PC.activatedAbilities (copiableCharacteristics material gs))) materials
               restricted a = a {ActivatedAbility.restrictions = ActivatedAbility.restrictions a <> extra}
            in pc {PC.activatedAbilities = PC.activatedAbilities pc <> fmap restricted gained}
+        -- CR 613.1f / 123.7a: the abilities printed on the ability stickers on
+        -- `src`, read off the stickers and never off src's projection, so a
+        -- layer-6 loss on src does not reach them. Each goes through the
+        -- GainKeyword or GainAbility arm, the receiver its source (CR 113.7).
+        -- Pawl.StickerSpec's Shadowspear case proves it.
+        Modification.GainAbilitiesOfStickers ->
+          let granted = foldMap (concatMap (\p -> foldMap stickerGrants (Game.abilityStickerOf (StickerPlacement.sticker p) gs)) . Object.stickers) (Game.lookupObject src gs)
+           in List.foldl' (flip (applyModification textBoxOf viewOf src stamp gs oid unitTypes affected)) pc granted
         -- CR 604.3: a CDA is a static ability, so this loses it too.
         Modification.LoseAllAbilities ->
           pc
@@ -738,6 +747,7 @@ cardTypesAfter m types = case m of
   Modification.GainAbility _ -> types
   Modification.GainAbilitiesOfSource _ -> types
   Modification.GainCraftMaterialAbilities _ -> types
+  Modification.GainAbilitiesOfStickers -> types
   Modification.LoseAllAbilities -> types
   Modification.LoseNamedAbility _ -> types
   Modification.LoseKeyword _ -> types
@@ -1508,6 +1518,7 @@ freezeQuantities gs announcedOn source context m =
         Modification.GainAbility _ -> Just m
         Modification.GainAbilitiesOfSource _ -> Just m
         Modification.GainCraftMaterialAbilities _ -> Just m
+        Modification.GainAbilitiesOfStickers -> Just m
         Modification.LoseAllAbilities -> Just m
         Modification.LoseNamedAbility _ -> Just m
         Modification.LoseKeyword _ -> Just m
@@ -1566,6 +1577,7 @@ quantitiesOf m = case m of
   Modification.GainAbility _ -> []
   Modification.GainAbilitiesOfSource _ -> []
   Modification.GainCraftMaterialAbilities _ -> []
+  Modification.GainAbilitiesOfStickers -> []
   Modification.LoseAllAbilities -> []
   Modification.LoseNamedAbility _ -> []
   Modification.LoseKeyword _ -> []
@@ -1621,6 +1633,7 @@ referenceQuery m = case m of
   Modification.GainAbility _ -> Nothing
   Modification.GainAbilitiesOfSource _ -> Nothing
   Modification.GainCraftMaterialAbilities _ -> Nothing
+  Modification.GainAbilitiesOfStickers -> Nothing
   Modification.LoseAllAbilities -> Nothing
   Modification.LoseNamedAbility _ -> Nothing
   Modification.LoseKeyword _ -> Nothing
@@ -1672,6 +1685,7 @@ setsLandSubtype m = case m of
   Modification.GainAbility _ -> False
   Modification.GainAbilitiesOfSource _ -> False
   Modification.GainCraftMaterialAbilities _ -> False
+  Modification.GainAbilitiesOfStickers -> False
   Modification.GainKeyword _ -> False
   Modification.GainKeywordAtManaCost _ -> False
   Modification.GainEnchant _ -> False
@@ -2911,6 +2925,7 @@ removesAbilities m = case m of
   Modification.GainAbility _ -> False
   Modification.GainAbilitiesOfSource _ -> False
   Modification.GainCraftMaterialAbilities _ -> False
+  Modification.GainAbilitiesOfStickers -> False
   -- CR 305.7 strips a land's rules text, but as a layer-4 type change performed
   -- by setLandSubtypeTo and the two gates beside it, never a layer-6 removal.
   -- setsLandSubtype is the classification; this one answers CR 613.1f.
@@ -4081,6 +4096,7 @@ modificationWrites m = case m of
   Modification.GainAbility _ -> Set.singleton Keywords
   Modification.GainAbilitiesOfSource _ -> Set.singleton Keywords
   Modification.GainCraftMaterialAbilities _ -> Set.singleton Keywords
+  Modification.GainAbilitiesOfStickers -> Set.singleton Keywords
   Modification.LoseAllAbilities -> Set.singleton Keywords
   -- Writes ProjectedCharacteristics.activatedAbilities, which Aspect has no finer
   -- grain for than Keywords -- Filter.HasNonManaActivatedAbility, the atom that
@@ -4183,6 +4199,7 @@ modificationReads m = case m of
   Modification.GainAbility _ -> Set.empty
   Modification.GainAbilitiesOfSource _ -> Set.empty
   Modification.GainCraftMaterialAbilities _ -> Set.empty
+  Modification.GainAbilitiesOfStickers -> Set.empty
   Modification.LoseAllAbilities -> Set.empty
   -- Carries a name, which is not a Quantity.
   Modification.LoseNamedAbility _ -> Set.empty
@@ -5971,6 +5988,8 @@ grantsKeywordWhere p m = case m of
   Modification.GainAbility g -> grantedStaticWrites (grantsKeywordWhere p) g
   Modification.GainAbilitiesOfSource _ -> False
   Modification.GainCraftMaterialAbilities _ -> False
+  -- The sticker data is not in the modification; True only widens a gate.
+  Modification.GainAbilitiesOfStickers -> True
   Modification.LoseAllAbilities -> False
   Modification.LoseNamedAbility _ -> False
   -- Take keywords AWAY, which is the opposite of what this asks.
@@ -6057,6 +6076,7 @@ grantsMintingType m = case m of
   Modification.GainAbility g -> grantedStaticWrites grantsMintingType g
   Modification.GainAbilitiesOfSource _ -> False
   Modification.GainCraftMaterialAbilities _ -> False
+  Modification.GainAbilitiesOfStickers -> False
   Modification.LoseAllAbilities -> False
   Modification.LoseNamedAbility _ -> False
   Modification.LoseKeyword _ -> False
@@ -6154,6 +6174,8 @@ grantsAbilityWhere p m = case m of
   Modification.GainCastingPermission _ -> False
   Modification.GainAbilitiesOfSource _ -> False
   Modification.GainCraftMaterialAbilities _ -> False
+  -- The sticker data is not in the modification; True only widens a gate.
+  Modification.GainAbilitiesOfStickers -> True
   Modification.LoseAllAbilities -> False
   Modification.LoseNamedAbility _ -> False
   Modification.LoseKeyword _ -> False
