@@ -955,7 +955,7 @@ costComponentNames asking onKeyword x = case x of
   CostComponent.UntapThis -> False
   CostComponent.SacrificeThis -> False
   CostComponent.ReturnThis -> False
-  CostComponent.PayLife _natural -> False
+  CostComponent.PayLife _amount -> False
   CostComponent.PayHalfLife _rounding -> False
   CostComponent.Sacrifice sacrifice -> sacrificeNames asking sacrifice
   CostComponent.TapForTotalPower tapForTotalPower -> tapForTotalPowerNames asking tapForTotalPower
@@ -965,13 +965,13 @@ costComponentNames asking onKeyword x = case x of
   CostComponent.DiscardCards discardCards -> discardCardsNames asking discardCards
   CostComponent.DiscardThis _discardCause -> False
   CostComponent.PutCardFromHandOntoBattlefield filter_ -> filterNames asking filter_
-  CostComponent.PayEnergy _natural -> False
+  CostComponent.PayEnergy _amount -> False
   CostComponent.AddLoyaltyToThis _natural -> False
-  CostComponent.RemoveLoyaltyFromThis _natural -> False
+  CostComponent.RemoveLoyaltyFromThis _amount -> False
   CostComponent.RemoveCountersFromThis countersFromThis -> countersFromThisNames asking onKeyword countersFromThis
   CostComponent.RemoveCounters countersFromPermanents -> countersFromPermanentsNames asking onKeyword countersFromPermanents
   CostComponent.PutPlusOneCountersOnThis _natural -> False
-  CostComponent.Blight _natural -> False
+  CostComponent.Blight _amount -> False
   CostComponent.Forage -> False
   CostComponent.FlipCoin -> False
   CostComponent.ExileThisFromGraveyard -> False
@@ -988,7 +988,7 @@ costComponentNames asking onKeyword x = case x of
   CostComponent.MillCards _natural -> False
   CostComponent.RevealTopOfLibrary _natural -> False
   CostComponent.ChooseOpponent -> False
-  CostComponent.Waterbend _natural -> False
+  CostComponent.Waterbend _amount -> False
   CostComponent.WaterbendInstead _natural -> False
 
 costReductionNames :: Asking -> CostReduction.CostReduction -> Bool
