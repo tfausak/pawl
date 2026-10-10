@@ -13,8 +13,8 @@
 -- says is not printed -- every room ability's trigger condition.
 module Pawl.Engine.Dungeon where
 
-import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -39,7 +39,6 @@ import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
-import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PrintingId as PrintingId
@@ -113,37 +112,24 @@ roomAbility room dungeonRoom =
       TriggeredAbility.limit = TriggerLimit.Unlimited
     }
 
--- | CR 309.4c: the room abilities that fired on this batch of events, as ordinary
--- PendingTriggers borne by the dungeon card ("each room ability is controlled by
--- the player who owns the dungeon card that is that ability's source").
+-- | CR 309.4c: every room ability of every dungeon card in the command zone,
+-- each with the card as its source and the card's owner as its controller ("each
+-- room ability is controlled by the player who owns the dungeon card that is
+-- that ability's source"), for Pawl.Engine.Event.Trigger.inherentTriggers.
 --
--- Gathered here rather than by Event.gatherTriggers for the reason
--- Event.Trigger.inherentTriggers is: that scan asks each BATTLEFIELD permanent
--- what it triggers, plus the graveyards, the just-cast spell and -- under CR
--- 113.6p -- the EMBLEMS and VANGUARD CARDS in the command zone, which a dungeon
--- card is neither.
--- A room ability is minted rather than printed besides, so there is nothing on
--- the card's face for that scan to read: widening it to offer dungeon cards
--- would find nothing, and unifying the two means teaching it to mint the
--- ability, which is this code moved rather than a divergence fixed. Nor can the
--- two answer differently -- CR 309.4c gives every room ability the same unprinted
--- trigger condition, so only the effect varies and neither collector reads it.
--- Unlike the monarch's, these abilities do have a source, so they carry
--- TriggerSource.OfObject and Engine.placeBorne puts them on the stack with no
--- special case -- which is what lets a room ability choose targets (CR 603.3d).
---
--- The bindings are empty and the reserved source slot is stamped at placement, so
--- a room's "target creature" resolves against the dungeon exactly as a permanent's
--- trigger resolves against itself.
-roomPending :: [GameEvent.GameEvent] -> GameState.GameState -> [PendingTrigger.PendingTrigger]
-roomPending events gs =
-  let pendingFor event = case event of
-        GameEvent.VentureMarkerEntered (VentureMarkerEntered.MkVentureMarkerEntered pid oid room) -> do
-          entered <- roomAt room (roomsOf oid gs)
-          Monad.guard (fmap Object.owner (Game.lookupObject oid gs) == Just pid)
-          Just (PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) pid (roomAbility room entered) Map.empty Nothing (Just event) 1)
-        _ -> Nothing
-   in Maybe.mapMaybe pendingFor events
+-- Gathered there rather than by Event.gatherTriggers because a room ability is
+-- minted rather than printed, so there is nothing on the card's face for that
+-- scan to read. With TriggerSource.OfObject, Engine.placeBorne puts it on the
+-- stack with no special case -- which is what lets a room ability choose
+-- targets (CR 603.3d) and resolve against the dungeon as a permanent's trigger
+-- resolves against itself.
+abilities :: GameState.GameState -> [(TriggerSource.TriggerSource, PlayerId, TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
+abilities gs =
+  [ (TriggerSource.OfObject oid, Object.owner obj, roomAbility (RoomIndex.MkRoomIndex index) room)
+  | oid <- Set.toList (GameState.command gs),
+    obj <- Maybe.maybeToList (Game.lookupObject oid gs),
+    (index, room) <- zip [0 ..] (Foldable.toList (roomsOf oid gs))
+  ]
 
 -- | CR 704.5t \/ 309.6: the dungeon cards whose owner must remove them from the
 -- game -- marker on the bottommost room, with no room ability of theirs still

@@ -5,13 +5,13 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Engine.Mint as Mint
 import Pawl.Types.ActivatedAbility (ActivatedAbility)
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.Activator as Activator
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardType as CardType
-import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Effect as Effect
@@ -19,11 +19,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GiveControl as GiveControl
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.ManaCost as ManaCost
-import qualified Pawl.Types.Modal as Modal
-import qualified Pawl.Types.Mode as Mode
-import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.ObjectRef as ObjectRef
-import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Pool as Pool
@@ -55,9 +51,7 @@ ability =
    in ActivatedAbility.MkActivatedAbility
         { ActivatedAbility.cost = Cost.MkCost (Just (ManaCost.MkManaCost [])) [CostComponent.TapThis],
           ActivatedAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton teammate slot)))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneModeTargeting (Map.singleton teammate slot) (Seq.singleton effect),
           ActivatedAbility.maximumX = [],
           ActivatedAbility.minimumX = 0,
           -- CR 307.5's sorcery timing.

@@ -1295,6 +1295,13 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.ChaosEnsues
       " {\"type\":\"ChaosEnsues\"} "
+  -- CR 901.8: the planeswalking ability's condition, PlayerRollsDice's shape.
+  Spec.it s "PlayerRollsPlaneswalker round-trips" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerRollsPlaneswalker PlayerRelation.You)
+      " {\"type\":\"PlayerRollsPlaneswalker\",\"value\":{\"type\":\"You\"}} "
   -- CR 701.51c and CR 702.159b, PlayerForages' shape.
   Spec.it s "PlayerOpensAttraction round-trips" $
     Common.assertCodec

@@ -27,12 +27,12 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Mint as Mint
 import Pawl.Types.AbilityName (AbilityName)
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardType as CardType
-import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Earthbend as Earthbend
@@ -42,23 +42,17 @@ import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
-import qualified Pawl.Types.Modal as Modal
-import qualified Pawl.Types.Mode as Mode
-import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Onset as Onset
-import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
-import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
-import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
 
 -- | CR 701.66a's first two sentences, in written order (CR 608.2c): the
@@ -160,13 +154,4 @@ returnAbility =
               MoveToZone.placement = LibraryPlacement.defaultValue,
               MoveToZone.duration = Nothing
             }
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.BoundDiesOrIsExiled Binding.earthbentLand,
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in Mint.trigger (TriggerCondition.BoundDiesOrIsExiled Binding.earthbentLand) (Seq.singleton effect)

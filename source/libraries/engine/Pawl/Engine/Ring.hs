@@ -33,6 +33,7 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mint as Mint
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Types.AbilityName as AbilityName
@@ -41,7 +42,6 @@ import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
-import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
@@ -59,15 +59,11 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
-import qualified Pawl.Types.Modal as Modal
-import qualified Pawl.Types.Mode as Mode
-import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Onset as Onset
-import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PermanentDealsCombatDamageToPlayer as PermanentDealsCombatDamageToPlayer
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
@@ -286,22 +282,15 @@ theRingLootsOnAttack =
                   CountedDiscard.discarded = Nothing
                 }
           )
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition =
-            TriggerCondition.PlayerAttacksWith
-              PlayerAttacksWith.MkPlayerAttacksWith
-                { PlayerAttacksWith.player = PlayerRelation.You,
-                  PlayerAttacksWith.filter = yourRingBearer,
-                  PlayerAttacksWith.attackers = 1
-                },
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [draw, discard]))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in Mint.trigger
+        ( TriggerCondition.PlayerAttacksWith
+            PlayerAttacksWith.MkPlayerAttacksWith
+              { PlayerAttacksWith.player = PlayerRelation.You,
+                PlayerAttacksWith.filter = yourRingBearer,
+                PlayerAttacksWith.attackers = 1
+              }
+        )
+        (Seq.fromList [draw, discard])
 
 -- CR 701.54c's three-temptation sentence names the delayed ability it creates.
 -- Face.delayedAbilities files it under this name and Effect.ArmDelayedTrigger arms
@@ -348,16 +337,7 @@ theRingSacrificesTheBlocker =
               ArmDelayedTrigger.duration = Nothing,
               ArmDelayedTrigger.ability = Nothing
             }
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.PermanentBecomesBlockedBy yourRingBearer,
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in Mint.trigger (TriggerCondition.PermanentBecomesBlockedBy yourRingBearer) (Seq.singleton effect)
 
 -- | CR 603.7 / 701.54c: the delayed half of the sentence above -- at end of
 -- combat, the blocking creature is sacrificed.
@@ -378,22 +358,15 @@ theRingSacrificesTheBlocker =
 -- Event.eventBindings stamps for the condition above.
 theRingBlockerSacrifice :: TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)
 theRingBlockerSacrifice =
-  TriggeredAbility.MkTriggeredAbility
-    { TriggeredAbility.condition =
-        TriggerCondition.StepBegins
-          StepBegins.MkStepBegins
-            { StepBegins.ordinal = Nothing,
-              StepBegins.phase = Phase.Combat CombatStep.EndOfCombat,
-              StepBegins.scope = TurnScope.EachTurn
-            },
-      TriggeredAbility.modal =
-        Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.blockingCreature, SacrificeEffect.sacrificer = Sacrificer.PermanentController, SacrificeEffect.sacrificed = Nothing})))) Map.empty))
-          (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing,
-      TriggeredAbility.name = Nothing,
-      TriggeredAbility.limit = TriggerLimit.Unlimited
-    }
+  Mint.trigger
+    ( TriggerCondition.StepBegins
+        StepBegins.MkStepBegins
+          { StepBegins.ordinal = Nothing,
+            StepBegins.phase = Phase.Combat CombatStep.EndOfCombat,
+            StepBegins.scope = TurnScope.EachTurn
+          }
+    )
+    (Seq.singleton (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.blockingCreature, SacrificeEffect.sacrificer = Sacrificer.PermanentController, SacrificeEffect.sacrificed = Nothing}))
 
 -- | CR 701.54c's four-temptation sentence: "Whenever your Ring-bearer deals combat
 -- damage to a player, each opponent loses 3 life." Minted here rather than carried
@@ -429,9 +402,7 @@ theRingDrainsOnCombatDamage =
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.PermanentDealsCombatDamageToPlayer (PermanentDealsCombatDamageToPlayer.MkPermanentDealsCombatDamageToPlayer yourRingBearer PlayerRelation.AnyPlayer),
           TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
+            Mint.oneMode (Seq.singleton effect),
           -- No intervening "if" (CR 603.4): rule 701.54c gives the emblem the ability
           -- or does not, and an ability that exists and declines to trigger is a
           -- different thing.

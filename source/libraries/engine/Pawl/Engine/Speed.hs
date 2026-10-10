@@ -29,7 +29,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
-import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Mint as Mint
 import qualified Pawl.Engine.Projection.View as Projection
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Compares as Compares
@@ -128,13 +128,13 @@ startEngines pid gs =
 -- waited on the stack while something else did.
 --
 -- Single mode, no targets, forced (CR 603.3's "you" is the ability's controller
--- and nothing is chosen), which is what lets Monarch.placeInherent put it on the
+-- and nothing is chosen), which is what lets Engine.placeSourceless put it on the
 -- stack unprompted.
 increaseAbility :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 increaseAbility =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.OpponentLostLifeDuringYourTurn,
-      TriggeredAbility.modal = Modal.single (Seq.singleton (Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)))),
+      TriggeredAbility.modal = Mint.oneMode (Seq.singleton (Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)))),
       TriggeredAbility.intervening = Just belowMaxSpeed,
       -- CR 702.179d's own "this ability triggers only once each turn", stated in
       -- the data because the rule states it, and enforced from there like every
