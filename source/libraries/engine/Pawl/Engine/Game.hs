@@ -2752,6 +2752,19 @@ castOf event = case event of
   GameEvent.TriggeredAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
+-- CR 601.2i: the casts this turn's log holds before `spell`'s own, earliest
+-- first. POSITIONAL, so a spell cast after it -- in response to its storm
+-- trigger, or later in one CR 117.5 window -- is not counted. Nothing where the
+-- log holds no cast of `spell`: a spell that was never cast (CR 707.10's copy)
+-- has no place among the turn's casts. Storm's count (CR 702.40a, Quantity's
+-- SpellsCastBefore) and Clarion Spirit's ordinal (Event.Match.castOrdinal)
+-- read it.
+castsBefore :: ObjectId -> GameState -> Maybe [SpellWasCast.SpellWasCast]
+castsBefore spell gs =
+  case break ((== spell) . SpellWasCast.spell) (Maybe.mapMaybe (castOf . LoggedEvent.event) (Foldable.toList (GameState.events gs))) of
+    (_, []) -> Nothing
+    (before, _) -> Just before
+
 -- CR 601.2i: how many spells each player has cast this turn, off the whole log,
 -- which Engine.handoffTurn clears. GameState.castsLastTurn is a snapshot of it,
 -- and Pawl.Engine.PlayerEffect.castsThisTurn and Pawl.Engine.Quantity's
