@@ -544,7 +544,7 @@ payableCostAtGiven aimable sources pcs x stamp spendable pid srcId gs cost =
 -- `slotReading` is asked of the cost with the blind gather's components added,
 -- so a criterion arriving on a component CR 601.2f's adjustments add takes the
 -- cost search as a printed one does.
-aimingSomewhere :: (CostAdjustments.CostAdjustments -> Cost Keyword) -> [(Map.Map SlotName (Natural, Natural), Map.Map SlotName (Set.Set ObjectId))] -> Maybe Keyword -> LoyaltyKind.LoyaltyKind -> PlayerId -> ObjectId -> GameState -> (Map.Map SlotName (Set.Set ObjectId) -> CostAdjustments.CostAdjustments -> Bool) -> Bool
+aimingSomewhere :: (CostAdjustments.CostAdjustments -> Cost Keyword) -> [(Map.Map SlotName (Natural, Natural), Map.Map SlotName (Set.Set ObjectId))] -> Maybe Keyword -> LoyaltyKind.LoyaltyKind -> PlayerId -> ObjectId -> GameState -> (Map.Map SlotName (Set.Set Recipient.Recipient) -> CostAdjustments.CostAdjustments -> Bool) -> Bool
 aimingSomewhere costWith aimable stamp loyalty pid srcId gs payable =
   -- CR 605.1a's kind is AbilityKind.NonManaAbility at all three sites in this
   -- module, and CR 605.3b is why: activatableGiven refuses a mana ability
@@ -568,7 +568,7 @@ aimingSomewhere costWith aimable stamp loyalty pid srcId gs payable =
       -- Targets the cost cannot tell apart are tried once (Cost.aimingSignature).
       key = Cost.aimingKey pid srcId gs (costWith blind) . Recipient.ToObject
    in if slotReading
-        then any (\(ranges, sets) -> any (\aiming -> payable (Binding.withAnnouncedTargets aiming) (gather (Set.unions (Map.elems aiming)))) (Target.aimingsBy id key ranges sets)) aimable
+        then any (\(ranges, sets) -> any (\aiming -> payable (Binding.withAnnouncedTargets (fmap (Set.map Recipient.ToObject) aiming)) (gather (Set.unions (Map.elems aiming)))) (Target.aimingsBy id key ranges sets)) aimable
         else
           payable Map.empty blind
             || (gather candidates /= blind && any (payable Map.empty . gather . Set.singleton) (Set.toList candidates))

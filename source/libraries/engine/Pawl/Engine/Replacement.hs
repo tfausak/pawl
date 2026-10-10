@@ -439,7 +439,7 @@ collect sources floating =
         Just condition ->
           Condition.holds
             (Projection.fullView sources)
-            ((SourceContext.sourceContext sources (Just (ActiveReplacement.controller active)) (ActiveReplacement.source active)) {Filter.slotObjects = ActiveReplacement.slots active})
+            (Projection.framedBySlots sources (fmap (Set.map Recipient.ToObject) (ActiveReplacement.slots active)) (SourceContext.sourceContext sources (Just (ActiveReplacement.controller active)) (ActiveReplacement.source active)))
             (Projection.boardAsEntering sources)
             (ActiveReplacement.source active)
             condition
@@ -1575,9 +1575,9 @@ matchesZoneOwner gs candidate rel oid = relationHolds gs candidate rel (fmap Obj
 -- The source's frame rides along (SourceContext.framedBy), CR 607.2d's
 -- link from "choose a creature type" to a cost printed beside it: Doom Cannon's
 -- "Sacrifice a creature of the chosen type" (Pawl.CostSpec's Doom Cannon group).
-matchesPermanent :: (ObjectId -> Filter.View) -> GameState -> Maybe PlayerId -> Map.Map SlotName.SlotName (Set ObjectId) -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
+matchesPermanent :: (ObjectId -> Filter.View) -> GameState -> Maybe PlayerId -> Map.Map SlotName.SlotName (Set Recipient.Recipient) -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
 matchesPermanent viewOf gs you slots source filter_ oid =
-  let base = Filter.contextWithSlots (Game.teams gs) you source slots
+  let base = Projection.contextWithSlots gs you source slots
       context = maybe base (\asking -> SourceContext.framedBy asking gs base) source
    in Filter.matches context (viewOf oid) filter_
 
@@ -1616,7 +1616,7 @@ matchesPermanent viewOf gs you slots source filter_ oid =
 -- entering permanent, who is also `pid` there, but the edict's CONTROLLER rather
 -- than its victim. data/scenarios/grim-hireling-sacrifices-x-treasures.json
 -- proves the cost reading.
-sacrificeCandidates :: Maybe PlayerId -> Map.Map SlotName.SlotName (Set ObjectId) -> PlayerId -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+sacrificeCandidates :: Maybe PlayerId -> Map.Map SlotName.SlotName (Set Recipient.Recipient) -> PlayerId -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 sacrificeCandidates you slots pid source filter_ gs =
   let viewOf = Projection.viewsOf gs
       matching = List.sort (filter (matchesPermanent viewOf gs you slots source filter_) (Projection.controls pid gs))
@@ -1720,10 +1720,12 @@ candidateContext :: GameState -> ReplacementCandidate -> Filter.Context
 candidateContext gs candidate =
   let source = ReplacementCandidate.source candidate
       choices = Maybe.fromMaybe (SourceContext.choicesOf source gs) (ReplacementCandidate.choices candidate)
-   in (SourceContext.framedWith choices source gs (SourceContext.sourceContext gs (ReplacementCandidate.controller candidate) source))
-        { Filter.slotObjects = ReplacementCandidate.slots candidate,
-          Filter.carrierChosenPlayer = Game.lookupObject source gs >>= Object.chosenPlayer
-        }
+   in Projection.framedBySlots
+        gs
+        (fmap (Set.map Recipient.ToObject) (ReplacementCandidate.slots candidate))
+        (SourceContext.framedWith choices source gs (SourceContext.sourceContext gs (ReplacementCandidate.controller candidate) source))
+          { Filter.carrierChosenPlayer = Game.lookupObject source gs >>= Object.chosenPlayer
+          }
 
 -- CR 614.12 for a token that does not exist yet: a lot's token is judged off
 -- the characteristics it would have on the battlefield -- its given text, or
