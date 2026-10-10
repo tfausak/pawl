@@ -30,34 +30,42 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "AddSpellCost",
+            "type": "ModifyCost",
             "value": {
-              "components": [
-                {
-                  "type": "Sacrifice",
-                  "value": {
-                    "count": {
-                      "type": "Fixed",
-                      "value": 1
-                    },
-                    "whichPermanents": {
-                      "type": "HasSubtype",
+              "change": {
+                "type": "Add",
+                "value": {
+                  "components": [
+                    {
+                      "type": "Sacrifice",
                       "value": {
-                        "type": "Swamp"
+                        "count": {
+                          "type": "Fixed",
+                          "value": 1
+                        },
+                        "whichPermanents": {
+                          "type": "HasSubtype",
+                          "value": {
+                            "type": "Swamp"
+                          }
+                        }
                       }
+                    }
+                  ],
+                  "scale": {
+                    "type": "PerColoredSymbol",
+                    "value": {
+                      "type": "Black"
                     }
                   }
                 }
-              ],
-              "scale": {
-                "type": "PerColoredSymbol",
-                "value": {
-                  "type": "Black"
-                }
               },
-              "whichSpells": {
+              "matching": {
                 "type": "And",
                 "value": []
+              },
+              "subject": {
+                "type": "Spells"
               }
             }
           },
@@ -67,34 +75,43 @@
         },
         {
           "effect": {
-            "type": "AddActivationCost",
+            "type": "ModifyCost",
             "value": {
-              "components": [
-                {
-                  "type": "Sacrifice",
-                  "value": {
-                    "count": {
-                      "type": "Fixed",
-                      "value": 1
-                    },
-                    "whichPermanents": {
-                      "type": "HasSubtype",
+              "change": {
+                "type": "Add",
+                "value": {
+                  "components": [
+                    {
+                      "type": "Sacrifice",
                       "value": {
-                        "type": "Swamp"
+                        "count": {
+                          "type": "Fixed",
+                          "value": 1
+                        },
+                        "whichPermanents": {
+                          "type": "HasSubtype",
+                          "value": {
+                            "type": "Swamp"
+                          }
+                        }
                       }
+                    }
+                  ],
+                  "scale": {
+                    "type": "PerColoredSymbol",
+                    "value": {
+                      "type": "Black"
                     }
                   }
                 }
-              ],
-              "scale": {
-                "type": "PerColoredSymbol",
-                "value": {
-                  "type": "Black"
-                }
               },
-              "whichAbilities": {
+              "matching": {
                 "type": "And",
                 "value": []
+              },
+              "subject": {
+                "type": "Activations",
+                "value": {}
               }
             }
           },

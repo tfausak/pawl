@@ -19,7 +19,7 @@ import qualified Pawl.Types.Quantity as Quantity
 -- this type: CR 702.41a's affinity and CR 702.125a's undaunted are the two, and
 -- neither reaches this type through a card's own text beyond affinity's quality.
 --
--- The SELF-scoped sibling of Pawl.Types.ReduceSpellCost, which is a battlefield
+-- The SELF-scoped sibling of Pawl.Types.CostModifier's reduction, which is a battlefield
 -- permanent's static ability discounting whatever spells its Filter names
 -- (Sapphire Medallion). Neither carrier can hold the other's sentence: that one
 -- is a CR 613.11 continuous effect gathered off the battlefield
@@ -37,7 +37,7 @@ import qualified Pawl.Types.Quantity as Quantity
 data CostReduction = MkCostReduction
   { -- | What ONE of the things counted takes off -- Thrasta's {3}.
     --
-    -- A ManaCost and not a number, for Pawl.Types.ReduceSpellCost's reason: CR
+    -- A ManaCost and not a number, for Pawl.Types.AppliedReduction's reason: CR
     -- 118.7 reduces a cost by mana of a stated type, and
     -- Pawl.Engine.Cost.applyAdjustments already reads a reduction's generic and
     -- typed halves apart -- Ertai's Scorn's {U} is a typed one.
@@ -67,7 +67,8 @@ data CostReduction = MkCostReduction
     -- Apart from 'condition' because the gates that measure a cost before CR
     -- 601.2c (Pawl.Engine.Cast.payableCostAt) have to search the aimings for a
     -- sentence reading the targets, and this field is how they know one does.
-    -- Pawl.Types.ReduceActivationCost's @whichTargets@ is the activation twin.
+    -- Pawl.Types.CostModifier's @whichTargets@ is the same question asked by
+    -- another permanent's effect, of a spell or an activation.
     whichTargets :: Maybe (Filter.Filter Keyword.Keyword),
     -- | Whether 'amount' comes off the total or goes onto it -- Dragon's Prey's
     -- "costs {2} more". A More amount is generic mana, the only kind CR 601.2f's

@@ -356,8 +356,8 @@ flashOn oid face gs =
 --     (#559), so no target set can be measured differently either side of it.
 --   * nothing counts a hand. No Pawl.Types.Count arm reaches a hand zone, so
 --     hand size cannot enter a cost or a filter.
---   * a cost adjustment carries a LITERAL amount. PlayerEffect.IncreaseSpellCost
---     and ReduceSpellCost hold a Natural or a ManaCost, never a Quantity, so no
+--   * a cost adjustment carries a LITERAL amount. Pawl.Types.CostChange's
+--     Increase and Reduce hold a Natural or a ManaCost, never a Quantity, so no
 --     adjustment can count anything but the spell's own targets (`perTarget`),
 --     which the first point keeps out of hidden zones -- and a count is the only
 --     route a zone read could take into Cost.total.
@@ -3401,10 +3401,15 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                   let aimedSets = Target.legalSets (Just pid) False (Binding.fromChoices Map.empty mAmount Seq.empty) sid slots announcedBoard
                       gatheredFor targets = Cost.plusReductions chosenReductions (Cost.spellAdjustments targets pid sid announcedBoard)
                       gathered = gatheredFor Set.empty
+                      -- Merged by value: aimings counting alike total alike. The
+                      -- empty aiming is among them only where every slot may take
+                      -- none: under Kopala, Warden of Waves it is the CHEAPEST
+                      -- total, so offering its routes would offer a half no legal
+                      -- aiming pays. Pawl.ManaSymbolSpec's "CR 601.2c Dismember at
+                      -- a Merfolk under Kopala is priced with its target" proves it.
+                      aimed = Set.toList . Set.fromList $ fmap (gatheredFor . Set.unions . Map.elems) (Target.aimingsBy Cost.aimedReferent (Cost.aimingKey pid sid announcedBoard announcedAtX) (Target.aimingRanges (Just pid) sid (Just (Maybe.fromMaybe 0 mAmount)) slots aimedSets announcedBoard) aimedSets)
                       aimedGathers
-                        | Cost.readsTargets pid sid announcedBoard =
-                            -- Merged by value: aimings counting alike total alike.
-                            Set.toList . Set.fromList $ gathered : fmap (gatheredFor . Set.unions . Map.elems) (Target.aimingsBy Cost.aimedReferent (Cost.aimingKey pid sid announcedBoard announcedAtX) (Target.aimingRanges (Just pid) sid (Just (Maybe.fromMaybe 0 mAmount)) slots aimedSets announcedBoard) aimedSets)
+                        | Cost.readsTargets pid sid announcedBoard && not (null aimed) = aimed
                         | otherwise = [gathered]
                       routeTotals mana = concatMap (`Cost.totalManas` mana) aimedGathers
                   let totalledCost = Cost.plusComponents gathered announcedAtX
@@ -3520,8 +3525,8 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                       -- below answers with.
                       --
                       -- CR 601.2f's ORDER of the reductions is asked at the same
-                      -- seam. A SPELL can observe it: no ReduceSpellCost states
-                      -- a floor, but two of them can still disagree about CR
+                      -- seam. A SPELL can observe it: no spell reduction in the
+                      -- pool states a floor, but two can still disagree about CR
                       -- 101.1's coloured-mana confinement, and Edgewalker beside
                       -- an unconfined typed reducer reaches two totals on one
                       -- Cleric spell (Pawl.PlayerEffectSpec's

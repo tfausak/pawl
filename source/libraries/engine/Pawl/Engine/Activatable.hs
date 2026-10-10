@@ -523,9 +523,9 @@ payableCostAtGiven aimable sources pcs x stamp spendable pid srcId gs cost =
 -- at every count its range admits (Target.aimingRanges), so the empty aiming is
 -- among them only where every slot may take none.
 --
--- The ADJUSTMENT search is the old one, unchanged: only ReduceActivationCost
--- reads the targets (Pawl.Engine.PlayerEffect.activationCostAdjustmentsGiven),
--- and each candidate is tried ON ITS OWN rather than all at once, since handing
+-- The ADJUSTMENT search, for a modifier that REDUCES by the targets (Dwarven
+-- Mauler; Pawl.Engine.PlayerEffect.activationCostAdjustmentsGiven), tries each
+-- candidate ON ITS OWN rather than all at once, since handing
 -- the whole set in would let two reducers wanting two different targets both
 -- apply where no one choice satisfies both. One at a time is exact for an
 -- ability with a single target slot -- which is every ability such a reducer
@@ -535,6 +535,14 @@ payableCostAtGiven aimable sources pcs x stamp spendable pid srcId gs cost =
 --
 -- The empty aiming comes first there: a player may always choose a target that
 -- reduces nothing, and it is the only aiming an ability with no target slot has.
+--
+-- That climb rests on the empty aiming being the DEAREST, which a modifier that
+-- INCREASES by the targets breaks: under Kopala, Warden of Waves the empty aiming
+-- is the cheapest, and an ability whose every legal target is a Merfolk is not
+-- payable merely because no target is. So a union gather whose increases differ
+-- from the blind one's sends the gate to the whole-announcement search, which is
+-- exact. Pawl.CostSpec's "a Brittle Effigy whose only targets are alice's
+-- Merfolk is not offered on five Plains" proves it.
 -- The union gather then guards the climb -- the gather is monotone in the target
 -- set, so a union that adjusts nothing leaves every singleton adjusting nothing
 -- too -- which keeps every board without a target-naming reducer at one gather
@@ -561,12 +569,14 @@ aimingSomewhere costWith aimable stamp loyalty pid srcId gs payable =
   let gather aimedAt = Cost.activationAdjustments aimedAt stamp AbilityKind.NonManaAbility loyalty pid srcId gs
       candidates = Set.unions (concatMap (Map.elems . snd) aimable)
       blind = gather Set.empty
-      -- The added components are the blind gather's under every aiming: only
-      -- ReduceActivationCost reads the targets, and it adds no component.
+      -- The added components are the blind gather's under every aiming:
+      -- Pawl.Codec.CostModifier refuses a target criterion on an addition to an
+      -- activation.
       slotReading = Cost.readsBoundSlot (costWith blind)
+      increasesReadTargets = CostAdjustments.increases (gather candidates) /= CostAdjustments.increases blind
       -- Targets the cost cannot tell apart are tried once (Cost.aimingSignature).
       key = Cost.aimingKey pid srcId gs (costWith blind) . Recipient.ToObject
-   in if slotReading
+   in if slotReading || increasesReadTargets
         then any (\(ranges, sets) -> any (\aiming -> payable (Binding.withAnnouncedTargets (fmap (Set.map Recipient.ToObject) aiming)) (gather (Set.unions (Map.elems aiming)))) (Target.aimingsBy id key ranges sets)) aimable
         else
           payable Map.empty blind

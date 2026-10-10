@@ -1014,7 +1014,7 @@ equipBoard s registry withHeadmaster = do
 --
 -- Boom Scholar is the card that NAMES them: "Exhaust abilities of other
 -- permanents you control cost {2} less to activate", which reaches
--- Pawl.Types.ReduceActivationCost's `grantedBy` as a
+-- Pawl.Types.ActivationCriteria's `grantedBy` as a
 -- KeywordDesignator.OfNullary, the arm a keyword with no family needs.
 exhaustSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 exhaustSpec s registry = Spec.describe s "Exhaust (CR 702.177)" $ do
@@ -1173,7 +1173,7 @@ powerUpSpec s registry = Spec.describe s "Power-up (CR 702.193)" $ do
     Spec.assertEqWith s "and not that of a Hulk that was already there" (offered settledId settled) 0
     Spec.assertEqWith s "both Hulks are on the battlefield" (fmap (\(oid, gs) -> Set.member oid (GameState.battlefield gs)) [(enteredId, entered), (settledId, settled)]) [True, True]
 
-  -- Hulk's second line, a Pawl.Types.ReduceActivationCost narrowed to power-up:
+  -- Hulk's second line, an activation reduction narrowed to power-up:
   -- Kang's {5}{U}{U}{U} less {3} is {2}{U}{U}{U}, which five Islands pay. Kang
   -- did not enter this turn, so the reduction is Hulk's alone.
   Spec.it s "CR 118.7 Hulk's reduction reaches another creature's power-up ability" $ do

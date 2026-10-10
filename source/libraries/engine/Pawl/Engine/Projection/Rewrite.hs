@@ -18,8 +18,6 @@ import qualified Pawl.Types.ActivateManaAbilities as ActivateManaAbilities
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationProhibition as ActivationProhibition
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
-import qualified Pawl.Types.AddActivationCost as AddActivationCost
-import qualified Pawl.Types.AddSpellCost as AddSpellCost
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
@@ -77,7 +75,10 @@ import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.CopyOriginal as CopyOriginal
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
+import qualified Pawl.Types.CostAddition as CostAddition
+import qualified Pawl.Types.CostChange as CostChange
 import qualified Pawl.Types.CostChoice as CostChoice
+import qualified Pawl.Types.CostModifier as CostModifier
 import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
@@ -141,8 +142,6 @@ import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Halved as Halved
-import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
-import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LifeLoss as LifeLoss
@@ -197,8 +196,6 @@ import qualified Pawl.Types.RandomCardInGraveyard as RandomCardInGraveyard
 import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
 import qualified Pawl.Types.RandomCardInLibrary as RandomCardInLibrary
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
-import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
-import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
@@ -447,28 +444,23 @@ rewritePlayerEffect pairs effect = case effect of
   -- Omniscience's "spells" name none today; Edgewalker's "Cleric spells" does on
   -- the printed road, and Liliana, Untouched by Death's "Zombie spells" does on
   -- the stored one.
-  PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost f n targets) -> PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost (Filter.rewrite pairs f) n (fmap (Filter.rewrite pairs) targets))
-  PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost f kind n) -> PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost (Filter.rewrite pairs f) kind n)
-  PlayerEffect.ReduceSpellCost x -> PlayerEffect.ReduceSpellCost x {ReduceSpellCost.whichSpells = Filter.rewrite pairs (ReduceSpellCost.whichSpells x), ReduceSpellCost.perTarget = fmap (Filter.rewrite pairs) (ReduceSpellCost.perTarget x)}
-  -- TWO Filters of its own, and both descend. The second names
-  -- what the ability targets (Dwarven Mauler's "that target this creature",
-  -- spelled Filter.IsSource), so no card in `data/cards/` puts a subtype word
-  -- there today and neutralising that descent leaves the suite green -- it is
-  -- here so that the card which does write one cannot silently keep the printed
-  -- word.
-  PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost f family kind targets first cost floor_) -> PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost (Filter.rewrite pairs f) family kind (fmap (Filter.rewrite pairs) targets) first cost floor_)
-  -- The two arms with a word in TWO places: their own criterion ("nontoken
-  -- Rebels"), and the criterion inside each component they add ("sacrifice a
-  -- LAND", "sacrifice a SWAMP"). Both descend, which is Filter.rewriteCost's
-  -- reading of CR 612.2 carried to a component that is added to a cost rather
-  -- than printed in one. The scale beside them names a COLOUR, which CR 612.2's
-  -- subtype pairs cannot reach, and neither can they reach the loyalty criterion
-  -- the activation arm carries beside it: CR 606.2's classification is not a
-  -- word on the card.
-  PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost f loyalty components scale) -> PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost (Filter.rewrite pairs f) loyalty (fmap (Filter.rewriteComponent pairs) components) scale)
+  --
+  -- A cost modifier has a word in up to FOUR places: its own criterion
+  -- ("nontoken Rebels"), the two target criteria (Dwarven Mauler's "that target
+  -- this creature", Kopala's "that target a MERFOLK"), and the criterion inside
+  -- each component it adds ("sacrifice a SWAMP"). All descend, which is
+  -- Filter.rewriteCost's reading of CR 612.2 carried to a component added to a
+  -- cost rather than printed in one. The subject's criteria (a rule-702
+  -- designator, CR 605.1a's and CR 606.2's classifications) and an addition's
+  -- scale (a colour) are no words CR 612.2's subtype pairs reach.
+  PlayerEffect.ModifyCost (CostModifier.MkCostModifier subject f targets perTarget first change) ->
+    let change' = case change of
+          CostChange.Add (CostAddition.MkCostAddition components scale) -> CostChange.Add (CostAddition.MkCostAddition (fmap (Filter.rewriteComponent pairs) components) scale)
+          CostChange.Increase _ -> change
+          CostChange.Reduce _ -> change
+     in PlayerEffect.ModifyCost (CostModifier.MkCostModifier subject (Filter.rewrite pairs f) (fmap (Filter.rewrite pairs) targets) (fmap (Filter.rewrite pairs) perTarget) first change')
   -- No filter to rewrite: a rule-702 designator is not a word CR 612.1 swaps.
   PlayerEffect.AlternativeActivationCost _ -> effect
-  PlayerEffect.AddSpellCost (AddSpellCost.MkAddSpellCost f components scale) -> PlayerEffect.AddSpellCost (AddSpellCost.MkAddSpellCost (Filter.rewrite pairs f) (fmap (Filter.rewriteComponent pairs) components) scale)
   PlayerEffect.CastAsThoughItHadFlash f -> PlayerEffect.CastAsThoughItHadFlash (Filter.rewrite pairs f)
   PlayerEffect.MayPlayAsThoughItHadFlash f -> PlayerEffect.MayPlayAsThoughItHadFlash (Filter.rewrite pairs f)
   -- A rule-702 designator is no word CR 612.1 swaps; the loyalty arm's Filter

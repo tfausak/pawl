@@ -1,16 +1,13 @@
 module Pawl.Types.PlayerEffect where
 
 import qualified Numeric.Natural as Natural
-import qualified Pawl.Types.AddActivationCost as AddActivationCost
-import qualified Pawl.Types.AddSpellCost as AddSpellCost
 import qualified Pawl.Types.AlternativeActivationCost as AlternativeActivationCost
 import qualified Pawl.Types.CantSearchLibraries as CantSearchLibraries
 import qualified Pawl.Types.CastFromZone as CastFromZone
+import qualified Pawl.Types.CostModifier as CostModifier
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.InZone as InZone
-import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
-import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordDesignator as KeywordDesignator
 import qualified Pawl.Types.ManaFilter as ManaFilter
@@ -18,8 +15,6 @@ import qualified Pawl.Types.ModifiedRoll as ModifiedRoll
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlotFromZone as PlotFromZone
-import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
-import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
 import qualified Pawl.Types.StatedFlip as StatedFlip
 
@@ -55,29 +50,12 @@ data PlayerEffect
   | -- | CR 601.3 / Rule of Law: this player can't cast more than this many spells
     -- each turn.
     CantCastMoreThan Natural.Natural
-  | -- | CR 613.11 / 601.2f / Thalia: matching spells cost this much more generic
-    -- mana to cast.
-    IncreaseSpellCost IncreaseSpellCost.IncreaseSpellCost
-  | -- | CR 613.11 / 601.2f / 602.2b / Oppressive Rays: the activated abilities
-    -- of matching permanents cost this much more generic mana to activate.
-    IncreaseActivationCost IncreaseActivationCost.IncreaseActivationCost
-  | -- | CR 613.11 / 601.2f / Sapphire Medallion, Edgewalker: matching spells cost
-    -- this much less to cast.
-    ReduceSpellCost ReduceSpellCost.ReduceSpellCost
-  | -- | CR 613.11 / 601.2f / 602.2b / Heartstone, Training Grounds: the
-    -- activated abilities of matching permanents cost this much less to
-    -- activate, and this effect may not reduce the mana left in such a cost
-    -- below the Natural.
-    ReduceActivationCost ReduceActivationCost.ReduceActivationCost
-  | -- | CR 118.8 / 602.2b / Brutal Suppression: the activated abilities of
-    -- matching permanents cost these additional non-mana components to activate.
-    AddActivationCost AddActivationCost.AddActivationCost
+  | -- | CR 613.11 / 601.2f / 602.2b / Thalia, Heartstone, Drought: matching
+    -- spells or activated abilities cost more, less or an additional cost.
+    ModifyCost CostModifier.CostModifier
   | -- | CR 118.9 / 602.2b / Kíli the Resourceful: this player may pay this cost
     -- rather than the activation cost of a matching keyword ability.
     AlternativeActivationCost AlternativeActivationCost.AlternativeActivationCost
-  | -- | CR 118.8 / Drought: matching spells cost these additional non-mana
-    -- components to cast.
-    AddSpellCost AddSpellCost.AddSpellCost
   | -- | CR 305.2 / Exploration, Azusa Lost but Seeking: this player may play this
     -- many lands each turn OVER the one CR 305.2 normally allows.
     --

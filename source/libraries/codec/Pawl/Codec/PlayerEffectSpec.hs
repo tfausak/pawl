@@ -5,29 +5,22 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.PlayerEffect as PlayerEffect
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
-import qualified Pawl.Types.AddActivationCost as AddActivationCost
-import qualified Pawl.Types.AddSpellCost as AddSpellCost
 import qualified Pawl.Types.CantSearchLibraries as CantSearchLibraries
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.Color as Color
-import qualified Pawl.Types.CostAmount as CostAmount
-import qualified Pawl.Types.CostComponent as CostComponent
-import qualified Pawl.Types.CostScale as CostScale
+import qualified Pawl.Types.CostChange as CostChange
+import qualified Pawl.Types.CostModifier as CostModifier
+import qualified Pawl.Types.CostSubject as CostSubject
 import qualified Pawl.Types.DamagePattern as DamagePattern
-import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.InZone as InZone
-import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
-import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordDesignator as KeywordDesignator
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
-import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaFilter as ManaFilter
-import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ModifiedRoll as ModifiedRoll
 import qualified Pawl.Types.PermissionLimit as PermissionLimit
@@ -39,14 +32,10 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlotFromZone as PlotFromZone
-import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
-import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Types.RollModifier as RollModifier
-import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
 import qualified Pawl.Types.StatedFlip as StatedFlip
-import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -65,83 +54,13 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.codec
       (PlayerEffect.CantCastMoreThan 1)
       " {\"type\":\"CantCastMoreThan\",\"value\":1} "
-  -- CR 613.11 / 601.2f / Thalia.
-  Spec.it s "IncreaseSpellCost" $
+  -- CR 613.11 / 601.2f / Thalia: the tag Pawl.Codec.CostModifier's payload rides.
+  Spec.it s "ModifyCost" $
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost (Filter.Not (Filter.HasCardType CardType.Creature)) 1 Nothing))
-      " {\"type\":\"IncreaseSpellCost\",\"value\":{\"whichSpells\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"amount\":1}} "
-  -- CR 613.11 / 601.2f / 602.2b / Oppressive Rays, whose criterion is CR
-  -- 303.4b's "enchanted" and nothing else.
-  Spec.it s "IncreaseActivationCost" $
-    Common.assertCodec
-      s
-      PlayerEffect.codec
-      (PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost Filter.IsHostOfSource Nothing 3))
-      " {\"type\":\"IncreaseActivationCost\",\"value\":{\"whichAbilities\":{\"type\":\"IsHostOfSource\"},\"amount\":3}} "
-  -- CR 613.11 / 601.2f / Sapphire Medallion.
-  Spec.it s "ReduceSpellCost" $
-    Common.assertCodec
-      s
-      PlayerEffect.codec
-      (PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost (Filter.HasColor Color.Blue) (ManaCost.MkManaCost [ManaSymbol.Generic 1]) False Nothing))
-      " {\"type\":\"ReduceSpellCost\",\"value\":{\"whichSpells\":{\"type\":\"HasColor\",\"value\":{\"type\":\"Blue\"}},\"reduction\":[{\"type\":\"Generic\",\"value\":1}]}} "
-  -- The reduction that names a mana type, which the generic one above would not
-  -- catch a regression in -- Edgewalker's, so it also carries the one key CR
-  -- 101.1's coloured-mana confinement writes.
-  Spec.it s "ReduceSpellCost, naming a mana type" $
-    Common.assertCodec
-      s
-      PlayerEffect.codec
-      (PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost (Filter.HasSubtype Subtype.Cleric) (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.White), ManaSymbol.OfType (ManaType.Colored Color.Black)]) True Nothing))
-      " {\"type\":\"ReduceSpellCost\",\"value\":{\"whichSpells\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Cleric\"}},\"reduction\":[{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"White\"}}},{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Black\"}}}],\"coloredOnly\":true}} "
-  -- CR 613.11 / 601.2f / Heartstone, floor and all.
-  Spec.it s "ReduceActivationCost" $
-    Common.assertCodec
-      s
-      PlayerEffect.codec
-      (PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost (Filter.HasCardType CardType.Creature) Nothing Nothing Nothing Nothing (ManaCost.MkManaCost [ManaSymbol.Generic 1]) 1))
-      " {\"type\":\"ReduceActivationCost\",\"value\":{\"whichAbilities\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"reduction\":[{\"type\":\"Generic\",\"value\":1}],\"floor\":1}} "
-  -- Training Grounds' amount and floor, which differ from each other -- a codec
-  -- that swapped the two payloads would round-trip Heartstone's above and not
-  -- this one.
-  Spec.it s "ReduceActivationCost, Training Grounds' two" $
-    Common.assertCodec
-      s
-      PlayerEffect.codec
-      (PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost (Filter.HasCardType CardType.Creature) Nothing Nothing Nothing Nothing (ManaCost.MkManaCost [ManaSymbol.Generic 2]) 1))
-      " {\"type\":\"ReduceActivationCost\",\"value\":{\"whichAbilities\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"reduction\":[{\"type\":\"Generic\",\"value\":2}],\"floor\":1}} "
-  -- CR 613.11 / 601.2f / Brutal Suppression: the criterion, and the components
-  -- it adds spelled exactly as a Cost's own components are.
-  Spec.it s "AddActivationCost" $
-    Common.assertCodec
-      s
-      PlayerEffect.codec
-      (PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost (Filter.And [Filter.HasSubtype Subtype.Rebel, Filter.Not Filter.IsToken]) Nothing [CostComponent.Sacrifice (Sacrifice.MkSacrifice (CostAmount.Fixed 1) (Filter.HasCardType CardType.Land))] CostScale.Once))
-      " {\"type\":\"AddActivationCost\",\"value\":{\"whichAbilities\":{\"type\":\"And\",\"value\":[{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Rebel\"}},{\"type\":\"Not\",\"value\":{\"type\":\"IsToken\"}}]},\"components\":[{\"type\":\"Sacrifice\",\"value\":{\"count\":{\"type\":\"Fixed\",\"value\":1},\"whichPermanents\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}}]}} "
-  -- TWO components, so a codec that read only the first would round-trip the one
-  -- above and not this -- and an EMPTY list is a legal value the same way.
-  Spec.it s "AddActivationCost, two components" $
-    Common.assertCodec
-      s
-      PlayerEffect.codec
-      (PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost (Filter.And []) Nothing [CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.And [])), CostComponent.PayLife (CostAmount.Fixed 2)] CostScale.Once))
-      " {\"type\":\"AddActivationCost\",\"value\":{\"whichAbilities\":{\"type\":\"And\",\"value\":[]},\"components\":[{\"type\":\"DiscardCards\",\"value\":{\"count\":1,\"whichCards\":{\"type\":\"And\",\"value\":[]}}},{\"type\":\"PayLife\",\"value\":{\"type\":\"Fixed\",\"value\":2}}]}} "
-  -- CR 613.11 / 601.2f / Drought, both of its sentences: the spell-side arm, and
-  -- the scale the activation-side arm above leaves at its default.
-  Spec.it s "AddSpellCost" $
-    Common.assertCodec
-      s
-      PlayerEffect.codec
-      (PlayerEffect.AddSpellCost (AddSpellCost.MkAddSpellCost (Filter.And []) [CostComponent.Sacrifice (Sacrifice.MkSacrifice (CostAmount.Fixed 1) (Filter.HasSubtype Subtype.Swamp))] (CostScale.PerColoredSymbol Color.Black)))
-      " {\"type\":\"AddSpellCost\",\"value\":{\"whichSpells\":{\"type\":\"And\",\"value\":[]},\"components\":[{\"type\":\"Sacrifice\",\"value\":{\"count\":{\"type\":\"Fixed\",\"value\":1},\"whichPermanents\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Swamp\"}}}}],\"scale\":{\"type\":\"PerColoredSymbol\",\"value\":{\"type\":\"Black\"}}}} "
-  Spec.it s "AddActivationCost, a scale" $
-    Common.assertCodec
-      s
-      PlayerEffect.codec
-      (PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost (Filter.And []) Nothing [CostComponent.Sacrifice (Sacrifice.MkSacrifice (CostAmount.Fixed 1) (Filter.HasSubtype Subtype.Swamp))] (CostScale.PerColoredSymbol Color.Black)))
-      " {\"type\":\"AddActivationCost\",\"value\":{\"whichAbilities\":{\"type\":\"And\",\"value\":[]},\"components\":[{\"type\":\"Sacrifice\",\"value\":{\"count\":{\"type\":\"Fixed\",\"value\":1},\"whichPermanents\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Swamp\"}}}}],\"scale\":{\"type\":\"PerColoredSymbol\",\"value\":{\"type\":\"Black\"}}}} "
+      (PlayerEffect.ModifyCost (CostModifier.MkCostModifier CostSubject.Spells (Filter.Not (Filter.HasCardType CardType.Creature)) Nothing Nothing Nothing (CostChange.Increase 1)))
+      " {\"type\":\"ModifyCost\",\"value\":{\"subject\":{\"type\":\"Spells\"},\"matching\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"change\":{\"type\":\"Increase\",\"value\":1}}} "
   -- CR 305.2 / Exploration.
   Spec.it s "PlayAdditionalLands, Exploration's one" $
     Common.assertCodec

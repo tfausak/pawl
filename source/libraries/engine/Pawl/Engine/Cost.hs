@@ -2003,7 +2003,7 @@ isLoyaltyCost :: Cost Keyword.Type.Keyword -> Bool
 isLoyaltyCost cost = any isLoyaltyComponent (Cost.components cost)
 
 -- The same question in the shape a cost adjustment asks it
--- (Pawl.Types.AddActivationCost.whichLoyalty, Pawl.Types.LoyaltyKind).
+-- (Pawl.Types.ActivationCriteria.whichLoyalty, Pawl.Types.LoyaltyKind).
 --
 -- Asked of the PRINTED cost, never of the total: Carth the Lion's own addition
 -- is a loyalty component, so a reading taken after CR 601.2f folded the

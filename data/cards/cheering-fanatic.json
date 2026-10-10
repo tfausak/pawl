@@ -66,16 +66,24 @@
                             "type": "UntilEndOfTurn"
                           },
                           "effect": {
-                            "type": "ReduceSpellCost",
+                            "type": "ModifyCost",
                             "value": {
-                              "reduction": [
-                                {
-                                  "type": "Generic",
-                                  "value": 1
+                              "change": {
+                                "type": "Reduce",
+                                "value": {
+                                  "amount": [
+                                    {
+                                      "type": "Generic",
+                                      "value": 1
+                                    }
+                                  ]
                                 }
-                              ],
-                              "whichSpells": {
+                              },
+                              "matching": {
                                 "type": "HasChosenName"
+                              },
+                              "subject": {
+                                "type": "Spells"
                               }
                             }
                           },

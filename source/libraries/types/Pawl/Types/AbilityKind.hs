@@ -12,7 +12,7 @@ module Pawl.Types.AbilityKind where
 -- A TYPE and not a Bool, and read at two different scales, which is why one type
 -- serves both: Pawl.Engine.PlayerEffect.activationCostAdjustmentsGiven is told
 -- which kind the ability being adjusted IS, and
--- Pawl.Types.IncreaseActivationCost.whichKind says which kind an adjustment
+-- Pawl.Types.ActivationCriteria.whichKind says which kind an adjustment
 -- APPLIES to.
 data AbilityKind
   = -- | CR 605.1a's four criteria all met.

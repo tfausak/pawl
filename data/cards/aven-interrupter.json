@@ -38,10 +38,13 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "IncreaseSpellCost",
+            "type": "ModifyCost",
             "value": {
-              "amount": 2,
-              "whichSpells": {
+              "change": {
+                "type": "Increase",
+                "value": 2
+              },
+              "matching": {
                 "type": "Or",
                 "value": [
                   {
@@ -57,6 +60,9 @@
                     }
                   }
                 ]
+              },
+              "subject": {
+                "type": "Spells"
               }
             }
           },

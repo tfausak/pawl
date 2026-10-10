@@ -1059,13 +1059,8 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   -- written and any of the three is legitimate: Rule of Law and Thalia say
   -- AnyPlayer, Silence's stored prohibition says Opponent, and Prowling
   -- Serpopard says You.
-  PlayerEffect.IncreaseSpellCost {} -> False
-  PlayerEffect.IncreaseActivationCost {} -> False
-  PlayerEffect.ReduceSpellCost {} -> False
-  PlayerEffect.ReduceActivationCost {} -> False
-  PlayerEffect.AddActivationCost {} -> False
+  PlayerEffect.ModifyCost {} -> False
   PlayerEffect.AlternativeActivationCost {} -> False
-  PlayerEffect.AddSpellCost {} -> False
   PlayerEffect.CantCastSpells -> False
   PlayerEffect.CantActivateAbilities _ -> False
   PlayerEffect.CantCastMoreThan _ -> False
@@ -1130,13 +1125,8 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.CantBecomeMonarch -> False
   PlayerEffect.CantSetSchemesInMotion -> False
   PlayerEffect.CantAttackWithCreatures -> False
-  PlayerEffect.IncreaseSpellCost {} -> False
-  PlayerEffect.IncreaseActivationCost {} -> False
-  PlayerEffect.ReduceSpellCost {} -> False
-  PlayerEffect.ReduceActivationCost {} -> False
-  PlayerEffect.AddActivationCost {} -> False
+  PlayerEffect.ModifyCost {} -> False
   PlayerEffect.AlternativeActivationCost {} -> False
-  PlayerEffect.AddSpellCost {} -> False
   PlayerEffect.CantCastSpells -> False
   PlayerEffect.CantActivateAbilities _ -> False
   PlayerEffect.CantCastMoreThan _ -> False
