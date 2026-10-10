@@ -1132,31 +1132,33 @@ data Context = MkContext
     --
     -- Nothing wherever the atom cannot appear, which is everywhere else.
     recipient :: Maybe PlayerId.PlayerId,
-    -- The objects the surrounding resolution's slots name, for
-    -- Quantity.AgainstSlot to aim an evaluation at one (CR 608.2b keeps an
-    -- illegal slot out), and for the IsBound atom above. It rides here because
+    -- The objects the surrounding announcement's or resolution's slots name,
+    -- for Quantity.AgainstSlot to aim an evaluation at one, for Count's
+    -- OverBound fold and for the IsBound atom above. It rides here because
     -- this record is already the evaluation context every Quantity is handed,
     -- and a slot map is exactly the part of a resolution the evaluator cannot
     -- derive.
     --
     -- A SET per slot, because a slot may name several objects at once: CR
-    -- 115.10a's group binding is what Act on Impulse's "those cards" and Midnight
-    -- Tilling's "from among them" read, and the readers that can take no more
+    -- 601.2c's target slot counted past one (Command the Dreadhorde's "those
+    -- cards") and CR 115.10a's group binding (Act on Impulse's "those cards",
+    -- Midnight Tilling's "from among them"). The readers that can take no more
     -- than one ask through `slotOneObject` below rather than off this map
     -- directly. An EMPTY set never appears -- a slot naming nothing is an absent
     -- key -- so `Map.member` and "names something" are the same question.
     --
-    -- Non-empty only where the caller supplies it. Pawl.Engine.Resolve's
-    -- effectContext, Pawl.Engine.Event.Trigger.interveningHolds (CR 603.4's
-    -- intervening-"if"), Pawl.Engine.Stack (CR 608.2a's re-check of that same
-    -- clause) and Pawl.Engine.Replacement.candidateContext are the producers --
-    -- the last of them off the snapshot ActiveReplacement.slots holds, the
-    -- resolution that installed the row being over -- and all four go through
-    -- contextWithSlots below. Pawl.Engine.Cost's candidate pools are a fifth
-    -- producer, off the announced stack object's bindings (Cost.announcedSlots):
-    -- CR 601.2c chooses the targets before CR 601.2h pays. A sixth is
-    -- Pawl.Engine.Event.Match.matchesTriggerGiven, off a delayed ability's
-    -- captured environment (CR 603.7c).
+    -- Pawl.Engine.Binding.objectsBySlot decides what each slot names, and
+    -- Pawl.Engine.Projection.framedBySlots fills this field with every field
+    -- derived from it, for a target slot's filter (Pawl.Engine.Target), a
+    -- resolution's positions (Pawl.Engine.Resolve.Slots.effectContext) and CR
+    -- 603.4's two intervening-"if" checks. Four producers fill this field
+    -- alone: Pawl.Engine.Replacement.candidateContext, off the snapshot
+    -- ActiveReplacement.slots holds, the resolution that installed the row
+    -- being over; Pawl.Engine.Cost's candidate pools, off the announced stack
+    -- object's bindings (Cost.announcedSlots), CR 601.2c choosing the targets
+    -- before CR 601.2h pays; Pawl.Engine.Event.Match.matchesTriggerGiven, off a
+    -- delayed ability's captured environment (CR 603.7c); and
+    -- Pawl.Engine.Mana's priced count, off a payment's slots.
     --
     -- Outside those, contextFor leaves it empty, and every atom that reads it
     -- (IsBound, SameNameAsBound, IsControllerOfBound, Quantity.AgainstSlot) is then vacuously False or Nothing rather than
@@ -1209,12 +1211,10 @@ data Context = MkContext
     -- slots hold, for the one atom that compares a candidate's against them
     -- (SameNameAsBound, Harness the Storm). Supplied by the caller for
     -- sourcePower's reason -- this module holds no game state and cannot read an
-    -- object's names -- and by two callers: Pawl.Engine.Target.admittedGiven,
-    -- where a target slot's Filter is matched, and
-    -- Pawl.Engine.Resolve.Slots.effectContext, which is what every one of a
-    -- resolution's positions goes through (Bifurcate's search filter, Hour of
-    -- Glory's hand sweep, Grim Reminder's life loss amount, an attach
-    -- destination).
+    -- object's names -- through Pawl.Engine.Projection.framedBySlots, where a
+    -- target slot's Filter is matched and where every one of a resolution's
+    -- positions is (Bifurcate's search filter, Hour of Glory's hand sweep, Grim
+    -- Reminder's life loss amount, an attach destination).
     --
     -- Separate from `slotObjects` above rather than derived from it, and that is
     -- the same division sourcePower makes against `source`: an id is not a name
@@ -1224,7 +1224,7 @@ data Context = MkContext
     -- object, and no filter that omits the atom ever forces it.
     --
     -- EMPTY in contextFor and contextWithSlots below, so the atom is vacuously
-    -- False in a position neither of the two callers above builds. Which
+    -- False in a position framedBySlots does not frame. Which
     -- direction an unfilled read takes is the ATOM's choice rather than a rule
     -- this record imposes: the arm in `matches` below decides it, and
     -- slotControllers' SameControllerAsBound chooses True where this one chooses
@@ -1237,10 +1237,9 @@ data Context = MkContext
     -- CR 110.2: the CONTROLLERS of the objects the surrounding announcement's
     -- slots hold, for the one atom that compares a candidate's against them
     -- (SameControllerAsBound, Bioshift). `slotNames` above in every respect --
-    -- supplied by the caller that matches a target slot's Filter
-    -- (Pawl.Engine.Target.slotContext) and by a resolution's
-    -- (Pawl.Engine.Resolve.Slots.effectContext, Glamer Spinners' attach
-    -- destination), separate from `slotObjects` because an id
+    -- filled by Pawl.Engine.Projection.framedBySlots for a target slot's Filter
+    -- and a resolution's positions (Glamer Spinners' attach destination),
+    -- separate from `slotObjects` because an id
     -- is not a controller until a board has been asked, lazy so that a filter
     -- omitting the atom never forces the projection, and read through CR 608.2h's
     -- last-known reader so a bound object that has left is still answerable.
@@ -1267,11 +1266,11 @@ data Context = MkContext
     -- field's reason: an id is neither a host nor a controller until a board has
     -- been asked.
     --
-    -- `slotCreatureTypes` below in every other respect: lazy, filled by the one
-    -- caller Pawl.Engine.Resolve.Slots.effectContext, empty elsewhere where the
-    -- atom is a silent False, and Pawl.FilterPositionLintSpec's "CR 110.2 no
-    -- card asks SameControllerAsHostOfBound outside a resolution's own
-    -- positions" to keep a card out of those.
+    -- `slotCreatureTypes` below in every other respect: lazy, filled by
+    -- Pawl.Engine.Projection.framedBySlots, empty elsewhere where the atom is a
+    -- silent False, and Pawl.FilterPositionLintSpec's "CR 110.2 no card asks
+    -- SameControllerAsHostOfBound outside a resolution's own positions" to keep
+    -- a card to the position the pool exercises.
     --
     -- Read LIVE rather than through CR 608.2h's last-known reader, which is the
     -- one place it parts from its neighbours: the bound object's HOST is a
@@ -1306,8 +1305,8 @@ data Context = MkContext
     -- SharesCreatureTypeWithBound -- Heirloom Blade's "shares a creature type
     -- with it", through Binding.triggerSource a kinship card's "with this
     -- creature", and a sibling target slot's (Unbury). Filled by
-    -- Pawl.Engine.Resolve.Slots.effectContext and Pawl.Engine.Target.slotContext;
-    -- empty elsewhere, where the atom widens, and
+    -- Pawl.Engine.Projection.framedBySlots; empty elsewhere, where the atom
+    -- widens, and
     -- Pawl.FilterPositionLintSpec's "CR 205.3m no card asks
     -- SharesCreatureTypeWithBound outside a resolution's own positions or a
     -- target slot" keeps a card out of those.
@@ -1315,25 +1314,20 @@ data Context = MkContext
     -- CR 208.1: the TOUGHNESS of the object a resolution's slot holds, for the one
     -- atom that compares a candidate's against it (ToughnessLessThanBound --
     -- Profaner of the Dead's "the exploited creature's toughness").
-    -- `slotCreatureTypes` above in every respect but one -- the same single filler
-    -- (Pawl.Engine.Resolve.Slots.effectContext), the same CR 608.2h last-known
+    -- `slotCreatureTypes` above in every respect but one -- the same filler
+    -- (Pawl.Engine.Projection.framedBySlots), the same CR 608.2h last-known
     -- reader so the sacrificed creature is still answerable, the same laziness, the
     -- same vacuous False elsewhere, and Pawl.FilterPositionLintSpec's "CR 208.1 no
     -- card asks ToughnessLessThanBound outside a resolution's own positions" to keep
-    -- a card out of those positions.
+    -- a card to the position the pool exercises.
     --
     -- ONE number per slot rather than a set, and a slot naming several objects has
     -- no key at all: CR 115.10a's group binding is read by "those cards" payloads,
     -- and no printed comparison asks a group for a single toughness.
     slotToughnesses :: Map.Map SlotName.SlotName Integer,
     -- CR 601.2c / 603.2: the PLAYERS the surrounding resolution's slots name --
-    -- `slotObjects` above's player half, filled from the same map by the same
-    -- caller (Pawl.Engine.Resolve.Slots.effectContext), by
-    -- Pawl.Engine.Target.slotContext, and off a trigger's own bindings by CR
-    -- 603.4's two intervening-"if" checks (Pawl.Engine.Event.Trigger.interveningHolds
-    -- and CR 608.2a's re-check, Pawl.Engine.Stack.interveningStillHolds), which fill
-    -- it together for the reason they share a view: the two must not disagree about
-    -- what a slot names.
+    -- `slotObjects` above's player half (Pawl.Engine.Binding.playersBySlot),
+    -- filled beside it by Pawl.Engine.Projection.framedBySlots.
     --
     -- A replacement's CONDITION leaves it empty: Pawl.Types.ActiveReplacement
     -- captures only the object half of the installing resolution's slots. Its
