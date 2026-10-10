@@ -13,6 +13,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CostAmount as CostAmount
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CostScale as CostScale
 import qualified Pawl.Types.DamagePattern as DamagePattern
@@ -117,30 +118,30 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost (Filter.And [Filter.HasSubtype Subtype.Rebel, Filter.Not Filter.IsToken]) Nothing [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.HasCardType CardType.Land))] CostScale.Once))
-      " {\"type\":\"AddActivationCost\",\"value\":{\"whichAbilities\":{\"type\":\"And\",\"value\":[{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Rebel\"}},{\"type\":\"Not\",\"value\":{\"type\":\"IsToken\"}}]},\"components\":[{\"type\":\"Sacrifice\",\"value\":{\"count\":1,\"whichPermanents\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}}]}} "
+      (PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost (Filter.And [Filter.HasSubtype Subtype.Rebel, Filter.Not Filter.IsToken]) Nothing [CostComponent.Sacrifice (Sacrifice.MkSacrifice (CostAmount.Fixed 1) (Filter.HasCardType CardType.Land))] CostScale.Once))
+      " {\"type\":\"AddActivationCost\",\"value\":{\"whichAbilities\":{\"type\":\"And\",\"value\":[{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Rebel\"}},{\"type\":\"Not\",\"value\":{\"type\":\"IsToken\"}}]},\"components\":[{\"type\":\"Sacrifice\",\"value\":{\"count\":{\"type\":\"Fixed\",\"value\":1},\"whichPermanents\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}}]}} "
   -- TWO components, so a codec that read only the first would round-trip the one
   -- above and not this -- and an EMPTY list is a legal value the same way.
   Spec.it s "AddActivationCost, two components" $
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost (Filter.And []) Nothing [CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.And [])), CostComponent.PayLife 2] CostScale.Once))
-      " {\"type\":\"AddActivationCost\",\"value\":{\"whichAbilities\":{\"type\":\"And\",\"value\":[]},\"components\":[{\"type\":\"DiscardCards\",\"value\":{\"count\":1,\"whichCards\":{\"type\":\"And\",\"value\":[]}}},{\"type\":\"PayLife\",\"value\":2}]}} "
+      (PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost (Filter.And []) Nothing [CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.And [])), CostComponent.PayLife (CostAmount.Fixed 2)] CostScale.Once))
+      " {\"type\":\"AddActivationCost\",\"value\":{\"whichAbilities\":{\"type\":\"And\",\"value\":[]},\"components\":[{\"type\":\"DiscardCards\",\"value\":{\"count\":1,\"whichCards\":{\"type\":\"And\",\"value\":[]}}},{\"type\":\"PayLife\",\"value\":{\"type\":\"Fixed\",\"value\":2}}]}} "
   -- CR 613.11 / 601.2f / Drought, both of its sentences: the spell-side arm, and
   -- the scale the activation-side arm above leaves at its default.
   Spec.it s "AddSpellCost" $
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.AddSpellCost (AddSpellCost.MkAddSpellCost (Filter.And []) [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.HasSubtype Subtype.Swamp))] (CostScale.PerColoredSymbol Color.Black)))
-      " {\"type\":\"AddSpellCost\",\"value\":{\"whichSpells\":{\"type\":\"And\",\"value\":[]},\"components\":[{\"type\":\"Sacrifice\",\"value\":{\"count\":1,\"whichPermanents\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Swamp\"}}}}],\"scale\":{\"type\":\"PerColoredSymbol\",\"value\":{\"type\":\"Black\"}}}} "
+      (PlayerEffect.AddSpellCost (AddSpellCost.MkAddSpellCost (Filter.And []) [CostComponent.Sacrifice (Sacrifice.MkSacrifice (CostAmount.Fixed 1) (Filter.HasSubtype Subtype.Swamp))] (CostScale.PerColoredSymbol Color.Black)))
+      " {\"type\":\"AddSpellCost\",\"value\":{\"whichSpells\":{\"type\":\"And\",\"value\":[]},\"components\":[{\"type\":\"Sacrifice\",\"value\":{\"count\":{\"type\":\"Fixed\",\"value\":1},\"whichPermanents\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Swamp\"}}}}],\"scale\":{\"type\":\"PerColoredSymbol\",\"value\":{\"type\":\"Black\"}}}} "
   Spec.it s "AddActivationCost, a scale" $
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost (Filter.And []) Nothing [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.HasSubtype Subtype.Swamp))] (CostScale.PerColoredSymbol Color.Black)))
-      " {\"type\":\"AddActivationCost\",\"value\":{\"whichAbilities\":{\"type\":\"And\",\"value\":[]},\"components\":[{\"type\":\"Sacrifice\",\"value\":{\"count\":1,\"whichPermanents\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Swamp\"}}}}],\"scale\":{\"type\":\"PerColoredSymbol\",\"value\":{\"type\":\"Black\"}}}} "
+      (PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost (Filter.And []) Nothing [CostComponent.Sacrifice (Sacrifice.MkSacrifice (CostAmount.Fixed 1) (Filter.HasSubtype Subtype.Swamp))] (CostScale.PerColoredSymbol Color.Black)))
+      " {\"type\":\"AddActivationCost\",\"value\":{\"whichAbilities\":{\"type\":\"And\",\"value\":[]},\"components\":[{\"type\":\"Sacrifice\",\"value\":{\"count\":{\"type\":\"Fixed\",\"value\":1},\"whichPermanents\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Swamp\"}}}}],\"scale\":{\"type\":\"PerColoredSymbol\",\"value\":{\"type\":\"Black\"}}}} "
   -- CR 305.2 / Exploration.
   Spec.it s "PlayAdditionalLands, Exploration's one" $
     Common.assertCodec

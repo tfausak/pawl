@@ -396,6 +396,8 @@ library codec
     Pawl.Codec.CopyTargets
     Pawl.Codec.CopyTargetsSpec
     Pawl.Codec.Cost
+    Pawl.Codec.CostAmount
+    Pawl.Codec.CostAmountSpec
     Pawl.Codec.CostBasis
     Pawl.Codec.CostBasisSpec
     Pawl.Codec.CostChoice
@@ -2162,6 +2164,7 @@ library types
     Pawl.Types.CopyTargets
     Pawl.Types.Cost
     Pawl.Types.CostAdjustments
+    Pawl.Types.CostAmount
     Pawl.Types.CostBasis
     Pawl.Types.CostChoice
     Pawl.Types.CostComponent

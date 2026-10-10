@@ -6,23 +6,28 @@
           "cost": {
             "components": [
               {
-                "type": "SacrificeX",
+                "type": "Sacrifice",
                 "value": {
-                  "type": "And",
-                  "value": [
-                    {
-                      "type": "HasSubtype",
-                      "value": {
-                        "type": "Treasure"
+                  "count": {
+                    "type": "AnnouncedX"
+                  },
+                  "whichPermanents": {
+                    "type": "And",
+                    "value": [
+                      {
+                        "type": "HasSubtype",
+                        "value": {
+                          "type": "Treasure"
+                        }
+                      },
+                      {
+                        "type": "ControlledBy",
+                        "value": {
+                          "type": "You"
+                        }
                       }
-                    },
-                    {
-                      "type": "ControlledBy",
-                      "value": {
-                        "type": "You"
-                      }
-                    }
-                  ]
+                    ]
+                  }
                 }
               }
             ],

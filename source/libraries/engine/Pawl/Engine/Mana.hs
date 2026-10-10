@@ -48,6 +48,7 @@ import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CostAmount as CostAmount
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.ExileLink as ExileLink
@@ -526,7 +527,7 @@ manaSuppliesGiven capacity pcs pid oid gs =
             -- The slot each one-object removal of the cost binds its object
             -- under (Pawl.Engine.Cost.payComponent's arms).
             removalSlot component = case component of
-              CostComponent.Sacrifice sacrifice | Sacrifice.count sacrifice == 1 -> Just Binding.sacrificedPermanent
+              CostComponent.Sacrifice sacrifice | Sacrifice.count sacrifice == CostAmount.Fixed 1 -> Just Binding.sacrificedPermanent
               CostComponent.ExilePermanents exiled | ExilePermanents.count exiled == 1 -> Just Binding.exiledPermanent
               _ -> Nothing
             onBattlefield = filter ((==) (ClaimAxis.Removal Zone.Battlefield) . Claim.Type.axis) (Activations.claims activations)

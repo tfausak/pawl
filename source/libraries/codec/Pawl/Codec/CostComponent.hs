@@ -2,6 +2,7 @@ module Pawl.Codec.CostComponent where
 
 import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.Behold as Behold
+import qualified Pawl.Codec.CostAmount as CostAmount
 import qualified Pawl.Codec.CountersFromPermanents as CountersFromPermanents
 import qualified Pawl.Codec.CountersFromThis as CountersFromThis
 import qualified Pawl.Codec.DiscardCards as DiscardCards
@@ -37,11 +38,9 @@ codec keywordCodec =
       Arm.nullary "UntapThis" CostComponent.UntapThis,
       Arm.nullary "SacrificeThis" CostComponent.SacrificeThis,
       Arm.nullary "ReturnThis" CostComponent.ReturnThis,
-      Arm.payload "PayLife" Common.natural CostComponent.PayLife (\x -> case x of CostComponent.PayLife y -> Just y; _ -> Nothing),
-      Arm.nullary "PayLifeX" CostComponent.PayLifeX,
+      Arm.payload "PayLife" CostAmount.codec CostComponent.PayLife (\x -> case x of CostComponent.PayLife y -> Just y; _ -> Nothing),
       Arm.payload "PayHalfLife" Rounding.codec CostComponent.PayHalfLife (\x -> case x of CostComponent.PayHalfLife y -> Just y; _ -> Nothing),
       Arm.payload "Sacrifice" (Sacrifice.codec keywordCodec) CostComponent.Sacrifice (\x -> case x of CostComponent.Sacrifice y -> Just y; _ -> Nothing),
-      Arm.payload "SacrificeX" (Filter.codec keywordCodec) CostComponent.SacrificeX (\x -> case x of CostComponent.SacrificeX y -> Just y; _ -> Nothing),
       Arm.payload "TapForTotalPower" (TapForTotalPower.codec keywordCodec) CostComponent.TapForTotalPower (\x -> case x of CostComponent.TapForTotalPower y -> Just y; _ -> Nothing),
       Arm.payload "TapPermanents" (TapPermanents.codec keywordCodec) CostComponent.TapPermanents (\x -> case x of CostComponent.TapPermanents y -> Just y; _ -> Nothing),
       Arm.payload "ReturnPermanents" (ReturnPermanents.codec keywordCodec) CostComponent.ReturnPermanents (\x -> case x of CostComponent.ReturnPermanents y -> Just y; _ -> Nothing),
@@ -58,17 +57,13 @@ codec keywordCodec =
       -- -- a round trip cannot, the wire having one spelling for both causes.
       Arm.nullary "DiscardThis" (CostComponent.DiscardThis DiscardCause.Ordinary),
       Arm.payload "PutCardFromHandOntoBattlefield" (Filter.codec keywordCodec) CostComponent.PutCardFromHandOntoBattlefield (\x -> case x of CostComponent.PutCardFromHandOntoBattlefield y -> Just y; _ -> Nothing),
-      Arm.payload "PayEnergy" Common.natural CostComponent.PayEnergy (\x -> case x of CostComponent.PayEnergy y -> Just y; _ -> Nothing),
-      Arm.nullary "PayEnergyX" CostComponent.PayEnergyX,
+      Arm.payload "PayEnergy" CostAmount.codec CostComponent.PayEnergy (\x -> case x of CostComponent.PayEnergy y -> Just y; _ -> Nothing),
       Arm.payload "AddLoyaltyToThis" Common.natural CostComponent.AddLoyaltyToThis (\x -> case x of CostComponent.AddLoyaltyToThis y -> Just y; _ -> Nothing),
-      Arm.payload "RemoveLoyaltyFromThis" Common.natural CostComponent.RemoveLoyaltyFromThis (\x -> case x of CostComponent.RemoveLoyaltyFromThis y -> Just y; _ -> Nothing),
-      Arm.nullary "RemoveLoyaltyFromThisX" CostComponent.RemoveLoyaltyFromThisX,
+      Arm.payload "RemoveLoyaltyFromThis" CostAmount.codec CostComponent.RemoveLoyaltyFromThis (\x -> case x of CostComponent.RemoveLoyaltyFromThis y -> Just y; _ -> Nothing),
       Arm.payload "RemoveCountersFromThis" (CountersFromThis.codec keywordCodec) CostComponent.RemoveCountersFromThis (\x -> case x of CostComponent.RemoveCountersFromThis y -> Just y; _ -> Nothing),
       Arm.payload "RemoveCounters" (CountersFromPermanents.codec keywordCodec) CostComponent.RemoveCounters (\x -> case x of CostComponent.RemoveCounters y -> Just y; _ -> Nothing),
-      Arm.payload "RemovePlusOneCountersX" (Filter.codec keywordCodec) CostComponent.RemovePlusOneCountersX (\x -> case x of CostComponent.RemovePlusOneCountersX y -> Just y; _ -> Nothing),
       Arm.payload "PutPlusOneCountersOnThis" Common.natural CostComponent.PutPlusOneCountersOnThis (\x -> case x of CostComponent.PutPlusOneCountersOnThis y -> Just y; _ -> Nothing),
-      Arm.payload "Blight" Common.natural CostComponent.Blight (\x -> case x of CostComponent.Blight y -> Just y; _ -> Nothing),
-      Arm.nullary "BlightX" CostComponent.BlightX,
+      Arm.payload "Blight" CostAmount.codec CostComponent.Blight (\x -> case x of CostComponent.Blight y -> Just y; _ -> Nothing),
       Arm.nullary "Forage" CostComponent.Forage,
       Arm.nullary "FlipCoin" CostComponent.FlipCoin,
       Arm.nullary "ExileThisFromGraveyard" CostComponent.ExileThisFromGraveyard,
@@ -85,8 +80,7 @@ codec keywordCodec =
       Arm.payload "MillCards" Common.natural CostComponent.MillCards (\x -> case x of CostComponent.MillCards y -> Just y; _ -> Nothing),
       Arm.payload "RevealTopOfLibrary" Common.natural CostComponent.RevealTopOfLibrary (\x -> case x of CostComponent.RevealTopOfLibrary y -> Just y; _ -> Nothing),
       Arm.nullary "ChooseOpponent" CostComponent.ChooseOpponent,
-      Arm.payload "Waterbend" Common.natural CostComponent.Waterbend (\x -> case x of CostComponent.Waterbend y -> Just y; _ -> Nothing),
-      Arm.nullary "WaterbendX" CostComponent.WaterbendX,
+      Arm.payload "Waterbend" CostAmount.codec CostComponent.Waterbend (\x -> case x of CostComponent.Waterbend y -> Just y; _ -> Nothing),
       Arm.payload "WaterbendInstead" Common.natural CostComponent.WaterbendInstead (\x -> case x of CostComponent.WaterbendInstead y -> Just y; _ -> Nothing)
     ]
 
@@ -97,10 +91,8 @@ tagOf x = case x of
   CostComponent.SacrificeThis {} -> "SacrificeThis"
   CostComponent.ReturnThis {} -> "ReturnThis"
   CostComponent.PayLife {} -> "PayLife"
-  CostComponent.PayLifeX {} -> "PayLifeX"
   CostComponent.PayHalfLife {} -> "PayHalfLife"
   CostComponent.Sacrifice {} -> "Sacrifice"
-  CostComponent.SacrificeX {} -> "SacrificeX"
   CostComponent.TapForTotalPower {} -> "TapForTotalPower"
   CostComponent.TapPermanents {} -> "TapPermanents"
   CostComponent.ReturnPermanents {} -> "ReturnPermanents"
@@ -109,16 +101,12 @@ tagOf x = case x of
   CostComponent.DiscardThis {} -> "DiscardThis"
   CostComponent.PutCardFromHandOntoBattlefield {} -> "PutCardFromHandOntoBattlefield"
   CostComponent.PayEnergy {} -> "PayEnergy"
-  CostComponent.PayEnergyX {} -> "PayEnergyX"
   CostComponent.AddLoyaltyToThis {} -> "AddLoyaltyToThis"
   CostComponent.RemoveLoyaltyFromThis {} -> "RemoveLoyaltyFromThis"
-  CostComponent.RemoveLoyaltyFromThisX {} -> "RemoveLoyaltyFromThisX"
   CostComponent.RemoveCountersFromThis {} -> "RemoveCountersFromThis"
   CostComponent.RemoveCounters {} -> "RemoveCounters"
-  CostComponent.RemovePlusOneCountersX {} -> "RemovePlusOneCountersX"
   CostComponent.PutPlusOneCountersOnThis {} -> "PutPlusOneCountersOnThis"
   CostComponent.Blight {} -> "Blight"
-  CostComponent.BlightX {} -> "BlightX"
   CostComponent.Forage {} -> "Forage"
   CostComponent.FlipCoin {} -> "FlipCoin"
   CostComponent.ExileThisFromGraveyard {} -> "ExileThisFromGraveyard"
@@ -136,5 +124,4 @@ tagOf x = case x of
   CostComponent.RevealTopOfLibrary {} -> "RevealTopOfLibrary"
   CostComponent.ChooseOpponent {} -> "ChooseOpponent"
   CostComponent.Waterbend {} -> "Waterbend"
-  CostComponent.WaterbendX {} -> "WaterbendX"
   CostComponent.WaterbendInstead {} -> "WaterbendInstead"

@@ -76,7 +76,10 @@
                       {
                         "type": "Sacrifice",
                         "value": {
-                          "count": 1,
+                          "count": {
+                            "type": "Fixed",
+                            "value": 1
+                          },
                           "whichPermanents": {
                             "type": "And",
                             "value": [

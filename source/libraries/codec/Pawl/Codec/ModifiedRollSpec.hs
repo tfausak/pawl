@@ -4,6 +4,7 @@ import qualified Pawl.Codec.ModifiedRoll as ModifiedRoll
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CostAmount as CostAmount
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -79,8 +80,8 @@ spec s = Spec.describe s "Pawl.Codec.ModifiedRoll" $ do
         { ModifiedRoll.sides = Nothing,
           ModifiedRoll.natural = Nothing,
           ModifiedRoll.modifier = RollModifier.IncreaseOrDecrease 1,
-          ModifiedRoll.cost = Just Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost []), Cost.components = [CostComponent.PayLife 1]},
+          ModifiedRoll.cost = Just Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost []), Cost.components = [CostComponent.PayLife (CostAmount.Fixed 1)]},
           ModifiedRoll.limit = PermissionLimit.OnceEachTurn
         }
-      " {\"modifier\":{\"type\":\"IncreaseOrDecrease\",\"value\":1},\"cost\":{\"mana\":[],\"components\":[{\"type\":\"PayLife\",\"value\":1}]},\"limit\":{\"type\":\"OnceEachTurn\"}} "
+      " {\"modifier\":{\"type\":\"IncreaseOrDecrease\",\"value\":1},\"cost\":{\"mana\":[],\"components\":[{\"type\":\"PayLife\",\"value\":{\"type\":\"Fixed\",\"value\":1}}]},\"limit\":{\"type\":\"OnceEachTurn\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ModifiedRoll.codec

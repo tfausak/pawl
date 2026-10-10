@@ -441,9 +441,9 @@ payableCost modes extra spending pid oid gs cost = any (\x -> payableCostAt mode
 -- creature sacrificed this way" makes its least X its dearest -- so every X up
 -- to the first whose COMPONENTS alone cannot be paid. That climb is monotone
 -- for Cost.greatestPayableX's reason, and it stops when a component's demand
--- grows with X (Cost.componentDemandGrowsWithX, SacrificeX's past the matching
--- permanents) or at CR 101.1's ceiling. A cost with neither keeps the least X,
--- the only value the climb could not overrun.
+-- grows with X (Cost.componentDemandGrowsWithX, an announced sacrifice's past
+-- the matching permanents) or at CR 101.1's ceiling. A cost with neither keeps
+-- the least X, the only value the climb could not overrun.
 gateXs :: PlayerId -> ObjectId -> GameState -> Cost Keyword -> [Natural]
 gateXs pid oid gs cost =
   let least = maybe 0 Face.minimumX (Game.faceOf oid gs)
@@ -644,25 +644,24 @@ castAimable key announced x pid oid gs = case Game.faceOf oid gs of
 --     generic mana, which carries no colour, so the count is the same at every
 --     X too.
 --
---   * as LIFE (Cost.substituteXInComponent, a CostComponent.PayLifeX becoming a
---     PayLife). CR 119.4's floor is Event.canPayLife's >= against a life total X
---     cannot move either, so the same argument runs a second time. Hatred is the
---     card whose X reaches a cost only this way.
---
---   * as ENERGY (Cost.substituteXInComponent again, a CostComponent.PayEnergyX
---     becoming a PayEnergy). CR 118.3's >= against a counter total X cannot
---     move, so the life argument runs verbatim. Sphinx of the Revelation is the
---     card whose X reaches a cost only this way, and it does so from an
---     ACTIVATION cost, which is Activatable.affordableX's climb rather than this
---     one; the monotonicity argument is shared because substituteXInComponent
---     is.
---
---   * as a BLIGHT (Cost.substituteXInComponent again, a CostComponent.BlightX
---     becoming a Blight). Monotone VACUOUSLY, CR 701.68b refusing a blight only
---     where the player controls no creature and naming no number of counters
---     that is too many -- so this route never fails and the climb needs
---     `mCeiling` below to stop. Soul Immolation is the card whose X reaches a
+--   * as LIFE (Cost.substituteX, a CostComponent.PayLife's
+--     CostAmount.AnnouncedX becoming a fixed amount). CR 119.4's floor is
+--     Event.canPayLife's >= against a life total X cannot move either, so the
+--     same argument runs a second time. Hatred is the card whose X reaches a
 --     cost only this way.
+--
+--   * as ENERGY (Cost.substituteX again, over a CostComponent.PayEnergy). CR
+--     118.3's >= against a counter total X cannot move, so the life argument
+--     runs verbatim. Sphinx of the Revelation is the card whose X reaches a
+--     cost only this way, and it does so from an ACTIVATION cost, which is
+--     Activatable.affordableX's climb rather than this one; the monotonicity
+--     argument is shared because Cost.substituteX is.
+--
+--   * as a BLIGHT (Cost.substituteX again, over a CostComponent.Blight).
+--     Monotone VACUOUSLY, CR 701.68b refusing a blight only where the player
+--     controls no creature and naming no number of counters that is too many
+--     -- so this route never fails and the climb needs `mCeiling` below to
+--     stop. Soul Immolation is the card whose X reaches a cost only this way.
 --
 -- `mCeiling` is CR 101.1's, evaluated off the face being cast (Cost.maximumX)
 -- and passed straight through: it bounds the search as well as the

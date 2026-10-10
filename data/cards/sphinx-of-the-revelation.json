@@ -9,7 +9,10 @@
                 "type": "TapThis"
               },
               {
-                "type": "PayEnergyX"
+                "type": "PayEnergy",
+                "value": {
+                  "type": "AnnouncedX"
+                }
               }
             ],
             "mana": [

@@ -5,6 +5,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AddSpellCost as AddSpellCost
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CostAmount as CostAmount
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CostScale as CostScale
 import qualified Pawl.Types.Filter as Filter
@@ -21,11 +22,11 @@ spec s = Spec.describe s "Pawl.Codec.AddSpellCost" $ do
       AddSpellCost.codec
       ( AddSpellCost.MkAddSpellCost
           { AddSpellCost.whichSpells = Filter.And [],
-            AddSpellCost.components = [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.HasSubtype Subtype.Swamp))],
+            AddSpellCost.components = [CostComponent.Sacrifice (Sacrifice.MkSacrifice (CostAmount.Fixed 1) (Filter.HasSubtype Subtype.Swamp))],
             AddSpellCost.scale = CostScale.PerColoredSymbol Color.Black
           }
       )
-      " {\"whichSpells\":{\"type\":\"And\",\"value\":[]},\"components\":[{\"type\":\"Sacrifice\",\"value\":{\"count\":1,\"whichPermanents\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Swamp\"}}}}],\"scale\":{\"type\":\"PerColoredSymbol\",\"value\":{\"type\":\"Black\"}}} "
+      " {\"whichSpells\":{\"type\":\"And\",\"value\":[]},\"components\":[{\"type\":\"Sacrifice\",\"value\":{\"count\":{\"type\":\"Fixed\",\"value\":1},\"whichPermanents\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Swamp\"}}}}],\"scale\":{\"type\":\"PerColoredSymbol\",\"value\":{\"type\":\"Black\"}}} "
   -- The pair the defaulted key needs: an absent @scale@ IS Once, and encoding
   -- Once writes no key.
   Spec.it s "MkAddSpellCost, an absent scale is Once" $
@@ -34,9 +35,9 @@ spec s = Spec.describe s "Pawl.Codec.AddSpellCost" $ do
       AddSpellCost.codec
       ( AddSpellCost.MkAddSpellCost
           { AddSpellCost.whichSpells = Filter.And [],
-            AddSpellCost.components = [CostComponent.PayLife 2],
+            AddSpellCost.components = [CostComponent.PayLife (CostAmount.Fixed 2)],
             AddSpellCost.scale = CostScale.Once
           }
       )
-      " {\"whichSpells\":{\"type\":\"And\",\"value\":[]},\"components\":[{\"type\":\"PayLife\",\"value\":2}]} "
+      " {\"whichSpells\":{\"type\":\"And\",\"value\":[]},\"components\":[{\"type\":\"PayLife\",\"value\":{\"type\":\"Fixed\",\"value\":2}}]} "
   Spec.it s "has a schema" $ Common.assertHasSchema s AddSpellCost.codec
