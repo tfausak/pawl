@@ -20,6 +20,7 @@ module Pawl.Engine.Interchangeable.Mentions where
 import qualified Data.Map.Strict as Map
 import qualified Pawl.Engine.Binding as Binding.Engine
 import qualified Pawl.Types.AbilityAddsMana as AbilityAddsMana
+import qualified Pawl.Types.ActingPermanent as ActingPermanent
 import qualified Pawl.Types.ActivateManaAbilities as ActivateManaAbilities
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationCriteria as ActivationCriteria
@@ -252,6 +253,7 @@ import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PendingDamageEffect as PendingDamageEffect
 import qualified Pawl.Types.PendingEntryEffect as PendingEntryEffect
 import qualified Pawl.Types.PerCreature as PerCreature
+import qualified Pawl.Types.PermanentActed as PermanentActed
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentCandidate as PermanentCandidate
 import qualified Pawl.Types.PermanentDealsCombatDamageToPlayer as PermanentDealsCombatDamageToPlayer
@@ -1135,6 +1137,15 @@ devotionNames asking x = case x of
 devourNames :: Asking -> Devour.Devour keyword -> Bool
 devourNames asking x = case x of
   Devour.MkDevour quality _count -> any (filterNames asking) quality
+
+permanentActedNames :: Asking -> (permanent -> Bool) -> PermanentActed.PermanentActed permanent -> Bool
+permanentActedNames _asking onPermanent x = case x of
+  PermanentActed.MkPermanentActed _action permanent -> onPermanent permanent
+
+actingPermanentNames :: Asking -> ActingPermanent.ActingPermanent -> Bool
+actingPermanentNames asking x = case x of
+  ActingPermanent.Self -> False
+  ActingPermanent.Matching filter_ -> filterNames asking filter_
 
 dieResultNames :: Asking -> (player -> Bool) -> DieResult.DieResult player -> Bool
 dieResultNames _asking onPlayer x = case x of
@@ -2773,13 +2784,10 @@ triggerConditionNames asking x = case x of
   TriggerCondition.SelfTransformedInto _cardName -> False
   TriggerCondition.PermanentTransforms filter_ -> filterNames asking filter_
   TriggerCondition.PermanentTurnedFaceUp filter_ -> filterNames asking filter_
-  TriggerCondition.PermanentTurnedFaceDown filter_ -> filterNames asking filter_
   TriggerCondition.FaceDownPermanentLeavesRevealed -> False
   TriggerCondition.PermanentBecomesDesignated permanentBecomesDesignated -> permanentBecomesDesignatedNames asking permanentBecomesDesignated
-  TriggerCondition.SelfEvolves -> False
-  TriggerCondition.SelfMutates -> False
+  TriggerCondition.PermanentActs permanentActs -> permanentActedNames asking (actingPermanentNames asking) permanentActs
   TriggerCondition.AttachedCreatureMentors -> False
-  TriggerCondition.SelfTrains -> False
   TriggerCondition.SelfExploits -> False
   TriggerCondition.CreatureExploits creatureExploits -> creatureExploitsNames asking creatureExploits
   TriggerCondition.SelfBecomesCrewed _triggerFrequency -> False
@@ -2803,9 +2811,6 @@ triggerConditionNames asking x = case x of
   TriggerCondition.PlayerWinsCoinFlip _playerRelation -> False
   TriggerCondition.PlayerLosesCoinFlip _playerRelation -> False
   TriggerCondition.SelfBecomesPlotted -> False
-  TriggerCondition.PermanentExplores filter_ -> filterNames asking filter_
-  TriggerCondition.PermanentConnives filter_ -> filterNames asking filter_
-  TriggerCondition.SelfExerted -> False
   TriggerCondition.SelfBecomesAttachedBy filter_ -> filterNames asking filter_
   TriggerCondition.SelfBecomesAttachedTo filter_ -> filterNames asking filter_
   TriggerCondition.SelfBecomesUnattachedFrom filter_ -> filterNames asking filter_

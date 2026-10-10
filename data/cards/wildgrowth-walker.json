@@ -29,23 +29,31 @@
       "triggeredAbilities": [
         {
           "condition": {
-            "type": "PermanentExplores",
+            "type": "PermanentActs",
             "value": {
-              "type": "And",
-              "value": [
-                {
-                  "type": "HasCardType",
-                  "value": {
-                    "type": "Creature"
-                  }
-                },
-                {
-                  "type": "ControlledBy",
-                  "value": {
-                    "type": "You"
-                  }
+              "action": {
+                "type": "Explore"
+              },
+              "permanent": {
+                "type": "Matching",
+                "value": {
+                  "type": "And",
+                  "value": [
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Creature"
+                      }
+                    },
+                    {
+                      "type": "ControlledBy",
+                      "value": {
+                        "type": "You"
+                      }
+                    }
+                  ]
                 }
-              ]
+              }
             }
           },
           "modal": {

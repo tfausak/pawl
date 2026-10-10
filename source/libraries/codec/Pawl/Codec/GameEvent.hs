@@ -41,6 +41,7 @@ import qualified Pawl.Codec.Mentored as Mentored
 import qualified Pawl.Codec.Milled as Milled
 import qualified Pawl.Codec.Moved as Moved
 import qualified Pawl.Codec.ObjectId as ObjectId
+import qualified Pawl.Codec.PermanentActed as PermanentActed
 import qualified Pawl.Codec.PermanentWasSacrificed as PermanentWasSacrificed
 import qualified Pawl.Codec.PlanarDieRolled as PlanarDieRolled
 import qualified Pawl.Codec.PlayerActed as PlayerActed
@@ -98,14 +99,11 @@ codec =
       Arm.payload "CountersRemoved" CounterChange.codec GameEvent.CountersRemoved (\x -> case x of GameEvent.CountersRemoved y -> Just y; _ -> Nothing),
       Arm.payload "HalfUnlocked" HalfUnlocked.codec GameEvent.HalfUnlocked (\x -> case x of GameEvent.HalfUnlocked y -> Just y; _ -> Nothing),
       Arm.payload "TurnedFaceUp" TurnedFaceUp.codec GameEvent.TurnedFaceUp (\x -> case x of GameEvent.TurnedFaceUp y -> Just y; _ -> Nothing),
-      Arm.payload "TurnedFaceDown" ObjectId.codec GameEvent.TurnedFaceDown (\x -> case x of GameEvent.TurnedFaceDown y -> Just y; _ -> Nothing),
+      Arm.payload "PermanentActed" (PermanentActed.codec ObjectId.codec) GameEvent.PermanentActed (\x -> case x of GameEvent.PermanentActed y -> Just y; _ -> Nothing),
       Arm.payload "Transformed" Transformed.codec GameEvent.Transformed (\x -> case x of GameEvent.Transformed y -> Just y; _ -> Nothing),
       Arm.payload "BecameDesignated" BecameDesignated.codec GameEvent.BecameDesignated (\x -> case x of GameEvent.BecameDesignated y -> Just y; _ -> Nothing),
-      Arm.payload "Evolved" ObjectId.codec GameEvent.Evolved (\x -> case x of GameEvent.Evolved y -> Just y; _ -> Nothing),
-      Arm.payload "Mutated" ObjectId.codec GameEvent.Mutated (\x -> case x of GameEvent.Mutated y -> Just y; _ -> Nothing),
       Arm.payload "Mentored" Mentored.codec GameEvent.Mentored (\x -> case x of GameEvent.Mentored y -> Just y; _ -> Nothing),
       Arm.payload "Exploited" Exploited.codec GameEvent.Exploited (\x -> case x of GameEvent.Exploited y -> Just y; _ -> Nothing),
-      Arm.payload "Trained" ObjectId.codec GameEvent.Trained (\x -> case x of GameEvent.Trained y -> Just y; _ -> Nothing),
       Arm.payload "Convoked" Convoking.codec GameEvent.Convoked (\x -> case x of GameEvent.Convoked y -> Just y; _ -> Nothing),
       Arm.payload "Crewed" Crewing.codec GameEvent.Crewed (\x -> case x of GameEvent.Crewed y -> Just y; _ -> Nothing),
       Arm.payload "BecameCrewed" Crewing.codec GameEvent.BecameCrewed (\x -> case x of GameEvent.BecameCrewed y -> Just y; _ -> Nothing),
@@ -128,9 +126,6 @@ codec =
       Arm.payload "SchemeSetInMotion" SchemeSetInMotion.codec GameEvent.SchemeSetInMotion (\x -> case x of GameEvent.SchemeSetInMotion y -> Just y; _ -> Nothing),
       Arm.payload "ClassLevelSet" ClassLevelChange.codec GameEvent.ClassLevelSet (\x -> case x of GameEvent.ClassLevelSet y -> Just y; _ -> Nothing),
       Arm.payload "Plotted" ObjectId.codec GameEvent.Plotted (\x -> case x of GameEvent.Plotted y -> Just y; _ -> Nothing),
-      Arm.payload "Explored" ObjectId.codec GameEvent.Explored (\x -> case x of GameEvent.Explored y -> Just y; _ -> Nothing),
-      Arm.payload "Connived" ObjectId.codec GameEvent.Connived (\x -> case x of GameEvent.Connived y -> Just y; _ -> Nothing),
-      Arm.payload "Exerted" ObjectId.codec GameEvent.Exerted (\x -> case x of GameEvent.Exerted y -> Just y; _ -> Nothing),
       Arm.payload "BecameTapped" ObjectId.codec GameEvent.BecameTapped (\x -> case x of GameEvent.BecameTapped y -> Just y; _ -> Nothing),
       Arm.payload "BecameUntapped" ObjectId.codec GameEvent.BecameUntapped (\x -> case x of GameEvent.BecameUntapped y -> Just y; _ -> Nothing),
       Arm.payload "TappedForMana" TappedForMana.codec GameEvent.TappedForMana (\x -> case x of GameEvent.TappedForMana y -> Just y; _ -> Nothing),
@@ -176,14 +171,11 @@ tagOf x = case x of
   GameEvent.CountersRemoved {} -> "CountersRemoved"
   GameEvent.HalfUnlocked {} -> "HalfUnlocked"
   GameEvent.TurnedFaceUp {} -> "TurnedFaceUp"
-  GameEvent.TurnedFaceDown {} -> "TurnedFaceDown"
+  GameEvent.PermanentActed {} -> "PermanentActed"
   GameEvent.Transformed {} -> "Transformed"
   GameEvent.BecameDesignated {} -> "BecameDesignated"
-  GameEvent.Evolved {} -> "Evolved"
-  GameEvent.Mutated {} -> "Mutated"
   GameEvent.Mentored {} -> "Mentored"
   GameEvent.Exploited {} -> "Exploited"
-  GameEvent.Trained {} -> "Trained"
   GameEvent.Convoked {} -> "Convoked"
   GameEvent.Saddled {} -> "Saddled"
   GameEvent.Crewed {} -> "Crewed"
@@ -206,9 +198,6 @@ tagOf x = case x of
   GameEvent.SchemeSetInMotion {} -> "SchemeSetInMotion"
   GameEvent.ClassLevelSet {} -> "ClassLevelSet"
   GameEvent.Plotted {} -> "Plotted"
-  GameEvent.Explored {} -> "Explored"
-  GameEvent.Connived {} -> "Connived"
-  GameEvent.Exerted {} -> "Exerted"
   GameEvent.BecameTapped {} -> "BecameTapped"
   GameEvent.BecameUntapped {} -> "BecameUntapped"
   GameEvent.TappedForMana {} -> "TappedForMana"
