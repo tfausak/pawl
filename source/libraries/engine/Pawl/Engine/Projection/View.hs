@@ -1277,14 +1277,15 @@ derivesFromCopiedHalves oid gs = case stampedSnapshotOf oid gs of
 -- Binding.copyOf, or a conjured duplicate carries (Game.copyStampOf), before
 -- rule 709.5's question is asked of it. The projection's ONE read of that
 -- binding, and only copiableSnapshotOf and derivesFromCopiedHalves
--- above call it; Pawl.Engine.Game.halvesCardOf makes the other read in the
+-- above call it; Pawl.Engine.Game.copiableOf makes the other read in the
 -- engine, off the object it already holds.
 --
 -- LAYER 1a IS NOT THE BINDING ALONE. A copy effect that stated a duration is
--- stored rather than stamped (Pawl.Types.ActiveCopy), so Game.storedCopyOf is
--- consulted first and the binding is what a swept row falls back to. Here rather
--- than in any one reader, for the reason copiableSnapshotOf above gives: a
--- per-reader fork is what that accessor exists to prevent.
+-- stored rather than stamped (Pawl.Types.ActiveCopy), so the object is read as
+-- Game.lookupLayerOne leaves it, a stored row laid over its binding and over the
+-- merge's flipped reading below. Here rather than in any one reader, for the
+-- reason copiableSnapshotOf above gives: a per-reader fork is what that accessor
+-- exists to prevent.
 --
 -- CR 730.2h is the one fork: a FLIPPED merged permanent reads the flipped
 -- stamp its merge left beside the ordinary one, so each flip component
@@ -1301,13 +1302,10 @@ derivesFromCopiedHalves oid gs = case stampedSnapshotOf oid gs of
 -- Runeclaw Bear -- keeps its status to no effect.
 stampedSnapshotOf :: ObjectId -> GameState -> Maybe ProjectedCharacteristics
 stampedSnapshotOf oid gs = do
-  object <- Game.lookupObject oid gs
-  let bindings = Object.bindings object
-      stamped = case Game.storedCopyOf oid gs of
-        Just stored -> Just stored
-        Nothing -> Game.copyStampOf object
+  object <- Game.lookupLayerOne oid gs
+  let stamped = Game.copyStampOf object
   if Object.flipped object
-    then case Binding.flippedCopyOf bindings of
+    then case Binding.flippedCopyOf (Object.bindings object) of
       Just flipped -> Just flipped
       Nothing -> fmap (\stamp -> Maybe.fromMaybe stamp (PC.flipped stamp)) stamped
     else stamped

@@ -4628,8 +4628,8 @@ lockHalf oid half =
 -- halves, and it has no halves at all. Nothing calls this for one, but the guard
 -- is the rule rather than defensiveness.
 --
--- Nothing -- a designation written for an object whose card cannot be found --
--- answers False, there being no faces to compare against.
+-- Nothing -- an object with no halves (Game.halvesOf) -- answers False, there
+-- being no faces to compare against.
 fullyUnlockedAfter :: Set RoomHalf.RoomHalf -> Maybe Card -> Bool
 fullyUnlockedAfter halves card = case card of
   Nothing -> False
@@ -5982,7 +5982,13 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
               -- neither half was cast as a spell, it enters with neither unlocked
               -- designation." A Room put onto the battlefield by an effect
               -- reaches this with `shown` Nothing and enters with both doors shut.
-              unlocking = dest == Zone.Battlefield && Maybe.isJust (Game.halvesOf oid gs)
+              unlocking = dest == Zone.Battlefield && Maybe.isJust halves
+              -- CR 709.5b: the halves the object HAS, its copiable values', read
+              -- once for both mkObj's designation and the CR 709.5i flag below.
+              halves = Game.halvesOf oid gs
+              -- CR 709.5d's designation is a POSITION (CR 709.5c), so the cast
+              -- half's name is placed against the halves the permanent has.
+              entryUnlocked = if unlocking then foldMap Set.singleton (shown >>= \n -> Card.halfPositionOf n =<< halves) else Set.empty
               -- CR 110.5's status the ARRIVING incarnation will carry. Named
               -- because two readers want it: mkObj's `facing` field below, whose
               -- comment has the reasoning, and the CR 303.4f gate further down,
@@ -6061,9 +6067,7 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                     -- between, one of which stops being right the moment the
                     -- second door opens.
                     Object.face = if dest == requestedDest && not unlocking then shown else Nothing,
-                    -- CR 709.5d's designation is a POSITION (CR 709.5c), so the cast
-                    -- half's name is placed against the halves the permanent has.
-                    Object.unlockedHalves = if unlocking then foldMap Set.singleton (shown >>= \n -> Card.halfPositionOf n =<< Game.halvesOf oid gs) else Set.empty,
+                    Object.unlockedHalves = entryUnlocked,
                     -- CR 708.4 / 708.3: the object is turned face down BEFORE it
                     -- is put onto the stack or enters the battlefield, so this is
                     -- part of the move rather than a stamp on what the move
@@ -6684,14 +6688,13 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                   -- which is logged first.
                   --
                   -- CR 709.5i's flag is computed here too, through the same
-                  -- `fullyUnlockedAfter` unlockHalves uses, and against the designations
-                  -- `mkObj` actually wrote. Reading `shown` back rather than the stored
-                  -- object, so the two writers answer the question the same way from the
-                  -- same input. Always False on THIS route, and that is CR 709.5d rather
-                  -- than a shortcut: an entry gives at most ONE designation, so a
-                  -- two-door Room can never arrive fully unlocked. CR 709.5i's second
-                  -- branch is reached from unlockHalves instead, which can give both at
-                  -- once.
+                  -- `fullyUnlockedAfter` unlockHalves uses, against the designations
+                  -- `mkObj` wrote (`entryUnlocked`) and the copiable halves
+                  -- (Game.halvesOf) unlockHalves reads too. Always False on THIS
+                  -- route, and that is CR 709.5d rather than a shortcut: an entry
+                  -- gives at most ONE designation, so a two-door Room can never
+                  -- arrive fully unlocked. CR 709.5i's second branch is reached from
+                  -- unlockHalves instead, which can give both at once.
                   --
                   -- The ACTOR is CR 110.2a's entry controller, the `chooser` above:
                   -- rule 709.5d gives the designation with no player taking an action,
@@ -6699,7 +6702,7 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                   -- connects to it -- which is also the player a Room's own "when you
                   -- unlock this door" reads as "you" (CR 109.5).
                   Monad.forM_ (if unlocking then Maybe.maybeToList shown else []) $ \half ->
-                    State.modify' (recordEvent (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked newId (Maybe.fromMaybe pid under) half (fullyUnlockedAfter (foldMap Set.singleton (shown >>= \n -> Card.halfPositionOf n =<< Game.halvesOf oid gs)) (Game.cardOf oid gs)))))
+                    State.modify' (recordEvent (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked newId (Maybe.fromMaybe pid under) half (fullyUnlockedAfter entryUnlocked halves))))
                   -- CR 603.2g: record the RESOLVED event, carrying the NEW object's id --
                   -- what an enters trigger scans -- alongside the id it had in `fromZone`,
                   -- which is the key `lastKnown` is filed under and so the only route back
@@ -8218,7 +8221,8 @@ meldable victims gs = do
 --
 -- CR 730.2h's flip components are stamped as a SECOND reading of the same merge,
 -- both sides read again through Projection.copiableCharacteristicsFlipped, and
--- Projection.stampedSnapshotOf spends it once the merged permanent is flipped.
+-- Projection.stampedSnapshotOf spends it once the merged permanent is flipped --
+-- off a rewoven stored copy row's PC.flipped while one covers the permanent.
 -- Two readings rather than one because CR 110.5a keeps status out of the
 -- characteristics: flipping is no CR 613 layer to fold in later, and CR 730.2a
 -- fixes this stamp's timestamp at the merge, so what the flip may reach is
@@ -8273,8 +8277,18 @@ merge sid target side = do
             -- expiry and timestamp and carries the merge read over it.
             -- Pawl.MutateSpec's "CR 730.2a/613.7 a merge outranks Mirrorweave's
             -- copy at once and is recomputed when it ends" proves both.
+            --
+            -- The row carries CR 730.2h's flipped reading of the merge as its
+            -- PC.flipped, the stamp's own slot for it, since a row has no
+            -- Binding.flippedCopyOf beside it. Pawl.MutateSpec's "CR 730.2h a
+            -- merge over Mirrorweave's copy of a flip card flips with the
+            -- abilities from under" proves it.
             alone row = row {ActiveCopy.objects = Set.singleton target}
-            rewoven row = (alone row) {ActiveCopy.snapshot = reading Projection.copiableCharacteristicsFaceUp unrowed {GameState.copyEffects = alone row : GameState.copyEffects unrowed}}
+            rewoven row =
+              let board = unrowed {GameState.copyEffects = alone row : GameState.copyEffects unrowed}
+                  faceUp = reading Projection.copiableCharacteristicsFaceUp board
+                  flipped = reading Projection.copiableCharacteristicsFlipped board
+               in (alone row) {ActiveCopy.snapshot = if flipped == faceUp then faceUp else faceUp {PC.flipped = Just flipped}}
             rows = fmap rewoven (filter (Set.member target . ActiveCopy.objects) (GameState.copyEffects gs))
         State.modify' (`forgetObject` sid)
         State.modify'
