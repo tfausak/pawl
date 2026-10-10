@@ -589,6 +589,8 @@ data Response
     -- replaying a transcript against the wrong one would reorder a payment
     -- instead of the two cards.
     OrderedComponentCards [Natural.Natural]
+  | -- | CR 123.5c: the index of the object the owner chose to keep the stickers.
+    ChoseStickerKeeper Natural.Natural
   | -- | CR 608.2f: the relative order a resolving spell's controller chose for the
     -- members of one APNAP group a per-object body walks, as a permutation of the
     -- offered indices. A separate constructor from the ones above for their

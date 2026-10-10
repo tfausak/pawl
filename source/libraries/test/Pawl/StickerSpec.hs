@@ -22,16 +22,21 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as KeywordEngine
 import qualified Pawl.Engine.NameWords as NameWords
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Sticker as Sticker
+import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Extra.Natural as Natural
+import qualified Pawl.MutateSpec as MutateSpec
 import qualified Pawl.Oracle as Oracle
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
@@ -43,8 +48,10 @@ import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Deck as Deck
+import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Game as Game.Type
@@ -56,10 +63,14 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
+import qualified Pawl.Types.MutateSide as MutateSide
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
@@ -67,9 +78,11 @@ import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PowerToughnessSticker as PowerToughnessSticker
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.StepBegan as StepBegan
@@ -374,6 +387,39 @@ pickerBoard sheets picker land lands tickets card =
   let base = S.addPlayerCounter PlayerCounterKind.Ticket tickets S.alice (S.landsFor land S.alice lands (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)))
       (_, withPicker) = S.addPermanent picker S.alice base
    in S.addHandCard card S.alice (mainPhaseForAlice withPicker)
+
+-- Answers ChooseStickerKeeper with `keep`'s index where it is offered, the
+-- first otherwise, counting the asks; every other prompt as `other` does.
+keeping :: Maybe PrintingId.PrintingId -> (Prompt.Prompt r -> r) -> Prompt.Prompt r -> State.State Int r
+keeping keep other p = case p of
+  Prompt.ChooseStickerKeeper _ _ offered -> do
+    State.modify' (+ 1)
+    pure (maybe 0 Int.toNaturalSaturating (keep >>= \k -> List.elemIndex k (NonEmpty.toList offered)))
+  _ -> pure (other p)
+
+-- Graf Rats and Midnight Scavengers meld into Chittering Host at alice's
+-- beginning of combat; the Host, if one, and the board.
+chitteringHost :: Printing.Printing -> Printing.Printing -> GameState.GameState -> (Maybe ObjectId.ObjectId, GameState.GameState)
+chitteringHost rats scavengers base =
+  let (_, g1) = S.addPermanent rats S.alice base
+      (_, g2) = S.addPermanent scavengers S.alice g1
+      atCombat = g2 {GameState.phase = Phase.Combat CombatStep.BeginningOfCombat, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+      after = S.runPure S.identityAnswer atCombat (Engine.runStep >> Engine.priorityLoop)
+      hostName = CardName.MkCardName (Text.pack "Chittering Host")
+   in (List.find (\oid -> fmap S.nameOf (Game.cardOf oid after) == Just hostName) (Game.zoneMembers Zone.Battlefield S.alice after), after)
+
+-- The objects of alice's in `zone` showing this card's name.
+namedIn :: Zone.Zone -> Printing.Printing -> GameState.GameState -> [ObjectId.ObjectId]
+namedIn zone card gs = filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (S.printingName card)) (Game.zoneMembers zone S.alice gs)
+
+-- Cubwarden's mutate cost with sticker kicker's {1} on it, the one offered
+-- candidate paying two {W}; MutateSpec.mutatingAt names the bare mutate cost.
+mutateKicked :: [Cost.Type.Cost Keyword.Keyword] -> Cost.Type.Cost Keyword.Keyword
+mutateKicked candidates =
+  let whites c = case Cost.Type.mana c of
+        Just (ManaCost.MkManaCost symbols) -> length (filter (== MutateSpec.theWhite) symbols)
+        Nothing -> 0
+   in Maybe.fromMaybe (Cost.firstOffered candidates) (List.find ((== 2) . whites) candidates)
 
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Sticker" $ do
@@ -1275,3 +1321,139 @@ spec s registry = Spec.describe s "Sticker" $ do
         Spec.assertEqWith s "the Bears entered under alice" (fmap (\oid -> Projection.controllerOf oid resolved) (arrivals board resolved)) [Just S.alice]
         Spec.assertBool s (bobsBears /= bearsCard) "the exiled card is a new object"
       other -> Spec.assertFailure s ("expected bob's Bears in exile, got " <> show other)
+  -- Through the card: Graf Rats takes Otter's 5/1 and Midnight Scavengers
+  -- Minotaur's 1/4, and they meld at combat.
+  Spec.it s "CR 123.5a Chittering Host takes both cards' P/T stickers, the later one winning, either way round" $ do
+    sheets <- committedSheets
+    rats <- S.printingOf s registry "Graf Rats"
+    scavengers <- S.printingOf s registry "Midnight Scavengers"
+    giant <- S.printingOf s registry "Hill Giant"
+    let base = withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)
+        stickeredBoth g = case (namedIn Zone.Battlefield rats g, namedIn Zone.Battlefield scavengers g) of
+          ([r], [v]) -> Sticker.put S.alice v minotaurOneFour Nothing (Sticker.put S.alice r otterFiveOne Nothing g)
+          _ -> g
+        -- The two cards stickered on the battlefield, then the trigger: the
+        -- board chitteringHost would meld, built by hand so the stickers go on
+        -- first.
+        (ratsId, g1) = S.addPermanent rats S.alice base
+        (scavId, g2) = S.addPermanent scavengers S.alice g1
+        stickered = stickeredBoth g2
+        atCombat = stickered {GameState.phase = Phase.Combat CombatStep.BeginningOfCombat, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+        melded_ = S.runPure S.identityAnswer atCombat (Engine.runStep >> Engine.priorityLoop)
+        hostName = CardName.MkCardName (Text.pack "Chittering Host")
+        hosts = filter (\oid -> fmap S.nameOf (Game.cardOf oid melded_) == Just hostName) (Game.zoneMembers Zone.Battlefield S.alice melded_)
+        -- CR 123.5a's order alone, off the exile the trigger's own CR 613.7m
+        -- stamps decide: both cards already exiled, stickered in one order or
+        -- the other, then melded (Effect.Meld; the result card is a stand-in,
+        -- MeldSpec's `melded` posture, since the stickers set the P/T).
+        meldExiled first second =
+          let (rId, e1) = S.addExiledCard rats S.alice base
+              (vId, e2) = S.addExiledCard scavengers S.alice e1
+              placed = case (first, second) of
+                ((onRats, ref1), (_, ref2)) ->
+                  let (one, two) = if onRats then (rId, vId) else (vId, rId)
+                   in Sticker.put S.alice two ref2 Nothing (Sticker.put S.alice one ref1 Nothing e2)
+              slot = SlotName.MkSlotName (Text.pack "melding")
+              bound = Map.singleton slot (Set.fromList [Recipient.ToObject rId, Recipient.ToObject vId])
+              after = S.runPure S.identityAnswer placed (Resolve.applyEffect S.noSource S.noSource S.alice bound Map.empty (Effect.Meld (Meld.MkMeld (ObjectRef.InSlot slot) (Printing.card giant))))
+           in (List.find (`Set.notMember` GameState.battlefield placed) (Set.toList (GameState.battlefield after)), after)
+        pt (mHost, g) = fmap (\h -> (Projection.powerOf h g, Projection.toughnessOf h g)) mHost
+        -- Rats then Scavengers, the later on the Scavengers: 1/4.
+        bNumbers = Just (Just 1, Just 4) :: Maybe (Maybe Integer, Maybe Integer)
+        -- Scavengers then Rats, the later on the Rats: 5/1.
+        aNumbers = Just (Just 5, Just 1) :: Maybe (Maybe Integer, Maybe Integer)
+    Spec.assertEqWith s "CR 123.5a Chittering Host has both stickers" (fmap (\h -> length (stickerKindsOn h melded_)) hosts) [2]
+    Spec.assertEqWith s "CR 613.7k the later sticker sets its P/T" (pt (meldExiled (True, otterFiveOne) (False, minotaurOneFour))) bNumbers
+    Spec.assertEqWith s "and the other way round" (pt (meldExiled (False, minotaurOneFour) (True, otterFiveOne))) aNumbers
+    Spec.assertEqWith s "the Rats and the Scavengers left the battlefield" (filter (`Set.member` GameState.battlefield melded_) [ratsId, scavId]) []
+  -- Wicker Picker; alice casts Cubwarden for its mutate cost onto her Grizzly
+  -- Bears, sticker-kicking it with Otter's 5/1.
+  Spec.it s "CR 123.5b the mutating Cubwarden spell's P/T sticker is on the merged permanent" $ do
+    sheets <- committedSheets
+    picker <- S.printingOf s registry "Wicker Picker"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    plains <- S.printingOf s registry "Plains"
+    let (card, g1) = pickerBoard sheets picker plains 5 1 cubwarden
+        (bearsId, board) = S.addPermanent bears S.alice g1
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseKicker _ _ _ keyword _ -> KickerDecision.MkKickerDecision (stickerKick keyword)
+          Prompt.ChooseStickerOrNone _ _ _ offered -> if List.elem otterFiveOne offered then Just otterFiveOne else Nothing
+          Prompt.ChooseCost _ _ _ candidates -> mutateKicked candidates
+          _ -> MutateSpec.mutatingAt MutateSide.Over bearsId p
+        merged = S.runPure answer board (S.cast S.alice card >> drain)
+        stickerNumbers = (Just 5, Just 1) :: (Maybe Integer, Maybe Integer)
+    Spec.assertEqWith s "CR 123.5b the merged Bears has the spell's sticker and its P/T" (stickerKindsOn bearsId merged, (Projection.powerOf bearsId merged, Projection.toughnessOf bearsId merged)) ([StickerKind.PowerToughness], stickerNumbers)
+  -- The Bears takes Otter's 5/1; Turn to Frog makes it 1/1 later; then
+  -- Cubwarden mutates onto it.
+  Spec.it s "CR 613.7k a host's P/T sticker restamps at the merge and beats Turn to Frog" $ do
+    sheets <- committedSheets
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    frog <- S.printingOf s registry "Turn to Frog"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    let base = mainPhaseForAlice (S.landsFor island S.alice 2 (S.landsFor plains S.alice 4 (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))))
+        (bearsId, g1) = S.addPermanent bears S.alice base
+        (frogId, g2) = S.addHandCard frog S.alice (Sticker.put S.alice bearsId otterFiveOne Nothing g1)
+        (cubId, g3) = S.addHandCard cubwarden S.alice g2
+        frogged = S.runPure (namingTarget bearsId) g3 (S.cast S.alice frogId >> drain)
+        merged = S.runPure (MutateSpec.mutatingAt MutateSide.Over bearsId) frogged (S.cast S.alice cubId >> drain)
+        pt g = (Projection.powerOf bearsId g, Projection.toughnessOf bearsId g)
+        stickerNumbers = (Just 5, Just 1) :: (Maybe Integer, Maybe Integer)
+    Spec.assertEqWith s "before the merge, Turn to Frog's 1/1 wins" (pt frogged) (Just 1, Just 1)
+    Spec.assertEqWith s "CR 613.7k after it, the restamped sticker's P/T wins" (pt merged) stickerNumbers
+    Spec.assertEqWith s "the Bears is merged" (fmap (Seq.length . Game.componentsOf . Object.source) (Game.lookupObject bearsId merged)) (Just 2)
+  -- Chittering Host takes an art sticker and is destroyed; two boards differing
+  -- in the owner's answer alone.
+  Spec.it s "CR 123.5c Chittering Host's owner chooses which card keeps its stickers in the graveyard, either way" $ do
+    sheets <- committedSheets
+    rats <- S.printingOf s registry "Graf Rats"
+    scavengers <- S.printingOf s registry "Midnight Scavengers"
+    case chitteringHost rats scavengers (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)) of
+      (Just hostId, melded_) -> do
+        let stickered = Sticker.put S.alice hostId (aliceSticker 1 StickerKind.Art 0) Nothing melded_
+            idOf card = Map.lookup card (GameState.printingIds stickered)
+            dies keep = State.runState (Engine.runGame (keeping (idOf keep) S.identityAnswer) stickered (Event.destroy Regenerability.Regenerable [hostId])) 0
+            ((_, g), askedKeeper) = dies rats
+            ((_, g'), _) = dies scavengers
+            kindsOf card board = concatMap (\oid -> stickerKindsOn oid board) (namedIn Zone.Graveyard card board)
+        Spec.assertEqWith s "CR 123.5c alice was asked, and Graf Rats keeps the sticker" (askedKeeper > 0, kindsOf rats g, kindsOf scavengers g) (True, [StickerKind.Art], [])
+        Spec.assertEqWith s "and Midnight Scavengers when she picks it" (kindsOf rats g', kindsOf scavengers g') ([], [StickerKind.Art])
+      (Nothing, _) -> Spec.assertFailure s "expected Chittering Host"
+  Spec.it s "CR 123.5 a melded permanent bounced to hand asks nothing and keeps no sticker" $ do
+    sheets <- committedSheets
+    rats <- S.printingOf s registry "Graf Rats"
+    scavengers <- S.printingOf s registry "Midnight Scavengers"
+    unsummon <- S.printingOf s registry "Unsummon"
+    island <- S.printingOf s registry "Island"
+    case chitteringHost rats scavengers (S.landsFor island S.bob 1 (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))) of
+      (Just hostId, melded_) -> do
+        let stickered = Sticker.put S.alice hostId (aliceSticker 1 StickerKind.Art 0) Nothing melded_
+            (unsummonId, g1) = S.addHandCard unsummon S.bob stickered
+            ((_, g), askedKeeper) = State.runState (Engine.runGame (keeping Nothing (namingTarget hostId)) (g1 {GameState.priority = Just S.bob}) (S.cast S.bob unsummonId >> Stack.resolveTop)) 0
+            hand = Game.zoneMembers Zone.Hand S.alice g
+        Spec.assertEqWith s "CR 123.5 not asked, and no card in hand has a sticker" (askedKeeper > 0, concatMap (\c -> stickerKindsOn c g) hand) (False, [])
+        Spec.assertEqWith s "both cards are in alice's hand" (length hand) 2
+      (Nothing, _) -> Spec.assertFailure s "expected Chittering Host"
+  -- The merged Bears of the 123.5b case dies: alice picks the Cubwarden card.
+  Spec.it s "CR 123.5c a mutated permanent's owner chooses which card keeps its stickers" $ do
+    sheets <- committedSheets
+    picker <- S.printingOf s registry "Wicker Picker"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    plains <- S.printingOf s registry "Plains"
+    let (card, g1) = pickerBoard sheets picker plains 5 1 cubwarden
+        (bearsId, board) = S.addPermanent bears S.alice g1
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseKicker _ _ _ keyword _ -> KickerDecision.MkKickerDecision (stickerKick keyword)
+          Prompt.ChooseStickerOrNone _ _ _ offered -> if List.elem otterFiveOne offered then Just otterFiveOne else Nothing
+          Prompt.ChooseCost _ _ _ candidates -> mutateKicked candidates
+          _ -> MutateSpec.mutatingAt MutateSide.Over bearsId p
+        merged = S.runPure answer board (S.cast S.alice card >> drain)
+        ((_, g), askedKeeper) = State.runState (Engine.runGame (keeping (Map.lookup cubwarden (GameState.printingIds merged)) S.identityAnswer) merged (Event.destroy Regenerability.Regenerable [bearsId])) 0
+        kindsOf c = concatMap (\oid -> stickerKindsOn oid g) (namedIn Zone.Graveyard c g)
+    Spec.assertEqWith s "CR 123.5c the Cubwarden card keeps the P/T sticker, the Bears card has none" (kindsOf cubwarden, kindsOf bears) ([StickerKind.PowerToughness], [])
+    Spec.assertEqWith s "alice was asked" (askedKeeper > 0) True

@@ -693,7 +693,8 @@ data View = MkView
     -- Burst Lightning's clause conditions and Monstrous War-Leech's CR 604.2
     -- clause on its entry replacement, and its TimesPaid arm, answering Gnarlid
     -- Pack's count, Sunscape Battlemage's "kicked with its {1}{G} kicker" and CR
-    -- 702.157a's and CR 702.175a's enters triggers.
+    -- 702.157a's and CR 702.175a's enters triggers, and Filter.Kicked, answering
+    -- Hallar, the Firefletcher's "if that spell was kicked".
     --
     -- Not a designation of a PERMANENT as that field holds -- rule 702.33d
     -- designates the SPELL -- but it comes through the view for the same reason

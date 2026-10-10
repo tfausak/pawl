@@ -224,6 +224,7 @@ import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.StatedFlip as StatedFlip
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.StepBegins as StepBegins
+import qualified Pawl.Types.StickerPlacement as StickerPlacement
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
@@ -6433,14 +6434,12 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                   -- way in, so the two agree about which component the
                   -- designation can sit on.
                   (commandComponents, destComponents) = Seq.partition (\component -> Game.componentIsCard component && Just (Game.printingOfComponent component) == splitOff) components
-                  -- Not implemented: CR 123.5c. A melded or merged permanent's
-                  -- stickers are dropped from every split object, the leading
-                  -- one included, rather than kept on the one its owner
-                  -- chooses (#872).
-                  asComponent zone mComponent ts =
+                  -- CR 123.5c: only the component `keeps` names takes the
+                  -- departing permanent's stickers.
+                  asComponent keeps zone mComponent ts =
                     ( case mComponent of
                         Nothing -> mkObj entrySeed ts
-                        Just component -> (Game.representComponent component (mkObj entrySeed ts)) {Object.stickers = Seq.empty}
+                        Just component -> (Game.representComponent component (mkObj entrySeed ts)) {Object.stickers = if keeps then Object.stickers obj else Seq.empty}
                     )
                       { Object.zone = zone
                       }
@@ -6456,11 +6455,37 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
               let (leading, trailing) = case Seq.viewl arranged of
                     Seq.EmptyL -> (Nothing, Seq.empty)
                     c Seq.:< cs -> (Just c, cs)
+              -- CR 123.5c: the owner chooses, among the components reaching a
+              -- public zone, the one that keeps the stickers; asked before
+              -- placement so CR 613.7k's restamp follows that object's own
+              -- stamp. One candidate keeps them unasked, there being nothing to
+              -- choose.
+              let keepers = (if Game.isHiddenZone dest then [] else fmap Left [0 .. Seq.length arranged - 1]) <> fmap Right [0 .. Seq.length commandComponents - 1]
+                  printingOfKeeper keeper = Game.printingOfComponent (either (Seq.index arranged) (Seq.index commandComponents) keeper)
+              keeper <-
+                if Seq.null components || Seq.null (Object.stickers obj)
+                  then pure Nothing
+                  else case keepers of
+                    [] -> pure Nothing
+                    first : rest -> case rest of
+                      [] -> pure (Just first)
+                      _ -> do
+                        asked <- State.get
+                        answer <- Game.choose (Prompt.ChooseStickerKeeper (Decide.deciderFor (Object.owner obj) asked) (Object.owner obj) (fmap printingOfKeeper (first NonEmpty.:| rest)))
+                        pure (Just (Maybe.fromMaybe first (Maybe.listToMaybe (List.genericDrop answer keepers))))
               start <- State.gets GameState.nextTimestamp
-              newId <- placeObject pid (asComponent dest leading) dest position
+              newId <- placeObject pid (asComponent (keeper == Just (Left 0)) dest leading) dest position
               -- CR 613.7k.
               State.modify' (Game.restampStickers newId)
-              trailingIds0 <- Monad.forM trailing (\component -> placeObject pid (asComponent dest (Just component)) dest position)
+              trailingIds0 <-
+                Monad.forM
+                  (Seq.zip (Seq.fromList [1 .. Seq.length trailing]) trailing)
+                  ( \(index, component) -> do
+                      trailingId <- placeObject pid (asComponent (keeper == Just (Left index)) dest (Just component)) dest position
+                      -- CR 613.7k.
+                      State.modify' (Game.restampStickers trailingId)
+                      pure trailingId
+                  )
               -- CR 712.21b / 730.3b: "if a player exiles a melded permanent, that
               -- player determines the relative timestamp order of the two cards",
               -- an exception to CR 613.7m. Asked AFTER the placements, which minted
@@ -6484,7 +6509,15 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
               -- player, so placeObject's `pid` decides nothing about where the
               -- card lands here; it is Object.owner all the same, which is rule
               -- 903.9b's "its owner" for a stolen commander.
-              commandIds <- Monad.forM commandComponents (\component -> placeObject pid (asComponent Zone.Command (Just component)) Zone.Command position)
+              commandIds <-
+                Monad.forM
+                  (Seq.zip (Seq.fromList [0 .. Seq.length commandComponents - 1]) commandComponents)
+                  ( \(index, component) -> do
+                      commandId <- placeObject pid (asComponent (keeper == Just (Right index)) Zone.Command (Just component)) Zone.Command position
+                      -- CR 613.7k.
+                      State.modify' (Game.restampStickers commandId)
+                      pure commandId
+                  )
               let trailingIds = trailingIds0 <> commandIds
               -- `newId` heads the answer, so a caller that can only act on one
               -- object acts on the first card the arrangement named -- the first
@@ -8015,10 +8048,13 @@ meld controller victims resultCard = do
                 -- CR 302.6 through CR 400.7: a permanent that has just entered is
                 -- a new object nobody has controlled for any time.
                 Object.sickness = Sickness.Sick,
-                -- Not implemented: CR 123.5a's stickers on a melded permanent (#872).
-                Object.stickers = Seq.empty
+                -- CR 123.5a: every melded card's stickers, in their timestamp
+                -- order; CR 613.7k restamps them below.
+                Object.stickers = Seq.sortOn StickerPlacement.timestamp (foldMap (foldMap Object.stickers . flip Game.lookupObject gs . fst) melding)
               }
       newId <- placeObject owner mkObj Zone.Battlefield LibraryPosition.defaultValue
+      -- CR 613.7k.
+      State.modify' (Game.restampStickers newId)
       -- Alchemy's "perpetually", the ARRIVAL direction of what perpetuate does at
       -- every other zone change. This is the one road that mints an incarnation
       -- outside changeZoneAttaching, so the call is made by hand here.
@@ -8201,9 +8237,9 @@ meldable victims gs = do
 -- Game.turnFaceOver swaps in when the merged permanent transforms -- for the
 -- flipped reading's reason.
 --
--- Not implemented: CR 123.5b's stickers on the merging spell joining the merged
--- permanent, and CR 613.7k's restamp of the host's stickers at the merge
--- (#872).
+-- CR 123.5b / 613.7k: the spell's stickers join the host's, all restamped at
+-- the merge, in their old timestamp order across the two objects, which the rule
+-- does not fix (#4947).
 merge :: ObjectId -> ObjectId -> MutateSide.MutateSide -> Game Bool
 merge sid target side = do
   gs <- State.get
@@ -8270,13 +8306,15 @@ merge sid target side = do
                               o
                                 { Object.source = Source.OfMerge merged,
                                   Object.facing = facing,
-                                  Object.bindings = Binding.setMergeCopy resulting resultingFlipped resultingTurned (Object.bindings o)
+                                  Object.bindings = Binding.setMergeCopy resulting resultingFlipped resultingTurned (Object.bindings o),
+                                  Object.stickers = Seq.sortOn StickerPlacement.timestamp (Object.stickers o <> Object.stickers spell)
                                 }
                           )
                           target
                           (GameState.objects u)
                     }
           )
+        State.modify' (Game.restampStickers target)
         State.modify' (recordEvent (GameEvent.Mutated target))
         pure True
       _ -> pure False

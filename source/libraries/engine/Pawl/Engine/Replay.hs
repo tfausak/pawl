@@ -179,6 +179,7 @@ encode p answer = case p of
   Prompt.OrderCostComponents {} -> Response.OrderedCostComponents answer
   Prompt.OrderCombatTolls {} -> Response.OrderedCombatTolls answer
   Prompt.OrderComponentCards {} -> Response.OrderedComponentCards answer
+  Prompt.ChooseStickerKeeper {} -> Response.ChoseStickerKeeper answer
   Prompt.OrderForEach {} -> Response.OrderedForEach answer
   Prompt.ChooseLoopMembers {} -> Response.ChoseLoopMembers answer
   Prompt.ChooseRepeat {} -> Response.ChoseRepeat answer
@@ -560,6 +561,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.OrderComponentCards {} -> case response of
     Response.OrderedComponentCards order -> Just order
+    _ -> Nothing
+  Prompt.ChooseStickerKeeper {} -> case response of
+    Response.ChoseStickerKeeper index -> Just index
     _ -> Nothing
   Prompt.OrderForEach {} -> case response of
     Response.OrderedForEach order -> Just order
@@ -1157,6 +1161,9 @@ defaultAnswer p = case p of
   -- rule says "MAY arrange", so this identity is a real answer rather than a
   -- stand-in for one.
   Prompt.OrderComponentCards _ _ _ components -> zipWith const [0 ..] components
+  -- CR 123.5c: the first object, the one the melded or merged permanent's split
+  -- names first.
+  Prompt.ChooseStickerKeeper {} -> 0
   -- CR 608.2f: likewise, and it is the engine's own APNAP-then-ascending sweep
   -- order -- what pawl walked in before the intra-seat key became the resolving
   -- controller's to choose.

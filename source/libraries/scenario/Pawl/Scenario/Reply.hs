@@ -427,6 +427,7 @@ shapeOf prompt = case prompt of
   Prompt.OrderCostComponents {} -> list natural
   Prompt.OrderCombatTolls {} -> list natural
   Prompt.OrderComponentCards {} -> list natural
+  Prompt.ChooseStickerKeeper {} -> natural
   Prompt.OrderForEach {} -> list natural
   Prompt.ChooseLoopMembers {} -> setOf recipient
   Prompt.ChooseRepeat {} -> viaCodec Codec.OptionalDecision.codec
