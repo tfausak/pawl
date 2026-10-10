@@ -19,7 +19,6 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
-import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
@@ -165,7 +164,7 @@ armiesOf pid gs =
 --
 -- 1. CR 701.47a's condition is on controlling an ARMY CREATURE, not on having
 --    amassed before, so a player whose Army died gets a second token.
--- 2. The choice, via Prompt.ChooseAmass, and only when there is one to make.
+-- 2. The choice, via Prompt.ChooseAmass through Game.chooseAmong.
 -- 3. The counters, through Event.putCounters -- the single funnel (CR 122.6), so
 --    CR 614.1's counter replacements (Hardened Scales, Doubling Season) get their
 --    opportunity.
@@ -187,22 +186,12 @@ amass pid source resolving subtype n = do
     . Monad.void
     $ Event.createTokens pid (armyToken subtype) Nothing 1 TapState.Untapped Map.empty Nothing
   gs1 <- State.get
-  case armiesOf pid gs1 of
-    -- CR 701.47b: an impossible choice is not a failed amass.
-    [] -> pure Nothing
-    first : rest -> do
-      chosen <- case rest of
-        -- One Army is the whole of "an Army creature you control", and rule
-        -- 701.47a is not a "may" -- where the rules leave nothing to ask, don't
-        -- prompt.
-        [] -> pure first
-        second : more -> do
-          let offered = first NonEmpty.:| (second : more)
-          -- FILTERED, NOT TRUSTED, Pawl.Engine.Ring.tempt's posture: an answer
-          -- naming something never offered falls back to the first candidate,
-          -- since the action is mandatory and must put its counters somewhere.
-          answer <- Game.choose (Prompt.ChooseAmass (Decide.deciderFor pid gs1) pid resolving offered)
-          pure (if List.elem answer (NonEmpty.toList offered) then answer else first)
+  -- CR 701.47b: an impossible choice is not a failed amass. Rule 701.47a is
+  -- not a "may".
+  picked <- Game.chooseAmong (\decider asked -> Prompt.ChooseAmass decider asked resolving) pid (armiesOf pid gs1)
+  case picked of
+    Nothing -> pure Nothing
+    Just chosen -> do
       Monad.when (n > 0)
         . Monad.void
         $ Event.putCounters (CounterCause.ByEffect pid) chosen CounterKind.PlusOnePlusOne n
