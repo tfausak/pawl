@@ -43,7 +43,15 @@
       "triggeredAbilities": [
         {
           "condition": {
-            "type": "SelfTrains"
+            "type": "PermanentActs",
+            "value": {
+              "action": {
+                "type": "Train"
+              },
+              "permanent": {
+                "type": "Self"
+              }
+            }
           },
           "modal": {
             "modes": [

@@ -95,6 +95,8 @@ library codec
     Pawl.Codec.AbilitySticker
     Pawl.Codec.AbilityTriggered
     Pawl.Codec.AbilityTriggeredSpec
+    Pawl.Codec.ActingPermanent
+    Pawl.Codec.ActingPermanentSpec
     Pawl.Codec.ActivatedAbility
     Pawl.Codec.ActivatedAbilitySource
     Pawl.Codec.ActivatedAbilitySourceSpec
@@ -936,6 +938,9 @@ library codec
     Pawl.Codec.PendingEntryEffect
     Pawl.Codec.PendingEntryEffectSpec
     Pawl.Codec.PerCreature
+    Pawl.Codec.PermanentActed
+    Pawl.Codec.PermanentAction
+    Pawl.Codec.PermanentActionSpec
     Pawl.Codec.PermanentBecomesDesignated
     Pawl.Codec.PermanentBecomesDesignatedSpec
     Pawl.Codec.PermanentCandidate
@@ -1996,6 +2001,7 @@ library types
     Pawl.Types.AbilityName
     Pawl.Types.AbilitySticker
     Pawl.Types.AbilityTriggered
+    Pawl.Types.ActingPermanent
     Pawl.Types.Action
     Pawl.Types.ActivatedAbility
     Pawl.Types.ActivatedAbilitySource
@@ -2475,6 +2481,8 @@ library types
     Pawl.Types.PendingEntryEffect
     Pawl.Types.PendingTrigger
     Pawl.Types.PerCreature
+    Pawl.Types.PermanentActed
+    Pawl.Types.PermanentAction
     Pawl.Types.PermanentBecomesDesignated
     Pawl.Types.PermanentCandidate
     Pawl.Types.PermanentDealsCombatDamageToPlayer

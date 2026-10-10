@@ -306,6 +306,8 @@ import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.PendingDamageEffect as PendingDamageEffect
 import qualified Pawl.Types.PendingEntryEffect as PendingEntryEffect
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
+import qualified Pawl.Types.PermanentActed as PermanentActed
+import qualified Pawl.Types.PermanentAction as PermanentAction
 import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
@@ -4945,7 +4947,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     --
     -- CR 708.2b is the guard below: an effect that LISTS its own values would
     -- otherwise overwrite the list already there, and a permanent it spares
-    -- records no GameEvent.TurnedFaceDown either. Pawl.FaceDownSpec's "CR 708.2b
+    -- records no PermanentAction.TurnFaceDown either. Pawl.FaceDownSpec's "CR 708.2b
     -- Synthetic Veiled Witness draws nothing off a permanent already face down"
     -- proves it.
     --
@@ -4978,7 +4980,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       )
     -- CR 701.27b: one event per permanent that actually turned, after the writes,
     -- so a trigger's Filter reads the face-down permanent (CR 603.10).
-    Monad.mapM_ (State.modify' . Event.recordEvent . GameEvent.TurnedFaceDown) ordered
+    Monad.mapM_ (State.modify' . Event.recordEvent . GameEvent.PermanentActed . PermanentActed.MkPermanentActed PermanentAction.TurnFaceDown) ordered
   -- CR 708 through FaceDown.turnFaceUpByEffect, the funnel CR 116.2b's special
   -- action shares: this arm decides only WHICH permanent, never what turning it
   -- over does. CR 701.40g lives inside that funnel and so applies here without
@@ -8578,7 +8580,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         Nothing -> pure ()
         Just target -> do
           placed <- Event.putCounters (CounterCause.ByEffect controller) target CounterKind.PlusOnePlusOne 1
-          Monad.when (placed > 0) (State.modify' (Event.recordEvent (GameEvent.Evolved target)))
+          Monad.when (placed > 0) (State.modify' (Event.recordEvent (GameEvent.PermanentActed (PermanentActed.MkPermanentActed PermanentAction.Evolve target))))
       _ -> pure ()
   -- CR 702.134a's counter and CR 702.134c's marker: rule 702.134c fires on the
   -- mentor ability RESOLVING, so the event is recorded however many counters CR
@@ -8601,7 +8603,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         Nothing -> pure ()
         Just target -> do
           placed <- Event.putCounters (CounterCause.ByEffect controller) target CounterKind.PlusOnePlusOne 1
-          Monad.when (placed > 0) (State.modify' (Event.recordEvent (GameEvent.Trained target)))
+          Monad.when (placed > 0) (State.modify' (Event.recordEvent (GameEvent.PermanentActed (PermanentActed.MkPermanentActed PermanentAction.Train target))))
       _ -> pure ()
   -- CR 702.110a's sacrifice and CR 702.110b's marker. The creature is CHOSEN as
   -- the effect is applied (CR 608.2d) rather than targeted (CR 115.1), so the
@@ -11856,7 +11858,7 @@ exploreOne oid = do
       -- done, so this comes after every branch above. Inside the Just, since an
       -- id nobody ever controlled explores nothing; but not inside the library
       -- case, that rule firing even when the actions were impossible.
-      State.modify' (Event.recordEvent (GameEvent.Explored oid))
+      State.modify' (Event.recordEvent (GameEvent.PermanentActed (PermanentActed.MkPermanentActed PermanentAction.Explore oid)))
 
 -- CR 701.50d: one permanent's connive N. Rule 701.50a's bare connive is this
 -- with N of one, so there is no second road.
@@ -11916,7 +11918,7 @@ conniveOne n oid = Monad.when (n > 0) $ do
     -- impossible -- exploreOne's CR 701.44b line. Inside the Just, since an id
     -- nobody ever controlled connives nothing; CR 701.50e's zero never reaches
     -- here, the guard above having returned.
-    State.modify' (Event.recordEvent (GameEvent.Connived oid))
+    State.modify' (Event.recordEvent (GameEvent.PermanentActed (PermanentActed.MkPermanentActed PermanentAction.Connive oid)))
 
 -- CR 702.26e: the objects a resolving effect that changes characteristics or
 -- control freezes (CR 611.2c), less every phased-out permanent -- even one it

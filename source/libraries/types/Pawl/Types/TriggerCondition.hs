@@ -2,6 +2,7 @@ module Pawl.Types.TriggerCondition where
 
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.AbilityAddsMana as AbilityAddsMana
+import qualified Pawl.Types.ActingPermanent as ActingPermanent
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardPutIntoGraveyard as CardPutIntoGraveyard
@@ -16,6 +17,7 @@ import qualified Pawl.Types.DieResult as DieResult
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.OwnedZone as OwnedZone
+import qualified Pawl.Types.PermanentActed as PermanentActed
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentDealsCombatDamageToPlayer as PermanentDealsCombatDamageToPlayer
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
@@ -480,29 +482,16 @@ data TriggerCondition
   | -- | CR 708.7's other written form read by a bystander (Aven Farseer),
     -- filtered and read live after CR 708.8 restores the copiable values.
     PermanentTurnedFaceUp (Filter.Filter Keyword.Keyword)
-  | -- | CR 701.27b: a permanent the Filter admits was turned face down (Synthetic
-    -- Veiled Witness), read live after the turning.
-    PermanentTurnedFaceDown (Filter.Filter Keyword.Keyword)
   | -- | CR 708.9: "whenever a face-down permanent is revealed as it leaves the
     -- battlefield" (Synthetic Unmasking Witness).
     FaceDownPermanentLeavesRevealed
   | -- | A permanent the Filter admits gained this designation -- CR 702.112b's
     -- renown (Valeron Wardens) and CR 701.37b's monstrous (Arbor Colossus).
     PermanentBecomesDesignated PermanentBecomesDesignated.PermanentBecomesDesignated
-  | -- | CR 702.100b: the bearer evolved (Renegade Krasis). Self-scoped.
-    SelfEvolves
-  | -- | CR 702.140d: "whenever this creature mutates" (Cubwarden), which rule
-    -- 702.140d fires when a mutating creature spell merges with it. Self-scoped,
-    -- SelfEvolves' shape: the merged permanent is the only object the event
-    -- names.
-    SelfMutates
   | -- | CR 702.134c: the creature the bearer is attached to mentored another
     -- (Aegis of the Legion). Attachment-scoped, so vacuously False while
     -- attached to nothing or to a player (CR 303.4).
     AttachedCreatureMentors
-  | -- | CR 702.149c: the bearer trained (Savior of Ollenbock). Self-scoped, and
-    -- recorded only where a counter actually went on.
-    SelfTrains
   | -- | CR 702.110b: the bearer exploited a creature (Qarsi Sadist). Self-scoped,
     -- AttachedCreatureMentors' shape: rule 702.110b's "a creature" is a second
     -- object, bound under Pawl.Engine.Binding.exploitedCreature.
@@ -601,20 +590,6 @@ data TriggerCondition
   | -- | CR 702.170a / 702.170c: "when this card becomes plotted" (Aloe
     -- Alchemist). Self-scoped, and watched for from exile.
     SelfBecomesPlotted
-  | -- | CR 701.44b: "whenever a creature you control explores" (Wildgrowth
-    -- Walker), once per completed explore including one whose library was empty.
-    PermanentExplores (Filter.Filter Keyword.Keyword)
-  | -- | CR 701.50f: "whenever a creature you control connives" (Iron Monger,
-    -- Sadistic Tycoon), once per completed connive. CR 701.50e is why a connive
-    -- 0 does not reach it.
-    PermanentConnives (Filter.Filter Keyword.Keyword)
-  | -- | CR 701.43d \/ 607.2h: "when you do" beside "you may exert this creature
-    -- as it attacks" (Glory-Bound Initiate). Self-scoped, the linkage holding by
-    -- construction.
-    --
-    -- Not implemented: a card bearing two exert paragraphs, whose two triggers
-    -- would each see both exerts.
-    SelfExerted
   | -- | CR 701.3a read by the host: "whenever an Aura becomes attached to this
     -- creature" (Bramble Elemental), with the Filter over the attachment.
     SelfBecomesAttachedBy (Filter.Filter Keyword.Keyword)
@@ -644,6 +619,12 @@ data TriggerCondition
     -- Rule 509.3d's remaining producer, an effect that causes a creature to
     -- block (General Jarkeld), reaches it through the same arm as the other two.
     PermanentBecomesBlockedBy (Filter.Filter Keyword.Keyword)
+  | -- | CR 603.2: "whenever [a permanent] <acts>" (Renegade Krasis, Wildgrowth
+    -- Walker), the actor being the bearer itself or one the Filter admits.
+    --
+    -- Not implemented: a card bearing two exert paragraphs, whose two
+    -- PermanentAction.Exert triggers would each see both exerts.
+    PermanentActs (PermanentActed.PermanentActed ActingPermanent.ActingPermanent)
   | -- | CR 603.2: "whenever [a player] <acts>", the actor read against CR
     -- 109.5's "you" (Matoya, Archon Elder; Synthetic Blight Chronicler).
     PlayerActs (PlayerActed.PlayerActed PlayerRelation.PlayerRelation)

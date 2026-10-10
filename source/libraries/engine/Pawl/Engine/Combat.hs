@@ -62,6 +62,8 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PermanentActed as PermanentActed
+import qualified Pawl.Types.PermanentAction as PermanentAction
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
@@ -2214,7 +2216,7 @@ attemptAttackDeclaration perform pid rejected = do
                 exertDecider = Decide.deciderFor you gsExert
                 exert g =
                   Event.recordEvent
-                    (GameEvent.Exerted oid)
+                    (GameEvent.PermanentActed (PermanentActed.MkPermanentActed PermanentAction.Exert oid))
                     g {GameState.objects = Map.adjust (\o -> o {Object.exertedBy = Set.insert you (Object.exertedBy o)}) oid (GameState.objects g)}
             answer <- Game.choose (Prompt.ChooseExert exertDecider you oid)
             Monad.when (answer == OptionalDecision.Exercises) (State.modify' exert)

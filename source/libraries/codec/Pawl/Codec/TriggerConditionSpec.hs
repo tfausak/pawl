@@ -6,6 +6,7 @@ import qualified Pawl.Codec.TriggerCondition as TriggerCondition
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityAddsMana as AbilityAddsMana
+import qualified Pawl.Types.ActingPermanent as ActingPermanent
 import qualified Pawl.Types.AttackedPlayer as AttackedPlayer
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardName as CardName
@@ -29,6 +30,8 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaSpecification as ManaSpecification
 import qualified Pawl.Types.OwnedZone as OwnedZone
+import qualified Pawl.Types.PermanentActed as PermanentActed
+import qualified Pawl.Types.PermanentAction as PermanentAction
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentDealsCombatDamageToPlayer as PermanentDealsCombatDamageToPlayer
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
@@ -1007,14 +1010,20 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PermanentTurnedFaceUp (Filter.ControlledBy PlayerRelation.You))
       " {\"type\":\"PermanentTurnedFaceUp\",\"value\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}} "
-  -- CR 701.27b: Synthetic Veiled Witness's "whenever a permanent you control is
-  -- turned face down".
-  Spec.it s "PermanentTurnedFaceDown round-trips" $
+  -- CR 603.2: both fields ride on the wire. Renegade Krasis' self-scoped
+  -- "whenever this creature evolves", and Wildgrowth Walker's bystander "whenever
+  -- a creature you control explores", whose Filter must survive the trip.
+  Spec.it s "PermanentActs round-trips the action and the subject" $ do
     Common.assertCodec
       s
       TriggerCondition.codec
-      (TriggerCondition.PermanentTurnedFaceDown (Filter.ControlledBy PlayerRelation.You))
-      " {\"type\":\"PermanentTurnedFaceDown\",\"value\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}} "
+      (TriggerCondition.PermanentActs (PermanentActed.MkPermanentActed PermanentAction.Evolve ActingPermanent.Self))
+      " {\"type\":\"PermanentActs\",\"value\":{\"action\":{\"type\":\"Evolve\"},\"permanent\":{\"type\":\"Self\"}}} "
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PermanentActs (PermanentActed.MkPermanentActed PermanentAction.Explore (ActingPermanent.Matching (Filter.ControlledBy PlayerRelation.You))))
+      " {\"type\":\"PermanentActs\",\"value\":{\"action\":{\"type\":\"Explore\"},\"permanent\":{\"type\":\"Matching\",\"value\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}}}} "
   -- CR 708.9: Synthetic Unmasking Witness's condition.
   Spec.it s "FaceDownPermanentLeavesRevealed round-trips" $
     Common.assertCodec
@@ -1040,22 +1049,8 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated Designation.Monstrous Filter.IsSource))
       " {\"type\":\"PermanentBecomesDesignated\",\"value\":{\"designation\":{\"type\":\"Monstrous\"},\"filter\":{\"type\":\"IsSource\"}}} "
-  -- CR 702.100b's marker, self-scoped, so nullary.
-  Spec.it s "SelfEvolves" $
-    Common.assertCodec
-      s
-      TriggerCondition.codec
-      TriggerCondition.SelfEvolves
-      " {\"type\":\"SelfEvolves\"} "
-  -- CR 702.140d's marker, self-scoped, so nullary for SelfEvolves' reason.
-  Spec.it s "SelfMutates" $
-    Common.assertCodec
-      s
-      TriggerCondition.codec
-      TriggerCondition.SelfMutates
-      " {\"type\":\"SelfMutates\"} "
-  -- CR 702.134c's marker, read through the source's attachment, so nullary for
-  -- SelfEvolves' reason: neither the mentor nor the mentored creature is named by
+  -- CR 702.134c's marker, read through the source's attachment, so nullary:
+  -- neither the mentor nor the mentored creature is named by
   -- the condition.
   Spec.it s "AttachedCreatureMentors" $
     Common.assertCodec
@@ -1063,14 +1058,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.AttachedCreatureMentors
       " {\"type\":\"AttachedCreatureMentors\"} "
-  -- CR 702.149c's marker, self-scoped, so nullary for SelfEvolves' reason.
-  Spec.it s "SelfTrains" $
-    Common.assertCodec
-      s
-      TriggerCondition.codec
-      TriggerCondition.SelfTrains
-      " {\"type\":\"SelfTrains\"} "
-  -- CR 702.110b's marker, self-scoped, so nullary for SelfTrains' reason above.
+  -- CR 702.110b's marker, self-scoped, so nullary.
   Spec.it s "SelfExploits" $
     Common.assertCodec
       s
@@ -1296,33 +1284,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.SelfBecomesPlotted
       " {\"type\":\"SelfBecomesPlotted\"} "
-  -- CR 701.44b. The Filter is Wildgrowth Walker's "a creature you control" and
-  -- describes the EXPLORER, so a codec that dropped it would grow the Walker off
-  -- an opponent's explore.
-  Spec.it s "PermanentExplores round-trips with its Filter" $
-    Common.assertCodec
-      s
-      TriggerCondition.codec
-      (TriggerCondition.PermanentExplores (Filter.And [Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.You]))
-      " {\"type\":\"PermanentExplores\",\"value\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}]}} "
-  -- CR 701.50f. PermanentExplores' payload exactly -- Iron Monger, Sadistic
-  -- Tycoon's "a creature you control" describes the CONNIVER -- so the tag is the
-  -- whole difference between the two.
-  Spec.it s "PermanentConnives round-trips with its Filter" $
-    Common.assertCodec
-      s
-      TriggerCondition.codec
-      (TriggerCondition.PermanentConnives (Filter.And [Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.You]))
-      " {\"type\":\"PermanentConnives\",\"value\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}]}} "
-  -- CR 701.43d. Nullary, SelfEvolves' shape: rule 701.43d links the trigger to
-  -- the static ability printed beside it, so its subject is always the bearer.
-  Spec.it s "SelfExerted round-trips" $
-    Common.assertCodec
-      s
-      TriggerCondition.codec
-      TriggerCondition.SelfExerted
-      " {\"type\":\"SelfExerted\"} "
-  -- CR 603.12's reflexive, nullary for SelfExerted's reason: the whole condition
+  -- CR 603.12's reflexive, nullary: the whole condition
   -- is the word "when you do", and what it says about is the entry's existence.
   Spec.it s "Reflexive round-trips" $
     Common.assertCodec

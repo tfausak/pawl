@@ -94,6 +94,7 @@ import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.OwnedZone as OwnedZone
 import Pawl.Types.PendingTrigger (PendingTrigger)
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
+import qualified Pawl.Types.PermanentActed as PermanentActed
 import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
 import qualified Pawl.Types.PlanarDieRolled as PlanarDieRolled
 import qualified Pawl.Types.PlayerActed as PlayerActed
@@ -227,14 +228,11 @@ movedOf event = case event of
   GameEvent.AbilityCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
-  GameEvent.TurnedFaceDown _ -> Nothing
+  GameEvent.PermanentActed _ -> Nothing
   GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
-  GameEvent.Evolved _ -> Nothing
-  GameEvent.Mutated _ -> Nothing
   GameEvent.Mentored {} -> Nothing
   GameEvent.Exploited {} -> Nothing
-  GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
   GameEvent.Convoked _ -> Nothing
   GameEvent.Saddled _ -> Nothing
@@ -263,9 +261,6 @@ movedOf event = case event of
   GameEvent.SchemeSetInMotion _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
-  GameEvent.Explored _ -> Nothing
-  GameEvent.Connived _ -> Nothing
-  GameEvent.Exerted _ -> Nothing
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
   GameEvent.BecameTapped _ -> Nothing
@@ -369,14 +364,11 @@ participants event =
         GameEvent.CountersRemoved c -> one (CounterChange.object c)
         GameEvent.HalfUnlocked h -> ([HalfUnlocked.object h], [HalfUnlocked.actor h])
         GameEvent.TurnedFaceUp t -> one (TurnedFaceUp.object t)
-        GameEvent.TurnedFaceDown oid -> one oid
+        GameEvent.PermanentActed acted -> one (PermanentActed.permanent acted)
         GameEvent.Transformed t -> one (Transformed.object t)
         GameEvent.BecameDesignated d -> one (BecameDesignated.object d)
-        GameEvent.Evolved oid -> one oid
-        GameEvent.Mutated oid -> one oid
         GameEvent.Mentored m -> ([Mentored.mentor m, Mentored.mentored m], [])
         GameEvent.Exploited e -> ([Exploited.exploiter e, Exploited.exploited e], [])
-        GameEvent.Trained oid -> one oid
         -- "Becomes crewed" names the Vehicle alone, the way "becomes blocked"
         -- names the attacker; Crewed is the crewing creatures' own event.
         GameEvent.BecameCrewed c -> one (Crewing.vehicle c)
@@ -408,9 +400,6 @@ participants event =
         GameEvent.SchemeSetInMotion e -> ([SchemeSetInMotion.scheme e], [SchemeSetInMotion.player e])
         GameEvent.ClassLevelSet c -> one (ClassLevelChange.object c)
         GameEvent.Plotted oid -> one oid
-        GameEvent.Explored oid -> one oid
-        GameEvent.Connived oid -> one oid
-        GameEvent.Exerted oid -> one oid
         GameEvent.BecameTapped oid -> one oid
         GameEvent.BecameUntapped oid -> one oid
         GameEvent.TappedForMana t -> one (TappedForMana.permanent t)
@@ -461,8 +450,12 @@ looksBack condition = case condition of
   TriggerCondition.PlayerPlaysLand _ -> False
   TriggerCondition.PlayerManifestsDread _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
-  TriggerCondition.PermanentExplores _ -> False
-  TriggerCondition.PermanentConnives _ -> False
+  -- Not on CR 603.10a's list, and no zone change: a permanent acts where it
+  -- stands -- CR 701.43c can only exert one ON the battlefield, CR 702.100b's
+  -- and CR 702.149a's counters go on a permanent there, and CR 730.2b keeps a
+  -- mutated permanent the same object. An explore or connive moves cards, but
+  -- its event says the keyword action COMPLETED, not that anything left a zone.
+  TriggerCondition.PermanentActs _ -> False
   TriggerCondition.PlacesSticker _ -> False
   -- Not on CR 603.10a's list, and CR 706.1's roll is no zone change: it moves
   -- no object at all, so CR 603.10's first sentence governs.
@@ -473,9 +466,6 @@ looksBack condition = case condition of
   TriggerCondition.SetInMotion -> False
   TriggerCondition.PlayerWinsCoinFlip _ -> False
   TriggerCondition.PlayerLosesCoinFlip _ -> False
-  -- The same answer once more, and the most plainly: CR 701.43c can only exert a
-  -- permanent that is ON the battlefield, so nothing has changed zones.
-  TriggerCondition.SelfExerted -> False
   -- CR 603.10a's list does not reach an attachment either. CR 701.3a moves a
   -- permanent ONTO another one without changing its zone, and the one route that
   -- is a zone change -- CR 608.3c's Aura spell arriving attached -- leaves both
@@ -595,7 +585,6 @@ looksBack condition = case condition of
   -- sentence asks for. Both written forms.
   TriggerCondition.SelfTurnedFaceUp -> False
   TriggerCondition.PermanentTurnedFaceUp _ -> False
-  TriggerCondition.PermanentTurnedFaceDown _ -> False
   -- CR 712.18 is the same claim about transforming, and states it outright: the
   -- permanent "doesn't become a new object", so there is no departure for CR
   -- 603.10a to look back at.
@@ -606,16 +595,10 @@ looksBack condition = case condition of
   -- CR 702.112b's designation is given to a permanent that stays where it is, so
   -- there is no departure here either.
   TriggerCondition.PermanentBecomesDesignated {} -> False
-  -- Nor here: rule 702.100b's counters are put on a permanent on the battlefield.
-  TriggerCondition.SelfEvolves -> False
-  TriggerCondition.SelfMutates -> False
-  -- Nor here, for the same reason one rule over: rule 702.134a's counter goes on a
+  -- Nor here: rule 702.134a's counter goes on a
   -- creature that CR 508.1k has made an attacking creature, and a permanent leaving
   -- the battlefield is removed from combat (CR 506.4) rather than mentored.
   TriggerCondition.AttachedCreatureMentors -> False
-  -- Nor here, and by the same sentence: rule 702.149a's counter goes on an
-  -- attacking creature, which CR 506.4 has removed from combat if it left.
-  TriggerCondition.SelfTrains -> False
   -- CR 603.10a's second family: rule 702.110b's exploit IS a sacrifice, so these
   -- trigger when a player sacrifices a permanent -- and the sacrificed creature
   -- may be the bearer itself, which the Colonel Autumn ruling says still
@@ -780,8 +763,7 @@ batchScoped condition = case condition of
   TriggerCondition.PlayerPlaysLand _ -> False
   TriggerCondition.PlayerManifestsDread _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
-  TriggerCondition.PermanentExplores _ -> False
-  TriggerCondition.PermanentConnives _ -> False
+  TriggerCondition.PermanentActs _ -> False
   TriggerCondition.PlayerRollsResult _ -> False
   TriggerCondition.Visit -> False
   TriggerCondition.ChaosEnsues -> False
@@ -789,7 +771,6 @@ batchScoped condition = case condition of
   TriggerCondition.SetInMotion -> False
   TriggerCondition.PlayerWinsCoinFlip _ -> False
   TriggerCondition.PlayerLosesCoinFlip _ -> False
-  TriggerCondition.SelfExerted -> False
   TriggerCondition.SelfBecomesAttachedBy _ -> False
   TriggerCondition.SelfBecomesAttachedTo _ -> False
   -- Per-occurrence too: CR 701.3d's routes each unattach one permanent from one
@@ -860,15 +841,11 @@ batchScoped condition = case condition of
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
   TriggerCondition.SelfTurnedFaceUp -> False
   TriggerCondition.PermanentTurnedFaceUp _ -> False
-  TriggerCondition.PermanentTurnedFaceDown _ -> False
   TriggerCondition.FaceDownPermanentLeavesRevealed -> False
   TriggerCondition.SelfTransformedInto _ -> False
   TriggerCondition.PermanentTransforms _ -> False
   TriggerCondition.PermanentBecomesDesignated {} -> False
-  TriggerCondition.SelfEvolves -> False
-  TriggerCondition.SelfMutates -> False
   TriggerCondition.AttachedCreatureMentors -> False
-  TriggerCondition.SelfTrains -> False
   TriggerCondition.SelfExploits -> False
   TriggerCondition.CreatureExploits {} -> False
   TriggerCondition.SelfBecomesCrewed {} -> False
@@ -1322,9 +1299,7 @@ eventTriggers events gs =
         GameEvent.SchemeSetInMotion _ -> Map.empty
         GameEvent.ClassLevelSet _ -> Map.empty
         GameEvent.Plotted _ -> Map.empty
-        GameEvent.Explored _ -> Map.empty
-        GameEvent.Connived _ -> Map.empty
-        GameEvent.Exerted _ -> Map.empty
+        GameEvent.PermanentActed _ -> Map.empty
         GameEvent.BecameAttacked _ -> Map.empty
         GameEvent.AttackersDeclared _ -> Map.empty
         GameEvent.BecameTapped _ -> Map.empty
@@ -1357,14 +1332,10 @@ eventTriggers events gs =
         GameEvent.AbilityCountered _ -> Map.empty
         GameEvent.HalfUnlocked {} -> Map.empty
         GameEvent.TurnedFaceUp _ -> Map.empty
-        GameEvent.TurnedFaceDown _ -> Map.empty
         GameEvent.Transformed {} -> Map.empty
         GameEvent.BecameDesignated {} -> Map.empty
-        GameEvent.Evolved _ -> Map.empty
-        GameEvent.Mutated _ -> Map.empty
         GameEvent.Mentored {} -> Map.empty
         GameEvent.Exploited {} -> Map.empty
-        GameEvent.Trained _ -> Map.empty
         GameEvent.BecameCrewed _ -> Map.empty
         GameEvent.Convoked _ -> Map.empty
         GameEvent.Saddled _ -> Map.empty
@@ -1648,14 +1619,11 @@ eventTriggers events gs =
         GameEvent.AbilityCountered _ -> Map.empty
         GameEvent.HalfUnlocked {} -> Map.empty
         GameEvent.TurnedFaceUp _ -> Map.empty
-        GameEvent.TurnedFaceDown _ -> Map.empty
+        GameEvent.PermanentActed _ -> Map.empty
         GameEvent.Transformed {} -> Map.empty
         GameEvent.BecameDesignated {} -> Map.empty
-        GameEvent.Evolved _ -> Map.empty
-        GameEvent.Mutated _ -> Map.empty
         GameEvent.Mentored {} -> Map.empty
         GameEvent.Exploited {} -> Map.empty
-        GameEvent.Trained _ -> Map.empty
         GameEvent.BecameCrewed _ -> Map.empty
         GameEvent.Convoked _ -> Map.empty
         GameEvent.Saddled _ -> Map.empty
@@ -1684,9 +1652,6 @@ eventTriggers events gs =
         GameEvent.SchemeSetInMotion _ -> Map.empty
         GameEvent.ClassLevelSet _ -> Map.empty
         GameEvent.Plotted _ -> Map.empty
-        GameEvent.Explored _ -> Map.empty
-        GameEvent.Connived _ -> Map.empty
-        GameEvent.Exerted _ -> Map.empty
         GameEvent.BecameAttacked _ -> Map.empty
         GameEvent.AttackersDeclared _ -> Map.empty
         GameEvent.BecameTapped _ -> Map.empty
@@ -1964,14 +1929,11 @@ eventTriggers events gs =
         GameEvent.AbilityCountered _ -> Map.empty
         GameEvent.HalfUnlocked {} -> Map.empty
         GameEvent.TurnedFaceUp _ -> Map.empty
-        GameEvent.TurnedFaceDown _ -> Map.empty
+        GameEvent.PermanentActed _ -> Map.empty
         GameEvent.Transformed {} -> Map.empty
         GameEvent.BecameDesignated {} -> Map.empty
-        GameEvent.Evolved _ -> Map.empty
-        GameEvent.Mutated _ -> Map.empty
         GameEvent.Mentored {} -> Map.empty
         GameEvent.Exploited {} -> Map.empty
-        GameEvent.Trained _ -> Map.empty
         GameEvent.BecameCrewed _ -> Map.empty
         GameEvent.Convoked _ -> Map.empty
         GameEvent.Saddled _ -> Map.empty
@@ -2000,9 +1962,6 @@ eventTriggers events gs =
         GameEvent.SchemeSetInMotion _ -> Map.empty
         GameEvent.ClassLevelSet _ -> Map.empty
         GameEvent.Plotted _ -> Map.empty
-        GameEvent.Explored _ -> Map.empty
-        GameEvent.Connived _ -> Map.empty
-        GameEvent.Exerted _ -> Map.empty
         GameEvent.BecameAttacked _ -> Map.empty
         GameEvent.AttackersDeclared _ -> Map.empty
         GameEvent.BecameTapped _ -> Map.empty
@@ -2126,14 +2085,11 @@ eventTriggers events gs =
         GameEvent.AbilityCountered _ -> Map.empty
         GameEvent.HalfUnlocked {} -> Map.empty
         GameEvent.TurnedFaceUp _ -> Map.empty
-        GameEvent.TurnedFaceDown _ -> Map.empty
+        GameEvent.PermanentActed _ -> Map.empty
         GameEvent.Transformed {} -> Map.empty
         GameEvent.BecameDesignated {} -> Map.empty
-        GameEvent.Evolved _ -> Map.empty
-        GameEvent.Mutated _ -> Map.empty
         GameEvent.Mentored {} -> Map.empty
         GameEvent.Exploited {} -> Map.empty
-        GameEvent.Trained _ -> Map.empty
         GameEvent.BecameCrewed _ -> Map.empty
         GameEvent.Convoked _ -> Map.empty
         GameEvent.Saddled _ -> Map.empty
@@ -2162,9 +2118,6 @@ eventTriggers events gs =
         GameEvent.SchemeSetInMotion _ -> Map.empty
         GameEvent.ClassLevelSet _ -> Map.empty
         GameEvent.Plotted _ -> Map.empty
-        GameEvent.Explored _ -> Map.empty
-        GameEvent.Connived _ -> Map.empty
-        GameEvent.Exerted _ -> Map.empty
         GameEvent.BecameAttacked _ -> Map.empty
         GameEvent.AttackersDeclared _ -> Map.empty
         GameEvent.BecameTapped _ -> Map.empty
@@ -2623,10 +2576,12 @@ zonesTriggeredFrom cond =
         TriggerCondition.PlayerManifestsDread _ -> battlefield
         -- CR 113.6's default: Withengar Unbound is a creature.
         TriggerCondition.PlayerLosesGame _ -> battlefield
-        -- CR 113.6's default: Wildgrowth Walker is a creature, and an explore is
-        -- no condition that cannot trigger from the battlefield.
-        TriggerCondition.PermanentExplores _ -> battlefield
-        TriggerCondition.PermanentConnives _ -> battlefield
+        -- CR 113.6's default: Renegade Krasis and Wildgrowth Walker are creatures,
+        -- and no permanent's act is a condition that cannot trigger from the
+        -- battlefield. For CR 701.43c's exert it is the only possible answer: an
+        -- object that isn't on the battlefield can't be exerted, so a Self bearer is
+        -- standing there when its own exert is recorded.
+        TriggerCondition.PermanentActs _ -> battlefield
         TriggerCondition.PlacesSticker _ -> battlefield
         -- CR 113.6's default again: nothing about rolling a die is a condition
         -- that cannot trigger from the battlefield.
@@ -2640,12 +2595,8 @@ zonesTriggeredFrom cond =
         TriggerCondition.Visit -> battlefield
         TriggerCondition.PlayerWinsCoinFlip _ -> battlefield
         TriggerCondition.PlayerLosesCoinFlip _ -> battlefield
-        -- CR 113.6's default, and CR 701.43c makes it the only possible answer rather
-        -- than a default: an object that isn't on the battlefield can't be exerted, so
-        -- the bearer is standing there when its own exert is recorded.
-        TriggerCondition.SelfExerted -> battlefield
         -- CR 113.6's default, and CR 701.3a makes it the only possible answer for the
-        -- exert arm's reason: the host of an attachment is a permanent, so the bearer
+        -- PermanentActs exert's reason: the host of an attachment is a permanent, so the bearer
         -- is on the battlefield whenever this can match.
         TriggerCondition.SelfBecomesAttachedBy _ -> battlefield
         TriggerCondition.SelfBecomesAttachedTo _ -> battlefield
@@ -2702,16 +2653,11 @@ zonesTriggeredFrom cond =
         -- 113.6k's exception, which is for a condition that cannot trigger from the
         -- battlefield at all, does not apply.
         TriggerCondition.PermanentTurnedFaceUp _ -> battlefield
-        TriggerCondition.PermanentTurnedFaceDown _ -> battlefield
         TriggerCondition.FaceDownPermanentLeavesRevealed -> battlefield
         -- The same default: CR 702.112b's "only permanents can be or become renowned"
         -- keeps the subject on the battlefield, and Valeron Wardens watches from it.
         TriggerCondition.PermanentBecomesDesignated {} -> battlefield
-        -- The same default again: rule 702.100b's marker goes to a creature, and
-        -- Renegade Krasis is the creature watching itself.
-        TriggerCondition.SelfEvolves -> battlefield
-        TriggerCondition.SelfMutates -> battlefield
-        -- The same default a third time, from the Equipment's side: CR 301.5c unattaches
+        -- The same default again, from the Equipment's side: CR 301.5c unattaches
         -- an Equipment rather than moving it, so one that equips anything is on the
         -- battlefield, and Aegis of the Legion watches from there -- CR 113.6k's exception
         -- is for a condition that cannot trigger from the battlefield at all.
@@ -2743,11 +2689,6 @@ zonesTriggeredFrom cond =
         -- CR 113.6's default once more: the bearer's own mana ability resolved,
         -- so the bearer is a permanent on the battlefield.
         TriggerCondition.SelfManaAbilityResolves -> battlefield
-        -- The same default from the training creature's own side: rule 702.149a's ability
-        -- fires on an attack, so its bearer is on the battlefield and CR 113.6k's
-        -- exception -- for a condition that cannot trigger from there at all -- does not
-        -- apply.
-        TriggerCondition.SelfTrains -> battlefield
         -- The same default from the exploiting creature's own side: rule 702.110a's
         -- ability fires on its bearer's entry, so the bearer is on the battlefield.
         TriggerCondition.SelfExploits -> battlefield
@@ -3102,8 +3043,11 @@ stateTriggers gs
             TriggerCondition.PlayerPlaysLand _ -> False
             TriggerCondition.PlayerManifestsDread _ -> False
             TriggerCondition.SelfBecomesPlotted -> False
-            TriggerCondition.PermanentExplores _ -> False
-            TriggerCondition.PermanentConnives _ -> False
+            -- CR 603.2 again: a permanent's act HAPPENS, with its own log entry,
+            -- and leaves no state behind that says it did -- CR 702.100b's and CR
+            -- 702.149c's counters are counters like any other, and CR 701.43b
+            -- makes "already exerted" no bar to exerting again.
+            TriggerCondition.PermanentActs _ -> False
             TriggerCondition.PlacesSticker _ -> False
             -- CR 603.2 once more: a die roll is something that HAPPENS, with its own log
             -- entry, never a CR 603.8 state that could be true standing still.
@@ -3114,10 +3058,6 @@ stateTriggers gs
             TriggerCondition.SetInMotion -> False
             TriggerCondition.PlayerWinsCoinFlip _ -> False
             TriggerCondition.PlayerLosesCoinFlip _ -> False
-            -- CR 603.2 again: being exerted is something that happens, with its
-            -- own log entry, and CR 701.43b makes "already exerted" no bar to
-            -- exerting again -- so there is no standing state to be true.
-            TriggerCondition.SelfExerted -> False
             -- CR 603.2 once more: becoming attached is something that HAPPENS,
             -- with its own log entry. Standing attached is a state, but no
             -- condition here asks about it.
@@ -3248,16 +3188,11 @@ stateTriggers gs
             -- says nothing about which of them was ever TURNED over, so there
             -- is no state here to read at all.
             TriggerCondition.PermanentTurnedFaceUp _ -> False
-            TriggerCondition.PermanentTurnedFaceDown _ -> False
             TriggerCondition.FaceDownPermanentLeavesRevealed -> False
             -- CR 702.112b's designation is exactly that shape once more: the
             -- permanent keeps it, so a state read would fire every settle.
             TriggerCondition.PermanentBecomesDesignated {} -> False
-            -- CR 702.100b is an EVENT trigger and leaves no state at all behind:
-            -- the counters it put are indistinguishable from any others.
-            TriggerCondition.SelfEvolves -> False
-            TriggerCondition.SelfMutates -> False
-            -- CR 702.134c likewise, and one step further removed: what it fires
+            -- CR 702.134c is an EVENT trigger and leaves no state behind: what it fires
             -- on is a resolution, and the counter that resolution put is a
             -- counter like any other, so the board afterwards says nothing about
             -- which creature mentored which.
@@ -3286,10 +3221,6 @@ stateTriggers gs
             -- counters like any other, so the board afterwards cannot say a
             -- mana ability was what resolved.
             TriggerCondition.SelfManaAbilityResolves -> False
-            -- CR 702.149c the same: it fires on a resolution, and the counter
-            -- that resolution put is a counter like any other, so the board
-            -- afterwards says nothing about which creature trained.
-            TriggerCondition.SelfTrains -> False
             -- CR 702.110b the same: it fires on a resolution, and a creature
             -- missing from the battlefield afterwards could have left for any
             -- reason, so the board says nothing about who exploited it.
@@ -3873,13 +3804,10 @@ resnapshot gs without event =
         GameEvent.CountersRemoved {} -> Just event
         GameEvent.HalfUnlocked {} -> Just event
         GameEvent.TurnedFaceUp {} -> Just event
-        GameEvent.TurnedFaceDown {} -> Just event
+        GameEvent.PermanentActed {} -> Just event
         GameEvent.BecameDesignated {} -> Just event
-        GameEvent.Evolved {} -> Just event
-        GameEvent.Mutated {} -> Just event
         GameEvent.Mentored {} -> Just event
         GameEvent.Exploited {} -> Just event
-        GameEvent.Trained {} -> Just event
         GameEvent.BecameCrewed {} -> Just event
         GameEvent.Convoked {} -> Just event
         GameEvent.Crewed {} -> Just event
@@ -3902,9 +3830,6 @@ resnapshot gs without event =
         GameEvent.SchemeSetInMotion {} -> Just event
         GameEvent.ClassLevelSet {} -> Just event
         GameEvent.Plotted {} -> Just event
-        GameEvent.Explored {} -> Just event
-        GameEvent.Connived {} -> Just event
-        GameEvent.Exerted {} -> Just event
         GameEvent.BecameTapped {} -> Just event
         GameEvent.BecameUntapped {} -> Just event
         GameEvent.TappedForMana {} -> Just event

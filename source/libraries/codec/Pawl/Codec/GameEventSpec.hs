@@ -63,6 +63,8 @@ import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Milled as Milled
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PermanentActed as PermanentActed
+import qualified Pawl.Types.PermanentAction as PermanentAction
 import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlanarDieFace as PlanarDieFace
@@ -331,14 +333,20 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.TurnedFaceUp TurnedFaceUp.MkTurnedFaceUp {TurnedFaceUp.object = ObjectId.MkObjectId 5, TurnedFaceUp.announcedX = Just 2})
       " {\"type\":\"TurnedFaceUp\",\"value\":{\"object\":5,\"announcedX\":2}} "
-  -- CR 701.27b's other direction, a one-id payload: CR 708.8 makes the turn a
-  -- change to one permanent, and the payload says only which.
-  Spec.it s "TurnedFaceDown" $
+  -- CR 603.2. The action and the acting permanent alone: CR 701.44c and CR
+  -- 701.50b make last known information answer who controlled it, so no seat
+  -- rides along. The ACTION is all that separates a connive from an explore of
+  -- the same object, so a codec that dropped it would turn one into the other.
+  Spec.it s "PermanentActed" $ do
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.TurnedFaceDown (ObjectId.MkObjectId 5))
-      " {\"type\":\"TurnedFaceDown\",\"value\":5} "
+      (GameEvent.PermanentActed (PermanentActed.MkPermanentActed PermanentAction.Explore (ObjectId.MkObjectId 6)))
+      " {\"type\":\"PermanentActed\",\"value\":{\"action\":{\"type\":\"Explore\"},\"permanent\":6}} "
+    Spec.assertBool
+      s
+      (Codec.encode GameEvent.codec (GameEvent.PermanentActed (PermanentActed.MkPermanentActed PermanentAction.Connive (ObjectId.MkObjectId 6))) /= Codec.encode GameEvent.codec (GameEvent.PermanentActed (PermanentActed.MkPermanentActed PermanentAction.Explore (ObjectId.MkObjectId 6))))
+      "a connive and an explore of the same object encode differently"
   -- CR 701.27a, the different game action CR 701.27b holds it apart from. More
   -- than one field: CR 701.27e reads what the permanent turned INTO, and CR
   -- 603.10 adds the two axes CR 109.3 keeps out of that. The two CR 603.10 axes
@@ -350,7 +358,7 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.Transformed Transformed.MkTransformed {Transformed.object = ObjectId.MkObjectId 5, Transformed.characteristics = ProjectedCharacteristicsSpec.testCharacteristics, Transformed.controller = Nothing, Transformed.attachments = Set.empty})
       ("{\"type\":\"Transformed\",\"value\":{\"object\":5,\"characteristics\":" <> ProjectedCharacteristicsSpec.testCharacteristicsJson <> "}}")
-  -- CR 702.112b. One id, TurnedFaceDown's payload exactly: the designation says only
+  -- CR 702.112b. One id: the designation says only
   -- which permanent got it.
   Spec.it s "BecameDesignated Renowned" $
     Common.assertCodec
@@ -364,20 +372,6 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.BecameDesignated (BecameDesignated.MkBecameDesignated Designation.Monstrous (ObjectId.MkObjectId 5)))
       " {\"type\":\"BecameDesignated\",\"value\":{\"designation\":{\"type\":\"Monstrous\"},\"object\":5}} "
-  Spec.it s "Evolved" $
-    Common.assertCodec
-      s
-      GameEvent.codec
-      (GameEvent.Evolved (ObjectId.MkObjectId 6))
-      " {\"type\":\"Evolved\",\"value\":6} "
-  -- CR 702.140d: the merged permanent, Evolved's shape -- CR 730.2b leaves the
-  -- spell that merged with no id of its own to name.
-  Spec.it s "Mutated" $
-    Common.assertCodec
-      s
-      GameEvent.codec
-      (GameEvent.Mutated (ObjectId.MkObjectId 7))
-      " {\"type\":\"Mutated\",\"value\":7} "
   -- CR 702.134c: the mentor first, the creature it mentored second. Distinct ids
   -- prove the order, which is what "put a shield counter on THAT creature" reads.
   Spec.it s "Mentored" $
@@ -394,14 +388,6 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.Exploited (Exploited.MkExploited (ObjectId.MkObjectId 8) (ObjectId.MkObjectId 9)))
       " {\"type\":\"Exploited\",\"value\":{\"exploiter\":8,\"exploited\":9}} "
-  -- CR 702.149c: the creature that trained, and nothing else -- rule 702.149a puts
-  -- its counter on that same creature, so there is no second id.
-  Spec.it s "Trained" $
-    Common.assertCodec
-      s
-      GameEvent.codec
-      (GameEvent.Trained (ObjectId.MkObjectId 8))
-      " {\"type\":\"Trained\",\"value\":8} "
   -- CR 702.51c: the spell and the creatures tapped to pay for mana in its total
   -- cost, two convokers so a codec that dropped all but one goes red.
   Spec.it s "Convoked" $
@@ -605,40 +591,8 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.Plotted (ObjectId.MkObjectId 5))
       " {\"type\":\"Plotted\",\"value\":5} "
-  -- CR 701.44b. The explorer alone: CR 701.44c makes last known information
-  -- answer who controlled it, so no seat rides along.
-  Spec.it s "Explored" $
-    Common.assertCodec
-      s
-      GameEvent.codec
-      (GameEvent.Explored (ObjectId.MkObjectId 6))
-      " {\"type\":\"Explored\",\"value\":6} "
-  -- CR 701.50f. Explored's payload exactly, so the TAG is all that separates the
-  -- two -- a codec that dropped it would turn a connive into an explore.
-  Spec.it s "Connived" $ do
-    Common.assertCodec
-      s
-      GameEvent.codec
-      (GameEvent.Connived (ObjectId.MkObjectId 6))
-      " {\"type\":\"Connived\",\"value\":6} "
-    Spec.assertBool
-      s
-      (Codec.encode GameEvent.codec (GameEvent.Connived (ObjectId.MkObjectId 6)) /= Codec.encode GameEvent.codec (GameEvent.Explored (ObjectId.MkObjectId 6)))
-      "a connive and an explore of the same object encode differently"
-  -- CR 701.43a. Explored's payload exactly, so the TAG is all that separates the
-  -- two -- a codec that dropped it would turn an exert into an explore.
-  Spec.it s "Exerted" $ do
-    Common.assertCodec
-      s
-      GameEvent.codec
-      (GameEvent.Exerted (ObjectId.MkObjectId 7))
-      " {\"type\":\"Exerted\",\"value\":7} "
-    Spec.assertBool
-      s
-      (Codec.encode GameEvent.codec (GameEvent.Exerted (ObjectId.MkObjectId 7)) /= Codec.encode GameEvent.codec (GameEvent.Explored (ObjectId.MkObjectId 7)))
-      "an exert and an explore of the same object encode differently"
-  -- CR 701.26a. Exerted's payload exactly -- a bare ObjectId -- so the TAG is
-  -- again the whole difference.
+  -- CR 701.26a. A bare ObjectId, the acting permanent PermanentActed carries, so
+  -- the TAG is the whole difference from an exert of the same object.
   Spec.it s "BecameTapped" $ do
     Common.assertCodec
       s
@@ -647,7 +601,7 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       " {\"type\":\"BecameTapped\",\"value\":8} "
     Spec.assertBool
       s
-      (Codec.encode GameEvent.codec (GameEvent.BecameTapped (ObjectId.MkObjectId 8)) /= Codec.encode GameEvent.codec (GameEvent.Exerted (ObjectId.MkObjectId 8)))
+      (Codec.encode GameEvent.codec (GameEvent.BecameTapped (ObjectId.MkObjectId 8)) /= Codec.encode GameEvent.codec (GameEvent.PermanentActed (PermanentActed.MkPermanentActed PermanentAction.Exert (ObjectId.MkObjectId 8))))
       "a tap and an exert of the same object encode differently"
   -- CR 701.26b. BecameTapped's payload exactly, so the TAG is the whole
   -- difference between the two directions of one status.
