@@ -21,6 +21,7 @@ import qualified Pawl.Codec.Keyword as Keyword.Codec
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Keyword as Keyword.Engine
+import qualified Pawl.Engine.Mint as Mint
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Object as Object
 import qualified Pawl.Json.Pair as Pair
@@ -99,7 +100,6 @@ import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
-import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.MoveCounters as MoveCounters
@@ -1808,9 +1808,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         slotWith slot =
           (S.combinedFace piker)
             { Face.spell =
-                Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) slot)))
-                  (ModeSelection.ChooseExactly 1)
+                Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) slot) Seq.empty
             }
         amountless = slotWith (TargetSlot.required Pool.Creatures (Just buried))
     Spec.assertEqWith s "a planted atom in an amountless slot is an offence" (manaValueAtMostAmountCounts amountless) (0, 1)
@@ -1854,9 +1852,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         slotWith slot =
           (S.combinedFace piker)
             { Face.spell =
-                Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) slot)))
-                  (ModeSelection.ChooseExactly 1)
+                Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) slot) Seq.empty
             }
         amountless = slotWith (TargetSlot.required Pool.Creatures (Just buried))
     Spec.assertEqWith s "a planted atom in an amountless slot is an offence" (manaValueEqualToAmountCounts amountless) (0, 1)
@@ -1869,9 +1865,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     let conjuring amount =
           (S.combinedFace piker)
             { Face.spell =
-                Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Conjure (Conjure.MkConjure Conjure.defaultQuantity (ConjureCards.Reference (FromReference.MkFromReference buried amount)) Conjure.defaultSelection (ConjureDestination.Battlefield ConjureEntry.defaultValue) Nothing))))) Map.empty))
-                  (ModeSelection.ChooseExactly 1)
+                Mint.oneMode (Seq.singleton (Effect.Conjure (Conjure.MkConjure Conjure.defaultQuantity (ConjureCards.Reference (FromReference.MkFromReference buried amount)) Conjure.defaultSelection (ConjureDestination.Battlefield ConjureEntry.defaultValue) Nothing)))
             }
     Spec.assertEqWith s "a planted atom in a reference pick naming no amount is an offence" (manaValueEqualToAmountCounts (conjuring Nothing)) (0, 1)
     Spec.assertEqWith s "and one naming an amount is not" (manaValueEqualToAmountCounts (conjuring (Just (Quantity.Type.Literal 4)))) (1, 0)
@@ -1889,9 +1883,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     let planted amount =
           (S.combinedFace piker)
             { Face.spell =
-                Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (amount (TargetSlot.required Pool.Creatures (Just Filter.Type.PowerAtMostAmount))))))
-                  (ModeSelection.ChooseExactly 1)
+                Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (amount (TargetSlot.required Pool.Creatures (Just Filter.Type.PowerAtMostAmount)))) Seq.empty
             }
     Spec.assertEqWith s "a planted atom in an amountless slot is an offence" (counts (planted id)) (0, 1)
     Spec.assertEqWith s "and the same atom in a slot that names one is not" (counts (planted (TargetSlot.withAmount (Quantity.Type.Literal 2)))) (1, 0)
@@ -1980,9 +1972,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         planted =
           (S.combinedFace piker)
             { Face.spell =
-                Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buried)))))
-                  (ModeSelection.ChooseExactly 1)
+                Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buried))) Seq.empty
             }
     Spec.assertEqWith s "a planted atom is an offence" (hostOfSourceCounts planted) (0, 1)
     Spec.assertBool s (hostOfSourceOffends planted) "and the lint says so"
@@ -2010,9 +2000,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         planted =
           (S.combinedFace piker)
             { Face.spell =
-                Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buried)))))
-                  (ModeSelection.ChooseExactly 1)
+                Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buried))) Seq.empty
             }
     Spec.assertEqWith s "a planted atom is outside every Count" (evaluatedCounts planted) (0, 1)
     Spec.assertBool s (evaluatedOffends planted) "and the lint says so"
@@ -2083,7 +2071,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     let atoms = jsonAtoms isTargetTag . Codec.encode (Face.Codec.codec Card.codec) . S.combinedFace
     Spec.assertEqWith s "and the added, additional and activation costs that ask it are accepted" (fmap atoms [edict, rite, altar], fmap (isTargetOffends . S.combinedFace) [edict, rite, altar]) ([1, 1, 1], [False, False, False])
     piker <- S.printingOf s registry "Goblin Piker"
-    let planted = (S.combinedFace piker) {Face.spell = Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching (Filter.Type.Not Filter.Type.IsTarget)) Regenerability.Regenerable Nothing Nothing Nothing))))) Map.empty)) (ModeSelection.ChooseExactly 1)}
+    let planted = (S.combinedFace piker) {Face.spell = Mint.oneMode (Seq.singleton (Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching (Filter.Type.Not Filter.Type.IsTarget)) Regenerability.Regenerable Nothing Nothing Nothing)))}
     Spec.assertBool s (isTargetOffends planted) "the same atom in an effect's filter is an offence"
   Spec.it s "CR 400.11c no card asks IsBound in a wish's filter" $ do
     ps <- S.allPrintings s
@@ -2107,9 +2095,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     let slot = SlotName.MkSlotName (Text.pack "target")
         buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Sorcery, Filter.Type.Not (Filter.Type.IsBound slot)]]
         spellOf effects =
-          Modal.MkModal
-            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) Map.empty))
-            (ModeSelection.ChooseExactly 1)
+          Mint.oneMode (Seq.fromList effects)
     piker <- S.printingOf s registry "Goblin Piker"
     let base = S.combinedFace piker
         wished = base {Face.spell = spellOf [Effect.FromOutsideTheGame (FromOutsideTheGame.MkFromOutsideTheGame 1 False OutsideDestination.Hand buried True)]}
@@ -2131,33 +2117,28 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     let gated =
           base
             { Face.spell =
-                Modal.MkModal
+                Mint.oneModeOf
+                  Map.empty
                   ( Seq.singleton
-                      ( Mode.MkMode
-                          ( Seq.singleton
-                              ( Clause.MkClause
-                                  Nothing
-                                  Nothing
-                                  Nothing
-                                  Optionality.Mandatory
-                                  ( Just
-                                      PayGate.MkPayGate
-                                        { PayGate.payer = PlayerRef.Relative PlayerRelation.You,
-                                          PayGate.cost = CostChoice.MkCostChoice (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 buried)] NonEmpty.:| []),
-                                          PayGate.basis = Nothing,
-                                          PayGate.branch = PayBranch.IfNotPaid,
-                                          PayGate.obligation = PayObligation.Optional,
-                                          PayGate.perEach = Nothing,
-                                          PayGate.offeredAt = Nothing
-                                        }
-                                  )
-                                  (Seq.singleton (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot slot, SacrificeEffect.sacrificer = Sacrificer.EffectController, SacrificeEffect.sacrificed = Nothing}))
-                              )
+                      ( Clause.MkClause
+                          Nothing
+                          Nothing
+                          Nothing
+                          Optionality.Mandatory
+                          ( Just
+                              PayGate.MkPayGate
+                                { PayGate.payer = PlayerRef.Relative PlayerRelation.You,
+                                  PayGate.cost = CostChoice.MkCostChoice (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 buried)] NonEmpty.:| []),
+                                  PayGate.basis = Nothing,
+                                  PayGate.branch = PayBranch.IfNotPaid,
+                                  PayGate.obligation = PayObligation.Optional,
+                                  PayGate.perEach = Nothing,
+                                  PayGate.offeredAt = Nothing
+                                }
                           )
-                          Map.empty
+                          (Seq.singleton (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot slot, SacrificeEffect.sacrificer = Sacrificer.EffectController, SacrificeEffect.sacrificed = Nothing}))
                       )
                   )
-                  (ModeSelection.ChooseExactly 1)
             }
     Spec.assertEqWith s "CR 118.12 the same atom in a gate's cost is not an offence" (isBoundCounts gated) (0, 1)
     Spec.assertBool s (not (isBoundOffends gated)) "and the lint accepts it"
@@ -2238,9 +2219,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
               Nothing
           ]
         spellOf targetSlot =
-          Modal.MkModal
-            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton slot targetSlot)))
-            (ModeSelection.ChooseExactly 1)
+          Mint.oneModeTargeting (Map.singleton slot targetSlot) Seq.empty
         counting kind f = spellOf (TargetSlot.withAmount (Quantity.Type.ObjectCounters kind) (TargetSlot.required Pool.Creatures f))
         -- CR 614.1c's own row, carrying the entry rewrite under test. Filter.IsSource
         -- is what every "[this permanent] enters ..." clause matches on.
@@ -2569,27 +2548,21 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         planted =
           (S.combinedFace piker)
             { Face.spell =
-                Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) targetSlot)))
-                  (ModeSelection.ChooseExactly 1)
+                Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) targetSlot) Seq.empty
             }
     Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
     let buriedGreater = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.PowerGreaterThanSource]]
         plantedGreater =
           planted
             { Face.spell =
-                Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buriedGreater)))))
-                  (ModeSelection.ChooseExactly 1)
+                Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buriedGreater))) Seq.empty
             }
     Spec.assertEqWith s "and so is its sibling" (greater plantedGreater) 1
     let buriedToughness = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.PowerAtLeastSourceToughness]]
         plantedToughness =
           planted
             { Face.spell =
-                Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buriedToughness)))))
-                  (ModeSelection.ChooseExactly 1)
+                Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buriedToughness))) Seq.empty
             }
     Spec.assertEqWith s "and so is the toughness comparison" (toughness plantedToughness) 1
   -- CR 702.85a's comparison is the pair above's one characteristic over, and
@@ -2617,9 +2590,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         planted =
           (S.combinedFace piker)
             { Face.spell =
-                Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buried)))))
-                  (ModeSelection.ChooseExactly 1)
+                Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buried))) Seq.empty
             }
     Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
   -- The pair above's comparison one operator over, which a CARD may write -- but
@@ -2654,9 +2625,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         planted =
           (S.combinedFace piker)
             { Face.spell =
-                Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buried)))))
-                  (ModeSelection.ChooseExactly 1)
+                Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buried))) Seq.empty
             }
     Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
   -- CR 702.140a's comparison is the atom above's sibling one characteristic over,
@@ -2678,9 +2647,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         planted =
           (S.combinedFace piker)
             { Face.spell =
-                Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buried)))))
-                  (ModeSelection.ChooseExactly 1)
+                Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buried))) Seq.empty
             }
     Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
   -- CR 508.5's atom is answerable only where the CONTEXT supplies a defending
@@ -2719,9 +2686,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         planted =
           (S.combinedFace piker)
             { Face.spell =
-                Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) targetSlot)))
-                  (ModeSelection.ChooseExactly 1)
+                Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) targetSlot) Seq.empty
             }
     Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
     Spec.assertEqWith s "and in a target slot it is accepted" (elsewhere planted) 0
@@ -2748,9 +2713,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         planted =
           (S.combinedFace piker)
             { Face.spell =
-                Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) targetSlot)))
-                  (ModeSelection.ChooseExactly 1)
+                Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) targetSlot) Seq.empty
             }
     Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
   -- CR 601.2c's baked "that player's graveyard", for ControlledByPlayer's reason:
@@ -2765,9 +2728,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         planted =
           (S.combinedFace piker)
             { Face.spell =
-                Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) targetSlot)))
-                  (ModeSelection.ChooseExactly 1)
+                Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) targetSlot) Seq.empty
             }
     Spec.assertEqWith s "a planted scope is seen" (atoms planted) 1
   -- CR 702.119c's baked half, in the position the atom above holds: an ObjectId
@@ -2786,9 +2747,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         planted =
           (S.combinedFace piker)
             { Face.spell =
-                Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) targetSlot)))
-                  (ModeSelection.ChooseExactly 1)
+                Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) targetSlot) Seq.empty
             }
     Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
   -- CR 611.2b's baked half, in exactly the position the atom above holds: a
@@ -2818,14 +2777,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         planted =
           (S.combinedFace piker)
             { Face.spell =
-                Modal.MkModal
-                  ( Seq.singleton
-                      ( Mode.MkMode
-                          (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.GainControl (DurationRef.MkDurationRef (Duration.ForAsLongAs crowned) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))))))
-                          (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures Nothing))
-                      )
-                  )
-                  (ModeSelection.ChooseExactly 1)
+                Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures Nothing)) (Seq.singleton (Effect.GainControl (DurationRef.MkDurationRef (Duration.ForAsLongAs crowned) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))))
             }
     Spec.assertEqWith s "a planted reference is seen" (atoms planted) 1
   -- The sweep above passes VACUOUSLY for every card but Aura Graft, and Aura
@@ -2851,9 +2803,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         -- declaring these slots -- the smallest carrier that reaches a mode's
         -- clauses and its targetSlots at once.
         spellOf effects slots =
-          Modal.MkModal
-            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) slots))
-            (ModeSelection.ChooseExactly 1)
+          Mint.oneModeTargeting slots (Seq.fromList effects)
         boostedBy quantity =
           StaticAbility.MkStaticAbility
             (Affected.Matching Filter.Type.IsSource)
@@ -3087,9 +3037,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         atom = Filter.Type.SameNameAsBound (SlotName.MkSlotName (Text.pack "thatSpell"))
         buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not atom]]
         spellOf effects slots =
-          Modal.MkModal
-            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) slots))
-            (ModeSelection.ChooseExactly 1)
+          Mint.oneModeTargeting slots (Seq.fromList effects)
         boostedBy quantity =
           StaticAbility.MkStaticAbility
             (Affected.Matching Filter.Type.IsSource)
@@ -3258,9 +3206,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         atom = Filter.Type.HasChosenName
         buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not atom]]
         spellOf effects slots =
-          Modal.MkModal
-            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) slots))
-            (ModeSelection.ChooseExactly 1)
+          Mint.oneModeTargeting slots (Seq.fromList effects)
         searchFor f = Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.outsideTheGame = False, Search.quantity = Just (Quantity.Type.Literal 1), Search.filter = f, Search.upTo = False, Search.destination = SearchDestination.Exile, Search.subject = Nothing, Search.slot = Nothing, Search.differentIn = Set.empty, Search.exactly = False}
         planted =
           [ ( "a mode's target slot",
@@ -3422,9 +3368,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     let base = S.combinedFace piker
         slot = SlotName.MkSlotName (Text.pack "target")
         spellOf effects slots =
-          Modal.MkModal
-            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) slots))
-            (ModeSelection.ChooseExactly 1)
+          Mint.oneModeTargeting slots (Seq.fromList effects)
         aimed f = Map.singleton slot (TargetSlot.required Pool.Permanents (Just f))
         withAbility change = (S.combinedFace sorcerer) {Face.activatedAbilities = fmap change (Face.activatedAbilities (S.combinedFace sorcerer))}
         affecting f =
@@ -3492,9 +3436,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     let slot = SlotName.MkSlotName (Text.pack "target")
         aimed =
-          Modal.MkModal
-            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton slot (TargetSlot.required Pool.Permanents (Just Filter.Type.IsLastExiledWithSource)))))
-            (ModeSelection.ChooseExactly 1)
+          Mint.oneModeTargeting (Map.singleton slot (TargetSlot.required Pool.Permanents (Just Filter.Type.IsLastExiledWithSource))) Seq.empty
         planted = (S.combinedFace sorcerer) {Face.activatedAbilities = fmap (\a -> a {ActivatedAbility.modal = aimed}) (Face.activatedAbilities (S.combinedFace sorcerer))}
     Spec.assertEqWith
       s

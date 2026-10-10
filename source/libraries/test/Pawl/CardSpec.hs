@@ -17,6 +17,7 @@ module Pawl.CardSpec where
 -- the evaluator module Pawl.Engine.Filter may later be imported and must not collide.
 -- triggered ability's effects (Card.allEffects only reaches the spell).
 -- whole card written by somebody else and so an independent witness to the
+
 import qualified Control.Monad as Monad
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
@@ -35,6 +36,7 @@ import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as KeywordEngine
+import qualified Pawl.Engine.Mint as Mint
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.Projection as Projection
@@ -259,7 +261,6 @@ import qualified Pawl.Types.MovedKinds as MovedKinds
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
-import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.OrElse as OrElse
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PerCreature as PerCreature
@@ -362,7 +363,6 @@ import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.TopOfLibraryUntil as TopOfLibraryUntil
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
-import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
 import qualified Pawl.Types.TurnUpR as TurnUpR
@@ -2675,16 +2675,7 @@ oneEffectTrigger ::
   Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) ->
   TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 oneEffectTrigger condition effect =
-  TriggeredAbility.MkTriggeredAbility
-    { TriggeredAbility.condition = condition,
-      TriggeredAbility.modal =
-        Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-          (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing,
-      TriggeredAbility.name = Nothing,
-      TriggeredAbility.limit = TriggerLimit.Unlimited
-    }
+  Mint.trigger condition (Seq.singleton effect)
 
 -- oneEffectTrigger's ACTIVATED twin: a one-mode, targetless ability running one
 -- effect, and the fixture the read lint's self-test misauthors on purpose. Kept
@@ -2703,9 +2694,7 @@ oneEffectActivated mana effect =
   ActivatedAbility.MkActivatedAbility
     { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = mana, Cost.Type.components = []},
       ActivatedAbility.modal =
-        Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-          (ModeSelection.ChooseExactly 1),
+        Mint.oneMode (Seq.singleton effect),
       ActivatedAbility.maximumX = [],
       ActivatedAbility.minimumX = 0,
       ActivatedAbility.restrictions = [],
@@ -2718,10 +2707,15 @@ oneEffectActivated mana effect =
 -- One CR 700.2 mode for the fixtures below: the effects it runs and the target
 -- slots it declares. Always mandatory -- no read lint asks about optionality.
 lintMode :: [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> [SlotName.SlotName] -> Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
-lintMode effects slots =
-  Mode.MkMode
-    (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList effects)))
-    (Map.fromList (fmap (\slot -> (slot, TargetSlot.required Pool.AnyTarget Nothing)) slots))
+lintMode effects slots = Mode.MkMode (Seq.singleton (Mint.mandatory (Seq.fromList effects))) (lintSlots slots)
+
+-- `lintMode` as the whole of a spell: one mode, selected outright.
+lintModal :: [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> [SlotName.SlotName] -> Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
+lintModal effects slots = Mint.oneModeTargeting (lintSlots slots) (Seq.fromList effects)
+
+-- The target slots `lintMode` declares, each any target.
+lintSlots :: [SlotName.SlotName] -> Map.Map SlotName.SlotName TargetSlot.TargetSlot
+lintSlots = Map.fromList . fmap (\slot -> (slot, TargetSlot.required Pool.AnyTarget Nothing))
 
 -- oneEffectActivated widened to SEVERAL modes, free, under CR 700.2's
 -- ChooseExactly 1. The fixture the per-mode read lint needs and the one-mode
@@ -6806,7 +6800,7 @@ mintingSpell :: (Face.Face Card.Type.Card -> Effect.Effect Card.Type.Card (Grant
 mintingSpell mint face =
   oneFaced
     ( (vanillaFace "Minter" instantLine)
-        { Face.spell = Modal.MkModal (Seq.singleton (lintMode [mint face] [])) (ModeSelection.ChooseExactly 1)
+        { Face.spell = lintModal [mint face] []
         }
     )
 
@@ -6924,7 +6918,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         sweeps = anyFaceOrMinted cardOffends
         offenders = filter (sweeps . Printing.card) ps
         slot = SlotName.MkSlotName (Text.pack "creature")
-        conjuredReading declared = (vanillaFace "Conjured" instantLine) {Face.spell = Modal.MkModal (Seq.singleton (lintMode [Effect.Tap (ObjectRef.InSlot slot)] declared)) (ModeSelection.ChooseExactly 1)}
+        conjuredReading declared = (vanillaFace "Conjured" instantLine) {Face.spell = lintModal [Effect.Tap (ObjectRef.InSlot slot)] declared}
     Spec.assertEqWith s "no dangling or unused slots" (fmap (S.nameOf . Printing.card) offenders) []
     -- The rejecting direction through the descent, which the corpus never
     -- exercises: the pair differs in the conjured spell declaring its slot.
@@ -7261,7 +7255,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "the lint itself catches a move onto a group under an arm the distribution cannot ask" $ do
     let self = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))
         group = ObjectRef.EachMatching (Filter.Type.And [])
-        moving kinds to = (vanillaFace "Mover" instantLine) {Face.spell = Modal.MkModal (Seq.singleton (lintMode [Effect.MoveCounters (MoveCounters.MkMoveCounters self kinds Nothing to)] [])) (ModeSelection.ChooseExactly 1)}
+        moving kinds to = (vanillaFace "Mover" instantLine) {Face.spell = lintModal [Effect.MoveCounters (MoveCounters.MkMoveCounters self kinds Nothing to)] []}
         asked = [MovedKinds.EveryOfKind CounterKind.PlusOnePlusOne, MovedKinds.Chosen (Quantity.Type.Literal 2), MovedKinds.UpToOneChosen]
     Spec.assertBool s (cardMovesOntoGroupUnasked (moving MovedKinds.EachAbsentKind group)) "each absent kind onto a group is rejected"
     Spec.assertBool s (not (cardMovesOntoGroupUnasked (moving MovedKinds.EachAbsentKind self))) "and onto a slot is accepted"
@@ -7868,9 +7862,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- hand-built instant granting two card-type protections until end of turn.
   Spec.it s "CR 702.16h the lint reads a resolution effect's grants of card-type protection" $ do
     let grant cardType = Effect.ModifyTarget (ModifyTarget.MkModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword (Keyword.Protection (Protection.MkProtection (Filter.Type.HasCardType cardType) Nothing))) (plantedRef "mt") Nothing)
-        spell = (vanillaFace "Unlisted Ward" instantLine) {Face.spell = Modal.MkModal (Seq.singleton (lintMode [grant CardType.Artifact, grant CardType.Creature] [])) (ModeSelection.ChooseExactly 1)}
+        spell = (vanillaFace "Unlisted Ward" instantLine) {Face.spell = lintModal [grant CardType.Artifact, grant CardType.Creature] []}
     Spec.assertBool s (not (null (protectionOffences spell))) "an unclassified pair of card-type grants is caught"
-    Spec.assertEqWith s "while one alone is not a group" (protectionOffences spell {Face.spell = Modal.MkModal (Seq.singleton (lintMode [grant CardType.Artifact] [])) (ModeSelection.ChooseExactly 1)}) []
+    Spec.assertEqWith s "while one alone is not a group" (protectionOffences spell {Face.spell = lintModal [grant CardType.Artifact] []}) []
   -- The countdown shield's rider, the same limb one opcode over: Test of Faith
   -- hangs CR 615.5's counters off a PreventNextDamage where Inkshield hangs its
   -- tokens off a PreventAllDamage. No lint fires on a PutCounters, so this is
@@ -8029,21 +8023,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- declares CR 109.5's `you` as a target slot and binds CR 615.13's
         -- `thatMuch` from the count of what it destroyed.
         offending =
-          TriggeredAbility.MkTriggeredAbility
-            { TriggeredAbility.condition = TriggerCondition.SelfDies,
-              TriggeredAbility.modal =
-                Modal.MkModal
-                  ( Seq.singleton
-                      ( Mode.MkMode
-                          (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Destroy (Destroy.MkDestroy (ObjectRef.InSlot Binding.you) Regenerability.Regenerable (Just Binding.eventAmount) Nothing Nothing)))))
-                          (Map.singleton Binding.you (TargetSlot.required Pool.AnyTarget Nothing))
-                      )
-                  )
-                  (ModeSelection.ChooseExactly 1),
-              TriggeredAbility.intervening = Nothing,
-              TriggeredAbility.name = Nothing,
-              TriggeredAbility.limit = TriggerLimit.Unlimited
-            }
+          Mint.triggerOf
+            TriggerCondition.SelfDies
+            Nothing
+            (Mint.oneModeTargeting (Map.singleton Binding.you (TargetSlot.required Pool.AnyTarget Nothing)) (Seq.singleton (Effect.Destroy (Destroy.MkDestroy (ObjectRef.InSlot Binding.you) Regenerability.Regenerable (Just Binding.eventAmount) Nothing Nothing))))
         arm face = face {Face.triggeredAbilities = offending : Face.triggeredAbilities face}
         overModal f modal =
           modal {Modal.modes = fmap (\m -> m {Mode.clauses = fmap (\c -> c {Clause.effects = fmap f (Clause.effects c)}) (Mode.clauses m)}) (Modal.modes modal)}
@@ -8141,19 +8124,14 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     tidalWave <- S.printingOf s registry "Tidal Wave"
     let -- A one-mode, effectless modal declaring exactly one target slot.
         declaring slot =
-          Modal.MkModal
-            (Seq.singleton (Mode.MkMode Seq.empty (Map.singleton slot (TargetSlot.required Pool.AnyTarget Nothing))))
-            (ModeSelection.ChooseExactly 1)
+          Mint.oneModeOf (Map.singleton slot (TargetSlot.required Pool.AnyTarget Nothing)) Seq.empty
         withTriggered slot card =
           card
             { Face.triggeredAbilities =
-                [ TriggeredAbility.MkTriggeredAbility
-                    { TriggeredAbility.condition = TriggerCondition.SelfDies,
-                      TriggeredAbility.modal = declaring slot,
-                      TriggeredAbility.intervening = Nothing,
-                      TriggeredAbility.name = Nothing,
-                      TriggeredAbility.limit = TriggerLimit.Unlimited
-                    }
+                [ Mint.triggerOf
+                    TriggerCondition.SelfDies
+                    Nothing
+                    (declaring slot)
                 ]
             }
         withActivated slot card =

@@ -25,6 +25,7 @@ import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Event.Binding as Event
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mint as Mint
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
@@ -104,9 +105,6 @@ import qualified Pawl.Types.ManaSpecification as ManaSpecification
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ManifestedDread as ManifestedDread
 import qualified Pawl.Types.Mentored as Mentored
-import qualified Pawl.Types.Modal as Modal
-import qualified Pawl.Types.Mode as Mode
-import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -160,7 +158,6 @@ import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Transformed as Transformed
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
-import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
@@ -1754,13 +1751,10 @@ representativeDeparted = ObjectId.MkObjectId 1
 -- source, and that arm's floor does not depend on what the ability does.
 bareAbility :: TriggerCondition.TriggerCondition -> TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)
 bareAbility condition =
-  TriggeredAbility.MkTriggeredAbility
-    { TriggeredAbility.condition = condition,
-      TriggeredAbility.modal = Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing,
-      TriggeredAbility.name = Nothing,
-      TriggeredAbility.limit = TriggerLimit.Unlimited
-    }
+  Mint.triggerOf
+    condition
+    Nothing
+    (Mint.oneModeOf Map.empty Seq.empty)
 
 representativeEvents :: TriggerCondition.TriggerCondition -> NonEmpty.NonEmpty (Map.Map ObjectId.ObjectId ObjectId.ObjectId, GameEvent.GameEvent)
 representativeEvents cond =

@@ -31,6 +31,7 @@ import qualified Pawl.Engine.Event.Binding as Event
 import qualified Pawl.Engine.Event.Trigger as Event
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mint as Mint
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
@@ -69,10 +70,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
-import qualified Pawl.Types.Modal as Modal
-import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
-import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
@@ -94,7 +92,6 @@ import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
-import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
@@ -1189,15 +1186,7 @@ delayedSpec s registry =
         -- direction (`Map.union captured placementTime`) the captured {7} would
         -- win instead, and this assertion would fail.
         Spec.it s "CR 603.7c placement-time's own chosen mode wins a collision with the captured environment" $ do
-          let onlyMode = Mode.MkMode {Mode.clauses = Seq.empty, Mode.targetSlots = Map.empty}
-              ability =
-                TriggeredAbility.MkTriggeredAbility
-                  { TriggeredAbility.condition = TriggerCondition.SelfEnters,
-                    TriggeredAbility.modal = Modal.MkModal {Modal.modes = Seq.singleton onlyMode, Modal.selection = ModeSelection.ChooseExactly 1},
-                    TriggeredAbility.intervening = Nothing,
-                    TriggeredAbility.name = Nothing,
-                    TriggeredAbility.limit = TriggerLimit.Unlimited
-                  }
+          let ability = Mint.triggerOf TriggerCondition.SelfEnters Nothing (Mint.oneModeOf Map.empty Seq.empty)
               -- Stands in for a modal arming spell's own captured chosenModes --
               -- built with the SAME Binding.fromChoices Cast.castSpell uses, so
               -- the collision is the real production shape, not a fabricated one.

@@ -132,15 +132,11 @@ startEngines pid gs =
 -- stack unprompted.
 increaseAbility :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 increaseAbility =
-  TriggeredAbility.MkTriggeredAbility
-    { TriggeredAbility.condition = TriggerCondition.OpponentLostLifeDuringYourTurn,
-      TriggeredAbility.modal = Mint.oneMode (Seq.singleton (Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)))),
-      TriggeredAbility.intervening = Just belowMaxSpeed,
-      -- CR 702.179d's own "this ability triggers only once each turn", stated in
+  (Mint.triggerIf TriggerCondition.OpponentLostLifeDuringYourTurn belowMaxSpeed (Seq.singleton (Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)))))
+    { -- CR 702.179d's own "this ability triggers only once each turn", stated in
       -- the data because the rule states it, and enforced from there like every
       -- other rider: Event.withinTriggerLimit reads the CR 603.3b log, which
       -- records a sourceless trigger under its controller.
-      TriggeredAbility.name = Nothing,
       TriggeredAbility.limit = TriggerLimit.OncePerTurn
     }
 
