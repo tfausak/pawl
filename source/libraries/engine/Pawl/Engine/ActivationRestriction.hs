@@ -32,7 +32,6 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
-import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Types.AbilityKind as AbilityKind
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
@@ -169,7 +168,7 @@ restrictionMet pid srcId ability gs restriction = case restriction of
     let moved = Game.withoutBeingCast gs
      in Condition.holds
           (Projection.fullView moved)
-          (SourceContext.sourceContext moved (Just pid) srcId)
+          (Projection.sourceContext moved (Just pid) srcId)
           moved
           srcId
           condition

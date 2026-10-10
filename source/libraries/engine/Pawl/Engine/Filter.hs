@@ -1006,75 +1006,36 @@ data Context = MkContext
     -- CR 208.1: the SOURCE's power, for the two atoms that compare a candidate
     -- against it (PowerLessThanSource, CR 702.134a; PowerGreaterThanSource, CR
     -- 702.149a). Not derivable from `source` here -- this module holds no game
-    -- state and cannot project -- so the caller that has the board supplies it:
-    -- Pawl.Engine.Target.admittedGiven for a target slot,
-    -- Pawl.Engine.Event.matchesTrigger for CR 702.149a's trigger condition, and
-    -- Pawl.Engine.CombatRestriction.cantBeBlockedBy and cantBlockCreatures for
-    -- CR 509.1b's pairwise restrictions (CR 701.54c, Spitfire Handler), and
-    -- Pawl.Engine.Event.eligible for a wish's filter (CR 400.11c, Synthetic
-    -- Wishful Djinn).
-    --
-    -- LAZY, and load-bearingly so: filling it costs a projection of the source,
-    -- and no filter that omits the atom ever forces it. That is the posture
-    -- View.attackedThisTurn takes for its event-log fold.
-    --
-    -- Nothing wherever the atom cannot appear, which `contextFor` below is the
-    -- spelling of.
-    sourcePower :: Maybe Integer,
-    -- CR 208.1: the SOURCE's toughness, for the one atom that compares a
-    -- candidate's power against it (PowerAtLeastSourceToughness, Ironclaw
-    -- Curse). sourcePower's sibling, filled through contextComparingPower by the
-    -- same callers, LAZY for its reason, and Nothing everywhere else, where the
-    -- atom matches nothing; Pawl.FilterPositionLintSpec keeps a card from
-    -- writing it there.
-    sourceToughness :: Maybe Integer,
-    -- CR 202.3: the SOURCE's mana value, for the two atoms that compare a
-    -- candidate against it (ManaValueLessThanSource, CR 702.85a;
-    -- ManaValueEqualToSource, CR 702.53a and CR 702.71a). sourcePower's
-    -- sibling one characteristic over, and undrivable from `source` here for that
-    -- field's reason -- this module holds no game state -- so the caller that has
-    -- the board supplies it: Pawl.Engine.Resolve.Slots.effectContext for a
-    -- resolution's own references, which is where rule 702.85a's walk and its
-    -- offer both read it.
-    --
-    -- LAZY, sourcePower's posture and load-bearingly so: filling it costs a
-    -- projection of the source, and no filter that omits the atom ever forces it.
-    --
-    -- Nothing wherever the atom cannot appear, which `contextFor` below is the
-    -- spelling of, and the atom then matches nothing. What keeps a CARD out of
-    -- those positions is Pawl.FilterPositionLintSpec's lint, sourcePower's pair.
-    sourceManaValue :: Maybe Integer,
-    -- CR 105.2: the SOURCE's colours, for the one atom that intersects a
-    -- candidate's against them (SharesColorWithSource, CR 702.78a's conspire).
-    -- sourceManaValue's sibling one characteristic over, and undrivable from
-    -- `source` here for that field's reason -- this module holds no game state --
-    -- so the caller that has the board supplies it: Pawl.Engine.Cost.tapCandidates,
-    -- which is where rule 702.78a's cost pool is drawn.
-    --
-    -- A SET rather than a Maybe, which is why it needs no laziness argument:
-    -- filling it costs a projection of the source, but the empty set is the right
-    -- answer wherever the atom cannot appear AND the right answer for a colourless
-    -- source, CR 105.2's own reading -- nothing shares a colour with either.
-    sourceColors :: Set.Set Color.Color,
-    -- CR 201.1 / 709.4a: the NAMES of the SOURCE, for the one atom that
-    -- intersects a candidate's against them (SameNameAsSource, CR 702.60a's
-    -- ripple). `slotNames` below asks the same question of a SLOT; this asks it
-    -- of CR 113.7's source, and is undrivable from `source` here for
-    -- sourceManaValue's reason -- this module holds no game state -- so the
-    -- caller that has the board supplies it:
-    -- Pawl.Engine.Resolve.Slots.effectContext, which is where rule 702.60a's
-    -- offer reads it.
-    --
-    -- A SET rather than a Maybe, sourceColors' shape one characteristic over:
-    -- the empty set is the right answer both where the atom cannot appear and
-    -- for a source with no name at all (CR 708.2a), and nothing shares a name
-    -- with either.
+    -- state and cannot project -- so Pawl.Engine.Projection.withCharacteristicsOf
+    -- fills it and the four fields below together, through CR 608.2h's last
+    -- known information: in every context Pawl.Engine.Projection.sourceContext
+    -- frames, and in CR 509.1b's pairwise restrictions, which frame by the
+    -- creature being compared (Projection.pairwiseContext, Spitfire Handler).
     --
     -- LAZY, and load-bearingly so: filling it costs a projection of the source,
     -- and no filter that omits the atom ever forces it.
     --
-    -- What keeps a CARD out of the positions this is empty in is
-    -- Pawl.FilterPositionLintSpec's lint, sourceManaValue's pair.
+    -- Nothing in `contextFor` below and inside the CR 613 layer fold, whose
+    -- contexts (Pawl.Engine.SourceContext) cannot project their own source; the
+    -- atom then matches nothing, and Pawl.FilterPositionLintSpec keeps a card
+    -- out of those positions.
+    sourcePower :: Maybe Integer,
+    -- CR 208.1: the SOURCE's toughness, for PowerAtLeastSourceToughness
+    -- (Ironclaw Curse). Filled with sourcePower.
+    sourceToughness :: Maybe Integer,
+    -- CR 202.3: the SOURCE's mana value, for the atoms that compare a candidate
+    -- against it (ManaValueLessThanSource, CR 702.85a; ManaValueEqualToSource,
+    -- CR 702.53a and CR 702.71a; ManaValueGreaterThanSource, Kami of
+    -- Mourning). Filled with sourcePower.
+    sourceManaValue :: Maybe Integer,
+    -- CR 105.2: the SOURCE's colours, for SharesColorWithSource (CR 702.78a's
+    -- conspire). Filled with sourcePower. A SET rather than a Maybe: empty is
+    -- the right answer both where it is unfilled and for a colourless source.
+    sourceColors :: Set.Set Color.Color,
+    -- CR 201.1 / 709.4a: the NAMES of the SOURCE, for SameNameAsSource (CR
+    -- 702.60a's ripple); `slotNames` below asks the same of a SLOT. Filled with
+    -- sourcePower, and a SET for sourceColors' reason (CR 708.2a's nameless
+    -- object).
     sourceNames :: Set.Set CardName.CardName,
     -- CR 202.3, the computed half: the number the TARGET SLOT being matched names
     -- as its bound, for the three atoms that ask (ManaValueAtMostAmount,
@@ -1105,7 +1066,7 @@ data Context = MkContext
     -- and mean the same thing -- CR 700.2a's mode is refused only for what the
     -- announcement cannot change.
     --
-    -- False in contextFor and contextComparingPower below, and False at CR 601.2c
+    -- False in contextFor below, and False at CR 601.2c
     -- and CR 608.2b alike: by then the announcement holds the number, and a bound
     -- that still cannot be read is vacuously False -- the refusing direction, as
     -- slotNames' atom takes and slotControllers' atom does not.
@@ -1384,7 +1345,7 @@ data Context = MkContext
     -- trigger's alone, and off the entering PERMANENT, which CR 400.7 left with no
     -- bindings to stamp it on.
     --
-    -- Empty in contextFor and contextComparingPower below, so a bound evaluated
+    -- Empty in contextFor below, so a bound evaluated
     -- outside a target slot and outside a resolution reads no announcement. What that unfilled read
     -- then ANSWERS is Pawl.Engine.Quantity's InSlot arm's call, not this record's:
     -- each reader of each field here picks its own vacuous direction, and
@@ -1484,7 +1445,7 @@ data Context = MkContext
     -- prevention shield's source half at the event, and a permanent's static
     -- ability is asked afresh every time.
     --
-    -- Nothing in contextFor below and so in contextComparingPower too, so the atom is vacuously False in every position
+    -- Nothing in contextFor below, so the atom is vacuously False in every position
     -- but those four -- sourceAttachedTo's posture rather than slotControllers'.
     -- What keeps a card out of the other positions is Pawl.CardSpec's "CR 702.16k
     -- no card asks OfChosenPlayer outside a keyword's own filter", the sweep
@@ -1631,22 +1592,6 @@ slotOneObject :: SlotName.SlotName -> Context -> Maybe ObjectId.ObjectId
 slotOneObject slot context = case Set.toList (Map.findWithDefault Set.empty slot (slotObjects context)) of
   [oid] -> Just oid
   _ -> Nothing
-
--- contextFor with the source's power and toughness supplied. Kept lazy at the call site, since
--- the field is: a Filter that never names the atom pays for no projection.
---
--- The defending player stays Nothing on both callers -- CR 702.149a's TRIGGER
--- match and CR 509.1b's pairwise blocking restriction. No filter reaching either
--- position names the atom: rule 702.39a's writes it in a target slot, and the
--- only card-written one is a CR 508.1c gate, which
--- Pawl.Engine.CombatRestriction.inForce evaluates through contextFor instead.
---
--- The source-derived fields are Nothing until a caller frames the record by
--- its source (Pawl.Engine.SourceContext.framedBy), as CR 702.149a's trigger
--- match does; CR 509.1b's pairwise restriction is framed by the creature being
--- compared, not by an ability's source, and leaves them unfilled.
-contextComparingPower :: Teams.Teams -> Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Maybe Integer -> Context
-contextComparingPower t p s n o = (contextFor t p (Just s)) {sourcePower = n, sourceToughness = o}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -3332,7 +3277,7 @@ manaValueThresholds predicate = case predicate of
   -- caller's argument whole -- the arm below's reasoning: CR 601.3a's lookahead
   -- reads a player ability's prohibition filter, while this atom is written only
   -- into a resolution's own references (Pawl.Engine.Resolve.Slots.effectContext
-  -- is the one filler of Context's sourceManaValue), and
+  -- fills Context's sourceManaValue there), and
   -- Pawl.FilterPositionLintSpec is what keeps a card from writing it anywhere.
   Filter.ManaValueLessThanSource -> []
   -- The arm above's comparison one operator over, empty for its reason.

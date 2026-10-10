@@ -533,7 +533,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (pikerId, gs) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
         slot = SlotName.MkSlotName (Text.pack "who")
-        context bindings = Target.slotContext (Projection.projectAll gs) (Just S.alice) False bindings S.noSource Nothing gs
+        context bindings = Target.slotContext (Just S.alice) False bindings S.noSource Nothing gs
         admits bindings = Filter.matches (context bindings) (Projection.viewOfObject pikerId gs) (Filter.Type.SameControllerAsBound slot)
     Spec.assertEqWith
       s

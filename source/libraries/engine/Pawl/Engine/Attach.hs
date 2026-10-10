@@ -38,7 +38,6 @@ import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Players as Players
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
-import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Filter as Filter.Type
@@ -403,7 +402,7 @@ groupHostsFor context subjects filter_ gs =
 -- slots it could name.
 turnUpHosts :: PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 turnUpHosts controller aura filter_ gs =
-  hostsFor (SourceContext.sourceContext gs (Just controller) aura) aura (Filter.Type.And [filter_, Filter.Type.CanHostSubject]) gs
+  hostsFor (Projection.sourceContext gs (Just controller) aura) aura (Filter.Type.And [filter_, Filter.Type.CanHostSubject]) gs
 
 -- Which of the offered destinations the player picks, or Nothing when the text
 -- admits none (CR 609.3: the effect does as much as it can, and that is nothing).

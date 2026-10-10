@@ -32,7 +32,6 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.Resolve.Slots as Slots
-import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Types.AbilityName as AbilityName
@@ -3248,7 +3247,7 @@ stateTriggers gs
       let live ab = liveCondition (TriggeredAbility.condition ab)
           liveCondition condition = case condition of
             TriggerCondition.StateIs cond ->
-              Condition.holds (Projection.fullView gs) (SourceContext.sourceContext gs (Just ctrl) oid) gs oid cond
+              Condition.holds (Projection.fullView gs) (Projection.sourceContext gs (Just ctrl) oid) gs oid cond
             TriggerCondition.SelfEnters -> False
             -- CR 309.4c is an EVENT trigger too: the marker MOVING into the room
             -- is what fires it, not the marker sitting there.
@@ -3892,7 +3891,7 @@ interveningHolds gs pending =
             -- creature is red" asks the source's CR 303.4b host and Tablet of the
             -- Guilds' "the chosen colors" its CR 607.2d choices. Stack's CR 608.2a
             -- re-check builds the same record so the two checks cannot disagree.
-            (Projection.framedByBindings gs (PendingTrigger.bindings pending) (SourceContext.sourceContext gs (Just (PendingTrigger.controller pending)) oid) {Filter.boundAmounts = Condition.inheritedX (TriggeredAbility.condition (PendingTrigger.ability pending)) oid gs})
+            (Projection.framedByBindings gs (PendingTrigger.bindings pending) (Projection.sourceContext gs (Just (PendingTrigger.controller pending)) oid) {Filter.boundAmounts = Condition.inheritedX (TriggeredAbility.condition (PendingTrigger.ability pending)) oid gs})
             gs
             oid
             cond

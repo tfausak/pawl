@@ -16,7 +16,6 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
-import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
@@ -667,7 +666,7 @@ eventBindingsOver board gs bearerBecame becameInGraveyard bearer you cond event 
   -- recipient's side; a printing there that named the source would want the
   -- same stamp.
   (TriggerCondition.SelfPreventsDamage f, GameEvent.DamagePrevented prevented) ->
-    let admitted = admittedPreventedSources (SourceContext.sourceContext gs (Just you) bearer) gs f prevented
+    let admitted = admittedPreventedSources (Projection.sourceContext gs (Just you) bearer) gs f prevented
      in Binding.setPreventedDamageSources (Map.keysSet admitted) (Binding.setEventAmount (sum (fmap sum admitted)) Map.empty)
   -- CR 119.9's "that much": how much life the gain was, which CR 603.2 makes part
   -- of the event that fired the trigger -- Sanguine Bond's "target opponent loses
@@ -1220,7 +1219,7 @@ admitsDeparture gs bearer you p departed = case Projection.viewWithLastKnown dep
           Just relation -> case Projection.lastKnownOf departed gs >>= LastKnown.pile of
             Just holder -> PlayerRelation.holds (Game.teams gs) relation you holder
             Nothing -> False
-     in fromWhose && Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view (CardLeavesZone.filter p)
+     in fromWhose && Filter.matches (Projection.sourceContext gs (Just you) bearer) view (CardLeavesZone.filter p)
 
 -- CR 615.13 / 120.1: the sources of one prevention that a SelfPreventsDamage
 -- Filter admits, each with its per-recipient share, read off CR 608.2h's last
@@ -1246,7 +1245,7 @@ admittedAttackers gs bearer you p attacker = Seq.fromList (filter admits (Set.to
     combat = GameState.combat gs
     admits oid =
       Map.lookup oid (Combat.joinedUnder combat) == Just attacker
-        && maybe False (\view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view (PlayerAttacksWith.filter p)) (Projection.viewWithLastKnown oid gs oid)
+        && maybe False (\view -> Filter.matches (Projection.sourceContext gs (Just you) bearer) view (PlayerAttacksWith.filter p)) (Projection.viewWithLastKnown oid gs oid)
 
 -- CR 400.7e's `became` slot, in the plural CR 712.21c asks for: "if an effect
 -- can find the new object that a melded permanent becomes as it leaves the

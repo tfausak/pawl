@@ -105,6 +105,7 @@ import qualified Pawl.Types.RuleAbilities as RuleAbilities
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.SourceChoices as SourceChoices
 import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.StickerPlacement as StickerPlacement
@@ -1237,6 +1238,55 @@ contextWithSlots gs perspective source slots =
 framedByBindings :: GameState -> Map SlotName Binding.Type.Binding -> Filter.Context -> Filter.Context
 framedByBindings gs bindings = framedBySlots gs (Binding.recipientsBySlot (Binding.targetsOf bindings) bindings)
 
+-- Pawl.Engine.SourceContext.sourceContext with the source's projected
+-- characteristics filled too (withCharacteristicsOf): THE context a source's
+-- own ability is matched in, everywhere outside the CR 613 layer fold. The
+-- fold builds its contexts through SourceContext directly, since projecting the
+-- source from inside its own projection would not terminate.
+sourceContext :: GameState -> Maybe PlayerId.PlayerId -> ObjectId -> Filter.Context
+sourceContext gs perspective source =
+  framedBy source gs (Filter.contextFor (Game.teams gs) perspective (Just source))
+
+-- SourceContext.framedBy plus withCharacteristicsOf: every source-derived field.
+framedBy :: ObjectId -> GameState -> Filter.Context -> Filter.Context
+framedBy source gs = framedWith (SourceContext.choicesOf source gs) source gs
+
+-- SourceContext.framedWith plus withCharacteristicsOf: the choices supplied (a
+-- stored effect's, CR 608.2h), everything else read off the board.
+framedWith :: SourceChoices.SourceChoices -> ObjectId -> GameState -> Filter.Context -> Filter.Context
+framedWith choices source gs = withCharacteristicsOf source gs . SourceContext.framedWith choices source gs
+
+-- `context` with `object`'s projected power, toughness, mana value, colours and
+-- names as the source's (CR 613), through CR 608.2h's last known information
+-- once it has left (viewWithLastKnownAnywhere): the fields the
+-- source-comparison atoms read (Filter.PowerLessThanSource,
+-- Filter.ManaValueLessThanSource, Filter.SharesColorWithSource,
+-- Filter.SameNameAsSource and their siblings). Leaves every other field alone,
+-- so CR 509.1b's pairwise restrictions, framed by the creature being compared
+-- rather than by an ability's source, take these and not its choices.
+--
+-- All thunks over one view: a filter naming none of the atoms projects
+-- nothing. pairwiseContext is the CR 509.1b framing.
+withCharacteristicsOf :: ObjectId -> GameState -> Filter.Context -> Filter.Context
+withCharacteristicsOf object gs context =
+  let view = viewWithLastKnownAnywhere gs object
+   in context
+        { Filter.sourcePower = Filter.power =<< view,
+          Filter.sourceToughness = Filter.toughness =<< view,
+          Filter.sourceManaValue = Filter.manaValue =<< view,
+          Filter.sourceColors = foldMap Filter.colors view,
+          Filter.sourceNames = foldMap Filter.names view
+        }
+
+-- CR 509.1b: the context a pairwise blocking restriction or cost is matched
+-- in, framed by the creature being compared (Spitfire Handler's "this
+-- creature", Ironclaw Curse's blocker) rather than by the restriction's
+-- source: its controller and its projected characteristics, and none of the
+-- source's choices.
+pairwiseContext :: GameState -> ObjectId -> Filter.Context
+pairwiseContext gs creature =
+  withCharacteristicsOf creature gs (Filter.contextFor (Game.teams gs) (controllerOf creature gs) (Just creature))
+
 -- CR 608.2h: this object's last known information, and only when the id names
 -- nothing, so a caller falls through to its live reader. Shared by the two
 -- readers below so the rule cannot mean one thing for keywords and another for
@@ -1346,14 +1396,6 @@ armedDelayedAbility resolving source arm gs =
         Just (Source.OfTrigger triggered) -> Map.lookup name (TriggeredAbilitySource.delayed triggered)
         _ -> Nothing
    in Game.carriedDelayedAbility arm Applicative.<|> frozen Applicative.<|> declaredDelayedAbility source name gs
-
--- powerGiven with the same fallback, on CR 608.2b's own sentence about target
--- re-validation -- so a mentor (CR 702.134a) killed in response leaves its
--- trigger's target legal rather than fizzling it.
-powerWithLastKnownGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> Maybe Integer
-powerWithLastKnownGiven pcs oid gs = case lastKnownOf oid gs of
-  Just lk -> PC.power (LastKnown.characteristics lk)
-  Nothing -> powerGiven pcs oid gs
 
 -- The ViewOf a count gets when it is evaluated while `bound` is being applied:
 -- candidates projected through the layers BEFORE that one. EVERY object in the
@@ -5219,7 +5261,7 @@ replacementsOfGiven pcs zone oid gs =
 printedRowLives :: ObjectId -> GameState -> PrintedReplacement.PrintedReplacement card ability effect -> Bool
 printedRowLives oid gs pr = case PrintedReplacement.condition pr of
   Nothing -> True
-  Just cond -> Condition.holds (fullView gs) (SourceContext.sourceContext gs (controllerOf oid gs) oid) (boardAsEntering gs) oid cond
+  Just cond -> Condition.holds (fullView gs) (sourceContext gs (controllerOf oid gs) oid) (boardAsEntering gs) oid cond
 
 -- CR 113.6b: does this printed replacement row function from `zone`?
 -- functionsFromZone's twin for rows, with the same empty-set reading -- a row

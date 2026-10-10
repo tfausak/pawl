@@ -18,7 +18,6 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
-import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Types.BlockPermission as BlockPermission
 import Pawl.Types.GameState (GameState)
@@ -61,7 +60,7 @@ additionalBlocks candidates gs =
       -- One reading of the source, shared by the gate and the amount below: CR
       -- 109.5's "you" and Filter.IsSource both mean the permanent printing the
       -- sentence, so both ask through the same Context.
-      contextOf source = SourceContext.sourceContext gs (Projection.controllerOf source gs) source
+      contextOf source = Projection.sourceContext gs (Projection.controllerOf source gs) source
       -- CR 604.2's "as long as", read exactly as CombatRestriction.inForce reads
       -- its "unless" and with the opposite polarity: a permission whose gate does
       -- NOT hold grants nothing. Asked once per permission and not per candidate,

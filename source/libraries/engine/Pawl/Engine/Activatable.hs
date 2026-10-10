@@ -21,7 +21,6 @@ import qualified Pawl.Engine.Plane as Plane
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
-import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.SplitSecond as SplitSecond
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
@@ -232,7 +231,7 @@ zoneAbilitiesOf pcs zone oid gs = case (Game.faceOf oid gs, Game.lookupObject oi
                )
         granted ability = case ActivatedAbility.condition ability of
           Nothing -> True
-          Just cond -> Condition.holds (Projection.fullView gs) (SourceContext.sourceContext gs (activatorOf oid gs) oid) gs oid cond
+          Just cond -> Condition.holds (Projection.fullView gs) (Projection.sourceContext gs (activatorOf oid gs) oid) gs oid cond
      in filter (\ability -> functionsHere ability && granted ability) (PC.activatedAbilities projected)
   _ -> []
 

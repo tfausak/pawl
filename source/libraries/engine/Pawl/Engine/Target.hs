@@ -28,7 +28,6 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.QuantitySlot as QuantitySlot
-import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
@@ -259,7 +258,7 @@ admittedGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.Control
 admittedGiven pcs grants pools perspective unannounced bindings source slot gs =
   let pool = TargetSlot.pool slot
       narrowing = TargetSlot.filter slot
-      context = slotContext pcs perspective unannounced bindings source (TargetSlot.amount slot) gs
+      context = slotContext perspective unannounced bindings source (TargetSlot.amount slot) gs
       -- ONE whole-board projection and ONE control-grant walk for the whole
       -- slot: both the base pool's creature test and the Filter's per-candidate
       -- view are asked of every object on the battlefield, and each was a fresh
@@ -303,20 +302,19 @@ admittedGiven pcs grants pools perspective unannounced bindings source slot gs =
 -- bare Filter.contextFor that would answer differently for the atoms filled
 -- here.
 --
--- THE one site that fills Filter.slotAmount, one of those that fill
--- Filter.sourcePower (see that field for the rest), and one of the two that
--- fill Filter.defendingPlayer, because it is the one site that
+-- THE one site that fills Filter.slotAmount, and one of the two that fill
+-- Filter.defendingPlayer, because it is the one site that
 -- matches a TARGET SLOT's Filter -- both of CR 115's moments (CR 601.2c's
 -- choosing and CR 608.2b's re-check) reach those atoms through here, and CR
 -- 702.134a, CR 702.39a, CR 202.3's computed bound and CR 508.5's printed
 -- "defending player controls" (Sensational Spider-Man) are the clauses that
 -- write them in a slot. CR 508.1c's gate is where the other defending-player
 -- read is (Pawl.Engine.CombatRestriction.inForce, Armored Galleon), and no
--- target slot can reach it. All are thunks, like the caller's `pcs`: a slot
--- whose filter never names an atom pays for neither the source's projection,
--- the combat lookup, nor the bound's evaluation.
-slotContext :: Map ObjectId PC.ProjectedCharacteristics -> Maybe PlayerId -> Bool -> Map SlotName Binding.Type.Binding -> ObjectId -> Maybe Quantity -> GameState -> Filter.Context
-slotContext pcs perspective unannounced bindings source amount gs =
+-- target slot can reach it. All are thunks: a slot whose filter never names
+-- an atom pays for neither the source's projection, the combat lookup, nor the
+-- bound's evaluation.
+slotContext :: Maybe PlayerId -> Bool -> Map SlotName Binding.Type.Binding -> ObjectId -> Maybe Quantity -> GameState -> Filter.Context
+slotContext perspective unannounced bindings source amount gs =
   let -- CR 601.2c's chosen recipients out of the announcement's whole binding
       -- environment, which is what the two slot-reading atoms below want; the
       -- amounts beside them go to boundAmounts instead.
@@ -342,24 +340,8 @@ slotContext pcs perspective unannounced bindings source amount gs =
       -- slotAmount's bound below does (#4865).
       base = Projection.framedBySlots gs (Binding.recipientsBySlot targets bindings) framed
       framed =
-        (SourceContext.sourceContext gs perspective source)
-          { Filter.sourcePower = Projection.powerWithLastKnownGiven pcs source gs,
-            Filter.sourceToughness = Nothing,
-            -- Nothing: CR 702.85a's comparison is written into a resolution's own
-            -- references (Pawl.Engine.Resolve.Slots.effectContext fills it), never
-            -- into a target slot, and Pawl.FilterPositionLintSpec is what keeps a
-            -- card out of the positions this field is empty in.
-            Filter.sourceManaValue = Nothing,
-            -- Empty for sourceManaValue's reason one field up: CR 702.78a's
-            -- comparison is written into a COST's criterion
-            -- (Pawl.Engine.Cost.tapCandidates fills it), never into a target slot.
-            Filter.sourceColors = Set.empty,
-            -- Empty for sourceColors' reason one field up: CR 702.60a's
-            -- comparison is written into a resolution's own references
-            -- (Pawl.Engine.Resolve.Slots.effectContext fills it), never into a
-            -- target slot.
-            Filter.sourceNames = Set.empty,
-            -- Nothing HERE and filled below: CR 202.3's computed bound is the slot's
+        (Projection.sourceContext gs perspective source)
+          { -- Nothing HERE and filled below: CR 202.3's computed bound is the slot's
             -- own Quantity, and evaluating one takes a Filter.Context -- so this
             -- record is the context the evaluation runs in, and the answer is laid
             -- over it. Nothing inside it is what makes that non-circular: no Quantity
@@ -482,7 +464,7 @@ slotContext pcs perspective unannounced bindings source amount gs =
 -- reader gives an id it has no record of.
 lastKnownAdmits :: Maybe PlayerId -> ObjectId -> TargetSlot -> ObjectId -> GameState -> Bool
 lastKnownAdmits perspective source slot host gs =
-  let context = slotContext (Projection.projectAll gs) perspective False Map.empty source (TargetSlot.amount slot) gs
+  let context = slotContext perspective False Map.empty source (TargetSlot.amount slot) gs
       admits view =
         poolHeldLastKnown (TargetSlot.pool slot) view
           && Maybe.maybe True (Filter.matches context view) (TargetSlot.filter slot)
@@ -1237,7 +1219,7 @@ aimingsBy referent signature ranges slots =
 -- then admits every count, since the announcement could still make any of them.
 aimingRanges :: Maybe PlayerId -> ObjectId -> Maybe Natural -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> GameState -> Map SlotName (Natural, Natural)
 aimingRanges perspective source announced slots sets gs =
-  let counting = countingByGiven (Projection.projectAll gs) perspective (Binding.fromChoices Map.empty announced Seq.empty) source gs
+  let counting = countingBy perspective (Binding.fromChoices Map.empty announced Seq.empty) source gs
       x = Maybe.fromMaybe 0 announced
       countOf slot = case (announced, TargetSlot.count slot) of
         (Nothing, SlotCount.AnnouncedX) -> TargetCount.anyNumber
@@ -1307,7 +1289,7 @@ legalSetsGiven pcs grants pools perspective unannounced seed source slots gs =
       independent = fmap (answer seed) slots
       widened = Map.union (fmap Binding.toRecipients independent) seed
       declared = Map.keysSet slots
-      counting = countingByGiven pcs perspective seed source gs
+      counting = countingBy perspective seed source gs
       -- CR 601.2b's X, where the announcement has made it: the seed's, and the
       -- zero an announcement naming none means (SlotCount.at) -- unknown only to
       -- a caller looking ahead of it.
@@ -1338,7 +1320,7 @@ legalSetsGiven pcs grants pools perspective unannounced seed source slots gs =
             readsOtherwise =
               maybe False (`Set.member` siblings) (scopeSlot (TargetSlot.pool slot))
                 || not (Set.disjoint siblings (foldMap Filter.boundSlots (TargetSlot.filter slot)))
-            boundValue bindings = Filter.slotAmount (slotContext pcs perspective unannounced bindings source (TargetSlot.amount slot) gs)
+            boundValue bindings = Filter.slotAmount (slotContext perspective unannounced bindings source (TargetSlot.amount slot) gs)
             representatives bindingsList =
               if readsOtherwise
                 then bindingsList
@@ -1531,11 +1513,11 @@ zoneScopeSlot scope = case scope of
 -- selectionLegal runs at CR 601.2e on the board the offer was built from, and the
 -- CR 707.10c / 115.7d re-target counts the recipients the object already has
 -- (Resolve.Effect.chooseNewTargetsFor) rather than asking a count again.
-countingByGiven :: Map ObjectId PC.ProjectedCharacteristics -> Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> GameState -> Quantity -> Natural
-countingByGiven pcs perspective seed source gs =
+countingBy :: Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> GameState -> Quantity -> Natural
+countingBy perspective seed source gs =
   Integer.toNaturalSaturating
     . Maybe.fromMaybe 0
-    . Quantity.evaluate (Projection.fullView gs) (slotContext pcs perspective False seed source Nothing gs) gs source
+    . Quantity.evaluate (Projection.fullView gs) (slotContext perspective False seed source Nothing gs) gs source
 
 -- CR 601.2c: the number of targets a slot's own text fixes ("in some cases, the
 -- number of targets will be defined by the spell's text"), for a slot that
@@ -1572,7 +1554,7 @@ fixedCount slot = case TargetSlot.count slot of
 --
 -- `counting` answers a slot counted by a COMPUTED number ("up to X target
 -- creatures ... where X is your devotion to black", Mogis's Marauder) -- see
--- countingByGiven, which every caller builds from the board it is judging on.
+-- countingBy, which every caller builds from the board it is judging on.
 announcedRange :: (Quantity -> Natural) -> Natural -> TargetSlot -> Natural -> (Natural, Natural)
 announcedRange counting x slot capacity =
   let count = SlotCount.at counting x (TargetSlot.count slot)
@@ -1656,7 +1638,7 @@ slotCapacities counting x slots sets gs =
 --
 -- `seed` is the announcement's own bindings, the map the caller's legalSets and
 -- selectionLegal are handed, so a computed count reads the same environment at
--- the offer and at the check -- see countingByGiven.
+-- the offer and at the check -- see countingBy.
 chooseTargets :: PlayerId -> ObjectId -> ObjectId -> Map SlotName Binding.Type.Binding -> Natural -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> Game (Map SlotName (Set Recipient))
 chooseTargets pid oid source seed x slots sets = do
   let groups = Map.fromListWith Set.union [(TargetSlot.chooser slot, Set.singleton name) | (name, slot) <- Map.toList slots]
@@ -1716,7 +1698,7 @@ chooserOf controller oid seed chooser = case chooser of
 --
 -- The perspectives are two different questions and split here. CR 406.4's
 -- "allowed to look at" is the CHOOSER's, so piledOffer takes them; CR 109.5's
--- "you" for a computed count belongs to the ability, so countingByGiven takes the
+-- "you" for a computed count belongs to the ability, so countingBy takes the
 -- controller whoever hands in the answer.
 --
 -- The OBJECTS split the same way. `oid` names the stack object in every prompt;
@@ -1728,7 +1710,7 @@ askChooser :: PlayerId -> PlayerId -> ObjectId -> ObjectId -> Map SlotName Bindi
 askChooser controller chooser oid source seed x slots sets mine = do
   gs <- State.get
   let decider = Decide.deciderFor chooser gs
-      counting = countingByGiven (Projection.projectAll gs) (Just controller) seed source gs
+      counting = countingBy (Just controller) seed source gs
       most slot = TargetCount.most . SlotCount.at counting x . TargetSlot.count =<< Map.lookup slot slots
       offered = Map.mapWithKey (\slot -> piledOffer (most slot) (Just chooser) gs) sets
       ranges = Map.restrictKeys (Map.intersectionWith (announcedRange counting x) slots (slotCapacities counting x slots offered gs)) mine
@@ -1937,7 +1919,7 @@ pileMembers perspective pile gs =
 selectionLegal :: Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Natural -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> Map SlotName (Set Recipient) -> GameState -> Bool
 selectionLegal perspective seed source x slots sets chosen gs =
   let pcs = Projection.projectAll gs
-      counting = countingByGiven pcs perspective seed source gs
+      counting = countingBy perspective seed source gs
       caps = slotCapacities counting x slots sets gs
       slotLegal slot targetSlot =
         let legal = Map.findWithDefault Set.empty slot sets
@@ -2054,7 +2036,7 @@ jointlyFillableGiven pcs grants pools perspective seed source slots sets gs =
       -- The slots being ENUMERATED: the ones a reader names, a reader that is
       -- itself named included.
       named = Map.restrictKeys slots (foldMap reads_ readers)
-      counting = countingByGiven pcs perspective seed source gs
+      counting = countingBy perspective seed source gs
       demanded slot = TargetCount.least (SlotCount.at counting 0 (TargetSlot.count slot))
       legalOf name = Map.findWithDefault Set.empty name sets
       -- The sizes ONE announcement could name this slot at, measured against
@@ -2120,7 +2102,7 @@ fillableModes perspective seed source extra modal gs =
 -- apiece to answer it (#716).
 fillableModesGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> Modal.Modal Card (GrantedAbility.GrantedAbility Card) -> GameState -> Set ModeIndex
 fillableModesGiven pcs grants pools perspective seed source extra modal gs =
-  let counting = countingByGiven pcs perspective seed source gs
+  let counting = countingBy perspective seed source gs
       ms = Foldable.toList (Modal.modes modal)
       fillable i m =
         let slots = maybe id (\p -> announcedSlots p source gs) perspective (Map.union extra (Mode.targetSlots m))

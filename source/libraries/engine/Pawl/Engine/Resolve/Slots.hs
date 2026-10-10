@@ -24,7 +24,6 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.QuantitySlot as QuantitySlot
-import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Types.ActivateManaAbilities as ActivateManaAbilities
@@ -3268,8 +3267,9 @@ resolvingBindings resolving gs = case Game.lookupObject resolving gs of
 -- is.
 --
 -- CR 607.2d's CHOSEN values -- CR 201.4's names, CR 105.2's colour and CR 205.3's
--- creature type -- come from Pawl.Engine.SourceContext, and this is their only
--- filler on the resolution side -- the search filter's and the mill tally's
+-- creature type -- come from Pawl.Engine.Projection.sourceContext, with the
+-- source's projected characteristics (CR 702.85a's cascade, CR 702.60a's
+-- ripple), and this is their only filler on the resolution side -- the search filter's and the mill tally's
 -- alike, which each overlaid the names for themselves until Petra Sphinx wanted
 -- them at an ObjectRef's own filter too, see #2992. What holds a CARD to the
 -- positions this fills is Pawl.FilterPositionLintSpec, not this function.
@@ -3286,38 +3286,14 @@ effectContext gs controller source legal bindings =
     -- choicesOf, for the source that has already left (Conjurer's Ban).
     -- Brass Herald's "creature cards of the chosen type revealed this way" is
     -- the chosen subtype's proof (Pawl.ResolveSpec).
-    (SourceContext.sourceContext gs (Just controller) source)
+    (Projection.sourceContext gs (Just controller) source)
       { -- CR 608.2c: the numbers earlier clauses of THIS resolution stamped on
         -- slots, for the one Filter atom that compares a candidate against one
         -- (Filter.PowerIsAmountInSlot) -- Localized Destruction's "power equal to
         -- the amount of {E} paid this way". Live off the resolving object, the
         -- group half's own read, so a clause reads what the clause before it bound.
         Filter.boundAmounts = Map.mapMaybe Binding.Type.amount bindings,
-        Filter.slotStickers = Map.mapMaybe Binding.Type.sticker bindings,
-        -- CR 202.3 off the SOURCE, for the two atoms that compare a candidate
-        -- against it (Filter.ManaValueLessThanSource, CR 702.85a's cascade;
-        -- Filter.ManaValueEqualToSource, CR 702.53a's transmute and CR 702.71a's
-        -- transfigure).
-        -- The ONE filler of that field, which is what makes it a
-        -- resolution-position atom: it is Nothing everywhere else, and
-        -- Pawl.FilterPositionLintSpec is what keeps a card out of those
-        -- positions.
-        --
-        -- Through CR 608.2h's last-known reader: a cascade spell countered
-        -- while its trigger is still on the stack has left, and "this spell's
-        -- mana value" is a reference the trigger already made.
-        Filter.sourceManaValue = Filter.manaValue =<< Projection.viewWithLastKnownAnywhere gs source,
-        -- CR 201.2a off the SOURCE, for the one atom that compares a
-        -- candidate's names against them (Filter.SameNameAsSource, CR
-        -- 702.60a's ripple). The ONE filler of that field, the mana value's
-        -- reason one characteristic over: it is empty everywhere else, and
-        -- Pawl.FilterPositionLintSpec is what keeps a card out of those
-        -- positions.
-        --
-        -- Through CR 608.2h's last-known reader for that field's reason: a
-        -- ripple spell countered while its trigger is still on the stack has
-        -- left, and "this spell" is a reference the trigger already made.
-        Filter.sourceNames = foldMap Filter.names (Projection.viewWithLastKnownAnywhere gs source)
+        Filter.slotStickers = Map.mapMaybe Binding.Type.sticker bindings
       }
 
 -- effectContext with `slot` naming `oid` alone, for an effect applied once per
