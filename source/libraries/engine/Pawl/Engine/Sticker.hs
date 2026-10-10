@@ -3,16 +3,25 @@
 -- a sticker with no bookkeeping (CR 123.5).
 module Pawl.Engine.Sticker where
 
+import qualified Control.Monad as Monad
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.NameWords as NameWords
+import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AbilitySticker as AbilitySticker
+import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -22,6 +31,7 @@ import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PowerToughnessSticker as PowerToughnessSticker
+import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.StickerKind as StickerKind
 import qualified Pawl.Types.StickerPlacement as StickerPlacement
 import qualified Pawl.Types.StickerPut as StickerPut
@@ -96,3 +106,50 @@ put placer oid ref position gs =
       placement = StickerPlacement.MkStickerPlacement {StickerPlacement.sticker = ref, StickerPlacement.timestamp = ts, StickerPlacement.position = position}
       placed = stamped {GameState.objects = Map.adjust (\o -> o {Object.stickers = Object.stickers o Seq.|> placement}) oid (GameState.objects stamped)}
    in Event.recordEvent (GameEvent.StickerPut StickerPut.MkStickerPut {StickerPut.placer = placer, StickerPut.object = oid, StickerPut.kind = StickerRef.kind ref}) placed
+
+-- | CR 123.3: the placer puts one sticker of these kinds on the object, asked
+-- among what `offered` allows; when @optional@ the placer may decline (CR
+-- 702.33h's "may"). CR 123.3b: an object the placer does not own takes
+-- nothing. CR 123.6b: a name sticker's position is chosen as it goes on, and
+-- CR 123.3c: the owner pays its tickets unless the placement is free. The
+-- sticker placed, if any.
+place :: Bool -> PlayerId -> ObjectId -> Set.Set StickerKind.StickerKind -> Maybe Natural -> Bool -> Game (Maybe StickerRef.StickerRef)
+place optional placer oid kinds cap free = do
+  gs <- State.get
+  let owned = fmap Object.owner (Game.lookupObject oid gs) == Just placer
+      candidates = offered placer oid kinds cap free gs
+  picked <-
+    if not owned
+      then pure Nothing
+      else
+        if optional
+          then case NonEmpty.nonEmpty candidates of
+            Nothing -> pure Nothing
+            Just offers -> do
+              answer <- Game.choose (Prompt.ChooseStickerOrNone (Decide.deciderFor placer gs) placer oid offers)
+              pure (List.find (\ref -> Just ref == answer) candidates)
+          else Game.chooseAmong (\decider who -> Prompt.ChooseSticker decider who oid) placer candidates
+  Monad.forM_ picked $ \ref -> do
+    position <- case StickerRef.kind ref of
+      StickerKind.Name -> fmap Just (namePosition oid)
+      StickerKind.Ability -> pure Nothing
+      StickerKind.PowerToughness -> pure Nothing
+      StickerKind.Art -> pure Nothing
+    Monad.unless free (State.modify' (payTickets oid ref))
+    State.modify' (put placer oid ref position)
+  pure picked
+
+-- | CR 123.6b: the object's CONTROLLER, or its owner for a card with none (CR
+-- 108.4a), chooses where the word goes: the start, or after any number of the
+-- words now in its name, the longest name's where it has several (gap #4901). An
+-- object whose names hold no word has one position and is not asked.
+namePosition :: ObjectId -> Game Natural
+namePosition oid = do
+  gs <- State.get
+  let most = List.foldl' max 0 (fmap NameWords.wordCount (Set.toList (Projection.namesOf oid gs)))
+      chooser = case Projection.controllerOf oid gs of
+        Just pid -> Just pid
+        Nothing -> fmap Object.owner (Game.lookupObject oid gs)
+  case chooser of
+    Just pid | most > 0 -> Maybe.fromMaybe 0 <$> Game.chooseAmong (\decider who -> Prompt.ChooseNamePosition decider who oid) pid [0 .. most]
+    _ -> pure 0

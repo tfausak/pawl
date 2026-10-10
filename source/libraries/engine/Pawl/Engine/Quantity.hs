@@ -44,7 +44,6 @@ import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.HybridPhyrexian as HybridPhyrexian
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword.Type
-import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -584,16 +583,14 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- as level 1 for every rule and effect that asks, so the default belongs at the
         -- one read rather than in the field Filter.classLevel reports.
         Quantity.ClassLevel -> fmap (toInteger . ClassLevel.defaulted . Filter.classLevel) mView
-        -- CR 702.33d's designation as a 0/1, HasDesignation's arm in every respect --
-        -- rule 702.33d designating the spell for ANY of its kicker costs, so this asks
-        -- every KICKER key of the map and no other: a squad or offspring payment is
-        -- not a kick. A REGRESSION FENCE: dropping the filter leaves the suite green
-        -- (2026-09-11), since every "kicked" reader in data/cards/ asks about its
-        -- own card and none prints squad or offspring. Hallar, the Firefletcher's
-        -- "if that spell was kicked" would observe it. The object it
+        -- CR 702.33d's designation as a 0/1, HasDesignation's arm in every respect,
+        -- for the "if kicked" CR 702.33e links to kicker or multikicker: Kicker and
+        -- Multikicker keys only (isPrintedKicker). A sticker kicker (CR 702.33h) is
+        -- in the family but not linked (Wicker Picker's ruling), nor is a squad or offspring payment a
+        -- kick. Pawl.StickerSpec's Faerie Squadron case proves it. The object it
         -- reads is the RESOLVING SPELL, which is still on the stack while its own
         -- clause conditions are gated (Pawl.Engine.Resolve.gateHolds).
-        Quantity.WasKicked -> fmap (\view -> if any (> 0) (Map.filterWithKey (\keyword _ -> Keyword.familyOf keyword == Just KeywordFamily.Kicker) (Filter.paidCosts view)) then 1 else 0) mView
+        Quantity.WasKicked -> fmap (\view -> if any (> 0) (Map.filterWithKey (\keyword _ -> Keyword.isPrintedKicker keyword) (Filter.paidCosts view)) then 1 else 0) mView
         -- CR 702.143c's "if this spell was foretold" as a 0/1, off the view for
         -- WasKicked's reason: the resolving spell is still on the stack while its
         -- clause conditions are gated.

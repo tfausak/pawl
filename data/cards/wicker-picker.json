@@ -1,0 +1,115 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        }
+      ],
+      "name": "Wicker Picker",
+      "oracleText": "Creature spells you cast have sticker kicker {1}. (You may pay an additional {1} as you cast a creature spell. If you do, you get {TK}, then you may put a sticker on it.)",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "MatchingOffBattlefield",
+            "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "Or",
+                  "value": [
+                    {
+                      "type": "WasCastFrom",
+                      "value": {
+                        "type": "Library"
+                      }
+                    },
+                    {
+                      "type": "WasCastFrom",
+                      "value": {
+                        "type": "Hand"
+                      }
+                    },
+                    {
+                      "type": "WasCastFrom",
+                      "value": {
+                        "type": "Graveyard"
+                      }
+                    },
+                    {
+                      "type": "WasCastFrom",
+                      "value": {
+                        "type": "Exile"
+                      }
+                    },
+                    {
+                      "type": "WasCastFrom",
+                      "value": {
+                        "type": "Command"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "ControlledBy",
+                  "value": {
+                    "type": "You"
+                  }
+                },
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Creature"
+                  }
+                }
+              ]
+            }
+          },
+          "modifications": [
+            {
+              "type": "GainKeyword",
+              "value": {
+                "type": "StickerKicker",
+                "value": {
+                  "mana": [
+                    {
+                      "type": "Generic",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "toughness": {
+        "type": "Literal",
+        "value": 3
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Guest"
+          },
+          {
+            "type": "Scarecrow"
+          }
+        ],
+        "types": [
+          {
+            "type": "Artifact"
+          },
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

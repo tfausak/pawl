@@ -847,6 +847,7 @@ withinOffer prompt chosen = case prompt of
   Prompt.Type.ChooseCardsFromAmong _ _ _ cards _ -> all (`elem` cards) chosen
   Prompt.Type.ChooseDungeon _ _ dungeons -> chosen `elem` dungeons
   Prompt.Type.ChooseSticker _ _ _ offered -> chosen `elem` offered
+  Prompt.Type.ChooseStickerOrNone _ _ _ offered -> all (`elem` offered) chosen
   Prompt.Type.ChooseNamePosition _ _ _ positions -> chosen `elem` positions
   Prompt.Type.ChooseCompanion _ _ companions -> all (`elem` companions) chosen
   Prompt.Type.ChooseRoom _ _ _ rooms -> chosen `elem` rooms
@@ -922,6 +923,7 @@ withinOffer prompt chosen = case prompt of
   Prompt.Type.OrderManaActivations _ _ objects -> permutationOf objects chosen
   Prompt.Type.OrderCombatTolls _ _ objects -> permutationOf objects chosen
   Prompt.Type.OrderComponentCards _ _ _ printings -> permutationOf printings chosen
+  Prompt.Type.ChooseStickerKeeper _ _ printings -> chosen < Natural.length printings
   Prompt.Type.OrderCostComponents _ _ _ components -> permutationOf components chosen
   Prompt.Type.OrderDamage _ _ events -> permutationOf events chosen
   Prompt.Type.OrderForEach _ _ _ recipients -> permutationOf recipients chosen

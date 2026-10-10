@@ -534,6 +534,7 @@ filterNames asking criterion = case criterion of
   Filter.IsInZone _zone -> False
   Filter.WasCastFrom _zone -> False
   Filter.TagWasSpent _tag -> False
+  Filter.Kicked -> False
   Filter.And nested -> any (filterNames asking) nested
   Filter.Or nested -> any (filterNames asking) nested
   Filter.Not nested -> filterNames asking nested
@@ -1667,6 +1668,7 @@ keywordNames asking x = case x of
   Keyword.Fading _natural -> False
   Keyword.Kicker cost -> costNames asking (keywordNames asking) cost
   Keyword.Multikicker cost -> costNames asking (keywordNames asking) cost
+  Keyword.StickerKicker cost -> costNames asking (keywordNames asking) cost
   Keyword.Flashback cost -> costNames asking (keywordNames asking) cost
   Keyword.Fear -> False
   Keyword.Morph morph -> morphNames asking (keywordNames asking) morph

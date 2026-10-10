@@ -140,9 +140,10 @@ data Quantity
   | -- | CR 716.2b: the level of the object this quantity is evaluated against;
     -- no level reads 1 (CR 716.2d, Pawl.Types.ClassLevel.defaulted).
     ClassLevel
-  | -- | CR 702.33d: 1 if the spell this quantity is evaluated against was
-    -- kicked with any of its kicker costs, else 0; a permanent answers for the
-    -- spell that became it (CR 400.7d).
+  | -- | CR 702.33d/e: 1 if the spell this quantity is evaluated against was
+    -- kicked with a Kicker or Multikicker cost, not a sticker kicker's (CR
+    -- 702.33h), else 0; a permanent answers for the spell that became it (CR
+    -- 400.7d).
     WasKicked
   | -- | CR 702.143c: 1 if the spell this quantity is evaluated against was a
     -- foretold card before it was cast, whatever cost it was cast for, else 0.

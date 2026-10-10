@@ -173,6 +173,7 @@ codec keywordCodec =
       Arm.payload "IsInZone" Zone.codec Filter.IsInZone (\x -> case x of Filter.IsInZone y -> Just y; _ -> Nothing),
       Arm.payload "WasCastFrom" Zone.codec Filter.WasCastFrom (\x -> case x of Filter.WasCastFrom y -> Just y; _ -> Nothing),
       Arm.payload "TagWasSpent" ProductionTag.codec Filter.TagWasSpent (\x -> case x of Filter.TagWasSpent y -> Just y; _ -> Nothing),
+      Arm.nullary "Kicked" Filter.Kicked,
       Arm.payload "And" (Common.list (codec keywordCodec)) Filter.And (\x -> case x of Filter.And y -> Just y; _ -> Nothing),
       Arm.payload "Or" (Common.list (codec keywordCodec)) Filter.Or (\x -> case x of Filter.Or y -> Just y; _ -> Nothing),
       Arm.payload "Not" (codec keywordCodec) Filter.Not (\x -> case x of Filter.Not y -> Just y; _ -> Nothing)
@@ -304,6 +305,7 @@ tagOf x = case x of
   Filter.IsInZone {} -> "IsInZone"
   Filter.WasCastFrom {} -> "WasCastFrom"
   Filter.TagWasSpent {} -> "TagWasSpent"
+  Filter.Kicked {} -> "Kicked"
   Filter.And {} -> "And"
   Filter.Or {} -> "Or"
   Filter.Not {} -> "Not"

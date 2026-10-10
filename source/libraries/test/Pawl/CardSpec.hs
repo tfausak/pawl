@@ -3381,6 +3381,7 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.MoreThanMeetsTheEye cost -> costFilters cost
   Keyword.Kicker cost -> costFilters cost
   Keyword.Multikicker cost -> costFilters cost
+  Keyword.StickerKicker cost -> costFilters cost
   -- CR 702.156a names no quality: the counter kind and the threshold are the
   -- rule's own nouns, so neither reaches a Filter.
   Keyword.Ravenous -> []
