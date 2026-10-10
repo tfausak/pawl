@@ -381,6 +381,8 @@ data Response
     ChoseDungeon PrintingId.PrintingId
   | -- | CR 123.3: the sticker a player put on an object.
     ChoseSticker StickerRef.StickerRef
+  | -- | CR 123.6b: the position a controller chose.
+    ChoseNamePosition Natural.Natural
   | -- | CR 103.2b \/ 702.139a: the card a player revealed as their companion
     -- before the game began, or Nothing for a player who revealed none.
     --

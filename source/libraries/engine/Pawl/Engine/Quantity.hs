@@ -16,6 +16,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.ManaCount as ManaCount
+import qualified Pawl.Engine.NameWords as NameWords
 import qualified Pawl.Engine.QuantitySlot as QuantitySlot
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Types.AgainstLastCardExiledWith as AgainstLastCardExiledWith
@@ -276,6 +277,13 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- counts toward Screaming Swarm's "that many" (CR 608.2i).
         Quantity.BoundCount slot ->
           Just (toInteger (Set.size (Map.findWithDefault Set.empty slot (Filter.slotObjects context))))
+        -- CR 123.6e's "that sticker", off the binding, WasBound's posture: an
+        -- unplaced sticker is an honest 0.
+        Quantity.UniqueVowelsOnSticker slot -> case Map.lookup slot (Filter.slotStickers context) of
+          Nothing -> Just 0
+          Just ref -> case Game.stickerWords ref gs of
+            Nothing -> Just 0
+            Just ws -> Just (toInteger (NameWords.uniqueVowels ws))
         -- CR 208.2: a bare star has no value of its own. Both readers of a
         -- characteristic-defining P/T substitute the object's quantity for it first,
         -- through Projection.seedCharacteristicPT at the projection's seed
@@ -564,6 +572,9 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- for a gone object too. An object with no counters at all sums to 0, which is the
         -- answer "it had no counters on it" wants rather than a Nothing.
         Quantity.ObjectCountersOfAnyKind -> fmap (toInteger . sum . Filter.counters) mView
+        -- CR 123.6d off the view, ObjectCounters' posture.
+        Quantity.LettersOnNameStickers letters -> fmap (toInteger . sum . fmap (NameWords.letterCount letters) . Filter.nameStickers) mView
+        Quantity.NameStickers -> fmap (toInteger . length . Filter.nameStickers) mView
         -- The designation as a 0/1, off the same view ObjectCounters reads -- so CR
         -- 608.2h's last known information answers for an object that is gone, which is
         -- what rule 702.112a's intervening "if" needs on resolution, and what CR 701.37a's
@@ -1268,6 +1279,7 @@ objectSlots quantity = case quantity of
   -- only whether the slot is bound, so a plural slot does not damage it.
   Quantity.WasBound _ -> Set.empty
   Quantity.BoundCount _ -> Set.empty
+  Quantity.UniqueVowelsOnSticker _ -> Set.empty
   Quantity.Literal _ -> Set.empty
   Quantity.ManaValue -> Set.empty
   Quantity.Power -> Set.empty
@@ -1300,6 +1312,8 @@ objectSlots quantity = case quantity of
   Quantity.PartySize _ -> Set.empty
   Quantity.ObjectCounters _ -> Set.empty
   Quantity.ObjectCountersOfAnyKind -> Set.empty
+  Quantity.LettersOnNameStickers _ -> Set.empty
+  Quantity.NameStickers -> Set.empty
   Quantity.HasDesignation _ -> Set.empty
   Quantity.DesignationValue _ -> Set.empty
   Quantity.StoredResultsOfSameValue -> Set.empty
@@ -1537,6 +1551,7 @@ readsX quantity = case quantity of
   -- a slot names an OBJECT, which Binding.variableX never does.
   Quantity.WasBound _ -> False
   Quantity.BoundCount _ -> False
+  Quantity.UniqueVowelsOnSticker _ -> False
   -- The whole point of the recursion: Vitalizing Cascade's "X plus 3" is
   -- Plus X (Literal 3), which reads X without being equal to it.
   Quantity.Plus (Plus.MkPlus a b) -> readsX a || readsX b
@@ -1583,6 +1598,8 @@ readsX quantity = case quantity of
   Quantity.PartySize _ -> False
   Quantity.ObjectCounters _ -> False
   Quantity.ObjectCountersOfAnyKind -> False
+  Quantity.LettersOnNameStickers _ -> False
+  Quantity.NameStickers -> False
   Quantity.HasDesignation _ -> False
   Quantity.DesignationValue _ -> False
   Quantity.StoredResultsOfSameValue -> False

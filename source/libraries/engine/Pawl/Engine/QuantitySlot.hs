@@ -102,6 +102,7 @@ overSlots f quantity =
         -- one with them.
         Quantity.WasBound slot -> fmap Quantity.WasBound (f slot)
         Quantity.BoundCount slot -> fmap Quantity.BoundCount (f slot)
+        Quantity.UniqueVowelsOnSticker slot -> fmap Quantity.UniqueVowelsOnSticker (f slot)
         Quantity.Star -> pure quantity
         Quantity.Plus (Plus.MkPlus a b) -> fmap Quantity.Plus (Plus.MkPlus <$> recur a <*> recur b)
         -- Composition, as Plus is: the rounding names no slot and the payload may name
@@ -153,6 +154,8 @@ overSlots f quantity =
         -- The kind-agnostic reading of that same arm, naming no slot for its reason and
         -- carrying not even a CounterKind.
         Quantity.ObjectCountersOfAnyKind -> pure quantity
+        Quantity.LettersOnNameStickers _ -> pure quantity
+        Quantity.NameStickers -> pure quantity
         -- The designation, which carries no reference either -- ObjectCounters' position,
         -- with which designation in the kind's place.
         Quantity.HasDesignation _ -> pure quantity
@@ -319,6 +322,7 @@ nestedRefs quantity = case quantity of
   -- and it hides no nested reference.
   Quantity.WasBound _ -> Set.empty
   Quantity.BoundCount _ -> Set.empty
+  Quantity.UniqueVowelsOnSticker _ -> Set.empty
   Quantity.Star -> Set.empty
   Quantity.Plus (Plus.MkPlus a b) -> Set.union (nestedRefs a) (nestedRefs b)
   -- Plus' answer: the rounding hides no reference, so what the payload hides is
@@ -344,6 +348,8 @@ nestedRefs quantity = case quantity of
   Quantity.PartySize ref -> Set.singleton (Left ref)
   Quantity.ObjectCounters _ -> Set.empty
   Quantity.ObjectCountersOfAnyKind -> Set.empty
+  Quantity.LettersOnNameStickers _ -> Set.empty
+  Quantity.NameStickers -> Set.empty
   Quantity.HasDesignation _ -> Set.empty
   Quantity.DesignationValue _ -> Set.empty
   Quantity.StoredResultsOfSameValue -> Set.empty
@@ -434,6 +440,7 @@ nestedCounts quantity = case quantity of
   -- no Count either.
   Quantity.WasBound _ -> []
   Quantity.BoundCount _ -> []
+  Quantity.UniqueVowelsOnSticker _ -> []
   Quantity.Star -> []
   Quantity.Plus (Plus.MkPlus a b) -> nestedCounts a <> nestedCounts b
   -- Plus' descent: CR 107.1a's rounding holds no Count, and the payload it halves
@@ -491,6 +498,8 @@ nestedCounts quantity = case quantity of
   -- quantityKindFilters is what digs out.
   Quantity.ObjectCounters _ -> []
   Quantity.ObjectCountersOfAnyKind -> []
+  Quantity.LettersOnNameStickers _ -> []
+  Quantity.NameStickers -> []
   Quantity.OpponentsAttacked _ -> []
   Quantity.AttackersDeclaredThisTurn _ -> []
   Quantity.AttackersDeclaredThisCombat -> []
@@ -692,9 +701,12 @@ mapPlayerRefs f intoCount quantity =
         Quantity.InSlot _ -> quantity
         Quantity.WasBound _ -> quantity
         Quantity.BoundCount _ -> quantity
+        Quantity.UniqueVowelsOnSticker _ -> quantity
         Quantity.Star -> quantity
         Quantity.ObjectCounters _ -> quantity
         Quantity.ObjectCountersOfAnyKind -> quantity
+        Quantity.LettersOnNameStickers _ -> quantity
+        Quantity.NameStickers -> quantity
         Quantity.HasDesignation _ -> quantity
         Quantity.DesignationValue _ -> quantity
         Quantity.StoredResultsOfSameValue -> quantity

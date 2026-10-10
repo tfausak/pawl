@@ -62,6 +62,7 @@ import qualified Pawl.Engine.ManifestDread as ManifestDread
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Monarch as Monarch
 import qualified Pawl.Engine.MoveDuration as MoveDuration
+import qualified Pawl.Engine.NameWords as NameWords
 import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.Planechase as Planechase
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
@@ -377,6 +378,8 @@ import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.SpellWasCopied as SpellWasCopied
 import qualified Pawl.Types.SpendTrigger as SpendTrigger
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
+import qualified Pawl.Types.StickerKind as StickerKind
+import qualified Pawl.Types.StickerRef as StickerRef
 import qualified Pawl.Types.StoredResult as StoredResult
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
@@ -3534,7 +3537,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   -- CR 608.2d / 123.3: no placer has an available sticker of an allowed kind
   -- and a named object they own. The ChosenPermanent read is the candidate set
   -- chosenPermanentOf offers, the pure sweep answering nothing for it.
-  Effect.PutSticker (PutSticker.MkPutSticker player ref kinds) ->
+  Effect.PutSticker (PutSticker.MkPutSticker player ref kinds _) ->
     let placers = playerRefPlayers legal controller gs player
         named = case ref of
           ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent filter_ _) -> battlefieldMatching legal resolving controller source gs filter_
@@ -5733,10 +5736,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         several -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList several))
   -- CR 123.3: each placer chooses a sticker of an allowed kind not on any
   -- object they own and puts it on each named object. CR 123.3b: an object
-  -- the placer does not own takes nothing; a regression fence, since the one
-  -- producer's own filter already says "you own". Placing nothing writes
-  -- nothing, so happenedBetween reads it as not having happened.
-  Effect.PutSticker (PutSticker.MkPutSticker player ref kinds) -> do
+  -- the placer does not own takes nothing; a regression fence, since no test
+  -- has a placer control an "on it" producer they do not own (Wizards of the
+  -- _____ stolen as it enters). Placing nothing writes nothing, so
+  -- happenedBetween reads it as not having happened.
+  -- CR 123.6b: the object's controller places a name sticker's word
+  -- (namePosition).
+  Effect.PutSticker (PutSticker.MkPutSticker player ref kinds bound) -> do
     named <- case ref of
       ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent filter_ chooser) -> chosenPermanentOf legal resolving controller source filter_ chooser
       _ -> fmap (\gs -> objectRefObjects legal resolving controller source gs ref) State.get
@@ -5744,13 +5750,22 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     Monad.forM_ placers $ \placer -> Monad.forM_ (ListUtils.nubOrd named) $ \oid -> do
       gs <- State.get
       let owned = fmap Object.owner (Game.lookupObject oid gs) == Just placer
+          place picked = do
+            -- CR 123.6b: a name sticker's position is chosen as it is placed.
+            position <- case StickerRef.kind picked of
+              StickerKind.Name -> fmap Just (namePosition oid)
+              StickerKind.Ability -> pure Nothing
+              StickerKind.PowerToughness -> pure Nothing
+              StickerKind.Art -> pure Nothing
+            State.modify' (Sticker.put placer oid picked position)
+            Monad.forM_ bound (\slot -> State.modify' (bindStickerSlot resolving slot picked))
       Monad.when owned $ case Sticker.available placer kinds gs of
         [] -> pure ()
-        [only] -> State.modify' (Sticker.put placer oid only)
+        [only] -> place only
         first : rest -> do
           let offered = first NonEmpty.:| rest
           answer <- Game.choose (Prompt.ChooseSticker (Decide.deciderFor placer gs) placer oid offered)
-          State.modify' (Sticker.put placer oid (if List.elem answer offered then answer else first))
+          place (if List.elem answer offered then answer else first)
   -- CR 701.24a alone: randomize the named libraries so no player knows their
   -- order. Nothing moves, so there is no changeZone call and no CR 616.1
   -- opportunity -- the cards a "then shuffle" follows are still the objects they
@@ -11258,6 +11273,29 @@ activateWhileRolling runSubgame pid oid ability = do
       Foldable.for_ (Modal.forcedSelection every (Modal.Type.selection modal)) $ \selection ->
         Monad.mapM_ (applyEffectWith runSubgame oid oid pid bound bound) (Modal.modesEffects selection modal)
       pure True
+
+-- CR 123.6b: the object's CONTROLLER, or its owner for a card with none (CR
+-- 108.4a), chooses where the word goes: the start, or after any number of the
+-- words now in its name, the longest name's where it has several (gap #4901). An
+-- object whose names hold no word has one position and is not asked.
+namePosition :: ObjectId -> Game Natural
+namePosition oid = do
+  gs <- State.get
+  let most = List.foldl' max 0 (fmap NameWords.wordCount (Set.toList (Projection.namesOf oid gs)))
+      chooser = case Projection.controllerOf oid gs of
+        Just pid -> Just pid
+        Nothing -> fmap Object.owner (Game.lookupObject oid gs)
+  case chooser of
+    Just pid | most > 0 -> do
+      answer <- Game.choose (Prompt.ChooseNamePosition (Decide.deciderFor pid gs) pid oid (0 NonEmpty.:| [1 .. most]))
+      pure (if answer <= most then answer else 0)
+    _ -> pure 0
+
+-- CR 123.6e's "that sticker": bind the placed sticker under @slot@, on
+-- bindSlot's holder. Written only when a sticker was placed, so
+-- happenedBetween needs no copy-across.
+bindStickerSlot :: ObjectId -> SlotName -> StickerRef.StickerRef -> GameState -> GameState
+bindStickerSlot holder slot ref = overHolderBindings holder (Map.insert slot (Binding.toSticker ref))
 
 -- CR 603.7c: bind `target` into `slot` of `holder`'s binding environment, so a
 -- delayed ability armed later in the SAME resolution can name the object.

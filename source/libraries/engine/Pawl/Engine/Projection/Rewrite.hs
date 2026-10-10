@@ -173,6 +173,7 @@ import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
 import qualified Pawl.Types.PermanentsDealCombatDamageToPlayer as PermanentsDealCombatDamageToPlayer
+import qualified Pawl.Types.PlacesSticker as PlacesSticker
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
@@ -306,6 +307,9 @@ rewriteModification pairs m =
         -- CR 612.1 through the names' own Filter, printed on the granter (CR
         -- 612.3) as the enchant's is.
         Modification.AddNamesMatching f -> Modification.AddNamesMatching (Filter.rewrite [(from, to)] f)
+        -- A name is no subtype word (CR 612.2).
+        Modification.SetName _ -> acc
+        Modification.InsertNameWords _ -> acc
         -- CR 612.1 over the whole quoted ability: the words are printed on the
         -- GRANTER, so a text change affecting it rewrites them before the grant.
         Modification.GainAbility a -> Modification.GainAbility (rewriteGrantedAbility [(from, to)] a)
@@ -996,7 +1000,7 @@ rewriteEffect pairs effect = case effect of
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named refs) -> Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named (fmap (rewriteObjectRef pairs) refs))
   -- ShuffleIntoLibrary's descent: the ref's filters are card text.
   Effect.Ante (Ante.MkAnte player ref mSlot) -> Effect.Ante (Ante.MkAnte player (rewriteObjectRef pairs ref) mSlot)
-  Effect.PutSticker (PutSticker.MkPutSticker player ref kinds) -> Effect.PutSticker (PutSticker.MkPutSticker player (rewriteObjectRef pairs ref) kinds)
+  Effect.PutSticker (PutSticker.MkPutSticker player ref kinds bound) -> Effect.PutSticker (PutSticker.MkPutSticker player (rewriteObjectRef pairs ref) kinds bound)
   Effect.SetOwner (SetOwner.MkSetOwner player ref) -> Effect.SetOwner (SetOwner.MkSetOwner player (rewriteObjectRef pairs ref))
   Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership one other) -> Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership (rewriteObjectRef pairs one) (rewriteObjectRef pairs other))
   Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary ref player) -> Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary (rewriteObjectRef pairs ref) player)
@@ -1643,9 +1647,10 @@ rewriteCopyException pairs exception = case exception of
   CopyException.AddSupertypes _ -> exception
   CopyException.RemoveSupertypes _ -> exception
   -- CR 201.1's name is the one CR 612.2 rules out in so many words: "an effect
-  -- that changes a color word or a subtype can't change a card name". CR 612.7's
-  -- Spy Kit is the effect that does, and it adds names in layer 3
-  -- (Modification.AddNamesMatching) rather than rewriting this clause.
+  -- that changes a color word or a subtype can't change a card name". The
+  -- effects that do are CR 612.7-612.9's, in layer 3 (Modification's
+  -- AddNamesMatching, SetName and InsertNameWords), rather than a rewrite of
+  -- this clause.
   CopyException.SetName _ -> exception
   -- CR 612.2 names colour words, but the only text changer that supplies a WORD
   -- PAIR here swaps subtypes -- CR 612.5's exchange of text boxes names no word
@@ -2045,7 +2050,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PlayerWaterbends _ -> condition
   TriggerCondition.PlayerAirbends _ -> condition
   TriggerCondition.PlayerFirebends _ -> condition
-  TriggerCondition.PlacesSticker _ -> condition
+  TriggerCondition.PlacesSticker p -> TriggerCondition.PlacesSticker p {PlacesSticker.object = Filter.rewrite pairs (PlacesSticker.object p)}
   TriggerCondition.PlayerCompletesDungeon _ -> condition
   TriggerCondition.PlayerSurveils _ -> condition
   TriggerCondition.PlayerPlaysLand payload -> TriggerCondition.PlayerPlaysLand payload {PlaysLand.filter = Filter.rewrite pairs (PlaysLand.filter payload)}
@@ -2198,6 +2203,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.InSlot _ -> quantity
   Quantity.Type.WasBound _ -> quantity
   Quantity.Type.BoundCount _ -> quantity
+  Quantity.Type.UniqueVowelsOnSticker _ -> quantity
   Quantity.Type.Star -> quantity
   Quantity.Type.ManaCount _ -> quantity
   Quantity.Type.LifeTotal _ -> quantity
@@ -2240,6 +2246,8 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.PartySize _ -> quantity
   Quantity.Type.ObjectCounters _ -> quantity
   Quantity.Type.ObjectCountersOfAnyKind -> quantity
+  Quantity.Type.LettersOnNameStickers _ -> quantity
+  Quantity.Type.NameStickers -> quantity
   Quantity.Type.OpponentsAttacked _ -> quantity
   Quantity.Type.AttackersDeclaredThisTurn _ -> quantity
   Quantity.Type.AttackersDeclaredThisCombat -> quantity
