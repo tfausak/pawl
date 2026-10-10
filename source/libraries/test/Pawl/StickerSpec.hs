@@ -27,6 +27,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as KeywordEngine
 import qualified Pawl.Engine.NameWords as NameWords
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Sticker as Sticker
@@ -52,6 +53,8 @@ import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.KickerDecision as KickerDecision
+import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
@@ -68,6 +71,7 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.StickerKind as StickerKind
 import qualified Pawl.Types.StickerPlacement as StickerPlacement
@@ -304,6 +308,72 @@ entersNaming card how gs0 =
   let (oid, entered) = S.entersWithTrigger card S.alice gs0
       ((_, after), asked) = State.runState (Engine.runGame (naming how) entered drain) []
    in (oid, after, reverse asked)
+
+-- The kinds of the stickers on `oid`, in placement order.
+stickerKindsOn :: ObjectId.ObjectId -> GameState.GameState -> [StickerKind.StickerKind]
+stickerKindsOn oid gs = foldMap (Foldable.toList . fmap (StickerRef.kind . StickerPlacement.sticker) . Object.stickers) (Game.lookupObject oid gs)
+
+-- Answers ChooseCardInGraveyard with `card`, pinned, ChooseSticker with `ref`,
+-- and every "may" yes, counting the "may"s.
+stickeringCard :: ObjectId.ObjectId -> StickerRef.StickerRef -> Prompt.Prompt r -> State.State Int r
+stickeringCard card ref p = case p of
+  Prompt.ChooseOptional {} -> do
+    State.modify' (+ 1)
+    pure OptionalDecision.Exercises
+  Prompt.ChooseCardInGraveyard _ _ _ offered _ -> pure (if List.elem card offered then card else NonEmpty.head offered)
+  Prompt.ChooseSticker _ _ _ offered -> pure (if List.elem ref offered then ref else NonEmpty.head offered)
+  _ -> pure (S.identityAnswer p)
+
+-- Pays each optional cost `kicks` names that many times and answers
+-- ChooseStickerOrNone with `ref` where it is offered, declining otherwise,
+-- counting the ChooseStickerOrNone asks.
+kicking :: (Keyword.Keyword -> Natural) -> Maybe StickerRef.StickerRef -> Prompt.Prompt r -> State.State Int r
+kicking kicks ref p = case p of
+  Prompt.ChooseKicker _ _ _ keyword _ -> pure (KickerDecision.MkKickerDecision (kicks keyword))
+  Prompt.ChooseStickerOrNone _ _ _ offered -> do
+    State.modify' (+ 1)
+    pure
+      ( case ref of
+          Just r | List.elem r offered -> Just r
+          _ -> Nothing
+      )
+  _ -> pure (S.identityAnswer p)
+
+-- Sticker kicker once, every other optional cost declined.
+stickerKick :: Keyword.Keyword -> Natural
+stickerKick keyword = case keyword of
+  Keyword.StickerKicker _ -> 1
+  _ -> 0
+
+-- A printed kicker once, every other optional cost declined.
+printedKick :: Keyword.Keyword -> Natural
+printedKick keyword = case keyword of
+  Keyword.Kicker _ -> 1
+  _ -> 0
+
+-- alice casts `card` under `kicking kicks ref`, then everything resolves: the
+-- board as the cast ends, the board after, and the ChooseStickerOrNone asks.
+castKicking :: (Keyword.Keyword -> Natural) -> Maybe StickerRef.StickerRef -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, GameState.GameState, Int)
+castKicking kicks ref card gs =
+  let ((_, cast), asked) = State.runState (Engine.runGame (kicking kicks ref) gs (S.cast S.alice card)) 0
+      ((_, resolved), asked') = State.runState (Engine.runGame (kicking kicks ref) cast drain) asked
+   in (cast, resolved, asked')
+
+-- The battlefield objects `after` has that `before` did not.
+arrivals :: GameState.GameState -> GameState.GameState -> [ObjectId.ObjectId]
+arrivals before after = [oid | oid <- Set.toList (GameState.battlefield after), Set.notMember oid (GameState.battlefield before)]
+
+-- The characteristics each GameEvent.SpellCast in the log recorded.
+castSnapshots :: GameState.GameState -> [PC.ProjectedCharacteristics]
+castSnapshots gs = [SpellWasCast.characteristics w | GameEvent.SpellCast w <- fmap LoggedEvent.event (Foldable.toList (GameState.events gs))]
+
+-- alice's Wicker Picker beside `lands` Forests, her sheets and `tickets`
+-- tickets, in her main phase, with `card` in her hand.
+pickerBoard :: [StickerSheet.StickerSheet] -> Printing.Printing -> Printing.Printing -> Int -> Natural -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+pickerBoard sheets picker land lands tickets card =
+  let base = S.addPlayerCounter PlayerCounterKind.Ticket tickets S.alice (S.landsFor land S.alice lands (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)))
+      (_, withPicker) = S.addPermanent picker S.alice base
+   in S.addHandCard card S.alice (mainPhaseForAlice withPicker)
 
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Sticker" $ do
@@ -1083,3 +1153,125 @@ spec s registry = Spec.describe s "Sticker" $ do
           [] -> stickered
     Spec.assertEqWith s "CR 123.8 the crewed Dreadnought is a 5/1" (Projection.powerOf vehicleId crewed, Projection.toughnessOf vehicleId crewed) (Just 5, Just 1)
     Spec.assertEqWith s "and a creature" (Set.member CardType.Creature (Projection.cardTypesOf vehicleId crewed)) True
+  -- Ticketomaton's ticket and alice's one make two: every name and art
+  -- sticker, and each ability or P/T sticker costing at most 2, across the four
+  -- kinds. The committed sheets hold 3- and 4-ticket ability stickers.
+  Spec.it s "CR 123.3 Ticketomaton offers stickers of every kind its ticket pays for" $ do
+    sheets <- committedSheets
+    robot <- S.printingOf s registry "Ticketomaton"
+    let (_, entered) = S.entersWithTrigger robot S.alice (S.addPlayerCounter PlayerCounterKind.Ticket 1 S.alice (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)))
+        ((_, board), offers) = State.runState (Engine.runGame (placing Nothing) entered drain) (MkOffers [] [] 0)
+        offered = concat (take 1 (stickers offers))
+    Spec.assertEqWith s "CR 123.3 the offer spans all four kinds" (Set.fromList (fmap StickerRef.kind offered)) (Set.fromList [StickerKind.Name, StickerKind.Ability, StickerKind.PowerToughness, StickerKind.Art])
+    Spec.assertEqWith s "CR 123.3c and nothing costing more than two tickets" (all (\r -> Sticker.ticketCost r board <= 2) offered) True
+  -- Two creature cards in alice's graveyard, so the choice is asked; the Bears
+  -- takes the art sticker and only it is a legal target for the {3}{B}.
+  Spec.it s "CR 123.3/123.5 Scampire stickers a creature card in alice's graveyard, and returns only that card" $ do
+    sheets <- committedSheets
+    scampire <- S.printingOf s registry "Scampire"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    giant <- S.printingOf s registry "Hill Giant"
+    swamp <- S.printingOf s registry "Swamp"
+    let art = aliceSticker 1 StickerKind.Art 0
+        (bearsCard, g1) = S.addGraveyardCard bears S.alice (S.landsFor swamp S.alice 4 (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)))
+        (giantCard, g2) = S.addGraveyardCard giant S.alice g1
+        (scampId, entered) = S.entersWithTrigger scampire S.alice g2
+        ((_, stickered), _) = State.runState (Engine.runGame (stickeringCard bearsCard art) entered drain) 0
+        board = mainPhaseForAlice stickered
+        recording :: Prompt.Prompt r -> State.State [ObjectId.ObjectId] r
+        recording p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> do
+            State.put (concatMap (Maybe.mapMaybe Recipient.objectOf . Set.toList . snd) (Map.elems sets))
+            pure (namingTarget bearsCard p)
+          _ -> pure (S.identityAnswer p)
+        ((_, returned), targets) = case Activatable.abilitiesFor scampId board of
+          [ability] -> State.runState (Engine.runGame recording board (Activate.activateAbility S.alice scampId ability >> Stack.resolveTop)) []
+          _ -> (((), board), [])
+        arrived = [oid | oid <- Set.toList (GameState.battlefield returned), Set.notMember oid (GameState.battlefield board)]
+    Spec.assertEqWith s "CR 123.3 the Bears card in the graveyard has the art sticker" (stickerKindsOn bearsCard stickered, stickerKindsOn giantCard stickered) ([StickerKind.Art], [])
+    Spec.assertEqWith s "CR 123.4 only the stickered Bears is a legal target" targets [bearsCard]
+    Spec.assertEqWith s "CR 123.5 the returned Bears keeps its sticker and has haste" (fmap (\oid -> (stickerKindsOn oid returned, Projection.hasKeyword Keyword.Haste oid returned)) arrived) [([StickerKind.Art], True)]
+  Spec.it s "CR 608.2d Scampire with no creature card in alice's graveyard asks nothing" $ do
+    sheets <- committedSheets
+    scampire <- S.printingOf s registry "Scampire"
+    let (_, entered) = S.entersWithTrigger scampire S.alice (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))
+        ((_, after), askedPrompts) = State.runState (Engine.runGame (stickeringCard (ObjectId.MkObjectId 0) night) entered drain) 0
+    Spec.assertEqWith s "CR 608.2d alice was not asked" askedPrompts 0
+    Spec.assertEqWith s "and she got her ticket" (S.playerCounterOf PlayerCounterKind.Ticket S.alice after) 1
+  Spec.it s "CR 702.33h sticker kicker gives alice a ticket and puts a sticker on the spell" $ do
+    sheets <- committedSheets
+    picker <- S.printingOf s registry "Wicker Picker"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    forest <- S.printingOf s registry "Forest"
+    let art = aliceSticker 1 StickerKind.Art 0
+        (card, board) = pickerBoard sheets picker forest 3 0 bears
+        (cast, _, _) = castKicking stickerKick (Just art) card board
+        spellKinds = concatMap (\spell -> stickerKindsOn spell cast) (GameState.stack cast)
+    Spec.assertEqWith s "CR 702.33h alice got one ticket and the Bears spell has the art sticker" (S.playerCounterOf PlayerCounterKind.Ticket S.alice cast, spellKinds) (1, [StickerKind.Art])
+  -- Otter's 5/1 costs two tickets: alice's one and the kicker's.
+  Spec.it s "CR 702.33h the sticker is on the spell when it becomes cast, and on the Bears it becomes" $ do
+    sheets <- committedSheets
+    picker <- S.printingOf s registry "Wicker Picker"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    forest <- S.printingOf s registry "Forest"
+    let (card, board) = pickerBoard sheets picker forest 3 1 bears
+        (cast, resolved, _) = castKicking stickerKick (Just otterFiveOne) card board
+        stickerPower = Just (5 :: Integer)
+    Spec.assertEqWith s "CR 601.2i the cast snapshot shows the sticker's power" (fmap PC.power (castSnapshots cast)) [stickerPower]
+    Spec.assertEqWith s "CR 123.5 the Bears on the battlefield keeps it" (fmap (\oid -> Projection.powerOf oid resolved) (filter (/= card) (arrivals board resolved))) [stickerPower]
+  Spec.it s "CR 702.33d declining sticker kicker gives no ticket and asks no sticker" $ do
+    sheets <- committedSheets
+    picker <- S.printingOf s registry "Wicker Picker"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    forest <- S.printingOf s registry "Forest"
+    let (card, board) = pickerBoard sheets picker forest 3 0 bears
+        (cast, _, asked) = castKicking (const 0) (Just (aliceSticker 1 StickerKind.Art 0)) card board
+    Spec.assertEqWith s "no ticket, no ChooseStickerOrNone" (S.playerCounterOf PlayerCounterKind.Ticket S.alice cast, asked > 0) (0, False)
+  -- Two boards with the same six Islands: sticker kicker alone, then the
+  -- Squadron's own kicker alone.
+  Spec.it s "CR 702.33e sticker kicker does not satisfy Faerie Squadron's if kicked" $ do
+    sheets <- committedSheets
+    picker <- S.printingOf s registry "Wicker Picker"
+    squadron <- S.printingOf s registry "Faerie Squadron"
+    island <- S.printingOf s registry "Island"
+    let (card, board) = pickerBoard sheets picker island 6 0 squadron
+        (_, g, _) = castKicking stickerKick Nothing card board
+        (_, g2, _) = castKicking printedKick Nothing card board
+        shape after = fmap (\sq -> (S.counterOf CounterKind.PlusOnePlusOne sq after, Projection.hasKeyword Keyword.Flying sq after)) (arrivals board after)
+    Spec.assertEqWith s "CR 702.33e the Squadron enters with no counters and no flying" (shape g) [(0, False)]
+    Spec.assertEqWith s "CR 702.33d its own kicker still does" (shape g2) [(2, True)]
+  Spec.it s "CR 702.33h/603.2 Hallar triggers on a sticker-kicked creature spell" $ do
+    sheets <- committedSheets
+    picker <- S.printingOf s registry "Wicker Picker"
+    hallar <- S.printingOf s registry "Hallar, the Firefletcher"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    forest <- S.printingOf s registry "Forest"
+    let (card, g1) = pickerBoard sheets picker forest 3 0 bears
+        (hallarId, board) = S.addPermanent hallar S.alice g1
+        (_, g, _) = castKicking stickerKick Nothing card board
+        (_, g0, _) = castKicking (const 0) Nothing card board
+    Spec.assertEqWith s "CR 702.33h Hallar has a +1/+1 counter and bob took 1" (S.counterOf CounterKind.PlusOnePlusOne hallarId g, S.lifeOf S.bob g) (1, Just 19)
+    Spec.assertEqWith s "an unkicked Bears doesn't trigger Hallar" (S.counterOf CounterKind.PlusOnePlusOne hallarId g0, S.lifeOf S.bob g0) (0, Just 20)
+  -- alice's Hostage Taker exiles bob's Bears, the only other creature; Wicker
+  -- Picker comes after, so the Taker cannot target it.
+  Spec.it s "CR 123.3b a sticker-kicked Hostage Taker card alice doesn't own gives her a ticket and takes no sticker" $ do
+    sheets <- committedSheets
+    picker <- S.printingOf s registry "Wicker Picker"
+    taker <- S.printingOf s registry "Hostage Taker"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    island <- S.printingOf s registry "Island"
+    swamp <- S.printingOf s registry "Swamp"
+    let lands = S.landsFor swamp S.alice 4 (S.landsFor island S.alice 5 (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)))
+        (bobsBears, g1) = S.addPermanent bears S.bob lands
+        (takerCard, g2) = S.addHandCard taker S.alice (mainPhaseForAlice g1)
+        taken = S.runPure S.identityAnswer g2 (S.cast S.alice takerCard >> drain)
+        exiled = Game.zoneMembers Zone.Exile S.bob taken
+        (_, board) = S.addPermanent picker S.alice (mainPhaseForAlice taken)
+    case exiled of
+      [bearsCard] -> do
+        let (cast, resolved, asked) = castKicking stickerKick (Just (aliceSticker 1 StickerKind.Art 0)) bearsCard board
+            onSpell = concatMap (\spell -> stickerKindsOn spell cast) (GameState.stack cast)
+        Spec.assertEqWith s "CR 123.3b alice got the ticket, was not asked, and the Bears has no sticker" (S.playerCounterOf PlayerCounterKind.Ticket S.alice cast, asked > 0, onSpell) (1, False, [])
+        Spec.assertEqWith s "the Bears entered under alice" (fmap (\oid -> Projection.controllerOf oid resolved) (arrivals board resolved)) [Just S.alice]
+        Spec.assertBool s (bobsBears /= bearsCard) "the exiled card is a new object"
+      other -> Spec.assertFailure s ("expected bob's Bears in exile, got " <> show other)

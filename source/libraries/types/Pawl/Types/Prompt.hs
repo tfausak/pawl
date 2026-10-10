@@ -356,6 +356,9 @@ data Prompt r where
   -- | CR 123.3: which available sticker the placer puts on this object.
   -- ChooseDungeon's posture: asked at two or more, filtered rather than trusted.
   ChooseSticker :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty StickerRef.StickerRef -> Prompt StickerRef.StickerRef
+  -- | CR 702.33h: ChooseSticker with declining added ("you may put"); raised
+  -- for one candidate too, and an unoffered sticker reads as declining.
+  ChooseStickerOrNone :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty StickerRef.StickerRef -> Prompt (Maybe StickerRef.StickerRef)
   -- | CR 123.6b: after how many words of this object's name the controller
   -- puts a name sticker's word.
   ChooseNamePosition :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty Natural.Natural -> Prompt Natural.Natural

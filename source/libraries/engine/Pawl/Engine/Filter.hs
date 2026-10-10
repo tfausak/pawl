@@ -2227,6 +2227,7 @@ matches context view predicate = case predicate of
   -- for as long as the object lasts. Vacuously False for a player and for
   -- everything nothing was ever paid for -- `manaSpentTagColors` is empty there.
   Filter.TagWasSpent tag -> Map.member tag (manaSpentTagColors view)
+  Filter.Kicked -> any (\(k, n) -> n > 0 && Keyword.isKicker k) (Map.toList (paidCosts view))
   -- CR 701.54e's designation conjunct, asked of the perspective (CR 109.5's
   -- "you"). A live read of Object.ringBearerFor, never a stamp on the candidate:
   -- CR 701.54a ends the designation when another creature takes it, and the next
@@ -2478,6 +2479,7 @@ rewrite pairs predicate = case predicate of
   -- "mana from an artifact" is a fact about a PAST production event, not a word
   -- on this object for Artificial Evolution to reach.
   Filter.TagWasSpent _ -> predicate
+  Filter.Kicked -> predicate
   -- Rewritten THROUGH the kind, for the reason rewriteCounterKind gives.
   Filter.HasCounters kind -> Filter.HasCounters (rewriteCounterKind pairs kind)
   -- Left standing where the atom above is rewritten: CR 612.1 swaps WORDS, and a
@@ -2630,6 +2632,7 @@ rewriteKeyword pairs keyword = case keyword of
   -- cost as part of the keyword, so rewriteCost carries CR 612.1 into it.
   Keyword.Type.Kicker cost -> Keyword.Type.Kicker (rewriteCost pairs cost)
   Keyword.Type.Multikicker cost -> Keyword.Type.Multikicker (rewriteCost pairs cost)
+  Keyword.Type.StickerKicker cost -> Keyword.Type.StickerKicker (rewriteCost pairs cost)
   Keyword.Type.Flashback cost -> Keyword.Type.Flashback (rewriteCost pairs cost)
   -- CR 702.162a states its cost as part of the keyword too.
   Keyword.Type.MoreThanMeetsTheEye cost -> Keyword.Type.MoreThanMeetsTheEye (rewriteCost pairs cost)
@@ -3238,6 +3241,7 @@ bakeBound players predicate = case predicate of
   Filter.IsInZone _ -> predicate
   Filter.WasCastFrom _ -> predicate
   Filter.TagWasSpent _ -> predicate
+  Filter.Kicked -> predicate
 
 -- The mana-value LITERALS a Filter compares against: every `n` in a
 -- ManaValueAtMost atom inside it, at any depth.
@@ -3420,6 +3424,7 @@ manaValueThresholds predicate = case predicate of
   Filter.IsInZone _ -> []
   Filter.WasCastFrom _ -> []
   Filter.TagWasSpent _ -> []
+  Filter.Kicked -> []
 
 -- CR 701.23b vs CR 701.23d: does this predicate state a QUALITY? A search whose
 -- filter states one may find fewer cards than it asks for, or none, even when the
@@ -3625,6 +3630,7 @@ statesAQuality predicate = case predicate of
   -- unreachable from a search for their reason: a card sitting in a library was
   -- never paid for.
   Filter.TagWasSpent _ -> True
+  Filter.Kicked -> True
 
 -- Does the Filter compare a candidate against anything Context holds about
 -- the SOURCE that a printed face can be told apart by -- its projected power,
@@ -3759,6 +3765,7 @@ readsSourceValues predicate = case predicate of
   Filter.IsInZone _ -> False
   Filter.WasCastFrom _ -> False
   Filter.TagWasSpent _ -> False
+  Filter.Kicked -> False
 
 -- The slots a Filter READS. Pawl.Engine.Resolve.Slots.modeSlots folds this over a
 -- mode's target slots, which is what makes the card dataflow lint see a slot
@@ -3939,6 +3946,7 @@ overBoundSlotsWith f predicate = case predicate of
   Filter.IsInZone _ -> pure predicate
   Filter.WasCastFrom _ -> pure predicate
   Filter.TagWasSpent _ -> pure predicate
+  Filter.Kicked -> pure predicate
   Filter.And fs -> fmap Filter.And (traverse (overBoundSlotsWith f) fs)
   Filter.Or fs -> fmap Filter.Or (traverse (overBoundSlotsWith f) fs)
   Filter.Not g -> fmap Filter.Not (overBoundSlotsWith f g)

@@ -170,13 +170,14 @@ data Keyword
   | -- | 702.33a: "You may pay an additional [cost] as you cast this spell", plus
     -- CR 702.33d's "kicked" designation. CR 702.33b's two kicker costs are two of
     -- these on one face, which the keyword Set keeps apart by cost.
-    --
-    -- Not implemented: CR 702.33h's sticker kicker (#872).
     Kicker (Cost.Cost Keyword)
   | -- | 702.33c: "You may pay an additional [cost] any number of times as you
     -- cast this spell". A multikicker cost IS a kicker cost, so everything
     -- downstream of the announcement treats the two alike.
     Multikicker (Cost.Cost Keyword)
+  | -- | 702.33h: "Kicker [cost]", and if kicked the caster gets {TK} and may put
+    -- a sticker on the spell.
+    StickerKicker (Cost.Cost Keyword)
   | -- | 702.34a: cast this card from its owner's graveyard for the given cost,
     -- exiling it as it leaves the stack.
     Flashback (Cost.Cost Keyword)

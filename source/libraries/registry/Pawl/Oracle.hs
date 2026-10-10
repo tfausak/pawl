@@ -151,6 +151,7 @@ printed keyword = case keyword of
   Keyword.Fading {} -> Nothing
   Keyword.Kicker {} -> Nothing
   Keyword.Multikicker {} -> Nothing
+  Keyword.StickerKicker {} -> Nothing
   Keyword.Flashback {} -> Nothing
   Keyword.Fear -> Just (Text.pack "Fear")
   Keyword.Morph {} -> Nothing

@@ -114,6 +114,7 @@ encode p answer = case p of
   Prompt.ChooseCardsFromAmong {} -> Response.ChoseCardsFromAmong answer
   Prompt.ChooseDungeon {} -> Response.ChoseDungeon answer
   Prompt.ChooseSticker {} -> Response.ChoseSticker answer
+  Prompt.ChooseStickerOrNone {} -> Response.ChoseStickerOrNone answer
   Prompt.ChooseNamePosition {} -> Response.ChoseNamePosition answer
   Prompt.ChooseCompanion {} -> Response.ChoseCompanion answer
   Prompt.ChooseFromOutsideTheGame {} -> Response.ChoseFromOutsideTheGame answer
@@ -412,6 +413,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseDungeon {} -> case response of
     Response.ChoseDungeon printingId -> Just printingId
+    _ -> Nothing
+  Prompt.ChooseStickerOrNone {} -> case response of
+    Response.ChoseStickerOrNone ref -> Just ref
     _ -> Nothing
   Prompt.ChooseSticker {} -> case response of
     Response.ChoseSticker ref -> Just ref
@@ -960,6 +964,7 @@ defaultAnswer p = case p of
   Prompt.ChooseDungeon _ _ candidates -> NonEmpty.head candidates
   -- CR 123.3: asked only at two or more, every one available.
   Prompt.ChooseSticker _ _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseStickerOrNone {} -> Nothing
   -- CR 123.6b: the start of the name is always a position.
   Prompt.ChooseNamePosition _ _ _ positions -> NonEmpty.head positions
   -- CR 103.2b's "if any players WISH to reveal": declining is the answer that
