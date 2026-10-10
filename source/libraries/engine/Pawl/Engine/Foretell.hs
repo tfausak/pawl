@@ -24,7 +24,6 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
-import qualified Data.Sequence as Seq
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Event as Event
@@ -50,7 +49,6 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import Pawl.Types.PlayerId (PlayerId)
-import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 116.2h: what the special action costs -- "may pay {2} and exile that card
@@ -183,19 +181,7 @@ reductionOf payload = case payload of
 -- here is resolving, so there is no CR 608.2h moment to evaluate one at.
 riders :: EntryRiders.EntryRiders Natural ability
 riders =
-  EntryRiders.MkEntryRiders
-    { EntryRiders.tapped = TapState.Untapped,
-      EntryRiders.attacking = Nothing,
-      EntryRiders.blocking = Nothing,
-      EntryRiders.transformed = False,
-      EntryRiders.counters = Map.empty,
-      EntryRiders.underOwner = False,
-      EntryRiders.exiledFaceDown = True,
-      EntryRiders.attachedTo = Nothing,
-      EntryRiders.faceDown = Nothing,
-      EntryRiders.noted = False,
-      EntryRiders.characteristics = Seq.empty
-    }
+  EntryRiders.defaultValue {EntryRiders.exiledFaceDown = True}
 
 -- "It becomes a foretold card" -- the stamp and CR 702.143d's granted cost
 -- together, which is the WHOLE of what becoming foretold is. Pawl.Engine.Plot's

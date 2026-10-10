@@ -8,7 +8,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.CastOffer as CastOffer
 import qualified Pawl.Codec.Effect as Effect
-import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Codec.RemoveCountersAmong as RemoveCountersAmong.Codec
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -83,7 +82,6 @@ import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.DoesNotUntapNext as DoesNotUntapNext
 import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Duration as Duration
-import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.Earthbend as Earthbend
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryAttack as EntryAttack
@@ -109,7 +107,7 @@ import qualified Pawl.Types.ForbidBeingBlocked as ForbidBeingBlocked
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.ForbidUntap as ForbidUntap
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
-import qualified Pawl.Types.GiveControl as GiveControl
+import qualified Pawl.Types.GainControl as GainControl
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.InZone as InZone
@@ -1801,21 +1799,21 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.GainControl (DurationRef.MkDurationRef Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))))
+      (Effect.GainControl (GainControl.MkGainControl Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (PlayerRef.Relative PlayerRelation.You)))
       " {\"type\":\"GainControl\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}}} "
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.GainControl (DurationRef.MkDurationRef Duration.Indefinite (ObjectRef.EachMatching (Filter.HasCardType CardType.Enchantment))))
+      (Effect.GainControl (GainControl.MkGainControl Duration.Indefinite (ObjectRef.EachMatching (Filter.HasCardType CardType.Enchantment)) (PlayerRef.Relative PlayerRelation.You)))
       " {\"type\":\"GainControl\",\"value\":{\"duration\":{\"type\":\"Indefinite\"},\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Enchantment\"}}}}} "
-  Spec.it s "GiveControl" $
+  Spec.it s "GainControl to a named player" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.GiveControl (GiveControl.MkGiveControl (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "teammate"))) (ObjectRef.EachMatching Filter.IsSource)))
-      " {\"type\":\"GiveControl\",\"value\":{\"player\":{\"type\":\"InSlot\",\"value\":\"teammate\"},\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}}}} "
+      (Effect.GainControl (GainControl.MkGainControl Duration.Indefinite (ObjectRef.EachMatching Filter.IsSource) (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "teammate")))))
+      " {\"type\":\"GainControl\",\"value\":{\"duration\":{\"type\":\"Indefinite\"},\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}},\"to\":{\"type\":\"InSlot\",\"value\":\"teammate\"}}} "
   Spec.it s "ExchangeControl round-trips both ControlSides arms" $ do
     Common.assertJsonCodec
       s

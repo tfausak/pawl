@@ -12,6 +12,7 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.CreateCopy as CreateCopy
+import qualified Pawl.Types.EntryRiders as EntryRiders
 
 -- | The count is ELIDED when it is one, so every card that mints a single copy
 -- writes the ref alone. Previously that was two whole payload SHAPES -- a bare

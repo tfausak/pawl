@@ -8,7 +8,6 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
-import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Event as Event
@@ -21,7 +20,6 @@ import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Subtype as Subtype
-import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
 -- | CR 717.2: this player's Attraction deck, top card first.
@@ -54,16 +52,4 @@ open pid = do
 -- with no counters.
 riders :: EntryRiders.EntryRiders Natural ability
 riders =
-  EntryRiders.MkEntryRiders
-    { EntryRiders.tapped = TapState.Untapped,
-      EntryRiders.attacking = Nothing,
-      EntryRiders.blocking = Nothing,
-      EntryRiders.transformed = False,
-      EntryRiders.counters = Map.empty,
-      EntryRiders.underOwner = False,
-      EntryRiders.exiledFaceDown = False,
-      EntryRiders.attachedTo = Nothing,
-      EntryRiders.noted = False,
-      EntryRiders.characteristics = Seq.empty,
-      EntryRiders.faceDown = Nothing
-    }
+  EntryRiders.defaultValue

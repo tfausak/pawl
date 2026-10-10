@@ -57,7 +57,6 @@ import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.DestructionCause as DestructionCause
 import qualified Pawl.Types.Duration as Duration
-import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntryR as EntryR
@@ -65,6 +64,7 @@ import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.GainControl as GainControl
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -79,6 +79,8 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Types.Prompt as Prompt
@@ -576,7 +578,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         g3 = S.addReplacement (leylineShape src (fst (Game.freshTimestamp g2))) g2
         stolen =
           S.runPure S.identityAnswer g3 $
-            Resolve.applyEffect S.noSource S.noSource S.bob (Map.singleton slot (Set.singleton (Recipient.ToObject oid))) (Map.singleton slot (Set.singleton (Recipient.ToObject oid))) (Effect.GainControl (DurationRef.MkDurationRef Duration.Indefinite (ObjectRef.InSlot slot)))
+            Resolve.applyEffect S.noSource S.noSource S.bob (Map.singleton slot (Set.singleton (Recipient.ToObject oid))) (Map.singleton slot (Set.singleton (Recipient.ToObject oid))) (Effect.GainControl (GainControl.MkGainControl Duration.Indefinite (ObjectRef.InSlot slot) (PlayerRef.Relative PlayerRelation.You)))
         after = S.runPure S.identityAnswer stolen (Event.changeZone oid Zone.Graveyard)
     Spec.assertEqWith s "bob really did take control of it" (Projection.controllerOf oid stolen) (Just S.bob)
     Spec.assertEqWith s "it reaches its OWNER's graveyard, unexiled" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1

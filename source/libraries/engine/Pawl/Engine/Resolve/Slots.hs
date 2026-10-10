@@ -99,7 +99,6 @@ import qualified Pawl.Types.DrawCountR as DrawCountR
 import qualified Pawl.Types.DrawR as DrawR
 import qualified Pawl.Types.DrawRewrite as DrawRewrite
 import qualified Pawl.Types.Duration as Duration
-import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.EachCardInHand as EachCardInHand
@@ -109,6 +108,7 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntersWith as EntersWith
 import qualified Pawl.Types.EntryAttack as EntryAttack
 import qualified Pawl.Types.EntryBlock as EntryBlock
+import qualified Pawl.Types.EntryPrice as EntryPrice
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
@@ -134,9 +134,9 @@ import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.ForbidUntap as ForbidUntap
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.FromReference as FromReference
+import qualified Pawl.Types.GainControl as GainControl
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
-import qualified Pawl.Types.GiveControl as GiveControl
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -815,8 +815,7 @@ effectObjectRefs effect = case effect of
   Effect.AddPhases {} -> []
   Effect.EndTurn -> []
   Effect.EndCombatPhase -> []
-  Effect.GainControl (DurationRef.MkDurationRef _ ref) -> [ref]
-  Effect.GiveControl (GiveControl.MkGiveControl _ ref) -> [ref]
+  Effect.GainControl (GainControl.MkGainControl _ ref _) -> [ref]
   Effect.ExchangeControl _ -> []
   Effect.ArmDelayedTrigger {} -> []
   Effect.AffectPlayers {} -> []
@@ -1040,8 +1039,7 @@ effectPlayerRefs effect = case effect of
   Effect.AddPhases {} -> []
   Effect.EndTurn -> []
   Effect.EndCombatPhase -> []
-  Effect.GainControl {} -> []
-  Effect.GiveControl (GiveControl.MkGiveControl player _) -> [player]
+  Effect.GainControl (GainControl.MkGainControl _ _ to) -> [to]
   Effect.ExchangeControl {} -> []
   Effect.ArmDelayedTrigger {} -> []
   -- CR 400.1's zone reference, which lives inside the permission payloads rather
@@ -1440,9 +1438,8 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.AddPhases _ -> Map.empty
   Effect.EndTurn -> Map.empty
   Effect.EndCombatPhase -> Map.empty
-  Effect.GainControl {} -> Map.empty
   -- Both refs are the generic folds' half, joined at the head.
-  Effect.GiveControl {} -> Map.empty
+  Effect.GainControl {} -> Map.empty
   Effect.ExchangeControl sides -> controlSidesSlots sides
   Effect.ArmDelayedTrigger {} -> Map.empty
   -- Two reads, on the two halves of one opcode: the seat AffectedPlayers.Named
@@ -1763,8 +1760,8 @@ entryRewriteReads rewrite = case rewrite of
   EntryRewrite.Tribute _ -> ([], [])
   EntryRewrite.Compleated _ -> ([], [])
   EntryRewrite.Tapped -> ([], [])
-  EntryRewrite.PayLifeOrTapped _ -> ([], [])
-  EntryRewrite.RevealOrTapped filter_ -> ([filter_], [])
+  EntryRewrite.OrTapped (EntryPrice.PayLife _) -> ([], [])
+  EntryRewrite.OrTapped (EntryPrice.Reveal filter_) -> ([filter_], [])
   EntryRewrite.EntersTransformed -> ([], [])
   -- The nested effects' reads are replacementRowEffects' answer rather than this
   -- one's, for the reason replacementRowReads' header gives.
@@ -1939,8 +1936,7 @@ entryRewriteEffects rewrite = case rewrite of
   EntryRewrite.Tribute _ -> []
   EntryRewrite.Compleated _ -> []
   EntryRewrite.Tapped -> []
-  EntryRewrite.PayLifeOrTapped _ -> []
-  EntryRewrite.RevealOrTapped _ -> []
+  EntryRewrite.OrTapped _ -> []
   EntryRewrite.EntersTransformed -> []
 
 -- The program a DAMAGE rewrite runs. entryRewriteEffects' twin, and its
@@ -2175,9 +2171,8 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.EndTurn -> True
   Effect.EndCombatPhase -> True
   -- slotsOf's arm drops this Duration, so the slotless test is made here.
-  Effect.GainControl (DurationRef.MkDurationRef duration _) ->
+  Effect.GainControl (GainControl.MkGainControl duration _ _) ->
     Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
-  Effect.GiveControl _ -> True
   Effect.ExchangeControl _ -> True
   -- CR 603.7c: the armed ability inherits this object's whole environment.
   Effect.ArmDelayedTrigger {} -> False
@@ -2444,8 +2439,7 @@ readsX =
         Effect.AddPhases _ -> False
         Effect.EndTurn -> False
         Effect.EndCombatPhase -> False
-        Effect.GainControl (DurationRef.MkDurationRef _ _) -> False
-        Effect.GiveControl _ -> False
+        Effect.GainControl (GainControl.MkGainControl {}) -> False
         Effect.ExchangeControl _ -> False
         Effect.ArmDelayedTrigger {} -> False
         Effect.AffectPlayers {} -> False
@@ -2719,8 +2713,7 @@ boundSlots effect = case effect of
   Effect.AddPhases _ -> Set.empty
   Effect.EndTurn -> Set.empty
   Effect.EndCombatPhase -> Set.empty
-  Effect.GainControl (DurationRef.MkDurationRef _ _) -> Set.empty
-  Effect.GiveControl _ -> Set.empty
+  Effect.GainControl (GainControl.MkGainControl {}) -> Set.empty
   Effect.ExchangeControl _ -> Set.empty
   Effect.ArmDelayedTrigger {} -> Set.empty
   Effect.AffectPlayers {} -> Set.empty

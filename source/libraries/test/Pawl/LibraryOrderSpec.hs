@@ -51,11 +51,11 @@ import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Duration as Duration
-import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.GainControl as GainControl
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -333,7 +333,7 @@ gainControlSpec s registry = Spec.describe s "GainControl" $ do
             S.alice
             (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
             (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
-            (Effect.GainControl (DurationRef.MkDurationRef Duration.UntilEndOfTurn (ObjectRef.InSlot slot)))
+            (Effect.GainControl (GainControl.MkGainControl Duration.UntilEndOfTurn (ObjectRef.InSlot slot) (PlayerRef.Relative PlayerRelation.You)))
         after = snd (Engine.runGamePure S.identityAnswer base run)
     Spec.assertEqWith s "alice now controls it" (Projection.controllerOf oid after) (Just S.alice)
     Spec.assertEqWith s "it is summoning sick for the new controller" (fmap Object.sickness (Game.lookupObject oid after)) (Just Sickness.Sick)
@@ -357,7 +357,7 @@ gainControlSpec s registry = Spec.describe s "GainControl" $ do
             S.alice
             (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
             (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
-            (Effect.GainControl (DurationRef.MkDurationRef Duration.UntilEndOfTurn (ObjectRef.InSlot slot)))
+            (Effect.GainControl (GainControl.MkGainControl Duration.UntilEndOfTurn (ObjectRef.InSlot slot) (PlayerRef.Relative PlayerRelation.You)))
         after = snd (Engine.runGamePure S.identityAnswer settled run)
     Spec.assertEqWith s "alice controlled it before" (Projection.controllerOf oid settled) (Just S.alice)
     Spec.assertEqWith s "and still does" (Projection.controllerOf oid after) (Just S.alice)
@@ -1781,7 +1781,7 @@ jailerExile slot =
     ( MoveToZone.MkMoveToZone
         (ObjectRef.InSlot slot)
         Zone.Exile
-        EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = Nothing, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.attachedTo = Nothing, EntryRiders.faceDown = Nothing, EntryRiders.noted = False, EntryRiders.characteristics = Seq.empty}
+        EntryRiders.defaultValue
         Nothing
         Nothing
         LibraryPlacement.defaultValue

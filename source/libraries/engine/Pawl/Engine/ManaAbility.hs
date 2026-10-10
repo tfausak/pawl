@@ -38,12 +38,12 @@ import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Designate as Designate
-import qualified Pawl.Types.DurationRef as DurationRef
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.ExchangeZones as ExchangeZones
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ForEachNumber as ForEachNumber
+import qualified Pawl.Types.GainControl as GainControl
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
@@ -424,8 +424,7 @@ manaProduced effect = case effect of
   Effect.AddPhases _ -> Nothing
   Effect.EndTurn -> Nothing
   Effect.EndCombatPhase -> Nothing
-  Effect.GainControl (DurationRef.MkDurationRef _ _) -> Nothing
-  Effect.GiveControl _ -> Nothing
+  Effect.GainControl (GainControl.MkGainControl {}) -> Nothing
   Effect.ExchangeControl _ -> Nothing
   Effect.ArmDelayedTrigger {} -> Nothing
   Effect.AffectPlayers {} -> Nothing
@@ -620,7 +619,6 @@ playerChoice effect = case effect of
   Effect.EndTurn -> Nothing
   Effect.EndCombatPhase -> Nothing
   Effect.GainControl {} -> Nothing
-  Effect.GiveControl _ -> Nothing
   Effect.ExchangeControl _ -> Nothing
   Effect.ArmDelayedTrigger {} -> Nothing
   Effect.AffectPlayers {} -> Nothing
@@ -904,8 +902,7 @@ movesLibraryCard effect = case effect of
   Effect.EndTurn -> False
   Effect.EndCombatPhase -> False
   Effect.TakeExtraTurn {} -> False
-  Effect.GainControl (DurationRef.MkDurationRef _ _) -> False
-  Effect.GiveControl _ -> False
+  Effect.GainControl (GainControl.MkGainControl {}) -> False
   Effect.ExchangeControl _ -> False
   -- The armed ability is a SEPARATE ability (CR 603.7a), so what it later does
   -- is not this effect's doing. The monarch's draw below is a separate triggered

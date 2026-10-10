@@ -117,7 +117,6 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RoomHalf as RoomHalf
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
-import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
 -- The two doors, by the names CR 709.4a gives them, plus the joined name CR
@@ -206,7 +205,7 @@ roomPermanent gs =
 -- for: CR 110.5b's untapped and face up, no CR 508.1 attacking entry, and CR
 -- 712.14's untransformed default.
 plainEntry :: EntryRiders.EntryRiders Natural ability
-plainEntry = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = Nothing, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.attachedTo = Nothing, EntryRiders.faceDown = Nothing, EntryRiders.noted = False, EntryRiders.characteristics = Seq.empty}
+plainEntry = EntryRiders.defaultValue
 
 -- The second Room's two doors, and the burn spell the CR 707.2a case below reads
 -- its replacement effect through.

@@ -17,6 +17,7 @@ import qualified Pawl.Types.Effect as Effect.Type
 import qualified Pawl.Types.EntersWith as EntersWith
 import qualified Pawl.Types.EntryFlip as EntryFlip
 import qualified Pawl.Types.EntryOption as EntryOption
+import qualified Pawl.Types.EntryPrice as EntryPrice
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
@@ -256,24 +257,14 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       (EntryRewrite.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
       EntryRewrite.EntersTransformed
       " {\"type\":\"EntersTransformed\"} "
-  -- CR 614.1c: the same tap-state rewrite with a price on avoiding it, and the
-  -- amount is card text rather than a rule's, so unlike Tapped above it carries a
-  -- payload.
-  Spec.it s "PayLifeOrTapped (Razorgrass Field)" $
+  -- CR 614.1c: the same tap-state rewrite with a price on avoiding it, which is
+  -- card text rather than a rule's, so unlike Tapped above it carries a payload.
+  Spec.it s "OrTapped (Razorgrass Field)" $
     Common.assertCodec
       s
       (EntryRewrite.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
-      (EntryRewrite.PayLifeOrTapped 3)
-      " {\"type\":\"PayLifeOrTapped\",\"value\":3} "
-  -- CR 614.1c: the same tap-state rewrite again, avoided by revealing a card
-  -- instead of by paying life. The payload is which card in the hand qualifies,
-  -- which is card text as PayLifeOrTapped's amount is.
-  Spec.it s "RevealOrTapped (Rustic Clachan)" $
-    Common.assertCodec
-      s
-      (EntryRewrite.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
-      (EntryRewrite.RevealOrTapped (Filter.HasSubtype Subtype.Kithkin))
-      " {\"type\":\"RevealOrTapped\",\"value\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Kithkin\"}}} "
+      (EntryRewrite.OrTapped (EntryPrice.PayLife 3))
+      " {\"type\":\"OrTapped\",\"value\":{\"type\":\"PayLife\",\"value\":3}} "
   -- CR 616.1b: a control rewrite, payload-free because CR 109.5 derives the
   -- player.
   Spec.it s "UnderSourceControl (Gather Specimens)" $

@@ -14,9 +14,10 @@ import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Filter as Filter
-import qualified Pawl.Types.GiveControl as GiveControl
+import qualified Pawl.Types.GainControl as GainControl
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -47,7 +48,7 @@ grants optionOn pc =
 ability :: ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
 ability =
   let slot = TargetSlot.required Pool.Players (Just (Filter.IsPlayer PlayerRelation.Teammate))
-      effect = Effect.GiveControl (GiveControl.MkGiveControl (PlayerRef.InSlot teammate) (ObjectRef.EachMatching Filter.IsSource))
+      effect = Effect.GainControl (GainControl.MkGainControl Duration.Indefinite (ObjectRef.EachMatching Filter.IsSource) (PlayerRef.InSlot teammate))
    in ActivatedAbility.MkActivatedAbility
         { ActivatedAbility.cost = Cost.MkCost (Just (ManaCost.MkManaCost [])) [CostComponent.TapThis],
           ActivatedAbility.modal =

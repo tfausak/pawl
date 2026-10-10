@@ -30,11 +30,11 @@ import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Designate as Designate
-import qualified Pawl.Types.DurationRef as DurationRef
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ForEachNumber as ForEachNumber
+import qualified Pawl.Types.GainControl as GainControl
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -267,8 +267,7 @@ zoneFunctionedAgainst itself delayed effect = case effect of
   Effect.AddPhases _ -> Nothing
   Effect.EndTurn -> Nothing
   Effect.EndCombatPhase -> Nothing
-  Effect.GainControl (DurationRef.MkDurationRef _ _) -> Nothing
-  Effect.GiveControl _ -> Nothing
+  Effect.GainControl (GainControl.MkGainControl {}) -> Nothing
   Effect.ExchangeControl _ -> Nothing
   -- CR 113.6m's final sentence: "the same is true if the effect of that ability
   -- creates a delayed triggered ability whose effect moves the object out of a

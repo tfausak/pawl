@@ -124,6 +124,7 @@ import qualified Pawl.Types.Effect as Effect.Type
 import qualified Pawl.Types.EnteringTogether as EnteringTogether
 import qualified Pawl.Types.EntersWith as EntersWith
 import qualified Pawl.Types.EntryFlip as EntryFlip
+import qualified Pawl.Types.EntryPrice as EntryPrice
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRefusal as EntryRefusal
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
@@ -637,8 +638,8 @@ payLife pid n = do
     recordEvent (GameEvent.LifeLost (LifeChange.MkLifeChange pid settled)) . Game.adjustLife pid (negate (toInteger settled))
 
 -- CR 110.5b: stamp the tapped status onto an entering permanent, the write shared
--- by EntryRewrite.Tapped (CR 614.1d), by the declining half of both
--- EntryRewrite.PayLifeOrTapped and EntryRewrite.RevealOrTapped (CR 614.1c), and
+-- by EntryRewrite.Tapped (CR 614.1d), by the declining half of
+-- EntryRewrite.OrTapped (CR 614.1c), and
 -- by the taking half of EntryRewrite.AsCopy's `tapped` (Vesuva) -- which is why
 -- it is one function: those sentences differ in what they charge and not in what
 -- they leave on the board.
@@ -2191,7 +2192,7 @@ apply batch candidate event =
                 then -- With nothing eligible, declining is the only legal answer
                 -- -- a forced selection rather than an elision of options a
                 -- player could tell apart -- so the prompt is skipped rather
-                -- than asked and overruled. RevealOrTapped's posture below.
+                -- than asked and overruled. OrTapped's reveal posture below.
                 -- One candidate IS still asked: the card's "may" makes
                 -- declining a real fork.
                   pure Nothing
@@ -2696,7 +2697,7 @@ apply batch candidate event =
       -- CHOSEN, so paying any later than this leaves five 3/3s instead of one.
       --
       -- That argument covers the costs no earlier choice can leave unpayable:
-      -- this one is "any number", PayLifeOrTapped may be declined, and the exile
+      -- this one is "any number", OrTapped's life may be declined, and the exile
       -- (EntryRewrite.ExileFromGraveyard) does as much as it can (CR 101.3).
       -- EntryRewrite.SacrificeToEnter's fixed count can be starved, so THIS
       -- answer is judged against the fixed costs of the members still to come
@@ -2855,7 +2856,7 @@ apply batch candidate event =
       -- answer rather than an omission.
       --
       -- WHICH CARDS is Replacement.amplifiableFromHand, read HERE at CR 614.12a's
-      -- moment for RevealOrTapped's reason: an entry replacement applied before
+      -- moment for OrTapped's reveal reason: an entry replacement applied before
       -- this one can have moved a card (CR 614.13). Rule 702.38a's exclusion of
       -- cards entering beside this one falls out of that read; the helper says
       -- why.
@@ -2867,7 +2868,7 @@ apply batch candidate event =
       -- retyped, so this is the right door rather than a demonstrated behaviour.
       --
       -- Through `reveal`, CR 701.20a's own funnel, so every shown card reaches the
-      -- public log -- the RevealOrTapped arm's road, and a reveal is not a cost
+      -- public log -- OrTapped's reveal road, and a reveal is not a cost
       -- here either.
       --
       -- The counters go through addEnteringCounters, so CR 614.16 reaches them in
@@ -2934,7 +2935,7 @@ apply batch candidate event =
           Nothing -> pure (Just event)
           Just controller -> do
             -- The graveyard is read HERE, at CR 614.12a's moment, for
-            -- RevealOrTapped's reason: an entry replacement applied before this
+            -- OrTapped's reveal reason: an entry replacement applied before this
             -- one can have moved a card (CR 614.13).
             let offered = Replacement.graveyardCandidates controller filter_ gs
             -- Asked through Game.chooseAmong: with no candidate nothing is
@@ -3332,20 +3333,14 @@ apply batch candidate event =
         Replacement.consume (ReplacementCandidate.identity candidate)
         enterTapped oid
         pure (Just event)
-      -- CR 614.1c with CR 119.4: "As this land enters, you may pay N life. If you
-      -- don't, it enters tapped" (Razorgrass Field). The arm above's write, with a
+      -- CR 614.1c: "As this land enters, you may [price]. If you don't, it enters
+      -- tapped" (Razorgrass Field, Rustic Clachan). The arm above's write, with a
       -- price on avoiding it -- so declining here leaves exactly the board Zof
       -- Bloodbog's unconditional sentence leaves, down to the same stamp.
       --
-      -- NEVER ELIDED where the payment is possible. Life against an untapped land
-      -- is a real fork on any board -- it is why the cycle is printed -- so the
-      -- prompt is raised every time the entering object has a controller who can
-      -- afford it.
-      --
-      -- Through payLife, CR 119.4's own door, and NOT a subtraction from the life
-      -- total: rule 119.4's last clause makes the payment a life loss like any
-      -- other, so a card watching for life loss sees this one.
-      EntryRewrite.PayLifeOrTapped n -> do
+      -- NEVER ELIDED where the price can be paid. Paying against an untapped land
+      -- is a real fork on any board -- it is why the cycles are printed.
+      EntryRewrite.OrTapped price -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         gs <- State.get
         case Projection.controllerOf oid gs of
@@ -3354,71 +3349,53 @@ apply batch candidate event =
           -- falls back to its owner. Tapped rather than untapped, because with
           -- nobody to ask nobody paid -- which is the card's own stated default,
           -- "if you don't, it enters tapped".
-          Nothing -> do
-            enterTapped oid
-            pure (Just event)
-          Just controller -> do
+          Nothing -> enterTapped oid
+          Just controller -> case price of
             -- CR 119.4: a player may pay N life only if their life total is at
             -- least N. Below that, declining is the only legal answer -- a forced
             -- selection, not an elision of options a player could tell apart --
             -- so the prompt is skipped rather than asked and overruled. CR 119.4b
             -- keeps 0 payable at any total, so a zero amount is still asked.
-            answer <-
-              if canPayLife controller n gs
-                then Game.choose (Prompt.ChoosePayLifeOnEntry (Decide.deciderFor controller gs) controller oid n)
-                else pure OptionalDecision.Declines
-            case answer of
-              OptionalDecision.Exercises -> payLife controller n
-              OptionalDecision.Declines -> enterTapped oid
-            pure (Just event)
-      -- CR 614.1c with CR 701.20a: "As this land enters, you may reveal a Kithkin
-      -- card from your hand. If you don't, this land enters tapped" (Rustic
-      -- Clachan). The arm above with a different price -- showing a card instead
-      -- of spending life -- and the same declining half, down to the same stamp.
-      --
-      -- Through `reveal`, CR 701.20a's own funnel, so the shown card reaches the
-      -- public log with the projection a player at the table would see. Nothing
-      -- moves and nothing changes (CR 701.20b), which is why the paying half is
-      -- the reveal alone: this is not a cost, so no CR 118 payment and no
-      -- rollback is involved.
-      --
-      -- NEVER ELIDED where a matching card is held. Showing a card nobody could
-      -- have made you show, against a land that comes in tapped, is a real fork on
-      -- any board -- it is why the cycle is printed.
-      EntryRewrite.RevealOrTapped filter_ -> do
-        Replacement.consume (ReplacementCandidate.identity candidate)
-        gs <- State.get
-        case Projection.controllerOf oid gs of
-          -- Unreachable, and defensive for the arm above's reason: the object is
-          -- materialized on the battlefield before this loop runs, so controllerOf
-          -- falls back to its owner. Tapped rather than untapped, because with
-          -- nobody to ask nobody revealed -- the card's own stated default.
-          Nothing -> do
-            enterTapped oid
-            pure (Just event)
-          Just controller -> do
-            -- The hand is read HERE, at CR 614.12a's moment, and not off any
-            -- earlier snapshot: an entry replacement applied before this one can
-            -- have moved a card (CR 614.13), and the offer must be what the
-            -- player actually holds as the choice is made.
-            let candidates = Replacement.revealableFromHand controller filter_ gs
-            answer <- case NonEmpty.nonEmpty candidates of
-              -- Holding nothing that matches, declining is the only legal answer
-              -- -- a forced selection rather than an elision of options a player
-              -- could tell apart -- so the prompt is skipped rather than asked and
-              -- overruled.
-              Nothing -> pure Nothing
-              Just offered -> Game.choose (Prompt.ChooseRevealOnEntry (Decide.deciderFor controller gs) controller oid offered)
-            -- FILTERED, NOT TRUSTED, AsCopy's posture above: this list is the only
-            -- thing enforcing the printed criterion, so honouring an unoffered
-            -- answer would let any card in hand keep the land untapped. A
-            -- REGRESSION FENCE rather than proven behaviour -- the offer is the
-            -- only thing an ordinary game answers from, so it takes a transcript
-            -- naming a card that was never offered to reach the refusal.
-            case answer of
-              Just shown | List.elem shown candidates -> reveal RevealCause.Ordinary controller shown
-              _ -> enterTapped oid
-            pure (Just event)
+            --
+            -- Through payLife, CR 119.4's own door, and NOT a subtraction from the
+            -- life total: rule 119.4's last clause makes the payment a life loss
+            -- like any other, so a card watching for life loss sees this one.
+            EntryPrice.PayLife n -> do
+              answer <-
+                if canPayLife controller n gs
+                  then Game.choose (Prompt.ChoosePayLifeOnEntry (Decide.deciderFor controller gs) controller oid n)
+                  else pure OptionalDecision.Declines
+              case answer of
+                OptionalDecision.Exercises -> payLife controller n
+                OptionalDecision.Declines -> enterTapped oid
+            -- CR 701.20a: through `reveal`, its own funnel, so the shown card
+            -- reaches the public log with the projection a player at the table
+            -- would see. Nothing moves and nothing changes (CR 701.20b), so this
+            -- is not a cost: no CR 118 payment and no rollback is involved.
+            EntryPrice.Reveal filter_ -> do
+              -- The hand is read HERE, at CR 614.12a's moment, and not off any
+              -- earlier snapshot: an entry replacement applied before this one
+              -- can have moved a card (CR 614.13), and the offer must be what the
+              -- player actually holds as the choice is made.
+              let candidates = Replacement.revealableFromHand controller filter_ gs
+              answer <- case NonEmpty.nonEmpty candidates of
+                -- Holding nothing that matches, declining is the only legal
+                -- answer -- a forced selection rather than an elision of options
+                -- a player could tell apart -- so the prompt is skipped rather
+                -- than asked and overruled.
+                Nothing -> pure Nothing
+                Just offered -> Game.choose (Prompt.ChooseRevealOnEntry (Decide.deciderFor controller gs) controller oid offered)
+              -- FILTERED, NOT TRUSTED, AsCopy's posture above: this list is the
+              -- only thing enforcing the printed criterion, so honouring an
+              -- unoffered answer would let any card in hand keep the land
+              -- untapped. A REGRESSION FENCE rather than proven behaviour -- the
+              -- offer is the only thing an ordinary game answers from, so it
+              -- takes a transcript naming a card that was never offered to reach
+              -- the refusal.
+              case answer of
+                Just shown | List.elem shown candidates -> reveal RevealCause.Ordinary controller shown
+                _ -> enterTapped oid
+        pure (Just event)
       -- CR 702.145b's first static ability: "if it is night and this permanent
       -- is represented by a double-faced card, it enters transformed." The one
       -- producer CR 616.1d's bucket has, and CR 616.1d names no origin zone, so
