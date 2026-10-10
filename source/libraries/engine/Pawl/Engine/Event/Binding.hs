@@ -393,7 +393,7 @@ eventBindingsOver board gs bearerBecame becameInGraveyard bearer you cond event 
   -- SelfLeavesTheBattlefield arm's guard, here settled by the condition itself.
   (TriggerCondition.PermanentReturnedToHand _, GameEvent.Moved m) ->
     let zc = Moved.change m
-        owner = fmap LastKnown.owner (Projection.lastKnownOf (ZoneChange.departed zc) gs)
+        owner = fmap LastKnown.owner (Game.lastKnownOf (ZoneChange.departed zc) gs)
      in Binding.setDepartedPermanent (ZoneChange.departed zc) (maybe Map.empty (`Binding.setTriggerPlayer` Map.empty) owner)
   -- CR 400.7e again, read in the ENTRY direction: the object that moved is the
   -- entrant, and what it became is the permanent now on the battlefield --
@@ -1216,7 +1216,7 @@ admitsDeparture gs bearer you p departed = case Projection.viewWithLastKnown dep
     -- that follows it (Tempest Efreet), where the owner names the wrong seat.
     let fromWhose = case CardLeavesZone.whose p of
           Nothing -> True
-          Just relation -> case Projection.lastKnownOf departed gs >>= LastKnown.pile of
+          Just relation -> case Game.lastKnownOf departed gs >>= LastKnown.pile of
             Just holder -> PlayerRelation.holds (Game.teams gs) relation you holder
             Nothing -> False
      in fromWhose && Filter.matches (Projection.sourceContext gs (Just you) bearer) view (CardLeavesZone.filter p)

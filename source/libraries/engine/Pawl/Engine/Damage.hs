@@ -47,6 +47,7 @@ import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Prevention as Prevention
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 
@@ -222,11 +223,11 @@ lethalRemaining gs oid =
 -- in the same instant, and it keeps the CR 608.2i record self-contained.
 --
 -- Lifelink's rider carries WHO rather than WHETHER, because CR 702.15b's answer
--- is a player. Projection.controllerWithLastKnown delegates to controllerOf,
--- which is both of that rule's clauses at once and answers in any zone, which is
--- what CR 702.15d needs.
+-- is a player. Projection.controllerWithLastKnown answers controllerOf for a
+-- source that exists, which is both of that rule's clauses at once and answers in
+-- any zone, which is what CR 702.15d needs.
 --
--- Read through the ...WithLastKnown pair rather than the plain readers, because
+-- Read through the ...WithLastKnown readers rather than the plain ones, because
 -- the source may already have CEASED by the time it deals damage -- Ghitu
 -- Fire-Eater sacrifices itself to pay for the ability that then deals its
 -- damage. The plain readers answer False, 0 and Nothing for an id that names
@@ -234,7 +235,7 @@ lethalRemaining gs oid =
 -- was, against CR 702.2e, CR 702.15c, CR 702.90d, CR 702.80b and CR 608.2h.
 --
 -- One fallback for all of the riders, not one each: they are read here at a
--- single site off readers that share one liveness test (Projection.lastKnownOf),
+-- single site off readers that share one liveness test (Game.lastKnownOf),
 -- so deathtouch and lifelink cannot come to disagree about whether the source is
 -- still there. Every damage the engine deals is built here, so no assignment
 -- site can capture two riders and forget the third.
@@ -248,7 +249,9 @@ lethalRemaining gs oid =
 -- card, which is why the answer is frozen here.
 damageEvent :: GameState -> DamageKind.DamageKind -> ObjectId -> Recipient.Recipient -> Natural -> DamageEvent.DamageEvent
 damageEvent gs kind source target amount =
-  let keywords = Projection.keywordsWithLastKnown source gs
+  let -- One projection for the keyword and creature-type riders.
+      characteristics = Projection.projectWithLastKnown source gs
+      keywords = PC.keywords characteristics
       has keyword = Map.member keyword keywords
       -- CR 702.164b: toxic is parameterized, so its rider is the SUM of every
       -- instance's N rather than a membership test -- Projection.totalToxic's
@@ -270,7 +273,7 @@ damageEvent gs kind source target amount =
               then controller
               else Nothing,
           DamageEvent.dealtByController = controller,
-          DamageEvent.dealtByCreatureTypes = Set.filter Subtype.isCreatureType (Projection.subtypesWithLastKnown source gs),
+          DamageEvent.dealtByCreatureTypes = Set.filter Subtype.isCreatureType (PC.subtypes characteristics),
           DamageEvent.dealtByCommander = Commander.isCommander source gs,
           DamageEvent.kind = kind
         }

@@ -113,12 +113,8 @@ protectorOf oid gs = Object.protector =<< Game.lookupObject oid gs
 -- 508.1i's attack cost was paid, and "the protector of the battle that creature
 -- was attacking" then has no live object to read
 -- (Pawl.Engine.Defender.playerOf's battle arm).
---
--- Reads GameState.lastKnown alone, so it answers only where protectorOf cannot:
--- Pawl.Engine.Projection.lastKnownOf's guard is the same membership test read the
--- other way round, and this module sits below that one.
 lastKnownProtectorOf :: ObjectId.ObjectId -> GameState -> Maybe PlayerId.PlayerId
-lastKnownProtectorOf oid gs = LastKnown.protector =<< Map.lookup oid (GameState.lastKnown gs)
+lastKnownProtectorOf oid gs = LastKnown.protector =<< Game.lastKnownOf oid gs
 
 -- CR 310.5 / CR 704.5x: is any attacking creature currently attacking this battle?
 --
