@@ -24,6 +24,7 @@ import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.StickerRef as StickerRef
 
 -- CR 601.2b: the reserved slot under which a spell's single chosen X is stored.
 -- No card's targetSlots may name it (lint-enforced): X is not a target, so it
@@ -1240,6 +1241,10 @@ toPlayers = toRecipients . Set.map Recipient.ToPlayer
 toAmount :: Natural -> Binding
 toAmount n = Binding.empty {Binding.amount = Just n}
 
+-- | A binding that holds one placed sticker and nothing else (CR 123.6e).
+toSticker :: StickerRef.StickerRef -> Binding
+toSticker ref = Binding.empty {Binding.sticker = Just ref}
+
 -- Bind an object under the reserved triggerSource slot. Dedicated and
 -- single-purpose, so the insert cannot clobber another binding -- as below.
 setTriggerSource :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
@@ -1611,7 +1616,8 @@ mergeBinding a b =
       Binding.amount = Binding.amount a <|> Binding.amount b,
       Binding.modes = Binding.modes a <|> Binding.modes b,
       Binding.copy = Binding.copy a <|> Binding.copy b,
-      Binding.objects = Binding.objects a <|> Binding.objects b
+      Binding.objects = Binding.objects a <|> Binding.objects b,
+      Binding.sticker = Binding.sticker a <|> Binding.sticker b
     }
 
 -- CR 400.7h: `binding` with every naming of `old` renamed to `new`, each
@@ -1632,5 +1638,6 @@ renameObject old new binding =
           Binding.amount = Binding.amount binding,
           Binding.modes = Binding.modes binding,
           Binding.copy = Binding.copy binding,
-          Binding.objects = fmap (fmap rename) (Binding.objects binding)
+          Binding.objects = fmap (fmap rename) (Binding.objects binding),
+          Binding.sticker = Binding.sticker binding
         }

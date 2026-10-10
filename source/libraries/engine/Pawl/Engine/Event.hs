@@ -7531,11 +7531,11 @@ attachVia legality subject destination = do
   case legality subject destination gs of
     Nothing -> pure ()
     Just attachment -> Monad.unless (fmap Object.attachedTo (Game.lookupObject subject gs) == Just (Just attachment)) $ do
-      -- Not implemented: CR 613.7k's sticker restamp after this CR 613.7e
-      -- timestamp (#872).
+      -- CR 613.7k: the stickers on it take new timestamps right after this CR
+      -- 613.7e one. A regression fence: no test attaches a stickered permanent.
       let (ts, gs1) = Game.freshTimestamp gs
           move o = o {Object.attachedTo = Just attachment, Object.timestamp = ts}
-      State.put gs1 {GameState.objects = Map.adjust move subject (GameState.objects gs1)}
+      State.put (Game.restampStickers subject gs1 {GameState.objects = Map.adjust move subject (GameState.objects gs1)})
       -- CR 701.3d's first route, and the one this funnel is the sole producer of:
       -- moving an already-attached permanent onto a DIFFERENT host makes it cease
       -- to be attached to the old one. Ahead of the attachment event, which is the

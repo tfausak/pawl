@@ -50,6 +50,7 @@ codec keywordCodec =
       Arm.payload "HasSubtype" Subtype.codec Filter.HasSubtype (\x -> case x of Filter.HasSubtype y -> Just y; _ -> Nothing),
       Arm.payload "HasName" CardName.codec Filter.HasName (\x -> case x of Filter.HasName y -> Just y; _ -> Nothing),
       Arm.payload "HasNameOriginallyPrintedIn" Expansion.codec Filter.HasNameOriginallyPrintedIn (\x -> case x of Filter.HasNameOriginallyPrintedIn y -> Just y; _ -> Nothing),
+      Arm.payload "NameWordsAtLeast" Common.natural Filter.NameWordsAtLeast (\x -> case x of Filter.NameWordsAtLeast y -> Just y; _ -> Nothing),
       Arm.payload "HasKeyword" keywordCodec Filter.HasKeyword (\x -> case x of Filter.HasKeyword y -> Just y; _ -> Nothing),
       Arm.payload "HasKeywordFamily" KeywordFamily.codec Filter.HasKeywordFamily (\x -> case x of Filter.HasKeywordFamily y -> Just y; _ -> Nothing),
       Arm.payload "PowerAtLeast" Common.integer Filter.PowerAtLeast (\x -> case x of Filter.PowerAtLeast y -> Just y; _ -> Nothing),
@@ -196,6 +197,7 @@ tagOf x = case x of
   Filter.HasSubtype {} -> "HasSubtype"
   Filter.HasName {} -> "HasName"
   Filter.HasNameOriginallyPrintedIn {} -> "HasNameOriginallyPrintedIn"
+  Filter.NameWordsAtLeast {} -> "NameWordsAtLeast"
   Filter.HasKeyword {} -> "HasKeyword"
   Filter.HasKeywordFamily {} -> "HasKeywordFamily"
   Filter.PowerAtLeast {} -> "PowerAtLeast"

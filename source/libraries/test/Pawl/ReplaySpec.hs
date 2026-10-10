@@ -1300,6 +1300,11 @@ combatReplaySpec s =
           Spec.assertEqWith s "choosing the second round trips" (Replay.decode p (Replay.encode p b)) (Just b)
           Spec.assertEqWith s "choosing the first round trips" (Replay.decode p (Replay.encode p a)) (Just a)
           Spec.assertEqWith s "a short transcript places the first offered" (Replay.defaultAnswer p) a
+        -- CR 123.6b: where the controller put the word is a decision.
+        Spec.it s "ChooseNamePosition round-trips through the transcript" $ do
+          let p = Prompt.ChooseNamePosition decider S.bob (ObjectId.MkObjectId 7) (0 NonEmpty.:| [1, 2])
+          Spec.assertEqWith s "choosing the last round trips" (Replay.decode p (Replay.encode p 2)) (Just 2)
+          Spec.assertEqWith s "a short transcript puts it first" (Replay.defaultAnswer p) 0
         -- CR 103.2b: whether a player revealed a companion before the game began,
         -- and which, is a decision, so it has to survive a transcript like any
         -- other.

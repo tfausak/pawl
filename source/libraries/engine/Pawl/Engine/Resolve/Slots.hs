@@ -897,7 +897,7 @@ effectObjectRefs effect = case effect of
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ refs) -> NonEmpty.toList refs
   Effect.Ante (Ante.MkAnte _ ref _) -> [ref]
-  Effect.PutSticker (PutSticker.MkPutSticker _ ref _) -> [ref]
+  Effect.PutSticker (PutSticker.MkPutSticker _ ref _ _) -> [ref]
   Effect.SetOwner (SetOwner.MkSetOwner _ ref) -> [ref]
   Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership one other) -> [one, other]
   Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary ref _) -> [ref]
@@ -1120,7 +1120,7 @@ effectPlayerRefs effect = case effect of
   Effect.TakeExtraTurn takeExtraTurn -> [TakeExtraTurn.player takeExtraTurn]
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named _) -> Maybe.maybeToList named
   Effect.Ante (Ante.MkAnte player _ _) -> [player]
-  Effect.PutSticker (PutSticker.MkPutSticker player _ _) -> [player]
+  Effect.PutSticker (PutSticker.MkPutSticker player _ _ _) -> [player]
   Effect.SetOwner (SetOwner.MkSetOwner player _) -> [player]
   Effect.ExchangeOwnership {} -> []
   Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary _ player) -> [player]
@@ -2523,7 +2523,8 @@ boundSlots effect = case effect of
   Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ _ mSlot _ _ _) -> foldMap Set.singleton mSlot
   -- MoveToZone's reason: the anted incarnations (CR 400.7).
   Effect.Ante (Ante.MkAnte _ _ mSlot) -> foldMap Set.singleton mSlot
-  Effect.PutSticker {} -> Set.empty
+  -- CR 123.6e: the placed sticker.
+  Effect.PutSticker putSticker -> foldMap Set.singleton (PutSticker.bound putSticker)
   Effect.SetOwner {} -> Set.empty
   Effect.ExchangeOwnership {} -> Set.empty
   Effect.ExchangeWithTopOfLibrary {} -> Set.empty
@@ -3292,6 +3293,7 @@ effectContext gs controller source legal bindings =
         -- the amount of {E} paid this way". Live off the resolving object, the
         -- group half's own read, so a clause reads what the clause before it bound.
         Filter.boundAmounts = Map.mapMaybe Binding.Type.amount bindings,
+        Filter.slotStickers = Map.mapMaybe Binding.Type.sticker bindings,
         -- CR 202.3 off the SOURCE, for the two atoms that compare a candidate
         -- against it (Filter.ManaValueLessThanSource, CR 702.85a's cascade;
         -- Filter.ManaValueEqualToSource, CR 702.53a's transmute and CR 702.71a's

@@ -5,6 +5,7 @@
 module Pawl.Engine.Projection.View where
 
 import Control.Applicative ((<|>))
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -251,6 +252,7 @@ viewOfCard face =
           Filter.counters = Map.empty,
           -- CR 123.1: a printed face has no object to be on.
           Filter.stickerKinds = Seq.empty,
+          Filter.nameStickers = Seq.empty,
           -- CR 701.54b: the designation rides an OBJECT, and CR 701.54a gives it
           -- only to a battlefield permanent.
           Filter.ringBearerFor = Nothing,
@@ -748,6 +750,7 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- CR 123.1: off the object, live, `designations`' posture. Not
       -- implemented: CR 608.2h's record of a departed object's stickers (#4890).
       Filter.stickerKinds = foldMap (fmap (StickerRef.kind . StickerPlacement.sticker) . Object.stickers) (Game.lookupObject oid gs),
+      Filter.nameStickers = foldMap (Seq.fromList . Maybe.mapMaybe (\p -> Game.stickerWords (StickerPlacement.sticker p) gs) . Foldable.toList . Object.stickers) (Game.lookupObject oid gs),
       -- CR 701.54b: a designation rather than a characteristic. Nothing for an id
       -- naming no object -- a designation dies with the permanent (CR 400.7).
       Filter.ringBearerFor = Game.lookupObject oid gs >>= Object.ringBearerFor,

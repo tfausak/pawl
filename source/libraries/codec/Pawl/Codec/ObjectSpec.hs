@@ -112,7 +112,8 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
                   Binding.amount = Nothing,
                   Binding.modes = Nothing,
                   Binding.copy = Nothing,
-                  Binding.objects = Nothing
+                  Binding.objects = Nothing,
+                  Binding.sticker = Nothing
                 },
           Object.counters =
             Map.fromList
@@ -150,7 +151,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.preparedCopyOf = Just (ObjectId.MkObjectId 26),
           Object.ringBearerFor = Just (PlayerId.MkPlayerId 16),
           Object.duplicate = Just ProjectedCharacteristicsSpec.minimalCharacteristics,
-          Object.stickers = Seq.singleton (StickerPlacement.MkStickerPlacement (StickerRef.MkStickerRef (PlayerId.MkPlayerId 1) 0 StickerKind.Art 2) (Timestamp.MkTimestamp 5)),
+          Object.stickers = Seq.singleton (StickerPlacement.MkStickerPlacement (StickerRef.MkStickerRef (PlayerId.MkPlayerId 1) 0 StickerKind.Art 2) (Timestamp.MkTimestamp 5) Nothing),
           Object.paired = Nothing,
           Object.protector = Just (PlayerId.MkPlayerId 17),
           Object.ventureRoom = Just (RoomIndex.MkRoomIndex 18),

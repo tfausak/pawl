@@ -13,6 +13,7 @@ import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.Activator as Activator
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
@@ -30,6 +31,7 @@ import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
+import qualified Pawl.Types.NameInsertion as NameInsertion
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -314,6 +316,18 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       " {\"type\":\"AddNamesMatching\",\"value\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"Not\",\"value\":{\"type\":\"HasSupertype\",\"value\":{\"type\":\"Legendary\"}}}]}} "
   -- layer 3, CR 612.6: Volrath's Shapeshifter's "full text of that card",
   -- here with no text of its own beside it.
+  Spec.it s "SetName carries the name" $
+    Common.assertCodec
+      s
+      codec
+      (Modification.SetName (CardName.MkCardName (Text.pack "Legitimate Businessperson")))
+      " {\"type\":\"SetName\",\"value\":\"Legitimate Businessperson\"} "
+  Spec.it s "InsertNameWords carries the word and its position" $
+    Common.assertCodec
+      s
+      codec
+      (Modification.InsertNameWords (NameInsertion.MkNameInsertion (Text.pack "Hot Dog") 2))
+      " {\"type\":\"InsertNameWords\",\"value\":{\"word\":\"Hot Dog\",\"after\":2}} "
   Spec.it s "HasFullText carries its graveyard and extra text" $
     Common.assertCodec
       s

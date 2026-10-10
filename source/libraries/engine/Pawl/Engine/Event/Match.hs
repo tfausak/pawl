@@ -14915,8 +14915,9 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
-  -- CR 123.3: a player the relation names put a sticker of one of these kinds.
-  TriggerCondition.PlacesSticker (PlacesSticker.MkPlacesSticker relation kinds) -> case event of
+  -- CR 123.3: a player the relation names put a sticker of one of these kinds
+  -- on an object the filter admits, read as it is or as it last was.
+  TriggerCondition.PlacesSticker (PlacesSticker.MkPlacesSticker relation kinds onto) -> case event of
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
@@ -15000,7 +15001,12 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Waterbent _ -> False
     GameEvent.Airbent _ -> False
     GameEvent.Firebent _ -> False
-    GameEvent.StickerPut put -> PlayerRelation.holds (Game.teams gs) relation you (StickerPut.placer put) && Set.member (StickerPut.kind put) kinds
+    GameEvent.StickerPut put ->
+      PlayerRelation.holds (Game.teams gs) relation you (StickerPut.placer put)
+        && Set.member (StickerPut.kind put) kinds
+        && case Projection.viewWithLastKnown (StickerPut.object put) gs (StickerPut.object put) of
+          Nothing -> False
+          Just view -> Filter.matches bearerContext view onto
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False

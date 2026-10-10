@@ -881,6 +881,7 @@ library codec
     Pawl.Codec.MoveSpec
     Pawl.Codec.MoveToZone
     Pawl.Codec.MoveToZoneSpec
+    Pawl.Codec.NameInsertion
     Pawl.Codec.NamesAre
     Pawl.Codec.NamesAreSpec
     Pawl.Codec.Object
@@ -1483,6 +1484,7 @@ library engine
     Pawl.Engine.Monarch
     Pawl.Engine.MoveDuration
     Pawl.Engine.Mulligan
+    Pawl.Engine.NameWords
     Pawl.Engine.Phasing
     Pawl.Engine.Plane
     Pawl.Engine.Planechase
@@ -2436,6 +2438,7 @@ library types
     Pawl.Types.MulliganDecision
     Pawl.Types.MulliganOffer
     Pawl.Types.MutateSide
+    Pawl.Types.NameInsertion
     Pawl.Types.NamesAre
     Pawl.Types.Object
     Pawl.Types.ObjectId
