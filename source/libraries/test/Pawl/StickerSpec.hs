@@ -40,6 +40,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilitySticker as AbilitySticker
 import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Deck as Deck
@@ -811,15 +812,24 @@ spec s registry = Spec.describe s "Sticker" $ do
     Spec.assertEqWith s "CR 123.8 Otter's sticker is a 5/1" (fmap (\pt -> (PowerToughnessSticker.power pt, PowerToughnessSticker.toughness pt)) (Game.powerToughnessStickerOf otterFiveOne gs)) (Just (5, 1))
     Spec.assertEqWith s "CR 123.7 Juggler's second ability sticker is indestructible" (fmap (Map.keys . AbilitySticker.keywords) (Game.abilityStickerOf jugglerIndestructible gs)) (Just [Keyword.Indestructible])
     Spec.assertEqWith s "and a P/T sticker has no abilities" (Game.abilityStickerOf otterFiveOne gs) Nothing
-  -- #4934's tripwire: a static or rule ability on an ability sticker, or a
-  -- keyword rule 702 states as one, does not reach the stickered object.
-  Spec.it s "CR 123.7 no committed ability sticker carries a static or rule ability (#4934)" $ do
+  -- #4934's tripwire: a static, rule, player or self-cost ability on an
+  -- ability sticker, or a keyword rule 702 states as a static ability, does not
+  -- reach the stickered object -- the first two join no list for a grant to
+  -- the object itself, and the gates in front of the rest ask no sticker.
+  -- Exhaustive, so a new kind of ability is decided here.
+  Spec.it s "CR 123.7 no committed ability sticker carries an ability stickerGathered cannot grant (#4934)" $ do
     root <- StickerSheets.defaultRoot
     loaded <- StickerSheets.loadRoot root
     let selfOnly g = case g of
           GrantedAbility.Static _ -> True
           GrantedAbility.Rules _ -> True
-          _ -> False
+          GrantedAbility.Player _ -> True
+          GrantedAbility.SelfCostReduction _ -> True
+          GrantedAbility.SelfAlternativeCost _ -> True
+          GrantedAbility.SelfSpendManaAsThough _ -> True
+          GrantedAbility.Activated _ -> False
+          GrantedAbility.Triggered _ -> False
+          GrantedAbility.Replacement _ -> False
         offends a = any selfOnly (AbilitySticker.abilities a) || not (null (KeywordEngine.mintedStaticAbilitiesOf (Map.keysSet (AbilitySticker.keywords a))))
     Spec.assertEqWith s "no such sheet" [StickerSheet.name sheet | (_, Right sheet) <- loaded, a <- Foldable.toList (StickerSheet.abilities sheet), offends a] []
   -- Every one of unit 1's eight ability stickers on its own Grizzly Bears:
@@ -1043,3 +1053,33 @@ spec s registry = Spec.describe s "Sticker" $ do
         combat = snd (fst (State.runState (Engine.runGame (placing Nothing) atCombat drain) (MkOffers [] [] 0)))
     Spec.assertEqWith s "CR 123.8a Ambassador is a 6/5" (Projection.powerOf ambassadorId combat, Projection.toughnessOf ambassadorId combat) (Just 6, Just 5)
     Spec.assertEqWith s "CR 123.3c alice paid two of its three tickets" (S.playerCounterOf PlayerCounterKind.Ticket S.alice combat) 1
+  -- CR 109.2: "on a creature" is a creature permanent, so a sticker put on a
+  -- creature card in a graveyard (Scampire's road) triggers nothing. One board
+  -- each, differing only in where the Bears is.
+  Spec.it s "CR 109.2 Tusk and Whiskers triggers on a creature permanent, not a creature card in a graveyard" $ do
+    sheets <- committedSheets
+    tusk <- S.printingOf s registry "Tusk and Whiskers"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    let (_, base) = S.addPermanent tusk S.alice (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))
+        triggered add =
+          let (bearsId, g1) = add bears S.alice base
+              settled = S.runPure S.identityAnswer (Sticker.put S.alice bearsId nightMenace Nothing g1) Engine.settleForPriority
+           in length (GameState.stack settled)
+    Spec.assertEqWith s "CR 109.2 nothing triggers for the card in the graveyard" (triggered S.addGraveyardCard) 0
+    Spec.assertEqWith s "and Tusk triggers for the permanent" (triggered S.addPermanent) 1
+  -- The battlefield half of CR 123.8 / 208.3: crewed, Consulate Dreadnought is
+  -- a creature, so Otter's sticker sets it to 5/1 in layer 7b.
+  Spec.it s "CR 123.8/208.3 a crewed Consulate Dreadnought takes its P/T sticker's 5/1" $ do
+    sheets <- committedSheets
+    dreadnought <- S.printingOf s registry "Consulate Dreadnought"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    blindSpot <- S.printingOf s registry "Blind-Spot Giant"
+    let (vehicleId, g1) = S.addPermanent dreadnought S.alice (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))
+        (_, g2) = S.addPermanent hillGiant S.alice g1
+        (_, g3) = S.addPermanent blindSpot S.alice g2
+        stickered = mainPhaseForAlice (Sticker.put S.alice vehicleId otterFiveOne Nothing g3)
+        crewed = case Projection.abilitiesOf vehicleId stickered of
+          crew : _ -> S.runPure S.identityAnswer (S.runPure S.identityAnswer stickered (Activate.activateAbility S.alice vehicleId crew)) Stack.resolveTop
+          [] -> stickered
+    Spec.assertEqWith s "CR 123.8 the crewed Dreadnought is a 5/1" (Projection.powerOf vehicleId crewed, Projection.toughnessOf vehicleId crewed) (Just 5, Just 1)
+    Spec.assertEqWith s "and a creature" (Set.member CardType.Creature (Projection.cardTypesOf vehicleId crewed)) True

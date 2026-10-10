@@ -3161,16 +3161,19 @@ honeAffected =
         ]
     )
 
--- CR 123.6 / 123.7 / 613.7k: each sticker on an object is a continuous effect
--- on it at the sticker's own timestamp -- a name sticker's word in layer 3 (CR
--- 612.9), an ability sticker's abilities in layer 6 (CR 613.1f) and a P/T
--- sticker's numbers in layer 7b (CR 613.4b). Every
--- object: both reach a card in any zone, and a hidden-zone move has already
--- taken the sticker off (CR 123.5). Cased on the sticker's kind (CR 123.1);
--- what an ability sticker grants is handed over unread (stickerGrants).
+-- CR 123.6 / 123.7 / 123.8 / 613.7k: each sticker on an object is a
+-- continuous effect at the sticker's own timestamp -- a name sticker's word in
+-- layer 3 (CR 612.9), an ability sticker's abilities in layer 6 (CR 613.1f)
+-- and a P/T sticker's numbers in layer 7b (CR 613.4b). Every object: the name
+-- and ability stickers reach a card in any zone, the P/T sticker a creature or
+-- a creature or Vehicle card (setsPT), and a hidden-zone move has already
+-- taken the sticker off (CR 123.5). The sticker's kind (CR 123.1) decides
+-- which of Game's readers answers, and so the layer; what an ability sticker
+-- grants is handed over unread (stickerGrants).
 --
--- Not implemented: a static or rule ability on an ability sticker, or a keyword
--- rule 702 states as one, reaching the stickered object (#4934).
+-- Not implemented: a static, rule, player or self-cost ability on an ability
+-- sticker, or a keyword rule 702 states as a static ability, reaching the
+-- stickered object (#4934).
 stickerGathered :: GameState -> [Gathered]
 stickerGathered gs =
   let at oid placement lyr affected m =
@@ -3216,9 +3219,9 @@ stickerGrants sticker =
   concatMap (\(k, n) -> List.genericReplicate n (Modification.GainKeyword k)) (Map.toList (AbilitySticker.keywords sticker))
     <> fmap Modification.GainAbility (AbilitySticker.abilities sticker)
 
--- Does a sticker write a modification satisfying `p`? The fourth road onto an
--- object beside storedWrites, elsewhereGrants and the counters, asked by the
--- minting gates. A regression fence: no committed sheet's keyword mints a
+-- Does a sticker write a modification satisfying `p`? The fifth road onto an
+-- object, beside a battlefield permanent's static ability, storedWrites,
+-- elsewhereGrants and the counters, asked by the minting gates. A regression fence: no committed sheet's keyword mints a
 -- replacement or combat restriction.
 stickerWrites :: (Modification -> Bool) -> GameState -> Bool
 stickerWrites p gs = any (p . gModification) (stickerGathered gs)
