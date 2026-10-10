@@ -16,6 +16,7 @@ import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import Pawl.Types.Optionality (Optionality)
 import qualified Pawl.Types.Optionality as Optionality
+import Pawl.Types.PayGate (PayGate)
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -43,6 +44,11 @@ mandatory = clause Optionality.Mandatory
 -- a printed "if" scoped to one clause (CR 608.2c).
 mandatoryIf :: Condition -> Seq.Seq (Effect card ability) -> Clause.Clause card ability
 mandatoryIf condition = Clause.MkClause Nothing (Just condition) Nothing Optionality.Mandatory Nothing
+
+-- | A `mandatory` clause hung on this CR 118.12 payment offer: "unless", or
+-- "you may pay ... if you do", by the gate's branch.
+mandatoryPaying :: PayGate -> Seq.Seq (Effect card ability) -> Clause.Clause card ability
+mandatoryPaying gate = Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory (Just gate)
 
 -- | A `clause` its controller may decline as it resolves: "you may" (CR 603.5).
 youMay :: Seq.Seq (Effect card ability) -> Clause.Clause card ability

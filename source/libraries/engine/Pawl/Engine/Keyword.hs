@@ -6333,7 +6333,7 @@ extort =
           }
       loss = Effect.LoseLife (LifeLoss.MkLifeLoss (PlayerRef.Relative PlayerRelation.Opponent) (Quantity.Literal 1) LifeLossCause.ByEffect (Just drained))
       gain = Effect.GainLife (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.InSlot drained))
-      clause = Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory (Just gate) (Seq.fromList [loss, gain])
+      clause = Mint.mandatoryPaying gate (Seq.fromList [loss, gain])
    in Mint.triggerOf
         (Mint.spellCast (Filter.ControlledBy PlayerRelation.You))
         Nothing
@@ -6662,7 +6662,7 @@ training =
 -- narrow.
 ward :: Ward.Ward Keyword -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 ward w =
-  let clause = Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory (Just gate) (Seq.singleton effect)
+  let clause = Mint.mandatoryPaying gate (Seq.singleton effect)
       -- PayObligation.Optional and no offeredAt: rule 702.21a's "unless that
       -- player pays" is CR 118.12a's "may", and one clause makes its own offer.
       gate =
@@ -7293,7 +7293,7 @@ ravenous =
 -- afterlife's reason.
 fabricate :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 fabricate n =
-  let clause = Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory (Just gate) (Seq.singleton spawn)
+  let clause = Mint.mandatoryPaying gate (Seq.singleton spawn)
       gate =
         PayGate.MkPayGate
           { PayGate.payer = PlayerRef.InSlot Binding.you,
@@ -8126,8 +8126,8 @@ recover cost =
               MoveToZone.placement = LibraryPlacement.defaultValue,
               MoveToZone.duration = Nothing
             }
-      returned = Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory (Just (gate PayBranch.IfPaid Nothing)) (Seq.singleton (moveTo Zone.Hand))
-      exiled = Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory (Just (gate PayBranch.IfNotPaid (Just (ClauseIndex.MkClauseIndex 0)))) (Seq.singleton (moveTo Zone.Exile))
+      returned = Mint.mandatoryPaying (gate PayBranch.IfPaid Nothing) (Seq.singleton (moveTo Zone.Hand))
+      exiled = Mint.mandatoryPaying (gate PayBranch.IfNotPaid (Just (ClauseIndex.MkClauseIndex 0))) (Seq.singleton (moveTo Zone.Exile))
    in Mint.triggerOf
         (TriggerCondition.PermanentDies (Filter.And [Filter.HasCardType CardType.Creature, Filter.OwnedBy PlayerRelation.You]))
         Nothing
@@ -9142,12 +9142,8 @@ cumulativeUpkeep cost =
         Mint.mandatory
           (Seq.singleton (Effect.PutCounters (PutCounters.MkPutCounters CounterKind.Age (Quantity.Literal 1) (ObjectRef.InSlot Binding.triggerSource))))
       upkeepClause =
-        Clause.MkClause
-          Nothing
-          Nothing
-          Nothing
-          Optionality.Mandatory
-          (Just gate)
+        Mint.mandatoryPaying
+          gate
           (Seq.singleton (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.triggerSource, SacrificeEffect.sacrificer = Sacrificer.EffectController, SacrificeEffect.sacrificed = Nothing}))
       gate =
         PayGate.MkPayGate
@@ -9209,12 +9205,8 @@ echo cost =
             PayGate.offeredAt = Nothing
           }
       sacrifice =
-        Clause.MkClause
-          Nothing
-          Nothing
-          Nothing
-          Optionality.Mandatory
-          (Just gate)
+        Mint.mandatoryPaying
+          gate
           (Seq.singleton (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.triggerSource, SacrificeEffect.sacrificer = Sacrificer.EffectController, SacrificeEffect.sacrificed = Nothing}))
    in Mint.triggerOf
         Mint.yourUpkeep

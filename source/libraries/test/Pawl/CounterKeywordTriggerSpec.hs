@@ -436,6 +436,19 @@ fadingSpec s registry =
           Spec.assertEqWith s "it really has none" (fades oid gs) 0
           Spec.assertEqWith s "and the ability still reached the stack" (length (GameState.stack settled)) 1
           Spec.assertBool s (not (S.onBattlefield oid resolved)) "so its own first upkeep took it"
+        -- The other half of rule 702.32a's one sentence: with a counter to
+        -- remove, the trigger removes it and the sacrifice clause's "if you
+        -- can't" stays unmet. Each clause carries its own condition, so this is
+        -- the board that tells them apart.
+        Spec.it s "CR 702.32a a Blastoderm with fade counters left loses one and stays" $ do
+          blastoderm <- S.printingOf s registry "Blastoderm"
+          let (oid, placed) = S.addPermanent blastoderm S.alice (Setup.emptyGame S.bothPlayers)
+              gs = S.addCounter CounterKind.Fade 3 oid placed
+              (settled, resolved) = upkeepOf S.alice gs
+          Spec.assertEqWith s "it starts with three" (fades oid gs) 3
+          Spec.assertBool s (S.onBattlefield oid resolved) "the upkeep trigger left it on the battlefield"
+          Spec.assertEqWith s "with one fade counter fewer" (fades oid resolved) 2
+          Spec.assertEqWith s "and the ability did reach the stack" (length (GameState.stack settled)) 1
         -- The mint, spelled out for vanishingSpec's reason: an assertion written
         -- against Keyword.fading itself would say only that one copy is one copy.
         -- Rule 702.32 states no multiplicity clause, so each instance is its own
