@@ -2376,9 +2376,10 @@ apply batch candidate event =
       EntryRewrite.ChooseColors count -> do
         let pick chosen _ = do
               gs <- State.get
-              case (Projection.controllerOf oid gs, filter (`Set.notMember` chosen) [minBound .. maxBound :: Color.Color]) of
-                (_, []) -> pure chosen
-                (_, [only]) -> pure (Set.insert only chosen)
+              let remaining = filter (`Set.notMember` chosen) [minBound .. maxBound :: Color.Color]
+              picked <- case Projection.controllerOf oid gs of
+                -- Through Game.chooseAmong, the choice being mandatory.
+                Just controller -> Game.chooseAmong (\decider who -> Prompt.ChooseColor decider who oid) controller remaining
                 -- Unreachable, and defensive for ChoiceOf's reason: the object is
                 -- materialized on the battlefield before this loop runs, so
                 -- controllerOf falls back to its owner. A WEAKER fallback than
@@ -2386,12 +2387,8 @@ apply batch candidate event =
                 -- decide something: there is no colour the card named to default
                 -- to, so the first offered is conjured. It stands only because the
                 -- branch cannot be reached.
-                (Nothing, first : _) -> pure (Set.insert first chosen)
-                (Just controller, first : second : more) -> do
-                  answer <- Game.choose (Prompt.ChooseColor (Decide.deciderFor controller gs) controller oid (first NonEmpty.:| (second : more)))
-                  -- Filtered, not trusted: an answer outside the offer falls
-                  -- back to its first colour, since the choice is mandatory.
-                  pure (Set.insert (if List.elem answer (first : second : more) then answer else first) chosen)
+                Nothing -> pure (Maybe.listToMaybe remaining)
+              pure (maybe chosen (`Set.insert` chosen) picked)
         picked <- Monad.foldM pick Set.empty [1 .. count]
         Replacement.consume (ReplacementCandidate.identity candidate)
         State.modify' $ \g ->
