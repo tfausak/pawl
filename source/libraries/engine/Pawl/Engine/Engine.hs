@@ -892,7 +892,7 @@ placeBorne srcId pending = do
       -- CR 107.3m: an enters-the-battlefield triggered ability's effects read
       -- the X announced for the spell that became its source, as its target
       -- count does (inheritedX). Nothing for every other trigger, so a delayed
-      -- ability's captured X (CR 603.7c) is not overwritten.
+      -- ability's captured X (CR 107.3n) is not overwritten.
       enteredX = case TriggeredAbility.condition ability of
         TriggerCondition.SelfEnters -> Game.lookupObject srcId gs >>= Object.announcedX
         _ -> Nothing

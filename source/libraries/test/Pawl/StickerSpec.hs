@@ -3,8 +3,9 @@
 -- Covers CR 107.17's ticket counters, CR 103.2d's sheet draw
 -- (Pawl.Engine.Setup), and CR 123's stickers: Pawl.Engine.Sticker,
 -- Effect.PutSticker (Pawl.Engine.Resolve.Effect), the CR 123.5 write-back in
--- Pawl.Engine.Event, Filter.HasSticker and Filter.Stickered, and
--- TriggerCondition.PlacesSticker.
+-- Pawl.Engine.Event, Filter.HasSticker and Filter.Stickered,
+-- TriggerCondition.PlacesSticker, and the name, ability and P/T stickers'
+-- layers (Pawl.Engine.Projection.stickerGathered).
 module Pawl.StickerSpec where
 
 import qualified Control.Monad as Monad

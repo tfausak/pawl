@@ -5990,7 +5990,7 @@ grantsKeywordWhere p m = case m of
   Modification.GainAbility g -> grantedStaticWrites (grantsKeywordWhere p) g
   Modification.GainAbilitiesOfSource _ -> False
   Modification.GainCraftMaterialAbilities _ -> False
-  -- The sticker data is not in the modification; True only widens a gate.
+  -- The sticker data is not in the modification, so True over-approximates.
   Modification.GainAbilitiesOfStickers -> True
   Modification.LoseAllAbilities -> False
   Modification.LoseNamedAbility _ -> False
@@ -6176,7 +6176,7 @@ grantsAbilityWhere p m = case m of
   Modification.GainCastingPermission _ -> False
   Modification.GainAbilitiesOfSource _ -> False
   Modification.GainCraftMaterialAbilities _ -> False
-  -- The sticker data is not in the modification; True only widens a gate.
+  -- The sticker data is not in the modification, so True over-approximates.
   Modification.GainAbilitiesOfStickers -> True
   Modification.LoseAllAbilities -> False
   Modification.LoseNamedAbility _ -> False
