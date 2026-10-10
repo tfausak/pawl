@@ -43,6 +43,7 @@ import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Discard as Discard
@@ -58,11 +59,14 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
+import qualified Pawl.Types.Measure as Measure
+import qualified Pawl.Types.Measures as Measures
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Onset as Onset
+import qualified Pawl.Types.Operand as Operand
 import qualified Pawl.Types.PermanentDealsCombatDamageToPlayer as PermanentDealsCombatDamageToPlayer
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
@@ -441,7 +445,8 @@ theRingIsLegendary =
 -- subject: `yourRingBearer` above, which is why that binding exists rather than
 -- the filter being written out twice.
 --
--- Filter.PowerGreaterThanSource is "with greater power" exactly, and strictly:
+-- Power GreaterThan the OfSource power is "with greater power" exactly, and
+-- strictly:
 -- CR 701.54c says greater, so a blocker of EQUAL power blocks legally. The source
 -- it compares against is the Ring-bearer, supplied by
 -- Pawl.Engine.CombatRestriction.cantBeBlockedBy -- the emblem has no power to
@@ -454,7 +459,7 @@ theRingCantBeBlockedByGreaterPower =
   CombatRestriction.CantBeBlockedBy
     CantBeBlockedBy.MkCantBeBlockedBy
       { CantBeBlockedBy.affected = Affected.Matching yourRingBearer,
-        CantBeBlockedBy.blockers = Filter.PowerGreaterThanSource,
+        CantBeBlockedBy.blockers = Filter.Measures (Measures.MkMeasures Measure.Power Comparison.GreaterThan (Operand.OfSource Measure.Power)),
         CantBeBlockedBy.unless = Nothing,
         -- CR 116.2d names an ability a face's own text grants a permission on, and
         -- rule 701.54c's sentence is the rulebook's rather than a card's, so there

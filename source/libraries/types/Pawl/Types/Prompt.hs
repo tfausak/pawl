@@ -135,7 +135,7 @@ data Prompt r where
   -- no reference. RollDie's reasons for carrying neither Decider nor PlayerId.
   LookUpCard :: CardName.CardName -> Prompt (Maybe Card.Card)
   -- | CR 108.1: the names of the cards in the Oracle card reference the filter
-  -- admits, the Integer being the bound Filter.ManaValueEqualToAmount reads.
+  -- admits, the Integer being the bound Filter.Measures' EnclosingAmount reads.
   -- Asked of the interpreter by a conjure that picks from the reference
   -- (Pawl.Types.ConjureCards.Reference), since the engine holds no reference;
   -- the pick is then RandomCard's. LookUpCard's reasons for carrying neither

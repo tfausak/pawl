@@ -1,8 +1,8 @@
 module Pawl.Types.Comparison where
 
--- | How a Pawl.Types.Condition relates its measured side to its threshold. A
--- sum type rather than a bare Bool-shaped "is zero": most of the pool's
--- conditions are Exactly, and a threshold card needs AtLeast or AtMost.
+-- | How a measured number relates to its threshold: a Pawl.Types.Condition's
+-- two Quantities, or a Pawl.Types.Filter Measures atom's candidate measure and
+-- operand. Pawl.Engine.Filter.compares is the one reader.
 --
 -- AtLeast's producer is Galvanic Blast's metalcraft clause -- "if you control
 -- three or more artifacts", the pool's first nonzero threshold.
@@ -12,14 +12,15 @@ module Pawl.Types.Comparison where
 -- states as AtMost 3. The Ten Rings is the printed one -- CR 603.4's "if you
 -- have fewer than ten cards in hand", stated as AtMost 9.
 --
--- No STRICT arm, and none is owed: every quantity these compare is an integer,
--- so a strict inequality is the adjacent bound -- "fewer than ten" is AtMost 9
--- and "greater than n" is AtLeast (n + 1), which is how Meren of Clan Nel Toth
--- spells the "otherwise" half of its end step. Both halves of that convention
--- live here so a card writing one can find the other; adding a fourth and fifth
--- arm would give every reader two spellings of one condition to keep in step.
+-- The STRICT arms are for an operand that is another object's number, where no
+-- adjacent literal can be written: CR 702.134a's mentor ("power less than this
+-- creature's power"). Against a literal, a card writes the adjacent bound
+-- instead -- "fewer than ten" is AtMost 9 and "greater than n" is AtLeast (n +
+-- 1), as Meren of Clan Nel Toth's end step does.
 data Comparison
   = Exactly
   | AtLeast
   | AtMost
+  | LessThan
+  | GreaterThan
   deriving (Bounded, Enum, Eq, Ord, Show)

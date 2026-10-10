@@ -62,7 +62,7 @@ data CastOffer = MkCastOffer
     -- {1}{U} creature) is the spell whose mana value the rule asks about second.
     --
     -- Matched in Pawl.Engine.Resolve.Effect.offerCast against the FACE's own view
-    -- and the resolution's Filter.Context, so Filter.ManaValueLessThanSource
+    -- and the resolution's Filter.Context, so an OfSource mana value operand
     -- reads the same source mana value here that the exiling walk read.
     restriction :: Maybe (Filter.Filter Keyword.Keyword),
     -- | CR 601.2b: the keyword ability whose cost this offer states, or Nothing

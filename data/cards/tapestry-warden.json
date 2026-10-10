@@ -47,7 +47,21 @@
                   }
                 },
                 {
-                  "type": "ToughnessGreaterThanPower"
+                  "type": "Measures",
+                  "value": {
+                    "comparison": {
+                      "type": "GreaterThan"
+                    },
+                    "measure": {
+                      "type": "Toughness"
+                    },
+                    "operand": {
+                      "type": "Own",
+                      "value": {
+                        "type": "Power"
+                      }
+                    }
+                  }
                 }
               ]
             }

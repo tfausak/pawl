@@ -43,7 +43,21 @@
                     "type": "Hand"
                   },
                   "filter": {
-                    "type": "PowerLessThanSource"
+                    "type": "Measures",
+                    "value": {
+                      "comparison": {
+                        "type": "LessThan"
+                      },
+                      "measure": {
+                        "type": "Power"
+                      },
+                      "operand": {
+                        "type": "OfSource",
+                        "value": {
+                          "type": "Power"
+                        }
+                      }
+                    }
                   },
                   "reveal": false,
                   "upTo": false

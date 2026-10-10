@@ -453,7 +453,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
         Spec.assertBool s (not (Set.member (Recipient.ToCreature blackOid) legal)) "black creature illegal"
         Spec.assertBool s (not (Set.member (Recipient.ToCreature artifactOid) legal)) "artifact creature illegal"
         Spec.assertBool s (Set.member (Recipient.ToCreature plainOid) legal) "nonblack, nonartifact creature legal"
-  Spec.it s "Reprisal: PowerAtLeast 4 legality tracks a projected power pump" $ do
+  Spec.it s "Reprisal: power 4 or greater legality tracks a projected power pump" $ do
     reprisal <- S.printingOf s registry "Reprisal"
     piker <- S.printingOf s registry "Goblin Piker"
     case S.spellTargetSlot reprisal of
@@ -464,7 +464,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
             legalBefore = Target.legalRecipients Nothing S.noSource theSlot gs
             pumped = S.withEffect smallOid (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 2) (Quantity.Literal 0))) gs
             legalAfter = Target.legalRecipients Nothing S.noSource theSlot pumped
-        Spec.assertBool s (not (Set.member (Recipient.ToCreature smallOid) legalBefore)) "power 2 is illegal (below the PowerAtLeast 4 floor)"
+        Spec.assertBool s (not (Set.member (Recipient.ToCreature smallOid) legalBefore)) "power 2 is illegal (below the power 4 floor)"
         Spec.assertBool s (Set.member (Recipient.ToCreature smallOid) legalAfter) "pumped to power 4 becomes legal"
 
 resolveSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()

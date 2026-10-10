@@ -3243,8 +3243,8 @@ effectContext gs controller source legal bindings =
     -- the chosen subtype's proof (Pawl.ResolveSpec).
     (Projection.sourceContext gs (Just controller) source)
       { -- CR 608.2c: the numbers earlier clauses of THIS resolution stamped on
-        -- slots, for the one Filter atom that compares a candidate against one
-        -- (Filter.PowerIsAmountInSlot) -- Localized Destruction's "power equal to
+        -- slots, for the Filter.Measures operand that compares a candidate
+        -- against one (AmountInSlot) -- Localized Destruction's "power equal to
         -- the amount of {E} paid this way". Live off the resolving object, the
         -- group half's own read, so a clause reads what the clause before it bound.
         Filter.boundAmounts = Map.mapMaybe Binding.Type.amount bindings,

@@ -9,6 +9,7 @@ import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Designation as Designation
 import qualified Pawl.Codec.Expansion as Expansion
 import qualified Pawl.Codec.KeywordFamily as KeywordFamily
+import qualified Pawl.Codec.Measures as Measures
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.PlayerRelation as PlayerRelation
@@ -22,7 +23,12 @@ import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
+import qualified Pawl.Types.BoundMeasure as BoundMeasure
+import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.Measure as Measure
+import qualified Pawl.Types.Measures as Measures.Type
+import qualified Pawl.Types.Operand as Operand
 
 -- | Recursive, mirroring Quantity's toJson/fromJson: And/Or carry their
 -- operands as a JSON Array, Not as a single nested object, and each atom
@@ -53,14 +59,24 @@ codec keywordCodec =
       Arm.payload "NameWordsAtLeast" Common.natural Filter.NameWordsAtLeast (\x -> case x of Filter.NameWordsAtLeast y -> Just y; _ -> Nothing),
       Arm.payload "HasKeyword" keywordCodec Filter.HasKeyword (\x -> case x of Filter.HasKeyword y -> Just y; _ -> Nothing),
       Arm.payload "HasKeywordFamily" KeywordFamily.codec Filter.HasKeywordFamily (\x -> case x of Filter.HasKeywordFamily y -> Just y; _ -> Nothing),
-      Arm.payload "PowerAtLeast" Common.integer Filter.PowerAtLeast (\x -> case x of Filter.PowerAtLeast y -> Just y; _ -> Nothing),
-      Arm.payload "PowerAtMost" Common.integer Filter.PowerAtMost (\x -> case x of Filter.PowerAtMost y -> Just y; _ -> Nothing),
-      Arm.nullary "ToughnessGreaterThanPower" Filter.ToughnessGreaterThanPower,
-      Arm.nullary "PowerLessThanSource" Filter.PowerLessThanSource,
-      Arm.nullary "PowerGreaterThanSource" Filter.PowerGreaterThanSource,
-      Arm.nullary "PowerAtLeastSourceToughness" Filter.PowerAtLeastSourceToughness,
-      Arm.payload "PowerIsAmountInSlot" SlotName.codec Filter.PowerIsAmountInSlot (\x -> case x of Filter.PowerIsAmountInSlot y -> Just y; _ -> Nothing),
-      Arm.payload "PowerAtLeastAmountInSlot" SlotName.codec Filter.PowerAtLeastAmountInSlot (\x -> case x of Filter.PowerAtLeastAmountInSlot y -> Just y; _ -> Nothing),
+      Arm.payload "Measures" Measures.codec Filter.Measures (\x -> case x of Filter.Measures y -> Just y; _ -> Nothing),
+      -- TEMPORARY decode-only aliases for the card-data rewrite.
+      legacy "PowerAtLeast",
+      legacy "PowerAtMost",
+      legacy "ToughnessGreaterThanPower",
+      legacy "PowerLessThanSource",
+      legacy "PowerGreaterThanSource",
+      legacy "PowerAtLeastSourceToughness",
+      legacy "PowerIsAmountInSlot",
+      legacy "PowerAtLeastAmountInSlot",
+      legacy "ManaValueAtMost",
+      legacy "ManaValueLessThanSource",
+      legacy "ManaValueGreaterThanSource",
+      legacy "ManaValueEqualToSource",
+      legacy "ManaValueAtMostAmount",
+      legacy "ManaValueEqualToAmount",
+      legacy "PowerAtMostAmount",
+      legacy "ToughnessLessThanBound",
       Arm.nullary "ControlledByDefendingPlayer" Filter.ControlledByDefendingPlayer,
       Arm.payload "ControlledByBound" SlotName.codec Filter.ControlledByBound (\x -> case x of Filter.ControlledByBound y -> Just y; _ -> Nothing),
       -- Runtime-only, and accepted here anyway: the codec must stay total, so a
@@ -68,15 +84,8 @@ codec keywordCodec =
       -- Modification.SetController's baked PlayerId gets.
       Arm.payload "ControlledByPlayer" PlayerId.codec Filter.ControlledByPlayer (\x -> case x of Filter.ControlledByPlayer y -> Just y; _ -> Nothing),
       Arm.nullary "ControlledByRecipient" Filter.ControlledByRecipient,
-      Arm.payload "ManaValueAtMost" Common.integer Filter.ManaValueAtMost (\x -> case x of Filter.ManaValueAtMost y -> Just y; _ -> Nothing),
-      Arm.nullary "ManaValueLessThanSource" Filter.ManaValueLessThanSource,
-      Arm.nullary "ManaValueGreaterThanSource" Filter.ManaValueGreaterThanSource,
-      Arm.nullary "ManaValueEqualToSource" Filter.ManaValueEqualToSource,
       Arm.nullary "SharesColorWithSource" Filter.SharesColorWithSource,
       Arm.nullary "ManaValueIsEven" Filter.ManaValueIsEven,
-      Arm.nullary "ManaValueAtMostAmount" Filter.ManaValueAtMostAmount,
-      Arm.nullary "ManaValueEqualToAmount" Filter.ManaValueEqualToAmount,
-      Arm.nullary "PowerAtMostAmount" Filter.PowerAtMostAmount,
       Arm.payload "ControlledBy" PlayerRelation.codec Filter.ControlledBy (\x -> case x of Filter.ControlledBy y -> Just y; _ -> Nothing),
       Arm.payload "OwnedBy" PlayerRelation.codec Filter.OwnedBy (\x -> case x of Filter.OwnedBy y -> Just y; _ -> Nothing),
       Arm.nullary "OwnedByRecipient" Filter.OwnedByRecipient,
@@ -105,7 +114,6 @@ codec keywordCodec =
       Arm.payload "SameControllerAsBound" SlotName.codec Filter.SameControllerAsBound (\x -> case x of Filter.SameControllerAsBound y -> Just y; _ -> Nothing),
       Arm.payload "SameControllerAsHostOfBound" SlotName.codec Filter.SameControllerAsHostOfBound (\x -> case x of Filter.SameControllerAsHostOfBound y -> Just y; _ -> Nothing),
       Arm.payload "SharesCreatureTypeWithBound" SlotName.codec Filter.SharesCreatureTypeWithBound (\x -> case x of Filter.SharesCreatureTypeWithBound y -> Just y; _ -> Nothing),
-      Arm.payload "ToughnessLessThanBound" SlotName.codec Filter.ToughnessLessThanBound (\x -> case x of Filter.ToughnessLessThanBound y -> Just y; _ -> Nothing),
       Arm.nullary "HasChosenName" Filter.HasChosenName,
       Arm.nullary "HasChosenColor" Filter.HasChosenColor,
       Arm.nullary "HasChosenSubtype" Filter.HasChosenSubtype,
@@ -200,27 +208,13 @@ tagOf x = case x of
   Filter.NameWordsAtLeast {} -> "NameWordsAtLeast"
   Filter.HasKeyword {} -> "HasKeyword"
   Filter.HasKeywordFamily {} -> "HasKeywordFamily"
-  Filter.PowerAtLeast {} -> "PowerAtLeast"
-  Filter.PowerAtMost {} -> "PowerAtMost"
-  Filter.ToughnessGreaterThanPower {} -> "ToughnessGreaterThanPower"
-  Filter.PowerLessThanSource {} -> "PowerLessThanSource"
-  Filter.PowerGreaterThanSource {} -> "PowerGreaterThanSource"
-  Filter.PowerAtLeastSourceToughness {} -> "PowerAtLeastSourceToughness"
-  Filter.PowerIsAmountInSlot {} -> "PowerIsAmountInSlot"
-  Filter.PowerAtLeastAmountInSlot {} -> "PowerAtLeastAmountInSlot"
+  Filter.Measures {} -> "Measures"
   Filter.ControlledByDefendingPlayer {} -> "ControlledByDefendingPlayer"
   Filter.ControlledByBound {} -> "ControlledByBound"
   Filter.ControlledByPlayer {} -> "ControlledByPlayer"
   Filter.ControlledByRecipient {} -> "ControlledByRecipient"
-  Filter.ManaValueAtMost {} -> "ManaValueAtMost"
-  Filter.ManaValueLessThanSource {} -> "ManaValueLessThanSource"
-  Filter.ManaValueGreaterThanSource {} -> "ManaValueGreaterThanSource"
-  Filter.ManaValueEqualToSource {} -> "ManaValueEqualToSource"
   Filter.SharesColorWithSource {} -> "SharesColorWithSource"
   Filter.ManaValueIsEven {} -> "ManaValueIsEven"
-  Filter.ManaValueAtMostAmount {} -> "ManaValueAtMostAmount"
-  Filter.ManaValueEqualToAmount {} -> "ManaValueEqualToAmount"
-  Filter.PowerAtMostAmount {} -> "PowerAtMostAmount"
   Filter.ControlledBy {} -> "ControlledBy"
   Filter.OwnedBy {} -> "OwnedBy"
   Filter.OwnedByRecipient {} -> "OwnedByRecipient"
@@ -244,7 +238,6 @@ tagOf x = case x of
   Filter.SameControllerAsBound {} -> "SameControllerAsBound"
   Filter.SameControllerAsHostOfBound {} -> "SameControllerAsHostOfBound"
   Filter.SharesCreatureTypeWithBound {} -> "SharesCreatureTypeWithBound"
-  Filter.ToughnessLessThanBound {} -> "ToughnessLessThanBound"
   Filter.HasChosenName {} -> "HasChosenName"
   Filter.HasChosenColor {} -> "HasChosenColor"
   Filter.HasChosenSubtype {} -> "HasChosenSubtype"
@@ -307,3 +300,29 @@ tagOf x = case x of
   Filter.And {} -> "And"
   Filter.Or {} -> "Or"
   Filter.Not {} -> "Not"
+
+-- TEMPORARY: a decode-only arm for each folded tag, for the card-data rewrite.
+legacy :: (Eq keyword) => String -> Arm.Arm (Filter.Filter keyword)
+legacy t =
+  let m measure comparison operand = Filter.Measures (Measures.Type.MkMeasures measure comparison operand)
+      lit inject = Arm.payload t Common.integer inject (const Nothing)
+      slotted inject = Arm.payload t SlotName.codec inject (const Nothing)
+      bare x = Arm.nullary t x
+   in case t of
+        "PowerAtLeast" -> lit (m Measure.Power Comparison.AtLeast . Operand.Literal)
+        "PowerAtMost" -> lit (m Measure.Power Comparison.AtMost . Operand.Literal)
+        "ManaValueAtMost" -> lit (m Measure.ManaValue Comparison.AtMost . Operand.Literal)
+        "PowerIsAmountInSlot" -> slotted (m Measure.Power Comparison.Exactly . Operand.AmountInSlot)
+        "PowerAtLeastAmountInSlot" -> slotted (m Measure.Power Comparison.AtLeast . Operand.AmountInSlot)
+        "ToughnessLessThanBound" -> slotted (\s -> m Measure.Toughness Comparison.LessThan (Operand.OfBound (BoundMeasure.MkBoundMeasure s Measure.Toughness)))
+        "ToughnessGreaterThanPower" -> bare (m Measure.Toughness Comparison.GreaterThan (Operand.Own Measure.Power))
+        "PowerLessThanSource" -> bare (m Measure.Power Comparison.LessThan (Operand.OfSource Measure.Power))
+        "PowerGreaterThanSource" -> bare (m Measure.Power Comparison.GreaterThan (Operand.OfSource Measure.Power))
+        "PowerAtLeastSourceToughness" -> bare (m Measure.Power Comparison.AtLeast (Operand.OfSource Measure.Toughness))
+        "ManaValueLessThanSource" -> bare (m Measure.ManaValue Comparison.LessThan (Operand.OfSource Measure.ManaValue))
+        "ManaValueGreaterThanSource" -> bare (m Measure.ManaValue Comparison.GreaterThan (Operand.OfSource Measure.ManaValue))
+        "ManaValueEqualToSource" -> bare (m Measure.ManaValue Comparison.Exactly (Operand.OfSource Measure.ManaValue))
+        "ManaValueAtMostAmount" -> bare (m Measure.ManaValue Comparison.AtMost Operand.EnclosingAmount)
+        "ManaValueEqualToAmount" -> bare (m Measure.ManaValue Comparison.Exactly Operand.EnclosingAmount)
+        "PowerAtMostAmount" -> bare (m Measure.Power Comparison.AtMost Operand.EnclosingAmount)
+        _ -> error t

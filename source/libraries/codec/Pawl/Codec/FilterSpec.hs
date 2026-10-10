@@ -6,16 +6,21 @@ import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.BoundMeasure as BoundMeasure
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Expansion as Expansion
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
+import qualified Pawl.Types.Measure as Measure
+import qualified Pawl.Types.Measures as Measures
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Operand as Operand
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProductionTag as ProductionTag
@@ -94,79 +99,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       s
       (Codec.encode codec (Filter.HasKeywordFamily KeywordFamily.Toxic) /= Codec.encode codec (Filter.HasKeyword (Keyword.Toxic 2)))
       "the toxic family filter is not the toxic 2 filter"
-  Spec.it s "PowerAtLeast" $
-    Common.assertCodec
-      s
-      codec
-      (Filter.PowerAtLeast 4)
-      " {\"type\":\"PowerAtLeast\",\"value\":4} "
-  Spec.it s "PowerAtMost" $
-    Common.assertCodec
-      s
-      codec
-      (Filter.PowerAtMost 2)
-      " {\"type\":\"PowerAtMost\",\"value\":2} "
-  Spec.it s "ToughnessGreaterThanPower" $
-    Common.assertCodec
-      s
-      codec
-      Filter.ToughnessGreaterThanPower
-      " {\"type\":\"ToughnessGreaterThanPower\"} "
-  Spec.it s "ManaValueLessThanSource" $
-    Common.assertCodec
-      s
-      codec
-      Filter.ManaValueLessThanSource
-      " {\"type\":\"ManaValueLessThanSource\"} "
-  Spec.it s "ManaValueGreaterThanSource" $
-    Common.assertCodec
-      s
-      codec
-      Filter.ManaValueGreaterThanSource
-      " {\"type\":\"ManaValueGreaterThanSource\"} "
-  Spec.it s "ManaValueEqualToSource" $ do
-    Common.assertCodec
-      s
-      codec
-      Filter.ManaValueEqualToSource
-      " {\"type\":\"ManaValueEqualToSource\"} "
-    Spec.assertNeWith s "CR 702.53a's equality is not CR 702.85a's order" (Codec.encode codec Filter.ManaValueEqualToSource) (Codec.encode codec Filter.ManaValueLessThanSource)
   Spec.it s "SharesColorWithSource" $
     Common.assertCodec
       s
       codec
       Filter.SharesColorWithSource
       " {\"type\":\"SharesColorWithSource\"} "
-  Spec.it s "PowerLessThanSource" $
-    Common.assertCodec
-      s
-      codec
-      Filter.PowerLessThanSource
-      " {\"type\":\"PowerLessThanSource\"} "
-  Spec.it s "PowerGreaterThanSource" $
-    Common.assertCodec
-      s
-      codec
-      Filter.PowerGreaterThanSource
-      " {\"type\":\"PowerGreaterThanSource\"} "
-  Spec.it s "PowerAtLeastSourceToughness" $
-    Common.assertCodec
-      s
-      codec
-      Filter.PowerAtLeastSourceToughness
-      " {\"type\":\"PowerAtLeastSourceToughness\"} "
-  Spec.it s "PowerIsAmountInSlot" $
-    Common.assertCodec
-      s
-      codec
-      (Filter.PowerIsAmountInSlot (SlotName.MkSlotName (Text.pack "paid")))
-      " {\"type\":\"PowerIsAmountInSlot\",\"value\":\"paid\"} "
-  Spec.it s "PowerAtLeastAmountInSlot" $
-    Common.assertCodec
-      s
-      codec
-      (Filter.PowerAtLeastAmountInSlot (SlotName.MkSlotName (Text.pack "chosen")))
-      " {\"type\":\"PowerAtLeastAmountInSlot\",\"value\":\"chosen\"} "
   Spec.it s "ControlledByDefendingPlayer" $
     Common.assertCodec
       s
@@ -207,36 +145,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.OwnedByRecipient
       " {\"type\":\"OwnedByRecipient\"} "
-  Spec.it s "ManaValueAtMost" $
-    Common.assertCodec
-      s
-      codec
-      (Filter.ManaValueAtMost 2)
-      " {\"type\":\"ManaValueAtMost\",\"value\":2} "
   Spec.it s "ManaValueIsEven" $
     Common.assertCodec
       s
       codec
       Filter.ManaValueIsEven
       " {\"type\":\"ManaValueIsEven\"} "
-  Spec.it s "ManaValueAtMostAmount" $
-    Common.assertCodec
-      s
-      codec
-      Filter.ManaValueAtMostAmount
-      " {\"type\":\"ManaValueAtMostAmount\"} "
-  Spec.it s "ManaValueEqualToAmount" $
-    Common.assertCodec
-      s
-      codec
-      Filter.ManaValueEqualToAmount
-      " {\"type\":\"ManaValueEqualToAmount\"} "
-  Spec.it s "PowerAtMostAmount" $
-    Common.assertCodec
-      s
-      codec
-      Filter.PowerAtMostAmount
-      " {\"type\":\"PowerAtMostAmount\"} "
   Spec.it s "ControlledBy" $
     Common.assertCodec
       s
@@ -371,12 +285,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       (Filter.SharesCreatureTypeWithBound (SlotName.MkSlotName (Text.pack "thatDepartedPermanent")))
       " {\"type\":\"SharesCreatureTypeWithBound\",\"value\":\"thatDepartedPermanent\"} "
-  Spec.it s "ToughnessLessThanBound" $
+  Spec.it s "Measures" $
     Common.assertCodec
       s
       codec
-      (Filter.ToughnessLessThanBound (SlotName.MkSlotName (Text.pack "thatExploitedCreature")))
-      " {\"type\":\"ToughnessLessThanBound\",\"value\":\"thatExploitedCreature\"} "
+      (Filter.Measures (Measures.MkMeasures Measure.Toughness Comparison.LessThan (Operand.OfBound (BoundMeasure.MkBoundMeasure (SlotName.MkSlotName (Text.pack "thatExploitedCreature")) Measure.Toughness))))
+      " {\"type\":\"Measures\",\"value\":{\"measure\":{\"type\":\"Toughness\"},\"comparison\":{\"type\":\"LessThan\"},\"operand\":{\"type\":\"OfBound\",\"value\":{\"slot\":\"thatExploitedCreature\",\"measure\":{\"type\":\"Toughness\"}}}}} "
   Spec.it s "HasChosenName" $
     Common.assertCodec
       s
@@ -802,7 +716,7 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
   Spec.it s "nested And/Or/Not round-trips" $
     let doomBlade = Filter.Not (Filter.HasColor Color.Black)
         terror = Filter.And [Filter.Not (Filter.HasColor Color.Black), Filter.Not (Filter.HasCardType CardType.Artifact)]
-        reprisal = Filter.PowerAtLeast 4
+        reprisal = Filter.Measures (Measures.MkMeasures Measure.Power Comparison.AtLeast (Operand.Literal 4))
         basicLand = Filter.And [Filter.HasCardType CardType.Land, Filter.HasSupertype Supertype.Basic]
         angelicEdict = Filter.Or [Filter.HasCardType CardType.Creature, Filter.HasCardType CardType.Enchantment]
         controlled = Filter.ControlledBy PlayerRelation.Opponent

@@ -21,6 +21,9 @@ import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.LimitUnless as LimitUnless
+import qualified Pawl.Types.Measure as Measure
+import qualified Pawl.Types.Measures as Measures
+import qualified Pawl.Types.Operand as Operand
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
@@ -53,15 +56,15 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
     Common.assertCodec
       s
       CombatRestriction.codec
-      (CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy Affected.Attached Filter.PowerGreaterThanSource Nothing Nothing))
-      " {\"type\":\"CantBeBlockedBy\",\"value\":{\"affected\":{\"type\":\"Attached\"},\"blockers\":{\"type\":\"PowerGreaterThanSource\"}}} "
+      (CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy Affected.Attached (Filter.Measures (Measures.MkMeasures Measure.Power Comparison.GreaterThan (Operand.OfSource Measure.Power))) Nothing Nothing))
+      " {\"type\":\"CantBeBlockedBy\",\"value\":{\"affected\":{\"type\":\"Attached\"},\"blockers\":{\"type\":\"Measures\",\"value\":{\"measure\":{\"type\":\"Power\"},\"comparison\":{\"type\":\"GreaterThan\"},\"operand\":{\"type\":\"OfSource\",\"value\":{\"type\":\"Power\"}}}}}} "
   -- Its blocker-side mirror: "attackers" beside "affected".
   Spec.it s "CantBlockCreatures carries its Affected and its attackers" $
     Common.assertCodec
       s
       CombatRestriction.codec
-      (CombatRestriction.CantBlockCreatures (CantBlockCreatures.MkCantBlockCreatures Affected.Attached Filter.PowerGreaterThanSource Nothing Nothing))
-      " {\"type\":\"CantBlockCreatures\",\"value\":{\"affected\":{\"type\":\"Attached\"},\"attackers\":{\"type\":\"PowerGreaterThanSource\"}}} "
+      (CombatRestriction.CantBlockCreatures (CantBlockCreatures.MkCantBlockCreatures Affected.Attached (Filter.Measures (Measures.MkMeasures Measure.Power Comparison.GreaterThan (Operand.OfSource Measure.Power))) Nothing Nothing))
+      " {\"type\":\"CantBlockCreatures\",\"value\":{\"affected\":{\"type\":\"Attached\"},\"attackers\":{\"type\":\"Measures\",\"value\":{\"measure\":{\"type\":\"Power\"},\"comparison\":{\"type\":\"GreaterThan\"},\"operand\":{\"type\":\"OfSource\",\"value\":{\"type\":\"Power\"}}}}}} "
   -- CR 508.1c's PAIRWISE arm, the attacking one, whose payload spells
   -- "defenders" where CantBeBlockedBy spells "blockers": the players the
   -- restricted creatures may not be announced against (CR 508.1b), together

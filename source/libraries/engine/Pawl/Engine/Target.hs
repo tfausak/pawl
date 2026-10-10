@@ -410,8 +410,8 @@ slotContext perspective unannounced bindings source amount gs =
       boundView oid = if Set.member oid targeted then Projection.fullView gs oid else Projection.viewWithLastKnownAnywhere gs oid
       evaluated = amount >>= Quantity.evaluate boundView base gs source
    in -- CR 202.3 / 601.2c: the slot's own computed bound, evaluated
-      -- against the context above and handed to Filter.ManaValueAtMostAmount,
-      -- Filter.ManaValueEqualToAmount and Filter.PowerAtMostAmount.
+      -- against the context above and handed to the Measures atom's
+      -- EnclosingAmount operand.
       -- THIS is the one site that fills it, sourcePower's and slotNames' sibling
       -- in that respect and for the same reason: the atom lives in a target
       -- slot's Filter, and this is where one is matched -- at both of CR 115's
@@ -1375,8 +1375,8 @@ choose n k
 -- rather than for jointlyJudged's: against the seed alone a bound naming a
 -- sibling slot measures nothing at all -- CR 400.7j's fold over an unbound slot
 -- is 0, and a read that insists on one object (Binding.onlyOne) is unanswerable
--- -- so ManaValueAtMostAmount and ManaValueEqualToAmount narrow to the mana value
--- -- 0 candidates or to none,
+-- -- so an EnclosingAmount comparison narrows to the mana value 0 candidates or
+-- to none,
 -- and the first pass would offer such a slot an empty set. Re-answering it
 -- against every announcement the named slot could make (legalSetsGiven's
 -- `rebound`) is the widening every other dependent slot gets, and

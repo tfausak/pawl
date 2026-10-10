@@ -60,8 +60,19 @@
                               }
                             },
                             {
-                              "type": "PowerAtLeastAmountInSlot",
-                              "value": "chosen"
+                              "type": "Measures",
+                              "value": {
+                                "comparison": {
+                                  "type": "AtLeast"
+                                },
+                                "measure": {
+                                  "type": "Power"
+                                },
+                                "operand": {
+                                  "type": "AmountInSlot",
+                                  "value": "chosen"
+                                }
+                              }
                             }
                           ]
                         }

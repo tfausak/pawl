@@ -64,8 +64,19 @@
                 {
                   "type": "Not",
                   "value": {
-                    "type": "ManaValueAtMost",
-                    "value": 5
+                    "type": "Measures",
+                    "value": {
+                      "comparison": {
+                        "type": "AtMost"
+                      },
+                      "measure": {
+                        "type": "ManaValue"
+                      },
+                      "operand": {
+                        "type": "Literal",
+                        "value": 5
+                      }
+                    }
                   }
                 }
               ]

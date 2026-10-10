@@ -379,6 +379,8 @@ import qualified Pawl.Codec.ManaSymbolSpec
 import qualified Pawl.Codec.ManaTypeSpec
 import qualified Pawl.Codec.ManaUnitSpec
 import qualified Pawl.Codec.ManifestedDreadSpec
+import qualified Pawl.Codec.MeasureSpec
+import qualified Pawl.Codec.MeasuresSpec
 import qualified Pawl.Codec.MeldSourceSpec
 import qualified Pawl.Codec.MeldSpec
 import qualified Pawl.Codec.MentoredSpec
@@ -416,6 +418,7 @@ import qualified Pawl.Codec.ObjectSnapshotSpec
 import qualified Pawl.Codec.ObjectSpec
 import qualified Pawl.Codec.OfferCastSpec
 import qualified Pawl.Codec.OnsetSpec
+import qualified Pawl.Codec.OperandSpec
 import qualified Pawl.Codec.OptionalDecisionSpec
 import qualified Pawl.Codec.OptionalitySpec
 import qualified Pawl.Codec.OrElseSpec
@@ -998,6 +1001,9 @@ spec s registry = do
   Pawl.Codec.CombatStepSpec.spec s
   Pawl.Codec.ComparesSpec.spec s
   Pawl.Codec.ComparisonSpec.spec s
+  Pawl.Codec.MeasureSpec.spec s
+  Pawl.Codec.MeasuresSpec.spec s
+  Pawl.Codec.OperandSpec.spec s
   Pawl.Codec.CompletedDungeonSpec.spec s
   Pawl.Codec.ConditionSpec.spec s
   Pawl.Codec.ContinuousEffectSpec.spec s

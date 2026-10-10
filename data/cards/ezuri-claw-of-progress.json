@@ -55,8 +55,19 @@
                   }
                 },
                 {
-                  "type": "PowerAtMost",
-                  "value": 2
+                  "type": "Measures",
+                  "value": {
+                    "comparison": {
+                      "type": "AtMost"
+                    },
+                    "measure": {
+                      "type": "Power"
+                    },
+                    "operand": {
+                      "type": "Literal",
+                      "value": 2
+                    }
+                  }
                 }
               ]
             }

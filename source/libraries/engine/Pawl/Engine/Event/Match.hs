@@ -2162,7 +2162,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- cleared per phase.
   --
   -- The source's power comes with Projection.sourceContext, which is what makes
-  -- CR 702.149a's PowerGreaterThanSource evaluable at a trigger match at all.
+  -- CR 702.149a's comparison against the source's power evaluable at a trigger
+  -- match at all.
   -- Both it and each candidate view read through the bearer's last known
   -- information (CR 608.2h),
   -- a REGRESSION FENCE rather than a live path: the bearer was declared an
@@ -9943,7 +9944,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     --
     -- The bearer's mana value too (CR 202.3, Projection.sourceContext), for a
     -- condition comparing against "this card"
-    -- (Filter.ManaValueGreaterThanSource): live for a bearer in a graveyard,
+    -- (Filter.Measures' OfSource operand): live for a bearer in a graveyard,
     -- and its last known information for one the event itself removed, CR
     -- 603.10a's look back. Pawl.ZoneTriggerSpec's "CR 113.6m a Kami of
     -- Mourning grant returns the card when a greater creature dies" proves it.
