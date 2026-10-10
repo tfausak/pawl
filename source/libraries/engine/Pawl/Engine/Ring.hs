@@ -446,9 +446,8 @@ theRingIsLegendary =
 -- the filter being written out twice.
 --
 -- Power GreaterThan the OfSource power is "with greater power" exactly, and
--- strictly:
--- CR 701.54c says greater, so a blocker of EQUAL power blocks legally. The source
--- it compares against is the Ring-bearer, supplied by
+-- strictly: CR 701.54c says greater, so a blocker of EQUAL power blocks legally.
+-- The source it compares against is the Ring-bearer, supplied by
 -- Pawl.Engine.CombatRestriction.cantBeBlockedBy -- the emblem has no power to
 -- compare against (CR 114.3).
 --

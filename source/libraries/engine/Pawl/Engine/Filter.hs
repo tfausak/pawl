@@ -3188,10 +3188,9 @@ manaValueThresholds predicate = case predicate of
     -- a bound object's, a slot's amount -- so there is nothing to report, and
     -- position is what keeps the caller's argument whole: CR 601.3a's lookahead
     -- reads a player ability's prohibition filter
-    -- (Pawl.Engine.PlayerEffect.prohibitsCasting), and Pawl.FilterPositionLintSpec
-    -- keeps every non-literal operand out of that position. An operand bounding
-    -- the mana value in any position this function's callers reach would have to
-    -- break this build instead.
+    -- (Pawl.Engine.PlayerEffect.prohibitsCasting), and Pawl.FilterPositionLintSpec's
+    -- "CR 601.3a no player effect compares a mana value against anything but a
+    -- literal" keeps every other operand out of that position.
     (Measure.ManaValue, Operand.OfSource _) -> []
     (Measure.ManaValue, Operand.Own _) -> []
     (Measure.ManaValue, Operand.OfBound _) -> []

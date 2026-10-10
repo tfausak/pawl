@@ -502,6 +502,26 @@ isTargetOffends = (/= 0) . isTargetStrays . Codec.encode (Face.Codec.codec Card.
 enclosingAmountTag :: Text.Text
 enclosingAmountTag = Text.pack "EnclosingAmount"
 
+-- How many comparisons of the candidate's MANA VALUE one encoded Filter holds
+-- whose operand's tag `wanted` accepts, at any depth.
+manaValueComparisons :: (Text.Text -> Bool) -> Value.Value -> Int
+manaValueComparisons wanted value = case value of
+  Value.Object o ->
+    let pairs = Object.unwrap o
+        named k = [Pair.value p | p <- pairs, String.unwrap (Pair.name p) == Text.pack k]
+        tagOf v = case v of
+          Value.Object x -> [t | p <- Object.unwrap x, String.unwrap (Pair.name p) == Text.pack "type", Value.String t <- [Pair.value p]]
+          _ -> []
+        isManaValue = any (\v -> fmap String.unwrap (tagOf v) == [Text.pack "ManaValue"]) (named "measure")
+        operandWanted = any (any (wanted . String.unwrap) . tagOf) (named "operand")
+        here = if isManaValue && operandWanted then 1 else 0 :: Int
+     in here + sum (fmap (manaValueComparisons wanted . Pair.value) pairs)
+  Value.Array a -> sum (fmap (manaValueComparisons wanted) (Array.unwrap a))
+  Value.String _ -> 0
+  Value.Null _ -> 0
+  Value.Boolean _ -> 0
+  Value.Number _ -> 0
+
 -- CR 702.122d's atom, which no card may write.
 cantCrewVehiclesTag :: Text.Text
 cantCrewVehiclesTag = Text.pack "CantCrewVehicles"
@@ -1686,6 +1706,23 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "the same atom in a static ability's affected set is an offence" (sameControllerAsBoundCounts planted) (0, 1)
     Spec.assertBool s (sameControllerAsBoundOffends planted) "and the lint says so"
     Spec.assertBool s (not (sameControllerAsBoundOffends (S.combinedFace piker))) "where the ungrafted card is accepted"
+  -- CR 601.3a's lookahead (Pawl.Engine.Filter.manaValueThresholds) bounds its
+  -- sample by the mana value LITERALS a prohibition compares against, so a
+  -- player effect comparing a mana value against any other operand would leave
+  -- the sample too short with nothing failing. The position lints above keep the
+  -- source, bound-object and enclosing-amount operands out of a player effect;
+  -- this keeps the rest out too.
+  Spec.it s "CR 601.3a no player effect compares a mana value against anything but a literal" $ do
+    ps <- S.allPrintings s
+    let encode = Codec.encode (Filter.Codec.codec Keyword.Codec.codec)
+        inPlayerEffects wanted c = sum [manaValueComparisons wanted (encode f) | (framing, f) <- cardFilters c, elem framing [PlayerEffectFramed, StoredPlayerEffectFramed]]
+        nonLiteral = (/= Text.pack "Literal")
+        offenders = filter (anyFace ((/= 0) . inPlayerEffects nonLiteral) . Printing.card) ps
+    Spec.assertEqWith s "every player effect's mana value comparison is against a literal" (fmap (S.nameOf . Printing.card) offenders) []
+    -- NOT vacuous: the traversal reaches the pool's literal ones, and the
+    -- counter sees a non-literal one buried under a combinator.
+    Spec.assertBool s (sum (fmap (sum . fmap (inPlayerEffects (== Text.pack "Literal")) . Card.Type.faces . Printing.card) ps) /= 0) "the pool's player effects compare mana values against literals"
+    Spec.assertEqWith s "a planted comparison against the candidate's own power is counted" (manaValueComparisons nonLiteral (encode (Filter.Type.Not (Filter.Type.Measures (Measures.MkMeasures Measure.ManaValue Comparison.AtMost (Operand.Own Measure.Power)))))) 1
   -- CR 202.3's computed bound is CR 709.4a's atom one axis over once more, and the
   -- axis is the SLOT rather than the Framing: Pawl.Engine.Target.slotContext fills
   -- Filter.Context.slotAmount off the target slot's own Quantity, so an
