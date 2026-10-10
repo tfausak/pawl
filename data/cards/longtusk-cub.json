@@ -7,7 +7,10 @@
             "components": [
               {
                 "type": "PayEnergy",
-                "value": 2
+                "value": {
+                  "type": "Fixed",
+                  "value": 2
+                }
               }
             ],
             "mana": []

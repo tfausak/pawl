@@ -51,6 +51,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CostAmount as CostAmount
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DiscardCards as DiscardCards
@@ -2997,7 +2998,7 @@ emergeSpec s registry = Spec.describe s "Emerge" $ do
           let answer :: Prompt.Prompt r -> State.State Bool r
               answer prompt = case prompt of
                 Prompt.ChooseCost _ _ _ payable ->
-                  let names cost = elem (CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.IsObject victim))) (Cost.Type.components cost)
+                  let names cost = elem (CostComponent.Sacrifice (Sacrifice.MkSacrifice (CostAmount.Fixed 1) (Filter.IsObject victim))) (Cost.Type.components cost)
                    in pure (case filter names payable of chosen : _ -> chosen; [] -> S.identityAnswer prompt)
                 Prompt.ChooseManaSource _ _ candidates -> do
                   eaten <- State.get

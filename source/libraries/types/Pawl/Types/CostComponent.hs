@@ -2,6 +2,7 @@ module Pawl.Types.CostComponent where
 
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Behold as Behold
+import qualified Pawl.Types.CostAmount as CostAmount
 import qualified Pawl.Types.CountersFromPermanents as CountersFromPermanents
 import qualified Pawl.Types.CountersFromThis as CountersFromThis
 import qualified Pawl.Types.DiscardCards as DiscardCards
@@ -44,22 +45,15 @@ data CostComponent keyword
   | -- | CR 118.1 as a cost / Grinning Ignus: return the permanent the cost is on
     -- to its owner's hand.
     ReturnThis
-  | -- | CR 119.4 / Greed: pay this much life, payable only out of a life total at
-    -- least that large.
-    PayLife Natural.Natural
-  | -- | CR 107.3a / 601.2b / Hatred: X as an amount of life, announced by the
-    -- caster and rewritten to a PayLife by Pawl.Engine.Cost.substituteX.
-    PayLifeX
+  | -- | CR 119.4 / Greed, Hatred: pay this much life, payable only out of a life
+    -- total at least that large.
+    PayLife CostAmount.CostAmount
   | -- | CR 119.4 / 107.1a / Lurking Evil: pay half the paying player's life,
     -- rounded as printed, fixed to a PayLife by Pawl.Engine.Cost.announce.
     PayHalfLife Rounding.Rounding
-  | -- | CR 701.21a / Village Rites, Fireblast: sacrifice this many permanents
-    -- matching the Filter, which the payer chooses.
+  | -- | CR 701.21a / Village Rites, Fireblast, Grim Hireling: sacrifice this many
+    -- permanents matching the Filter, which the payer chooses.
     Sacrifice (Sacrifice.Sacrifice keyword)
-  | -- | CR 107.3a / 602.2b / Grim Hireling: sacrifice X permanents matching the
-    -- Filter, X announced and rewritten to a Sacrifice by
-    -- Pawl.Engine.Cost.substituteX.
-    SacrificeX (Filter.Filter keyword)
   | -- | CR 702.122a's cost half / crew: tap any number of untapped permanents
     -- matching the Filter, chosen so that their TOTAL power reaches totalPower.
     TapForTotalPower (TapForTotalPower.TapForTotalPower keyword)
@@ -84,40 +78,32 @@ data CostComponent keyword
     -- paying player puts one card matching the Filter from their own hand onto the
     -- battlefield.
     PutCardFromHandOntoBattlefield (Filter.Filter keyword)
-  | -- | CR 107.14 / Longtusk Cub: pay this many energy counters.
-    PayEnergy Natural.Natural
-  | -- | CR 107.3a / 602.2b / Sphinx of the Revelation: X as an amount of energy,
-    -- announced by the activating player.
-    PayEnergyX
+  | -- | CR 107.14 / Longtusk Cub, Sphinx of the Revelation: pay this many energy
+    -- counters.
+    PayEnergy CostAmount.CostAmount
   | -- | CR 606.4 / Jace Beleren: put this many loyalty counters on the permanent
     -- the cost is on.
     AddLoyaltyToThis Natural.Natural
   | -- | CR 606.4's other half / Jace Beleren: remove this many loyalty counters
     -- from the permanent the cost is on, which CR 606.6 gates on it having them.
-    RemoveLoyaltyFromThis Natural.Natural
-  | -- | CR 606.4 / 107.3a / Tamiyo, Compleated Sage: [-X], announced by the
-    -- activator and rewritten to a RemoveLoyaltyFromThis by
-    -- Pawl.Engine.Cost.substituteX.
-    RemoveLoyaltyFromThisX
+    -- Tamiyo, Compleated Sage's [-X] is this with an announced amount.
+    RemoveLoyaltyFromThis CostAmount.CostAmount
   | -- | CR 118.1 as a cost / Barkhide Troll, Hickory Woodlot: remove this many
     -- counters of one kind from the permanent the cost is on.
     RemoveCountersFromThis (CountersFromThis.CountersFromThis keyword)
-  | -- | CR 118.1 as a cost / Zameck Guildmage, Tayam, Luminous Enigma: remove
-    -- this many counters from permanents matching the Filter, chosen by the payer.
+  | -- | CR 118.1 as a cost / Zameck Guildmage, Tayam, Luminous Enigma,
+    -- Retribution of the Ancients: remove this many counters from permanents
+    -- matching the Filter, chosen by the payer.
     RemoveCounters (CountersFromPermanents.CountersFromPermanents keyword)
-  | -- | CR 107.3a / 602.2b / Retribution of the Ancients: X as a count of
-    -- +1\/+1 counters removed from among permanents matching the Filter,
-    -- announced by the activator and rewritten by Pawl.Engine.Cost.substituteX
-    -- to a RemoveCounters of that kind spread FromAmong.
-    RemovePlusOneCountersX (Filter.Filter keyword)
   | -- | CR 118.12's counter-placing cost / CR 701.63a's endure, Fortress
     -- Kin-Guard: put this many +1\/+1 counters on the permanent the cost is on,
     -- paid as the spell or ability resolves.
     PutPlusOneCountersOnThis Natural.Natural
   | -- | CR 701.68a as a cost / Bogslither's Embrace, Dawnhand Dissident: the paying
     -- player puts N -1\/-1 counters on a creature they control, and can't pay at
-    -- all where they control none (CR 701.68b).
-    Blight Natural.Natural
+    -- all where they control none (CR 701.68b). Soul Immolation's "blight X"
+    -- announces N; its printed ceiling rides Pawl.Types.Face.maximumX (CR 101.1).
+    Blight CostAmount.CostAmount
   | -- | CR 701.61a as a cost / Thornvault Forager, Camellia, the Seedmiser: the
     -- paying player forages, and can't pay at all where neither half of rule
     -- 701.61a can be carried out (CR 608.2d, Pawl.Engine.Forage.canForage).
@@ -141,10 +127,6 @@ data CostComponent keyword
     -- provenance and binds a tally for a later effect to read, where a cost binds
     -- nothing; Pawl.Engine.Event.flipWinLoseCoin is the one procedure both reach.
     FlipCoin
-  | -- | CR 107.3a / 601.2b / Soul Immolation: X as a blight amount, announced by
-    -- the caster and rewritten to a Blight by Pawl.Engine.Cost.substituteX. The
-    -- printed ceiling on X rides Pawl.Types.Face.maximumX (CR 101.1).
-    BlightX
   | -- | CR 406.2 as a cost / Loxodon Surveyor: exile the card the cost is on, from
     -- the graveyard it is in -- the zone CR 113.6m then functions the ability in,
     -- read off the constructor by Pawl.Engine.Cost.zoneFunctionedFrom.
@@ -250,25 +232,17 @@ data CostComponent keyword
     -- The NUMBER is what CR 701.67b scopes the substitution to: the offer is
     -- capped at it even where the total cost holds other generic mana, so a
     -- waterbend {4} taxed {2} more by Suppression Field may tap four permanents
-    -- and no more.
+    -- and no more. Katara, Water Tribe's Hope's announced amount is the cost's
+    -- own {X} (ManaSymbol.Variable), which the same announcement fixes.
     --
     -- A SPELL's mandatory additional waterbend cost rides the same way, its mana
     -- and this licence one Face.additionalCostChoices option (Water Whip); an
     -- optional one is the second option beside an empty one (Spirit Water
     -- Revival). So do a ward cost and an unless cost, paid at CR 118.12 (The
     -- Unagi of Kyoshi Island, Waterbending Lesson).
-    Waterbend Natural.Natural
+    Waterbend CostAmount.CostAmount
   | -- | CR 118.9 / 701.67a: Waterbend's licence and CR 701.67c event, paid as an
     -- alternative cost rather than an additional one, so it binds no record
     -- (Hama, the Bloodbender; Pawl.Engine.Cost.permissionCost).
     WaterbendInstead Natural.Natural
-  | -- | CR 107.3a / 601.2b / Katara, Water Tribe's Hope: X as a waterbend
-    -- amount, announced by the activator and rewritten to a Waterbend by
-    -- Pawl.Engine.Cost.substituteX. BlightX's shape one keyword action over.
-    --
-    -- The MANA the licence scopes is the cost's own {X} (ManaSymbol.Variable),
-    -- substituted by the same announcement, so this arm carries no number of its
-    -- own: what it adds is CR 701.67b's ceiling, which without it would read 0
-    -- and offer no tap at all.
-    WaterbendX
   deriving (Eq, Ord, Show)

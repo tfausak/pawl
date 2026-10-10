@@ -176,6 +176,7 @@ import qualified Pawl.Codec.CopyExceptionSpec
 import qualified Pawl.Codec.CopyOriginalSpec
 import qualified Pawl.Codec.CopyStackObjectSpec
 import qualified Pawl.Codec.CopyTargetsSpec
+import qualified Pawl.Codec.CostAmountSpec
 import qualified Pawl.Codec.CostBasisSpec
 import qualified Pawl.Codec.CostChoiceSpec
 import qualified Pawl.Codec.CostComponentSpec
@@ -1021,6 +1022,7 @@ spec s registry = do
   Pawl.Codec.CopyExceptionSpec.spec s
   Pawl.Codec.CostBasisSpec.spec s
   Pawl.Codec.CostChoiceSpec.spec s
+  Pawl.Codec.CostAmountSpec.spec s
   Pawl.Codec.CostComponentSpec.spec s
   Pawl.Codec.CostDirectionSpec.spec s
   Pawl.Codec.CostKeywordSpec.spec s

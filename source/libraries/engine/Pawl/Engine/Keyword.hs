@@ -59,6 +59,7 @@ import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CostAmount as CostAmount
 import qualified Pawl.Types.CostChoice as CostChoice
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CostDirection as CostDirection
@@ -3660,7 +3661,7 @@ casualtyCost :: Natural -> Cost Keyword
 casualtyCost n =
   Cost.MkCost
     { Cost.mana = Just (ManaCost.MkManaCost []),
-      Cost.components = [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.And [Filter.HasCardType CardType.Creature, Filter.PowerAtLeast (toInteger n)]))]
+      Cost.components = [CostComponent.Sacrifice (Sacrifice.MkSacrifice (CostAmount.Fixed 1) (Filter.And [Filter.HasCardType CardType.Creature, Filter.PowerAtLeast (toInteger n)]))]
     }
 
 -- CR 702.166a's additional cost: "you may sacrifice an artifact, enchantment, or
@@ -3678,7 +3679,7 @@ bargainCost :: Cost Keyword
 bargainCost =
   Cost.MkCost
     { Cost.mana = Just (ManaCost.MkManaCost []),
-      Cost.components = [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.Or [Filter.HasCardType CardType.Artifact, Filter.HasCardType CardType.Enchantment, Filter.IsToken]))]
+      Cost.components = [CostComponent.Sacrifice (Sacrifice.MkSacrifice (CostAmount.Fixed 1) (Filter.Or [Filter.HasCardType CardType.Artifact, Filter.HasCardType CardType.Enchantment, Filter.IsToken]))]
     }
 
 -- CR 702.174a's additional cost: "you may choose an opponent". No mana and one

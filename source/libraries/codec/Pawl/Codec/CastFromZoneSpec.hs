@@ -6,6 +6,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastFromZone as CastFromZone
+import qualified Pawl.Types.CostAmount as CostAmount
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterSpread as CounterSpread
 import qualified Pawl.Types.CountersFromPermanents as CountersFromPermanents
@@ -102,10 +103,10 @@ spec s = Spec.describe s "Pawl.Codec.CastFromZone" $ do
             CastFromZone.verb = PermissionVerb.Cast,
             CastFromZone.pool = PermissionPool.CardsExiledWithSource,
             CastFromZone.reduction = 0,
-            CastFromZone.additionalCosts = [CostComponent.RemoveCounters (CountersFromPermanents.MkCountersFromPermanents 3 WhichCounters.OfAnyKind (Filter.And [Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.You]) CounterSpread.FromAmong)]
+            CastFromZone.additionalCosts = [CostComponent.RemoveCounters (CountersFromPermanents.MkCountersFromPermanents (CostAmount.Fixed 3) WhichCounters.OfAnyKind (Filter.And [Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.You]) CounterSpread.FromAmong)]
           }
       )
-      " {\"from\":{\"zone\":{\"type\":\"Exile\"},\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"AnyPlayer\"}}},\"matching\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"pool\":{\"type\":\"CardsExiledWithSource\"},\"additionalCosts\":[{\"type\":\"RemoveCounters\",\"value\":{\"count\":3,\"kind\":{\"type\":\"OfAnyKind\"},\"spread\":{\"type\":\"FromAmong\"},\"whichPermanent\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}]}}}]} "
+      " {\"from\":{\"zone\":{\"type\":\"Exile\"},\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"AnyPlayer\"}}},\"matching\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"pool\":{\"type\":\"CardsExiledWithSource\"},\"additionalCosts\":[{\"type\":\"RemoveCounters\",\"value\":{\"count\":{\"type\":\"Fixed\",\"value\":3},\"kind\":{\"type\":\"OfAnyKind\"},\"spread\":{\"type\":\"FromAmong\"},\"whichPermanent\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}]}}}]} "
   -- Urianger Augurelt's Play Arcanum: cards exiled with the source, played this
   -- turn, and a spell cast this way costs {2} less (CR 601.2f).
   Spec.it s "a reduction" $

@@ -169,7 +169,10 @@
               {
                 "type": "Sacrifice",
                 "value": {
-                  "count": 2,
+                  "count": {
+                    "type": "Fixed",
+                    "value": 2
+                  },
                   "whichPermanents": {
                     "type": "HasSubtype",
                     "value": {

@@ -51,6 +51,7 @@ import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CostAmount as CostAmount
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Decider as Decider
@@ -2260,7 +2261,7 @@ loyaltyChange :: ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbilit
 loyaltyChange ability =
   let change c = case c of
         CostComponent.AddLoyaltyToThis n -> Just (toInteger n)
-        CostComponent.RemoveLoyaltyFromThis n -> Just (negate (toInteger n))
+        CostComponent.RemoveLoyaltyFromThis (CostAmount.Fixed n) -> Just (negate (toInteger n))
         _ -> Nothing
    in Maybe.listToMaybe (Maybe.mapMaybe change (Cost.Type.components (ActivatedAbility.cost ability)))
 

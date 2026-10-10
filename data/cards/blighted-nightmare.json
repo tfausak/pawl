@@ -6,7 +6,10 @@
           "cost": {
             "components": [
               {
-                "type": "BlightX"
+                "type": "Blight",
+                "value": {
+                  "type": "AnnouncedX"
+                }
               },
               {
                 "type": "ReturnThis"

@@ -6,11 +6,16 @@
           "cost": {
             "components": [
               {
-                "type": "SacrificeX",
+                "type": "Sacrifice",
                 "value": {
-                  "type": "HasCardType",
-                  "value": {
-                    "type": "Creature"
+                  "count": {
+                    "type": "AnnouncedX"
+                  },
+                  "whichPermanents": {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Creature"
+                    }
                   }
                 }
               }

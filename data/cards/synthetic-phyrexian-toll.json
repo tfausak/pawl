@@ -4,7 +4,10 @@
       "additionalCosts": [
         {
           "type": "PayLife",
-          "value": 2
+          "value": {
+            "type": "Fixed",
+            "value": 2
+          }
         }
       ],
       "manaCost": [

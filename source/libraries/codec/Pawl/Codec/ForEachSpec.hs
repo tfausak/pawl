@@ -9,6 +9,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CostAmount as CostAmount
 import qualified Pawl.Types.CostChoice as CostChoice
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Filter as Filter
@@ -100,7 +101,7 @@ spec s = Spec.describe s "Pawl.Codec.ForEach" $ do
               Just
                 PayGate.MkPayGate
                   { PayGate.payer = PlayerRef.Relative PlayerRelation.AnyPlayer,
-                    PayGate.cost = CostChoice.MkCostChoice (Cost.MkCost (Just (ManaCost.MkManaCost [])) [CostComponent.PayLife 1] NonEmpty.:| []),
+                    PayGate.cost = CostChoice.MkCostChoice (Cost.MkCost (Just (ManaCost.MkManaCost [])) [CostComponent.PayLife (CostAmount.Fixed 1)] NonEmpty.:| []),
                     PayGate.basis = Nothing,
                     PayGate.branch = PayBranch.IfNonePaid,
                     PayGate.obligation = PayObligation.Optional,
@@ -109,5 +110,5 @@ spec s = Spec.describe s "Pawl.Codec.ForEach" $ do
                   }
           }
       )
-      " {\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}},\"slot\":\"land\",\"body\":[\"destroy\"],\"payGate\":{\"payer\":{\"type\":\"Relative\",\"value\":{\"type\":\"AnyPlayer\"}},\"cost\":{\"mana\":[],\"components\":[{\"type\":\"PayLife\",\"value\":1}]},\"branch\":{\"type\":\"IfNonePaid\"}}} "
+      " {\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}},\"slot\":\"land\",\"body\":[\"destroy\"],\"payGate\":{\"payer\":{\"type\":\"Relative\",\"value\":{\"type\":\"AnyPlayer\"}},\"cost\":{\"mana\":[],\"components\":[{\"type\":\"PayLife\",\"value\":{\"type\":\"Fixed\",\"value\":1}}]},\"branch\":{\"type\":\"IfNonePaid\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

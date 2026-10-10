@@ -10,7 +10,10 @@
               },
               {
                 "type": "Blight",
-                "value": 1
+                "value": {
+                  "type": "Fixed",
+                  "value": 1
+                }
               }
             ],
             "mana": []
@@ -51,7 +54,10 @@
               },
               {
                 "type": "Blight",
-                "value": 2
+                "value": {
+                  "type": "Fixed",
+                  "value": 2
+                }
               }
             ],
             "mana": []
@@ -138,7 +144,10 @@
                 {
                   "type": "RemoveCounters",
                   "value": {
-                    "count": 3,
+                    "count": {
+                      "type": "Fixed",
+                      "value": 3
+                    },
                     "kind": {
                       "type": "OfAnyKind"
                     },

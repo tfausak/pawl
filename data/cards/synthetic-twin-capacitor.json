@@ -10,10 +10,16 @@
               },
               {
                 "type": "PayEnergy",
-                "value": 1
+                "value": {
+                  "type": "Fixed",
+                  "value": 1
+                }
               },
               {
-                "type": "PayEnergyX"
+                "type": "PayEnergy",
+                "value": {
+                  "type": "AnnouncedX"
+                }
               }
             ],
             "mana": []

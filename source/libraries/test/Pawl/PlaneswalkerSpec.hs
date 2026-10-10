@@ -92,6 +92,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Choices as Choices
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CostAmount as CostAmount
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
@@ -932,7 +933,7 @@ tamiyoNotebookSpec s registry = Spec.describe s "TamiyoNotebook" $ do
               GameState.activePlayer = S.alice,
               GameState.priority = Just S.alice
             }
-        ultimate = filter (elem (CostComponent.RemoveLoyaltyFromThis 7) . Cost.Type.components . ActivatedAbility.cost) (Face.activatedAbilities (S.combinedFace tamiyo))
+        ultimate = filter (elem (CostComponent.RemoveLoyaltyFromThis (CostAmount.Fixed 7)) . Cost.Type.components . ActivatedAbility.cost) (Face.activatedAbilities (S.combinedFace tamiyo))
         created = S.runPure S.identityAnswer board (do mapM_ (Activate.activateAbility S.alice tamiyoId) ultimate; Stack.resolveTop)
         notebooks = Set.toList (Set.difference (GameState.battlefield created) (GameState.battlefield board))
         drawn = S.runPure S.identityAnswer created (do Monad.forM_ notebooks (\oid -> mapM_ (Activate.activateAbility S.alice oid) (Projection.abilitiesOf oid created)); Stack.resolveTop)
