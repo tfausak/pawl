@@ -37,6 +37,7 @@ module Pawl.ForageSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -51,6 +52,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.ForageMode as ForageMode
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
@@ -99,6 +101,18 @@ takingFood p = case p of
   Prompt.ChooseOptional {} -> OptionalDecision.Exercises
   Prompt.ChooseForage {} -> ForageMode.SacrificeFood
   _ -> S.identityAnswer p
+
+-- `takingFood`, but answering the Food chooser with the LAST Food offered.
+-- Pinned by position, so a forage that ignored the answer and took the offered
+-- set's front sacrifices the other Food.
+takingLastFood :: Prompt.Prompt r -> r
+takingLastFood p = case p of
+  Prompt.ChoosePermanent _ _ _ candidates -> NonEmpty.last candidates
+  _ -> takingFood p
+
+-- alice's Golden Eggs on the battlefield, ascending.
+eggsOf :: Printing.Printing -> GameState.GameState -> [ObjectId.ObjectId]
+eggsOf egg gs = List.sort (filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (S.printingName egg)) (Game.zoneMembers Zone.Battlefield S.alice gs))
 
 -- The names of the cards in one of alice's zones, sorted.
 namesIn :: Zone.Zone -> GameState.GameState -> [CardName.CardName]
@@ -175,3 +189,14 @@ spec s registry = Spec.describe s "Forage" $ do
     Spec.assertEqWith s "CR 608.2d nothing was drawn, so the forage never happened" (S.handSize S.alice after) 0
     Spec.assertEqWith s "and the graveyard is untouched" (namesIn Zone.Graveyard after) (names [forest, spider])
     Spec.assertBool s (notElem (Text.pack "ChooseOptional") asked) "CR 608.2d an impossible option is not offered"
+  -- Two Golden Eggs and no graveyard to exile, so the Food half is the only one
+  -- and the forager chooses which Egg. Told apart by ObjectId: the Egg left on
+  -- the battlefield keeps the id the board gave it.
+  Spec.it s "CR 701.61a with two Foods the forager chooses which is sacrificed" $ do
+    sentries <- S.printingOf s registry "Treetop Sentries"
+    egg <- S.printingOf s registry "Golden Egg"
+    mountain <- S.printingOf s registry "Mountain"
+    let gs = sentriesBoard sentries egg mountain [] 2
+        (asked, after) = foraged takingLastFood gs
+    Spec.assertEqWith s "CR 701.61a the Egg she did not choose is still on the battlefield" (eggsOf egg after) (take 1 (eggsOf egg gs))
+    Spec.assertBool s (elem (Text.pack "ChoosePermanent") asked) "CR 701.61a two Foods: the forager was asked which"

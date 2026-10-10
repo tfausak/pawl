@@ -17,7 +17,7 @@ module Pawl.Engine.Forage where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
-import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
@@ -85,8 +85,8 @@ canForage pid gs = length (exileCandidates pid gs) >= 3 || not (null (foodCandid
 -- Food" without saying "target", so nothing was declared on the stack (CR
 -- 601.2c) and there is no CR 608.2b legality to re-check.
 --
--- FILTERED, NOT TRUSTED, Pawl.Engine.Blight's posture: an answer naming
--- something never offered falls back to the offered set's own front. That holds
+-- FILTERED, NOT TRUSTED: an answer naming something never offered falls back to
+-- the offered set's own front, the Food through Game.chooseAmong. That holds
 -- for the COST caller too, where the alternative would be Pawl.Engine.Cost's
 -- reject-not-repair: rule 701.61a states no way to fail once canForage holds, so
 -- a payment lost to a bad answer would be a refusal the rules do not offer.
@@ -117,18 +117,11 @@ forage pid resolving = do
       -- it.
       Monad.mapM_ (\oid -> Event.changeZone oid Zone.Exile) (Set.toAscList chosen)
       pure True
-    Just ForageMode.SacrificeFood -> case foods of
-      [] -> pure False
-      first : rest -> do
-        food <- case rest of
-          [] -> pure first
-          second : more -> do
-            let offered = first NonEmpty.:| (second : more)
-            answer <- Game.choose (Prompt.ChoosePermanent decider pid resolving offered)
-            pure (if List.elem answer (NonEmpty.toList offered) then answer else first)
-        -- CR 701.21a, through the one funnel a sacrifice goes through.
-        Event.sacrifice pid food
-        pure True
+    Just ForageMode.SacrificeFood -> do
+      food <- Game.chooseAmong (\chooser asked -> Prompt.ChoosePermanent chooser asked resolving) pid foods
+      -- CR 701.21a, through the one funnel a sacrifice goes through.
+      Monad.forM_ food (Event.sacrifice pid)
+      pure (Maybe.isJust food)
   -- CR 701.61a's forage itself, for "whenever you forage" (Corpseberry
   -- Cultivator) to watch. HERE and not at a caller, Pawl.Engine.Blight's reason:
   -- this is the one place every provenance meets, so an effect's forage and a
