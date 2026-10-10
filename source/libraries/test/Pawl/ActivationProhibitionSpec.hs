@@ -39,7 +39,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
-import qualified Pawl.Types.ActiveActivationProhibition as ActiveActivationProhibition
+import qualified Pawl.Types.ActiveObjectProhibition as ActiveObjectProhibition
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -148,7 +148,7 @@ unenchantedSpec s registry = Spec.describe s "Unenchanted" $ do
 -- its source has stopped saying it. Deadlock Trap's "{T}, Pay {E}: Tap target
 -- creature or planeswalker. Its activated abilities can't be activated this
 -- turn" (checked against Scryfall, 2026-09-05) is the pool's printing; the row
--- lands in GameState.activationProhibitions and
+-- lands in GameState.objectProhibitions and
 -- Pawl.Engine.ActivationProhibition.cantActivate is what reads it.
 --
 -- Every clause of the card is transcribed, the entry rewrite and the energy
@@ -174,7 +174,7 @@ storedSpec s registry = Spec.describe s "Stored" $ do
     let offered = twinOffers victim twin resolved
     Spec.assertBool s (notElem victim offered) "the named Troll's regeneration is withheld"
     Spec.assertEqWith s "and its twin's is the one Troll offer left" offered [twin]
-    Spec.assertEqWith s "one prohibition was stored, over the Troll named" (fmap ActiveActivationProhibition.object (GameState.activationProhibitions resolved)) [victim]
+    Spec.assertEqWith s "one prohibition was stored, over the Troll named" (fmap ActiveObjectProhibition.object (GameState.objectProhibitions resolved)) [victim]
     Spec.assertEqWith s "and the ability's other clause tapped that same Troll" (fmap Object.tapped (Game.lookupObject victim resolved)) (Just TapState.Tapped)
   -- CR 400.7: the replayed Troll is a new object, so the row names nothing on
   -- the board and that Troll may regenerate. `replayed` below has the board.
@@ -187,7 +187,7 @@ storedSpec s registry = Spec.describe s "Stored" $ do
     Spec.assertBool s (elem returned offered) "the replayed Troll's regeneration is offered again"
     Spec.assertBool s (elem twin offered) "and so is the twin's, which the Trap never named"
     Spec.assertEqWith s "exactly one permanent arrived on the replay" (length arrivals) 1
-    Spec.assertEqWith s "and the stored row still names the Troll that left" (fmap ActiveActivationProhibition.object (GameState.activationProhibitions final)) [victim]
+    Spec.assertEqWith s "and the stored row still names the Troll that left" (fmap ActiveObjectProhibition.object (GameState.objectProhibitions final)) [victim]
 
 -- The two twins bob may activate right now, narrowed off `activatableIds` so
 -- bob's Mountain -- which CR 605.3a offers him on every board here -- cannot

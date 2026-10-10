@@ -20,16 +20,13 @@ import qualified Pawl.Engine.Interchangeable.Mentions as Mentions
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection.View
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
-import qualified Pawl.Types.ActiveActivationProhibition as ActiveActivationProhibition
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
-import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
 import qualified Pawl.Types.ActiveCopy as ActiveCopy
 import qualified Pawl.Types.ActiveEvasion as ActiveEvasion
+import qualified Pawl.Types.ActiveObjectProhibition as ActiveObjectProhibition
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
-import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
-import qualified Pawl.Types.ActiveUntapProhibition as ActiveUntapProhibition
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AimedAt as AimedAt
 import qualified Pawl.Types.AimedPlayers as AimedPlayers
@@ -238,11 +235,8 @@ namedByStored oid gs =
     || any (playerEffectRowNames oid) (GameState.playerEffects gs)
     || any (blockRequirementNames oid) (GameState.blockRequirements gs)
     || any (attackRequirementNames oid) (GameState.attackRequirements gs)
-    || any (unregeneratableNames oid) (GameState.unregeneratables gs)
-    || any (blockProhibitionNames oid) (GameState.blockProhibitions gs)
+    || any (objectProhibitionNames oid) (GameState.objectProhibitions gs)
     || any (attackProhibitionNames oid) (GameState.attackProhibitions gs)
-    || any (activationProhibitionNames oid) (GameState.activationProhibitions gs)
-    || any (untapProhibitionNames oid) (GameState.untapProhibitions gs)
     || any (evasionNames oid) (GameState.evasions gs)
     || any (ignoredNames oid) (GameState.ignoredAbilities gs)
     || any (Mentions.activeReplacementNames (searched oid)) (GameState.replacements gs)
@@ -333,14 +327,9 @@ attackRequirementNames oid row = case row of
   ActiveAttackRequirement.MkActiveAttackRequirement source _controller _timestamp expiry attacker defender ->
     source == oid || Mentions.expiryNames (unread oid) expiry || restrictedNames oid attacker || attackTargetNames oid defender
 
-unregeneratableNames :: ObjectId -> ActiveUnregeneratable.ActiveUnregeneratable -> Bool
-unregeneratableNames oid row = case row of
-  ActiveUnregeneratable.MkActiveUnregeneratable source _timestamp expiry object ->
-    source == oid || Mentions.expiryNames (unread oid) expiry || object == oid
-
-blockProhibitionNames :: ObjectId -> ActiveBlockProhibition.ActiveBlockProhibition -> Bool
-blockProhibitionNames oid row = case row of
-  ActiveBlockProhibition.MkActiveBlockProhibition source _timestamp expiry object ->
+objectProhibitionNames :: ObjectId -> ActiveObjectProhibition.ActiveObjectProhibition -> Bool
+objectProhibitionNames oid row = case row of
+  ActiveObjectProhibition.MkActiveObjectProhibition source _timestamp expiry _what object ->
     source == oid || Mentions.expiryNames (unread oid) expiry || object == oid
 
 -- AimedAt names players and target kinds, never an object.
@@ -355,16 +344,6 @@ aimedAtNames aimed = case aimed of
     AimedPlayers.Scoped _scope -> False
     AimedPlayers.EachInSlot _slot -> False
     AimedPlayers.BoundPlayer _player -> False
-
-activationProhibitionNames :: ObjectId -> ActiveActivationProhibition.ActiveActivationProhibition -> Bool
-activationProhibitionNames oid row = case row of
-  ActiveActivationProhibition.MkActiveActivationProhibition source _timestamp expiry object ->
-    source == oid || Mentions.expiryNames (unread oid) expiry || object == oid
-
-untapProhibitionNames :: ObjectId -> ActiveUntapProhibition.ActiveUntapProhibition -> Bool
-untapProhibitionNames oid row = case row of
-  ActiveUntapProhibition.MkActiveUntapProhibition source _timestamp expiry object ->
-    source == oid || Mentions.expiryNames (unread oid) expiry || object == oid
 
 evasionNames :: ObjectId -> ActiveEvasion.ActiveEvasion -> Bool
 evasionNames oid row = case row of

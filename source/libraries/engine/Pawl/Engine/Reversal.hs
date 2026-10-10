@@ -107,11 +107,8 @@ withoutAnnouncement before entry closed = do
   playerEffects <- listOf GameState.playerEffects
   blockRequirements <- listOf GameState.blockRequirements
   attackRequirements <- listOf GameState.attackRequirements
-  unregeneratables <- listOf GameState.unregeneratables
-  blockProhibitions <- listOf GameState.blockProhibitions
+  objectProhibitions <- listOf GameState.objectProhibitions
   attackProhibitions <- listOf GameState.attackProhibitions
-  activationProhibitions <- listOf GameState.activationProhibitions
-  untapProhibitions <- listOf GameState.untapProhibitions
   evasions <- listOf GameState.evasions
   ignoredAbilities <- listOf GameState.ignoredAbilities
   turnOrder <- one GameState.turnOrder
@@ -229,11 +226,8 @@ withoutAnnouncement before entry closed = do
         GameState.playerEffects = playerEffects,
         GameState.blockRequirements = blockRequirements,
         GameState.attackRequirements = attackRequirements,
-        GameState.unregeneratables = unregeneratables,
-        GameState.blockProhibitions = blockProhibitions,
+        GameState.objectProhibitions = objectProhibitions,
         GameState.attackProhibitions = attackProhibitions,
-        GameState.activationProhibitions = activationProhibitions,
-        GameState.untapProhibitions = untapProhibitions,
         GameState.evasions = evasions,
         GameState.ignoredAbilities = ignoredAbilities,
         GameState.turnOrder = turnOrder,

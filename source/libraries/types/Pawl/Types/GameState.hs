@@ -7,17 +7,14 @@ import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Types.ActiveActivationProhibition as ActiveActivationProhibition
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
-import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
 import qualified Pawl.Types.ActiveCopy as ActiveCopy
 import qualified Pawl.Types.ActiveEvasion as ActiveEvasion
+import qualified Pawl.Types.ActiveObjectProhibition as ActiveObjectProhibition
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
-import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
-import qualified Pawl.Types.ActiveUntapProhibition as ActiveUntapProhibition
 import qualified Pawl.Types.Arrival as Arrival
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BattlefieldCandidate as BattlefieldCandidate
@@ -259,21 +256,12 @@ data GameState = MkGameState
     -- | CR 508.1d / 613.11: stored attacking requirements from resolutions, each
     -- with an expiry; printed ones are re-derived live.
     attackRequirements :: [ActiveAttackRequirement.ActiveAttackRequirement],
-    -- | CR 701.19c / 611.1: stored regeneration prohibitions from resolutions,
-    -- each with an expiry, read at Pawl.Engine.Event.resolveDestruction.
-    unregeneratables :: [ActiveUnregeneratable.ActiveUnregeneratable],
-    -- | CR 509.1b / 611.1: stored blocking restrictions from resolutions, each
-    -- with an expiry; printed ones are re-derived live.
-    blockProhibitions :: [ActiveBlockProhibition.ActiveBlockProhibition],
+    -- | CR 611.2a / 613.11: stored per-object prohibitions from resolutions,
+    -- each with an expiry; printed ones are re-derived live.
+    objectProhibitions :: [ActiveObjectProhibition.ActiveObjectProhibition],
     -- | CR 508.1c / 611.1: stored attacking restrictions from resolutions, each
     -- with an expiry; printed ones are re-derived live.
     attackProhibitions :: [ActiveAttackProhibition.ActiveAttackProhibition],
-    -- | CR 602.2 / 611.1: stored activation prohibitions from resolutions, each
-    -- with an expiry; printed ones are re-derived live.
-    activationProhibitions :: [ActiveActivationProhibition.ActiveActivationProhibition],
-    -- | CR 502.3 / 611.1: stored untap prohibitions from resolutions, each with
-    -- an expiry; printed ones are re-derived live.
-    untapProhibitions :: [ActiveUntapProhibition.ActiveUntapProhibition],
     -- | CR 509.1b / 611.2c: stored classes of attackers that can't be
     -- blocked, from resolutions, each with an expiry.
     evasions :: [ActiveEvasion.ActiveEvasion],

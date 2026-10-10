@@ -10,7 +10,7 @@ import qualified Pawl.Types.ForbidBeingBlocked as ForbidBeingBlocked
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.ForbidBeingBlocked" $ do
-  -- CR 509.1b. Two keys, as Pawl.Codec.ForbidUntap's are.
+  -- CR 509.1b. Two keys.
   Spec.it s "MkForbidBeingBlocked, both keys" $
     Common.assertCodec
       s

@@ -9,7 +9,7 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.ForbidBeingBlocked as ForbidBeingBlocked
 
--- | A bare object keyed by the record's field names, Pawl.Codec.ForbidUntap's
+-- | A bare object keyed by the record's field names, Pawl.Codec.Prohibit's
 -- shape. The tag that picks it is written by Pawl.Codec.Effect's
 -- ForbidBeingBlocked arm.
 codec :: Codec.Codec ForbidBeingBlocked.ForbidBeingBlocked

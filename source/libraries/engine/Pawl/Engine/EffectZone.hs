@@ -294,12 +294,9 @@ zoneFunctionedAgainst itself delayed effect = case effect of
         Just ability -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedAgainst itself Nothing) (Modal.allEffects (TriggeredAbility.modal ability)))
   Effect.AffectPlayers {} -> Nothing
   Effect.RequireBlock {} -> Nothing
-  Effect.CantBeRegenerated {} -> Nothing
-  Effect.ForbidBlock {} -> Nothing
+  Effect.Prohibit {} -> Nothing
   Effect.ForbidAttack {} -> Nothing
   Effect.ForbidBeingBlocked {} -> Nothing
-  Effect.ForbidActivation {} -> Nothing
-  Effect.ForbidUntap {} -> Nothing
   Effect.RequireAttack {} -> Nothing
   Effect.CreateEmblem {} -> Nothing
   Effect.BecomeMonarch {} -> Nothing

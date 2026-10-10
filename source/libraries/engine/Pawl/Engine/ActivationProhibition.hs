@@ -5,8 +5,8 @@
 -- siblings). None is a layer, and no layer of Pawl.Engine.Projection rewrites them.
 --
 -- The only reader of Pawl.Types.ActivationProhibition, the PRINTED carrier, and
--- of GameState.activationProhibitions, the STORED rows a resolution leaves
--- behind (Pawl.Types.ActiveActivationProhibition). Every caller asks for one
+-- of the STORED rows a resolution leaves behind
+-- (Pawl.Types.ActiveObjectProhibition's Activate). Every caller asks for one
 -- permanent's answer and never learns which card produced it, or by which road.
 --
 -- TWO places ask, and both are needed, exactly as Pawl.Engine.Detain's header
@@ -27,6 +27,7 @@ module Pawl.Engine.ActivationProhibition where
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.IgnoredAbility as IgnoredAbility
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
@@ -34,10 +35,10 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Types.AbilityKind as AbilityKind
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivationProhibition as ActivationProhibition
-import qualified Pawl.Types.ActiveActivationProhibition as ActiveActivationProhibition
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.Prohibition as Prohibition
 import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Types.RuleAbilities as RuleAbilities
 import qualified Pawl.Types.Subtype as Subtype
@@ -126,15 +127,15 @@ cantActivate asked candidates gs =
               candidates
           else []
       -- CR 611.2a / 613.11: the STORED rows a resolution left behind, unioned in
-      -- the way Pawl.Engine.CombatRestriction unions GameState.blockProhibitions
-      -- into `cantBlock` -- so neither gate learns which road a prohibition took.
+      -- the way Pawl.Engine.CombatRestriction unions the stored Block rows into
+      -- `cantBlock` -- so neither gate learns which road a prohibition took.
       --
-      -- EVERY CR 605.1a kind, unlike a printed row: Pawl.Types.ForbidActivation
-      -- carries no kind, both printings of the sentence naming every activated
-      -- ability. And no CR 116.2d filter: a stored row carries no name for a
-      -- payment to refer to, which Pawl.Types.ActiveActivationProhibition argues
-      -- is exact rather than a shortcut.
-      storedSubjects = Set.fromList (fmap ActiveActivationProhibition.object (GameState.activationProhibitions gs))
+      -- EVERY CR 605.1a kind, unlike a printed row: Pawl.Types.Prohibit carries
+      -- no kind, both printings of the sentence naming every activated ability.
+      -- And no CR 116.2d filter: a stored row carries no name for a payment to
+      -- refer to, which Pawl.Types.ActiveObjectProhibition argues is exact
+      -- rather than a shortcut.
+      storedSubjects = Game.prohibitedObjects Prohibition.Activate gs
    in Set.fromList (concatMap fromProhibition (gathered gs)) <> Set.intersection storedSubjects (Set.fromList candidates)
 
 -- CR 116.2d's WHO on this carrier: the permanents that `source`'s ability named

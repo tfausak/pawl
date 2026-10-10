@@ -30,7 +30,6 @@ import qualified Pawl.Types.AttackTargetRef as AttackTargetRef
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Blight as Blight
-import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastObligation as CastObligation
@@ -101,11 +100,8 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ForEachNumber as ForEachNumber
-import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBeingBlocked as ForbidBeingBlocked
-import qualified Pawl.Types.ForbidBlock as ForbidBlock
-import qualified Pawl.Types.ForbidUntap as ForbidUntap
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.GainControl as GainControl
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
@@ -155,6 +151,8 @@ import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Types.PreventNextDamageInstance as PreventNextDamageInstance
+import qualified Pawl.Types.Prohibit as Prohibit
+import qualified Pawl.Types.Prohibition as Prohibition
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.PutSticker as PutSticker
@@ -2055,36 +2053,18 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.RequireBlock (RequireBlock.MkRequireBlock Duration.UntilEndOfCombat (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature))))
       " {\"type\":\"RequireBlock\",\"value\":{\"duration\":{\"type\":\"UntilEndOfCombat\"},\"blocker\":{\"type\":\"InSlot\",\"value\":\"target\"},\"attacker\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}}} "
-  Spec.it s "CantBeRegenerated" $
+  Spec.it s "Prohibit" $
     Common.assertCodec
       s
       codec
-      (Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))))
-      " {\"type\":\"CantBeRegenerated\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}}} "
+      (Effect.Prohibit (Prohibit.MkProhibit Prohibition.Regenerate Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))))
+      " {\"type\":\"Prohibit\",\"value\":{\"what\":{\"type\":\"Regenerate\"},\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}}} "
   Spec.it s "RequireAttack" $
     Common.assertCodec
       s
       codec
       (Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (RestrictedCreatures.Named (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))) (AttackTargetRef.Players (PlayerRef.Relative PlayerRelation.You))))
       " {\"type\":\"RequireAttack\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"attacker\":{\"type\":\"Named\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}},\"defender\":{\"type\":\"Players\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}}}} "
-  Spec.it s "ForbidBlock" $
-    Common.assertCodec
-      s
-      codec
-      (Effect.ForbidBlock (ForbidBlock.MkForbidBlock Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))))
-      " {\"type\":\"ForbidBlock\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}}} "
-  Spec.it s "ForbidActivation" $
-    Common.assertCodec
-      s
-      codec
-      (Effect.ForbidActivation (ForbidActivation.MkForbidActivation Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))))
-      " {\"type\":\"ForbidActivation\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}}} "
-  Spec.it s "ForbidUntap" $
-    Common.assertCodec
-      s
-      codec
-      (Effect.ForbidUntap (ForbidUntap.MkForbidUntap Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))))
-      " {\"type\":\"ForbidUntap\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}}} "
   Spec.it s "ForbidAttack" $
     Common.assertCodec
       s

@@ -39,12 +39,10 @@ import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
-import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
 import qualified Pawl.Types.ActiveCopy as ActiveCopy
 import qualified Pawl.Types.ActiveEvasion as ActiveEvasion
-import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
-import qualified Pawl.Types.ActiveUntapProhibition as ActiveUntapProhibition
+import qualified Pawl.Types.ActiveObjectProhibition as ActiveObjectProhibition
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
@@ -93,6 +91,7 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProductionTag as ProductionTag
+import qualified Pawl.Types.Prohibition as Prohibition
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
@@ -1829,18 +1828,6 @@ interchangeableSourcesSpec s registry = Spec.describe s "Interchangeable mana so
   -- The other flat rows namedByStored searches, each naming one Elf from bob's
   -- Bears, and each a difference no projection shows: the Elf a row names is a
   -- candidate of its own.
-  Spec.it s "CR 509.1b an Elf that can't block is a candidate of its own" $ do
-    offers <- namedRowOffers s registry $ \bear elf gs ->
-      let (ts, gs1) = Game.freshTimestamp gs
-       in gs1 {GameState.blockProhibitions = [ActiveBlockProhibition.MkActiveBlockProhibition bear ts Expiry.AtCleanup elf]}
-    Spec.assertEqWith s "asked once, with the named Elf beside the two that are alike" offers [2]
-
-  Spec.it s "CR 502.3 an Elf that will not untap by a stored row is a candidate of its own" $ do
-    offers <- namedRowOffers s registry $ \bear elf gs ->
-      let (ts, gs1) = Game.freshTimestamp gs
-       in gs1 {GameState.untapProhibitions = [ActiveUntapProhibition.MkActiveUntapProhibition bear ts Expiry.AtCleanup elf]}
-    Spec.assertEqWith s "asked once, with the named Elf beside the two that are alike" offers [2]
-
   Spec.it s "CR 508.1c an Elf that can't attack is a candidate of its own" $ do
     offers <- namedRowOffers s registry $ \bear elf gs ->
       let (ts, gs1) = Game.freshTimestamp gs
@@ -2101,8 +2088,8 @@ nothingMore = Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPo
 unregeneratable :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 unregeneratable source oid gs =
   let (ts, gs1) = Game.freshTimestamp gs
-      row = ActiveUnregeneratable.MkActiveUnregeneratable {ActiveUnregeneratable.source = source, ActiveUnregeneratable.timestamp = ts, ActiveUnregeneratable.expiry = Expiry.AtCleanup, ActiveUnregeneratable.object = oid}
-   in gs1 {GameState.unregeneratables = row : GameState.unregeneratables gs1}
+      row = ActiveObjectProhibition.MkActiveObjectProhibition {ActiveObjectProhibition.source = source, ActiveObjectProhibition.timestamp = ts, ActiveObjectProhibition.expiry = Expiry.AtCleanup, ActiveObjectProhibition.what = Prohibition.Regenerate, ActiveObjectProhibition.object = oid}
+   in gs1 {GameState.objectProhibitions = row : GameState.objectProhibitions gs1}
 
 -- A fixture write standing in for Veiling Oddity's trigger resolving: the one
 -- CR 509.1b row Pawl.Engine.Resolve.Effect stores for ForbidBeingBlocked, over
