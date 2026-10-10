@@ -1168,15 +1168,16 @@ viewWithLastKnownAnywhere gs oid =
     then fullView gs oid
     else fmap (Count.lastKnownView (fullView gs) oid gs) (Map.lookup oid (GameState.lastKnown gs))
 
--- `context` with every SLOT-derived field filled from one slot map: the objects
--- each slot names (Pawl.Engine.Binding.objectsBySlot), the players
--- (Binding.playersBySlot), and what the board says about those objects -- CR
--- 201.2a's names, CR 110.2's controllers, CR 205.3m's creature types, CR
--- 208.1's toughness and CR 303.4b's host's controller. The slot-derived half
--- of what Pawl.Engine.SourceContext.framedBy is for the source: one filler, so
--- a target slot's filter (Pawl.Engine.Target.slotContext), a resolution's
--- (Pawl.Engine.Resolve.Slots.effectContext) and CR 603.4's two
--- intervening-"if" checks cannot answer "that creature" differently.
+-- `context` with every SLOT-derived field filled from one map of what each
+-- slot names (Pawl.Engine.Binding.recipientsBySlot): the objects, the players,
+-- and what the board says about those objects -- CR 201.2a's names, CR 110.2's
+-- controllers, CR 205.3m's creature types, CR 208.1's toughness and CR
+-- 303.4b's host's controller. The slot-derived half of what
+-- Pawl.Engine.SourceContext.framedBy is for the source: one filler, so a
+-- target slot's filter (Pawl.Engine.Target.slotContext), a resolution's
+-- (Pawl.Engine.Resolve.Slots.effectContext), CR 603.4's two intervening-"if"
+-- checks, a cost's candidate pools and a waiting replacement cannot answer
+-- "that creature" differently.
 --
 -- Through CR 608.2h's last-known reader, because a bound object is a reference
 -- the spell or ability already made: Bifurcate's creature may have left by the
@@ -1190,14 +1191,20 @@ viewWithLastKnownAnywhere gs oid =
 -- controller is the projected one, not its owner" in data/scenarios/aura
 -- proves.
 --
--- A key per slot the map names, so SameControllerAsBound's widening on an
--- absent key is CR 601.2c's slot nobody has answered yet. Toughness only for a
--- slot naming exactly ONE object: no printed comparison asks a group for one.
--- All thunks: a filter naming none of the atoms forces no projection.
-framedBySlots :: GameState -> Map SlotName (Set ObjectId) -> Map SlotName (Set PlayerId.PlayerId) -> Filter.Context -> Filter.Context
-framedBySlots gs objects players context =
+-- A key for every slot the map names, so a slot holding only a player, one
+-- answered with no target (CR 601.2c's "up to"), or one CR 608.2b emptied
+-- answers an EMPTY set and SameControllerAsBound and
+-- SharesCreatureTypeWithBound refuse there; only a slot nobody has answered yet
+-- is absent, where they widen. slotObjects keeps only the slots naming an
+-- object, its own doctrine. Toughness only for a slot naming exactly ONE
+-- object: no printed comparison asks a group for one. All thunks: a filter
+-- naming none of the atoms forces no projection.
+framedBySlots :: GameState -> Map SlotName (Set Recipient.Recipient) -> Filter.Context -> Filter.Context
+framedBySlots gs recipients context =
   let lastKnown = viewWithLastKnownAnywhere gs
-      over read_ = fmap (foldMap (foldMap read_ . lastKnown)) objects
+      objects = Binding.objectsOfSlots recipients
+      objectsOf = Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList
+      over read_ = fmap (foldMap (foldMap read_ . lastKnown) . objectsOf) recipients
       hostController oid = case Game.hostOf oid gs of
         Just host | Set.member host (GameState.battlefield gs) -> maybe Set.empty Set.singleton (controllerOf host gs)
         _ -> Set.empty
@@ -1206,20 +1213,29 @@ framedBySlots gs objects players context =
         _ -> Nothing
    in context
         { Filter.slotObjects = objects,
-          Filter.slotPlayers = players,
+          Filter.slotPlayers = Binding.playersBySlot recipients,
           Filter.slotNames = over Filter.names,
           Filter.slotControllers = over (maybe Set.empty Set.singleton . Filter.controller),
           Filter.slotCreatureTypes = over (Set.filter Subtype.isCreatureType . Filter.subtypes),
           Filter.slotToughnesses = Map.mapMaybe oneToughness objects,
-          Filter.slotHostControllers = fmap (foldMap hostController) objects
+          Filter.slotHostControllers = fmap (foldMap hostController . objectsOf) recipients
         }
 
+-- Filter.contextFor with a recipient map framed in through framedBySlots, for
+-- a caller that holds the map rather than a binding environment: a cost's
+-- candidate pools (Pawl.Engine.Cost, off the announcement CR 601.2c made before
+-- CR 601.2h pays) and a sacrifice criterion
+-- (Pawl.Engine.Replacement.matchesPermanent).
+contextWithSlots :: GameState -> Maybe PlayerId.PlayerId -> Maybe ObjectId -> Map SlotName (Set Recipient.Recipient) -> Filter.Context
+contextWithSlots gs perspective source slots =
+  framedBySlots gs slots (Filter.contextFor (Game.teams gs) perspective source)
+
 -- framedBySlots off a whole binding environment as announced
--- (Binding.slotObjects): CR 603.4's intervening "if", which Event.Trigger checks
--- as the trigger is gathered and Stack again at CR 608.2a -- before CR 608.2b's
--- re-check, so no target has been dropped yet.
+-- (Binding.recipientsBySlot over its own targets): CR 603.4's intervening "if",
+-- which Event.Trigger checks as the trigger is gathered and Stack again at CR
+-- 608.2a -- before CR 608.2b's re-check, so no target has been dropped yet.
 framedByBindings :: GameState -> Map SlotName Binding.Type.Binding -> Filter.Context -> Filter.Context
-framedByBindings gs bindings = framedBySlots gs (Binding.slotObjects bindings) (Binding.slotPlayers bindings)
+framedByBindings gs bindings = framedBySlots gs (Binding.recipientsBySlot (Binding.targetsOf bindings) bindings)
 
 -- CR 608.2h: this object's last known information, and only when the id names
 -- nothing, so a caller falls through to its live reader. Shared by the two

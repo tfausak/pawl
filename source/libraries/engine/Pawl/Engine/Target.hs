@@ -340,7 +340,7 @@ slotContext pcs perspective unannounced bindings source amount gs =
       -- Not implemented: CR 608.2b's last sentence blanking a departed
       -- sibling TARGET's names, controller and creature types here, as
       -- slotAmount's bound below does (#4865).
-      base = Projection.framedBySlots gs (Binding.objectsBySlot targets bindings) (Binding.playersBySlot targets) framed
+      base = Projection.framedBySlots gs (Binding.recipientsBySlot targets bindings) framed
       framed =
         (SourceContext.sourceContext gs perspective source)
           { Filter.sourcePower = Projection.powerWithLastKnownGiven pcs source gs,

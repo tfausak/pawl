@@ -553,7 +553,7 @@ payableCostAtGiven modes pcs sources x extra spending pid oid gs cost =
       adjustmentsFor aiming = Cost.plusReductions extra (Cost.spellAdjustments (Set.unions (Map.elems aiming)) pid oid priced)
       askWith adjustments aiming =
         let totalled = Cost.plusComponents adjustments substituted
-            slots = Binding.withAnnouncedTargets (fmap (Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList) aiming)
+            slots = Binding.withAnnouncedTargets aiming
          in Cost.canPaySomeCompletionGiven slots (PaymentSubject.Casting oid) spending sources pcs pid oid (fmap assisted . Cost.totalManas adjustments) (Cost.manaSubstitutions (Cost.Type.components totalled) slots pid oid gs) totalled gs
       -- The adjustments with nothing aimed at, which are the adjustments under
       -- EVERY aiming unless they read the targets (readsTargets below), so the
@@ -3563,7 +3563,7 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                           -- locked in here, before any of it is paid, per its
                           -- ruling. A fence: the payment reads the same slots,
                           -- and no board changes a target's mana value mid-payment.
-                          paidCost = Cost.fixComputedIn (fmap (Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList) chosen) pricedGs (Cost.totalWith adjustments announcedCost {Cost.Type.components = Cost.Type.components lateCost <> announcedSuffix})
+                          paidCost = Cost.fixComputedIn chosen pricedGs (Cost.totalWith adjustments announcedCost {Cost.Type.components = Cost.Type.components lateCost <> announcedSuffix})
                       -- CR 702.51b / 702.66b / 702.126b: convoke, delve and
                       -- improvise apply once the total cost is determined, so the
                       -- offer is handed to the payment rather than made here --

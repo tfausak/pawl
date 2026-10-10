@@ -76,7 +76,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Recruit as Recruit
 import qualified Pawl.Engine.Replacement as Replacement
-import Pawl.Engine.Resolve.Slots (battlefieldMatching, boundSlots, conditionSlots, effectContext, effectObjectRefs, effectPlayerRefs, effectViewOf, graveyardCardsOf, handCardsOf, legalMany, legalOne, libraryCardsOf, matchingFromAmong, objectRefObjects, overRelations, playerRefPlayers, replacementRowSlots, resolutionReads, slotBindings, slotGroup, zoneScopePlayers)
+import Pawl.Engine.Resolve.Slots (battlefieldMatching, boundSlots, conditionSlots, effectContext, effectContextNaming, effectObjectRefs, effectPlayerRefs, effectViewOf, graveyardCardsOf, handCardsOf, legalMany, legalOne, libraryCardsOf, matchingFromAmong, objectRefObjects, overRelations, playerRefPlayers, replacementRowSlots, resolutionReads, slotBindings, slotGroup, zoneScopePlayers)
 import qualified Pawl.Engine.Restamp as Restamp
 import qualified Pawl.Engine.Ring as Ring
 import qualified Pawl.Engine.Room as Room
@@ -3514,7 +3514,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices players filter_ quantity) ->
     let victims = playerRefPlayers legal controller gs players
         tooFewToGive victim = case evaluateForRecipient viewOf context gs resolving source victim quantity of
-          Just n | n > 0 -> n > List.genericLength (Replacement.sacrificeCandidates (Filter.perspective context) (Filter.slotObjects context) victim Nothing filter_ gs)
+          Just n | n > 0 -> n > List.genericLength (Replacement.sacrificeCandidates (Filter.perspective context) (Binding.recipientsBySlot legal (slotBindings resolving gs)) victim Nothing filter_ gs)
           _ -> False
      in not (null victims) && all tooFewToGive victims
   -- CR 701.38b lists the choices, and an object vote's empty list is the
@@ -3821,7 +3821,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 freezeFor objs ctx = (objs, Projection.freezeQuantities gs resolving source ctx modification)
                 frozenSets = case each of
                   Nothing -> [freezeFor targets context]
-                  Just slot -> [freezeFor [t] context {Filter.slotObjects = Map.insert slot (Set.singleton t) (Filter.slotObjects context)} | t <- targets]
+                  Just slot -> [freezeFor [t] (effectContextNaming slot t gs controller source legal (slotBindings resolving gs)) | t <- targets]
                 store objs g m =
                   let (ts, g1) = Game.freshTimestamp g
                       eff =
@@ -6962,7 +6962,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   -- Replacement.sacrificeCandidates, which is what puts CR 101.2's
                   -- "can't be sacrificed" on this path: a prohibited permanent is
                   -- never the pick that satisfies the edict.
-                  let candidates = Replacement.sacrificeCandidates (Filter.perspective context) (Filter.slotObjects context) victim Nothing filter_ gs
+                  let candidates = Replacement.sacrificeCandidates (Filter.perspective context) (Binding.recipientsBySlot legal (slotBindings resolving gs)) victim Nothing filter_ gs
                       decider = Decide.deciderFor victim gs
                       -- `n > 0` above, so the clamp never decides anything here.
                       count = Integer.toNaturalSaturating n
@@ -12235,7 +12235,7 @@ payGatePaidBy runSubgame resolving source controller offer earlier legal payer g
 -- The costs one offer of this gate may be paid with, one per option in printed
 -- order (PayGate.cost), with the slot map their components read: payGatePaidBy's
 -- CR 107.3 X, CR 118.6 description and "for each" multiplier, applied to each.
-gateCostOf :: ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> PayGate.PayGate -> GameState -> (Map.Map SlotName (Set ObjectId), NonEmpty.NonEmpty (Cost.Type.Cost Keyword.Type.Keyword))
+gateCostOf :: ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> PayGate.PayGate -> GameState -> (Map.Map SlotName (Set Recipient), NonEmpty.NonEmpty (Cost.Type.Cost Keyword.Type.Keyword))
 gateCostOf resolving source controller legal gate gs =
   let multiplier = case PayGate.perEach gate of
         Nothing -> 1
@@ -12248,7 +12248,7 @@ gateCostOf resolving source controller legal gate gs =
       -- other filter of this resolution reads -- CR 608.2b's legal targets, the
       -- reserved cost slots among them (Binding.discardedCard), and the groups.
       -- Pawl.ConjureSpec's Calim's Breath cases prove it.
-      slots = Binding.objectsBySlot legal (slotBindings resolving gs)
+      slots = Binding.recipientsBySlot legal (slotBindings resolving gs)
    in (slots, costs)
 
 -- CR 118.3 / 800.4f for one seat, before any offer: could this payer pay any
@@ -12273,7 +12273,7 @@ gateAffordable resolving source controller legal payer gate gs =
 -- outside them pays nothing. Then Prompt.ChooseToPay over the option picked, so
 -- an optional cost can still be declined. Proved by Pawl.ResolveSpec's "CR
 -- 118.12 a choice of costs" group.
-payGateAgreed :: ObjectId -> ObjectId -> PayOffer.PayOffer -> Seq.Seq (PlayerId, PaymentDecision.PaymentDecision) -> PlayerId -> PayGate.PayGate -> Map.Map SlotName (Set ObjectId) -> Maybe (Cost.Type.Cost Keyword.Type.Keyword) -> NonEmpty.NonEmpty (Cost.Type.Cost Keyword.Type.Keyword) -> Game (Maybe (Cost.Type.Cost Keyword.Type.Keyword))
+payGateAgreed :: ObjectId -> ObjectId -> PayOffer.PayOffer -> Seq.Seq (PlayerId, PaymentDecision.PaymentDecision) -> PlayerId -> PayGate.PayGate -> Map.Map SlotName (Set Recipient) -> Maybe (Cost.Type.Cost Keyword.Type.Keyword) -> NonEmpty.NonEmpty (Cost.Type.Cost Keyword.Type.Keyword) -> Game (Maybe (Cost.Type.Cost Keyword.Type.Keyword))
 payGateAgreed resolving source offer earlier payer gate slots owed options = do
   gs <- State.get
   let total cost = maybe cost (`Cost.plus` cost) owed
@@ -12297,7 +12297,7 @@ payGateAgreed resolving source offer earlier payer gate slots owed options = do
 
 -- The payment of a cost the payer agreed to, against `source` (CR 113.7a): the
 -- slots it bound when it was paid (foldPaid), Nothing when it was not.
-payGateCost :: Game Result -> Map.Map SlotName (Set ObjectId) -> PlayerId -> ObjectId -> Cost.Type.Cost Keyword.Type.Keyword -> Game (Maybe (Map.Map SlotName Binding.Type.Binding))
+payGateCost :: Game Result -> Map.Map SlotName (Set Recipient) -> PlayerId -> ObjectId -> Cost.Type.Cost Keyword.Type.Keyword -> Game (Maybe (Map.Map SlotName Binding.Type.Binding))
 payGateCost runSubgame slots payer source cost = do
   gs <- State.get
   -- CR 118.13b: a symbol payable in multiple ways is announced by the
