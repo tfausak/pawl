@@ -160,7 +160,7 @@ data Modification ability
     -- (Pin Collection).
     --
     -- Not implemented: the stickers on objects other than the source
-    -- (Clandestine Chameleon) (#N3).
+    -- (Clandestine Chameleon) (#4935).
     GainAbilitiesOfStickers
   | LoseAllAbilities -- layer 6 (Humility)
   | -- | layer 6, CR 613.1f: this object loses the abilities carrying this name

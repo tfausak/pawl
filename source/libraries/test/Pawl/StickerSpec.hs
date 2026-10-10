@@ -810,9 +810,9 @@ spec s registry = Spec.describe s "Sticker" $ do
     Spec.assertEqWith s "CR 123.8 Otter's sticker is a 5/1" (fmap (\pt -> (PowerToughnessSticker.power pt, PowerToughnessSticker.toughness pt)) (Game.powerToughnessStickerOf otterFiveOne gs)) (Just (5, 1))
     Spec.assertEqWith s "CR 123.7 Juggler's second ability sticker is indestructible" (fmap (Map.keys . AbilitySticker.keywords) (Game.abilityStickerOf jugglerIndestructible gs)) (Just [Keyword.Indestructible])
     Spec.assertEqWith s "and a P/T sticker has no abilities" (Game.abilityStickerOf otterFiveOne gs) Nothing
-  -- #N2's tripwire: a static or rule ability on an ability sticker, or a
+  -- #4934's tripwire: a static or rule ability on an ability sticker, or a
   -- keyword rule 702 states as one, does not reach the stickered object.
-  Spec.it s "CR 123.7 no committed ability sticker carries a static or rule ability (#N2)" $ do
+  Spec.it s "CR 123.7 no committed ability sticker carries a static or rule ability (#4934)" $ do
     root <- StickerSheets.defaultRoot
     loaded <- StickerSheets.loadRoot root
     let selfOnly g = case g of

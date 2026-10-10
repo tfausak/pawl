@@ -3149,7 +3149,7 @@ honeAffected =
 -- what an ability sticker grants is handed over unread (stickerGrants).
 --
 -- Not implemented: a static or rule ability on an ability sticker, or a keyword
--- rule 702 states as one, reaching the stickered object (#N2).
+-- rule 702 states as one, reaching the stickered object (#4934).
 stickerGathered :: GameState -> [Gathered]
 stickerGathered gs =
   let at oid placement lyr affected m =
