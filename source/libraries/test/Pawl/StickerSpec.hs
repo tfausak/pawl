@@ -59,6 +59,7 @@ import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PowerToughnessSticker as PowerToughnessSticker
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.StickerKind as StickerKind
@@ -806,3 +807,33 @@ spec s registry = Spec.describe s "Sticker" $ do
           _ -> False
         offends a = any selfOnly (AbilitySticker.abilities a) || not (null (KeywordEngine.mintedStaticAbilitiesOf (Map.keysSet (AbilitySticker.keywords a))))
     Spec.assertEqWith s "no such sheet" [StickerSheet.name sheet | (_, Right sheet) <- loaded, a <- Foldable.toList (StickerSheet.abilities sheet), offends a] []
+  -- Every one of unit 1's eight ability stickers on its own Grizzly Bears:
+  -- each keyword is granted, and Contortionist Otter Storm's {T} ability joins
+  -- the Bears' activated abilities. Juggler's bolster trigger joins its
+  -- triggered abilities.
+  Spec.it s "CR 123.7/613.1f each ability sticker grants what it prints, Contortionist's {T} ability included" $ do
+    sheets <- withJuggler
+    bears <- S.printingOf s registry "Grizzly Bears"
+    let base = withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)
+        stickered ref = let (oid, gs) = S.addPermanent bears S.alice base in (oid, Sticker.put S.alice oid ref Nothing gs)
+        keywordsOn ref = let (oid, gs) = stickered ref in Map.keysSet (Projection.keywordsOf oid gs)
+        (hasteBears, hasteBoard) = stickered (aliceSticker 2 StickerKind.Ability 0)
+        (bolsterBears, bolsterBoard) = stickered (aliceSticker 4 StickerKind.Ability 0)
+    Spec.assertEqWith s "CR 113.3b Contortionist's {T} ability is the Bears' one activated ability" (length (Activatable.abilitiesFor hasteBears hasteBoard)) 1
+    Spec.assertEqWith s "CR 613.1f each keyword sticker's keywords" (fmap keywordsOn [nightMenace, aliceSticker 0 StickerKind.Ability 1, aliceSticker 1 StickerKind.Ability 0, aliceSticker 1 StickerKind.Ability 1, aliceSticker 2 StickerKind.Ability 1, aliceSticker 3 StickerKind.Ability 0, hotDogFlying, jugglerIndestructible]) (fmap Set.fromList [[Keyword.Menace], [Keyword.Persist], [Keyword.Bushido 2], [Keyword.DoubleStrike], [Keyword.Deathtouch, Keyword.Lifelink], [Keyword.Afflict 2], [Keyword.Flying], [Keyword.Indestructible]])
+    Spec.assertEqWith s "CR 113.3c Juggler's bolster trigger is the Bears' one triggered ability" (length (PC.triggeredAbilities (Projection.project bolsterBears bolsterBoard))) 1
+  -- Review Focus 2. A Grizzly Bears card in alice's graveyard takes Hot Dog
+  -- Minotaur's flying, Yixlid Jailer entering before the sticker on one board
+  -- and after it on the other: CR 613.7 orders the two layer-6 effects.
+  Spec.it s "CR 123.7/613.7 an ability sticker applies in the graveyard, before or after Yixlid Jailer" $ do
+    sheets <- committedSheets
+    bears <- S.printingOf s registry "Grizzly Bears"
+    jailer <- S.printingOf s registry "Yixlid Jailer"
+    let (card, base) = S.addGraveyardCard bears S.alice (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))
+        flies = Projection.hasKeyword Keyword.Flying card
+        stickered = Sticker.put S.alice card hotDogFlying Nothing base
+        jailedFirst = Sticker.put S.alice card hotDogFlying Nothing (snd (S.addPermanent jailer S.bob base))
+        jailedAfter = snd (S.addPermanent jailer S.bob stickered)
+    Spec.assertEqWith s "CR 123.7 the card in the graveyard flies" (flies stickered) True
+    Spec.assertEqWith s "CR 613.7 a sticker placed after Yixlid Jailer entered still flies" (flies jailedFirst) True
+    Spec.assertEqWith s "CR 613.7 Yixlid Jailer entering after the sticker takes flying away" (flies jailedAfter) False

@@ -35,6 +35,7 @@ import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Types.AbilityName as AbilityName
+import qualified Pawl.Types.AbilitySticker as AbilitySticker
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.Affected as Affected
@@ -3123,27 +3124,52 @@ honeAffected =
         ]
     )
 
--- CR 123.6 / 612.9 / 613.7k: each name sticker is a layer-3 effect on the
--- object it is on, at the sticker's own timestamp, putting its word after the
--- position recorded as it was placed. Every object: CR 612.9 reaches a card in
--- any zone, and a hidden-zone move has already taken the sticker off (CR
--- 123.5). Game.stickerWords answers Nothing for every other kind.
+-- CR 123.6 / 123.7 / 613.7k: each sticker on an object is a continuous effect
+-- on it at the sticker's own timestamp -- a name sticker's word in layer 3 (CR
+-- 612.9) and an ability sticker's abilities in layer 6 (CR 613.1f). Every
+-- object: both reach a card in any zone, and a hidden-zone move has already
+-- taken the sticker off (CR 123.5). Cased on the sticker's kind (CR 123.1);
+-- what an ability sticker grants is handed over unread (stickerGrants).
+--
+-- Not implemented: a static or rule ability on an ability sticker, or a keyword
+-- rule 702 states as one, reaching the stickered object (#N2).
 stickerGathered :: GameState -> [Gathered]
 stickerGathered gs =
-  [ MkGathered
-      { gEffect = Nothing,
-        gSource = oid,
-        gAffected = Affected.TheseObjects (Set.singleton oid),
-        gLayer = Layer.Text,
-        gLowest = Layer.Text,
-        gTimestamp = StickerPlacement.timestamp placement,
-        gModification = Modification.InsertNameWords NameInsertion.MkNameInsertion {NameInsertion.word = ws, NameInsertion.after = k}
-      }
-  | (oid, obj) <- Map.toList (GameState.objects gs),
-    placement <- Foldable.toList (Object.stickers obj),
-    Just k <- [StickerPlacement.position placement],
-    Just ws <- [Game.stickerWords (StickerPlacement.sticker placement) gs]
-  ]
+  let at oid placement lyr affected m =
+        MkGathered
+          { gEffect = Nothing,
+            gSource = oid,
+            gAffected = affected,
+            gLayer = lyr,
+            gLowest = lyr,
+            gTimestamp = StickerPlacement.timestamp placement,
+            gModification = m
+          }
+      itself oid = Affected.TheseObjects (Set.singleton oid)
+      parts oid placement =
+        let ref = StickerPlacement.sticker placement
+            named =
+              [ at oid placement Layer.Text (itself oid) (Modification.InsertNameWords NameInsertion.MkNameInsertion {NameInsertion.word = ws, NameInsertion.after = k})
+              | Just k <- [StickerPlacement.position placement],
+                Just ws <- [Game.stickerWords ref gs]
+              ]
+            granted = fmap (at oid placement Layer.Ability (itself oid)) (foldMap stickerGrants (Game.abilityStickerOf ref gs))
+         in named <> granted
+   in [part | (oid, obj) <- Map.toList (GameState.objects gs), placement <- Foldable.toList (Object.stickers obj), part <- parts oid placement]
+
+-- CR 123.7 / 613.1f: an ability sticker's abilities as layer-6 grants, one per
+-- keyword instance and one per other ability, none of them read.
+stickerGrants :: AbilitySticker.AbilitySticker -> [Modification]
+stickerGrants sticker =
+  concatMap (\(k, n) -> List.genericReplicate n (Modification.GainKeyword k)) (Map.toList (AbilitySticker.keywords sticker))
+    <> fmap Modification.GainAbility (AbilitySticker.abilities sticker)
+
+-- Does a sticker write a modification satisfying `p`? The fourth road onto an
+-- object beside storedWrites, elsewhereGrants and the counters, asked by the
+-- minting gates. A regression fence: no committed sheet's keyword mints a
+-- replacement or combat restriction.
+stickerWrites :: (Modification -> Bool) -> GameState -> Bool
+stickerWrites p gs = any (p . gModification) (stickerGathered gs)
 
 -- CR 122.1a / 613.4c: +1/+1 and -1/-1 counters modify P/T in layer 7c, as one
 -- synthetic ModifyPowerToughness per KIND. CR 122.1b / 613.1f: a keyword counter
@@ -5566,9 +5592,10 @@ replacementsAffecting gs =
       -- of baseHas's grantor disjuncts again: a stored effect and an
       -- off-battlefield static ability write the same modifications a
       -- permanent's static ability does. Pawl.ZoneReplacementSpec's Can't Stay
-      -- Away case proves the grantsReplacement limb.
+      -- Away case proves the grantsReplacement limb. A sticker's grant
+      -- (stickerWrites, CR 123.7) is the third.
       mints m = grantsKeywordWhere Keyword.mintsReplacement m || grantsMintingType m || grantsReplacement m
-      elsewhereHas = storedWrites mints gs || elsewhereGrants mints gs
+      elsewhereHas = storedWrites mints gs || elsewhereGrants mints gs || stickerWrites mints gs
       -- CR 604.2's second limb: a static ability's replacement effect stays
       -- active while the object with the ability remains "in the appropriate
       -- zone, as described in rule 113.6", and CR 113.6p is the arm of that list
@@ -5780,20 +5807,22 @@ mintingGrantInForce :: (Set Keyword -> [a]) -> GameState -> Bool
 mintingGrantInForce mints = keywordGrantInForce (not . null . mints . Set.singleton)
 
 -- Does anything write a modification handing out a keyword satisfying `p`? A
--- battlefield permanent's static ability, a stored effect (`storedWrites`) or
--- an off-battlefield static ability (`elsewhereGrants`) -- the three grantor
--- disjuncts replacementsAffecting's gate asks, for a gate that must decide
--- whether to project a card off the battlefield without projecting it.
+-- battlefield permanent's static ability, a stored effect (`storedWrites`), an
+-- off-battlefield static ability (`elsewhereGrants`) or a sticker
+-- (`stickerWrites`) -- the grantor disjuncts replacementsAffecting's gate
+-- asks, for a gate that must decide whether to project a card off the
+-- battlefield without projecting it.
 keywordGrantInForce :: (Keyword -> Bool) -> GameState -> Bool
 keywordGrantInForce p = grantInForce (grantsKeywordWhere p)
 
 -- Does anything write a modification satisfying `writes`? keywordGrantInForce's
--- three grantor disjuncts, for any modification.
+-- grantor disjuncts, for any modification.
 grantInForce :: (Modification -> Bool) -> GameState -> Bool
 grantInForce writes gs =
   any (any (any writes . StaticAbility.modifications) . (`staticAbilitiesOf` gs)) (Set.toList (GameState.battlefield gs))
     || storedWrites writes gs
     || elsewhereGrants writes gs
+    || stickerWrites writes gs
 
 -- CR 113.6k / 113.6m / 613.1f: does anything grant a keyword the roster
 -- `mints` answers for (mintingGrantInForce), or a TRIGGERED ability outright?
