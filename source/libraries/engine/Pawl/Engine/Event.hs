@@ -8229,7 +8229,7 @@ meldable victims gs = do
 --
 -- CR 123.5b / 613.7k: the spell's stickers join the host's, all restamped at
 -- the merge, in their old timestamp order across the two objects, which the rule
--- does not fix (#4947).
+-- does not fix (gap #4947).
 merge :: ObjectId -> ObjectId -> MutateSide.MutateSide -> Game Bool
 merge sid target side = do
   gs <- State.get

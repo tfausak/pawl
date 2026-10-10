@@ -584,9 +584,9 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- one read rather than in the field Filter.classLevel reports.
         Quantity.ClassLevel -> fmap (toInteger . ClassLevel.defaulted . Filter.classLevel) mView
         -- CR 702.33d's designation as a 0/1, HasDesignation's arm in every respect,
-        -- for the "if kicked" CR 702.33e links to the kicker or multikicker PRINTED
-        -- on the object: a sticker kicker (CR 702.33h) is in the family but not
-        -- linked (Wicker Picker's ruling), nor is a squad or offspring payment a
+        -- for the "if kicked" CR 702.33e links to kicker or multikicker: Kicker and
+        -- Multikicker keys only (isPrintedKicker). A sticker kicker (CR 702.33h) is
+        -- in the family but not linked (Wicker Picker's ruling), nor is a squad or offspring payment a
         -- kick. Pawl.StickerSpec's Faerie Squadron case proves it. The object it
         -- reads is the RESOLVING SPELL, which is still on the stack while its own
         -- clause conditions are gated (Pawl.Engine.Resolve.gateHolds).

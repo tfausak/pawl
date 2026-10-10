@@ -36,6 +36,7 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Sticker as Sticker
 import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Extra.Natural as Natural
+import qualified Pawl.MeldSpec as MeldSpec
 import qualified Pawl.MutateSpec as MutateSpec
 import qualified Pawl.Oracle as Oracle
 import qualified Pawl.Registry as Registry
@@ -1437,7 +1438,8 @@ spec s registry = Spec.describe s "Sticker" $ do
         Spec.assertEqWith s "CR 123.5 not asked, and no card in hand has a sticker" (askedKeeper > 0, concatMap (\c -> stickerKindsOn c g) hand) (False, [])
         Spec.assertEqWith s "both cards are in alice's hand" (length hand) 2
       (Nothing, _) -> Spec.assertFailure s "expected Chittering Host"
-  -- The merged Bears of the 123.5b case dies: alice picks the Cubwarden card.
+  -- The merged Bears of the 123.5b case dies: alice picks the Bears card, which
+  -- is not the first offered (Cubwarden, on top), so the default cannot pass.
   Spec.it s "CR 123.5c a mutated permanent's owner chooses which card keeps its stickers" $ do
     sheets <- committedSheets
     picker <- S.printingOf s registry "Wicker Picker"
@@ -1453,7 +1455,30 @@ spec s registry = Spec.describe s "Sticker" $ do
           Prompt.ChooseCost _ _ _ candidates -> mutateKicked candidates
           _ -> MutateSpec.mutatingAt MutateSide.Over bearsId p
         merged = S.runPure answer board (S.cast S.alice card >> drain)
-        ((_, g), askedKeeper) = State.runState (Engine.runGame (keeping (Map.lookup cubwarden (GameState.printingIds merged)) S.identityAnswer) merged (Event.destroy Regenerability.Regenerable [bearsId])) 0
+        ((_, g), askedKeeper) = State.runState (Engine.runGame (keeping (Map.lookup bears (GameState.printingIds merged)) S.identityAnswer) merged (Event.destroy Regenerability.Regenerable [bearsId])) 0
         kindsOf c = concatMap (\oid -> stickerKindsOn oid g) (namedIn Zone.Graveyard c g)
-    Spec.assertEqWith s "CR 123.5c the Cubwarden card keeps the P/T sticker, the Bears card has none" (kindsOf cubwarden, kindsOf bears) ([StickerKind.PowerToughness], [])
+    Spec.assertEqWith s "CR 123.5c the Bears card keeps the P/T sticker, the Cubwarden card has none" (kindsOf bears, kindsOf cubwarden) ([StickerKind.PowerToughness], [])
     Spec.assertEqWith s "alice was asked" (askedKeeper > 0) True
+  -- CR 903.9c with 123.5c: Griptide puts alice's melded Hanweir commander on
+  -- her library and CR 903.9b's offer splits the Garrison card off to the
+  -- command zone, the one public object, so it keeps the sticker unasked.
+  Spec.it s "CR 123.5c/903.9c a melded commander's card split off to the command zone keeps the stickers" $ do
+    sheets <- committedSheets
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    griptide <- S.printingOf s registry "Griptide"
+    let (mMelded, base) = MeldSpec.meldedThrough (withSheets sheets (Setup.emptyGame S.bothPlayers)) battlements garrison mountain
+        (griptideId, withSpell) = S.addHandCard griptide S.alice base
+        board = S.landsFor island S.alice 4 withSpell
+    case mMelded >>= \meldedId -> fmap ((,) meldedId . MeldSpec.componentPrintings . Object.source) (Game.lookupObject meldedId board) of
+      Just (meldedId, components) | firstPid : _ <- Foldable.toList components -> do
+        let stickered = Sticker.put S.alice meldedId (aliceSticker 1 StickerKind.Art 0) Nothing board
+            designated = stickered {GameState.players = Map.adjust (\p -> p {Player.commander = Set.singleton firstPid}) S.alice (GameState.players stickered)}
+            ((_, g), askedKeeper) = State.runState (Engine.runGame (keeping Nothing (MeldSpec.returningComponent meldedId)) designated (S.cast S.alice griptideId >> Stack.resolveTop)) 0
+            kinds = concatMap (\oid -> stickerKindsOn oid g)
+        Spec.assertEqWith s "CR 123.5c the commander card in the command zone keeps the art sticker, the card in the library none" (kinds (Set.toList (GameState.command g)), kinds (Game.zoneMembers Zone.Library S.alice g)) ([StickerKind.Art], [])
+        Spec.assertEqWith s "and alice was not asked, one object being public" (askedKeeper > 0) False
+        Spec.assertEqWith s "setup: one card in each zone" (length (GameState.command g), length (Game.zoneMembers Zone.Library S.alice g)) (1, 1)
+      _ -> Spec.assertFailure s "expected a melded Hanweir, the Writhing Township"

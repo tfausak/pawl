@@ -3547,9 +3547,9 @@ disguiseCosts keywords =
 isKicker :: Keyword -> Bool
 isKicker keyword = familyOf keyword == Just KeywordFamily.Kicker
 
--- | CR 702.33e: a kicker or multikicker cost, which an object's "if kicked"
--- is linked to; a sticker kicker (CR 702.33h) is not. A wildcard,
--- optionalCost's posture.
+-- | CR 702.33e: a Kicker or Multikicker keyword, printed or granted, which an
+-- object's "if kicked" reads; a sticker kicker (CR 702.33h) is not one. A
+-- wildcard, optionalCost's posture.
 isPrintedKicker :: Keyword -> Bool
 isPrintedKicker keyword = case keyword of
   Keyword.Kicker _ -> True

@@ -2686,7 +2686,7 @@ followIntoPools old new gs =
 
 -- CR 702.33g/702.113b's own scope: a Quantity naming a CAST-ANNOUNCEMENT fact
 -- rather than a board or resolution one -- Quantity.WasKicked (CR 702.33d's
--- "kicked" as CR 702.33e links it to the printed kicker, the only reading a
+-- "kicked" as CR 702.33e links it to kicker or multikicker, the only reading a
 -- bare if-clause needs), Quantity.CastUsing (which ALTERNATIVE cost candidate CR
 -- 601.2b's announcement settled on -- awaken, cleave, overload and the other
 -- CR 601.3-listed candidates), and Quantity.Literal, the threshold side of
