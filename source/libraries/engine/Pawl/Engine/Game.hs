@@ -396,13 +396,26 @@ choose p = do
 -- back to the first candidate, since every caller's choice is mandatory. The
 -- candidates are the caller's, CR 801.5a's range cut included.
 chooseAmong :: (Eq a) => (Decider.Decider -> PlayerId -> NonEmpty.NonEmpty a -> Prompt.Prompt a) -> PlayerId -> [a] -> Game (Maybe a)
-chooseAmong question chooser candidates = case candidates of
+chooseAmong question chooser candidates = do
+  gs <- State.get
+  among choose (question (Decide.deciderFor chooser gs) chooser) candidates
+
+-- | One of @candidates@ drawn at random through the prompt @question@ builds:
+-- chooseAmong's shape for RANDOMNESS, so through `ask` and not `choose` (CR
+-- 701.9b's "at random" is not "the player chooses"). Nothing at no candidate,
+-- elided at one, the answer FILTERED rather than trusted.
+drawAmong :: (Eq a) => (NonEmpty.NonEmpty a -> Prompt.Prompt a) -> [a] -> Game (Maybe a)
+drawAmong = among ask
+
+-- chooseAmong and drawAmong's shared none / one / ask / check, @put@ being how
+-- the question is put.
+among :: (Eq a) => (Prompt.Prompt a -> Game a) -> (NonEmpty.NonEmpty a -> Prompt.Prompt a) -> [a] -> Game (Maybe a)
+among put question candidates = case candidates of
   [] -> pure Nothing
   [sole] -> pure (Just sole)
   first : second : rest -> do
-    gs <- State.get
     let offered = first NonEmpty.:| (second : rest)
-    answer <- choose (question (Decide.deciderFor chooser gs) chooser offered)
+    answer <- put (question offered)
     pure (Just (if elem answer offered then answer else first))
 
 -- CR 801.16: record that an object this player controls took part in what the

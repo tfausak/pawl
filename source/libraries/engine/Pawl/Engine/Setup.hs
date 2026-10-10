@@ -783,13 +783,8 @@ anteFromLibraries seated = do
   playing <- State.gets (GameSettings.ante . GameState.settings)
   let anteOne pid = do
         gs <- State.get
-        case Game.zoneMembers Zone.Library pid gs of
-          [] -> pure ()
-          [only] -> Event.changeZone only Zone.Ante
-          first : rest -> do
-            let offered = first NonEmpty.:| rest
-            answer <- Game.ask (Prompt.RandomObject offered)
-            Event.changeZone (if List.elem answer (NonEmpty.toList offered) then answer else first) Zone.Ante
+        drawn <- Game.drawAmong Prompt.RandomObject (Game.zoneMembers Zone.Library pid gs)
+        Monad.forM_ drawn (`Event.changeZone` Zone.Ante)
   Monad.when playing (Monad.forM_ seated anteOne)
 
 -- CR 103.2d / 123.2: each player who brought more than three sticker sheets
@@ -807,16 +802,13 @@ drawStickerSheets seated = Monad.forM_ seated $ \pid -> do
   gs <- State.get
   let brought = foldMap Player.stickerSheets (Map.lookup pid (GameState.players gs))
       slots = zipWith const [0 :: Natural ..] (Foldable.toList brought)
-      drawThree n remaining chosen = case remaining of
-        first : rest | n > (0 :: Int) -> do
-          picked <-
-            if null rest
-              then pure first
-              else do
-                answer <- Game.ask (Prompt.RandomStickerSheet (first NonEmpty.:| rest))
-                pure (if List.elem answer remaining then answer else first)
-          drawThree (n - 1) (List.delete picked remaining) (Set.insert picked chosen)
-        _ -> pure chosen
+      drawThree n remaining chosen
+        | n > (0 :: Int) = do
+            drawn <- Game.drawAmong Prompt.RandomStickerSheet remaining
+            case drawn of
+              Nothing -> pure chosen
+              Just picked -> drawThree (n - 1) (List.delete picked remaining) (Set.insert picked chosen)
+        | otherwise = pure chosen
   chosen <- if length slots <= 3 then pure (Set.fromList slots) else drawThree 3 slots Set.empty
   State.modify' (\g -> g {GameState.players = Map.adjust (\p -> p {Player.chosenStickerSheets = chosen}) pid (GameState.players g)})
 
@@ -834,14 +826,7 @@ claimStartingPlayer = do
   -- command zone is the controller's. The printed face, for
   -- Pawl.Engine.Conspiracy.isConspiracy's reason (CR 315.3).
   let claims pid = any (maybe False Face.claimsStartingPlayer . (`Game.faceOf` gs)) (Game.zoneMembers Zone.Command pid gs)
-  starter <- case filter claims (Game.stillPlayingInOrder gs) of
-    [] -> pure Nothing
-    [only] -> pure (Just only)
-    first : rest -> do
-      let claimants = first NonEmpty.:| rest
-      answer <- Game.ask (Prompt.RandomFirstPlayer claimants)
-      -- Filtered, not trusted: only a claimant can be chosen.
-      pure (Just (if List.elem answer claimants then answer else first))
+  starter <- Game.drawAmong Prompt.RandomFirstPlayer (filter claims (Game.stillPlayingInOrder gs))
   Monad.forM_ starter $ \pid ->
     State.modify' (\g -> g {GameState.turnOrder = rotateTo pid (GameState.turnOrder g), GameState.activePlayer = pid})
 
@@ -854,13 +839,9 @@ randomEmperorFirst :: Game ()
 randomEmperorFirst = do
   gs <- State.get
   let emperors = GameSettings.emperors (GameState.settings gs)
-  case filter (Emperors.isEmperor emperors) (GameState.turnOrder gs) of
-    [] -> pure ()
-    first : rest -> do
-      let candidates = first NonEmpty.:| rest
-      answer <- if null rest then pure first else Game.ask (Prompt.RandomFirstPlayer candidates)
-      let starter = if List.elem answer candidates then answer else first
-      State.modify' (\g -> g {GameState.turnOrder = rotateTo starter (GameState.turnOrder g), GameState.activePlayer = starter})
+  drawn <- Game.drawAmong Prompt.RandomFirstPlayer (filter (Emperors.isEmperor emperors) (GameState.turnOrder gs))
+  Monad.forM_ drawn $ \starter ->
+    State.modify' (\g -> g {GameState.turnOrder = rotateTo starter (GameState.turnOrder g), GameState.activePlayer = starter})
 
 -- CR 103 / 727.1a: put `starter` at the head of the turn order, preserving the
 -- cyclic order. Total: a `starter` not in the order leaves it as-is.

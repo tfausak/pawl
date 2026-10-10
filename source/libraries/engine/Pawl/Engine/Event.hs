@@ -2940,20 +2940,14 @@ apply batch candidate event =
             -- RevealOrTapped's reason: an entry replacement applied before this
             -- one can have moved a card (CR 614.13).
             let offered = Replacement.graveyardCandidates controller filter_ gs
-            chosen <- case NonEmpty.nonEmpty offered of
-              -- Where the rules leave nothing to ask, don't prompt: with no
-              -- candidate nothing is exiled, and with ONE the instruction names
-              -- that card -- a forced selection rather than options a player
-              -- could tell apart, which is ObjectRef.ChosenCardInGraveyard's own
-              -- elision (CR 101.3).
-              Nothing -> pure Nothing
-              Just (only NonEmpty.:| []) -> pure (Just only)
-              Just candidates -> do
-                answer <- Game.choose (Prompt.ChooseCardInGraveyard (Decide.deciderFor controller gs) controller oid candidates Seq.empty)
-                -- FILTERED, NOT TRUSTED (#222): an answer naming a card that was
-                -- never offered would otherwise exile a card the printed
-                -- criterion excludes.
-                pure (Just (if List.elem answer offered then answer else NonEmpty.head candidates))
+            -- Asked through Game.chooseAmong: with no candidate nothing is
+            -- exiled, and with ONE the instruction names that card -- a forced
+            -- selection rather than options a player could tell apart, which
+            -- is ObjectRef.ChosenCardInGraveyard's own elision (CR 101.3).
+            -- FILTERED, NOT TRUSTED (#222): an answer naming a card that was
+            -- never offered would otherwise exile a card the printed criterion
+            -- excludes.
+            chosen <- Game.chooseAmong (\decider asked candidates -> Prompt.ChooseCardInGraveyard decider asked oid candidates Seq.empty) controller offered
             Monad.forM_ chosen $ \card -> do
               arrivals <- changeZoneReturning card Zone.Exile
               State.modify' $ \gs2 ->

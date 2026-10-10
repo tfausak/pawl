@@ -2109,14 +2109,7 @@ playSubgame = do
   -- CR 729.2: randomly determine which player goes first. The engine asks; the
   -- interpreter rolls. Only the players still in the main game are in the subgame
   -- (CR 729.4). Not asked when the answer is forced.
-  starter <- case NonEmpty.nonEmpty (Game.stillPlayingInOrder parent) of
-    Nothing -> pure (GameState.activePlayer parent)
-    Just order -> case order of
-      only NonEmpty.:| [] -> pure only
-      _ -> do
-        answer <- Game.ask (Prompt.RandomFirstPlayer order)
-        -- Filtered, not trusted: a subgame cannot start with an unseated player.
-        pure (if List.elem answer (NonEmpty.toList order) then answer else NonEmpty.head order)
+  starter <- Maybe.fromMaybe (GameState.activePlayer parent) <$> Game.drawAmong Prompt.RandomFirstPlayer (Game.stillPlayingInOrder parent)
   -- CR 100.6a: the one match-scoped tally, raised BEFORE the subgame is built
   -- so the subgame it counts is inside its own answer (Shahrazad and Sindbad's
   -- "if there haven't been any subgames this match" is false inside the subgame
