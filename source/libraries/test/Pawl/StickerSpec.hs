@@ -3,8 +3,9 @@
 -- Covers CR 107.17's ticket counters, CR 103.2d's sheet draw
 -- (Pawl.Engine.Setup), and CR 123's stickers: Pawl.Engine.Sticker,
 -- Effect.PutSticker (Pawl.Engine.Resolve.Effect), the CR 123.5 write-back in
--- Pawl.Engine.Event, Filter.HasSticker and Filter.Stickered, and
--- TriggerCondition.PlacesSticker.
+-- Pawl.Engine.Event, Filter.HasSticker and Filter.Stickered,
+-- TriggerCondition.PlacesSticker, and the name, ability and P/T stickers'
+-- layers (Pawl.Engine.Projection.stickerGathered).
 module Pawl.StickerSpec where
 
 import qualified Control.Monad as Monad
@@ -23,6 +24,7 @@ import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Keyword as KeywordEngine
 import qualified Pawl.Engine.NameWords as NameWords
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
@@ -36,14 +38,19 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.StickerSheets as StickerSheets
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilitySticker as AbilitySticker
+import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Game as Game.Type
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ModeIndex as ModeIndex
@@ -57,8 +64,11 @@ import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PowerToughnessSticker as PowerToughnessSticker
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.StickerKind as StickerKind
 import qualified Pawl.Types.StickerPlacement as StickerPlacement
 import qualified Pawl.Types.StickerRef as StickerRef
@@ -140,6 +150,43 @@ slimy = nameSticker 1 0
 otter :: StickerRef.StickerRef
 otter = nameSticker 2 1
 
+-- One of alice's stickers, by its sheet's position, its kind and its index
+-- among that sheet's stickers of the kind.
+aliceSticker :: Natural -> StickerKind.StickerKind -> Natural -> StickerRef.StickerRef
+aliceSticker slot kind i = StickerRef.MkStickerRef {StickerRef.owner = S.alice, StickerRef.sheet = slot, StickerRef.kind = kind, StickerRef.index = i}
+
+-- Night's menace (2 tickets), Hot Dog Minotaur's flying (3) and Juggler's
+-- indestructible (4).
+nightMenace :: StickerRef.StickerRef
+nightMenace = aliceSticker 0 StickerKind.Ability 0
+
+hotDogFlying :: StickerRef.StickerRef
+hotDogFlying = aliceSticker 3 StickerKind.Ability 1
+
+jugglerIndestructible :: StickerRef.StickerRef
+jugglerIndestructible = aliceSticker 4 StickerKind.Ability 1
+
+-- The four 2-ticket P/T stickers: 2/3, 2/4, 5/1 and 1/4.
+nightTwoThree :: StickerRef.StickerRef
+nightTwoThree = aliceSticker 0 StickerKind.PowerToughness 0
+
+slimyTwoFour :: StickerRef.StickerRef
+slimyTwoFour = aliceSticker 1 StickerKind.PowerToughness 0
+
+otterFiveOne :: StickerRef.StickerRef
+otterFiveOne = aliceSticker 2 StickerKind.PowerToughness 0
+
+minotaurOneFour :: StickerRef.StickerRef
+minotaurOneFour = aliceSticker 3 StickerKind.PowerToughness 0
+
+-- committedSheets, then Unsanctioned Ancient Juggler at position 4.
+withJuggler :: IO [StickerSheet.StickerSheet]
+withJuggler = do
+  sheets <- committedSheets
+  root <- StickerSheets.defaultRoot
+  loaded <- StickerSheets.loadRoot root
+  pure (sheets <> [sheet | (_, Right sheet) <- loaded, StickerSheet.name sheet == Text.pack "Unsanctioned Ancient Juggler"])
+
 -- The names an object shows, as text.
 nameTexts :: ObjectId.ObjectId -> GameState.GameState -> [Text.Text]
 nameTexts oid gs = fmap CardName.unwrap (Set.toList (Projection.namesOf oid gs))
@@ -177,6 +224,25 @@ placing onto p = case p of
     State.modify' (\o -> o {stickers = NonEmpty.toList offered : stickers o})
     pure (NonEmpty.head offered)
   _ -> pure (S.identityAnswer p)
+
+-- `placing`, answering ChooseX with `x` and ChooseSticker with `ref` where it
+-- is offered, the first offered otherwise.
+placingRef :: Natural -> Maybe ObjectId.ObjectId -> StickerRef.StickerRef -> Prompt.Prompt r -> State.State Offers r
+placingRef x onto ref p = case p of
+  Prompt.ChooseX {} -> pure x
+  Prompt.ChooseSticker _ _ _ offered -> do
+    State.modify' (\o -> o {stickers = NonEmpty.toList offered : stickers o})
+    pure (if List.elem ref offered then ref else NonEmpty.head offered)
+  _ -> placing onto p
+
+-- alice casts Pin Collection with X = `x` and everything resolves under
+-- `placingRef x Nothing ref`; the permanent it became, the board and what was
+-- offered.
+castPin :: Printing.Printing -> Natural -> StickerRef.StickerRef -> GameState.GameState -> (Maybe ObjectId.ObjectId, GameState.GameState, Offers)
+castPin pin x ref gs0 =
+  let (card, board) = S.addHandCard pin S.alice (mainPhaseForAlice gs0)
+      ((_, after), offers) = State.runState (Engine.runGame (placingRef x Nothing ref) board (S.cast S.alice card >> drain)) (MkOffers [] [] 0)
+   in (List.find (\oid -> Set.notMember oid (GameState.battlefield board)) (Set.toList (GameState.battlefield after)), after, offers)
 
 -- Settle and resolve until the stack is empty.
 drain :: Game.Type.Game ()
@@ -738,3 +804,282 @@ spec s registry = Spec.describe s "Sticker" $ do
           Nothing -> False
         (_, after, _) = entersNaming splash ((placingAt Nothing (nameSticker 0 1) 0) {namingPrefers = bobs}) g2
     Spec.assertEqWith s "CR 123.6d one Piker is tapped" (S.tappedCount S.bob after) 1
+  Spec.it s "CR 123.3c/107.17a a sticker's ticket cost is printed on its sheet, and name and art stickers cost nothing" $ do
+    sheets <- withJuggler
+    let gs = withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)
+    Spec.assertEqWith s "the five sheets load" (length sheets) 5
+    Spec.assertEqWith s "CR 123.3c four, two, none and none" (fmap (\ref -> Sticker.ticketCost ref gs) [jugglerIndestructible, otterFiveOne, night, aliceSticker 2 StickerKind.Art 0]) [4, 2, 0, 0]
+    Spec.assertEqWith s "CR 123.8 Otter's sticker is a 5/1" (fmap (\pt -> (PowerToughnessSticker.power pt, PowerToughnessSticker.toughness pt)) (Game.powerToughnessStickerOf otterFiveOne gs)) (Just (5, 1))
+    Spec.assertEqWith s "CR 123.7 Juggler's second ability sticker is indestructible" (fmap (Map.keys . AbilitySticker.keywords) (Game.abilityStickerOf jugglerIndestructible gs)) (Just [Keyword.Indestructible])
+    Spec.assertEqWith s "and a P/T sticker has no abilities" (Game.abilityStickerOf otterFiveOne gs) Nothing
+  -- #4934's tripwire: a static, rule, player or self-cost ability on an
+  -- ability sticker, or a keyword rule 702 states as a static ability, does not
+  -- reach the stickered object -- the first two join no list for a grant to
+  -- the object itself, and the gates in front of the rest ask no sticker.
+  -- Exhaustive, so a new kind of ability is decided here.
+  Spec.it s "CR 123.7 no committed ability sticker carries an ability stickerGathered cannot grant (#4934)" $ do
+    root <- StickerSheets.defaultRoot
+    loaded <- StickerSheets.loadRoot root
+    let selfOnly g = case g of
+          GrantedAbility.Static _ -> True
+          GrantedAbility.Rules _ -> True
+          GrantedAbility.Player _ -> True
+          GrantedAbility.SelfCostReduction _ -> True
+          GrantedAbility.SelfAlternativeCost _ -> True
+          GrantedAbility.SelfSpendManaAsThough _ -> True
+          GrantedAbility.Activated _ -> False
+          GrantedAbility.Triggered _ -> False
+          GrantedAbility.Replacement _ -> False
+        offends a = any selfOnly (AbilitySticker.abilities a) || not (null (KeywordEngine.mintedStaticAbilitiesOf (Map.keysSet (AbilitySticker.keywords a))))
+    Spec.assertEqWith s "no such sheet" [StickerSheet.name sheet | (_, Right sheet) <- loaded, a <- Foldable.toList (StickerSheet.abilities sheet), offends a] []
+  -- Every one of unit 1's eight ability stickers on its own Grizzly Bears:
+  -- each keyword is granted, and Contortionist Otter Storm's {T} ability joins
+  -- the Bears' activated abilities. Juggler's bolster trigger joins its
+  -- triggered abilities.
+  Spec.it s "CR 123.7/613.1f each ability sticker grants what it prints, Contortionist's {T} ability included" $ do
+    sheets <- withJuggler
+    bears <- S.printingOf s registry "Grizzly Bears"
+    let base = withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)
+        stickered ref = let (oid, gs) = S.addPermanent bears S.alice base in (oid, Sticker.put S.alice oid ref Nothing gs)
+        keywordsOn ref = let (oid, gs) = stickered ref in Map.keysSet (Projection.keywordsOf oid gs)
+        (hasteBears, hasteBoard) = stickered (aliceSticker 2 StickerKind.Ability 0)
+        (bolsterBears, bolsterBoard) = stickered (aliceSticker 4 StickerKind.Ability 0)
+    Spec.assertEqWith s "CR 113.3b Contortionist's {T} ability is the Bears' one activated ability" (length (Activatable.abilitiesFor hasteBears hasteBoard)) 1
+    Spec.assertEqWith s "CR 613.1f each keyword sticker's keywords" (fmap keywordsOn [nightMenace, aliceSticker 0 StickerKind.Ability 1, aliceSticker 1 StickerKind.Ability 0, aliceSticker 1 StickerKind.Ability 1, aliceSticker 2 StickerKind.Ability 1, aliceSticker 3 StickerKind.Ability 0, hotDogFlying, jugglerIndestructible]) (fmap Set.fromList [[Keyword.Menace], [Keyword.Persist], [Keyword.Bushido 2], [Keyword.DoubleStrike], [Keyword.Deathtouch, Keyword.Lifelink], [Keyword.Afflict 2], [Keyword.Flying], [Keyword.Indestructible]])
+    Spec.assertEqWith s "CR 113.3c Juggler's bolster trigger is the Bears' one triggered ability" (length (PC.triggeredAbilities (Projection.project bolsterBears bolsterBoard))) 1
+  -- Review Focus 2. A Grizzly Bears card in alice's graveyard takes Hot Dog
+  -- Minotaur's flying, Yixlid Jailer entering before the sticker on one board
+  -- and after it on the other: CR 613.7 orders the two layer-6 effects.
+  Spec.it s "CR 123.7/613.7 an ability sticker applies in the graveyard, before or after Yixlid Jailer" $ do
+    sheets <- committedSheets
+    bears <- S.printingOf s registry "Grizzly Bears"
+    jailer <- S.printingOf s registry "Yixlid Jailer"
+    let (card, base) = S.addGraveyardCard bears S.alice (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))
+        flies = Projection.hasKeyword Keyword.Flying card
+        stickered = Sticker.put S.alice card hotDogFlying Nothing base
+        jailedFirst = Sticker.put S.alice card hotDogFlying Nothing (snd (S.addPermanent jailer S.bob base))
+        jailedAfter = snd (S.addPermanent jailer S.bob stickered)
+    Spec.assertEqWith s "CR 123.7 the card in the graveyard flies" (flies stickered) True
+    Spec.assertEqWith s "CR 613.7 a sticker placed after Yixlid Jailer entered still flies" (flies jailedFirst) True
+    Spec.assertEqWith s "CR 613.7 Yixlid Jailer entering after the sticker takes flying away" (flies jailedAfter) False
+  -- Review Focus 1. The counter goes on first, so a 7c counter landing after
+  -- the 7b set is the only reading that gives 6/2.
+  Spec.it s "CR 613.4b-c Grizzly Bears with a +1/+1 counter under Otter's 5/1 sticker is a 6/2" $ do
+    sheets <- committedSheets
+    bears <- S.printingOf s registry "Grizzly Bears"
+    let (bearsId, g1) = S.addPermanent bears S.alice (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))
+        after = Sticker.put S.alice bearsId otterFiveOne Nothing (S.addCounter CounterKind.PlusOnePlusOne 1 bearsId g1)
+    Spec.assertEqWith s "CR 613.4b-c a 6/2" (Projection.powerOf bearsId after, Projection.toughnessOf bearsId after) (Just 6, Just 2)
+  Spec.it s "CR 123.8/613.7 of two P/T stickers the later one wins, either way round" $ do
+    sheets <- committedSheets
+    bears <- S.printingOf s registry "Grizzly Bears"
+    let (bearsId, g1) = S.addPermanent bears S.alice (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))
+        both first second = Sticker.put S.alice bearsId second Nothing (Sticker.put S.alice bearsId first Nothing g1)
+        pt gs = (Projection.powerOf bearsId gs, Projection.toughnessOf bearsId gs)
+    Spec.assertEqWith s "CR 613.7 5/1 then 1/4 is a 1/4" (pt (both otterFiveOne minotaurOneFour)) (Just 1, Just 4)
+    Spec.assertEqWith s "CR 613.7 1/4 then 5/1 is a 5/1" (pt (both minotaurOneFour otterFiveOne)) (Just 5, Just 1)
+  -- Review Focus 2. Consulate Dreadnought is a 7/11 Vehicle; Bonesplitter has
+  -- no P/T.
+  Spec.it s "CR 123.8/208.3a a P/T sticker sets a Vehicle card's P/T off the battlefield and none on Bonesplitter" $ do
+    sheets <- committedSheets
+    dreadnought <- S.printingOf s registry "Consulate Dreadnought"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    let base = withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)
+        stickeredBy add card = let (oid, gs) = add card S.alice base in (oid, Sticker.put S.alice oid otterFiveOne Nothing gs)
+        pt (oid, gs) = (Projection.powerOf oid gs, Projection.toughnessOf oid gs)
+    Spec.assertEqWith s "CR 123.8 a Consulate Dreadnought card in a graveyard is a 5/1" (pt (stickeredBy S.addGraveyardCard dreadnought)) (Just 5, Just 1)
+    Spec.assertEqWith s "CR 123.8 a Bonesplitter card in a graveyard has no P/T" (pt (stickeredBy S.addGraveyardCard bonesplitter)) (Nothing, Nothing)
+    Spec.assertEqWith s "CR 208.3a nor has an uncrewed Dreadnought on the battlefield" (pt (stickeredBy S.addPermanent dreadnought)) (Nothing, Nothing)
+  -- The off-battlefield read through a real reader: "creature cards with power
+  -- 2 or less". Hill Giant is a 2/3 by Night's sticker; the Bears a 5/1 by
+  -- Otter's.
+  Spec.it s "CR 123.8 Graceful Restoration offers the Hill Giant its sticker makes a 2/3, not the Bears it makes a 5/1" $ do
+    sheets <- committedSheets
+    restoration <- S.printingOf s registry "Graceful Restoration"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    giant <- S.printingOf s registry "Hill Giant"
+    plains <- S.printingOf s registry "Plains"
+    swamp <- S.printingOf s registry "Swamp"
+    let base = mainPhaseForAlice (S.landsFor plains S.alice 4 (S.landsFor swamp S.alice 1 (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))))
+        (bearsCard, g1) = S.addGraveyardCard bears S.alice base
+        (giantCard, g2) = S.addGraveyardCard giant S.alice g1
+        stickered = Sticker.put S.alice giantCard nightTwoThree Nothing (Sticker.put S.alice bearsCard otterFiveOne Nothing g2)
+        (spellId, board) = S.addHandCard restoration S.alice stickered
+        recording :: Prompt.Prompt r -> State.State [ObjectId.ObjectId] r
+        recording p = case p of
+          Prompt.ChooseModes {} -> pure (secondMode p)
+          Prompt.ChooseTargets _ _ _ sets -> do
+            State.put (concatMap (Maybe.mapMaybe Recipient.objectOf . Set.toList . snd) (Map.elems sets))
+            pure (fmap snd sets)
+          _ -> pure (S.identityAnswer p)
+        offered = State.execState (Engine.runGame recording board (S.cast S.alice spellId)) []
+    Spec.assertEqWith s "CR 123.8 only the Hill Giant card is offered" offered [giantCard]
+  -- Review Focus 5's second half; CLAUDE.md's Clone tripwire for both grants.
+  Spec.it s "CR 123.1/707.2 a Clone of a stickered Grizzly Bears is a 2/2 that does not fly" $ do
+    sheets <- committedSheets
+    bears <- S.printingOf s registry "Grizzly Bears"
+    clone <- S.printingOf s registry "Clone"
+    let (bearsId, g1) = S.addPermanent bears S.alice (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))
+        stickered = Sticker.put S.alice bearsId hotDogFlying Nothing (Sticker.put S.alice bearsId otterFiveOne Nothing g1)
+        (_, staged) = S.spellOnStack clone S.alice stickered
+        cloned = S.settleSba (S.runPure (copying bearsId) staged Stack.resolveTop)
+        clones = [oid | oid <- Game.zoneMembers Zone.Battlefield S.alice cloned, oid /= bearsId]
+        shape oid = (Projection.powerOf oid cloned, Projection.toughnessOf oid cloned, Projection.hasKeyword Keyword.Flying oid cloned)
+    Spec.assertEqWith s "CR 707.2 the Clone is a 2/2 without flying" (fmap shape clones) [(Just 2, Just 2, False)]
+    Spec.assertEqWith s "and the Bears it copied is a 5/1 that flies" (shape bearsId) (Just 5, Just 1, True)
+  -- Review Focus 3, and Review Focus 1 through the card. Alice has no tickets
+  -- until Lineprancers gives her two.
+  Spec.it s "CR 123.3c Lineprancers offers only the four P/T stickers its two tickets pay for, and spends both" $ do
+    sheets <- committedSheets
+    lineprancers <- S.printingOf s registry "Lineprancers"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    let (bearsId, g1) = S.addPermanent bears S.alice (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))
+        (_, entered) = S.entersWithTrigger lineprancers S.alice (S.addCounter CounterKind.PlusOnePlusOne 1 bearsId g1)
+        ((_, after), offers) = State.runState (Engine.runGame (placingRef 0 (Just bearsId) otterFiveOne) entered drain) (MkOffers [] [] 0)
+    Spec.assertEqWith s "CR 613.4b-c the Bears is a 6/2" (Projection.powerOf bearsId after, Projection.toughnessOf bearsId after) (Just 6, Just 2)
+    Spec.assertEqWith s "CR 123.3c alice spent both tickets" (S.playerCounterOf PlayerCounterKind.Ticket S.alice after) 0
+    Spec.assertEqWith s "CR 123.3c only the 2-ticket P/T stickers are offered" (concat (take 1 (stickers offers))) [nightTwoThree, slimyTwoFour, otterFiveOne, minotaurOneFour]
+  -- Lineprancers carries a sticker too, and Hill Giant none: only the Bears is
+  -- an attacker the ability can name.
+  Spec.it s "CR 509.1c Lineprancers makes bob's Piker block alice's P/T-stickered Bears, never Lineprancers itself" $ do
+    sheets <- committedSheets
+    lineprancers <- S.printingOf s registry "Lineprancers"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    giant <- S.printingOf s registry "Hill Giant"
+    piker <- S.printingOf s registry "Goblin Piker"
+    forest <- S.printingOf s registry "Forest"
+    let base = mainPhaseForAlice (S.landsFor forest S.alice 4 (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)))
+        (lineId, g1) = S.addPermanent lineprancers S.alice base
+        (bearsId, g2) = S.addPermanent bears S.alice g1
+        (_, g3) = S.addPermanent giant S.alice g2
+        (pikerId, g4) = S.addPermanent piker S.bob g3
+        board = Sticker.put S.alice lineId slimyTwoFour Nothing (Sticker.put S.alice bearsId otterFiveOne Nothing g4)
+        recording :: Prompt.Prompt r -> State.State (Map.Map SlotName.SlotName [ObjectId.ObjectId]) r
+        recording p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> do
+            State.put (fmap (Maybe.mapMaybe Recipient.objectOf . Set.toList . snd) sets)
+            pure (S.preferring (const False) sets)
+          _ -> pure (S.identityAnswer p)
+        ((_, after), offered) = case Activatable.abilitiesFor lineId board of
+          [ability] -> State.runState (Engine.runGame recording board (Activate.activateAbility S.alice lineId ability >> Stack.resolveTop)) Map.empty
+          _ -> (((), board), Map.empty)
+    Spec.assertEqWith s "CR 509.1c bob's Piker must block the Bears" (fmap (\r -> (ActiveBlockRequirement.blocker r, ActiveBlockRequirement.attacker r)) (GameState.blockRequirements after)) [(pikerId, bearsId)]
+    Spec.assertEqWith s "CR 115.1 the attacker slot offers only the Bears" (Map.lookup (SlotName.MkSlotName (Text.pack "attacker")) offered) (Just [bearsId])
+  -- Review Focus 3's waiver and cap: five tickets would pay for any of them.
+  Spec.it s "CR 123.3c Pin Collection with X=3 offers seven ability stickers, spends no ticket, and its Bears flies" $ do
+    sheets <- committedSheets
+    pin <- S.printingOf s registry "Pin Collection"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    plains <- S.printingOf s registry "Plains"
+    let (bearsId, g1) = S.addPermanent bears S.alice (S.addPlayerCounter PlayerCounterKind.Ticket 5 S.alice (S.landsFor plains S.alice 4 (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))))
+        (pinId, after, offers) = castPin pin 3 hotDogFlying g1
+        equipped = maybe after (\p -> S.attach p bearsId after) pinId
+    Spec.assertEqWith s "CR 123.7 the Bears it equips flies and is a 3/3" (Projection.hasKeyword Keyword.Flying bearsId equipped, Projection.powerOf bearsId equipped) (True, Just 3)
+    Spec.assertEqWith s "CR 123.3c alice still has five tickets" (S.playerCounterOf PlayerCounterKind.Ticket S.alice after) 5
+    Spec.assertEqWith s "CR 123.3c every ability sticker costing three or less is offered, deathtouch and lifelink's four is not" (concat (take 1 (stickers offers))) [nightMenace, aliceSticker 0 StickerKind.Ability 1, aliceSticker 1 StickerKind.Ability 0, aliceSticker 1 StickerKind.Ability 1, aliceSticker 2 StickerKind.Ability 0, aliceSticker 3 StickerKind.Ability 0, hotDogFlying]
+  Spec.it s "CR 608.2d Pin Collection with X=1 asks no may" $ do
+    sheets <- committedSheets
+    pin <- S.printingOf s registry "Pin Collection"
+    plains <- S.printingOf s registry "Plains"
+    let (pinId, after, offers) = castPin pin 1 hotDogFlying (S.landsFor plains S.alice 4 (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)))
+    Spec.assertEqWith s "CR 608.2d alice was not asked" (mays offers) 0
+    Spec.assertEqWith s "and Pin Collection is not stickered" (fmap (\p -> fmap (Seq.length . Object.stickers) (Game.lookupObject p after)) pinId) (Just (Just 0))
+  -- Review Focus 4. Shadowspear's loss locks its set as it resolves (CR
+  -- 611.2c); the Bears enters after it, so only Pin's grant can make it
+  -- indestructible, and Pin itself is not.
+  Spec.it s "CR 123.7a Shadowspear strips Pin Collection's indestructible, and a Bears it equips afterwards survives Murder" $ do
+    sheets <- withJuggler
+    pin <- S.printingOf s registry "Pin Collection"
+    spear <- S.printingOf s registry "Shadowspear"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    murder <- S.printingOf s registry "Murder"
+    swamp <- S.printingOf s registry "Swamp"
+    let base = withSheets sheets (S.landsFor swamp S.bob 4 (Setup.gameWith GameSettings.plain S.bothPlayers))
+        (pinId, g1) = S.addPermanent pin S.alice base
+        (spearId, g2) = S.addPermanent spear S.bob (Sticker.put S.alice pinId jugglerIndestructible Nothing g1)
+        bobsTurn = g2 {GameState.activePlayer = S.bob, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.bob}
+        stripped = case Activatable.abilitiesFor spearId bobsTurn of
+          lose : _ -> S.runPure S.identityAnswer bobsTurn (Activate.activateAbility S.bob spearId lose >> Stack.resolveTop)
+          [] -> bobsTurn
+        (bearsId, g3) = S.addPermanent bears S.alice stripped
+        (murderId, g4) = S.addHandCard murder S.bob (S.attach pinId bearsId g3)
+        murdered = S.settleSba (S.runPure (namingTarget bearsId) g4 (S.cast S.bob murderId >> Stack.resolveTop))
+    Spec.assertEqWith s "CR 123.7a/702.12b the Bears survives Murder" (Set.member bearsId (GameState.battlefield murdered)) True
+    Spec.assertEqWith s "CR 613.1f Shadowspear took Pin Collection's indestructible" (Projection.hasKeyword Keyword.Indestructible pinId murdered) False
+  -- One board, two answers: Night's menace (ability) or Otter's 5/1 (P/T) on
+  -- the Bears. Alice's one ticket and Tusk's make two.
+  Spec.it s "CR 123.7 Tusk and Whiskers puts a +1/+1 counter on a creature that takes an ability sticker, and none for a P/T sticker" $ do
+    sheets <- committedSheets
+    tusk <- S.printingOf s registry "Tusk and Whiskers"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    forest <- S.printingOf s registry "Forest"
+    plains <- S.printingOf s registry "Plains"
+    let base = mainPhaseForAlice (S.addPlayerCounter PlayerCounterKind.Ticket 1 S.alice (S.landsFor forest S.alice 3 (S.landsFor plains S.alice 1 (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)))))
+        (tuskId, g1) = S.addPermanent tusk S.alice base
+        (bearsId, board) = S.addPermanent bears S.alice g1
+        activatedWith ref = case Activatable.abilitiesFor tuskId board of
+          [ability] -> snd (fst (State.runState (Engine.runGame (placingRef 0 (Just bearsId) ref) board (Activate.activateAbility S.alice tuskId ability >> drain)) (MkOffers [] [] 0)))
+          _ -> board
+        menaced = activatedWith nightMenace
+        sized = activatedWith otterFiveOne
+    Spec.assertEqWith s "CR 123.7 the Bears that took menace has one +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne bearsId menaced) 1
+    Spec.assertEqWith s "and menace, with both of alice's tickets spent" (Projection.hasKeyword Keyword.Menace bearsId menaced, S.playerCounterOf PlayerCounterKind.Ticket S.alice menaced) (True, 0)
+    Spec.assertEqWith s "the Bears that took a P/T sticker has none" (S.counterOf CounterKind.PlusOnePlusOne bearsId sized) 0
+  -- The "on a creature" half: Pin Collection is an artifact.
+  Spec.it s "CR 123.7 Tusk and Whiskers puts no counter on Pin Collection when Pin stickers itself" $ do
+    sheets <- committedSheets
+    tusk <- S.printingOf s registry "Tusk and Whiskers"
+    pin <- S.printingOf s registry "Pin Collection"
+    plains <- S.printingOf s registry "Plains"
+    let (_, g1) = S.addPermanent tusk S.alice (S.landsFor plains S.alice 4 (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)))
+        (pinId, after, _) = castPin pin 3 hotDogFlying g1
+    Spec.assertEqWith s "Pin Collection took the sticker" (fmap (\p -> fmap (Seq.length . Object.stickers) (Game.lookupObject p after)) pinId) (Just (Just 1))
+    Spec.assertEqWith s "CR 123.7 and no +1/+1 counter" (fmap (\p -> S.counterOf CounterKind.PlusOnePlusOne p after) pinId) (Just 0)
+  -- Review Focus 5. Ambassador's own trigger puts Otter's 5/1 on the Bears;
+  -- Hot Dog Minotaur's 1/4 goes on Bonesplitter, a noncreature whose P/T CR
+  -- 208.3 blanks, and Night's 2-ticket menace on the Bears. 5+1 and 1+4: the
+  -- menace sticker's cost is no part of it, and Bonesplitter's sticker is.
+  Spec.it s "CR 123.8a Ambassador Blorpityblorpboop becomes a 6/5 from the P/T stickers on alice's permanents" $ do
+    sheets <- committedSheets
+    ambassador <- S.printingOf s registry "Ambassador Blorpityblorpboop"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    let (bearsId, g1) = S.addPermanent bears S.alice (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))
+        (splitterId, g2) = S.addPermanent bonesplitter S.alice g1
+        (ambassadorId, entered) = S.entersWithTrigger ambassador S.alice g2
+        placed = snd (fst (State.runState (Engine.runGame (placingRef 0 (Just bearsId) otterFiveOne) entered drain) (MkOffers [] [] 0)))
+        stickered = Sticker.put S.alice bearsId nightMenace Nothing (Sticker.put S.alice splitterId minotaurOneFour Nothing placed)
+        atCombat = (S.withEvents [GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Combat CombatStep.BeginningOfCombat) S.alice)] stickered) {GameState.phase = Phase.Combat CombatStep.BeginningOfCombat}
+        combat = snd (fst (State.runState (Engine.runGame (placing Nothing) atCombat drain) (MkOffers [] [] 0)))
+    Spec.assertEqWith s "CR 123.8a Ambassador is a 6/5" (Projection.powerOf ambassadorId combat, Projection.toughnessOf ambassadorId combat) (Just 6, Just 5)
+    Spec.assertEqWith s "CR 123.3c alice paid two of its three tickets" (S.playerCounterOf PlayerCounterKind.Ticket S.alice combat) 1
+  -- CR 109.2: "on a creature" is a creature permanent, so a sticker put on a
+  -- creature card in a graveyard (Scampire's road) triggers nothing. One board
+  -- each, differing only in where the Bears is.
+  Spec.it s "CR 109.2 Tusk and Whiskers triggers on a creature permanent, not a creature card in a graveyard" $ do
+    sheets <- committedSheets
+    tusk <- S.printingOf s registry "Tusk and Whiskers"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    let (_, base) = S.addPermanent tusk S.alice (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))
+        triggered add =
+          let (bearsId, g1) = add bears S.alice base
+              settled = S.runPure S.identityAnswer (Sticker.put S.alice bearsId nightMenace Nothing g1) Engine.settleForPriority
+           in length (GameState.stack settled)
+    Spec.assertEqWith s "CR 109.2 nothing triggers for the card in the graveyard" (triggered S.addGraveyardCard) 0
+    Spec.assertEqWith s "and Tusk triggers for the permanent" (triggered S.addPermanent) 1
+  -- The battlefield half of CR 123.8 / 208.3: crewed, Consulate Dreadnought is
+  -- a creature, so Otter's sticker sets it to 5/1 in layer 7b.
+  Spec.it s "CR 123.8/208.3 a crewed Consulate Dreadnought takes its P/T sticker's 5/1" $ do
+    sheets <- committedSheets
+    dreadnought <- S.printingOf s registry "Consulate Dreadnought"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    blindSpot <- S.printingOf s registry "Blind-Spot Giant"
+    let (vehicleId, g1) = S.addPermanent dreadnought S.alice (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))
+        (_, g2) = S.addPermanent hillGiant S.alice g1
+        (_, g3) = S.addPermanent blindSpot S.alice g2
+        stickered = mainPhaseForAlice (Sticker.put S.alice vehicleId otterFiveOne Nothing g3)
+        crewed = case Projection.abilitiesOf vehicleId stickered of
+          crew : _ -> S.runPure S.identityAnswer (S.runPure S.identityAnswer stickered (Activate.activateAbility S.alice vehicleId crew)) Stack.resolveTop
+          [] -> stickered
+    Spec.assertEqWith s "CR 123.8 the crewed Dreadnought is a 5/1" (Projection.powerOf vehicleId crewed, Projection.toughnessOf vehicleId crewed) (Just 5, Just 1)
+    Spec.assertEqWith s "and a creature" (Set.member CardType.Creature (Projection.cardTypesOf vehicleId crewed)) True

@@ -3501,16 +3501,17 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
           Just obj -> List.elem (Object.owner obj) anteing
           Nothing -> False
      in not (null anteing) && not (any theirs named)
-  -- CR 608.2d / 123.3: no placer has an available sticker of an allowed kind
-  -- and a named object they own. The ChosenPermanent read is the candidate set
-  -- chosenPermanentOf offers, the pure sweep answering nothing for it.
-  Effect.PutSticker (PutSticker.MkPutSticker player ref kinds _) ->
+  -- CR 608.2d / 123.3: no placer has a sticker of an allowed kind it can put
+  -- on a named object it owns, at its cost and cap. The ChosenPermanent read is
+  -- the candidate set chosenPermanentOf offers, the pure sweep answering
+  -- nothing for it.
+  Effect.PutSticker (PutSticker.MkPutSticker player ref kinds cap free _) ->
     let placers = playerRefPlayers legal controller gs player
         named = case ref of
           ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent filter_ _) -> battlefieldMatching legal resolving controller source gs filter_
           _ -> objectRefObjects legal resolving controller source gs ref
         owns pid oid = fmap Object.owner (Game.lookupObject oid gs) == Just pid
-        placeable pid = not (null (Sticker.available pid kinds gs)) && any (owns pid) named
+        placeable pid = any (\oid -> owns pid oid && not (null (Sticker.offered pid oid kinds (ticketCapOf resolving source controller legal gs cap) free gs))) named
      in not (null placers) && not (any placeable placers)
   Effect.Shuffle {} -> False
   Effect.OfferCast {} -> False
@@ -5694,8 +5695,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- _____ stolen as it enters). Placing nothing writes nothing, so
   -- happenedBetween reads it as not having happened.
   -- CR 123.6b: the object's controller places a name sticker's word
-  -- (namePosition).
-  Effect.PutSticker (PutSticker.MkPutSticker player ref kinds bound) -> do
+  -- (namePosition). CR 123.3c: a sticker the object's owner cannot pay for, or
+  -- above the cap, is not offered, and the owner pays as it goes on unless the
+  -- placement is free (Pin Collection).
+  Effect.PutSticker (PutSticker.MkPutSticker player ref kinds cap free bound) -> do
     named <- case ref of
       ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent filter_ chooser) -> chosenPermanentOf legal resolving controller source filter_ chooser
       _ -> fmap (\gs -> objectRefObjects legal resolving controller source gs ref) State.get
@@ -5710,10 +5713,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               StickerKind.Ability -> pure Nothing
               StickerKind.PowerToughness -> pure Nothing
               StickerKind.Art -> pure Nothing
+            Monad.unless free (State.modify' (Sticker.payTickets oid picked))
             State.modify' (Sticker.put placer oid picked position)
             Monad.forM_ bound (\slot -> State.modify' (bindStickerSlot resolving slot picked))
       Monad.when owned $ do
-        picked <- Game.chooseAmong (\decider who -> Prompt.ChooseSticker decider who oid) placer (Sticker.available placer kinds gs)
+        picked <- Game.chooseAmong (\decider who -> Prompt.ChooseSticker decider who oid) placer (Sticker.offered placer oid kinds (ticketCapOf resolving source controller legal gs cap) free gs)
         Monad.forM_ picked place
   -- CR 701.24a alone: randomize the named libraries so no player knows their
   -- order. Nothing moves, so there is no changeZone call and no CR 616.1
@@ -11186,6 +11190,12 @@ namePosition oid = do
 -- happenedBetween needs no copy-across.
 bindStickerSlot :: ObjectId -> SlotName -> StickerRef.StickerRef -> GameState -> GameState
 bindStickerSlot holder slot ref = overHolderBindings holder (Map.insert slot (Binding.toSticker ref))
+
+-- CR 123.3c: a placement's ticket-cost cap, evaluated now; an unevaluable
+-- cap is zero, so nothing above it is offered.
+ticketCapOf :: ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> GameState -> Maybe Quantity.Type.Quantity -> Maybe Natural
+ticketCapOf resolving source controller legal gs =
+  fmap (maybe 0 Integer.toNaturalSaturating . Quantity.evaluateFor (effectViewOf source legal gs) (effectContext gs controller source legal (slotBindings resolving gs)) gs resolving source)
 
 -- CR 603.7c: bind `target` into `slot` of `holder`'s binding environment, so a
 -- delayed ability armed later in the SAME resolution can name the object.

@@ -35,6 +35,7 @@ import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Types.AbilityName as AbilityName
+import qualified Pawl.Types.AbilitySticker as AbilitySticker
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.Affected as Affected
@@ -93,6 +94,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.Plus as Plus
+import qualified Pawl.Types.PowerToughnessSticker as PowerToughnessSticker
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -143,6 +145,7 @@ layer m = case m of
   Modification.GainAbility _ -> Layer.Ability
   Modification.GainAbilitiesOfSource _ -> Layer.Ability
   Modification.GainCraftMaterialAbilities _ -> Layer.Ability
+  Modification.GainAbilitiesOfStickers -> Layer.Ability
   Modification.LoseAllAbilities -> Layer.Ability
   -- CR 613.1f again, and the same layer as the wipe above: what differs is the
   -- SCOPE of the removal, never when it applies.
@@ -356,6 +359,14 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
               gained = foldMap (\material -> fmap (named material) (PC.activatedAbilities (copiableCharacteristics material gs))) materials
               restricted a = a {ActivatedAbility.restrictions = ActivatedAbility.restrictions a <> extra}
            in pc {PC.activatedAbilities = PC.activatedAbilities pc <> fmap restricted gained}
+        -- CR 613.1f / 123.7a: the abilities printed on the ability stickers on
+        -- `src`, read off the stickers and never off src's projection, so a
+        -- layer-6 loss on src does not reach them. Each goes through the
+        -- GainKeyword or GainAbility arm, the receiver its source (CR 113.7).
+        -- Pawl.StickerSpec's Shadowspear case proves it.
+        Modification.GainAbilitiesOfStickers ->
+          let granted = foldMap (concatMap (\p -> foldMap stickerGrants (Game.abilityStickerOf (StickerPlacement.sticker p) gs)) . Object.stickers) (Game.lookupObject src gs)
+           in List.foldl' (flip (applyModification textBoxOf viewOf src stamp gs oid unitTypes affected)) pc granted
         -- CR 604.3: a CDA is a static ability, so this loses it too.
         Modification.LoseAllAbilities ->
           pc
@@ -737,6 +748,7 @@ cardTypesAfter m types = case m of
   Modification.GainAbility _ -> types
   Modification.GainAbilitiesOfSource _ -> types
   Modification.GainCraftMaterialAbilities _ -> types
+  Modification.GainAbilitiesOfStickers -> types
   Modification.LoseAllAbilities -> types
   Modification.LoseNamedAbility _ -> types
   Modification.LoseKeyword _ -> types
@@ -1527,6 +1539,7 @@ freezeQuantities gs announcedOn source context m =
         Modification.GainAbility _ -> Just m
         Modification.GainAbilitiesOfSource _ -> Just m
         Modification.GainCraftMaterialAbilities _ -> Just m
+        Modification.GainAbilitiesOfStickers -> Just m
         Modification.LoseAllAbilities -> Just m
         Modification.LoseNamedAbility _ -> Just m
         Modification.LoseKeyword _ -> Just m
@@ -1585,6 +1598,7 @@ quantitiesOf m = case m of
   Modification.GainAbility _ -> []
   Modification.GainAbilitiesOfSource _ -> []
   Modification.GainCraftMaterialAbilities _ -> []
+  Modification.GainAbilitiesOfStickers -> []
   Modification.LoseAllAbilities -> []
   Modification.LoseNamedAbility _ -> []
   Modification.LoseKeyword _ -> []
@@ -1640,6 +1654,7 @@ referenceQuery m = case m of
   Modification.GainAbility _ -> Nothing
   Modification.GainAbilitiesOfSource _ -> Nothing
   Modification.GainCraftMaterialAbilities _ -> Nothing
+  Modification.GainAbilitiesOfStickers -> Nothing
   Modification.LoseAllAbilities -> Nothing
   Modification.LoseNamedAbility _ -> Nothing
   Modification.LoseKeyword _ -> Nothing
@@ -1691,6 +1706,7 @@ setsLandSubtype m = case m of
   Modification.GainAbility _ -> False
   Modification.GainAbilitiesOfSource _ -> False
   Modification.GainCraftMaterialAbilities _ -> False
+  Modification.GainAbilitiesOfStickers -> False
   Modification.GainKeyword _ -> False
   Modification.GainKeywordAtManaCost _ -> False
   Modification.GainEnchant _ -> False
@@ -2930,6 +2946,7 @@ removesAbilities m = case m of
   Modification.GainAbility _ -> False
   Modification.GainAbilitiesOfSource _ -> False
   Modification.GainCraftMaterialAbilities _ -> False
+  Modification.GainAbilitiesOfStickers -> False
   -- CR 305.7 strips a land's rules text, but as a layer-4 type change performed
   -- by setLandSubtypeTo and the two gates beside it, never a layer-6 removal.
   -- setsLandSubtype is the classification; this one answers CR 613.1f.
@@ -3144,27 +3161,70 @@ honeAffected =
         ]
     )
 
--- CR 123.6 / 612.9 / 613.7k: each name sticker is a layer-3 effect on the
--- object it is on, at the sticker's own timestamp, putting its word after the
--- position recorded as it was placed. Every object: CR 612.9 reaches a card in
--- any zone, and a hidden-zone move has already taken the sticker off (CR
--- 123.5). Game.stickerWords answers Nothing for every other kind.
+-- CR 123.6 / 123.7 / 123.8 / 613.7k: each sticker on an object is a
+-- continuous effect at the sticker's own timestamp -- a name sticker's word in
+-- layer 3 (CR 612.9), an ability sticker's abilities in layer 6 (CR 613.1f)
+-- and a P/T sticker's numbers in layer 7b (CR 613.4b). Every object: the name
+-- and ability stickers reach a card in any zone, the P/T sticker a creature or
+-- a creature or Vehicle card (setsPT), and a hidden-zone move has already
+-- taken the sticker off (CR 123.5). The sticker's kind (CR 123.1) decides
+-- which of Game's readers answers, and so the layer; what an ability sticker
+-- grants is handed over unread (stickerGrants).
+--
+-- Not implemented: a static, rule, player or self-cost ability on an ability
+-- sticker, or a keyword rule 702 states as a static ability, reaching the
+-- stickered object (#4934).
 stickerGathered :: GameState -> [Gathered]
 stickerGathered gs =
-  [ MkGathered
-      { gEffect = Nothing,
-        gSource = oid,
-        gAffected = Affected.TheseObjects (Set.singleton oid),
-        gLayer = Layer.Text,
-        gLowest = Layer.Text,
-        gTimestamp = StickerPlacement.timestamp placement,
-        gModification = Modification.InsertNameWords NameInsertion.MkNameInsertion {NameInsertion.word = ws, NameInsertion.after = k}
-      }
-  | (oid, obj) <- Map.toList (GameState.objects gs),
-    placement <- Foldable.toList (Object.stickers obj),
-    Just k <- [StickerPlacement.position placement],
-    Just ws <- [Game.stickerWords (StickerPlacement.sticker placement) gs]
-  ]
+  let at oid placement lyr affected m =
+        MkGathered
+          { gEffect = Nothing,
+            gSource = oid,
+            gAffected = affected,
+            gLayer = lyr,
+            gLowest = lyr,
+            gTimestamp = StickerPlacement.timestamp placement,
+            gModification = m
+          }
+      itself oid = Affected.TheseObjects (Set.singleton oid)
+      -- CR 123.8 / 208.3a: a creature, or a creature or Vehicle card off the
+      -- battlefield. On the battlefield CR 208.3 (noncreaturePT) masks a
+      -- Vehicle until it becomes a creature.
+      setsPT =
+        Affected.MatchingAnywhere
+          ( Filter.Type.And
+              [ Filter.Type.IsSource,
+                Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.HasSubtype Subtype.Type.Vehicle]
+              ]
+          )
+      parts oid placement =
+        let ref = StickerPlacement.sticker placement
+            named =
+              [ at oid placement Layer.Text (itself oid) (Modification.InsertNameWords NameInsertion.MkNameInsertion {NameInsertion.word = ws, NameInsertion.after = k})
+              | Just k <- [StickerPlacement.position placement],
+                Just ws <- [Game.stickerWords ref gs]
+              ]
+            granted = fmap (at oid placement Layer.Ability (itself oid)) (foldMap stickerGrants (Game.abilityStickerOf ref gs))
+            sized =
+              [ at oid placement Layer.SetPT setsPT (Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness (Just (Quantity.Type.Literal (PowerToughnessSticker.power pt))) (Just (Quantity.Type.Literal (PowerToughnessSticker.toughness pt)))))
+              | Just pt <- [Game.powerToughnessStickerOf ref gs]
+              ]
+         in named <> granted <> sized
+   in [part | (oid, obj) <- Map.toList (GameState.objects gs), placement <- Foldable.toList (Object.stickers obj), part <- parts oid placement]
+
+-- CR 123.7 / 613.1f: an ability sticker's abilities as layer-6 grants, one per
+-- keyword instance and one per other ability, none of them read.
+stickerGrants :: AbilitySticker.AbilitySticker -> [Modification]
+stickerGrants sticker =
+  concatMap (\(k, n) -> List.genericReplicate n (Modification.GainKeyword k)) (Map.toList (AbilitySticker.keywords sticker))
+    <> fmap Modification.GainAbility (AbilitySticker.abilities sticker)
+
+-- Does a sticker write a modification satisfying `p`? The fifth road onto an
+-- object, beside a battlefield permanent's static ability, storedWrites,
+-- elsewhereGrants and the counters, asked by the minting gates. A regression fence: no committed sheet's keyword mints a
+-- replacement or combat restriction.
+stickerWrites :: (Modification -> Bool) -> GameState -> Bool
+stickerWrites p gs = any (p . gModification) (stickerGathered gs)
 
 -- CR 122.1a / 613.4c: +1/+1 and -1/-1 counters modify P/T in layer 7c, as one
 -- synthetic ModifyPowerToughness per KIND. CR 122.1b / 613.1f: a keyword counter
@@ -4060,6 +4120,7 @@ modificationWrites m = case m of
   Modification.GainAbility _ -> Set.singleton Keywords
   Modification.GainAbilitiesOfSource _ -> Set.singleton Keywords
   Modification.GainCraftMaterialAbilities _ -> Set.singleton Keywords
+  Modification.GainAbilitiesOfStickers -> Set.singleton Keywords
   Modification.LoseAllAbilities -> Set.singleton Keywords
   -- Writes ProjectedCharacteristics.activatedAbilities, which Aspect has no finer
   -- grain for than Keywords -- Filter.HasNonManaActivatedAbility, the atom that
@@ -4162,6 +4223,7 @@ modificationReads m = case m of
   Modification.GainAbility _ -> Set.empty
   Modification.GainAbilitiesOfSource _ -> Set.empty
   Modification.GainCraftMaterialAbilities _ -> Set.empty
+  Modification.GainAbilitiesOfStickers -> Set.empty
   Modification.LoseAllAbilities -> Set.empty
   -- Carries a name, which is not a Quantity.
   Modification.LoseNamedAbility _ -> Set.empty
@@ -4282,6 +4344,8 @@ quantityReads q = case q of
   Quantity.Type.ObjectCountersOfAnyKind -> Set.empty
   Quantity.Type.LettersOnNameStickers _ -> Set.empty
   Quantity.Type.NameStickers -> Set.empty
+  Quantity.Type.PowerOfStickers -> Set.empty
+  Quantity.Type.ToughnessOfStickers -> Set.empty
   Quantity.Type.HasDesignation _ -> Set.empty
   Quantity.Type.DesignationValue _ -> Set.empty
   Quantity.Type.StoredResultsOfSameValue -> Set.empty
@@ -5587,9 +5651,10 @@ replacementsAffecting gs =
       -- of baseHas's grantor disjuncts again: a stored effect and an
       -- off-battlefield static ability write the same modifications a
       -- permanent's static ability does. Pawl.ZoneReplacementSpec's Can't Stay
-      -- Away case proves the grantsReplacement limb.
+      -- Away case proves the grantsReplacement limb. A sticker's grant
+      -- (stickerWrites, CR 123.7) is the third.
       mints m = grantsKeywordWhere Keyword.mintsReplacement m || grantsMintingType m || grantsReplacement m
-      elsewhereHas = storedWrites mints gs || elsewhereGrants mints gs
+      elsewhereHas = storedWrites mints gs || elsewhereGrants mints gs || stickerWrites mints gs
       -- CR 604.2's second limb: a static ability's replacement effect stays
       -- active while the object with the ability remains "in the appropriate
       -- zone, as described in rule 113.6", and CR 113.6p is the arm of that list
@@ -5801,20 +5866,22 @@ mintingGrantInForce :: (Set Keyword -> [a]) -> GameState -> Bool
 mintingGrantInForce mints = keywordGrantInForce (not . null . mints . Set.singleton)
 
 -- Does anything write a modification handing out a keyword satisfying `p`? A
--- battlefield permanent's static ability, a stored effect (`storedWrites`) or
--- an off-battlefield static ability (`elsewhereGrants`) -- the three grantor
--- disjuncts replacementsAffecting's gate asks, for a gate that must decide
--- whether to project a card off the battlefield without projecting it.
+-- battlefield permanent's static ability, a stored effect (`storedWrites`), an
+-- off-battlefield static ability (`elsewhereGrants`) or a sticker
+-- (`stickerWrites`) -- the grantor disjuncts replacementsAffecting's gate
+-- asks, for a gate that must decide whether to project a card off the
+-- battlefield without projecting it.
 keywordGrantInForce :: (Keyword -> Bool) -> GameState -> Bool
 keywordGrantInForce p = grantInForce (grantsKeywordWhere p)
 
 -- Does anything write a modification satisfying `writes`? keywordGrantInForce's
--- three grantor disjuncts, for any modification.
+-- grantor disjuncts, for any modification.
 grantInForce :: (Modification -> Bool) -> GameState -> Bool
 grantInForce writes gs =
   any (any (any writes . StaticAbility.modifications) . (`staticAbilitiesOf` gs)) (Set.toList (GameState.battlefield gs))
     || storedWrites writes gs
     || elsewhereGrants writes gs
+    || stickerWrites writes gs
 
 -- CR 113.6k / 113.6m / 613.1f: does anything grant a keyword the roster
 -- `mints` answers for (mintingGrantInForce), or a TRIGGERED ability outright?
@@ -5947,6 +6014,8 @@ grantsKeywordWhere p m = case m of
   Modification.GainAbility g -> grantedStaticWrites (grantsKeywordWhere p) g
   Modification.GainAbilitiesOfSource _ -> False
   Modification.GainCraftMaterialAbilities _ -> False
+  -- The sticker data is not in the modification, so True over-approximates.
+  Modification.GainAbilitiesOfStickers -> True
   Modification.LoseAllAbilities -> False
   Modification.LoseNamedAbility _ -> False
   -- Take keywords AWAY, which is the opposite of what this asks.
@@ -6033,6 +6102,7 @@ grantsMintingType m = case m of
   Modification.GainAbility g -> grantedStaticWrites grantsMintingType g
   Modification.GainAbilitiesOfSource _ -> False
   Modification.GainCraftMaterialAbilities _ -> False
+  Modification.GainAbilitiesOfStickers -> False
   Modification.LoseAllAbilities -> False
   Modification.LoseNamedAbility _ -> False
   Modification.LoseKeyword _ -> False
@@ -6130,6 +6200,8 @@ grantsAbilityWhere p m = case m of
   Modification.GainCastingPermission _ -> False
   Modification.GainAbilitiesOfSource _ -> False
   Modification.GainCraftMaterialAbilities _ -> False
+  -- The sticker data is not in the modification, so True over-approximates.
+  Modification.GainAbilitiesOfStickers -> True
   Modification.LoseAllAbilities -> False
   Modification.LoseNamedAbility _ -> False
   Modification.LoseKeyword _ -> False

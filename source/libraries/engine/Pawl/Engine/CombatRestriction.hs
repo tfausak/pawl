@@ -557,10 +557,12 @@ gathered gs =
       -- counters, announced as X, stop both creatures blocking" proves it,
       -- through Rot-Curse Rakshasa. The twin gate in Pawl.Engine.Projection needs no such
       -- read: rule 122.1b's list and Keyword.mintsReplacement's set are disjoint.
+      -- An ability sticker (CR 123.7) is the fifth road, Projection.stickerWrites.
       anyMinted =
         any baseCouldMint (Set.toList (GameState.battlefield gs))
           || Projection.storedWrites minting gs
           || Projection.elsewhereGrants minting gs
+          || Projection.stickerWrites minting gs
       minting = Projection.grantsKeywordWhere Keyword.mintsCombatRestriction
       baseCouldMint oid =
         any (any (Projection.grantsKeywordWhere Keyword.mintsCombatRestriction) . StaticAbility.modifications) (Projection.staticAbilitiesOf oid gs)

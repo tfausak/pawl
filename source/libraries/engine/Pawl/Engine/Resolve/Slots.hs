@@ -895,7 +895,7 @@ effectObjectRefs effect = case effect of
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ refs) -> NonEmpty.toList refs
   Effect.Ante (Ante.MkAnte _ ref _) -> [ref]
-  Effect.PutSticker (PutSticker.MkPutSticker _ ref _ _) -> [ref]
+  Effect.PutSticker (PutSticker.MkPutSticker _ ref _ _ _ _) -> [ref]
   Effect.SetOwner (SetOwner.MkSetOwner _ ref) -> [ref]
   Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership one other) -> [one, other]
   Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary ref _) -> [ref]
@@ -1117,7 +1117,7 @@ effectPlayerRefs effect = case effect of
   Effect.TakeExtraTurn takeExtraTurn -> [TakeExtraTurn.player takeExtraTurn]
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named _) -> Maybe.maybeToList named
   Effect.Ante (Ante.MkAnte player _ _) -> [player]
-  Effect.PutSticker (PutSticker.MkPutSticker player _ _ _) -> [player]
+  Effect.PutSticker (PutSticker.MkPutSticker player _ _ _ _ _) -> [player]
   Effect.SetOwner (SetOwner.MkSetOwner player _) -> [player]
   Effect.ExchangeOwnership {} -> []
   Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary _ player) -> [player]
@@ -1525,7 +1525,8 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.TakeExtraTurn takeExtraTurn -> quantitySlots (TakeExtraTurn.count takeExtraTurn)
   Effect.ShuffleIntoLibrary {} -> Map.empty
   Effect.Ante {} -> Map.empty
-  Effect.PutSticker {} -> Map.empty
+  -- The slots the ticket-cost cap reads (Pin Collection's X).
+  Effect.PutSticker putSticker -> foldMap quantitySlots (PutSticker.ticketCap putSticker)
   Effect.SetOwner {} -> Map.empty
   Effect.ExchangeOwnership {} -> Map.empty
   Effect.ExchangeWithTopOfLibrary {} -> Map.empty
@@ -2236,7 +2237,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.TakeExtraTurn takeExtraTurn -> Quantity.slotsAreExhaustive (TakeExtraTurn.count takeExtraTurn)
   Effect.ShuffleIntoLibrary {} -> True
   Effect.Ante {} -> True
-  Effect.PutSticker {} -> True
+  Effect.PutSticker putSticker -> all Quantity.slotsAreExhaustive (PutSticker.ticketCap putSticker)
   Effect.SetOwner {} -> True
   Effect.ExchangeOwnership {} -> True
   Effect.ExchangeWithTopOfLibrary {} -> True
@@ -2487,7 +2488,9 @@ readsX =
         Effect.TakeExtraTurn takeExtraTurn -> Quantity.readsX (TakeExtraTurn.count takeExtraTurn)
         Effect.ShuffleIntoLibrary {} -> False
         Effect.Ante {} -> False
-        Effect.PutSticker {} -> False
+        -- The ticket-cost cap may be the X announced for the spell that became
+        -- the source (Pin Collection, CR 107.3m).
+        Effect.PutSticker putSticker -> any Quantity.readsX (PutSticker.ticketCap putSticker)
         Effect.SetOwner {} -> False
         Effect.ExchangeOwnership {} -> False
         Effect.ExchangeWithTopOfLibrary {} -> False

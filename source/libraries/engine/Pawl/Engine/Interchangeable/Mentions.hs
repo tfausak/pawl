@@ -1939,6 +1939,7 @@ modificationNames asking onAbility x = case x of
   Modification.GainAbility ability -> onAbility ability
   Modification.GainAbilitiesOfSource keyword -> any (keywordNames asking) keyword
   Modification.GainCraftMaterialAbilities items -> any (activationRestrictionNames asking) items
+  Modification.GainAbilitiesOfStickers -> False
   Modification.LoseAllAbilities -> False
   Modification.LoseNamedAbility _abilityName -> False
   Modification.LoseKeyword keyword -> keywordNames asking keyword
@@ -2335,6 +2336,8 @@ quantityNames asking x = case x of
   Quantity.ObjectCountersOfAnyKind -> False
   Quantity.LettersOnNameStickers _ -> False
   Quantity.NameStickers -> False
+  Quantity.PowerOfStickers -> False
+  Quantity.ToughnessOfStickers -> False
   Quantity.HasDesignation _designation -> False
   Quantity.DesignationValue _designation -> False
   Quantity.StoredResultsOfSameValue -> False
@@ -2561,7 +2564,7 @@ anteNames asking x = case x of
 
 putStickerNames :: Asking -> PutSticker.PutSticker -> Bool
 putStickerNames asking x = case x of
-  PutSticker.MkPutSticker player ref _kinds bound -> playerRefNames asking player || objectRefNames asking ref || any (slotNames asking) bound
+  PutSticker.MkPutSticker player ref _kinds cap _free bound -> playerRefNames asking player || objectRefNames asking ref || any (quantityNames asking) cap || any (slotNames asking) bound
 
 shuffleIntoLibraryNames :: Asking -> ShuffleIntoLibrary.ShuffleIntoLibrary -> Bool
 shuffleIntoLibraryNames asking x = case x of

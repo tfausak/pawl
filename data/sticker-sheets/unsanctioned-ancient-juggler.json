@@ -1,0 +1,68 @@
+{
+  "abilities": [
+    {
+      "abilities": [
+        {
+          "type": "Triggered",
+          "value": {
+            "condition": {
+              "type": "SelfAttacks",
+              "value": {
+                "type": "EveryTime"
+              }
+            },
+            "modal": {
+              "modes": [
+                {
+                  "clauses": [
+                    {
+                      "effects": [
+                        {
+                          "type": "Bolster",
+                          "value": {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "tickets": 2
+    },
+    {
+      "keywords": [
+        {
+          "type": "Indestructible"
+        }
+      ],
+      "tickets": 4
+    }
+  ],
+  "art": 3,
+  "name": "Unsanctioned Ancient Juggler",
+  "names": [
+    "Unsanctioned",
+    "Ancient",
+    "Juggler"
+  ],
+  "number": 13,
+  "oracleText": "{TK}{TK} — Whenever this creature attacks, bolster 1. (Choose a creature with the least toughness among creatures you control and put a +1/+1 counter on it.)\n{TK}{TK}{TK}{TK} — Indestructible\n{TK}{TK} — 3/2\n{TK}{TK}{TK} — 5/4",
+  "powerToughness": [
+    {
+      "power": 3,
+      "tickets": 2,
+      "toughness": 2
+    },
+    {
+      "power": 5,
+      "tickets": 3,
+      "toughness": 4
+    }
+  ]
+}

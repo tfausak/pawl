@@ -155,6 +155,13 @@ data Modification ability
     -- of the exiled cards used to craft this effect's source, each carrying
     -- these extra restrictions (Locus of Enlightenment).
     GainCraftMaterialAbilities [ActivationRestriction.ActivationRestriction]
+  | -- | layer 6, CR 613.1f / 123.7a: this object has the abilities printed on
+    -- the ability stickers on this effect's source, read off the stickers
+    -- (Pin Collection).
+    --
+    -- Not implemented: the stickers on objects other than the source
+    -- (Clandestine Chameleon) (#4935).
+    GainAbilitiesOfStickers
   | LoseAllAbilities -- layer 6 (Humility)
   | -- | layer 6, CR 613.1f: this object loses the abilities carrying this name
     -- -- "this creature loses this ability", the clause every Licid prints ahead

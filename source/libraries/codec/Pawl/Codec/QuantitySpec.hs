@@ -123,6 +123,19 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       Quantity.NameStickers
       " {\"type\":\"NameStickers\"} "
+  -- CR 123.8a (Ambassador Blorpityblorpboop).
+  Spec.it s "PowerOfStickers, a bare tag" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      Quantity.PowerOfStickers
+      " {\"type\":\"PowerOfStickers\"} "
+  Spec.it s "ToughnessOfStickers, a bare tag" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      Quantity.ToughnessOfStickers
+      " {\"type\":\"ToughnessOfStickers\"} "
   Spec.it s "Star" $
     Common.assertCodec
       s

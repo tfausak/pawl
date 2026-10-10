@@ -79,6 +79,11 @@ data Quantity
     -- Not implemented: a letter condition on the count, "with eight or more
     -- letters" (#4902).
     NameStickers
+  | -- | CR 123.8a: the printed power on the P/T stickers on the object this is
+    -- evaluated against, summed (Ambassador Blorpityblorpboop).
+    PowerOfStickers
+  | -- | CR 123.8a: the printed toughness on them, summed.
+    ToughnessOfStickers
   | -- | CR 208.2 / 208.2a: the printed star -- notation, which the projection
     -- seed substitutes (Projection.baseCharacteristics) and evaluate answers
     -- Nothing for.

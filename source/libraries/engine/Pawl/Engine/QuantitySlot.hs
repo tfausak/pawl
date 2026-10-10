@@ -156,6 +156,8 @@ overSlots f quantity =
         Quantity.ObjectCountersOfAnyKind -> pure quantity
         Quantity.LettersOnNameStickers _ -> pure quantity
         Quantity.NameStickers -> pure quantity
+        Quantity.PowerOfStickers -> pure quantity
+        Quantity.ToughnessOfStickers -> pure quantity
         -- The designation, which carries no reference either -- ObjectCounters' position,
         -- with which designation in the kind's place.
         Quantity.HasDesignation _ -> pure quantity
@@ -350,6 +352,8 @@ nestedRefs quantity = case quantity of
   Quantity.ObjectCountersOfAnyKind -> Set.empty
   Quantity.LettersOnNameStickers _ -> Set.empty
   Quantity.NameStickers -> Set.empty
+  Quantity.PowerOfStickers -> Set.empty
+  Quantity.ToughnessOfStickers -> Set.empty
   Quantity.HasDesignation _ -> Set.empty
   Quantity.DesignationValue _ -> Set.empty
   Quantity.StoredResultsOfSameValue -> Set.empty
@@ -500,6 +504,8 @@ nestedCounts quantity = case quantity of
   Quantity.ObjectCountersOfAnyKind -> []
   Quantity.LettersOnNameStickers _ -> []
   Quantity.NameStickers -> []
+  Quantity.PowerOfStickers -> []
+  Quantity.ToughnessOfStickers -> []
   Quantity.OpponentsAttacked _ -> []
   Quantity.AttackersDeclaredThisTurn _ -> []
   Quantity.AttackersDeclaredThisCombat -> []
@@ -707,6 +713,8 @@ mapPlayerRefs f intoCount quantity =
         Quantity.ObjectCountersOfAnyKind -> quantity
         Quantity.LettersOnNameStickers _ -> quantity
         Quantity.NameStickers -> quantity
+        Quantity.PowerOfStickers -> quantity
+        Quantity.ToughnessOfStickers -> quantity
         Quantity.HasDesignation _ -> quantity
         Quantity.DesignationValue _ -> quantity
         Quantity.StoredResultsOfSameValue -> quantity
