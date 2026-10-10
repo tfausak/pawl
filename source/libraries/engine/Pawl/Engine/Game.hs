@@ -1,6 +1,7 @@
 module Pawl.Engine.Game where
 
 import qualified Control.Applicative as Applicative
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
@@ -631,38 +632,29 @@ attackTargetOf oid gs =
 -- attackTargetOf through CR 608.2h: for an object that has left, what it was
 -- attacking as it left (Pawl.Types.LastKnown.attacking).
 attackTargetWithLastKnown :: ObjectId -> GameState -> Maybe AttackTarget.AttackTarget
-attackTargetWithLastKnown oid gs = case lookupObject oid gs of
-  Just _ -> attackTargetOf oid gs
-  Nothing -> LastKnown.attackTarget =<< Map.lookup oid (GameState.lastKnown gs)
+attackTargetWithLastKnown oid gs = Monad.join (liveOrLastKnown (const (attackTargetOf oid gs)) LastKnown.attackTarget oid gs)
 
 -- CR 614.1c / 702.174a's chosen player, through CR 608.2h: the live object's
 -- Object.chosenPlayer, else the one it carried as it left
 -- (Pawl.Types.LastKnown.chosenPlayer).
 chosenPlayerWithLastKnown :: ObjectId -> GameState -> Maybe PlayerId
-chosenPlayerWithLastKnown oid gs = case lookupObject oid gs of
-  Just obj -> Object.chosenPlayer obj
-  Nothing -> LastKnown.chosenPlayer =<< Map.lookup oid (GameState.lastKnown gs)
+chosenPlayerWithLastKnown oid gs = Monad.join (liveOrLastKnown Object.chosenPlayer LastKnown.chosenPlayer oid gs)
 
 -- CR 614.1c / 607.2d's chosen colours, through CR 608.2h: the live object's
 -- Object.chosenColors, else the ones it carried as it left
 -- (Pawl.Types.LastKnown.chosenColors).
 chosenColorsWithLastKnown :: ObjectId -> GameState -> Set.Set Color.Color
-chosenColorsWithLastKnown oid gs = case lookupObject oid gs of
-  Just obj -> Object.chosenColors obj
-  Nothing -> maybe Set.empty LastKnown.chosenColors (Map.lookup oid (GameState.lastKnown gs))
+chosenColorsWithLastKnown oid gs = Maybe.fromMaybe Set.empty (liveOrLastKnown Object.chosenColors LastKnown.chosenColors oid gs)
 
--- chosenColorsWithLastKnown one choice over, for Object.chosenSubtype.
+-- chosenColorsWithLastKnown one choice over, for Object.chosenSubtype. The
+-- fallback is proved by the Kindred Boon scenario in data/scenarios/activate.
 chosenSubtypeWithLastKnown :: ObjectId -> GameState -> Maybe Subtype.Subtype
-chosenSubtypeWithLastKnown oid gs = case lookupObject oid gs of
-  Just obj -> Object.chosenSubtype obj
-  Nothing -> LastKnown.chosenSubtype =<< Map.lookup oid (GameState.lastKnown gs)
+chosenSubtypeWithLastKnown oid gs = Monad.join (liveOrLastKnown Object.chosenSubtype LastKnown.chosenSubtype oid gs)
 
 -- chosenColorsWithLastKnown for CR 201.4's chosen names (Object.chosenNames). The
 -- empty set where neither the object nor its last known information exists.
 chosenNamesWithLastKnown :: ObjectId -> GameState -> Set.Set CardName.CardName
-chosenNamesWithLastKnown oid gs = case lookupObject oid gs of
-  Just obj -> Object.chosenNames obj
-  Nothing -> maybe Set.empty LastKnown.chosenNames (Map.lookup oid (GameState.lastKnown gs))
+chosenNamesWithLastKnown oid gs = Maybe.fromMaybe Set.empty (liveOrLastKnown Object.chosenNames LastKnown.chosenNames oid gs)
 
 -- CR 509.1g: is this creature blocking? Combat.blockers is keyed by ATTACKER, so
 -- the answer is membership in some attacker's set rather than a key lookup, or
@@ -874,9 +866,7 @@ cardOf oid gs = cardOfSource gs (fmap Object.source (lookupObject oid gs))
 -- there, and answering it for one that is not would quietly resurrect a
 -- permanent for every projection and quantity read that goes through it.
 cardOfWithLastKnown :: ObjectId -> GameState -> Maybe Card
-cardOfWithLastKnown oid gs = case lookupObject oid gs of
-  Just obj -> cardOfSource gs (Just (Object.source obj))
-  Nothing -> cardOfSource gs (fmap LastKnown.source (Map.lookup oid (GameState.lastKnown gs)))
+cardOfWithLastKnown oid gs = cardOfSource gs (sourceOfWithLastKnown oid gs)
 
 -- The card behind a Source, if it has one. An ability on the stack does not: it
 -- is an object in its own right (CR 113.7a), and the card is its SOURCE's.
@@ -1751,22 +1741,31 @@ cardsOfWithLastKnown oid gs =
 -- `cardOfWithLastKnown`'s own lookup, stopping at the Source: the live object's
 -- first, then the record filed under the id it had while it existed (CR 608.2h).
 sourceOfWithLastKnown :: ObjectId -> GameState -> Maybe Source.Source
-sourceOfWithLastKnown oid gs = case lookupObject oid gs of
-  Just obj -> Just (Object.source obj)
-  Nothing -> fmap LastKnown.source (Map.lookup oid (GameState.lastKnown gs))
+sourceOfWithLastKnown = liveOrLastKnown Object.source LastKnown.source
+
+-- CR 108.3's owner through CR 608.2h: the live object's, else the one its record
+-- kept. Read off the object rather than a projected view, since nothing moves
+-- ownership. Pawl.CountSpec's Daredevil pair drives both arms; PlayerRef.OwnerOfBound
+-- (The Deck of Many Things' 20 band) is another reader.
+ownerWithLastKnown :: ObjectId -> GameState -> Maybe PlayerId
+ownerWithLastKnown = liveOrLastKnown Object.owner LastKnown.owner
+
+-- CR 113.7a / 608.2h: `live` of the object while the id names one, else
+-- `remembered` of the record filed under it as it left, else Nothing. THE
+-- liveness test every last-known reader shares, so the rule cannot mean one
+-- thing for keywords and another for control. Pawl.DamageSpec's "CR 608.2h a
+-- live source reads LIVE, even with a last-known entry filed under its id"
+-- proves the guard, and the Ownership Ledger scenario in data/scenarios/count
+-- the fallback.
+liveOrLastKnown :: (Object -> a) -> (LastKnown.LastKnown -> a) -> ObjectId -> GameState -> Maybe a
+liveOrLastKnown live remembered oid gs = case lookupObject oid gs of
+  Just obj -> Just (live obj)
+  Nothing -> fmap remembered (Map.lookup oid (GameState.lastKnown gs))
 
 -- CR 608.2h: this object's last known information, and only when the id names
--- nothing, so a caller falls through to its live reader. THE liveness test every
--- last-known reader shares (Pawl.Engine.Count.orLastKnown,
--- Pawl.Engine.Projection.projectWithLastKnown), so the rule cannot mean one thing
--- for keywords and another for control. Pawl.DamageSpec's "CR 608.2h a live
--- source reads LIVE, even with a last-known entry filed under its id" proves the
--- guard.
+-- nothing, so a caller falls through to its live reader (liveOrLastKnown).
 lastKnownOf :: ObjectId -> GameState -> Maybe LastKnown.LastKnown
-lastKnownOf oid gs =
-  if Map.member oid (GameState.objects gs)
-    then Nothing
-    else Map.lookup oid (GameState.lastKnown gs)
+lastKnownOf oid gs = Monad.join (liveOrLastKnown (const Nothing) Just oid gs)
 
 -- CR 708.2 / CR 708.8 over ONE object: write which face it is showing, and give
 -- it CR 613.7f's new timestamp -- "a permanent receives a new timestamp each time

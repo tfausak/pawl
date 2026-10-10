@@ -2797,7 +2797,7 @@ playerRefPlayers legal controller gs =
 -- controller and owner.
 resolutionReads :: Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> Players.Reads
 resolutionReads legal controller gs =
-  Players.resolution (`Projection.controllerWithLastKnown` gs) (`Projection.ownerWithLastKnown` gs) legal controller gs
+  Players.resolution (`Projection.controllerWithLastKnown` gs) (`Game.ownerWithLastKnown` gs) legal controller gs
 
 -- CR 109.2's battlefield, narrowed by an effect-borne Filter and sorted into CR
 -- 608.2f's APNAP order. ObjectRef.EachMatching's whole answer, and the

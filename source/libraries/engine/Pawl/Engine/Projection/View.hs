@@ -5,6 +5,7 @@
 module Pawl.Engine.Projection.View where
 
 import Control.Applicative ((<|>))
+import qualified Control.Monad as Monad
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import Data.Map.Strict (Map)
@@ -1414,7 +1415,7 @@ textBoxHolderOf oid gs =
 -- Akiri's pump after she dies" proves it.
 carriedSnapshotOf :: ObjectId -> ObjectId -> GameState -> Maybe ProjectedCharacteristics
 carriedSnapshotOf carrier holder gs
-  | holder /= carrier && not (Map.member holder (GameState.objects gs)) = fmap LastKnown.copiable (Map.lookup holder (GameState.lastKnown gs))
+  | holder /= carrier = Monad.join (Game.liveOrLastKnown (const (copiableSnapshotOf holder gs)) (Just . LastKnown.copiable) holder gs)
   | otherwise = copiableSnapshotOf holder gs
 
 -- CR 613.7a: the timestamp of the effects `carrier`'s static abilities
@@ -2487,6 +2488,4 @@ defaultControllerOf obj = Maybe.fromMaybe (Object.owner obj) (Object.enteredUnde
 -- CR 400.1 / 608.2h: the zone an object is in, or for an id that has ceased the
 -- zone its last-known record was filed from.
 lastZoneOf :: ObjectId -> GameState -> Maybe Zone.Zone
-lastZoneOf oid gs = case Game.lookupObject oid gs of
-  Just obj -> Just (Object.zone obj)
-  Nothing -> fmap LastKnown.zone (Map.lookup oid (GameState.lastKnown gs))
+lastZoneOf = Game.liveOrLastKnown Object.zone LastKnown.zone

@@ -102,7 +102,7 @@ evaluate viewOf quantityOf context gs count =
         -- event's stored snapshot (CR 608.2h last-known information), never from a
         -- live object -- a token has no printed card at all (CR 111.3) and an
         -- animated land died as a creature. The shape whose unit is the CARD that
-        -- ARRIVED reads the arriving object instead (see arrivedView), which is why
+        -- ARRIVED reads the arriving object instead (see the CardArrived arm), which is why
         -- the fold hands snapshotView the same reader the zone arm uses.
         --
         -- SpellCastThisGame's window reaches back past the log to the earlier
@@ -678,7 +678,7 @@ snapshotView viewOf gs shape event = case event of
     -- the shape excludes one.
     EventShape.CardArrivedIn arrival ->
       if arrivalMatches arrival zc
-        then Just (Maybe.fromMaybe (departedView viewOf gs zc snapshot) (arrivedView viewOf gs (ZoneChange.object zc)))
+        then Just (Maybe.fromMaybe (departedView viewOf gs zc snapshot) (orLastKnown viewOf gs (ZoneChange.object zc)))
         else Nothing
     EventShape.SpellCast -> Nothing
     EventShape.SpellCastThisGame -> Nothing
@@ -692,7 +692,7 @@ snapshotView viewOf gs shape event = case event of
   -- that spell has usually resolved or been countered, so the live object is
   -- gone. TriggerCondition.SpellCast is the other reader and does read it live,
   -- which it can -- CR 601.2i's trigger is checked while the spell is still
-  -- there. The CHARACTERISTICS, that is: castOwner below reads the live object
+  -- there. The CHARACTERISTICS, that is: Game.ownerWithLastKnown reads the live object
   -- for the one field a snapshot cannot carry, wherever there still is one.
   GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell snapshot _ _) -> case shape of
     -- CR 601.2a: "that player becomes its controller", so the caster the event
@@ -707,9 +707,9 @@ snapshotView viewOf gs shape event = case event of
     -- became this spell shed whatever it carried on its way to the stack, so a
     -- cast records none.
     --
-    -- CR 108.3's owner comes from castOwner below, and is NOT `caster` again:
-    -- Dire Fleet Daredevil casts a card its owner never touched
-    -- (Pawl.CountSpec).
+    -- CR 108.3's owner comes from Game.ownerWithLastKnown, and is NOT `caster`
+    -- again, whom CR 405.4 makes the spell's controller and no more: Dire Fleet
+    -- Daredevil casts a card its owner never touched (Pawl.CountSpec).
     EventShape.SpellCast -> Just castView
     EventShape.SpellCastThisGame -> Just castView
     EventShape.MovedBetween {} -> Nothing
@@ -719,7 +719,7 @@ snapshotView viewOf gs shape event = case event of
     -- too would count one cast twice.
     EventShape.CardArrivedIn {} -> Nothing
     where
-      castView = viewOfSnapshot False (Just caster) (castOwner gs spell) False Map.empty snapshot
+      castView = viewOfSnapshot False (Just caster) (Game.ownerWithLastKnown spell gs) False Map.empty snapshot
   GameEvent.BecameMonarch _ -> Nothing
   GameEvent.TookInitiative _ -> Nothing
   -- CR 702.29c's cycling records no characteristics snapshot -- the Moved event
@@ -853,7 +853,7 @@ snapshotView viewOf gs shape event = case event of
     -- Case of the Gorgon's Kiss case proves its melded half.
     EventShape.CardArrivedIn arrival ->
       if arrivalMatches arrival zc
-        then case arrivedView viewOf gs (ZoneChange.object zc) of
+        then case orLastKnown viewOf gs (ZoneChange.object zc) of
           Just view -> Just view
           Nothing -> fmap (lastKnownView viewOf (ZoneChange.departed zc) gs) (Map.lookup (ZoneChange.departed zc) (GameState.lastKnown gs))
         else Nothing
@@ -861,28 +861,6 @@ snapshotView viewOf gs shape event = case event of
     EventShape.MovedFrom {} -> Nothing
     EventShape.SpellCast -> Nothing
     EventShape.SpellCastThisGame -> Nothing
-
--- CR 400.7: the view of the object that ARRIVED, for the one shape whose unit is
--- the CARD. A permanent's characteristics on the battlefield are not the card's:
--- a crewed Vehicle is an artifact creature as it dies (CR 702.122a) and an
--- artifact card in the graveyard, and a melded permanent's two components are
--- two cards (CR 712.21e) where the departed record knows only the melded
--- permanent.
---
--- The LIVE object first, through the caller's own reader so the answer is taken
--- at the same layer depth every other candidate of the same count is; CR 608.2h's
--- record filed under the ARRIVED id second, for the card that has since moved on
--- again. Game.lookupObject rather than the reader's Nothing decides which,
--- because Projection.fullView answers Just a blank view for an id naming nothing
--- and a blank view is not a token.
---
--- Nothing when the id names nothing and nothing was filed -- a token that ceased
--- to exist (CR 111.7) -- which sends the caller back to the departed record.
-arrivedView :: ViewOf -> GameState -> ObjectId -> Maybe Filter.View
-arrivedView viewOf gs arrived =
-  if Maybe.isJust (Game.lookupObject arrived gs)
-    then viewOf arrived
-    else fmap (lastKnownView viewOf arrived gs) (Map.lookup arrived (GameState.lastKnown gs))
 
 -- CR 712.21e's destination narrowed by the printed clause's origin: the arrival
 -- landed in the named zone, and it did not come from one this shape excludes. An
@@ -915,35 +893,18 @@ departedView viewOf gs zc snapshot = case Map.lookup (ZoneChange.departed zc) (G
   Just lastKnown -> lastKnownView viewOf (ZoneChange.departed zc) gs lastKnown {LastKnown.characteristics = snapshot}
   Nothing -> viewOfSnapshot (deployIn gs (ZoneChange.from zc)) Nothing Nothing (Game.isToken (ZoneChange.object zc) gs) Map.empty snapshot
 
--- CR 108.3: who owns the card that became a recorded cast's spell. Never read
--- off the caster, whom CR 405.4 makes the spell's controller and no more -- Dire
--- Fleet Daredevil casts a card out of an opponent's graveyard.
---
--- The LIVE object first, since CR 400.7 gives the id to one object for the whole
--- game and a count can run while the cast's own spell is still on the stack,
--- before any record exists. Once the spell has resolved or been countered the
--- zone-change funnel has filed one, and CR 108.3 never moved the answer in
--- between, so the two roads agree wherever both answer. Both are driven by
--- Pawl.CountSpec's Daredevil pair.
---
--- Nothing where neither road answers -- the spell is gone and nothing was filed
--- under its id -- which is the honest blank departedView gives for the same
--- reason, and leaves Filter.OwnedBy False rather than guessing a seat.
-castOwner :: GameState -> ObjectId -> Maybe PlayerId
-castOwner gs spell = case Game.lookupObject spell gs of
-  Just object -> Just (Object.owner object)
-  Nothing -> fmap LastKnown.owner (Map.lookup spell (GameState.lastKnown gs))
-
 -- CR 113.7a / 608.2h: `live`'s view of an object that exists, else the view of
 -- the record filed under its id once it has left (lastKnownView), else Nothing.
 -- The one "live, else last known" fallback over a whole view: every single
 -- characteristic a departed object is asked for is a field of this view
 -- (Pawl.Engine.Projection.controllerWithLastKnown) or of the record's projection
 -- (Pawl.Engine.Projection.projectWithLastKnown), never a fallback of its own.
+--
+-- Game.liveOrLastKnown rather than `live`'s Nothing decides which, because
+-- Projection.fullView answers Just a blank view for an id naming nothing, and a
+-- blank view is not a token (the CardArrived arm above).
 orLastKnown :: ViewOf -> GameState -> ViewOf
-orLastKnown live gs oid = case Game.lastKnownOf oid gs of
-  Just lastKnown -> Just (lastKnownView live oid gs lastKnown)
-  Nothing -> if Map.member oid (GameState.objects gs) then live oid else Nothing
+orLastKnown live gs oid = Monad.join (Game.liveOrLastKnown (const (live oid)) (Just . lastKnownView live oid gs) oid gs)
 
 -- CR 608.2h: an object that has ceased, as its record shows it -- the one view
 -- of a LastKnown, read by a trigger or an intervening "if" asking about the
@@ -1186,7 +1147,7 @@ viewOfSnapshot deploy mController mOwner isToken counters snapshot =
       -- `counters` below is. Dimir Strandcatcher's "put into YOUR graveyard" is
       -- what reads it, CR 400.3 keying that zone by owner (Pawl.CountSpec).
       --
-      -- The SpellCast arm supplies it too, off castOwner above rather than off a
+      -- The SpellCast arm supplies it too, off Game.ownerWithLastKnown rather than off a
       -- record alone, since a spell still on the stack has none.
       Filter.owner = mOwner,
       -- CR 400.1: a snapshot records characteristics (CR 608.2h) and no zone, and

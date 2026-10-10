@@ -1795,9 +1795,7 @@ colorOfManaType manaType = case manaType of
 -- a permanent still on the battlefield has a clock that is still moving, and its
 -- record would be a stale one from an earlier incarnation of the same id.
 controlClockOf :: GameState -> ObjectId -> Map.Map PlayerId.PlayerId ControlClock.ControlClock
-controlClockOf gs oid = case Game.lookupObject oid gs of
-  Just object -> Object.controlClock object
-  Nothing -> maybe Map.empty LastKnown.controlClock (Map.lookup oid (GameState.lastKnown gs))
+controlClockOf gs oid = Maybe.fromMaybe Map.empty (Game.liveOrLastKnown Object.controlClock LastKnown.controlClock oid gs)
 
 -- | CR 706.8a: the greatest number of these stored results sharing one value.
 -- Grouped by VALUE alone, since Centaur of Attention's "of the same value" asks

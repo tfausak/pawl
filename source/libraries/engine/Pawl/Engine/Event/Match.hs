@@ -7242,7 +7242,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
         && ZoneChange.from zc == Zone.Battlefield
         && ZoneChange.to zc /= Zone.Battlefield
         && ZoneChange.to zc == OwnedZone.zone destination
-        && maybe False (PlayerRelation.holds (Game.teams gs) (OwnedZone.owner destination) you) (Projection.ownerWithLastKnown (ZoneChange.departed zc) gs)
+        && maybe False (PlayerRelation.holds (Game.teams gs) (OwnedZone.owner destination) you) (Game.ownerWithLastKnown (ZoneChange.departed zc) gs)
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False

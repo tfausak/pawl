@@ -316,11 +316,10 @@ eventWithinRange board gs you event
   | otherwise =
       let (objects, players) = participants event
           reaches pid = Game.wasInRangeOf you pid gs
-          lastKnown oid = Map.lookup oid (GameState.lastKnown gs)
           controllerAt oid = case Map.lookup oid board of
             Just candidate -> Just (BattlefieldCandidate.controller candidate)
-            Nothing -> maybe (Projection.controllerOf oid gs) (Just . LastKnown.controller) (lastKnown oid)
-          protectorAt oid = maybe (Object.protector =<< Game.lookupObject oid gs) LastKnown.protector (lastKnown oid)
+            Nothing -> Monad.join (Game.liveOrLastKnown (const (Projection.controllerOf oid gs)) (Just . LastKnown.controller) oid gs)
+          protectorAt oid = Monad.join (Game.liveOrLastKnown Object.protector LastKnown.protector oid gs)
           objectWithin oid = case controllerAt oid of
             Nothing -> True
             Just pid -> reaches pid || maybe False reaches (protectorAt oid)
