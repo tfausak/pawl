@@ -1,13 +1,10 @@
 module Pawl.Engine.Players where
 
-import qualified Control.Monad.Trans.State.Strict as State
-import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Binding as Binding
-import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackingPlayers as AttackingPlayers
@@ -79,12 +76,14 @@ resolution controllerRead ownerRead slots controller gs =
           reaches = (`elem` reached)
         }
 
--- | CR 102.1 / 801.10 / 801.11: the players still in the game that the
--- perspective reaches. A departed player keeps their row in GameState.players,
--- so this is Game.stillPlaying rather than the map's keys; an unframed
--- evaluation has no controller to measure range from, and cuts nothing else.
+-- | CR 102.1 / 801.5a / 801.10 / 801.11: the players still in the game that the
+-- perspective reaches, in Game.stillPlaying's order -- the table a spell or
+-- ability reaches, and the one a choice offers. A departed player keeps their
+-- row in GameState.players, so this is Game.stillPlaying rather than the map's
+-- keys; an unframed evaluation has no controller to measure range from, and
+-- cuts nothing else.
 table :: Maybe PlayerId -> GameState -> [PlayerId]
-table viewer gs = maybe (Game.stillPlaying gs) (`Game.reachableBy` gs) viewer
+table viewer gs = filter (\pid -> all (\you -> Game.inRangeOf you pid gs) viewer) (Game.stillPlaying gs)
 
 -- | The players on 'table' standing in this relation to the perspective,
 -- judged once through PlayerRelation.holds. Nothing where the relation needs a
@@ -116,27 +115,17 @@ offer :: PlayerId -> GameState -> PlayerRelation.PlayerRelation -> [PlayerId]
 offer you gs = Maybe.fromMaybe [] . related (Just you) gs
 
 -- | CR 608.2d / 614.12a / 601.2c: @chooser@ picks one of the candidates, for
--- @source@. Nothing at no candidate (CR 101.3); elided at one, the options
--- being indistinguishable. Prompt.ChoosePlayer where the offer holds the
--- chooser and Prompt.ChooseOpponent where it cannot, so the prompt follows the
--- candidate set rather than any scope's name. The answer is FILTERED rather
--- than trusted, falling back to the first candidate, since every caller's
--- instruction is mandatory. Hexproof and shroud do not enter into it: a choice
--- is not a target (CR 115.10a).
+-- @source@, through Game.chooseAmong. Prompt.ChoosePlayer where the offer holds
+-- the chooser and Prompt.ChooseOpponent where it cannot, so the prompt follows
+-- the candidate set rather than any scope's name. Hexproof and shroud do not
+-- enter into it: a choice is not a target (CR 115.10a).
 chooseOne :: PlayerId -> ObjectId -> [PlayerId] -> Game (Maybe PlayerId)
-chooseOne chooser source candidates = case candidates of
-  [] -> pure Nothing
-  [sole] -> pure (Just sole)
-  first : second : rest -> do
-    gs <- State.get
-    let offered = first NonEmpty.:| (second : rest)
-        decider = Decide.deciderFor chooser gs
-        question =
-          if elem chooser offered
-            then Prompt.ChoosePlayer decider chooser source offered
-            else Prompt.ChooseOpponent decider chooser source offered
-    answer <- Game.choose question
-    pure (Just (if elem answer offered then answer else first))
+chooseOne chooser source =
+  let question decider asked offered =
+        if elem asked offered
+          then Prompt.ChoosePlayer decider asked source offered
+          else Prompt.ChooseOpponent decider asked source offered
+   in Game.chooseAmong question chooser
 
 -- | The players a PlayerRef names, in PlayerId order, or Nothing where the
 -- position cannot answer it. THE one reading of every PlayerRef arm; a caller

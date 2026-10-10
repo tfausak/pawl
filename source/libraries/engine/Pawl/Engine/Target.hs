@@ -1035,20 +1035,26 @@ graveyardRecipients context bindings scope gs =
 -- Shared with Pawl.Engine.Resolve, whose ObjectRef.EachCardInGraveyard sweep asks
 -- the same question at CR 608.2c; see #1310. The two callers differ only in what
 -- they do with the answer -- a target pool wants CR 404.1's cards as recipients,
--- a sweep wants them filtered and in CR 608.2f's APNAP order -- so splitting here
--- rather than at the recipients keeps one reading of the scope for both.
+-- a sweep wants them filtered -- so splitting here rather than at the
+-- recipients keeps one reading of the scope for both.
 --
--- Unordered: the caller imposes whatever order its own rule asks for.
+-- Every arm is cut to the perspective's Players.table, CR 801.4 for a target
+-- pool and CR 801.10 at resolution; Scoped's playersInScope has already cut. In
+-- APNAP order (CR 608.2f, CR 101.4), the order a sweep asks for.
 zoneScopePlayers :: Maybe PlayerId -> Map SlotName (Set Recipient) -> ZoneScope.ZoneScope -> GameState -> [PlayerId]
-zoneScopePlayers perspective bindings scope gs = case scope of
-  ZoneScope.Scoped playerScope -> Maybe.fromMaybe [] (PlayerEffect.playersInScope perspective gs playerScope)
-  ZoneScope.InSlot slot ->
-    Maybe.mapMaybe playerOf (Set.toList (Map.findWithDefault Set.empty slot bindings))
-  ZoneScope.ControllerOfBound slot ->
-    Maybe.mapMaybe
-      (Recipient.objectOf Monad.>=> \oid -> Projection.controllerWithLastKnown oid gs)
-      (Set.toList (Map.findWithDefault Set.empty slot bindings))
-  ZoneScope.BoundPlayer pid -> [pid]
+zoneScopePlayers perspective bindings scope gs =
+  let reached = Players.table perspective gs
+      named = case scope of
+        ZoneScope.Scoped playerScope -> Maybe.fromMaybe [] (PlayerEffect.playersInScope perspective gs playerScope)
+        ZoneScope.InSlot slot ->
+          filter (`elem` reached) (Maybe.mapMaybe playerOf (Set.toList (Map.findWithDefault Set.empty slot bindings)))
+        ZoneScope.ControllerOfBound slot ->
+          filter (`elem` reached) $
+            Maybe.mapMaybe
+              (Recipient.objectOf Monad.>=> \oid -> Projection.controllerWithLastKnown oid gs)
+              (Set.toList (Map.findWithDefault Set.empty slot bindings))
+        ZoneScope.BoundPlayer pid -> filter (`elem` reached) [pid]
+   in filter (`elem` named) (Game.apnapOrder gs)
 
 -- CR 404.1 over a list of players, deduplicated by the Set the caller gets back.
 graveyardsOf :: [PlayerId] -> GameState -> Set Recipient
@@ -1679,7 +1685,7 @@ chooserOf controller oid seed chooser = case chooser of
   Nothing -> pure (Just controller)
   Just (TargetChooser.InSlot slot) -> do
     gs <- State.get
-    pure (List.find (`List.elem` Game.reachableBy controller gs) (Map.lookup slot (Binding.playerSlots seed)))
+    pure (List.find (`List.elem` Players.table (Just controller) gs) (Map.lookup slot (Binding.playerSlots seed)))
   Just (TargetChooser.Relative r) -> do
     gs <- State.get
     Players.chooseOne controller oid (Players.offer controller gs r)
@@ -2213,7 +2219,7 @@ bakeSlot players slot =
 announcedSlots :: PlayerId -> ObjectId -> GameState -> Map SlotName TargetSlot -> Map SlotName TargetSlot
 announcedSlots controller source gs =
   splitPerPlayer
-    (\_ each -> List.filter (PlayerRelation.holds (Game.teams gs) (SlotPerPlayer.players each) controller) (Game.reachableBy controller gs))
+    (\_ each -> List.filter (PlayerRelation.holds (Game.teams gs) (SlotPerPlayer.players each) controller) (Players.table (Just controller) gs))
     (\copy -> not (Set.null (legalRecipients (Just controller) source copy gs)))
 
 -- CR 802.2a: the defending player an announcement chose, for a source with no
