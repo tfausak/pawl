@@ -2547,12 +2547,12 @@ primaryOf gs pid =
 -- CR 805.9 names one active player for an ABILITY; for these rules nothing
 -- does, so the active team decides, and CR 805.2 gives its unsettled choice to
 -- its primary player, asked through chooseAmong among the eligible active
--- players within their range (CR 801.5a). Without the shared team turns option
--- Turn.activePlayers is the active seat alone, so nothing is asked. The team
--- scenario "CR 725.4 the active team's primary player names the new monarch"
--- proves the ask, and the range-of-influence scenario "CR 801.5a / 725.4 the
--- active team's primary player names a monarch within range" the cut. A primary
--- player reaching no eligible active player takes the first of them.
+-- players. Without the shared team turns option Turn.activePlayers is the
+-- active seat alone, so nothing is asked. The team scenario "CR 725.4 the
+-- active team's primary player names the new monarch" proves it.
+--
+-- Not implemented: any CR 801.5a / 801.5c range cut on this team choice under
+-- limited range (#4918).
 --
 -- The walk anchors on the ACTIVE seat and excludes it, unlike
 -- Engine.nextStillPlaying's CR 800.4a walk, which anchors on the departing
@@ -2566,10 +2566,9 @@ heirOnDeparture eligible = do
       walk = case List.break (== active) (GameState.turnOrder gs) of
         (before, _ : after) -> after <> before
         (before, []) -> before
-      chooser = primaryOf gs active
   case live of
     [] -> pure (List.find eligible walk)
-    first : _ -> fmap (Just . Maybe.fromMaybe first) (chooseAmong Prompt.ChooseActivePlayer chooser (filter (\pid -> inRangeOf chooser pid gs) live))
+    _ -> chooseAmong Prompt.ChooseActivePlayer (primaryOf gs active) live
 
 -- apnapOrder's generalisation: the seating roster rotated to start with the
 -- player NAMED rather than with the active player. CR 701.38a's vote is the

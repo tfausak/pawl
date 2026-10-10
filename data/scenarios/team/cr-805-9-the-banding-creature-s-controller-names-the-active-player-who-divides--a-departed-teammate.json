@@ -1,0 +1,154 @@
+{
+  "description": "CR 805.9 the banding creature's controller names the active player who divides -- a departed teammate is not offered",
+  "note": "Shared team turns at an unlimited range, alice, bob and erin against carol and dave. erin concedes at the beginning of combat; CR 800.4j leaves her seat among the active team's, but CR 800.4a takes her out of the game. bob's Benalish Hero (banding) and Goblin Piker attack carol, whose Foriysian Brigade blocks both. bob names the active player who divides the Brigade's damage (CR 805.9): erin is refused as unoffered, and bob names himself and divides.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1
+      },
+      {
+        "name": "bob",
+        "team": 1,
+        "battlefield": [
+          {
+            "card": "Benalish Hero",
+            "label": "hero",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "other",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "erin",
+        "team": 1
+      },
+      {
+        "name": "carol",
+        "team": 2,
+        "battlefield": [
+          {
+            "card": "Foriysian Brigade",
+            "label": "brigade",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "dave",
+        "team": 2
+      }
+    ],
+    "sharedTeamTurns": true
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "erin",
+      "do": "Concede"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$hero",
+          "$other"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "$hero",
+      "do": {
+        "ChooseAttackTarget": "$carol"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "$other",
+      "do": {
+        "ChooseAttackTarget": "$carol"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "do": {
+        "Block": {
+          "$brigade": [
+            "$hero",
+            "$other"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "bob",
+      "refuse": {
+        "Answer": {
+          "prompt": "ChoosePlayer",
+          "with": "erin"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "bob",
+      "do": {
+        "Answer": {
+          "prompt": "ChoosePlayer",
+          "with": "bob"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "bob",
+      "do": {
+        "Answer": {
+          "prompt": "AssignCombatDamage",
+          "with": [
+            [
+              [
+                "Creature",
+                "$hero"
+              ],
+              2
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Graveyard",
+          "card": "Benalish Hero",
+          "count": 1
+        }
+      }
+    }
+  ]
+}
