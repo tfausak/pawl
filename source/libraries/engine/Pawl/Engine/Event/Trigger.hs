@@ -182,7 +182,7 @@ resampleEntry oid gs = case entryGroup oid gs of
 -- The event group of the log entry that put `oid` onto the battlefield.
 entryGroup :: ObjectId -> GameState -> Maybe EventGroup.EventGroup
 entryGroup oid gs =
-  let entered logged = maybe False (\zc -> ZoneChange.object zc == oid && ZoneChange.to zc == Zone.Battlefield) (movedOf (LoggedEvent.event logged))
+  let entered logged = maybe False ((== oid) . ZoneChange.object) (Game.enteredBattlefieldChange (LoggedEvent.event logged))
    in fmap (LoggedEvent.group . Seq.index (GameState.events gs)) (Seq.findIndexR entered (GameState.events gs))
 
 -- The zone change an event describes, if it is one.
@@ -1488,14 +1488,7 @@ eventTriggers events gs =
       becameInGraveyard =
         Map.fromList
           ( Maybe.mapMaybe
-              ( ( \event -> case event of
-                    GameEvent.Moved (Moved.MkMoved zc _ _ _ _)
-                      | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard ->
-                          Just (ZoneChange.departed zc, ZoneChange.object zc)
-                    _ -> Nothing
-                )
-                  . LoggedEvent.event
-              )
+              (fmap (\zc -> (ZoneChange.departed zc, ZoneChange.object zc)) . Game.diedChange . LoggedEvent.event)
               events
           )
       -- The batch cut into its CR 704.3 / CR 608.2f events, by the one reading of
@@ -1558,9 +1551,7 @@ eventTriggers events gs =
       -- through a batch and buried by CR 704.5f before the boundary is withheld
       -- from the batch's earlier events for the same reason a returning card is.
       arrivalsOnBattlefieldIn block = Set.fromList (Maybe.mapMaybe (arrivedOnBattlefieldAt . LoggedEvent.event) (Foldable.toList block))
-      arrivedOnBattlefieldAt event = case movedOf event of
-        Just zc | ZoneChange.to zc == Zone.Battlefield -> Just (ZoneChange.object zc)
-        _ -> Nothing
+      arrivedOnBattlefieldAt event = fmap ZoneChange.object (Game.enteredBattlefieldChange event)
       -- CR 603.10's first sentence on the battlefield's ARRIVAL side, and
       -- `arrivedLater`'s mirror: entry i holds the ids that reached the
       -- battlefield at a STRICTLY LATER group, which `laterGroups` subtracts.
