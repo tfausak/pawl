@@ -906,7 +906,7 @@ becameSlotSpec s registry =
           (roachId, board) <- roachBoard
           let (settled, _) = boltIt board
               bindingsOn oid = maybe Map.empty Object.bindings (Game.lookupObject oid settled)
-              slots = concatMap (Map.toList . Map.mapMaybe Binding.onlyOne . Binding.targetsOf . bindingsOn) (GameState.stack settled)
+              slots = concatMap (Map.toList . Binding.oneBySlot . Binding.targetsOf . bindingsOn) (GameState.stack settled)
               slotFor name = lookup name slots
           Spec.assertEqWith s "self is the permanent that died" (slotFor Binding.triggerSource) (Just (Recipient.ToObject roachId))
           Spec.assertBool s (Maybe.isNothing (Game.lookupObject roachId settled)) "and that id is gone (CR 400.7)"

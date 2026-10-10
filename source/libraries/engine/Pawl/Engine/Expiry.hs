@@ -77,7 +77,6 @@ import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import Pawl.Types.Recipient (Recipient)
-import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.While as While
 
@@ -140,7 +139,7 @@ arm targets controller source duration gs = case duration of
   -- moves the window (CR 611.2a).
   Duration.DuringNextTurnOf ref -> case ref of
     PlayerRef.ControllerOfBound slot
-      | Just oid <- Map.lookup slot targets >>= Binding.onlyOne >>= Recipient.objectOf,
+      | Just oid <- Map.lookup slot (Binding.objectsIn targets),
         Maybe.isJust (Game.lookupObject oid gs) ->
           Just (Expiry.DuringTurnOfControllerOf (AfterObjectTurn.MkAfterObjectTurn oid (GameState.turnNumber gs)))
     _ ->

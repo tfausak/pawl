@@ -2772,10 +2772,11 @@ boundSlots effect = case effect of
 
 -- CR 608.2b: the ONE recipient still legal in `slot`, for a reader that can take
 -- only one -- nothing when the slot named none, its target became illegal, or it
--- names SEVERAL. Pawl.CardSpec's plural-slot lint keeps a card from aiming one of
--- those at such a reader.
+-- names SEVERAL (Binding.oneBySlot). Pawl.AbilitySlotLintSpec's "no
+-- multi-target slot is read one at a time" keeps a card from aiming one of those
+-- at such a reader.
 legalOne :: SlotName -> Map.Map SlotName (Set Recipient) -> Maybe Recipient
-legalOne slot legal = Binding.onlyOne (Map.findWithDefault Set.empty slot legal)
+legalOne slot legal = Map.lookup slot (Binding.oneBySlot legal)
 
 -- The same read for a reader that takes them ALL, CR 608.2b's illegal ones
 -- already dropped.
@@ -2920,20 +2921,20 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   ObjectRef.FromAnywhere slot -> Maybe.mapMaybe (\oid -> Game.currentIncarnation oid gs) (objectRefObjects legal resolving controller source gs (ObjectRef.InSlot slot))
   -- EachMatching's sweep with CR 109.2's battlefield default switched off by the
   -- card's own words (CR 109.2a), over CR 400.1's per-player zone. Whose
-  -- graveyards is zoneScopePlayers below -- either the perspective's own
+  -- graveyards is Target.zoneScopePlayers -- either the perspective's own
   -- reading of CR 109.5 or the players another slot of this announcement targets
   -- -- and what matches within each is graveyardCardsOf.
   ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard scope filter_) ->
     -- With CR 303.4b's host filled for Animate Dead's "return enchanted
     -- creature card".
     let context = effectContext gs controller source legal (slotBindings resolving gs)
-     in concatMap (\pid -> graveyardCardsOf context gs pid filter_) (zoneScopePlayers legal controller gs scope)
+     in concatMap (\pid -> graveyardCardsOf context gs pid filter_) (Target.zoneScopePlayers (Just controller) legal scope gs)
   -- CR 400.1's per-player zone again, but only the RESOLVING CONTROLLER's, so no
   -- scope to fold over and no APNAP order to impose. In the zone's own order,
   -- which no rule reads: CR 402.3 leaves a hand's arrangement to its owner.
   ObjectRef.EachCardInYourHand -> Game.zoneMembers Zone.Hand controller gs
   -- The arm above's zone under EachCardInGraveyard's scope and filter: CR
-  -- 109.2a's reading again, over the hands zoneScopePlayers names rather
+  -- 109.2a's reading again, over the hands Target.zoneScopePlayers names rather
   -- than the resolving controller's alone. In APNAP order (CR 608.2f) across
   -- seats, and within a seat in the hand's own order, which no rule reads (CR
   -- 402.3) -- the arm above's answer.
@@ -2949,7 +2950,7 @@ objectRefObjects legal resolving controller source gs ref = case ref of
         held pid = case mFilter of
           Nothing -> Game.zoneMembers Zone.Hand pid gs
           Just filter_ -> handCardsOf context gs pid filter_
-     in concatMap held (zoneScopePlayers legal controller gs scope)
+     in concatMap held (Target.zoneScopePlayers (Just controller) legal scope gs)
   -- CR 400.1's other hidden per-player zone, and only the RESOLVING
   -- CONTROLLER's, so no scope to fold over and no APNAP order to impose --
   -- EachCardInYourHand's answer above. CR 400.12 is what makes "from your
@@ -3149,27 +3150,11 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- the Reveal arm, the Discard arm and Effect.MoveToZone's gather.
   ObjectRef.RandomCardInHand _ -> []
   -- Answered for real by randomCardsInGraveyard, over the graveyards
-  -- zoneScopePlayers names -- Effect.MoveToZone's gather, and that alone.
+  -- Target.zoneScopePlayers names -- Effect.MoveToZone's gather, and that alone.
   ObjectRef.RandomCardInGraveyard _ -> []
   -- Answered for real by randomCardsInLibrary -- Effect.MoveToZone's gather,
   -- and that alone.
   ObjectRef.RandomCardInLibrary _ -> []
-
--- The players a ZoneScope names, in APNAP order -- whose graveyards is
--- Target.zoneScopePlayers, the same answer a target pool over CR 400.1's
--- per-player zone gets, and the order imposed on it here is APNAP (CR 608.2f, CR
--- 101.4) restricted to the players still in the game. The seat half of both
--- graveyardCards and ObjectRef.ChosenCardInGraveyard's EachInScope chooser,
--- which asks each seat separately.
---
--- The bindings are the ones the CALLER holds, which is CR 608.2b's re-checked set
--- at resolution: an InSlot scope naming a slot whose target went illegal names
--- nobody, and CR 101.3 ignores that share of the effect.
-zoneScopePlayers :: Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> ZoneScope.ZoneScope -> [PlayerId]
-zoneScopePlayers bindings controller gs scope =
-  let named = Target.zoneScopePlayers (Just controller) bindings scope gs
-   in -- CR 801.10: only the zones of players in the controller's range.
-      filter (\pid -> elem pid named && Game.inRangeOf controller pid gs) (Game.apnapOrder gs)
 
 -- The cards in ONE player's graveyard matching the filter, in ascending
 -- ObjectId. The filter is matched in THIS EFFECT's context -- the caller's, so

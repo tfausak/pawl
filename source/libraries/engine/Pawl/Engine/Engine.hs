@@ -47,6 +47,7 @@ import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.Planechase as Planechase
 import qualified Pawl.Engine.PlayerDesignation as PlayerDesignation
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
+import qualified Pawl.Engine.Players as Players
 import qualified Pawl.Engine.Plot as Plot
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
@@ -1240,7 +1241,7 @@ checkMandatoryLoop = do
       gap = now - Timestamp.unwrap (GameState.lastChoice gs)
       recent = Timestamp.MkTimestamp (now - div mandatoryLoopLimit 2)
       involved = Map.keys (Map.filter (>= recent) (GameState.loopInvolvement gs))
-      drawn = Set.fromList (concatMap (`Game.reachableBy` gs) involved)
+      drawn = Set.fromList (concatMap (\pid -> Players.table (Just pid) gs) involved)
       ranged = GameSettings.rangeOfInfluence (GameState.settings gs) /= RangeOfInfluence.unlimited
   Monad.when (Maybe.isNothing (GameState.result gs) && gap >= mandatoryLoopLimit) $
     if ranged && not (Set.null drawn)

@@ -1588,6 +1588,11 @@ contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePowe
 -- group must not silently take one of its members, which is the doctrine
 -- Pawl.Engine.Binding.onlyOne states one type over. Filter.IsBound is the reader
 -- that CAN take them, and it goes to `slotObjects` itself.
+--
+-- Over the WHOLE slot's objects, where Binding.oneBySlot reads its targets alone,
+-- so a group of one answers its member here and a slot naming a player beside one
+-- object answers the object. No card reaches either: Binding.oneBySlot's note
+-- names the two lints that keep a singular read off such a slot.
 slotOneObject :: SlotName.SlotName -> Context -> Maybe ObjectId.ObjectId
 slotOneObject slot context = case Set.toList (Map.findWithDefault Set.empty slot (slotObjects context)) of
   [oid] -> Just oid

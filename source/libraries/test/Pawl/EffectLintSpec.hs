@@ -2151,7 +2151,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
         --
         -- A slot read from inside a NUMBER is not one of these arms either:
         -- Quantity.AgainstSlot reaches Filter.slotOneObject, which declines a
-        -- group exactly as Binding.onlyOne does, and readSinglyInQuantities
+        -- group of several as Binding.onlyOne does, and readSinglyInQuantities
         -- below is its leg. Filter.IsControllerOfBound, the third reader through
         -- that funnel, is filterSlotsReadSingly's; Filter.IsBound reads the whole
         -- set, so it is no risk and no fence for the others either.
