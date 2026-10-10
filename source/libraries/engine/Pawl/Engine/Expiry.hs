@@ -216,7 +216,7 @@ arm targets controller source duration gs = case duration of
 -- before arming (perSeat).
 seatOf :: Map.Map SlotName (Set.Set Recipient) -> PlayerId -> GameState -> PlayerRef.PlayerRef -> Maybe PlayerId
 seatOf targets controller gs ref =
-  let given = Players.resolution (`Projection.controllerWithLastKnown` gs) (`Projection.ownerWithLastKnown` gs) targets controller gs
+  let given = Players.resolution (`Projection.controllerWithLastKnown` gs) (`Game.ownerWithLastKnown` gs) targets controller gs
    in case Players.named given {Players.reaches = const True} gs ref of
         Just [pid] -> Just pid
         _ -> Nothing

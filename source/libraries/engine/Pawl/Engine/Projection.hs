@@ -1303,12 +1303,6 @@ sampledView oid candidate gs =
 controllerWithLastKnown :: ObjectId -> GameState -> Maybe PlayerId.PlayerId
 controllerWithLastKnown oid gs = Filter.controller =<< viewWithLastKnownAnywhere gs oid
 
--- CR 108.3's owner off the same view. PlayerRef.OwnerOfBound's reader
--- (Pawl.Engine.Resolve.Slots.playerRefPlayers); The Deck of Many Things' 20
--- band is the producer.
-ownerWithLastKnown :: ObjectId -> GameState -> Maybe PlayerId.PlayerId
-ownerWithLastKnown oid gs = Filter.owner =<< viewWithLastKnownAnywhere gs oid
-
 -- `project` with CR 608.2h's fallback, for a reader that wants what the view does
 -- not carry: keyword COUNTS (CR 702.164b's toxic total, Damage.damageEvent),
 -- delayed-trigger text, or the whole fold of a gone object: CR 603.3b's "the
