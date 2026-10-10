@@ -71,24 +71,6 @@
     },
     {
       "turn": 1,
-      "step": "DeclareAttackers",
-      "player": "alice",
-      "source": "$hero",
-      "do": {
-        "ChooseAttackTarget": "$frank"
-      }
-    },
-    {
-      "turn": 1,
-      "step": "DeclareAttackers",
-      "player": "alice",
-      "source": "$other",
-      "do": {
-        "ChooseAttackTarget": "$frank"
-      }
-    },
-    {
-      "turn": 1,
       "step": "DeclareBlockers",
       "player": "dave",
       "do": {
