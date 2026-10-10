@@ -6,16 +6,34 @@ module Pawl.Engine.Mint where
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Pawl.Types.Clause as Clause
+import Pawl.Types.Condition (Condition)
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
+import Pawl.Types.Optionality (Optionality)
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import Pawl.Types.SlotName (SlotName)
 import Pawl.Types.TargetSlot (TargetSlot)
 import Pawl.Types.TriggerCondition (TriggerCondition)
 import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+
+-- | One clause (CR 608.2e) of these effects in order (CR 608.2c), with this
+-- optionality and nothing else: no "if you do", no "if", no "otherwise", no
+-- "unless".
+clause :: Optionality -> Seq.Seq (Effect card ability) -> Clause.Clause card ability
+clause optionality = Clause.MkClause Nothing Nothing Nothing optionality Nothing
+
+-- | A `clause` its controller must follow.
+mandatory :: Seq.Seq (Effect card ability) -> Clause.Clause card ability
+mandatory = clause Optionality.Mandatory
+
+-- | A `clause` its controller may decline as it resolves: "you may" (CR 603.5).
+youMay :: Seq.Seq (Effect card ability) -> Clause.Clause card ability
+youMay = clause (Optionality.Optional (PlayerRef.Relative PlayerRelation.You))
 
 -- | One mode, selected outright, of one mandatory clause holding these effects
 -- in order (CR 608.2c): an ability that is not modal (CR 700.2) and chooses
@@ -25,7 +43,7 @@ oneMode = oneModeTargeting Map.empty
 
 -- | `oneMode`, with these target slots (CR 115.1).
 oneModeTargeting :: Map.Map SlotName TargetSlot -> Seq.Seq (Effect card ability) -> Modal.Modal card ability
-oneModeTargeting slots effects = oneModeOf slots (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing effects))
+oneModeTargeting slots = oneModeOf slots . Seq.singleton . mandatory
 
 -- | One mode, selected outright, of these clauses and target slots: the
 -- general form of `oneModeTargeting`, for a clause that is optional, gated or
@@ -36,11 +54,21 @@ oneModeOf slots clauses = Modal.MkModal (Seq.singleton (Mode.MkMode clauses slot
 -- | A triggered ability (CR 603.1) of one `oneMode`, with no intervening "if"
 -- (CR 603.4), no name and no "only once" rider.
 trigger :: TriggerCondition -> Seq.Seq (Effect card ability) -> TriggeredAbility.TriggeredAbility card ability
-trigger condition effects =
+trigger condition = triggerOf condition Nothing . oneMode
+
+-- | `trigger`, with this intervening "if" (CR 603.4).
+triggerIf :: TriggerCondition -> Condition -> Seq.Seq (Effect card ability) -> TriggeredAbility.TriggeredAbility card ability
+triggerIf condition intervening = triggerOf condition (Just intervening) . oneMode
+
+-- | A triggered ability (CR 603.1) of this modal and intervening "if" (CR
+-- 603.4), with no name and no "only once" rider: the general form of
+-- `trigger` and `triggerIf`.
+triggerOf :: TriggerCondition -> Maybe Condition -> Modal.Modal card ability -> TriggeredAbility.TriggeredAbility card ability
+triggerOf condition intervening modal =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = condition,
-      TriggeredAbility.modal = oneMode effects,
-      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.modal = modal,
+      TriggeredAbility.intervening = intervening,
       TriggeredAbility.name = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
     }

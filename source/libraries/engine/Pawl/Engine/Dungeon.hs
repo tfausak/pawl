@@ -25,6 +25,7 @@ import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mint as Mint
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
@@ -45,7 +46,6 @@ import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
-import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
@@ -100,13 +100,7 @@ isBottommost rooms room = RoomIndex.unwrap room + 1 == Natural.length rooms
 -- a room ability is the sentence above and nothing else.
 roomAbility :: RoomIndex.RoomIndex -> DungeonRoom.DungeonRoom Card.Type.Card -> TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 roomAbility room dungeonRoom =
-  TriggeredAbility.MkTriggeredAbility
-    { TriggeredAbility.condition = TriggerCondition.RoomEntered room,
-      TriggeredAbility.modal = DungeonRoom.ability dungeonRoom,
-      TriggeredAbility.intervening = Nothing,
-      TriggeredAbility.name = Nothing,
-      TriggeredAbility.limit = TriggerLimit.Unlimited
-    }
+  Mint.triggerOf (TriggerCondition.RoomEntered room) Nothing (DungeonRoom.ability dungeonRoom)
 
 -- | CR 309.4c: every room ability of every dungeon card in the command zone,
 -- each with the card as its source and the card's owner as its controller ("each

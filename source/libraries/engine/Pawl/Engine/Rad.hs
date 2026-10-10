@@ -58,9 +58,7 @@ import qualified Pawl.Types.RemovePlayerCounters as RemovePlayerCounters
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
-import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
-import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
 
 -- | CR 122.1: how many rad counters a player has, as the rules core reads it.
@@ -125,50 +123,47 @@ hasRadCounters =
 -- unprompted.
 ability :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 ability =
-  TriggeredAbility.MkTriggeredAbility
-    { -- CR 500.1 / 505.1a: a turn has exactly one precombat main phase and it is
-      -- the active player's, so ControllersTurn plus the active player as this
-      -- ability's controller IS rule 728.1's "each player's precombat main
-      -- phase" -- the rule quantifies over turns, not over the players of one.
-      TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins Phase.PrecombatMain Nothing TurnScope.ControllersTurn),
-      TriggeredAbility.modal =
-        Mint.oneMode . Seq.fromList $
-          [ -- "that player mills a number of cards equal to the
-            -- number of rad counters they have", counting the
-            -- nonland cards it milled.
-            Effect.Mill
-              ( Mill.MkMill
-                  (PlayerRef.Relative PlayerRelation.You)
-                  (Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad))
-                  (Just (MillTally.MkMillTally {MillTally.slot = milledSlot, MillTally.filter = nonland}))
-                  -- CR 701.17c's slot: rule 728.1 looks back at how MANY
-                  -- cards were milled, never at which.
-                  Nothing
-              ),
-            -- "for each nonland card milled this way, that player
-            -- loses 1 life" -- one life per card, which is the count
-            -- itself.
-            --
-            -- CR 728.1a's cause, the one field of this ability that no
-            -- card could have written: rule 728.1a makes "life loss
-            -- from radiation" mean a loss this very ability caused, so
-            -- the loss says so and Pawl.Engine.Replacement.applies
-            -- narrows by it.
-            Effect.LoseLife
-              ( LifeLoss.MkLifeLoss
-                  (PlayerRef.Relative PlayerRelation.You)
-                  (Quantity.InSlot milledSlot)
-                  LifeLossCause.ByRadiation
-                  Nothing
-              ),
-            -- "and removes one rad counter from themselves",
-            -- likewise once per card.
-            Effect.RemovePlayerCounters (RemovePlayerCounters.MkRemovePlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad (Quantity.InSlot milledSlot) Nothing)
-          ],
-      TriggeredAbility.intervening = Just hasRadCounters,
-      TriggeredAbility.name = Nothing,
-      TriggeredAbility.limit = TriggerLimit.Unlimited
-    }
+  Mint.triggerIf
+    -- CR 500.1 / 505.1a: a turn has exactly one precombat main phase and it is
+    -- the active player's, so ControllersTurn plus the active player as this
+    -- ability's controller IS rule 728.1's "each player's precombat main
+    -- phase" -- the rule quantifies over turns, not over the players of one.
+    (TriggerCondition.StepBegins (StepBegins.MkStepBegins Phase.PrecombatMain Nothing TurnScope.ControllersTurn))
+    hasRadCounters
+    ( Seq.fromList
+        [ -- "that player mills a number of cards equal to the
+          -- number of rad counters they have", counting the
+          -- nonland cards it milled.
+          Effect.Mill
+            ( Mill.MkMill
+                (PlayerRef.Relative PlayerRelation.You)
+                (Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad))
+                (Just (MillTally.MkMillTally {MillTally.slot = milledSlot, MillTally.filter = nonland}))
+                -- CR 701.17c's slot: rule 728.1 looks back at how MANY
+                -- cards were milled, never at which.
+                Nothing
+            ),
+          -- "for each nonland card milled this way, that player
+          -- loses 1 life" -- one life per card, which is the count
+          -- itself.
+          --
+          -- CR 728.1a's cause, the one field of this ability that no
+          -- card could have written: rule 728.1a makes "life loss
+          -- from radiation" mean a loss this very ability caused, so
+          -- the loss says so and Pawl.Engine.Replacement.applies
+          -- narrows by it.
+          Effect.LoseLife
+            ( LifeLoss.MkLifeLoss
+                (PlayerRef.Relative PlayerRelation.You)
+                (Quantity.InSlot milledSlot)
+                LifeLossCause.ByRadiation
+                Nothing
+            ),
+          -- "and removes one rad counter from themselves",
+          -- likewise once per card.
+          Effect.RemovePlayerCounters (RemovePlayerCounters.MkRemovePlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad (Quantity.InSlot milledSlot) Nothing)
+        ]
+    )
 
 -- | CR 728.1: the ability, paired with each active player, for
 -- Pawl.Engine.Event.Trigger.inherentTriggers -- "controlled by the active
