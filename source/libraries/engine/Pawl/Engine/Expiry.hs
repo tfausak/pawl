@@ -41,17 +41,14 @@ import qualified Pawl.Engine.Players as Players
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as View
 import qualified Pawl.Engine.Turn as Turn
-import qualified Pawl.Types.ActiveActivationProhibition as ActiveActivationProhibition
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
-import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
 import qualified Pawl.Types.ActiveCopy as ActiveCopy
 import qualified Pawl.Types.ActiveEvasion as ActiveEvasion
+import qualified Pawl.Types.ActiveObjectProhibition as ActiveObjectProhibition
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
-import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
-import qualified Pawl.Types.ActiveUntapProhibition as ActiveUntapProhibition
 import qualified Pawl.Types.AfterObjectTurn as AfterObjectTurn
 import qualified Pawl.Types.AfterTurn as AfterTurn
 import qualified Pawl.Types.CombatStep as CombatStep
@@ -392,11 +389,8 @@ dropAtCleanup gs =
       keepPlayerEffect active = survives (ActivePlayerEffect.expiry active)
       keepBlockRequirement active = survives (ActiveBlockRequirement.expiry active)
       keepAttackRequirement active = survives (ActiveAttackRequirement.expiry active)
-      keepUnregeneratable active = survives (ActiveUnregeneratable.expiry active)
-      keepBlockProhibition active = survives (ActiveBlockProhibition.expiry active)
+      keepObjectProhibition active = survives (ActiveObjectProhibition.expiry active)
       keepAttackProhibition active = survives (ActiveAttackProhibition.expiry active)
-      keepActivationProhibition active = survives (ActiveActivationProhibition.expiry active)
-      keepUntapProhibition active = survives (ActiveUntapProhibition.expiry active)
       keepEvasion active = survives (ActiveEvasion.expiry active)
       keepDelayed = maybe True survives . DelayedTrigger.expiry
       -- CR 116.2d: an ignore is stored "for a duration" like every carrier
@@ -410,11 +404,8 @@ dropAtCleanup gs =
           GameState.playerEffects = filter keepPlayerEffect (GameState.playerEffects gs),
           GameState.blockRequirements = filter keepBlockRequirement (GameState.blockRequirements gs),
           GameState.attackRequirements = filter keepAttackRequirement (GameState.attackRequirements gs),
-          GameState.unregeneratables = filter keepUnregeneratable (GameState.unregeneratables gs),
-          GameState.blockProhibitions = filter keepBlockProhibition (GameState.blockProhibitions gs),
+          GameState.objectProhibitions = filter keepObjectProhibition (GameState.objectProhibitions gs),
           GameState.attackProhibitions = filter keepAttackProhibition (GameState.attackProhibitions gs),
-          GameState.activationProhibitions = filter keepActivationProhibition (GameState.activationProhibitions gs),
-          GameState.untapProhibitions = filter keepUntapProhibition (GameState.untapProhibitions gs),
           GameState.evasions = filter keepEvasion (GameState.evasions gs),
           GameState.ignoredAbilities = filter keepIgnored (GameState.ignoredAbilities gs),
           GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs),
@@ -467,11 +458,8 @@ sweepConditional = do
       keepPlayerEffect active = survives (ActivePlayerEffect.source active) (ActivePlayerEffect.expiry active)
       keepBlockRequirement active = survives (ActiveBlockRequirement.source active) (ActiveBlockRequirement.expiry active)
       keepAttackRequirement active = survives (ActiveAttackRequirement.source active) (ActiveAttackRequirement.expiry active)
-      keepUnregeneratable active = survives (ActiveUnregeneratable.source active) (ActiveUnregeneratable.expiry active)
-      keepBlockProhibition active = survives (ActiveBlockProhibition.source active) (ActiveBlockProhibition.expiry active)
+      keepObjectProhibition active = survives (ActiveObjectProhibition.source active) (ActiveObjectProhibition.expiry active)
       keepAttackProhibition active = survives (ActiveAttackProhibition.source active) (ActiveAttackProhibition.expiry active)
-      keepActivationProhibition active = survives (ActiveActivationProhibition.source active) (ActiveActivationProhibition.expiry active)
-      keepUntapProhibition active = survives (ActiveUntapProhibition.source active) (ActiveUntapProhibition.expiry active)
       keepEvasion active = survives (ActiveEvasion.source active) (ActiveEvasion.expiry active)
       keepDelayed entry = maybe True (survives (DelayedTrigger.source entry)) (DelayedTrigger.expiry entry)
       keptEffects = filter keepEffect (GameState.continuousEffects gs)
@@ -480,11 +468,8 @@ sweepConditional = do
       keptPlayerEffects = filter keepPlayerEffect (GameState.playerEffects gs)
       keptBlockRequirements = filter keepBlockRequirement (GameState.blockRequirements gs)
       keptAttackRequirements = filter keepAttackRequirement (GameState.attackRequirements gs)
-      keptUnregeneratables = filter keepUnregeneratable (GameState.unregeneratables gs)
-      keptBlockProhibitions = filter keepBlockProhibition (GameState.blockProhibitions gs)
+      keptObjectProhibitions = filter keepObjectProhibition (GameState.objectProhibitions gs)
       keptAttackProhibitions = filter keepAttackProhibition (GameState.attackProhibitions gs)
-      keptActivationProhibitions = filter keepActivationProhibition (GameState.activationProhibitions gs)
-      keptUntapProhibitions = filter keepUntapProhibition (GameState.untapProhibitions gs)
       keptEvasions = filter keepEvasion (GameState.evasions gs)
       keptDelayed = Seq.filter keepDelayed (GameState.delayedTriggers gs)
       keepIgnored ignored = survives (IgnoredAbility.source ignored) (IgnoredAbility.expiry ignored)
@@ -498,11 +483,8 @@ sweepConditional = do
           || length keptPlayerEffects /= length (GameState.playerEffects gs)
           || length keptBlockRequirements /= length (GameState.blockRequirements gs)
           || length keptAttackRequirements /= length (GameState.attackRequirements gs)
-          || length keptUnregeneratables /= length (GameState.unregeneratables gs)
-          || length keptBlockProhibitions /= length (GameState.blockProhibitions gs)
+          || length keptObjectProhibitions /= length (GameState.objectProhibitions gs)
           || length keptAttackProhibitions /= length (GameState.attackProhibitions gs)
-          || length keptActivationProhibitions /= length (GameState.activationProhibitions gs)
-          || length keptUntapProhibitions /= length (GameState.untapProhibitions gs)
           || length keptEvasions /= length (GameState.evasions gs)
           || Seq.length keptDelayed /= Seq.length (GameState.delayedTriggers gs)
           || length keptIgnored /= length (GameState.ignoredAbilities gs)
@@ -519,11 +501,8 @@ sweepConditional = do
           GameState.playerEffects = keptPlayerEffects,
           GameState.blockRequirements = keptBlockRequirements,
           GameState.attackRequirements = keptAttackRequirements,
-          GameState.unregeneratables = keptUnregeneratables,
-          GameState.blockProhibitions = keptBlockProhibitions,
+          GameState.objectProhibitions = keptObjectProhibitions,
           GameState.attackProhibitions = keptAttackProhibitions,
-          GameState.activationProhibitions = keptActivationProhibitions,
-          GameState.untapProhibitions = keptUntapProhibitions,
           GameState.evasions = keptEvasions,
           GameState.ignoredAbilities = keptIgnored,
           GameState.delayedTriggers = keptDelayed,
@@ -653,11 +632,8 @@ dropAtTurnOf pid gs =
       keepPlayerEffect active = survives (ActivePlayerEffect.expiry active)
       keepBlockRequirement active = survives (ActiveBlockRequirement.expiry active)
       keepAttackRequirement active = survives (ActiveAttackRequirement.expiry active)
-      keepUnregeneratable active = survives (ActiveUnregeneratable.expiry active)
-      keepBlockProhibition active = survives (ActiveBlockProhibition.expiry active)
+      keepObjectProhibition active = survives (ActiveObjectProhibition.expiry active)
       keepAttackProhibition active = survives (ActiveAttackProhibition.expiry active)
-      keepActivationProhibition active = survives (ActiveActivationProhibition.expiry active)
-      keepUntapProhibition active = survives (ActiveUntapProhibition.expiry active)
       keepEvasion active = survives (ActiveEvasion.expiry active)
       keepDelayed = maybe True survives . DelayedTrigger.expiry
       keepIgnored = survives . IgnoredAbility.expiry
@@ -668,11 +644,8 @@ dropAtTurnOf pid gs =
           GameState.playerEffects = filter keepPlayerEffect (GameState.playerEffects gs),
           GameState.blockRequirements = filter keepBlockRequirement (GameState.blockRequirements gs),
           GameState.attackRequirements = filter keepAttackRequirement (GameState.attackRequirements gs),
-          GameState.unregeneratables = filter keepUnregeneratable (GameState.unregeneratables gs),
-          GameState.blockProhibitions = filter keepBlockProhibition (GameState.blockProhibitions gs),
+          GameState.objectProhibitions = filter keepObjectProhibition (GameState.objectProhibitions gs),
           GameState.attackProhibitions = filter keepAttackProhibition (GameState.attackProhibitions gs),
-          GameState.activationProhibitions = filter keepActivationProhibition (GameState.activationProhibitions gs),
-          GameState.untapProhibitions = filter keepUntapProhibition (GameState.untapProhibitions gs),
           GameState.evasions = filter keepEvasion (GameState.evasions gs),
           GameState.ignoredAbilities = filter keepIgnored (GameState.ignoredAbilities gs),
           GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs),
@@ -727,11 +700,8 @@ mapExpiries f gs =
       GameState.playerEffects = fmap (\x -> x {ActivePlayerEffect.expiry = f (ActivePlayerEffect.expiry x)}) (GameState.playerEffects gs),
       GameState.blockRequirements = fmap (\x -> x {ActiveBlockRequirement.expiry = f (ActiveBlockRequirement.expiry x)}) (GameState.blockRequirements gs),
       GameState.attackRequirements = fmap (\x -> x {ActiveAttackRequirement.expiry = f (ActiveAttackRequirement.expiry x)}) (GameState.attackRequirements gs),
-      GameState.unregeneratables = fmap (\x -> x {ActiveUnregeneratable.expiry = f (ActiveUnregeneratable.expiry x)}) (GameState.unregeneratables gs),
-      GameState.blockProhibitions = fmap (\x -> x {ActiveBlockProhibition.expiry = f (ActiveBlockProhibition.expiry x)}) (GameState.blockProhibitions gs),
+      GameState.objectProhibitions = fmap (\x -> x {ActiveObjectProhibition.expiry = f (ActiveObjectProhibition.expiry x)}) (GameState.objectProhibitions gs),
       GameState.attackProhibitions = fmap (\x -> x {ActiveAttackProhibition.expiry = f (ActiveAttackProhibition.expiry x)}) (GameState.attackProhibitions gs),
-      GameState.activationProhibitions = fmap (\x -> x {ActiveActivationProhibition.expiry = f (ActiveActivationProhibition.expiry x)}) (GameState.activationProhibitions gs),
-      GameState.untapProhibitions = fmap (\x -> x {ActiveUntapProhibition.expiry = f (ActiveUntapProhibition.expiry x)}) (GameState.untapProhibitions gs),
       GameState.evasions = fmap (\x -> x {ActiveEvasion.expiry = f (ActiveEvasion.expiry x)}) (GameState.evasions gs),
       GameState.ignoredAbilities = fmap (\x -> x {IgnoredAbility.expiry = f (IgnoredAbility.expiry x)}) (GameState.ignoredAbilities gs),
       GameState.delayedTriggers = fmap (\x -> x {DelayedTrigger.expiry = fmap f (DelayedTrigger.expiry x)}) (GameState.delayedTriggers gs),
@@ -812,11 +782,8 @@ keepSurvivors survives gs =
       keepPlayerEffect active = survives (ActivePlayerEffect.expiry active)
       keepBlockRequirement active = survives (ActiveBlockRequirement.expiry active)
       keepAttackRequirement active = survives (ActiveAttackRequirement.expiry active)
-      keepUnregeneratable active = survives (ActiveUnregeneratable.expiry active)
-      keepBlockProhibition active = survives (ActiveBlockProhibition.expiry active)
+      keepObjectProhibition active = survives (ActiveObjectProhibition.expiry active)
       keepAttackProhibition active = survives (ActiveAttackProhibition.expiry active)
-      keepActivationProhibition active = survives (ActiveActivationProhibition.expiry active)
-      keepUntapProhibition active = survives (ActiveUntapProhibition.expiry active)
       keepEvasion active = survives (ActiveEvasion.expiry active)
       keepDelayed = maybe True survives . DelayedTrigger.expiry
       keepIgnored = survives . IgnoredAbility.expiry
@@ -827,11 +794,8 @@ keepSurvivors survives gs =
           GameState.playerEffects = filter keepPlayerEffect (GameState.playerEffects gs),
           GameState.blockRequirements = filter keepBlockRequirement (GameState.blockRequirements gs),
           GameState.attackRequirements = filter keepAttackRequirement (GameState.attackRequirements gs),
-          GameState.unregeneratables = filter keepUnregeneratable (GameState.unregeneratables gs),
-          GameState.blockProhibitions = filter keepBlockProhibition (GameState.blockProhibitions gs),
+          GameState.objectProhibitions = filter keepObjectProhibition (GameState.objectProhibitions gs),
           GameState.attackProhibitions = filter keepAttackProhibition (GameState.attackProhibitions gs),
-          GameState.activationProhibitions = filter keepActivationProhibition (GameState.activationProhibitions gs),
-          GameState.untapProhibitions = filter keepUntapProhibition (GameState.untapProhibitions gs),
           GameState.evasions = filter keepEvasion (GameState.evasions gs),
           GameState.ignoredAbilities = filter keepIgnored (GameState.ignoredAbilities gs),
           GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs),
@@ -879,11 +843,8 @@ sourcedExpiries gs =
     <> fmap (\x -> (ActivePlayerEffect.source x, ActivePlayerEffect.expiry x)) (GameState.playerEffects gs)
     <> fmap (\x -> (ActiveBlockRequirement.source x, ActiveBlockRequirement.expiry x)) (GameState.blockRequirements gs)
     <> fmap (\x -> (ActiveAttackRequirement.source x, ActiveAttackRequirement.expiry x)) (GameState.attackRequirements gs)
-    <> fmap (\x -> (ActiveUnregeneratable.source x, ActiveUnregeneratable.expiry x)) (GameState.unregeneratables gs)
-    <> fmap (\x -> (ActiveBlockProhibition.source x, ActiveBlockProhibition.expiry x)) (GameState.blockProhibitions gs)
+    <> fmap (\x -> (ActiveObjectProhibition.source x, ActiveObjectProhibition.expiry x)) (GameState.objectProhibitions gs)
     <> fmap (\x -> (ActiveAttackProhibition.source x, ActiveAttackProhibition.expiry x)) (GameState.attackProhibitions gs)
-    <> fmap (\x -> (ActiveActivationProhibition.source x, ActiveActivationProhibition.expiry x)) (GameState.activationProhibitions gs)
-    <> fmap (\x -> (ActiveUntapProhibition.source x, ActiveUntapProhibition.expiry x)) (GameState.untapProhibitions gs)
     <> fmap (\x -> (ActiveEvasion.source x, ActiveEvasion.expiry x)) (GameState.evasions gs)
     <> fmap (\x -> (IgnoredAbility.source x, IgnoredAbility.expiry x)) (GameState.ignoredAbilities gs)
     <> Maybe.mapMaybe (\x -> fmap ((,) (DelayedTrigger.source x)) (DelayedTrigger.expiry x)) (Foldable.toList (GameState.delayedTriggers gs))
@@ -923,11 +884,8 @@ dropWhenPaidBy oid gs =
       keepPlayerEffect x = survives (ActivePlayerEffect.source x) (ActivePlayerEffect.expiry x)
       keepBlockRequirement x = survives (ActiveBlockRequirement.source x) (ActiveBlockRequirement.expiry x)
       keepAttackRequirement x = survives (ActiveAttackRequirement.source x) (ActiveAttackRequirement.expiry x)
-      keepUnregeneratable x = survives (ActiveUnregeneratable.source x) (ActiveUnregeneratable.expiry x)
-      keepBlockProhibition x = survives (ActiveBlockProhibition.source x) (ActiveBlockProhibition.expiry x)
+      keepObjectProhibition x = survives (ActiveObjectProhibition.source x) (ActiveObjectProhibition.expiry x)
       keepAttackProhibition x = survives (ActiveAttackProhibition.source x) (ActiveAttackProhibition.expiry x)
-      keepActivationProhibition x = survives (ActiveActivationProhibition.source x) (ActiveActivationProhibition.expiry x)
-      keepUntapProhibition x = survives (ActiveUntapProhibition.source x) (ActiveUntapProhibition.expiry x)
       keepEvasion x = survives (ActiveEvasion.source x) (ActiveEvasion.expiry x)
       keepIgnored x = survives (IgnoredAbility.source x) (IgnoredAbility.expiry x)
       keepDelayed x = maybe True (survives (DelayedTrigger.source x)) (DelayedTrigger.expiry x)
@@ -939,11 +897,8 @@ dropWhenPaidBy oid gs =
           GameState.playerEffects = filter keepPlayerEffect (GameState.playerEffects gs),
           GameState.blockRequirements = filter keepBlockRequirement (GameState.blockRequirements gs),
           GameState.attackRequirements = filter keepAttackRequirement (GameState.attackRequirements gs),
-          GameState.unregeneratables = filter keepUnregeneratable (GameState.unregeneratables gs),
-          GameState.blockProhibitions = filter keepBlockProhibition (GameState.blockProhibitions gs),
+          GameState.objectProhibitions = filter keepObjectProhibition (GameState.objectProhibitions gs),
           GameState.attackProhibitions = filter keepAttackProhibition (GameState.attackProhibitions gs),
-          GameState.activationProhibitions = filter keepActivationProhibition (GameState.activationProhibitions gs),
-          GameState.untapProhibitions = filter keepUntapProhibition (GameState.untapProhibitions gs),
           GameState.evasions = filter keepEvasion (GameState.evasions gs),
           GameState.ignoredAbilities = filter keepIgnored (GameState.ignoredAbilities gs),
           GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs),

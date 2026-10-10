@@ -42,7 +42,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
-import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
+import qualified Pawl.Types.ActiveObjectProhibition as ActiveObjectProhibition
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AfterObjectTurn as AfterObjectTurn
 import qualified Pawl.Types.AttackTarget as AttackTarget
@@ -2387,7 +2387,7 @@ keywordCounterRestrictionSpec s registry = Spec.describe s "KeywordCounterRestri
 -- up can state -- the counter's restriction is indefinite, and a printed row is
 -- gathered live off a source standing on the battlefield. Zirda, the Dawnwaker's
 -- "{1}, {T}: Target creature can't block this turn" (checked against Scryfall) is
--- the pool's printing; the row lands in GameState.blockProhibitions and
+-- the pool's printing; the row lands in GameState.objectProhibitions and
 -- Pawl.Engine.CombatRestriction.blockProhibited is what reads it.
 --
 -- THE PAIR that makes these cases discriminating: the SAME activation is made on
@@ -2404,13 +2404,13 @@ storedBlockRestrictionSpec s registry = Spec.describe s "StoredBlockRestriction"
         after = S.runPure S.aggressiveAnswer declaring (Combat.declareBlockers S.manaPerformer)
     Spec.assertEqWith s "only the twin ended up blocking" (Combat.blockersOf attacker after) (Set.singleton twin)
     Spec.assertBool s (not (Combat.canBlock S.bob victim declaring)) "and the named creature is off CR 509.1a's candidate list"
-    Spec.assertEqWith s "one restriction was stored, over the creature named" (fmap ActiveBlockProhibition.object (GameState.blockProhibitions resolved)) [victim]
+    Spec.assertEqWith s "one restriction was stored, over the creature named" (fmap ActiveObjectProhibition.object (GameState.objectProhibitions resolved)) [victim]
   -- The pair's other half: the same activation, aimed at alice's attacker.
   Spec.it s "CR 509.1b aimed elsewhere, both of bob's twins block" $ do
     (attacker, victim, twin, resolved) <- zirdaResolved s registry (\a _ _ -> a)
     let after = S.runPure S.aggressiveAnswer (declaringAttackers resolved) (Combat.declareBlockers S.manaPerformer)
     Spec.assertEqWith s "both twins blocked" (Combat.blockersOf attacker after) (Set.fromList [victim, twin])
-    Spec.assertEqWith s "and the restriction was stored all the same, over the attacker" (fmap ActiveBlockProhibition.object (GameState.blockProhibitions resolved)) [attacker]
+    Spec.assertEqWith s "and the restriction was stored all the same, over the attacker" (fmap ActiveObjectProhibition.object (GameState.objectProhibitions resolved)) [attacker]
   -- CR 514.2 / 611.2a: "this turn" arms Expiry.AtCleanup, so the cleanup sweep
   -- drops the row and the creature blocks again. Through the sweep directly,
   -- which is the narrowest path that shows it.
@@ -2419,7 +2419,7 @@ storedBlockRestrictionSpec s registry = Spec.describe s "StoredBlockRestriction"
     let swept = Expiry.dropAtCleanup resolved
     Spec.assertBool s (not (Combat.canBlock S.bob victim resolved)) "restricted on the turn it resolved"
     Spec.assertBool s (Combat.canBlock S.bob victim swept) "and blocking again once the turn's cleanup has run"
-    Spec.assertEqWith s "with nothing left stored" (GameState.blockProhibitions swept) []
+    Spec.assertEqWith s "with nothing left stored" (GameState.objectProhibitions swept) []
   -- CR 509.1c is CR 508.1d's textual mirror -- both count the requirements that
   -- could be obeyed "without disobeying any restrictions" -- and this side
   -- reaches it by the same route storedAttackRestrictionSpec's last case proves

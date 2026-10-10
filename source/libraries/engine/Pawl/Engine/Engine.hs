@@ -235,7 +235,7 @@ checkSba = sampleWorldSince >> Sba.checkStateBasedActions
 -- job, one paragraph down.
 --
 -- FOUR carriers, subtracted together. The printed static one is re-derived live,
--- and a resolution's stored rows (GameState.untapProhibitions) are read beside it,
+-- and a resolution's stored rows (GameState.objectProhibitions) are read beside it,
 -- both through UntapRestriction.doesNotUntap; the other two are stored on the
 -- victim, and this is where each both applies and
 -- ENDS, CR 701.43b putting the expiry in the untap step it bites in. They are two

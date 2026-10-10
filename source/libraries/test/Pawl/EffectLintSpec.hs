@@ -60,7 +60,6 @@ import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttackTargetRef as AttackTargetRef
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.Blight as Blight
-import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -118,11 +117,8 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ForEachNumber as ForEachNumber
-import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBeingBlocked as ForbidBeingBlocked
-import qualified Pawl.Types.ForbidBlock as ForbidBlock
-import qualified Pawl.Types.ForbidUntap as ForbidUntap
 import qualified Pawl.Types.FromReference as FromReference
 import qualified Pawl.Types.GainControl as GainControl
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
@@ -173,6 +169,7 @@ import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Types.PreventNextDamageInstance as PreventNextDamageInstance
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Prohibit as Prohibit
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.PutSticker as PutSticker
@@ -389,10 +386,7 @@ ownQuantities effect = case effect of
   Effect.ArmDelayedTrigger {} -> []
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ _) -> durationQuantities duration
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration _ _) -> durationQuantities duration
-  Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration _) -> durationQuantities duration
-  Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration _) -> durationQuantities duration
-  Effect.ForbidActivation (ForbidActivation.MkForbidActivation duration _) -> durationQuantities duration
-  Effect.ForbidUntap (ForbidUntap.MkForbidUntap duration _) -> durationQuantities duration
+  Effect.Prohibit (Prohibit.MkProhibit _ duration _) -> durationQuantities duration
   Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration _ _) -> durationQuantities duration
   Effect.ForbidBeingBlocked (ForbidBeingBlocked.MkForbidBeingBlocked duration _) -> durationQuantities duration
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) -> durationQuantities duration
@@ -1539,10 +1533,7 @@ effectObjectRefs effect =
         Effect.ArmDelayedTrigger {} -> []
         Effect.AffectPlayers {} -> []
         Effect.RequireBlock (RequireBlock.MkRequireBlock _ blocker attacker) -> read_ [blocker, attacker]
-        Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated _ ref) -> read_ [ref]
-        Effect.ForbidBlock (ForbidBlock.MkForbidBlock _ ref) -> read_ [ref]
-        Effect.ForbidActivation (ForbidActivation.MkForbidActivation _ ref) -> read_ [ref]
-        Effect.ForbidUntap (ForbidUntap.MkForbidUntap _ ref) -> read_ [ref]
+        Effect.Prohibit (Prohibit.MkProhibit _ _ ref) -> read_ [ref]
         Effect.ForbidAttack (ForbidAttack.MkForbidAttack _ affected _) -> case affected of
           RestrictedCreatures.Named ref -> read_ [ref]
           RestrictedCreatures.Matching _ -> []

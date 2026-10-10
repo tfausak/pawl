@@ -8,7 +8,7 @@
 -- and is read off the victim (Pawl.Engine.Detain) rather than off any card's
 -- printed text, and CR 508.1c's "can't attack this turn" and CR 509.1b's "can't
 -- block this turn" are stored by the resolution that said them
--- (GameState.attackProhibitions, GameState.blockProhibitions). See `detained`,
+-- (GameState.attackProhibitions, GameState.objectProhibitions). See `detained`,
 -- `attackProhibited` and `blockProhibited`.
 --
 -- The only module that may CASE on Pawl.Types.CombatRestriction.
@@ -45,7 +45,6 @@ import qualified Pawl.Engine.RuleAbilities as RuleAbilities.Engine
 import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
-import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.ActiveEvasion as ActiveEvasion
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
@@ -70,6 +69,7 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerScope as PlayerScope
+import qualified Pawl.Types.Prohibition as Prohibition
 import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import qualified Pawl.Types.RuleAbilities as RuleAbilities
@@ -232,7 +232,7 @@ storedSubjects candidates gs active = case ActiveAttackProhibition.affected acti
 -- Pawl.Types.Affected either, because the ref was read once at resolution and
 -- Pawl.Engine.Resolve stored the ids it named. The extra reason is CR 509.1b's
 -- "unless": every gate in the pool is printed beside the restriction it gates,
--- and Pawl.Types.ForbidBlock states none, so there is nothing here to ask.
+-- and Pawl.Types.Prohibit states none, so there is nothing here to ask.
 --
 -- Outside the layer system, which is CR 613.11 -- a restriction on a declaration
 -- modifies the rules rather than an object's characteristics, so no
@@ -240,8 +240,7 @@ storedSubjects candidates gs active = case ActiveAttackProhibition.affected acti
 -- nothing of it.
 blockProhibited :: [ObjectId] -> GameState -> Set ObjectId
 blockProhibited candidates gs =
-  let stopped = Set.fromList (fmap ActiveBlockProhibition.object (GameState.blockProhibitions gs))
-   in Set.intersection (Set.fromList candidates) stopped
+  Set.intersection (Set.fromList candidates) (Game.prohibitedObjects Prohibition.Block gs)
 
 -- CR 701.35a: the detained permanents among `candidates`, which that rule forbids
 -- both declarations at once -- so one reading serves both gates above.

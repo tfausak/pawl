@@ -8,7 +8,7 @@ module Pawl.Types.Regenerability where
 --
 -- CR 701.19c's LASTING prohibition (Hurr Jackal's "target creature can't be
 -- regenerated this turn") does not make this a property of the permanent either.
--- It is a stored continuous effect (Pawl.Types.ActiveUnregeneratable) that
+-- It is a stored continuous effect (Pawl.Types.ActiveObjectProhibition) that
 -- Pawl.Engine.Event.resolveDestruction converts into this value as it proposes
 -- the event, so every reader downstream still asks one question of one
 -- destruction.

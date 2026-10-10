@@ -429,12 +429,9 @@ manaProduced effect = case effect of
   Effect.ArmDelayedTrigger {} -> Nothing
   Effect.AffectPlayers {} -> Nothing
   Effect.RequireBlock {} -> Nothing
-  Effect.CantBeRegenerated {} -> Nothing
-  Effect.ForbidBlock {} -> Nothing
+  Effect.Prohibit {} -> Nothing
   Effect.ForbidAttack {} -> Nothing
   Effect.ForbidBeingBlocked {} -> Nothing
-  Effect.ForbidActivation {} -> Nothing
-  Effect.ForbidUntap {} -> Nothing
   Effect.RequireAttack {} -> Nothing
   Effect.CreateEmblem {} -> Nothing
   Effect.BecomeMonarch {} -> Nothing
@@ -622,12 +619,9 @@ playerChoice effect = case effect of
   Effect.ArmDelayedTrigger {} -> Nothing
   Effect.AffectPlayers {} -> Nothing
   Effect.RequireBlock {} -> Nothing
-  Effect.CantBeRegenerated {} -> Nothing
-  Effect.ForbidBlock {} -> Nothing
+  Effect.Prohibit {} -> Nothing
   Effect.ForbidAttack {} -> Nothing
   Effect.ForbidBeingBlocked {} -> Nothing
-  Effect.ForbidActivation {} -> Nothing
-  Effect.ForbidUntap {} -> Nothing
   Effect.RequireAttack {} -> Nothing
   Effect.CreateEmblem {} -> Nothing
   Effect.BecomeMonarch {} -> Nothing
@@ -912,12 +906,9 @@ movesLibraryCard effect = case effect of
   -- may do; none moves a card.
   Effect.AffectPlayers {} -> False
   Effect.RequireBlock {} -> False
-  Effect.CantBeRegenerated {} -> False
-  Effect.ForbidBlock {} -> False
+  Effect.Prohibit {} -> False
   Effect.ForbidAttack {} -> False
   Effect.ForbidBeingBlocked {} -> False
-  Effect.ForbidActivation {} -> False
-  Effect.ForbidUntap {} -> False
   Effect.RequireAttack {} -> False
   Effect.CreateEmblem {} -> False
   Effect.Designate (Designate.MkDesignate {}) -> False
