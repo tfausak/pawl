@@ -24,13 +24,11 @@ import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Crewing as Crewing
-import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
-import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Modal as Modal.Type
 import qualified Pawl.Types.Object as Object
@@ -44,10 +42,8 @@ import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.Result (Result)
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Saddling as Saddling
-import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
-import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 602.2a: an ability activated from a hidden zone reveals the card that has
@@ -123,75 +119,17 @@ activateAbilityWith runSubgame pid srcId ability = Event.announcing $ do
   let (abilId, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
       obj =
-        Object.MkObject
-          { Object.owner = pid,
-            Object.identity = Nothing,
-            Object.enteredUnder = Nothing,
-            Object.source =
-              Source.OfAbility
-                ActivatedAbilitySource.MkActivatedAbilitySource
-                  { ActivatedAbilitySource.source = srcId,
-                    ActivatedAbilitySource.ability = ability,
-                    ActivatedAbilitySource.delayed = Projection.delayedSnapshotOf srcId gs
-                  },
-            Object.zone = Zone.Stack,
-            Object.tapped = TapState.Untapped,
-            Object.facing = Facing.FaceUp,
-            Object.flipped = False,
-            Object.exiledFaceDown = False,
-            Object.exileLookers = Set.empty,
-            Object.damage = 0,
-            Object.sickness = Sickness.Settled pid,
-            Object.controlClock = Map.empty,
-            Object.bindings = Map.empty,
-            Object.counters = Map.empty,
-            Object.counterTimestamps = Map.empty,
-            Object.attachedTo = Nothing,
-            Object.chosenColors = Set.empty,
-            Object.chosenSubtype = Nothing,
-            Object.chosenNames = Set.empty,
-            Object.chosenPlayer = Nothing,
-            Object.timestamp = ts,
-            Object.face = Nothing,
-            Object.turnedOverAt = Nothing,
-            Object.worldSince = Nothing,
-            Object.playableFromExile = Nothing,
-            Object.plotted = Nothing,
-            Object.foretold = Nothing,
-            Object.foretellCostReduction = Nothing,
-            Object.warped = Nothing,
-            Object.preparedCopyOf = Nothing,
-            Object.ringBearerFor = Nothing,
-            Object.stickers = Seq.empty,
-            Object.duplicate = Nothing,
-            Object.paired = Nothing,
-            Object.protector = Nothing,
-            Object.ventureRoom = Nothing,
-            Object.classLevel = Nothing,
-            Object.unlockedHalves = Set.empty,
-            Object.designations = Set.empty,
-            Object.designationValues = Map.empty,
-            Object.storedResults = Map.empty,
-            Object.paidCosts = Map.empty,
-            Object.tributePaid = False,
-            Object.bestowed = False,
-            Object.mutating = False,
-            Object.prototyped = False,
-            Object.boughtBack = False,
-            Object.unannounced = False,
-            Object.spliced = Seq.empty,
-            Object.phyrexianLifePaid = 0,
-            Object.manaSpent = Mana.MkMana [],
-            Object.announcedX = Nothing,
-            Object.castFrom = Nothing,
-            Object.castUsing = Nothing,
-            Object.castGrant = Nothing,
-            Object.detainedUntil = Set.empty,
-            Object.goadedBy = Set.empty,
-            Object.doesNotUntapFor = 0,
-            Object.exertedBy = Set.empty,
-            Object.activatedOnce = Map.empty
-          }
+        Object.newSettled
+          pid
+          ( Source.OfAbility
+              ActivatedAbilitySource.MkActivatedAbilitySource
+                { ActivatedAbilitySource.source = srcId,
+                  ActivatedAbilitySource.ability = ability,
+                  ActivatedAbilitySource.delayed = Projection.delayedSnapshotOf srcId gs
+                }
+          )
+          Zone.Stack
+          ts
       onStack = Game.putOnStack abilId gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2)}
       decider = Decide.deciderFor pid gs
       -- CR 602.2b/700.2a, mirroring Cast.castSpell's mode block: a selection with

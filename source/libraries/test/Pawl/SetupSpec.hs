@@ -395,9 +395,9 @@ dirtied pid object =
 -- comparisons, which would have to be extended by hand alongside Object.
 --
 -- ONE BLIND SPOT, since the predicate is Object.newIncarnation's own fixed
--- point: a field that function never resets is invisible here however dirty
--- `dirtied` above leaves it. Deleting a line from newIncarnation therefore
--- leaves this green.
+-- point: a field that function carries across is invisible here however dirty
+-- `dirtied` above leaves it. Carrying one more field across in newIncarnation
+-- therefore leaves this green.
 forgotten :: Object.Object -> Bool
 forgotten object = Object.newIncarnation object == object
 

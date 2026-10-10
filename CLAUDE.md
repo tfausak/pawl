@@ -278,7 +278,10 @@ to agents as written. What it doesn't say:
 
     A NEW FIELD's invisible site is positional record construction in the test
     suite, which absorbs it in argument order. Grep every construction site of
-    the type by hand.
+    the type by hand. `Object` is the exception: every new object goes through
+    `Object.new`, so a new field's neutral value is written there once, and
+    `Object.newIncarnation` resets it on every zone change unless carried
+    across there.
 
     A RECORD UPDATE is the other one, and `-Werror`'s missing-fields check does
     not name it: an update keeps the old value of the field you added, so a
