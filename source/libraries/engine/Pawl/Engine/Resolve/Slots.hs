@@ -25,7 +25,6 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.QuantitySlot as QuantitySlot
 import qualified Pawl.Engine.SourceContext as SourceContext
-import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Types.ActivateManaAbilities as ActivateManaAbilities
@@ -3247,30 +3246,26 @@ resolvingBindings resolving gs = case Game.lookupObject resolving gs of
 
 -- The context every effect of a resolution evaluates its quantities and its
 -- ref-borne filters in: CR 109.5's "you" is the resolving controller, the source
--- frames CR 113.7, and the resolution's slot objects ride along so a
--- Quantity.AgainstSlot can aim at one and a Filter.IsBound can ask whether a
--- candidate is among them.
+-- frames CR 113.7, and the resolution's slots ride along through
+-- Projection.framedBySlots, the filler a target slot's own filter is matched
+-- through too (Pawl.Engine.Target.slotContext).
 --
--- Of the TARGET half, only LEGAL recipients and only OBJECT ones, and only where
--- the slot names exactly one (CR 608.2b); all three drop out as an absent key, so
--- a quantity is unanswered rather than answered off the source.
+-- Of the TARGET half, only the recipients CR 608.2b left LEGAL: an illegal
+-- target is one "it fails to determine any such information" about, so it
+-- drops out of every slot-derived field. A slot naming several legal objects
+-- names all of them (Binding.objectsBySlot): Command the Dreadhorde's "the total
+-- mana value of those cards" reads both its targets, which the scenario
+-- "CR 601.2c Command the Dreadhorde deals damage equal to the total mana value
+-- of both its targets" in data/scenarios/target proves.
 --
 -- The GROUP half comes in beside `legal` rather than through it: CR 115.10a makes
 -- a group a definition and never a target, so it owes CR 608.2b nothing and is
--- read live off the resolving object (slotBindings) instead. It reaches
--- Filter.IsBound whole, and the singular readers decline it
--- (Filter.slotOneObject).
---
--- The AMOUNTS ride the same live read, which is why the parameter is the whole
--- binding map rather than the groups alone: a number an earlier clause stamped
--- (bindAmountSlot) is on the resolving object exactly as a group is.
---
--- The NAMES of those same objects ride along too, which is why the parameter is a
--- GameState rather than Teams alone: this module can read a board and
--- Pawl.Engine.Filter cannot, so CR 201.2a's SameNameAsBound is answerable at a
--- resolution's positions exactly as it is at a target slot's
--- (Pawl.Engine.Target.slotContext). A THUNK, as it is there: one projection per
--- bound object, paid for only by a filter naming the atom.
+-- read live off the resolving object (slotBindings) instead, as CR 608.2c's
+-- clauses in order want -- a slot an earlier clause defined is visible to a
+-- later one. The AMOUNTS ride the same live read, which is why the parameter is
+-- the whole binding map rather than the groups alone: a number an earlier
+-- clause stamped (bindAmountSlot) is on the resolving object exactly as a group
+-- is.
 --
 -- CR 607.2d's CHOSEN values -- CR 201.4's names, CR 105.2's colour and CR 205.3's
 -- creature type -- come from Pawl.Engine.SourceContext, and this is their only
@@ -3280,119 +3275,56 @@ resolvingBindings resolving gs = case Game.lookupObject resolving gs of
 -- positions this fills is Pawl.FilterPositionLintSpec, not this function.
 effectContext :: GameState -> PlayerId -> ObjectId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName Binding.Type.Binding -> Filter.Context
 effectContext gs controller source legal bindings =
-  let objects = Binding.withGroups (effectSlotObjects legal) (Binding.groupsOf bindings)
-   in -- CR 607.2d: the SOURCE's choices (CR 113.7), read LIVE for the group
-      -- half's reason: CR 608.2c has the clauses carried out in order, so the
-      -- name an earlier clause chose is part of the state a later one is read
-      -- against -- Petra Sphinx's "if that card has the chosen name" over the
-      -- card its own reveal bound. CR 608.2h's last-known reader is inside
-      -- choicesOf, for the source that has already left (Conjurer's Ban).
-      -- Brass Herald's "creature cards of the chosen type revealed this way" is
-      -- the chosen subtype's proof (Pawl.ResolveSpec).
-      (SourceContext.sourceContext gs (Just controller) source)
-        { Filter.slotObjects = objects,
-          -- CR 608.2c: the numbers earlier clauses of THIS resolution stamped on
-          -- slots, for the one Filter atom that compares a candidate against one
-          -- (Filter.PowerIsAmountInSlot) -- Localized Destruction's "power equal to
-          -- the amount of {E} paid this way". Live off the resolving object, the
-          -- group half's own read, so a clause reads what the clause before it bound.
-          Filter.boundAmounts = Map.mapMaybe Binding.Type.amount bindings,
-          Filter.slotStickers = Map.mapMaybe Binding.Type.sticker bindings,
-          -- CR 201.2a's names off the same objects, through CR 608.2h's
-          -- last-known reader for slotContext's reason: Bifurcate's bound
-          -- creature may have left by the time the search runs, and "that
-          -- creature" is a reference the spell already made rather than a target
-          -- CR 608.2b re-checks.
-          Filter.slotNames = fmap (foldMap (foldMap Filter.names . Projection.viewWithLastKnownAnywhere gs)) objects,
-          -- CR 110.2's controllers off the same objects and the same reader,
-          -- for the atom comparing a candidate's against them
-          -- (Filter.SameControllerAsBound) -- Glamer Spinners' "another
-          -- permanent with the same controller" as its target, asked at the
-          -- attach destination. A slot CR 608.2b emptied has no key, where the
-          -- atom widens; the destination's Filter.IsBound conjunct then has
-          -- nothing to exclude either, but a lone target that went illegal has
-          -- already fizzled the ability (CR 608.2b).
-          Filter.slotControllers = fmap (foldMap (foldMap (maybe Set.empty Set.singleton . Filter.controller) . Projection.viewWithLastKnownAnywhere gs)) objects,
-          -- CR 110.2 asked of what those objects are ATTACHED TO (CR 303.4b),
-          -- for the one atom that compares a candidate's controller against it
-          -- (Filter.SameControllerAsHostOfBound) -- Simic Guildmage's "another
-          -- permanent with the same controller", whose 2006-05-01 ruling reads
-          -- the antecedent as the Aura's host rather than the Aura.
-          --
-          -- LIVE and narrowed to the BATTLEFIELD, which is where it parts from
-          -- its neighbours' CR 608.2h reader: a host is a permanent, and the
-          -- ruling asks who controls it as the ability resolves. The narrowing
-          -- is Filter.attachedToView's, so the two cannot disagree about which
-          -- host a slot's object has -- an Aura attached to a player (CR
-          -- 303.4b's other destination) or to a host that has left or phased out
-          -- gets an empty set from both, and the atom is False.
-          --
-          -- Projection.controllerOf and not an owner read: CR 613.1b's layer 2
-          -- is what makes the host's controller differ from its owner, and
-          -- Pawl.AuraSpec's "CR 613.1b the host's controller is the projected
-          -- one, not its owner" is the board that tells the two apart.
-          Filter.slotHostControllers = fmap (foldMap (\oid -> maybe Set.empty (\host -> if Set.member host (GameState.battlefield gs) then maybe Set.empty Set.singleton (Projection.controllerOf host gs) else Set.empty) (Game.hostOf oid gs))) objects,
-          -- CR 205.3m's creature types off the same objects and the same
-          -- reader, for slotNames' reason: Heirloom Blade's dead creature is
-          -- read as it last existed (CR 603.10a), and a face-down one has none
-          -- (CR 708.2a).
-          Filter.slotCreatureTypes = fmap (foldMap (foldMap (Set.filter Subtype.isCreatureType . Filter.subtypes) . Projection.viewWithLastKnownAnywhere gs)) objects,
-          -- CR 208.1's toughness off the same objects and the same reader, for
-          -- slotNames' reason once more: Profaner of the Dead's exploited creature
-          -- is in a graveyard by the time the trigger resolves, and CR 608.2h is
-          -- what still answers for it. Only where the slot names exactly ONE
-          -- object, which the field's own note is about.
-          Filter.slotToughnesses = Map.mapMaybe (oneToughness gs) objects,
-          -- CR 601.2c's PLAYERS out of the same CR 608.2b-filtered map
-          -- effectSlotObjects takes the objects from, and the reason the
-          -- resolution has to hand them over at all: CR 113.7 makes
-          -- Filter.source the ability's SOURCE, while its targets and its
-          -- trigger's bindings are stamped on the ability object on the stack,
-          -- so Pawl.Engine.Count.playersFor reading the source's own bindings
-          -- finds nothing for every ability. Keening Stone's "that player's
-          -- graveyard" proves the activated road and Price of Knowledge's "that
-          -- player's hand" the triggered one (Pawl.CountSpec).
-          Filter.slotPlayers = fmap (Set.fromList . Maybe.mapMaybe Recipient.playerOf . Set.toList) legal,
-          -- CR 202.3 off the SOURCE, for the two atoms that compare a candidate
-          -- against it (Filter.ManaValueLessThanSource, CR 702.85a's cascade;
-          -- Filter.ManaValueEqualToSource, CR 702.53a's transmute and CR 702.71a's
-          -- transfigure).
-          -- The ONE filler of that field, which is what makes it a
-          -- resolution-position atom: it is Nothing everywhere else, and
-          -- Pawl.FilterPositionLintSpec is what keeps a card out of those
-          -- positions.
-          --
-          -- Through CR 608.2h's last-known reader, slotNames' reason: a cascade
-          -- spell countered while its trigger is still on the stack has left, and
-          -- "this spell's mana value" is a reference the trigger already made.
-          Filter.sourceManaValue = Filter.manaValue =<< Projection.viewWithLastKnownAnywhere gs source,
-          -- CR 201.2a off the SOURCE, for the one atom that compares a
-          -- candidate's names against them (Filter.SameNameAsSource, CR
-          -- 702.60a's ripple). The ONE filler of that field, the mana value's
-          -- reason one characteristic over: it is empty everywhere else, and
-          -- Pawl.FilterPositionLintSpec is what keeps a card out of those
-          -- positions.
-          --
-          -- Through CR 608.2h's last-known reader for that field's reason: a
-          -- ripple spell countered while its trigger is still on the stack has
-          -- left, and "this spell" is a reference the trigger already made.
-          Filter.sourceNames = foldMap Filter.names (Projection.viewWithLastKnownAnywhere gs source)
-        }
+  Projection.framedBySlots
+    gs
+    (Binding.objectsBySlot legal bindings)
+    (Binding.playersBySlot legal)
+    -- CR 607.2d: the SOURCE's choices (CR 113.7), read LIVE for the group
+    -- half's reason: CR 608.2c has the clauses carried out in order, so the
+    -- name an earlier clause chose is part of the state a later one is read
+    -- against -- Petra Sphinx's "if that card has the chosen name" over the
+    -- card its own reveal bound. CR 608.2h's last-known reader is inside
+    -- choicesOf, for the source that has already left (Conjurer's Ban).
+    -- Brass Herald's "creature cards of the chosen type revealed this way" is
+    -- the chosen subtype's proof (Pawl.ResolveSpec).
+    (SourceContext.sourceContext gs (Just controller) source)
+      { -- CR 608.2c: the numbers earlier clauses of THIS resolution stamped on
+        -- slots, for the one Filter atom that compares a candidate against one
+        -- (Filter.PowerIsAmountInSlot) -- Localized Destruction's "power equal to
+        -- the amount of {E} paid this way". Live off the resolving object, the
+        -- group half's own read, so a clause reads what the clause before it bound.
+        Filter.boundAmounts = Map.mapMaybe Binding.Type.amount bindings,
+        Filter.slotStickers = Map.mapMaybe Binding.Type.sticker bindings,
+        -- CR 202.3 off the SOURCE, for the two atoms that compare a candidate
+        -- against it (Filter.ManaValueLessThanSource, CR 702.85a's cascade;
+        -- Filter.ManaValueEqualToSource, CR 702.53a's transmute and CR 702.71a's
+        -- transfigure).
+        -- The ONE filler of that field, which is what makes it a
+        -- resolution-position atom: it is Nothing everywhere else, and
+        -- Pawl.FilterPositionLintSpec is what keeps a card out of those
+        -- positions.
+        --
+        -- Through CR 608.2h's last-known reader: a cascade spell countered
+        -- while its trigger is still on the stack has left, and "this spell's
+        -- mana value" is a reference the trigger already made.
+        Filter.sourceManaValue = Filter.manaValue =<< Projection.viewWithLastKnownAnywhere gs source,
+        -- CR 201.2a off the SOURCE, for the one atom that compares a
+        -- candidate's names against them (Filter.SameNameAsSource, CR
+        -- 702.60a's ripple). The ONE filler of that field, the mana value's
+        -- reason one characteristic over: it is empty everywhere else, and
+        -- Pawl.FilterPositionLintSpec is what keeps a card out of those
+        -- positions.
+        --
+        -- Through CR 608.2h's last-known reader for that field's reason: a
+        -- ripple spell countered while its trigger is still on the stack has
+        -- left, and "this spell" is a reference the trigger already made.
+        Filter.sourceNames = foldMap Filter.names (Projection.viewWithLastKnownAnywhere gs source)
+      }
 
--- CR 208.1 off the ONE object a slot names, for effectContext's slotToughnesses
--- above. Nothing for a slot naming a group or nothing at all -- CR 115.10a's
--- group binding has no single toughness -- and nothing for an object that has no
--- toughness, which leaves Filter.ToughnessLessThanBound vacuously False either way.
-oneToughness :: GameState -> Set ObjectId -> Maybe Integer
-oneToughness gs objects = case Set.toList objects of
-  [oid] -> Filter.toughness =<< Projection.viewWithLastKnownAnywhere gs oid
-  _ -> Nothing
-
--- The ONE object each of a resolution's TARGET slots names, shared by
--- effectContext above and effectViewOf below so the two cannot disagree about
--- which object a slot is.
-effectSlotObjects :: Map.Map SlotName (Set Recipient) -> Map.Map SlotName ObjectId
-effectSlotObjects = Map.mapMaybe Recipient.objectOf . Map.mapMaybe Binding.onlyOne
+-- Every object a resolution's TARGET slots name, CR 608.2b's legal ones only:
+-- what effectViewOf below answers through CR 608.2h's last-known reader.
+effectTargetObjects :: Map.Map SlotName (Set Recipient) -> Set ObjectId
+effectTargetObjects = foldMap (Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList)
 
 -- The GROUP bindings a resolution has made so far, read LIVE off the resolving
 -- object (CR 608.2c): a slot an earlier clause of this same resolution defined is
@@ -3426,7 +3358,7 @@ slotBindings = resolvingBindings
 -- Any other id keeps viewWithLastKnown's blank for a gone object.
 effectViewOf :: ObjectId -> Map.Map SlotName (Set Recipient) -> GameState -> ObjectId -> Maybe Filter.View
 effectViewOf source legal gs oid =
-  if oid `elem` effectSlotObjects legal
+  if Set.member oid (effectTargetObjects legal)
     then Projection.viewWithLastKnownAnywhere gs oid
     else Projection.viewWithLastKnown source gs oid
 

@@ -3892,7 +3892,7 @@ interveningHolds gs pending =
             -- creature is red" asks the source's CR 303.4b host and Tablet of the
             -- Guilds' "the chosen colors" its CR 607.2d choices. Stack's CR 608.2a
             -- re-check builds the same record so the two checks cannot disagree.
-            ((SourceContext.sourceContext gs (Just (PendingTrigger.controller pending)) oid) {Filter.slotObjects = Binding.slotObjects (PendingTrigger.bindings pending), Filter.slotPlayers = Binding.slotPlayers (PendingTrigger.bindings pending), Filter.boundAmounts = Condition.inheritedX (TriggeredAbility.condition (PendingTrigger.ability pending)) oid gs})
+            (Projection.framedByBindings gs (PendingTrigger.bindings pending) (SourceContext.sourceContext gs (Just (PendingTrigger.controller pending)) oid) {Filter.boundAmounts = Condition.inheritedX (TriggeredAbility.condition (PendingTrigger.ability pending)) oid gs})
             gs
             oid
             cond

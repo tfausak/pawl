@@ -260,7 +260,7 @@ interveningStillHolds :: GameState.GameState -> Object.Object -> ObjectId -> Tri
 interveningStillHolds gs obj srcId trigger =
   Condition.holds
     (Projection.viewWithLastKnownAnywhere gs)
-    ((SourceContext.sourceContext gs (Just (Object.owner obj)) srcId) {Filter.slotObjects = Binding.slotObjects (Object.bindings obj), Filter.slotPlayers = Binding.slotPlayers (Object.bindings obj), Filter.boundAmounts = Condition.inheritedX trigger srcId gs})
+    (Projection.framedByBindings gs (Object.bindings obj) (SourceContext.sourceContext gs (Just (Object.owner obj)) srcId) {Filter.boundAmounts = Condition.inheritedX trigger srcId gs})
     gs
     srcId
 

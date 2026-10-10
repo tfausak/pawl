@@ -58,77 +58,15 @@ import qualified Pawl.Types.Zone as Zone
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Object" $ do
   -- CR 402.1: a card in a hand, which is most of what a game state holds. Every
-  -- optional axis is at its default, so the literal is the five required keys and
-  -- nothing else -- this is the case that pins the OMISSION, and a field switched
+  -- optional axis is at Object.new's default, so the literal is the five required
+  -- keys and nothing else -- this is the case that pins the OMISSION, and a field switched
   -- back to 'Fields.required' reappears here. `plotted` is absent against the
   -- Just 0 below, which CR 702.170a makes two different cards rather than one.
   Spec.it s "a card in a hand" $
     Common.assertCodec
       s
       Object.codec
-      Object.MkObject
-        { Object.owner = PlayerId.MkPlayerId 1,
-          Object.identity = Nothing,
-          Object.enteredUnder = Nothing,
-          Object.source = Source.OfCard (PrintingId.MkPrintingId 2),
-          Object.zone = Zone.Hand,
-          Object.tapped = TapState.Untapped,
-          Object.facing = Facing.FaceUp,
-          Object.flipped = False,
-          Object.exiledFaceDown = False,
-          Object.exileLookers = Set.empty,
-          Object.damage = 0,
-          Object.sickness = Sickness.Sick,
-          Object.controlClock = Map.empty,
-          Object.bindings = Map.empty,
-          Object.counters = Map.empty,
-          Object.counterTimestamps = Map.empty,
-          Object.attachedTo = Nothing,
-          Object.chosenColors = Set.empty,
-          Object.chosenSubtype = Nothing,
-          Object.chosenNames = Set.empty,
-          Object.chosenPlayer = Nothing,
-          Object.timestamp = Timestamp.MkTimestamp 3,
-          Object.face = Nothing,
-          Object.turnedOverAt = Nothing,
-          Object.worldSince = Nothing,
-          Object.playableFromExile = Nothing,
-          Object.plotted = Nothing,
-          Object.foretold = Nothing,
-          Object.foretellCostReduction = Nothing,
-          Object.warped = Nothing,
-          Object.preparedCopyOf = Nothing,
-          Object.ringBearerFor = Nothing,
-          Object.stickers = Seq.empty,
-          Object.duplicate = Nothing,
-          Object.paired = Nothing,
-          Object.protector = Nothing,
-          Object.ventureRoom = Nothing,
-          Object.classLevel = Nothing,
-          Object.unlockedHalves = Set.empty,
-          Object.designations = Set.empty,
-          Object.designationValues = Map.empty,
-          Object.storedResults = Map.empty,
-          Object.paidCosts = Map.empty,
-          Object.tributePaid = False,
-          Object.bestowed = False,
-          Object.mutating = False,
-          Object.prototyped = False,
-          Object.boughtBack = False,
-          Object.unannounced = False,
-          Object.spliced = Seq.empty,
-          Object.phyrexianLifePaid = 0,
-          Object.manaSpent = Mana.MkMana [],
-          Object.announcedX = Nothing,
-          Object.castFrom = Nothing,
-          Object.castUsing = Nothing,
-          Object.castGrant = Nothing,
-          Object.detainedUntil = Set.empty,
-          Object.goadedBy = Set.empty,
-          Object.doesNotUntapFor = 0,
-          Object.exertedBy = Set.empty,
-          Object.activatedOnce = Map.empty
-        }
+      (Object.new (PlayerId.MkPlayerId 1) (Source.OfCard (PrintingId.MkPrintingId 2)) Zone.Hand (Timestamp.MkTimestamp 3))
       ( " {\"owner\":1,\"source\":{\"type\":\"OfCard\",\"value\":2}"
           <> ",\"zone\":{\"type\":\"Hand\"},\"sickness\":{\"type\":\"Sick\"}"
           <> ",\"timestamp\":3} "

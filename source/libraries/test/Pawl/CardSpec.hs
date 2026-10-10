@@ -4994,8 +4994,8 @@ filterSlotsReadSingly predicate = case predicate of
   -- Reads the whole set too, off its own field.
   Filter.Type.SharesCreatureTypeWithBound _ -> []
   -- The second arm with an answer, IsControllerOfBound's below: CR 208.1's
-  -- comparison wants ONE toughness, and Pawl.Engine.Resolve.Slots.oneToughness
-  -- declines a slot that names a group.
+  -- comparison wants ONE toughness, and Pawl.Engine.Projection.framedBySlots
+  -- declines a slot that names several.
   Filter.Type.ToughnessLessThanBound slot -> [slot]
   Filter.Type.HasChosenName -> []
   -- Reads no slot either: CR 105.2's colour arrives on Filter.Context.

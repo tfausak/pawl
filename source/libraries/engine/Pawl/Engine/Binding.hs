@@ -1414,15 +1414,10 @@ modesOf m = Maybe.fromMaybe Seq.empty (Binding.modes =<< Map.lookup chosenModes 
 targetsOf :: Map SlotName Binding -> Map SlotName (Set Recipient)
 targetsOf = Map.filter (not . Set.null) . Map.mapMaybe Binding.targets
 
--- The OBJECTS a binding environment names as a TARGET, one slot at a time:
--- targetsOf with the player recipients dropped. Half of what
--- Pawl.Engine.Filter.Context's slotObjects holds -- `slotObjects` below is the
--- whole, group binding included.
---
--- No CR 608.2b legality filter, unlike Pawl.Engine.Resolve.Slots.effectContext's
--- version: what this is read for is CR 603.4's two intervening-"if" checks, and
--- what they aim at is a slot the EVENT bound (Binding.became), which was never
--- chosen and so was never a target to become illegal.
+-- The ONE object each of a binding environment's TARGET slots names, for a
+-- reader that compares a slot against a single id -- Pawl.Engine.Event.Match's
+-- "that creature" trigger conditions. A Filter.Context's slot map is
+-- objectsBySlot below, which keeps a slot naming several.
 objectSlots :: Map SlotName Binding -> Map SlotName ObjectId
 objectSlots = objectsIn . targetsOf
 
@@ -1436,18 +1431,23 @@ objectSlots = objectsIn . targetsOf
 playerSlots :: Map SlotName Binding -> Map SlotName PlayerId
 playerSlots = playersIn . targetsOf
 
--- What Pawl.Engine.Filter.Context's slotPlayers holds: every PLAYER a slot
--- names, slotObjects' twin the way playerSlots above is objectSlots' -- and
--- kept apart from that one because a reader of the field takes the whole set
--- and narrows it itself (Pawl.Engine.Count.slotPlayers), where playerSlots
--- collapses to CR 601.2c's one recipient before its reader ever sees it.
---
--- ABSENT versus EMPTY is Filter.Context's own doctrine: a key for every slot
--- the environment bound, so a slot bound only to an object is here with an
--- empty set and Count.slotPlayers declines it rather than falling back to the
--- source's bindings, which for an ability is #1783's read.
+-- playersBySlot over a whole environment's own targets, objectsBySlot's twin
+-- in slotObjects below.
 slotPlayers :: Map SlotName Binding -> Map SlotName (Set PlayerId)
-slotPlayers = fmap (Set.fromList . Maybe.mapMaybe Recipient.playerOf . Set.toList) . targetsOf
+slotPlayers = playersBySlot . targetsOf
+
+-- What Pawl.Engine.Filter.Context's slotPlayers holds: every PLAYER each target
+-- slot names, objectsBySlot's twin -- and kept apart from playerSlots because a
+-- reader of the field takes the whole set and narrows it itself
+-- (Pawl.Engine.Count.slotPlayers), where playerSlots collapses to CR 601.2c's
+-- one recipient before its reader ever sees it.
+--
+-- ABSENT versus EMPTY is Filter.Context's own doctrine: a key for every target
+-- slot, so a slot naming only an object is here with an empty set and
+-- Count.slotPlayers declines it rather than falling back to the source's
+-- bindings, which for an ability is #1783's read.
+playersBySlot :: Map SlotName (Set Recipient) -> Map SlotName (Set PlayerId)
+playersBySlot = fmap (Set.fromList . Maybe.mapMaybe Recipient.playerOf . Set.toList)
 
 -- playerSlots' inner half, over the PROJECTED targets a resolution already holds
 -- rather than over a whole environment. Pawl.Engine.Resolve reads it that way:
@@ -1486,32 +1486,38 @@ objectsOf slot m = Binding.objects =<< Map.lookup slot m
 
 -- Every GROUP binding an environment holds, keyed by slot: objectsOf over the
 -- whole map, for a reader that wants them all at once rather than one name at a
--- time. What Pawl.Engine.Resolve.Slots.effectContext puts in
--- Pawl.Engine.Filter.Context's slotObjects so that CR 115.10a's group is visible
--- to the IsBound atom.
+-- time. objectsBySlot's group half.
 groupsOf :: Map SlotName Binding -> Map SlotName (Seq ObjectId)
 groupsOf = Map.mapMaybe Binding.objects
 
--- What Pawl.Engine.Filter.Context's slotObjects holds: every object a slot
--- names, both shapes at once -- the ONE object a target slot names (objectSlots)
--- and every member of a group (groupsOf). One function so that no reader of that
--- field learns only half of what a slot may name; the singular readers narrow it
--- back through Pawl.Engine.Filter.slotOneObject.
+-- objectsBySlot over a whole environment's own targets, as announced: no CR
+-- 608.2b re-check, which is right for every caller -- CR 603.4's
+-- intervening-"if" is checked at CR 608.2a, before targets are re-checked, and
+-- the rest read an announcement or a payment rather than a resolution.
 slotObjects :: Map SlotName Binding -> Map SlotName (Set ObjectId)
-slotObjects m = withGroups (objectSlots m) (groupsOf m)
+slotObjects m = objectsBySlot (targetsOf m) m
 
--- slotObjects over the two halves separately, for the caller that cannot take
--- the target half off an environment: Pawl.Engine.Resolve reads it out of CR
--- 608.2b's re-validated recipients instead. An empty group is dropped, so an
--- absent key and "names nothing" stay the same question. The union meets both
--- shapes only for a payment of several objects (setPaid), whose target half
--- `onlyOne` has already dropped, so the group alone answers.
-withGroups :: Map SlotName ObjectId -> Map SlotName (Seq ObjectId) -> Map SlotName (Set ObjectId)
-withGroups singles groups =
-  Map.unionWith
-    Set.union
-    (fmap Set.singleton singles)
-    (Map.filter (not . Set.null) (fmap (Set.fromList . Foldable.toList) groups))
+-- THE answer to "which objects does each slot name", for every
+-- Pawl.Engine.Filter.Context: every object recipient of a target slot,
+-- WHATEVER its count (CR 601.2c lets one slot hold several), and every member
+-- of a group (CR 115.10a). A reader that can take no more than one narrows
+-- through Pawl.Engine.Filter.slotOneObject; IsBound and Count's OverBound take
+-- the set, so Command the Dreadhorde's "those cards" is both of its targets.
+--
+-- `targets` is the caller's, and WHICH targets is the one rules difference
+-- between callers: the announcement's own at CR 601.2c (Pawl.Engine.Target),
+-- the recipients CR 608.2b left legal at resolution
+-- (Pawl.Engine.Resolve.Slots.effectContext). An empty set is dropped, so an
+-- absent key and "names nothing" stay the same question.
+objectsBySlot :: Map SlotName (Set Recipient) -> Map SlotName Binding -> Map SlotName (Set ObjectId)
+objectsBySlot targets bindings =
+  Map.filter
+    (not . Set.null)
+    ( Map.unionWith
+        Set.union
+        (fmap (Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList) targets)
+        (fmap (Set.fromList . Foldable.toList) (groupsOf bindings))
+    )
 
 -- The copy snapshot stored on an object, if any (CR 707.2).
 copyOf :: Map SlotName Binding -> Maybe ProjectedCharacteristics

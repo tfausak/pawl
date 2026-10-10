@@ -43,6 +43,7 @@ import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.BattlefieldCandidate as BattlefieldCandidate
+import qualified Pawl.Types.Binding as Binding.Type
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -102,6 +103,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementProvenance as ReplacementProvenance
 import qualified Pawl.Types.RuleAbilities as RuleAbilities
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
+import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
@@ -1165,6 +1167,59 @@ viewWithLastKnownAnywhere gs oid =
   if Map.member oid (GameState.objects gs)
     then fullView gs oid
     else fmap (Count.lastKnownView (fullView gs) oid gs) (Map.lookup oid (GameState.lastKnown gs))
+
+-- `context` with every SLOT-derived field filled from one slot map: the objects
+-- each slot names (Pawl.Engine.Binding.objectsBySlot), the players
+-- (Binding.playersBySlot), and what the board says about those objects -- CR
+-- 201.2a's names, CR 110.2's controllers, CR 205.3m's creature types, CR
+-- 208.1's toughness and CR 303.4b's host's controller. The slot-derived half
+-- of what Pawl.Engine.SourceContext.framedBy is for the source: one filler, so
+-- a target slot's filter (Pawl.Engine.Target.slotContext), a resolution's
+-- (Pawl.Engine.Resolve.Slots.effectContext) and CR 603.4's two
+-- intervening-"if" checks cannot answer "that creature" differently.
+--
+-- Through CR 608.2h's last-known reader, because a bound object is a reference
+-- the spell or ability already made: Bifurcate's creature may have left by the
+-- time its search runs, Heirloom Blade's has died (CR 603.10a), Harness the
+-- Storm's spell may have been countered, and Unbury's departed target still
+-- lends its creature types to the one that stayed. Not the HOST's
+-- controller, which is read live off the battlefield -- "the permanent the
+-- Aura is attached to" is a question about the board now, and a host that has
+-- left or phased out gives an empty set, as Filter.attachedToView does; and the
+-- PROJECTED controller (CR 613.1b), which the scenario "CR 613.1b the host's
+-- controller is the projected one, not its owner" in data/scenarios/aura
+-- proves.
+--
+-- A key per slot the map names, so SameControllerAsBound's widening on an
+-- absent key is CR 601.2c's slot nobody has answered yet. Toughness only for a
+-- slot naming exactly ONE object: no printed comparison asks a group for one.
+-- All thunks: a filter naming none of the atoms forces no projection.
+framedBySlots :: GameState -> Map SlotName (Set ObjectId) -> Map SlotName (Set PlayerId.PlayerId) -> Filter.Context -> Filter.Context
+framedBySlots gs objects players context =
+  let lastKnown = viewWithLastKnownAnywhere gs
+      over read_ = fmap (foldMap (foldMap read_ . lastKnown)) objects
+      hostController oid = case Game.hostOf oid gs of
+        Just host | Set.member host (GameState.battlefield gs) -> maybe Set.empty Set.singleton (controllerOf host gs)
+        _ -> Set.empty
+      oneToughness named = case Set.toList named of
+        [oid] -> Filter.toughness =<< lastKnown oid
+        _ -> Nothing
+   in context
+        { Filter.slotObjects = objects,
+          Filter.slotPlayers = players,
+          Filter.slotNames = over Filter.names,
+          Filter.slotControllers = over (maybe Set.empty Set.singleton . Filter.controller),
+          Filter.slotCreatureTypes = over (Set.filter Subtype.isCreatureType . Filter.subtypes),
+          Filter.slotToughnesses = Map.mapMaybe oneToughness objects,
+          Filter.slotHostControllers = fmap (foldMap hostController) objects
+        }
+
+-- framedBySlots off a whole binding environment as announced
+-- (Binding.slotObjects): CR 603.4's intervening "if", which Event.Trigger checks
+-- as the trigger is gathered and Stack again at CR 608.2a -- before CR 608.2b's
+-- re-check, so no target has been dropped yet.
+framedByBindings :: GameState -> Map SlotName Binding.Type.Binding -> Filter.Context -> Filter.Context
+framedByBindings gs bindings = framedBySlots gs (Binding.slotObjects bindings) (Binding.slotPlayers bindings)
 
 -- CR 608.2h: this object's last known information, and only when the id names
 -- nothing, so a caller falls through to its live reader. Shared by the two

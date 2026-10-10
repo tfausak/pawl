@@ -47,7 +47,6 @@ import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
-import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -55,7 +54,6 @@ import qualified Pawl.Types.GraveyardArrangement as GraveyardArrangement
 import qualified Pawl.Types.GraveyardOrder as GraveyardOrder
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeChange as LifeChange
-import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.Object as Object
@@ -72,7 +70,6 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Sickness as Sickness
-import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
@@ -335,7 +332,10 @@ handCards printing pid k gs =
   let addOne g =
         let (printingId, gP) = Game.intern printing g
             (oid, g1) = Game.freshObjectId gP
-            obj = Object.MkObject pid (Just (Game.mintIdentity oid pid)) Nothing (Source.OfCard printingId) Zone.Hand TapState.Untapped Facing.FaceUp False False Set.empty 0 (Sickness.Settled pid) Map.empty Map.empty Map.empty Map.empty Nothing Set.empty Nothing Set.empty Nothing (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty Map.empty Map.empty Map.empty False False False False False False Seq.empty 0 (Mana.MkMana []) Nothing Nothing Nothing Nothing Set.empty Set.empty 0 Set.empty Map.empty Nothing Nothing Seq.empty
+            obj =
+              (Game.cardObject oid pid printingId Zone.Hand (Timestamp.MkTimestamp 0))
+                { Object.sickness = Sickness.Settled pid
+                }
          in g1
               { GameState.objects = Map.insert oid obj (GameState.objects g1),
                 GameState.hand = Map.insertWith (Seq.><) pid (Seq.singleton oid) (GameState.hand g1)

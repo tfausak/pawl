@@ -76,7 +76,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Recruit as Recruit
 import qualified Pawl.Engine.Replacement as Replacement
-import Pawl.Engine.Resolve.Slots (battlefieldMatching, boundSlots, conditionSlots, effectContext, effectObjectRefs, effectPlayerRefs, effectSlotObjects, effectViewOf, graveyardCardsOf, handCardsOf, legalMany, legalOne, libraryCardsOf, matchingFromAmong, objectRefObjects, overRelations, playerRefPlayers, replacementRowSlots, resolutionReads, slotBindings, slotGroup, zoneScopePlayers)
+import Pawl.Engine.Resolve.Slots (battlefieldMatching, boundSlots, conditionSlots, effectContext, effectObjectRefs, effectPlayerRefs, effectViewOf, graveyardCardsOf, handCardsOf, legalMany, legalOne, libraryCardsOf, matchingFromAmong, objectRefObjects, overRelations, playerRefPlayers, replacementRowSlots, resolutionReads, slotBindings, slotGroup, zoneScopePlayers)
 import qualified Pawl.Engine.Restamp as Restamp
 import qualified Pawl.Engine.Ring as Ring
 import qualified Pawl.Engine.Room as Room
@@ -2077,12 +2077,11 @@ sourceObjectOf src = case src of
   Source.OfCardCopy _ -> []
   Source.OfInherentTrigger _ -> []
 
--- Every object a binding environment names, both shapes: the one object a target
--- slot holds (CR 601.2c) and every member of a group a clause defines without
--- targeting it (CR 115.10a). Not Pawl.Engine.Binding.slotObjects, which narrows a
--- multi-target slot away through `onlyOne` -- a spell that targets two creatures
--- refers to both of them, and CR 609.7a asks for every object referred to.
--- Player recipients drop out, the rule's classes all being objects.
+-- Every object a binding environment names (Pawl.Engine.Binding.slotObjects):
+-- every target a slot holds (CR 601.2c) and every member of a group a clause
+-- defines without targeting it (CR 115.10a) -- a spell that targets two
+-- creatures refers to both of them, and CR 609.7a asks for every object
+-- referred to. Player recipients drop out, the rule's classes all being objects.
 --
 -- TWO SLOTS ARE DROPPED, by NAME rather than by comparing ids. Binding.thisAbility
 -- holds the ability's OWN id (CR 602.2a, 603.3), which pawl stamps so a card can
@@ -2111,8 +2110,7 @@ sourceObjectOf src = case src of
 referentsOfBindings :: Map.Map SlotName Binding.Type.Binding -> [ObjectId]
 referentsOfBindings bindings =
   let named = Map.withoutKeys bindings (Set.fromList [Binding.thisAbility, Binding.collectedEvidence, Binding.announcedTargets])
-   in foldMap (Maybe.mapMaybe Recipient.objectOf . Set.toList) (Binding.targetsOf named)
-        <> foldMap Foldable.toList (Binding.groupsOf named)
+   in foldMap Set.toList (Binding.slotObjects named)
 
 -- CR 608.2h for an entry rider's counts: the card writes a Quantity per counter
 -- kind (CR 122.6, CR 107.3c -- Printlifter Ooze's "X +1/+1 counters on it, where
@@ -12250,7 +12248,7 @@ gateCostOf resolving source controller legal gate gs =
       -- other filter of this resolution reads -- CR 608.2b's legal targets, the
       -- reserved cost slots among them (Binding.discardedCard), and the groups.
       -- Pawl.ConjureSpec's Calim's Breath cases prove it.
-      slots = Binding.withGroups (effectSlotObjects legal) (Binding.groupsOf (slotBindings resolving gs))
+      slots = Binding.objectsBySlot legal (slotBindings resolving gs)
    in (slots, costs)
 
 -- CR 118.3 / 800.4f for one seat, before any offer: could this payer pay any
