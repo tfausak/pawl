@@ -1301,6 +1301,19 @@ combatReplaySpec s =
           Spec.assertEqWith s "choosing the second round trips" (Replay.decode p (Replay.encode p b)) (Just b)
           Spec.assertEqWith s "choosing the first round trips" (Replay.decode p (Replay.encode p a)) (Just a)
           Spec.assertEqWith s "a short transcript places the first offered" (Replay.defaultAnswer p) a
+        -- CR 123.5c: which split object keeps the stickers is a decision.
+        Spec.it s "ChooseStickerKeeper round-trips through the transcript" $ do
+          let p = Prompt.ChooseStickerKeeper decider S.alice (PrintingId.MkPrintingId 3 NonEmpty.:| [PrintingId.MkPrintingId 4])
+          Spec.assertEqWith s "choosing the second round trips" (Replay.decode p (Replay.encode p 1)) (Just 1)
+          Spec.assertEqWith s "a short transcript keeps them on the first" (Replay.defaultAnswer p) 0
+        -- CR 702.33h: sticker kicker's "may put" carries a declining half.
+        Spec.it s "ChooseStickerOrNone round-trips through the transcript" $ do
+          let a = StickerRef.MkStickerRef S.alice 0 StickerKind.Art 0
+              b = StickerRef.MkStickerRef S.alice 1 StickerKind.Art 2
+              p = Prompt.ChooseStickerOrNone decider S.alice (ObjectId.MkObjectId 7) (a NonEmpty.:| [b])
+          Spec.assertEqWith s "declining round trips" (Replay.decode p (Replay.encode p Nothing)) (Just Nothing)
+          Spec.assertEqWith s "and so does choosing the second" (Replay.decode p (Replay.encode p (Just b))) (Just (Just b))
+          Spec.assertEqWith s "a short transcript places nothing" (Replay.defaultAnswer p) Nothing
         -- CR 123.6b: where the controller put the word is a decision.
         Spec.it s "ChooseNamePosition round-trips through the transcript" $ do
           let p = Prompt.ChooseNamePosition decider S.bob (ObjectId.MkObjectId 7) (0 NonEmpty.:| [1, 2])

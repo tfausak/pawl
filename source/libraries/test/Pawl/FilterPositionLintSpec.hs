@@ -341,6 +341,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsInZone _ -> 0
   Filter.Type.WasCastFrom _ -> 0
   Filter.Type.TagWasSpent _ -> 0
+  Filter.Type.Kicked -> 0
   Filter.Type.IsRingBearer -> 0
   Filter.Type.IsPaired -> 0
   Filter.Type.IsPairedWithSource -> 0
@@ -1147,9 +1148,8 @@ timesPaidKeywords value = case value of
 -- engine joins on, and the codec is injective, so the two agree.
 --
 -- Stated about the PRINTED keywords, which is what a card file can be wrong
--- about. Nothing in data/cards/ grants one for a CR 613 projection to add
--- instead: each of the six Kicker or Multikicker occurrences sits at a face's own
--- `keywords`, 2026-09-02.
+-- about. Every Kicker or Multikicker in data/cards/ sits at a face's own
+-- `keywords`; Wicker Picker's granted StickerKicker is named by no TimesPaid.
 timesPaidOffends :: Face.Face Card.Type.Card -> Bool
 timesPaidOffends card =
   let printed = fmap (Codec.encode Keyword.Codec.codec) (Keyword.Engine.optionalCosts (Face.keywordSet card))
@@ -1907,6 +1907,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         reverseMana cost = cost {Cost.Type.mana = fmap (\(ManaCost.MkManaCost symbols) -> ManaCost.MkManaCost (reverse symbols)) (Cost.Type.mana cost)}
         respell keyword = case keyword of
           Keyword.Multikicker cost -> Keyword.Multikicker (reverseMana cost)
+          Keyword.StickerKicker cost -> Keyword.StickerKicker (reverseMana cost)
           _ -> keyword
     Spec.assertBool s (not (timesPaidOffends face)) "the control: Gnarlid Pack as printed is accepted"
     Spec.assertBool s (timesPaidOffends (face {Face.keywords = Map.mapKeys respell (Face.keywords face)})) "a reordered multikicker cost is rejected"

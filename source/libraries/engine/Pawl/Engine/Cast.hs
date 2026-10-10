@@ -30,6 +30,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Resolve.Slots as Slots
 import qualified Pawl.Engine.SplitSecond as SplitSecond
+import qualified Pawl.Engine.Sticker as Sticker
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
@@ -52,6 +53,7 @@ import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CostReduction as CostReduction
+import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.DuringPhase as DuringPhase
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
@@ -88,6 +90,7 @@ import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -2682,8 +2685,8 @@ followIntoPools old new gs =
 
 -- CR 702.33g/702.113b's own scope: a Quantity naming a CAST-ANNOUNCEMENT fact
 -- rather than a board or resolution one -- Quantity.WasKicked (CR 702.33d's
--- "kicked with any of its kicker costs", the only reading of "kicked" a bare
--- if-clause needs), Quantity.CastUsing (which ALTERNATIVE cost candidate CR
+-- "kicked" as CR 702.33e links it to kicker or multikicker, the only reading a
+-- bare if-clause needs), Quantity.CastUsing (which ALTERNATIVE cost candidate CR
 -- 601.2b's announcement settled on -- awaken, cleave, overload and the other
 -- CR 601.3-listed candidates), and Quantity.Literal, the threshold side of
 -- every such comparison. Nothing else qualifies, on purpose: rule 702.33g/113b
@@ -3640,6 +3643,16 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                           -- is stored before the event below snapshots the spell.
                           -- Nothing past the convoke record rejects.
                           State.modify' (\g -> g {GameState.continuousEffects = ridersUsed <> GameState.continuousEffects g})
+                          -- CR 702.33h: for each sticker kicker paid, the caster
+                          -- gets {TK}, then may put a sticker on the spell, which
+                          -- CR 123.3b allows only on a spell they own (Sticker.place).
+                          -- Before CR 601.2i's event, so a cast trigger sees it
+                          -- (Wicker Picker's ruling). Two sticker kickers of one cost
+                          -- are offered as one (gap #3635).
+                          stickerKicks <- State.gets (maybe 0 (\o -> sum [n | (Keyword.Type.StickerKicker {}, n) <- Map.toList (Object.paidCosts o)]) . Game.lookupObject sid)
+                          Monad.forM_ [1 .. stickerKicks] $ \_ -> do
+                            Monad.void (Event.putPlayerCounters (CounterCause.ByPayment pid) pid PlayerCounterKind.Ticket 1)
+                            Monad.void (Sticker.place True pid sid (Set.fromList [minBound .. maxBound]) Nothing False)
                           -- CR 601.2i: the spell has been cast. Emitted AFTER the
                           -- last step that can fail, so a rejected announcement
                           -- records nothing.

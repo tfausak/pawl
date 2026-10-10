@@ -73,8 +73,8 @@ data KeywordFamily
     Echo
   | -- | CR 702.32a: fading N.
     Fading
-  | -- | CR 702.33a: kicker [cost], which CR 702.33c's multikicker is a variant of
-    -- ("a multikicker cost is a kicker cost"), so one family covers both.
+  | -- | CR 702.33a: kicker [cost], with CR 702.33c's multikicker ("a multikicker
+    -- cost is a kicker cost") and CR 702.33h's sticker kicker ("means Kicker").
     Kicker
   | -- | CR 702.34a: flashback [cost].
     Flashback

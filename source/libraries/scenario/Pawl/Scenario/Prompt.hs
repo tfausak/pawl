@@ -85,6 +85,7 @@ deciderOf prompt = case prompt of
   Prompt.ChooseCardsFromAmong decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseDungeon decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseSticker decider _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseStickerOrNone decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseNamePosition decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseCompanion decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseFromOutsideTheGame decider _ _ _ _ -> Just (Decider.unwrap decider)
@@ -167,6 +168,7 @@ deciderOf prompt = case prompt of
   Prompt.OrderCostComponents decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.OrderCombatTolls decider _ _ -> Just (Decider.unwrap decider)
   Prompt.OrderComponentCards decider _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseStickerKeeper decider _ _ -> Just (Decider.unwrap decider)
   Prompt.OrderForEach decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseLoopMembers decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseRepeat decider _ _ _ -> Just (Decider.unwrap decider)
@@ -256,6 +258,7 @@ kindOf prompt = Text.pack $ case prompt of
   Prompt.ChooseCardsFromAmong {} -> "ChooseCardsFromAmong"
   Prompt.ChooseDungeon {} -> "ChooseDungeon"
   Prompt.ChooseSticker {} -> "ChooseSticker"
+  Prompt.ChooseStickerOrNone {} -> "ChooseStickerOrNone"
   Prompt.ChooseNamePosition {} -> "ChooseNamePosition"
   Prompt.ChooseCompanion {} -> "ChooseCompanion"
   Prompt.ChooseFromOutsideTheGame {} -> "ChooseFromOutsideTheGame"
@@ -338,6 +341,7 @@ kindOf prompt = Text.pack $ case prompt of
   Prompt.OrderCostComponents {} -> "OrderCostComponents"
   Prompt.OrderCombatTolls {} -> "OrderCombatTolls"
   Prompt.OrderComponentCards {} -> "OrderComponentCards"
+  Prompt.ChooseStickerKeeper {} -> "ChooseStickerKeeper"
   Prompt.OrderForEach {} -> "OrderForEach"
   Prompt.ChooseLoopMembers {} -> "ChooseLoopMembers"
   Prompt.ChooseRepeat {} -> "ChooseRepeat"

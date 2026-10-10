@@ -153,6 +153,8 @@ import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PayBranch as PayBranch
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PayObligation as PayObligation
+import qualified Pawl.Types.PermanentActed as PermanentActed
+import qualified Pawl.Types.PermanentAction as PermanentAction
 import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
@@ -445,6 +447,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Cycling {} -> []
   Keyword.Kicker _ -> []
   Keyword.Multikicker _ -> []
+  Keyword.StickerKicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
   Keyword.Mutate _ -> []
@@ -675,6 +678,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Renown _ -> []
   Keyword.Kicker _ -> []
   Keyword.Multikicker _ -> []
+  Keyword.StickerKicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
   Keyword.Mutate _ -> []
@@ -1231,6 +1235,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Renown _ -> []
   Keyword.Kicker _ -> []
   Keyword.Multikicker _ -> []
+  Keyword.StickerKicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
   Keyword.Mutate _ -> []
@@ -1845,6 +1850,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Renown _ -> []
   Keyword.Kicker _ -> []
   Keyword.Multikicker _ -> []
+  Keyword.StickerKicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
   Keyword.Mutate _ -> []
@@ -2623,6 +2629,7 @@ permissionsFor cardTypes keyword = case keyword of
   -- shape one clause below.
   Keyword.Kicker _ -> []
   Keyword.Multikicker _ -> []
+  Keyword.StickerKicker _ -> []
   Keyword.Entwine _ -> []
   -- CR 702.27a's "as you cast this spell" is kicker's shape above: an additional
   -- cost announced at CR 601.2b, never a permission to cast.
@@ -3541,6 +3548,20 @@ disguiseCosts keywords =
         _ -> Nothing
    in Set.toAscList (Set.fromList (Maybe.mapMaybe costOf (Set.toAscList keywords)))
 
+-- | CR 702.33d: a kicker cost of any kind, multikicker's and sticker kicker's
+-- among them (CR 702.33c, 702.33h).
+isKicker :: Keyword -> Bool
+isKicker keyword = familyOf keyword == Just KeywordFamily.Kicker
+
+-- | CR 702.33e: a Kicker or Multikicker keyword, printed or granted, which an
+-- object's "if kicked" reads; a sticker kicker (CR 702.33h) is not one. A
+-- wildcard, optionalCost's posture.
+isPrintedKicker :: Keyword -> Bool
+isPrintedKicker keyword = case keyword of
+  Keyword.Kicker _ -> True
+  Keyword.Multikicker _ -> True
+  _ -> False
+
 -- CR 601.2b: the OPTIONAL additional cost this keyword ability lets its spell's
 -- controller pay as they cast it, paired with how many times its rule lets it be
 -- paid -- Just 1 for kicker (CR 702.33a), offspring (CR 702.175a), casualty (CR
@@ -3561,6 +3582,8 @@ optionalCost :: Keyword -> Maybe (Cost Keyword, Maybe Natural)
 optionalCost keyword = case keyword of
   Keyword.Kicker cost -> Just (cost, Just 1)
   Keyword.Multikicker cost -> Just (cost, Nothing)
+  -- CR 702.33h: "means Kicker [cost]", so payable once.
+  Keyword.StickerKicker cost -> Just (cost, Just 1)
   Keyword.Squad cost -> Just (cost, Nothing)
   Keyword.Offspring cost -> Just (cost, Just 1)
   -- Minted rather than printed, bargain's and conspire's reason: rule 702.174a
@@ -4446,6 +4469,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Cycling {} -> []
   Keyword.Kicker _ -> []
   Keyword.Multikicker _ -> []
+  Keyword.StickerKicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
   Keyword.Mutate _ -> []
@@ -4832,6 +4856,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Cycling {} -> []
   Keyword.Kicker _ -> []
   Keyword.Multikicker _ -> []
+  Keyword.StickerKicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
   Keyword.Mutate _ -> []
@@ -5182,6 +5207,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Cycling {} -> []
   Keyword.Kicker _ -> []
   Keyword.Multikicker _ -> []
+  Keyword.StickerKicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
   Keyword.Mutate _ -> []
@@ -5462,6 +5488,10 @@ familyOf keyword = case keyword of
   -- CR 702.33c's last sentence, "a multikicker cost is a kicker cost", is why
   -- this answers the SAME family rather than owing one of its own.
   Keyword.Multikicker _ -> Just KeywordFamily.Kicker
+  -- CR 702.33h: sticker kicker "means Kicker [cost]", so a "spell with
+  -- kicker" or "kicked" reader matches it; Quantity.WasKicked's linked read
+  -- does not (isPrintedKicker).
+  Keyword.StickerKicker _ -> Just KeywordFamily.Kicker
   Keyword.Flashback _ -> Just KeywordFamily.Flashback
   Keyword.Bestow _ -> Just KeywordFamily.Bestow
   Keyword.Mutate _ -> Just KeywordFamily.Mutate
@@ -6031,8 +6061,9 @@ graft =
 -- CR 702.100c then falls out: a permanent that is not a creature has no power or
 -- toughness (CR 208.3), and Condition.holds reads an unanswerable side as False.
 --
--- Effect.Evolve rather than Effect.PutCounters, which is rule 702.100b: one opcode
--- is what ties the "evolves" marker to the placement. Renegade Krasis reads it.
+-- Effect.CounterAndMark rather than Effect.PutCounters, which is rule 702.100b:
+-- one opcode is what ties the "evolves" marker to the placement. Renegade Krasis
+-- reads it.
 
 -- CR 702.95a: soulbond, two triggered abilities. Bushido's shape -- one keyword,
 -- two conditions, and a TriggeredAbility carries one each -- with the pair of
@@ -6147,7 +6178,7 @@ soulbondOtherEnters =
 
 evolve :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 evolve =
-  let effect = Effect.Evolve Binding.triggerSource
+  let effect = Effect.CounterAndMark (PermanentActed.MkPermanentActed PermanentAction.Evolve Binding.triggerSource)
       entrantExceeds quantity =
         Condition.Compares
           ( Compares.MkCompares
@@ -6515,12 +6546,12 @@ mentorTarget = SlotName.MkSlotName (Text.pack "mentored")
 -- that dies in response still leaves the counter. "Other" is the condition's own,
 -- an identity check the Filter has no atom for.
 --
--- Through Effect.Train, evolve's opcode one rule over: rule 702.149c makes "when
+-- Through Effect.CounterAndMark, evolve's opcode: rule 702.149c makes "when
 -- this creature trains" mean the placement, so it has to be distinguishable from
 -- any other +1/+1 counter arriving.
 training :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 training =
-  let effect = Effect.Train Binding.triggerSource
+  let effect = Effect.CounterAndMark (PermanentActed.MkPermanentActed PermanentAction.Train Binding.triggerSource)
    in Mint.trigger
         ( TriggerCondition.SelfAttacksWithAnother
             (Filter.And [Filter.HasCardType CardType.Creature, Filter.Measures (Measures.MkMeasures Measure.Power Comparison.GreaterThan (Operand.OfSource Measure.Power))])

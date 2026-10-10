@@ -3868,6 +3868,7 @@ filterReads f = case f of
   -- it, so no Modification writes Object.manaSpent and no layer's ordering turns
   -- on this atom.
   Filter.Type.TagWasSpent _ -> Set.empty
+  Filter.Type.Kicked -> Set.empty
   -- Reads nothing: CR 701.54b keeps the ring-bearer designation off the copiable
   -- values, so no Modification writes Object.ringBearerFor.
   Filter.Type.IsRingBearer -> Set.empty
@@ -4045,6 +4046,7 @@ filterReadsPeers f = case f of
   Filter.Type.IsInZone _ -> False
   Filter.Type.WasCastFrom _ -> False
   Filter.Type.TagWasSpent _ -> False
+  Filter.Type.Kicked -> False
   Filter.Type.IsRingBearer -> False
   Filter.Type.IsPaired -> False
   Filter.Type.IsPairedWithSource -> False

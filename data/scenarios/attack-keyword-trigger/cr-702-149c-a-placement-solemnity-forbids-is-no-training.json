@@ -1,0 +1,28 @@
+{
+  "description": "CR 702.149c a placement Solemnity forbids is no training",
+  "note": "\"CR 702.149c whole card: training exiles the targeted creature\" with Solemnity beside the Savior. Training triggers and resolves, but Solemnity's \"counters can't be put on creatures\" leaves it placing none, and rule 702.149c makes training the placement, so \"whenever this creature trains\" never triggers: no target is asked for and bob's Hill Giant stays.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Savior of Ollenbock", "label": "savior", "ready": true },
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Solemnity", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Hill Giant", "label": "giant" }]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$savior", "$piker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": {} } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Hill Giant", "count": 1 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Counters": { "object": "$savior", "kind": { "type": "PlusOnePlusOne" }, "count": 0 } } }
+  ]
+}

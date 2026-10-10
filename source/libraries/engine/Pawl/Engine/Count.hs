@@ -457,6 +457,7 @@ bakePerspective viewOf context gs candidate predicate =
         Filter.Type.IsInZone _ -> predicate
         Filter.Type.WasCastFrom _ -> predicate
         Filter.Type.TagWasSpent _ -> predicate
+        Filter.Type.Kicked -> predicate
 
 -- A baked answer as a Filter. `And []` is the trivial predicate by
 -- Pawl.Types.Filter's own note, so its negation is the trivially false one --

@@ -522,6 +522,7 @@ filterNames asking criterion = case criterion of
   Filter.IsInZone _zone -> False
   Filter.WasCastFrom _zone -> False
   Filter.TagWasSpent _tag -> False
+  Filter.Kicked -> False
   Filter.And nested -> any (filterNames asking) nested
   Filter.Or nested -> any (filterNames asking) nested
   Filter.Not nested -> filterNames asking nested
@@ -1320,10 +1321,9 @@ effectNames asking onCard onAbility x = case x of
   Effect.SetClassLevel setClassLevel -> setClassLevelNames asking setClassLevel
   Effect.Unsuspect objectRef -> objectRefNames asking objectRef
   Effect.SetHalfLocked setHalfLocked -> setHalfLockedNames asking setHalfLocked
-  Effect.Evolve slotName -> slotNames asking slotName
+  Effect.CounterAndMark counterAndMark -> permanentActedNames asking (slotNames asking) counterAndMark
   Effect.BecomeProtector slotName -> slotNames asking slotName
   Effect.Mentor slotName -> slotNames asking slotName
-  Effect.Train slotName -> slotNames asking slotName
   Effect.Firebend manaAddition -> manaAdditionNames asking manaAddition
   Effect.Exploit -> False
   Effect.GiveGift -> False
@@ -1659,6 +1659,7 @@ keywordNames asking x = case x of
   Keyword.Fading _natural -> False
   Keyword.Kicker cost -> costNames asking (keywordNames asking) cost
   Keyword.Multikicker cost -> costNames asking (keywordNames asking) cost
+  Keyword.StickerKicker cost -> costNames asking (keywordNames asking) cost
   Keyword.Flashback cost -> costNames asking (keywordNames asking) cost
   Keyword.Fear -> False
   Keyword.Morph morph -> morphNames asking (keywordNames asking) morph

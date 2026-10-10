@@ -1,0 +1,31 @@
+{
+  "description": "CR 702.100b a placement Solemnity forbids is no evolution",
+  "note": "Watchful Radstag (2/2, evolve, and \"whenever this creature evolves, create a token that's a copy of it\") beside Solemnity. Hill Giant 3/3 enters and beats the Radstag on both axes, so evolve triggers and resolves, but Solemnity's \"counters can't be put on creatures\" leaves it placing none. Rule 702.100b makes evolving the placement and not the resolution, so no token is minted. CopySpec's \"Watchful Radstag mints a token copy of itself when it evolves\" is the same board without Solemnity.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Watchful Radstag", "label": "radstag", "ready": true },
+          { "card": "Solemnity", "ready": true },
+          { "card": "Mountain", "label": "m1", "ready": true },
+          { "card": "Mountain", "label": "m2", "ready": true },
+          { "card": "Mountain", "label": "m3", "ready": true },
+          { "card": "Mountain", "label": "m4", "ready": true }
+        ],
+        "hand": [{ "card": "Hill Giant", "label": "giant" }]
+      },
+      { "name": "bob" }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$giant", "mana": ["$m1", "$m2", "$m3", "$m4"] } } }
+  ],
+  "final": [
+    { "Count": { "player": "alice", "zone": "Battlefield", "card": "Watchful Radstag", "count": 1 } },
+    { "Counters": { "object": "$radstag", "kind": { "type": "PlusOnePlusOne" }, "count": 0 } },
+    { "Count": { "player": "alice", "zone": "Battlefield", "card": "Hill Giant", "count": 1 } }
+  ]
+}

@@ -62,7 +62,6 @@ import qualified Pawl.Engine.ManifestDread as ManifestDread
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Monarch as Monarch
 import qualified Pawl.Engine.MoveDuration as MoveDuration
-import qualified Pawl.Engine.NameWords as NameWords
 import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.Planechase as Planechase
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
@@ -379,7 +378,6 @@ import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.SpellWasCopied as SpellWasCopied
 import qualified Pawl.Types.SpendTrigger as SpendTrigger
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
-import qualified Pawl.Types.StickerKind as StickerKind
 import qualified Pawl.Types.StickerRef as StickerRef
 import qualified Pawl.Types.StoredResult as StoredResult
 import qualified Pawl.Types.Subtype as Subtype
@@ -985,6 +983,41 @@ alreadyTurnedFor resolving victim gs =
 graveyardCards :: Filter.Context -> Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> ZoneScope.ZoneScope -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
 graveyardCards context bindings controller gs scope filter_ =
   concatMap (\pid -> graveyardCardsOf context gs pid filter_) (Target.zoneScopePlayers (Just controller) bindings scope gs)
+
+-- ChosenCardInGraveyard's ask, shared by every opcode that names one
+-- (MoveToZone, PutSticker), so the candidates, the chooser and the count are
+-- read one way.
+chosenCardsInGraveyard :: Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId -> ObjectId -> ChosenCardInGraveyard.ChosenCardInGraveyard -> Game [ObjectId]
+chosenCardsInGraveyard legal resolving controller source (ChosenCardInGraveyard.MkChosenCardInGraveyard chooser scope filter_ count) = do
+  gs <- State.get
+  let viewOf = effectViewOf source legal gs
+      context = effectContext gs controller source legal (slotBindings resolving gs)
+      wanted = maybe 0 Integer.toNaturalSaturating (Quantity.evaluateFor viewOf context gs resolving source count)
+      -- `made` is every card this pass has taken so far, beside
+      -- who took it: CR 101.4b lets a later chooser know them.
+      pick made asked n candidates
+        | n <= (0 :: Natural) = pure made
+        | otherwise = do
+            picked <- Game.chooseAmong (\decider who pool -> Prompt.ChooseCardInGraveyard decider who source pool made) asked candidates
+            case picked of
+              Nothing -> pure made
+              Just taken -> pick (made Seq.|> (asked, taken)) asked (n - 1) (List.delete taken candidates)
+      ask asked = fmap (fmap snd . Foldable.toList) . pick Seq.empty asked wanted
+  case chooser of
+    Chooser.TheController -> ask controller (graveyardCards context legal controller gs scope filter_)
+    Chooser.EachInScope ->
+      fmap (fmap snd . Foldable.toList) . Monad.foldM (\made pid -> pick made pid wanted (graveyardCardsOf context gs pid filter_)) Seq.empty $
+        Target.zoneScopePlayers (Just controller) legal scope gs
+    -- ONE chooser, read out of the slot a ChoosePlayer bound,
+    -- choosing out of their own graveyard. Through playerRefPlayers so
+    -- the slot is read as every other is (CR 608.2b): an unfilled,
+    -- illegal, non-player or many-valued slot names nobody, and nobody
+    -- asked is nothing moved (CR 101.3). Intersected with the scope, so
+    -- a chooser the scope does not name is offered nothing.
+    Chooser.BoundInSlot slot ->
+      case playerRefPlayers legal controller gs (PlayerRef.InSlot slot) of
+        [pid] | List.elem pid (Target.zoneScopePlayers (Just controller) legal scope gs) -> ask pid (graveyardCardsOf context gs pid filter_)
+        _ -> pure []
 
 -- The seats an ObjectRef.ChosenCardInHand asks -- and an
 -- ObjectRef.RandomCardInHand reads -- in APNAP order. One list, not a chooser
@@ -3415,12 +3448,11 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ locked slot) -> case legalOne slot legal >>= Recipient.objectOf of
     Nothing -> False
     Just target -> null (if locked then Room.unlockedHalves target gs else Room.lockedHalves target gs)
-  Effect.Evolve {} -> False
+  Effect.CounterAndMark {} -> False
   Effect.BecomeProtector {} -> False
   Effect.Mentor {} -> False
   Effect.Exploit -> False
   Effect.GiveGift -> False
-  Effect.Train {} -> False
   Effect.ItBecomes {} -> False
   Effect.ExileHaunting {} -> False
   Effect.PlaySubgame {} -> False
@@ -3500,13 +3532,19 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
           Nothing -> False
      in not (null anteing) && not (any theirs named)
   -- CR 608.2d / 123.3: no placer has a sticker of an allowed kind it can put
-  -- on a named object it owns, at its cost and cap. The ChosenPermanent read is
-  -- the candidate set chosenPermanentOf offers, the pure sweep answering
-  -- nothing for it.
+  -- on a named object it owns, at its cost and cap. The ChosenPermanent and
+  -- ChosenCardInGraveyard reads are the candidate sets chosenPermanentOf and
+  -- chosenCardsInGraveyard offer, the pure sweep answering nothing for them.
   Effect.PutSticker (PutSticker.MkPutSticker player ref kinds cap free _) ->
     let placers = playerRefPlayers legal controller gs player
         named = case ref of
           ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent filter_ _) -> battlefieldMatching legal resolving controller source gs filter_
+          ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard chooser scope filter_ _) -> case chooser of
+            Chooser.BoundInSlot slot -> case playerRefPlayers legal controller gs (PlayerRef.InSlot slot) of
+              [pid] | List.elem pid (Target.zoneScopePlayers (Just controller) legal scope gs) -> graveyardCardsOf context gs pid filter_
+              _ -> []
+            Chooser.TheController -> graveyardCards context legal controller gs scope filter_
+            Chooser.EachInScope -> graveyardCards context legal controller gs scope filter_
           _ -> objectRefObjects legal resolving controller source gs ref
         owns pid oid = fmap Object.owner (Game.lookupObject oid gs) == Just pid
         placeable pid = any (\oid -> owns pid oid && not (null (Sticker.offered pid oid kinds (ticketCapOf resolving source controller legal gs cap) free gs))) named
@@ -5282,35 +5320,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- leaving the order of a player's own simultaneous choices to that
               -- player. A graveyard holding fewer matches than the count gives what it
               -- has (CR 609.3).
-              ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard chooser scope filter_ count) -> do
-                gs <- State.get
-                let viewOf = effectViewOf source legal gs
-                    wanted = maybe 0 Integer.toNaturalSaturating (Quantity.evaluateFor viewOf (chooseContext gs) gs resolving source count)
-                    -- `made` is every card this pass has taken so far, beside
-                    -- who took it: CR 101.4b lets a later chooser know them.
-                    pick made asked n candidates
-                      | n <= (0 :: Natural) = pure made
-                      | otherwise = do
-                          picked <- Game.chooseAmong (\decider who pool -> Prompt.ChooseCardInGraveyard decider who source pool made) asked candidates
-                          case picked of
-                            Nothing -> pure made
-                            Just taken -> pick (made Seq.|> (asked, taken)) asked (n - 1) (List.delete taken candidates)
-                    ask asked = fmap (fmap snd . Foldable.toList) . pick Seq.empty asked wanted
-                case chooser of
-                  Chooser.TheController -> ask controller (graveyardCards (chooseContext gs) legal controller gs scope filter_)
-                  Chooser.EachInScope ->
-                    fmap (fmap snd . Foldable.toList) . Monad.foldM (\made pid -> pick made pid wanted (graveyardCardsOf (chooseContext gs) gs pid filter_)) Seq.empty $
-                      Target.zoneScopePlayers (Just controller) legal scope gs
-                  -- ONE chooser, read out of the slot a ChoosePlayer bound,
-                  -- choosing out of their own graveyard. Through playerRefPlayers so
-                  -- the slot is read as every other is (CR 608.2b): an unfilled,
-                  -- illegal, non-player or many-valued slot names nobody, and nobody
-                  -- asked is nothing moved (CR 101.3). Intersected with the scope, so
-                  -- a chooser the scope does not name is offered nothing.
-                  Chooser.BoundInSlot slot ->
-                    case playerRefPlayers legal controller gs (PlayerRef.InSlot slot) of
-                      [pid] | List.elem pid (Target.zoneScopePlayers (Just controller) legal scope gs) -> ask pid (graveyardCardsOf (chooseContext gs) gs pid filter_)
-                      _ -> pure []
+              ObjectRef.ChosenCardInGraveyard fromGraveyard -> chosenCardsInGraveyard legal resolving controller source fromGraveyard
               -- The arm above over the hidden zone CR 400.2 makes a hand: what it
               -- says about when the candidates are read (CR 608.2c), about the asks
               -- running in APNAP order (CR 608.2e, CR 101.4) and about the answer
@@ -5686,37 +5696,20 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         [] -> pure ()
         [only] -> State.modify' (bindSlot resolving slot only)
         several -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList several))
-  -- CR 123.3: each placer chooses a sticker of an allowed kind not on any
-  -- object they own and puts it on each named object. CR 123.3b: an object
-  -- the placer does not own takes nothing; a regression fence, since no test
-  -- has a placer control an "on it" producer they do not own (Wizards of the
-  -- _____ stolen as it enters). Placing nothing writes nothing, so
-  -- happenedBetween reads it as not having happened.
-  -- CR 123.6b: the object's controller places a name sticker's word
-  -- (namePosition). CR 123.3c: a sticker the object's owner cannot pay for, or
-  -- above the cap, is not offered, and the owner pays as it goes on unless the
-  -- placement is free (Pin Collection).
+  -- CR 123.3: each placer puts a sticker of an allowed kind on each named
+  -- object, through Sticker.place, which holds CR 123.3b's owner gate, CR
+  -- 123.6b's position and CR 123.3c's payment. Placing nothing writes nothing,
+  -- so happenedBetween reads it as not having happened.
   Effect.PutSticker (PutSticker.MkPutSticker player ref kinds cap free bound) -> do
     named <- case ref of
       ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent filter_ chooser) -> chosenPermanentOf legal resolving controller source filter_ chooser
+      ObjectRef.ChosenCardInGraveyard fromGraveyard -> chosenCardsInGraveyard legal resolving controller source fromGraveyard
       _ -> fmap (\gs -> objectRefObjects legal resolving controller source gs ref) State.get
     placers <- State.gets (\gs -> playerRefPlayers legal controller gs player)
     Monad.forM_ placers $ \placer -> Monad.forM_ (ListUtils.nubOrd named) $ \oid -> do
       gs <- State.get
-      let owned = fmap Object.owner (Game.lookupObject oid gs) == Just placer
-          place picked = do
-            -- CR 123.6b: a name sticker's position is chosen as it is placed.
-            position <- case StickerRef.kind picked of
-              StickerKind.Name -> fmap Just (namePosition oid)
-              StickerKind.Ability -> pure Nothing
-              StickerKind.PowerToughness -> pure Nothing
-              StickerKind.Art -> pure Nothing
-            Monad.unless free (State.modify' (Sticker.payTickets oid picked))
-            State.modify' (Sticker.put placer oid picked position)
-            Monad.forM_ bound (\slot -> State.modify' (bindStickerSlot resolving slot picked))
-      Monad.when owned $ do
-        picked <- Game.chooseAmong (\decider who -> Prompt.ChooseSticker decider who oid) placer (Sticker.offered placer oid kinds (ticketCapOf resolving source controller legal gs cap) free gs)
-        Monad.forM_ picked place
+      picked <- Sticker.place False placer oid kinds (ticketCapOf resolving source controller legal gs cap) free
+      Monad.forM_ picked (\placed -> Monad.forM_ bound (\slot -> State.modify' (bindStickerSlot resolving slot placed)))
   -- CR 701.24a alone: randomize the named libraries so no player knows their
   -- order. Nothing moves, so there is no changeZone call and no CR 616.1
   -- opportunity -- the cards a "then shuffle" follows are still the objects they
@@ -8487,39 +8480,25 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.BecomeProtector slot -> case legalOne slot legal >>= Recipient.objectOf of
     Nothing -> pure ()
     Just battle -> State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.protector = Just controller}) battle (GameState.objects g)})
-  -- CR 702.100a's counter and CR 702.100b's marker: the creature evolves only if
-  -- the placement actually put one or more counters on it.
-  Effect.Evolve slot ->
-    case legalOne slot legal of
-      Just recipient -> case Recipient.objectOf recipient of
-        Nothing -> pure ()
-        Just target -> do
-          placed <- Event.putCounters (CounterCause.ByEffect controller) target CounterKind.PlusOnePlusOne 1
-          Monad.when (placed > 0) (State.modify' (Event.recordEvent (GameEvent.PermanentActed (PermanentActed.MkPermanentActed PermanentAction.Evolve target))))
-      _ -> pure ()
+  -- CR 702.100b and CR 702.149c: the slot's permanent evolves or trains only if
+  -- the placement put one or more counters on it, so a placement replaced away
+  -- (CR 614.16) or forbidden marks nothing. The event names that permanent, each
+  -- rule's "it". The scenario "CR 702.100b a placement Solemnity forbids is no
+  -- evolution" proves the gate.
+  Effect.CounterAndMark (PermanentActed.MkPermanentActed action slot) -> case legalOne slot legal >>= Recipient.objectOf of
+    Nothing -> pure ()
+    Just target -> do
+      placed <- Event.putCounters (CounterCause.ByEffect controller) target CounterKind.PlusOnePlusOne 1
+      Monad.when (placed > 0) (State.modify' (Event.recordEvent (GameEvent.PermanentActed (PermanentActed.MkPermanentActed action target))))
   -- CR 702.134a's counter and CR 702.134c's marker: rule 702.134c fires on the
   -- mentor ability RESOLVING, so the event is recorded however many counters CR
   -- 614.16 left to place. The event names the resolving ability's SOURCE and the
   -- slot's creature, in that order.
-  Effect.Mentor slot ->
-    case legalOne slot legal of
-      Just recipient -> case Recipient.objectOf recipient of
-        Nothing -> pure ()
-        Just target -> do
-          _ <- Event.putCounters (CounterCause.ByEffect controller) target CounterKind.PlusOnePlusOne 1
-          State.modify' (Event.recordEvent (GameEvent.Mentored (Mentored.MkMentored source target)))
-      _ -> pure ()
-  -- CR 702.149a's counter and CR 702.149c's marker, with Evolve's gate: a
-  -- placement CR 614.16 replaced away to nothing trains nobody. The event names
-  -- the slot's creature, rule 702.149c's "this creature".
-  Effect.Train slot ->
-    case legalOne slot legal of
-      Just recipient -> case Recipient.objectOf recipient of
-        Nothing -> pure ()
-        Just target -> do
-          placed <- Event.putCounters (CounterCause.ByEffect controller) target CounterKind.PlusOnePlusOne 1
-          Monad.when (placed > 0) (State.modify' (Event.recordEvent (GameEvent.PermanentActed (PermanentActed.MkPermanentActed PermanentAction.Train target))))
-      _ -> pure ()
+  Effect.Mentor slot -> case legalOne slot legal >>= Recipient.objectOf of
+    Nothing -> pure ()
+    Just target -> do
+      _ <- Event.putCounters (CounterCause.ByEffect controller) target CounterKind.PlusOnePlusOne 1
+      State.modify' (Event.recordEvent (GameEvent.Mentored (Mentored.MkMentored source target)))
   -- CR 702.110a's sacrifice and CR 702.110b's marker. The creature is CHOSEN as
   -- the effect is applied (CR 608.2d) rather than targeted (CR 115.1), so the
   -- candidates are swept live off the battlefield and the ask follows
@@ -11088,21 +11067,6 @@ activateWhileRolling runSubgame pid oid ability = do
       Foldable.for_ (Modal.forcedSelection every (Modal.Type.selection modal)) $ \selection ->
         Monad.mapM_ (applyEffectWith runSubgame oid oid pid bound bound) (Modal.modesEffects selection modal)
       pure True
-
--- CR 123.6b: the object's CONTROLLER, or its owner for a card with none (CR
--- 108.4a), chooses where the word goes: the start, or after any number of the
--- words now in its name, the longest name's where it has several (gap #4901). An
--- object whose names hold no word has one position and is not asked.
-namePosition :: ObjectId -> Game Natural
-namePosition oid = do
-  gs <- State.get
-  let most = List.foldl' max 0 (fmap NameWords.wordCount (Set.toList (Projection.namesOf oid gs)))
-      chooser = case Projection.controllerOf oid gs of
-        Just pid -> Just pid
-        Nothing -> fmap Object.owner (Game.lookupObject oid gs)
-  case chooser of
-    Just pid | most > 0 -> Maybe.fromMaybe 0 <$> Game.chooseAmong (\decider who -> Prompt.ChooseNamePosition decider who oid) pid [0 .. most]
-    _ -> pure 0
 
 -- CR 123.6e's "that sticker": bind the placed sticker under @slot@, on
 -- bindSlot's holder. Written only when a sticker was placed, so

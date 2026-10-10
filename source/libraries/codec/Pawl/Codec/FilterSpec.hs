@@ -657,6 +657,13 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       (Filter.TagWasSpent ProductionTag.Artifact)
       " {\"type\":\"TagWasSpent\",\"value\":{\"type\":\"Artifact\"}} "
+  -- Hallar, the Firefletcher's "if that spell was kicked".
+  Spec.it s "Kicked" $
+    Common.assertCodec
+      s
+      codec
+      Filter.Kicked
+      " {\"type\":\"Kicked\"} "
   Spec.it s "HasDesignation Renowned" $
     Common.assertCodec
       s

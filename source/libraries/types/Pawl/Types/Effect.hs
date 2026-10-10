@@ -68,6 +68,7 @@ import qualified Pawl.Types.MoveMana as MoveMana
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
+import qualified Pawl.Types.PermanentActed as PermanentActed
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -597,20 +598,16 @@ data Effect card ability
     -- sentence with two words swapped; which half is asked at resolution (CR
     -- 608.2d) and how many is the payload. General, never Room-shaped.
     SetHalfLocked SetHalfLocked.SetHalfLocked
-  | -- | CR 702.100a and CR 702.100b together: put a +1/+1 counter on the slot's
-    -- permanent, and if one or more actually land, that permanent evolves. One
-    -- opcode because rule 702.100b makes the marker conditional on the placement.
-    Evolve SlotName.SlotName
+  | -- | CR 702.100b and CR 702.149c: put a +1/+1 counter on the slot's
+    -- permanent, and if one or more land, it performs the action (evolves,
+    -- trains). One opcode because both rules make the marker the placement.
+    CounterAndMark (PermanentActed.PermanentActed SlotName.SlotName)
   | -- | CR 702.134a and CR 702.134c together: put a +1/+1 counter on the slot's
-    -- creature, and record that the source mentored it. Evolve's shape one rule
-    -- over.
+    -- creature, and record that the source mentored it. Not CounterAndMark: rule
+    -- 702.134c's marker is the resolution, and it names two creatures.
     Mentor SlotName.SlotName
-  | -- | CR 702.149a and CR 702.149c together: put a +1/+1 counter on the slot's
-    -- creature, and record that it trained. Evolve's shape, over
-    -- Binding.triggerSource rather than a chosen target.
-    Train SlotName.SlotName
   | -- | CR 702.189a and CR 702.189b together: add the mana, and record that
-    -- this ability's controller firebent. Train's shape: one opcode so a
+    -- this ability's controller firebent. CounterAndMark's shape: one opcode so a
     -- firebending ability resolving is told apart from any other red added.
     Firebend ManaAddition.ManaAddition
   | -- | CR 702.110a's sacrifice and CR 702.110b's marker together: this effect's
