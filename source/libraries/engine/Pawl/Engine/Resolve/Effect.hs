@@ -3420,12 +3420,11 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ locked slot) -> case legalOne slot legal >>= Recipient.objectOf of
     Nothing -> False
     Just target -> null (if locked then Room.unlockedHalves target gs else Room.lockedHalves target gs)
-  Effect.Evolve {} -> False
+  Effect.CounterAndMark {} -> False
   Effect.BecomeProtector {} -> False
   Effect.Mentor {} -> False
   Effect.Exploit -> False
   Effect.GiveGift -> False
-  Effect.Train {} -> False
   Effect.ItBecomes {} -> False
   Effect.ExileHaunting {} -> False
   Effect.PlaySubgame {} -> False
@@ -8571,39 +8570,25 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.BecomeProtector slot -> case legalOne slot legal >>= Recipient.objectOf of
     Nothing -> pure ()
     Just battle -> State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.protector = Just controller}) battle (GameState.objects g)})
-  -- CR 702.100a's counter and CR 702.100b's marker: the creature evolves only if
-  -- the placement actually put one or more counters on it.
-  Effect.Evolve slot ->
-    case legalOne slot legal of
-      Just recipient -> case Recipient.objectOf recipient of
-        Nothing -> pure ()
-        Just target -> do
-          placed <- Event.putCounters (CounterCause.ByEffect controller) target CounterKind.PlusOnePlusOne 1
-          Monad.when (placed > 0) (State.modify' (Event.recordEvent (GameEvent.PermanentActed (PermanentActed.MkPermanentActed PermanentAction.Evolve target))))
-      _ -> pure ()
+  -- CR 702.100b and CR 702.149c: the slot's permanent evolves or trains only if
+  -- the placement put one or more counters on it, so a placement CR 614.16
+  -- replaced away to nothing marks nothing. The event names that permanent, each
+  -- rule's "it". The Solemnity scenarios under data/scenarios/attack-keyword-trigger/
+  -- prove the gate.
+  Effect.CounterAndMark (PermanentActed.MkPermanentActed action slot) -> case legalOne slot legal >>= Recipient.objectOf of
+    Nothing -> pure ()
+    Just target -> do
+      placed <- Event.putCounters (CounterCause.ByEffect controller) target CounterKind.PlusOnePlusOne 1
+      Monad.when (placed > 0) (State.modify' (Event.recordEvent (GameEvent.PermanentActed (PermanentActed.MkPermanentActed action target))))
   -- CR 702.134a's counter and CR 702.134c's marker: rule 702.134c fires on the
   -- mentor ability RESOLVING, so the event is recorded however many counters CR
   -- 614.16 left to place. The event names the resolving ability's SOURCE and the
   -- slot's creature, in that order.
-  Effect.Mentor slot ->
-    case legalOne slot legal of
-      Just recipient -> case Recipient.objectOf recipient of
-        Nothing -> pure ()
-        Just target -> do
-          _ <- Event.putCounters (CounterCause.ByEffect controller) target CounterKind.PlusOnePlusOne 1
-          State.modify' (Event.recordEvent (GameEvent.Mentored (Mentored.MkMentored source target)))
-      _ -> pure ()
-  -- CR 702.149a's counter and CR 702.149c's marker, with Evolve's gate: a
-  -- placement CR 614.16 replaced away to nothing trains nobody. The event names
-  -- the slot's creature, rule 702.149c's "this creature".
-  Effect.Train slot ->
-    case legalOne slot legal of
-      Just recipient -> case Recipient.objectOf recipient of
-        Nothing -> pure ()
-        Just target -> do
-          placed <- Event.putCounters (CounterCause.ByEffect controller) target CounterKind.PlusOnePlusOne 1
-          Monad.when (placed > 0) (State.modify' (Event.recordEvent (GameEvent.PermanentActed (PermanentActed.MkPermanentActed PermanentAction.Train target))))
-      _ -> pure ()
+  Effect.Mentor slot -> case legalOne slot legal >>= Recipient.objectOf of
+    Nothing -> pure ()
+    Just target -> do
+      _ <- Event.putCounters (CounterCause.ByEffect controller) target CounterKind.PlusOnePlusOne 1
+      State.modify' (Event.recordEvent (GameEvent.Mentored (Mentored.MkMentored source target)))
   -- CR 702.110a's sacrifice and CR 702.110b's marker. The creature is CHOSEN as
   -- the effect is applied (CR 608.2d) rather than targeted (CR 115.1), so the
   -- candidates are swept live off the battlefield and the ask follows

@@ -171,6 +171,7 @@ import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.OrElse as OrElse
 import qualified Pawl.Types.PayGate as PayGate
+import qualified Pawl.Types.PermanentActed as PermanentActed
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
@@ -850,12 +851,11 @@ effectObjectRefs effect = case effect of
   Effect.SetClassLevel {} -> []
   Effect.Unsuspect ref -> [ref]
   Effect.SetHalfLocked {} -> []
-  Effect.Evolve {} -> []
+  Effect.CounterAndMark {} -> []
   Effect.BecomeProtector {} -> []
   Effect.Mentor {} -> []
   Effect.Exploit -> []
   Effect.GiveGift -> []
-  Effect.Train {} -> []
   Effect.ItBecomes {} -> []
   Effect.ExileHaunting {} -> []
   Effect.PlaySubgame {} -> []
@@ -1068,12 +1068,11 @@ effectPlayerRefs effect = case effect of
   Effect.SetClassLevel {} -> []
   Effect.Unsuspect {} -> []
   Effect.SetHalfLocked {} -> []
-  Effect.Evolve {} -> []
+  Effect.CounterAndMark {} -> []
   Effect.BecomeProtector {} -> []
   Effect.Mentor {} -> []
   Effect.Exploit -> []
   Effect.GiveGift -> []
-  Effect.Train {} -> []
   Effect.ItBecomes {} -> []
   Effect.ExileHaunting {} -> []
   Effect.PlaySubgame {} -> []
@@ -1481,13 +1480,12 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- A READ, Designate's: the slot names the permanent whose half is locked or
   -- unlocked. WHICH half is chosen at resolution and is no slot of any kind.
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _ slot) -> oneSlot slot
-  -- A READ, Designate's: the slot names where rule 702.100a's counter goes.
-  Effect.Evolve slot -> oneSlot slot
+  -- A READ, Designate's: the slot names where the counter goes.
+  Effect.CounterAndMark (PermanentActed.MkPermanentActed _ slot) -> oneSlot slot
   Effect.BecomeProtector slot -> oneSlot slot
   Effect.Mentor slot -> oneSlot slot
   Effect.Exploit -> Map.empty
   Effect.GiveGift -> Map.empty
-  Effect.Train slot -> oneSlot slot
   Effect.ItBecomes _ -> Map.empty
   Effect.ExileHaunting (ExileHaunting.MkExileHaunting card slot) -> joinSlots [oneSlot card, oneSlot slot]
   Effect.Attach slot -> oneSlot slot
@@ -2212,12 +2210,11 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> True
   Effect.Unsuspect _ -> True
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> True
-  Effect.Evolve _ -> True
+  Effect.CounterAndMark _ -> True
   Effect.BecomeProtector _ -> True
   Effect.Mentor _ -> True
   Effect.Exploit -> True
   Effect.GiveGift -> True
-  Effect.Train _ -> True
   Effect.ItBecomes _ -> True
   Effect.ExileHaunting (ExileHaunting.MkExileHaunting _ _) -> True
   Effect.Attach _ -> True
@@ -2459,12 +2456,11 @@ readsX =
         Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> False
         Effect.Unsuspect _ -> False
         Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> False
-        Effect.Evolve _ -> False
+        Effect.CounterAndMark _ -> False
         Effect.BecomeProtector _ -> False
         Effect.Mentor _ -> False
         Effect.Exploit -> False
         Effect.GiveGift -> False
-        Effect.Train _ -> False
         Effect.ItBecomes _ -> False
         Effect.ExileHaunting {} -> False
         Effect.Attach _ -> False
@@ -2735,12 +2731,11 @@ boundSlots effect = case effect of
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> Set.empty
   Effect.Unsuspect _ -> Set.empty
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> Set.empty
-  Effect.Evolve _ -> Set.empty
+  Effect.CounterAndMark _ -> Set.empty
   Effect.BecomeProtector _ -> Set.empty
   Effect.Mentor _ -> Set.empty
   Effect.Exploit -> Set.empty
   Effect.GiveGift -> Set.empty
-  Effect.Train _ -> Set.empty
   Effect.ItBecomes _ -> Set.empty
   Effect.ExileHaunting {} -> Set.empty
   Effect.Attach _ -> Set.empty

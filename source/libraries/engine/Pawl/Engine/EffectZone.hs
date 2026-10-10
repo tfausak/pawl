@@ -308,12 +308,11 @@ zoneFunctionedAgainst itself delayed effect = case effect of
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> Nothing
   Effect.Unsuspect _ -> Nothing
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> Nothing
-  Effect.Evolve _ -> Nothing
+  Effect.CounterAndMark _ -> Nothing
   Effect.BecomeProtector _ -> Nothing
   Effect.Mentor _ -> Nothing
   Effect.Exploit -> Nothing
   Effect.GiveGift -> Nothing
-  Effect.Train _ -> Nothing
   Effect.ItBecomes _ -> Nothing
   Effect.ExileHaunting {} -> Nothing
   Effect.Attach _ -> Nothing

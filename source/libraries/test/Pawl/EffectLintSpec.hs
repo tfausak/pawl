@@ -154,6 +154,7 @@ import qualified Pawl.Types.OrElse as OrElse
 import qualified Pawl.Types.PayBranch as PayBranch
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PayObligation as PayObligation
+import qualified Pawl.Types.PermanentActed as PermanentActed
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
@@ -403,12 +404,11 @@ ownQuantities effect = case effect of
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> []
   Effect.Unsuspect _ -> []
   Effect.SetHalfLocked {} -> []
-  Effect.Evolve _ -> []
+  Effect.CounterAndMark _ -> []
   Effect.BecomeProtector _ -> []
   Effect.Mentor _ -> []
   Effect.Exploit -> []
   Effect.GiveGift -> []
-  Effect.Train _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileHaunting {} -> []
   Effect.Attach _ -> []
@@ -1562,12 +1562,11 @@ effectObjectRefs effect =
         Effect.SetClassLevel {} -> []
         Effect.Unsuspect ref -> read_ [ref]
         Effect.SetHalfLocked {} -> []
-        Effect.Evolve {} -> []
+        Effect.CounterAndMark {} -> []
         Effect.BecomeProtector {} -> []
         Effect.Mentor {} -> []
         Effect.Exploit -> []
         Effect.GiveGift -> []
-        Effect.Train {} -> []
         Effect.ItBecomes {} -> []
         Effect.ExileHaunting {} -> []
         Effect.Attach {} -> []
@@ -2166,10 +2165,9 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           Effect.RerollStoredResults slot -> [slot]
           Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ slot) -> [slot]
           Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _ slot) -> [slot]
-          Effect.Evolve slot -> [slot]
+          Effect.CounterAndMark (PermanentActed.MkPermanentActed _ slot) -> [slot]
           Effect.BecomeProtector slot -> [slot]
           Effect.Mentor slot -> [slot]
-          Effect.Train slot -> [slot]
           -- Effect.Attach is NOT one: CR 301.5c makes a slot naming several
           -- objects the Equipment controller's choice, and its arm asks
           -- slotGroup first and hands the group to Attach.arbitrate.

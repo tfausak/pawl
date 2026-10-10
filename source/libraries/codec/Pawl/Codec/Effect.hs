@@ -84,6 +84,7 @@ import qualified Pawl.Codec.MoveMana as MoveMana
 import qualified Pawl.Codec.MoveToZone as MoveToZone
 import qualified Pawl.Codec.ObjectRef as ObjectRef
 import qualified Pawl.Codec.OfferCast as OfferCast
+import qualified Pawl.Codec.PermanentActed as PermanentActed
 import qualified Pawl.Codec.PlayerCounters as PlayerCounters
 import qualified Pawl.Codec.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Codec.PlayerRef as PlayerRef
@@ -269,12 +270,11 @@ codec cardCodec abilityCodec =
           Arm.payload "SetClassLevel" SetClassLevel.codec Effect.SetClassLevel (\x -> case x of Effect.SetClassLevel y -> Just y; _ -> Nothing),
           Arm.payload "Unsuspect" ObjectRef.codec Effect.Unsuspect (\x -> case x of Effect.Unsuspect y -> Just y; _ -> Nothing),
           Arm.payload "SetHalfLocked" SetHalfLocked.codec Effect.SetHalfLocked (\x -> case x of Effect.SetHalfLocked y -> Just y; _ -> Nothing),
-          Arm.payload "Evolve" SlotName.codec Effect.Evolve (\x -> case x of Effect.Evolve y -> Just y; _ -> Nothing),
+          Arm.payload "CounterAndMark" (PermanentActed.codec SlotName.codec) Effect.CounterAndMark (\x -> case x of Effect.CounterAndMark y -> Just y; _ -> Nothing),
           Arm.payload "BecomeProtector" SlotName.codec Effect.BecomeProtector (\x -> case x of Effect.BecomeProtector y -> Just y; _ -> Nothing),
           Arm.payload "Mentor" SlotName.codec Effect.Mentor (\x -> case x of Effect.Mentor y -> Just y; _ -> Nothing),
           Arm.nullary "Exploit" Effect.Exploit,
           Arm.nullary "GiveGift" Effect.GiveGift,
-          Arm.payload "Train" SlotName.codec Effect.Train (\x -> case x of Effect.Train y -> Just y; _ -> Nothing),
           Arm.payload "Firebend" ManaAddition.codec Effect.Firebend (\x -> case x of Effect.Firebend y -> Just y; _ -> Nothing),
           Arm.payload "ItBecomes" Daytime.codec Effect.ItBecomes (\x -> case x of Effect.ItBecomes y -> Just y; _ -> Nothing),
           Arm.payload "ExileHaunting" ExileHaunting.codec Effect.ExileHaunting (\x -> case x of Effect.ExileHaunting y -> Just y; _ -> Nothing),
@@ -447,12 +447,11 @@ tagOf x = case x of
   Effect.SetClassLevel {} -> "SetClassLevel"
   Effect.Unsuspect {} -> "Unsuspect"
   Effect.SetHalfLocked {} -> "SetHalfLocked"
-  Effect.Evolve {} -> "Evolve"
+  Effect.CounterAndMark {} -> "CounterAndMark"
   Effect.BecomeProtector {} -> "BecomeProtector"
   Effect.Mentor {} -> "Mentor"
   Effect.Exploit {} -> "Exploit"
   Effect.GiveGift {} -> "GiveGift"
-  Effect.Train {} -> "Train"
   Effect.Firebend {} -> "Firebend"
   Effect.ItBecomes {} -> "ItBecomes"
   Effect.ExileHaunting {} -> "ExileHaunting"

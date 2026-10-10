@@ -957,12 +957,11 @@ rewriteEffect pairs effect = case effect of
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> effect
   Effect.Unsuspect ref -> Effect.Unsuspect (rewriteObjectRef pairs ref)
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> effect
-  Effect.Evolve _ -> effect
+  Effect.CounterAndMark _ -> effect
   Effect.BecomeProtector _ -> effect
   Effect.Mentor _ -> effect
   Effect.Exploit -> effect
   Effect.GiveGift -> effect
-  Effect.Train _ -> effect
   Effect.ItBecomes _ -> effect
   Effect.ExileHaunting {} -> effect
   Effect.Attach _ -> effect
