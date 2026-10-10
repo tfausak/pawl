@@ -1199,7 +1199,8 @@ copiableOf fromStamp fromCard obj card = maybe (fromCard card) fromStamp (copySt
 -- `value` for a caller that holds only the id, asked of the object as layer 1a
 -- leaves it (`lookupLayerOne`). FACE UP only, which is CR 708.2: a face-down
 -- object has only the characteristics its allower listed, so none of these
--- however its card is printed.
+-- however its card is printed; data/scenarios/room's "CR 708.2 a manifested Room
+-- has no doors to unlock" proves it.
 faceUpCopiable :: (Object.Object -> Card -> Maybe a) -> ObjectId -> GameState -> Maybe a
 faceUpCopiable value oid gs = do
   obj <- lookupLayerOne oid gs
@@ -1906,7 +1907,8 @@ flipsOver oid gs = Set.member oid (GameState.battlefield gs) && hasFlipHalf oid 
 --
 -- HERE rather than beside its main caller
 -- (Pawl.Engine.Projection.View.stampedSnapshotOf) so that `hasFlipHalf` below
--- answers the same question the projection does. The readers of Binding.copyOf
+-- answers the same question the projection does, both through
+-- `lookupLayerOne`. The readers of Binding.copyOf
 -- that hold an Object and no GameState -- copiableOf and resolveFaceFor's
 -- arms -- reach it through `lookupLayerOne` below.
 storedCopyOf :: ObjectId -> GameState -> Maybe PC.ProjectedCharacteristics
