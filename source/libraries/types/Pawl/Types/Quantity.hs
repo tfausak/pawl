@@ -3,13 +3,13 @@ module Pawl.Types.Quantity where
 import qualified Data.Text as Text
 import qualified Pawl.Types.AgainstLastCardExiledWith as AgainstLastCardExiledWith
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
+import qualified Pawl.Types.Arithmetic as Arithmetic
 import qualified Pawl.Types.CastFrom as CastFrom
 import qualified Pawl.Types.CompletedDungeon as CompletedDungeon
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Devotion as Devotion
-import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
@@ -17,16 +17,14 @@ import qualified Pawl.Types.ManaCount as ManaCount
 import qualified Pawl.Types.PlayerCounterTally as PlayerCounterTally
 import qualified Pawl.Types.PlayerDesignationTally as PlayerDesignationTally
 import qualified Pawl.Types.PlayerRef as PlayerRef
-import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.SlotName as SlotName
-import qualified Pawl.Types.Times as Times
 
 -- | A number that may not be a literal number.
 --
 -- Deliberately no Num instance: it would be lawless and partial once Star and
 -- Infinite exist, and fromInteger would erase the distinction this type draws.
--- Combining is explicit named functions; Plus composes the printed values.
+-- Combining is explicit named functions; Arithmetic composes the printed values.
 --
 -- Arms that name no object (Power, ObjectCounters, HasDesignation, ...) read
 -- the object the evaluation is aimed at, most of them through the injected
@@ -88,18 +86,8 @@ data Quantity
     -- seed substitutes (Projection.baseCharacteristics) and evaluate answers
     -- Nothing for.
     Star
-  | -- | CR 208.2: composition, so a printed 1+* needs no constructor of its own.
-    Plus (Plus.Plus Quantity)
-  | -- | CR 107.1a: half the inner quantity, rounded the way the card prints
-    -- (Pawl.Types.Rounding).
-    Halved (Halved.Halved Quantity)
-  | -- | CR 107.1: the payload's factor times the inner quantity, which is the
-    -- "N for each" a card prints; see Pawl.Types.Times.
-    Times (Times.Times Quantity)
-  | -- | The negation of the inner quantity -- the minus a card prints in front
-    -- of a value, as in "-X/-X". CR 107.1b: a game value may go negative; a
-    -- count reader saturates at 0.
-    Negate Quantity
+  | -- | CR 107.1: a calculation over inner quantities; see Pawl.Types.Arithmetic.
+    Arithmetic (Arithmetic.Arithmetic Quantity)
   | -- | A quantity that counts game state (CR 208.2a, CR 608.2h); see
     -- Pawl.Types.Count. The payload is `Count Quantity` so Aggregation.Greatest
     -- recurses through the data rather than a module cycle.

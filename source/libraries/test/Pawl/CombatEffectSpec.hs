@@ -1404,7 +1404,7 @@ blessedReversalBoard piker jace plains reversal =
            in Just (ready, attackers, jaceId, spell)
         _ -> Nothing
 
--- CR 107.1 through Pawl.Types.Quantity's Times arm: a printed "N for each" is a
+-- CR 107.1 through Pawl.Types.Arithmetic's Times arm: a printed "N for each" is a
 -- factor times a count and not that count added to itself N times.
 attackerCountSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 attackerCountSpec s registry = Spec.describe s "AttackerCount" $ do

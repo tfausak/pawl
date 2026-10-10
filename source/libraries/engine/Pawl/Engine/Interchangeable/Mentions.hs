@@ -43,6 +43,7 @@ import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.Ante as Ante
 import qualified Pawl.Types.AnyNumberDiscard as AnyNumberDiscard
 import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
+import qualified Pawl.Types.Arithmetic as Arithmetic
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttachAll as AttachAll
@@ -647,6 +648,13 @@ anyNumberDiscardNames asking x = case x of
 anyNumberMatchingNames :: Asking -> AnyNumberMatching.AnyNumberMatching -> Bool
 anyNumberMatchingNames asking x = case x of
   AnyNumberMatching.MkAnyNumberMatching filter_ atMost -> filterNames asking filter_ || any (quantityNames asking) atMost
+
+arithmeticNames :: Asking -> (quantity -> Bool) -> Arithmetic.Arithmetic quantity -> Bool
+arithmeticNames asking onQuantity x = case x of
+  Arithmetic.Plus plus -> plusNames asking onQuantity plus
+  Arithmetic.Halved halved -> halvedNames asking onQuantity halved
+  Arithmetic.Times times -> timesNames asking onQuantity times
+  Arithmetic.Negate quantity -> onQuantity quantity
 
 armDelayedTriggerNames :: Asking -> (ability -> Bool) -> ArmDelayedTrigger.ArmDelayedTrigger ability -> Bool
 armDelayedTriggerNames asking onAbility x = case x of
@@ -2327,10 +2335,7 @@ quantityNames asking x = case x of
   Quantity.BoundCount slotName -> slotNames asking slotName
   Quantity.UniqueVowelsOnSticker slotName -> slotNames asking slotName
   Quantity.Star -> False
-  Quantity.Plus plus -> plusNames asking (quantityNames asking) plus
-  Quantity.Halved halved -> halvedNames asking (quantityNames asking) halved
-  Quantity.Times times -> timesNames asking (quantityNames asking) times
-  Quantity.Negate quantity -> quantityNames asking quantity
+  Quantity.Arithmetic arithmetic -> arithmeticNames asking (quantityNames asking) arithmetic
   Quantity.Count count -> countNames asking (quantityNames asking) count
   Quantity.ManaCount manaCount -> manaCountNames asking manaCount
   Quantity.LifeTotal playerRef -> playerRefNames asking playerRef

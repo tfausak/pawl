@@ -1,0 +1,36 @@
+{
+  "description": "CR 107.3m Banquet Guests cast for X=3 enters with twice that X, six +1/+1 counters",
+  "note": "The entry replacement's count is a Times over X, so the announced X has to be substituted inside the calculation rather than only at its top (Quantity.substituteAnnouncedX). No Food is on the board, so affinity takes nothing off.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest-1", "ready": true },
+          { "card": "Forest", "label": "forest-2", "ready": true },
+          { "card": "Forest", "label": "forest-3", "ready": true },
+          { "card": "Forest", "label": "forest-4", "ready": true },
+          { "card": "Plains", "label": "plains", "ready": true }
+        ],
+        "hand": [{ "card": "Banquet Guests", "label": "guests" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": { "Cast": { "object": "$guests", "x": 3, "mana": ["$forest-1", "$forest-2", "$forest-3", "$forest-4", "$plains"] } }
+    }
+  ],
+  "final": [
+    { "Counters": { "object": "Banquet Guests", "kind": { "type": "PlusOnePlusOne" }, "count": 6 } },
+    { "PowerToughness": { "object": "Banquet Guests", "power": 6, "toughness": 6 } }
+  ]
+}
