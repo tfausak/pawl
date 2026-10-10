@@ -23,12 +23,7 @@ import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
-import qualified Pawl.Types.BoundMeasure as BoundMeasure
-import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Filter as Filter
-import qualified Pawl.Types.Measure as Measure
-import qualified Pawl.Types.Measures as Measures.Type
-import qualified Pawl.Types.Operand as Operand
 
 -- | Recursive, mirroring Quantity's toJson/fromJson: And/Or carry their
 -- operands as a JSON Array, Not as a single nested object, and each atom
@@ -60,23 +55,6 @@ codec keywordCodec =
       Arm.payload "HasKeyword" keywordCodec Filter.HasKeyword (\x -> case x of Filter.HasKeyword y -> Just y; _ -> Nothing),
       Arm.payload "HasKeywordFamily" KeywordFamily.codec Filter.HasKeywordFamily (\x -> case x of Filter.HasKeywordFamily y -> Just y; _ -> Nothing),
       Arm.payload "Measures" Measures.codec Filter.Measures (\x -> case x of Filter.Measures y -> Just y; _ -> Nothing),
-      -- TEMPORARY decode-only aliases for the card-data rewrite.
-      legacy "PowerAtLeast",
-      legacy "PowerAtMost",
-      legacy "ToughnessGreaterThanPower",
-      legacy "PowerLessThanSource",
-      legacy "PowerGreaterThanSource",
-      legacy "PowerAtLeastSourceToughness",
-      legacy "PowerIsAmountInSlot",
-      legacy "PowerAtLeastAmountInSlot",
-      legacy "ManaValueAtMost",
-      legacy "ManaValueLessThanSource",
-      legacy "ManaValueGreaterThanSource",
-      legacy "ManaValueEqualToSource",
-      legacy "ManaValueAtMostAmount",
-      legacy "ManaValueEqualToAmount",
-      legacy "PowerAtMostAmount",
-      legacy "ToughnessLessThanBound",
       Arm.nullary "ControlledByDefendingPlayer" Filter.ControlledByDefendingPlayer,
       Arm.payload "ControlledByBound" SlotName.codec Filter.ControlledByBound (\x -> case x of Filter.ControlledByBound y -> Just y; _ -> Nothing),
       -- Runtime-only, and accepted here anyway: the codec must stay total, so a
@@ -302,29 +280,3 @@ tagOf x = case x of
   Filter.And {} -> "And"
   Filter.Or {} -> "Or"
   Filter.Not {} -> "Not"
-
--- TEMPORARY: a decode-only arm for each folded tag, for the card-data rewrite.
-legacy :: (Eq keyword) => String -> Arm.Arm (Filter.Filter keyword)
-legacy t =
-  let m measure comparison operand = Filter.Measures (Measures.Type.MkMeasures measure comparison operand)
-      lit inject = Arm.payload t Common.integer inject (const Nothing)
-      slotted inject = Arm.payload t SlotName.codec inject (const Nothing)
-      bare x = Arm.nullary t x
-   in case t of
-        "PowerAtLeast" -> lit (m Measure.Power Comparison.AtLeast . Operand.Literal)
-        "PowerAtMost" -> lit (m Measure.Power Comparison.AtMost . Operand.Literal)
-        "ManaValueAtMost" -> lit (m Measure.ManaValue Comparison.AtMost . Operand.Literal)
-        "PowerIsAmountInSlot" -> slotted (m Measure.Power Comparison.Exactly . Operand.AmountInSlot)
-        "PowerAtLeastAmountInSlot" -> slotted (m Measure.Power Comparison.AtLeast . Operand.AmountInSlot)
-        "ToughnessLessThanBound" -> slotted (\s -> m Measure.Toughness Comparison.LessThan (Operand.OfBound (BoundMeasure.MkBoundMeasure s Measure.Toughness)))
-        "ToughnessGreaterThanPower" -> bare (m Measure.Toughness Comparison.GreaterThan (Operand.Own Measure.Power))
-        "PowerLessThanSource" -> bare (m Measure.Power Comparison.LessThan (Operand.OfSource Measure.Power))
-        "PowerGreaterThanSource" -> bare (m Measure.Power Comparison.GreaterThan (Operand.OfSource Measure.Power))
-        "PowerAtLeastSourceToughness" -> bare (m Measure.Power Comparison.AtLeast (Operand.OfSource Measure.Toughness))
-        "ManaValueLessThanSource" -> bare (m Measure.ManaValue Comparison.LessThan (Operand.OfSource Measure.ManaValue))
-        "ManaValueGreaterThanSource" -> bare (m Measure.ManaValue Comparison.GreaterThan (Operand.OfSource Measure.ManaValue))
-        "ManaValueEqualToSource" -> bare (m Measure.ManaValue Comparison.Exactly (Operand.OfSource Measure.ManaValue))
-        "ManaValueAtMostAmount" -> bare (m Measure.ManaValue Comparison.AtMost Operand.EnclosingAmount)
-        "ManaValueEqualToAmount" -> bare (m Measure.ManaValue Comparison.Exactly Operand.EnclosingAmount)
-        "PowerAtMostAmount" -> bare (m Measure.Power Comparison.AtMost Operand.EnclosingAmount)
-        _ -> error t

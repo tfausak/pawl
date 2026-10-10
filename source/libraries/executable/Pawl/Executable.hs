@@ -52,13 +52,6 @@ main = do
     "scenario" : paths@(_ : _) -> scenario paths
     "bench" : rest -> Environment.withArgs rest Pawl.Benchmark.main
     "test" : rest -> Environment.withArgs rest Pawl.Test.main
-    ["TEMPROUNDTRIP", kind, listFile] ->
-      readFile listFile >>= \listing -> Monad.forM_ (lines listing) $ \path -> do
-        bytes <- ByteString.readFile path
-        let rt codec = case Common.parse (Encoding.decodeUtf8 bytes) >>= Codec.decode codec of
-              Left e -> IO.hPutStrLn IO.stderr (path <> ": " <> show e)
-              Right x -> ByteString.writeFile path (Encoding.encodeUtf8 (Common.render (Codec.encode codec x)))
-        if kind == "card" then rt Card.codec else rt Codec.Scenario.codec
     _ -> do
       name <- Environment.getProgName
       IO.hPutStrLn IO.stderr $ "usage: " <> name <> " (schema [scenario] | deck FILE | ingest FILE | scenario FILE... | bench | test)"
