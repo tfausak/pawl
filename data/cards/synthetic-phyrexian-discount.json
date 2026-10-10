@@ -11,21 +11,29 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "ReduceSpellCost",
+            "type": "ModifyCost",
             "value": {
-              "reduction": [
-                {
-                  "type": "Phyrexian",
-                  "value": {
-                    "type": "Green"
-                  }
+              "change": {
+                "type": "Reduce",
+                "value": {
+                  "amount": [
+                    {
+                      "type": "Phyrexian",
+                      "value": {
+                        "type": "Green"
+                      }
+                    }
+                  ]
                 }
-              ],
-              "whichSpells": {
+              },
+              "matching": {
                 "type": "HasColor",
                 "value": {
                   "type": "Green"
                 }
+              },
+              "subject": {
+                "type": "Spells"
               }
             }
           },

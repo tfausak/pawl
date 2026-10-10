@@ -139,7 +139,10 @@
             "components": [
               {
                 "type": "RemoveLoyaltyFromThis",
-                "value": 2
+                "value": {
+                  "type": "Fixed",
+                  "value": 2
+                }
               }
             ],
             "mana": []
@@ -166,7 +169,10 @@
                           {
                             "type": "Sacrifice",
                             "value": {
-                              "count": 1,
+                              "count": {
+                                "type": "Fixed",
+                                "value": 1
+                              },
                               "whichPermanents": {
                                 "type": "HasCardType",
                                 "value": {
@@ -194,7 +200,10 @@
             "components": [
               {
                 "type": "RemoveLoyaltyFromThis",
-                "value": 5
+                "value": {
+                  "type": "Fixed",
+                  "value": 5
+                }
               }
             ],
             "mana": []

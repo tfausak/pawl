@@ -40,7 +40,6 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Players as Players
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as View
-import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Types.ActiveActivationProhibition as ActiveActivationProhibition
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
@@ -78,7 +77,6 @@ import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import Pawl.Types.Recipient (Recipient)
-import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.While as While
 
@@ -141,7 +139,7 @@ arm targets controller source duration gs = case duration of
   -- moves the window (CR 611.2a).
   Duration.DuringNextTurnOf ref -> case ref of
     PlayerRef.ControllerOfBound slot
-      | Just oid <- Map.lookup slot targets >>= Binding.onlyOne >>= Recipient.objectOf,
+      | Just oid <- Map.lookup slot (Binding.objectsIn targets),
         Maybe.isJust (Game.lookupObject oid gs) ->
           Just (Expiry.DuringTurnOfControllerOf (AfterObjectTurn.MkAfterObjectTurn oid (GameState.turnNumber gs)))
     _ ->
@@ -167,7 +165,7 @@ arm targets controller source duration gs = case duration of
   -- one line below.
   Duration.ForAsLongAs cond ->
     let baked = Condition.bakeBound targets cond
-     in if Condition.holds (Projection.fullView gs) (SourceContext.sourceContext gs (Just controller) source) gs source baked
+     in if Condition.holds (Projection.fullView gs) (Projection.sourceContext gs (Just controller) source) gs source baked
           then Just (Expiry.While (While.MkWhile controller baked))
           else Nothing
   -- CR 500.5a / 511.2: "until end of combat" is the end of the combat PHASE, so
@@ -218,7 +216,7 @@ arm targets controller source duration gs = case duration of
 -- before arming (perSeat).
 seatOf :: Map.Map SlotName (Set.Set Recipient) -> PlayerId -> GameState -> PlayerRef.PlayerRef -> Maybe PlayerId
 seatOf targets controller gs ref =
-  let given = Players.resolution (`Projection.controllerWithLastKnown` gs) (`Projection.ownerWithLastKnown` gs) targets controller gs
+  let given = Players.resolution (`Projection.controllerWithLastKnown` gs) (`Game.ownerWithLastKnown` gs) targets controller gs
    in case Players.named given {Players.reaches = const True} gs ref of
         Just [pid] -> Just pid
         _ -> Nothing
@@ -325,7 +323,7 @@ permissionOpen pid permission gs =
    in ExilePlayPermission.player permission == pid
         && begun gs (ExilePlayPermission.expiry permission)
         && all
-          (Condition.holds (Projection.fullView gs) (SourceContext.sourceContext gs (Just pid) source) gs source)
+          (Condition.holds (Projection.fullView gs) (Projection.sourceContext gs (Just pid) source) gs source)
           (ExilePlayPermission.condition permission)
 
 -- CR 514.2: "until end of turn" and "this turn" effects end during the cleanup
@@ -445,7 +443,7 @@ sweepConditional :: Game Bool
 sweepConditional = do
   gs <- State.get
   let survives source expiry = case expiry of
-        Expiry.While (While.MkWhile you cond) -> Condition.holds (Projection.fullView gs) (SourceContext.sourceContext gs (Just you) source) gs source cond
+        Expiry.While (While.MkWhile you cond) -> Condition.holds (Projection.fullView gs) (Projection.sourceContext gs (Just you) source) gs source cond
         Expiry.AtCleanup -> True
         Expiry.Never -> True
         -- Alchemy's "perpetually" lasts for the rest of the game, as Never does.

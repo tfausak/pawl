@@ -22,7 +22,6 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Requirement as Requirement
-import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.AttackTarget as AttackTarget
@@ -283,7 +282,7 @@ instances candidates targets gs =
         Just condition ->
           Condition.holds
             (Projection.fullView gs)
-            (SourceContext.sourceContext gs (Projection.controllerOf source gs) source)
+            (Projection.sourceContext gs (Projection.controllerOf source gs) source)
             gs
             source
             (if null changes then condition else Projection.rewriteCondition changes condition)
@@ -311,7 +310,7 @@ instances candidates targets gs =
       -- as Pawl.Engine.CombatRestriction.storedSubjects reads a prohibition's.
       fromStored active =
         let target = ActiveAttackRequirement.defender active
-            context = SourceContext.sourceContext gs (Just (ActiveAttackRequirement.controller active)) (ActiveAttackRequirement.source active)
+            context = Projection.sourceContext gs (Just (ActiveAttackRequirement.controller active)) (ActiveAttackRequirement.source active)
             creatures = case ActiveAttackRequirement.attacker active of
               RestrictedCreatures.Named oid -> filter (== oid) candidates
               RestrictedCreatures.Matching f -> filter (\oid -> Filter.matches context (Projection.viewOfObject oid gs) f) candidates

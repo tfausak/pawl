@@ -104,7 +104,7 @@ votingFor pins p = case p of
       Nothing -> S.identityAnswer p
   _ -> pure (S.identityAnswer p)
 
-councilsJudgmentSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+councilsJudgmentSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 councilsJudgmentSpec s registry = Spec.describe s "Council's Judgment" $ do
   -- Two seats name bob's Piker and one names carol's Rats, so one resolution has
   -- a strict winner and a strict loser: the exile that takes the Piker has to
@@ -128,6 +128,16 @@ councilsJudgmentSpec s registry = Spec.describe s "Council's Judgment" $ do
       asked
       [(S.alice, [bPiker, cRats]), (S.bob, [bPiker, cRats]), (S.carol, [bPiker, cRats])]
     Spec.assertBool s (S.onBattlefield aWall after && S.onBattlefield bMountain after) "neither permanent the filter excludes left the battlefield"
+  -- The same board with the votes the other way round, so the winner is the
+  -- LAST of the offered pair: a vote that took the offered set's front would
+  -- exile the Piker again.
+  Spec.it s "CR 701.38a the same board voted the other way exiles the other permanent" $ do
+    rats <- S.printingOf s registry "Typhoid Rats"
+    (_, _, bPiker, cRats, spell, gs) <- judgmentBoard s registry
+    let pins = [(S.alice, cRats), (S.bob, bPiker), (S.carol, cRats)]
+        ((_, after), _) = State.runState (Engine.runGame (votingFor pins) gs (S.cast S.alice spell >> Stack.resolveTop)) []
+    Spec.assertEqWith s "carol's Rats, whom alice and carol both voted for, is the one card in exile" (namesIn Zone.Exile S.carol after) [Just (S.printingName rats)]
+    Spec.assertBool s (S.onBattlefield bPiker after) "bob's Piker, with the one vote bob cast, is still on the battlefield"
 
 -- Alice's four Islands, Plea for Power in her hand, and three Mountains in her
 -- library so the printed "draw three cards" has cards to draw (CR 104.3c).

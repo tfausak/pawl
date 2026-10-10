@@ -21,6 +21,7 @@ import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mint as Mint
 import qualified Pawl.Engine.Monarch as Monarch
 import qualified Pawl.Engine.MoveDuration as MoveDuration
 import qualified Pawl.Engine.Projection as Projection
@@ -41,7 +42,6 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
-import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
@@ -62,11 +62,9 @@ import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.ManaCost as ManaCost
-import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeInstance as ModeInstance
-import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
 import qualified Pawl.Types.MoveDuration as MoveDuration.Type
 import qualified Pawl.Types.MoveToZone as MoveToZone
@@ -74,7 +72,6 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
-import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
@@ -1537,7 +1534,7 @@ denethorBoard s registry = do
       (srcId, gs1) = S.addPermanent denethor S.alice lands
       ability = case Face.activatedAbilities (S.combinedFace denethor) of
         ab : _ -> ab
-        [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] 0 (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1)) [] Activator.Controller Nothing Nothing Nothing
+        [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] 0 (Mint.oneModeOf Map.empty Seq.empty) [] Activator.Controller Nothing Nothing Nothing
   pure (ability, srcId, S.withMonarch S.alice (gs1 {GameState.priority = Just S.alice}))
 
 -- CR 725.1: "The monarch is a designation a player can have. There is no monarch
@@ -1947,8 +1944,8 @@ optionalEffectSpec s registry =
               mode =
                 Mode.MkMode
                   ( Seq.fromList
-                      [ Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton draw),
-                        Clause.MkClause Nothing Nothing Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.singleton draw)
+                      [ Mint.mandatory (Seq.singleton draw),
+                        Mint.youMay (Seq.singleton draw)
                       ]
                   )
                   Map.empty

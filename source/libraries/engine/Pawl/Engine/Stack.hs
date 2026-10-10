@@ -24,7 +24,6 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Resolve.Effect as Resolve
-import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.CardType as CardType
@@ -260,7 +259,7 @@ interveningStillHolds :: GameState.GameState -> Object.Object -> ObjectId -> Tri
 interveningStillHolds gs obj srcId trigger =
   Condition.holds
     (Projection.viewWithLastKnownAnywhere gs)
-    (Projection.framedByBindings gs (Object.bindings obj) (SourceContext.sourceContext gs (Just (Object.owner obj)) srcId) {Filter.boundAmounts = Condition.inheritedX trigger srcId gs})
+    (Projection.framedByBindings gs (Object.bindings obj) (Projection.sourceContext gs (Just (Object.owner obj)) srcId) {Filter.boundAmounts = Condition.inheritedX trigger srcId gs})
     gs
     srcId
 
@@ -284,7 +283,7 @@ resolveTop = resolveTopWith Resolve.noSubgame
 enchantedBy :: ObjectId -> GameState.GameState -> Maybe Recipient.Recipient
 enchantedBy oid gs = case Game.lookupObject oid gs of
   Nothing -> Nothing
-  Just obj -> Binding.onlyOne =<< Map.lookup Card.enchantSlot (Binding.targetsOf (Object.bindings obj))
+  Just obj -> Map.lookup Card.enchantSlot (Binding.oneBySlot (Binding.targetsOf (Object.bindings obj)))
 
 -- CR 702.140c's "target creature", read off the slot rule 702.140a's ability
 -- added -- `enchantedBy` above's shape one keyword over. Nothing where the slot
@@ -293,8 +292,7 @@ enchantedBy oid gs = case Game.lookupObject oid gs of
 mutatingTarget :: ObjectId -> GameState.GameState -> Maybe ObjectId
 mutatingTarget oid gs = do
   obj <- Game.lookupObject oid gs
-  recipient <- Binding.onlyOne =<< Map.lookup Card.mutateSlot (Binding.targetsOf (Object.bindings obj))
-  Recipient.objectOf recipient
+  Map.lookup Card.mutateSlot (Binding.objectSlots (Object.bindings obj))
 
 -- CR 608.3 for a resolving spell that has a printing behind it -- CR 108's card
 -- (Source.OfCard) and CR 112.1a's copy of one (Source.OfSpellCopy), which CR 608.2

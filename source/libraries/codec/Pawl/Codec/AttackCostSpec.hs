@@ -16,6 +16,7 @@ import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackCostScope as AttackCostScope
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CostAmount as CostAmount
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.Filter as Filter
@@ -75,12 +76,12 @@ spec s = Spec.describe s "Pawl.Codec.AttackCost" $ do
           ( PerCreature.Fixed
               ( Cost.MkCost
                   (Just (ManaCost.MkManaCost []))
-                  [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.HasCardType CardType.Land))]
+                  [CostComponent.Sacrifice (Sacrifice.MkSacrifice (CostAmount.Fixed 1) (Filter.HasCardType CardType.Land))]
               )
           )
           AttackCostScope.EveryAttack
       )
-      " {\"perAttacker\":{\"type\":\"Fixed\",\"value\":{\"components\":[{\"type\":\"Sacrifice\",\"value\":{\"count\":1,\"whichPermanents\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}}],\"mana\":[]}},\"scope\":{\"type\":\"EveryAttack\"},\"subject\":{\"type\":\"Matching\",\"value\":{\"type\":\"IsSource\"}}} "
+      " {\"perAttacker\":{\"type\":\"Fixed\",\"value\":{\"components\":[{\"type\":\"Sacrifice\",\"value\":{\"count\":{\"type\":\"Fixed\",\"value\":1},\"whichPermanents\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}}],\"mana\":[]}},\"scope\":{\"type\":\"EveryAttack\"},\"subject\":{\"type\":\"Matching\",\"value\":{\"type\":\"IsSource\"}}} "
   -- Exhaustive where the two literals above are representative: Arm.enum derives
   -- the scope's arm list from the type, so this is what would catch an arm the
   -- derivation missed or two that encode alike.

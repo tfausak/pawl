@@ -1,0 +1,42 @@
+{
+  "description": "CR 608.2h Kindred Boon destroyed in response still reads the type it chose",
+  "note": "alice names Goblin as Kindred Boon enters and activates it at her Goblin Piker; bob Disenchants the Boon in response. CR 608.2b rechecks \"of the chosen type\" as the ability resolves, against the departed Boon's last known choice, so the Piker still gets its divinity counter. A read of the live object alone would find no choice and the ability would do nothing.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Plains", "label": "p1", "ready": true },
+          { "card": "Plains", "label": "p2", "ready": true },
+          { "card": "Plains", "label": "p3", "ready": true },
+          { "card": "Plains", "label": "p4", "ready": true },
+          { "card": "Plains", "label": "p5", "ready": true },
+          { "card": "Plains", "label": "p6", "ready": true },
+          { "card": "Goblin Piker", "label": "piker", "ready": true }
+        ],
+        "hand": [{ "card": "Kindred Boon", "label": "boon" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Plains", "label": "b1", "ready": true },
+          { "card": "Plains", "label": "b2", "ready": true }
+        ],
+        "hand": [{ "card": "Disenchant", "label": "disenchant" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$boon", "mana": ["$p1", "$p2", "$p3", "$p4", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Answer": { "prompt": "ChooseCreatureType", "with": { "type": "Goblin" } } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "Kindred Boon", "targets": ["$piker"], "mana": ["$p5", "$p6"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "$disenchant", "targets": ["Kindred Boon"], "mana": ["$b1", "$b2"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": [] } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Counters": { "object": "$piker", "kind": { "type": "Named", "value": "divinity" }, "count": 1 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Kindred Boon", "count": 1 } } }
+  ]
+}

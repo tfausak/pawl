@@ -17,6 +17,7 @@ module Pawl.CardSpec where
 -- the evaluator module Pawl.Engine.Filter may later be imported and must not collide.
 -- triggered ability's effects (Card.allEffects only reaches the spell).
 -- whole card written by somebody else and so an independent witness to the
+
 import qualified Control.Monad as Monad
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
@@ -33,8 +34,10 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as KeywordEngine
+import qualified Pawl.Engine.Mint as Mint
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.Projection as Projection
@@ -59,8 +62,6 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationProhibition as ActivationProhibition
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.Activator as Activator
-import qualified Pawl.Types.AddActivationCost as AddActivationCost
-import qualified Pawl.Types.AddSpellCost as AddSpellCost
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
@@ -127,8 +128,11 @@ import qualified Pawl.Types.CopyOriginal as CopyOriginal
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CostAddition as CostAddition
+import qualified Pawl.Types.CostChange as CostChange
 import qualified Pawl.Types.CostChoice as CostChoice
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CostModifier as CostModifier
 import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
@@ -216,8 +220,6 @@ import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.HandAction as HandAction
 import qualified Pawl.Types.Impending as Impending
 import qualified Pawl.Types.InZone as InZone
-import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
-import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordCount as KeywordCount
 import qualified Pawl.Types.KeywordTally as KeywordTally
@@ -259,7 +261,6 @@ import qualified Pawl.Types.MovedKinds as MovedKinds
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
-import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.OrElse as OrElse
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PerCreature as PerCreature
@@ -304,8 +305,6 @@ import qualified Pawl.Types.RandomCardInGraveyard as RandomCardInGraveyard
 import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
 import qualified Pawl.Types.RandomCardInLibrary as RandomCardInLibrary
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
-import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
-import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Reinforce as Reinforce
 import qualified Pawl.Types.RemovalCount as RemovalCount
@@ -363,7 +362,6 @@ import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.TopOfLibraryUntil as TopOfLibraryUntil
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
-import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
 import qualified Pawl.Types.TurnUpR as TurnUpR
@@ -1559,7 +1557,7 @@ triggeredAbilityCounts ability =
 -- restated so the lint and the announcement cannot disagree about which cards get
 -- asked. It reads BOTH halves of a cost: CR 601.2b's "such as an {X} in its mana
 -- cost" is an example, and CR 107.3a lists the additional cost beside the mana
--- cost -- Hatred's only X is a CostComponent.PayLifeX. Nothing (CR 118.6, an
+-- cost -- Hatred's only X is a CostComponent.PayLife's. Nothing (CR 118.6, an
 -- unpayable cost) declares nothing.
 declaresVariable :: Cost.Type.Cost Keyword.Keyword -> Bool
 declaresVariable = Cost.hasVariable
@@ -1615,13 +1613,12 @@ collectsEvidenceAsCost =
 -- Does this cost WATERBEND? collectsEvidenceAsCost's shape exactly: CR 601.2h's
 -- payment binds Binding.waterbendCost (Pawl.Engine.Cost.payComponent's
 -- Waterbend arm), which is what "if this spell's additional cost was paid"
--- reads -- printed only on a card whose own cost waterbends. WaterbendX counts:
--- the announcement rewrites it to a Waterbend before it is paid.
+-- reads -- printed only on a card whose own cost waterbends, its amount
+-- announced or not.
 waterbendsAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
 waterbendsAsCost =
   let isWaterbend component = case component of
         CostComponent.Waterbend _ -> True
-        CostComponent.WaterbendX -> True
         _ -> False
    in any isWaterbend . Cost.Type.components
 
@@ -1642,8 +1639,6 @@ sacrificesAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
 sacrificesAsCost =
   let isSacrifice component = case component of
         CostComponent.Sacrifice {} -> True
-        -- Paid as a Sacrifice once X is announced (Cost.substituteX).
-        CostComponent.SacrificeX {} -> True
         _ -> False
    in any isSacrifice . Cost.Type.components
 
@@ -2679,16 +2674,7 @@ oneEffectTrigger ::
   Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) ->
   TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 oneEffectTrigger condition effect =
-  TriggeredAbility.MkTriggeredAbility
-    { TriggeredAbility.condition = condition,
-      TriggeredAbility.modal =
-        Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-          (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing,
-      TriggeredAbility.name = Nothing,
-      TriggeredAbility.limit = TriggerLimit.Unlimited
-    }
+  Mint.trigger condition (Seq.singleton effect)
 
 -- oneEffectTrigger's ACTIVATED twin: a one-mode, targetless ability running one
 -- effect, and the fixture the read lint's self-test misauthors on purpose. Kept
@@ -2707,9 +2693,7 @@ oneEffectActivated mana effect =
   ActivatedAbility.MkActivatedAbility
     { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = mana, Cost.Type.components = []},
       ActivatedAbility.modal =
-        Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-          (ModeSelection.ChooseExactly 1),
+        Mint.oneMode (Seq.singleton effect),
       ActivatedAbility.maximumX = [],
       ActivatedAbility.minimumX = 0,
       ActivatedAbility.restrictions = [],
@@ -2722,10 +2706,15 @@ oneEffectActivated mana effect =
 -- One CR 700.2 mode for the fixtures below: the effects it runs and the target
 -- slots it declares. Always mandatory -- no read lint asks about optionality.
 lintMode :: [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> [SlotName.SlotName] -> Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
-lintMode effects slots =
-  Mode.MkMode
-    (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList effects)))
-    (Map.fromList (fmap (\slot -> (slot, TargetSlot.required Pool.AnyTarget Nothing)) slots))
+lintMode effects slots = Mode.MkMode (Seq.singleton (Mint.mandatory (Seq.fromList effects))) (lintSlots slots)
+
+-- `lintMode` as the whole of a spell: one mode, selected outright.
+lintModal :: [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> [SlotName.SlotName] -> Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
+lintModal effects slots = Mint.oneModeTargeting (lintSlots slots) (Seq.fromList effects)
+
+-- The target slots `lintMode` declares, each any target.
+lintSlots :: [SlotName.SlotName] -> Map.Map SlotName.SlotName TargetSlot.TargetSlot
+lintSlots = Map.fromList . fmap (\slot -> (slot, TargetSlot.required Pool.AnyTarget Nothing))
 
 -- oneEffectActivated widened to SEVERAL modes, free, under CR 700.2's
 -- ChooseExactly 1. The fixture the per-mode read lint needs and the one-mode
@@ -3894,24 +3883,16 @@ costComponentFilters component = case component of
   CostComponent.ReturnThis -> []
   CostComponent.PayLife _ -> []
   CostComponent.PayHalfLife _ -> []
-  CostComponent.PayLifeX -> []
-  CostComponent.PayEnergyX -> []
   CostComponent.DiscardThis _ -> []
   CostComponent.PayEnergy _ -> []
   CostComponent.AddLoyaltyToThis _ -> []
   CostComponent.RemoveLoyaltyFromThis _ -> []
-  CostComponent.RemoveLoyaltyFromThisX -> []
   CostComponent.RemoveCountersFromThis _ -> []
   -- CR 118.1's removal aimed elsewhere: Zameck Guildmage's "a creature you
-  -- control".
+  -- control", Retribution of the Ancients' "creatures you control".
   CostComponent.RemoveCounters (CountersFromPermanents.MkCountersFromPermanents _ _ f _) -> [f]
-  -- Retribution of the Ancients' "creatures you control", X counters from among
-  -- them.
-  CostComponent.RemovePlusOneCountersX f -> [f]
-  CostComponent.SacrificeX f -> [f]
   CostComponent.PutPlusOneCountersOnThis _ -> []
   CostComponent.Blight _ -> []
-  CostComponent.BlightX -> []
   CostComponent.Forage -> []
   CostComponent.FlipCoin -> []
   CostComponent.ExileThisFromGraveyard -> []
@@ -3925,7 +3906,6 @@ costComponentFilters component = case component of
   CostComponent.ChooseOpponent -> []
   CostComponent.Waterbend _ -> []
   CostComponent.WaterbendInstead _ -> []
-  CostComponent.WaterbendX -> []
 
 -- The Filter narrowing a target slot's CR 115 pool -- "target creature with
 -- flying" -- and CR 303.4a's enchant slot, which is a TargetSlot too.
@@ -4894,192 +4874,23 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   -- condition itself admits no event and names nothing.
   TriggerCondition.Reflexive -> []
 
--- Every SlotName a Filter reads SINGLY -- today exactly the IsControllerOfBound
--- atoms in it. Pawl.Engine.Count answers that one through
--- Pawl.Engine.Filter.slotOneObject, which declines a slot naming several objects
--- rather than picking one of them (Pawl.Engine.Binding.onlyOne's doctrine), so
--- the atom is False for every candidate and the count is zero, in silence.
+-- Every SlotName a Filter reads SINGLY: Pawl.Engine.Filter.singularSlots, the
+-- classification the engine's arity lint reads too. Pawl.Engine.Count answers
+-- IsControllerOfBound through Pawl.Engine.Filter.slotOneObject, which declines
+-- a slot naming several objects rather than picking one of them, so the atom
+-- is False for every candidate and the count is zero, in silence.
 --
--- Exhaustive with no fallthrough, triggerConditionSlots' shape and for its
--- reason. Pawl.Engine.Filter.boundSlots is deliberately NOT reused: it ends in a
--- catch-all, so a new atom naming a slot would be absorbed there, and it reports
--- IsBound and SameNameAsBound beside the atom wanted -- both of which read the
--- whole bound set through Filter.Context and so tolerate a group.
---
--- ControlledByBound is not one either, though it names a slot:
--- Pawl.Engine.Filter.bakeBound answers it off a map of PLAYER slots, a namespace
--- disjoint from the object slots a binder mints.
---
--- Reported wherever the atom sits, not only where it is ANSWERED -- which is a
--- Scope.OverPlayers count's filter and nothing else, Pawl.Types.Filter's own
--- haddock says, every other position leaving it vacuously False. Within one
+-- Reported wherever the atom sits, not only where it is ANSWERED. Within one
 -- card's own text that is the conservative direction, an atom in one of those
 -- other positions naming no slot at all. It says nothing about a position in
 -- ANOTHER object's text, which is read for real in a resolution of its own --
 -- see clashesIn, which is where that boundary is kept (#2735).
 --
--- NOT descended into: the Filter a Keyword carries (CR 702.29e) and the one a
--- CounterKind hides under a keyword (CR 122.1b). Sound rather than elided --
--- keywordFilters tags both KeywordFramed, a position whose evaluator supplies no
--- slots at all, so nothing there reads a slot singly or plurally and there is no
--- clash to report. That covers the payload as it is READ under Filter.HasKeyword;
--- the one payload rule 702 transplants into a slot instead, CR 702.6c's equip
--- quality, keywordFilters hands out as its own MintedTargetSlot pair, which IS
--- swept. sweptForSingularSlots below is that argument, and every reader
--- reaches this walk through framedSlotsReadSingly beside it, so a keyword's
--- Filter arriving as a TOP-LEVEL tagged pair is dropped exactly as this
--- non-descent drops it nested (#2741).
+-- A keyword's own Filter is not descended into; sweptForSingularSlots below is
+-- the argument for that, and every reader reaches this walk through
+-- framedSlotsReadSingly beside it (#2741).
 filterSlotsReadSingly :: Filter.Type.Filter Keyword.Keyword -> [SlotName.SlotName]
-filterSlotsReadSingly predicate = case predicate of
-  Filter.Type.HasCardType _ -> []
-  Filter.Type.HasSupertype _ -> []
-  Filter.Type.HasColor _ -> []
-  Filter.Type.IsMonocolored -> []
-  Filter.Type.SharesColorWithSource -> []
-  Filter.Type.HasSubtype _ -> []
-  Filter.Type.HasName _ -> []
-  Filter.Type.NameWordsAtLeast _ -> []
-  Filter.Type.HasNameOriginallyPrintedIn _ -> []
-  -- The keyword's own Filter, left alone for the reason above.
-  Filter.Type.HasKeyword _ -> []
-  Filter.Type.HasKeywordFamily _ -> []
-  Filter.Type.PowerAtLeast _ -> []
-  Filter.Type.PowerAtMost _ -> []
-  Filter.Type.ToughnessGreaterThanPower -> []
-  Filter.Type.PowerLessThanSource -> []
-  Filter.Type.PowerGreaterThanSource -> []
-  Filter.Type.PowerAtLeastSourceToughness -> []
-  -- Not one either, though it names a slot: the slot holds an AMOUNT
-  -- (Pawl.Engine.Filter.Context's boundAmounts), a namespace disjoint from the
-  -- object slots a binder mints, which is ControlledByBound's position above.
-  Filter.Type.PowerIsAmountInSlot _ -> []
-  Filter.Type.PowerAtLeastAmountInSlot _ -> []
-  Filter.Type.ManaValueAtMost _ -> []
-  Filter.Type.ManaValueLessThanSource -> []
-  Filter.Type.ManaValueGreaterThanSource -> []
-  Filter.Type.ManaValueEqualToSource -> []
-  Filter.Type.ManaValueIsEven -> []
-  Filter.Type.ManaValueAtMostAmount -> []
-  Filter.Type.ManaValueEqualToAmount -> []
-  Filter.Type.PowerAtMostAmount -> []
-  Filter.Type.ControlledBy _ -> []
-  Filter.Type.ControlledByDefendingPlayer -> []
-  -- A PLAYER slot, not an object one -- the disjoint namespace above.
-  Filter.Type.ControlledByBound _ -> []
-  Filter.Type.ControlledByPlayer _ -> []
-  Filter.Type.ControlledByRecipient -> []
-  Filter.Type.OwnedBy _ -> []
-  Filter.Type.OwnedByRecipient -> []
-  Filter.Type.IsSource -> []
-  Filter.Type.IsObject _ -> []
-  Filter.Type.TargetsSource -> []
-  Filter.Type.TargetsOnlySource -> []
-  Filter.Type.HasSingleTarget -> []
-  -- DESCENT, for AttachedTo's reason below: CR 115.1's atom carries the one
-  -- target's description, which a card author writes like any other filter.
-  Filter.Type.TargetsOnlyOne f -> filterSlotsReadSingly f
-  Filter.Type.TargetsMatching f -> filterSlotsReadSingly f
-  Filter.Type.TargetsPlayer _ -> []
-  -- Reads the whole bound set off Filter.Context, so a group is every one of its
-  -- members rather than nothing -- the atom this lint must NOT report.
-  Filter.Type.IsBound _ -> []
-  Filter.Type.IsTarget -> []
-  -- Reads the whole set too, one field over.
-  Filter.Type.SameNameAsBound _ -> []
-  -- Names no slot at all: CR 702.60a's comparison is against the SOURCE, whose
-  -- names arrive on Filter.Context.
-  Filter.Type.SameNameAsSource -> []
-  Filter.Type.SameOwnerAsSource -> []
-  -- Reads the whole set too, one field further over.
-  Filter.Type.SameControllerAsBound _ -> []
-  -- Reads the whole set too, off its own field: a slot naming a group answers
-  -- with every member's host's controller.
-  Filter.Type.SameControllerAsHostOfBound _ -> []
-  -- Reads the whole set too, off its own field.
-  Filter.Type.SharesCreatureTypeWithBound _ -> []
-  -- The second arm with an answer, IsControllerOfBound's below: CR 208.1's
-  -- comparison wants ONE toughness, and Pawl.Engine.Projection.framedBySlots
-  -- declines a slot that names several.
-  Filter.Type.ToughnessLessThanBound slot -> [slot]
-  Filter.Type.HasChosenName -> []
-  -- Reads no slot either: CR 105.2's colour arrives on Filter.Context.
-  Filter.Type.HasChosenColor -> []
-  -- Reads no slot either: CR 205.3's subtype arrives on Filter.Context.
-  Filter.Type.HasChosenSubtype -> []
-  Filter.Type.IsLastExiledWithSource -> []
-  -- Reads no slot at all: rule 702.16k's player arrives on Filter.Context.
-  Filter.Type.OfChosenPlayer -> []
-  Filter.Type.OfRelatedPlayer _ -> []
-  Filter.Type.IsPlayer _ -> []
-  -- The one arm with an answer: the candidate is the controller of the object
-  -- the slot names (CR 608.2h), read through slotOneObject.
-  Filter.Type.IsControllerOfBound slot -> [slot]
-  -- DESCENT: the nest is card text like any other, and an atom written into it
-  -- is read exactly as one written at the top level.
-  Filter.Type.ControlsMoreThanYou _ f -> filterSlotsReadSingly f
-  Filter.Type.CardsInGraveyardAtLeast _ -> []
-  Filter.Type.IsAttacking -> []
-  Filter.Type.IsAttackingPlayer _ -> []
-  Filter.Type.IsAttackingPlaneswalker _ -> []
-  Filter.Type.IsAttackingBattle _ -> []
-  Filter.Type.DeclaredAttackedThisCombat -> []
-  Filter.Type.IsBlocking -> []
-  Filter.Type.IsBlocked -> []
-  Filter.Type.DeclaredAttackerThisCombat -> []
-  Filter.Type.DeclaredBlockerThisCombat -> []
-  Filter.Type.AttackedThisTurn -> []
-  Filter.Type.MilledThisTurn -> []
-  Filter.Type.CantCrewVehicles -> []
-  Filter.Type.DealtDamageThisTurn -> []
-  Filter.Type.EnteredThisTurn -> []
-  Filter.Type.CrewedSourceThisTurn -> []
-  Filter.Type.ConvokedSourceThisTurn -> []
-  Filter.Type.SaddledSourceThisTurn -> []
-  Filter.Type.ControlledSinceTurnBegan -> []
-  -- DESCENT, for ControlsMoreThanYou's reason.
-  Filter.Type.AttachedTo f -> filterSlotsReadSingly f
-  -- DESCENT, for the atom above's reason.
-  Filter.Type.HasAttached f -> filterSlotsReadSingly f
-  Filter.Type.IsAttachedToSource -> []
-  Filter.Type.IsAttachedToEvaluated -> []
-  Filter.Type.IsHostOfSource -> []
-  Filter.Type.EnteredWithSource -> []
-  Filter.Type.AttachedNoLaterThanSource -> []
-  Filter.Type.CanHostSubject -> []
-  Filter.Type.CanAttachToSubject -> []
-  Filter.Type.HostOfSubjectHasCardType _ -> []
-  Filter.Type.IsCommander -> []
-  Filter.Type.IsToken -> []
-  Filter.Type.IsActivatedAbility -> []
-  Filter.Type.IsAbility -> []
-  Filter.Type.IsEmblem -> []
-  -- DESCENT, for RepresentedByCard's reason below.
-  Filter.Type.FromSource f -> filterSlotsReadSingly f
-  Filter.Type.IsTapped -> []
-  Filter.Type.IsFaceDown -> []
-  -- DESCENT, for the atom above's reason.
-  Filter.Type.RepresentedByCard f -> filterSlotsReadSingly f
-  Filter.Type.IsExiledFaceDown -> []
-  Filter.Type.Transformed -> []
-  Filter.Type.IsRingBearer -> []
-  Filter.Type.IsPaired -> []
-  Filter.Type.IsPairedWithSource -> []
-  Filter.Type.IsBlockedBySource -> []
-  Filter.Type.HasDesignation _ -> []
-  -- The kind may be a whole Keyword hiding a Filter, left alone for the reason
-  -- the keyword atom above is.
-  Filter.Type.HasCounters _ -> []
-  Filter.Type.HasCountersOfAnyKind -> []
-  Filter.Type.HasSticker _ -> []
-  Filter.Type.Stickered -> []
-  Filter.Type.HasNonManaActivatedAbility -> []
-  Filter.Type.HasActivatedAbility -> []
-  Filter.Type.IsInZone _ -> []
-  Filter.Type.WasCastFrom _ -> []
-  Filter.Type.TagWasSpent _ -> []
-  Filter.Type.And fs -> concatMap filterSlotsReadSingly fs
-  Filter.Type.Or fs -> concatMap filterSlotsReadSingly fs
-  Filter.Type.Not f -> filterSlotsReadSingly f
+filterSlotsReadSingly = Set.toList . Filter.singularSlots
 
 -- The Filters a DamagePattern carries -- its source half and its printed
 -- recipient half, the two axes of that type that ARE predicates over an object.
@@ -5091,38 +4902,22 @@ damagePatternFilters pattern_ = DamagePattern.whatSource pattern_ : Maybe.maybeT
 -- 701.6a).
 playerEffectFilters :: PlayerEffect.PlayerEffect -> [Filter.Type.Filter Keyword.Keyword]
 playerEffectFilters playerEffect = case playerEffect of
-  -- BOTH Filters, ReduceActivationCost's reason below: `perTarget` asks about
-  -- the spell's targets through the same context.
-  PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost f _ targets) -> f : Maybe.maybeToList targets
-  -- CR 601.2f at the ACTIVATION moment, Oppressive Rays' third line. Its Filter
-  -- names the ability's SOURCE PERMANENT, exactly as ReduceActivationCost's
-  -- below does. The whichKind beside it is not returned, for the reason that
-  -- arm's grantedBy is not: CR 605.1a's classification is no more a Filter than
-  -- a rule-702 family is.
-  PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost f _ _) -> [f]
-  PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost f _ _ targets) -> f : Maybe.maybeToList targets
-  -- CR 601.2f's other moment: Heartstone's Filter narrows the ability's SOURCE
-  -- PERMANENT rather than a spell, and is authored the same way. The grantedBy
-  -- and whichKind beside it are not returned: neither a KeywordFamily nor CR
-  -- 605.1a's classification is a Filter, so the lints this list feeds have
-  -- nothing to say about either.
-  --
-  -- BOTH Filters, and they are held to one standard because they are evaluated
-  -- through one context: `whichTargets` (Dwarven Mauler's "that target this
-  -- creature") asks about the ability's chosen TARGET rather than its source, but
-  -- Pawl.Engine.PlayerEffect.matchesObjectFrom builds the same Context for it, so
-  -- the same framing and the same atom vocabulary apply.
-  PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost f _ _ targets _ _ _) -> f : Maybe.maybeToList targets
-  -- CR 601.2f's addition carries a Filter in two places: its own criterion
-  -- ("nontoken Rebels"), and one inside each component it adds ("sacrifice a
-  -- land"). Both are authored by the card, so both are linted, and the inner
-  -- ones go through costComponentFilters so an added component and a printed
-  -- one are held to one standard.
-  PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost f _ components _) -> f : concatMap costComponentFilters components
+  -- CR 601.2f at either moment: the criterion names the SPELL or the ability's
+  -- SOURCE PERMANENT. The two target Filters (Kopala's "that target a Merfolk",
+  -- Dwarven Mauler's "that target this creature", Hinata's "for each target")
+  -- ask about a chosen TARGET instead, but Pawl.Engine.PlayerEffect builds the
+  -- same Context for them, so the same framing and the same atom vocabulary
+  -- apply. An addition's components carry one each ("sacrifice a SWAMP"), held
+  -- to a printed component's standard through costComponentFilters. The
+  -- subject's criteria are not returned: neither a rule-702 designator nor CR
+  -- 605.1a's or 606.2's classification is a Filter.
+  PlayerEffect.ModifyCost (CostModifier.MkCostModifier _ f targets perTarget _ change) ->
+    f
+      : Maybe.maybeToList targets <> Maybe.maybeToList perTarget <> case change of
+        CostChange.Add addition -> concatMap costComponentFilters (CostAddition.components addition)
+        CostChange.Increase _ -> []
+        CostChange.Reduce _ -> []
   PlayerEffect.AlternativeActivationCost _ -> []
-  -- The spell-side twin, whose Filter names the SPELL (Drought's is universal)
-  -- and whose components carry one of their own ("sacrifice a SWAMP").
-  PlayerEffect.AddSpellCost (AddSpellCost.MkAddSpellCost f components _) -> f : concatMap costComponentFilters components
   PlayerEffect.CantCastSpells -> []
   PlayerEffect.CantActivateAbilities _ -> []
   PlayerEffect.CantCastMoreThan _ -> []
@@ -5815,9 +5610,8 @@ data Framing
 -- keyword's payload Filter supplies SLOT OBJECTS, so Filter.IsControllerOfBound
 -- reads nothing at any of them. That is the test to put a new evaluator to,
 -- rather than a list of today's: the question is what the EVALUATING context
--- holds, not how many builders there are -- Pawl.Engine.Filter.contextWithSlots
--- has callers across the engine and Pawl.Engine.Target.slotContext writes a
--- slot-carrying Context out by hand. None reaches a keyword's payload: CR
+-- holds, not how many builders there are -- Pawl.Engine.Projection.framedBySlots
+-- has callers across the engine. None reaches a keyword's payload: CR
 -- 702.11d and CR 702.16b (Pawl.Engine.Target.targetable), CR 702.14c
 -- (Pawl.Engine.Combat), CR 702.16c/d (Pawl.Engine.AttachRestriction), CR
 -- 702.16f (Pawl.Engine.CombatRestriction) and the CR 702.29e cycling mint's
@@ -5850,7 +5644,7 @@ sweptForSingularSlots framing = case framing of
   SourceHostFramed -> True
   -- SWEPT, as these positions were under SourceHostFramed before #3320 split them
   -- off: CR 603.4's clause really does read the trigger's slots
-  -- (Filter.contextWithSlots), and where the other two read none the sweep can
+  -- (Projection.framedByBindings), and where the other two read none the sweep can
   -- only reject more, SlotlessCostFramed's argument.
   StandingHostFramed -> True
   -- SWEPT, as both were before they were split off: the split is about CR
@@ -6819,7 +6613,7 @@ mintingSpell :: (Face.Face Card.Type.Card -> Effect.Effect Card.Type.Card (Grant
 mintingSpell mint face =
   oneFaced
     ( (vanillaFace "Minter" instantLine)
-        { Face.spell = Modal.MkModal (Seq.singleton (lintMode [mint face] [])) (ModeSelection.ChooseExactly 1)
+        { Face.spell = lintModal [mint face] []
         }
     )
 
@@ -6937,7 +6731,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         sweeps = anyFaceOrMinted cardOffends
         offenders = filter (sweeps . Printing.card) ps
         slot = SlotName.MkSlotName (Text.pack "creature")
-        conjuredReading declared = (vanillaFace "Conjured" instantLine) {Face.spell = Modal.MkModal (Seq.singleton (lintMode [Effect.Tap (ObjectRef.InSlot slot)] declared)) (ModeSelection.ChooseExactly 1)}
+        conjuredReading declared = (vanillaFace "Conjured" instantLine) {Face.spell = lintModal [Effect.Tap (ObjectRef.InSlot slot)] declared}
     Spec.assertEqWith s "no dangling or unused slots" (fmap (S.nameOf . Printing.card) offenders) []
     -- The rejecting direction through the descent, which the corpus never
     -- exercises: the pair differs in the conjured spell declaring its slot.
@@ -7274,7 +7068,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "the lint itself catches a move onto a group under an arm the distribution cannot ask" $ do
     let self = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))
         group = ObjectRef.EachMatching (Filter.Type.And [])
-        moving kinds to = (vanillaFace "Mover" instantLine) {Face.spell = Modal.MkModal (Seq.singleton (lintMode [Effect.MoveCounters (MoveCounters.MkMoveCounters self kinds Nothing to)] [])) (ModeSelection.ChooseExactly 1)}
+        moving kinds to = (vanillaFace "Mover" instantLine) {Face.spell = lintModal [Effect.MoveCounters (MoveCounters.MkMoveCounters self kinds Nothing to)] []}
         asked = [MovedKinds.EveryOfKind CounterKind.PlusOnePlusOne, MovedKinds.Chosen (Quantity.Type.Literal 2), MovedKinds.UpToOneChosen]
     Spec.assertBool s (cardMovesOntoGroupUnasked (moving MovedKinds.EachAbsentKind group)) "each absent kind onto a group is rejected"
     Spec.assertBool s (not (cardMovesOntoGroupUnasked (moving MovedKinds.EachAbsentKind self))) "and onto a slot is accepted"
@@ -7881,9 +7675,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- hand-built instant granting two card-type protections until end of turn.
   Spec.it s "CR 702.16h the lint reads a resolution effect's grants of card-type protection" $ do
     let grant cardType = Effect.ModifyTarget (ModifyTarget.MkModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword (Keyword.Protection (Protection.MkProtection (Filter.Type.HasCardType cardType) Nothing))) (plantedRef "mt") Nothing)
-        spell = (vanillaFace "Unlisted Ward" instantLine) {Face.spell = Modal.MkModal (Seq.singleton (lintMode [grant CardType.Artifact, grant CardType.Creature] [])) (ModeSelection.ChooseExactly 1)}
+        spell = (vanillaFace "Unlisted Ward" instantLine) {Face.spell = lintModal [grant CardType.Artifact, grant CardType.Creature] []}
     Spec.assertBool s (not (null (protectionOffences spell))) "an unclassified pair of card-type grants is caught"
-    Spec.assertEqWith s "while one alone is not a group" (protectionOffences spell {Face.spell = Modal.MkModal (Seq.singleton (lintMode [grant CardType.Artifact] [])) (ModeSelection.ChooseExactly 1)}) []
+    Spec.assertEqWith s "while one alone is not a group" (protectionOffences spell {Face.spell = lintModal [grant CardType.Artifact] []}) []
   -- The countdown shield's rider, the same limb one opcode over: Test of Faith
   -- hangs CR 615.5's counters off a PreventNextDamage where Inkshield hangs its
   -- tokens off a PreventAllDamage. No lint fires on a PutCounters, so this is
@@ -8042,21 +7836,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- declares CR 109.5's `you` as a target slot and binds CR 615.13's
         -- `thatMuch` from the count of what it destroyed.
         offending =
-          TriggeredAbility.MkTriggeredAbility
-            { TriggeredAbility.condition = TriggerCondition.SelfDies,
-              TriggeredAbility.modal =
-                Modal.MkModal
-                  ( Seq.singleton
-                      ( Mode.MkMode
-                          (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Destroy (Destroy.MkDestroy (ObjectRef.InSlot Binding.you) Regenerability.Regenerable (Just Binding.eventAmount) Nothing Nothing)))))
-                          (Map.singleton Binding.you (TargetSlot.required Pool.AnyTarget Nothing))
-                      )
-                  )
-                  (ModeSelection.ChooseExactly 1),
-              TriggeredAbility.intervening = Nothing,
-              TriggeredAbility.name = Nothing,
-              TriggeredAbility.limit = TriggerLimit.Unlimited
-            }
+          Mint.triggerOf
+            TriggerCondition.SelfDies
+            Nothing
+            (Mint.oneModeTargeting (Map.singleton Binding.you (TargetSlot.required Pool.AnyTarget Nothing)) (Seq.singleton (Effect.Destroy (Destroy.MkDestroy (ObjectRef.InSlot Binding.you) Regenerability.Regenerable (Just Binding.eventAmount) Nothing Nothing))))
         arm face = face {Face.triggeredAbilities = offending : Face.triggeredAbilities face}
         overModal f modal =
           modal {Modal.modes = fmap (\m -> m {Mode.clauses = fmap (\c -> c {Clause.effects = fmap f (Clause.effects c)}) (Mode.clauses m)}) (Modal.modes modal)}
@@ -8154,19 +7937,14 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     tidalWave <- S.printingOf s registry "Tidal Wave"
     let -- A one-mode, effectless modal declaring exactly one target slot.
         declaring slot =
-          Modal.MkModal
-            (Seq.singleton (Mode.MkMode Seq.empty (Map.singleton slot (TargetSlot.required Pool.AnyTarget Nothing))))
-            (ModeSelection.ChooseExactly 1)
+          Mint.oneModeOf (Map.singleton slot (TargetSlot.required Pool.AnyTarget Nothing)) Seq.empty
         withTriggered slot card =
           card
             { Face.triggeredAbilities =
-                [ TriggeredAbility.MkTriggeredAbility
-                    { TriggeredAbility.condition = TriggerCondition.SelfDies,
-                      TriggeredAbility.modal = declaring slot,
-                      TriggeredAbility.intervening = Nothing,
-                      TriggeredAbility.name = Nothing,
-                      TriggeredAbility.limit = TriggerLimit.Unlimited
-                    }
+                [ Mint.triggerOf
+                    TriggerCondition.SelfDies
+                    Nothing
+                    (declaring slot)
                 ]
             }
         withActivated slot card =

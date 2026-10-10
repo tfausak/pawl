@@ -4,11 +4,11 @@ module Pawl.Codec.CountersFromPermanents where
 
 import qualified Data.Text as Text
 import qualified Data.Typeable as Typeable
+import qualified Pawl.Codec.CostAmount as CostAmount
 import qualified Pawl.Codec.CounterSpread as CounterSpread
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.WhichCounters as WhichCounters
 import qualified Pawl.JsonCodec.Codec as Codec
-import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.CounterSpread as CounterSpread.Type
 import qualified Pawl.Types.CountersFromPermanents as CountersFromPermanents
@@ -23,7 +23,7 @@ import qualified Pawl.Types.WhichCounters as WhichCounters.Type
 -- counters" of any kind ('Fields.objectWith''s check).
 codec :: (Typeable.Typeable keyword, Eq keyword) => Codec.Codec keyword -> Codec.Codec (CountersFromPermanents.CountersFromPermanents keyword)
 codec keywordCodec = Fields.objectWith check $ do
-  count <- Fields.required "count" Common.natural CountersFromPermanents.count
+  count <- Fields.required "count" CostAmount.codec CountersFromPermanents.count
   kind <- Fields.required "kind" (WhichCounters.codec keywordCodec) CountersFromPermanents.kind
   whichPermanent <- Fields.required "whichPermanent" (Filter.codec keywordCodec) CountersFromPermanents.whichPermanent
   spread <- Fields.defaulted "spread" CounterSpread.Type.FromOne CounterSpread.codec CountersFromPermanents.spread

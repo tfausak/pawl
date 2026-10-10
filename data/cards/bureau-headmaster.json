@@ -26,19 +26,27 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "ReduceSpellCost",
+            "type": "ModifyCost",
             "value": {
-              "reduction": [
-                {
-                  "type": "Generic",
-                  "value": 1
+              "change": {
+                "type": "Reduce",
+                "value": {
+                  "amount": [
+                    {
+                      "type": "Generic",
+                      "value": 1
+                    }
+                  ]
                 }
-              ],
-              "whichSpells": {
+              },
+              "matching": {
                 "type": "HasSubtype",
                 "value": {
                   "type": "Equipment"
                 }
+              },
+              "subject": {
+                "type": "Spells"
               }
             }
           },
@@ -48,24 +56,33 @@
         },
         {
           "effect": {
-            "type": "ReduceActivationCost",
+            "type": "ModifyCost",
             "value": {
-              "floor": 0,
-              "grantedBy": {
-                "type": "OfFamily",
+              "change": {
+                "type": "Reduce",
                 "value": {
-                  "type": "Equip"
+                  "amount": [
+                    {
+                      "type": "Generic",
+                      "value": 1
+                    }
+                  ]
                 }
               },
-              "reduction": [
-                {
-                  "type": "Generic",
-                  "value": 1
-                }
-              ],
-              "whichAbilities": {
+              "matching": {
                 "type": "And",
                 "value": []
+              },
+              "subject": {
+                "type": "Activations",
+                "value": {
+                  "grantedBy": {
+                    "type": "OfFamily",
+                    "value": {
+                      "type": "Equip"
+                    }
+                  }
+                }
               }
             }
           },

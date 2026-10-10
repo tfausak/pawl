@@ -906,7 +906,7 @@ becameSlotSpec s registry =
           (roachId, board) <- roachBoard
           let (settled, _) = boltIt board
               bindingsOn oid = maybe Map.empty Object.bindings (Game.lookupObject oid settled)
-              slots = concatMap (Map.toList . Map.mapMaybe Binding.onlyOne . Binding.targetsOf . bindingsOn) (GameState.stack settled)
+              slots = concatMap (Map.toList . Binding.oneBySlot . Binding.targetsOf . bindingsOn) (GameState.stack settled)
               slotFor name = lookup name slots
           Spec.assertEqWith s "self is the permanent that died" (slotFor Binding.triggerSource) (Just (Recipient.ToObject roachId))
           Spec.assertBool s (Maybe.isNothing (Game.lookupObject roachId settled)) "and that id is gone (CR 400.7)"
@@ -1007,7 +1007,7 @@ becameSlotSpec s registry =
               -- bounce and re-filed under the id representativeEvents uses, so the
               -- pin cannot be satisfied by a record shaped to suit it. Nothing
               -- lands under the departed id in `objects`, which is what
-              -- Projection.lastKnownOf's liveness guard requires.
+              -- Game.lastKnownOf's liveness guard requires.
               (pikerId, placed) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
               bounced = S.runPure S.identityAnswer placed (Event.changeZone pikerId Zone.Hand)
               empty = Setup.emptyGame S.bothPlayers

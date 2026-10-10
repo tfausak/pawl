@@ -39,7 +39,7 @@ module Pawl.Types.KeywordFamily where
 data KeywordFamily
   = -- | CR 702.6a: equip [cost]. Bureau Headmaster's "equip abilities you
     -- activate cost {1} less to activate" is the card asking, through
-    -- Pawl.Types.ReduceActivationCost's @grantedBy@ rather than through a
+    -- Pawl.Types.ActivationCriteria's @grantedBy@ rather than through a
     -- Filter.
     Equip
   | -- | CR 702.11d: hexproof from [quality].
@@ -107,7 +107,7 @@ data KeywordFamily
     Offering
   | -- | CR 702.49a: ninjutsu [cost]. Silver-Fur Master's "ninjutsu abilities you
     -- activate cost {1} less to activate" is the card asking, through
-    -- Pawl.Types.ReduceActivationCost's @grantedBy@ rather than through a Filter;
+    -- Pawl.Types.ActivationCriteria's @grantedBy@ rather than through a Filter;
     -- it is not in the pool yet, and the family is owed at the keyword.
     Ninjutsu
   | -- | CR 702.52a: dredge N. The family "a card with dredge" would name, as

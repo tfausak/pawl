@@ -3,9 +3,9 @@
 module Pawl.Codec.Sacrifice where
 
 import qualified Data.Typeable as Typeable
+import qualified Pawl.Codec.CostAmount as CostAmount
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.JsonCodec.Codec as Codec
-import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.Sacrifice as Sacrifice
 
@@ -14,6 +14,6 @@ import qualified Pawl.Types.Sacrifice as Sacrifice
 -- Pawl.Codec.Filter's header.
 codec :: (Typeable.Typeable keyword, Eq keyword) => Codec.Codec keyword -> Codec.Codec (Sacrifice.Sacrifice keyword)
 codec keywordCodec = Fields.object $ do
-  count <- Fields.required "count" Common.natural Sacrifice.count
+  count <- Fields.required "count" CostAmount.codec Sacrifice.count
   whichPermanents <- Fields.required "whichPermanents" (Filter.codec keywordCodec) Sacrifice.whichPermanents
   pure Sacrifice.MkSacrifice {Sacrifice.count = count, Sacrifice.whichPermanents = whichPermanents}

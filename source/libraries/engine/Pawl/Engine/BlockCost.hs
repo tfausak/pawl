@@ -21,11 +21,9 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Filter as Filter
-import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
-import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Types.BlockCost as BlockCost
 import qualified Pawl.Types.Cost as Cost
@@ -99,12 +97,12 @@ costsOn blocker blocked gs =
       shareOf source bc = case BlockCost.perBlocker bc of
         PerCreature.Fixed cost -> [cost]
         PerCreature.Counted quantity ->
-          let context = SourceContext.sourceContext gs (Projection.controllerOf source gs) source
+          let context = Projection.sourceContext gs (Projection.controllerOf source gs) source
               generic n = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic (Integer.toNaturalSaturating n)])) []
            in Maybe.maybeToList (fmap generic (Quantity.evaluate (Projection.fullView gs) context gs source quantity))
       -- CR 509.1b: "can't block [these] creatures unless", so the cost is owed
       -- only for a block of an attacker the filter names.
-      blockerContext = Filter.contextComparingPower (Game.teams gs) (Projection.controllerOf blocker gs) blocker (Projection.powerOf blocker gs) (Projection.toughnessOf blocker gs)
+      blockerContext = Projection.pairwiseContext gs blocker
       taxes bc = case BlockCost.attackers bc of
         Nothing -> True
         Just wanted -> any (\attacker -> Filter.matches blockerContext (Projection.viewOfObject attacker gs) wanted) (Set.toList blocked)

@@ -21,7 +21,6 @@ import qualified Pawl.Engine.Plane as Plane
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
-import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.SplitSecond as SplitSecond
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
@@ -232,7 +231,7 @@ zoneAbilitiesOf pcs zone oid gs = case (Game.faceOf oid gs, Game.lookupObject oi
                )
         granted ability = case ActivatedAbility.condition ability of
           Nothing -> True
-          Just cond -> Condition.holds (Projection.fullView gs) (SourceContext.sourceContext gs (activatorOf oid gs) oid) gs oid cond
+          Just cond -> Condition.holds (Projection.fullView gs) (Projection.sourceContext gs (activatorOf oid gs) oid) gs oid cond
      in filter (\ability -> functionsHere ability && granted ability) (PC.activatedAbilities projected)
   _ -> []
 
@@ -524,9 +523,9 @@ payableCostAtGiven aimable sources pcs x stamp spendable pid srcId gs cost =
 -- at every count its range admits (Target.aimingRanges), so the empty aiming is
 -- among them only where every slot may take none.
 --
--- The ADJUSTMENT search is the old one, unchanged: only ReduceActivationCost
--- reads the targets (Pawl.Engine.PlayerEffect.activationCostAdjustmentsGiven),
--- and each candidate is tried ON ITS OWN rather than all at once, since handing
+-- The ADJUSTMENT search, for a modifier that REDUCES by the targets (Dwarven
+-- Mauler; Pawl.Engine.PlayerEffect.activationCostAdjustmentsGiven), tries each
+-- candidate ON ITS OWN rather than all at once, since handing
 -- the whole set in would let two reducers wanting two different targets both
 -- apply where no one choice satisfies both. One at a time is exact for an
 -- ability with a single target slot -- which is every ability such a reducer
@@ -536,6 +535,14 @@ payableCostAtGiven aimable sources pcs x stamp spendable pid srcId gs cost =
 --
 -- The empty aiming comes first there: a player may always choose a target that
 -- reduces nothing, and it is the only aiming an ability with no target slot has.
+--
+-- That climb rests on the empty aiming being the DEAREST, which a modifier that
+-- INCREASES by the targets breaks: under Kopala, Warden of Waves the empty aiming
+-- is the cheapest, and an ability whose every legal target is a Merfolk is not
+-- payable merely because no target is. So a union gather whose increases differ
+-- from the blind one's sends the gate to the whole-announcement search, which is
+-- exact. Pawl.CostSpec's "a Brittle Effigy whose only targets are alice's
+-- Merfolk is not offered on five Plains" proves it.
 -- The union gather then guards the climb -- the gather is monotone in the target
 -- set, so a union that adjusts nothing leaves every singleton adjusting nothing
 -- too -- which keeps every board without a target-naming reducer at one gather
@@ -544,7 +551,7 @@ payableCostAtGiven aimable sources pcs x stamp spendable pid srcId gs cost =
 -- `slotReading` is asked of the cost with the blind gather's components added,
 -- so a criterion arriving on a component CR 601.2f's adjustments add takes the
 -- cost search as a printed one does.
-aimingSomewhere :: (CostAdjustments.CostAdjustments -> Cost Keyword) -> [(Map.Map SlotName (Natural, Natural), Map.Map SlotName (Set.Set ObjectId))] -> Maybe Keyword -> LoyaltyKind.LoyaltyKind -> PlayerId -> ObjectId -> GameState -> (Map.Map SlotName (Set.Set ObjectId) -> CostAdjustments.CostAdjustments -> Bool) -> Bool
+aimingSomewhere :: (CostAdjustments.CostAdjustments -> Cost Keyword) -> [(Map.Map SlotName (Natural, Natural), Map.Map SlotName (Set.Set ObjectId))] -> Maybe Keyword -> LoyaltyKind.LoyaltyKind -> PlayerId -> ObjectId -> GameState -> (Map.Map SlotName (Set.Set Recipient.Recipient) -> CostAdjustments.CostAdjustments -> Bool) -> Bool
 aimingSomewhere costWith aimable stamp loyalty pid srcId gs payable =
   -- CR 605.1a's kind is AbilityKind.NonManaAbility at all three sites in this
   -- module, and CR 605.3b is why: activatableGiven refuses a mana ability
@@ -562,13 +569,15 @@ aimingSomewhere costWith aimable stamp loyalty pid srcId gs payable =
   let gather aimedAt = Cost.activationAdjustments aimedAt stamp AbilityKind.NonManaAbility loyalty pid srcId gs
       candidates = Set.unions (concatMap (Map.elems . snd) aimable)
       blind = gather Set.empty
-      -- The added components are the blind gather's under every aiming: only
-      -- ReduceActivationCost reads the targets, and it adds no component.
+      -- The added components are the blind gather's under every aiming:
+      -- Pawl.Codec.CostModifier refuses a target criterion on an addition to an
+      -- activation.
       slotReading = Cost.readsBoundSlot (costWith blind)
+      increasesReadTargets = CostAdjustments.increases (gather candidates) /= CostAdjustments.increases blind
       -- Targets the cost cannot tell apart are tried once (Cost.aimingSignature).
       key = Cost.aimingKey pid srcId gs (costWith blind) . Recipient.ToObject
-   in if slotReading
-        then any (\(ranges, sets) -> any (\aiming -> payable (Binding.withAnnouncedTargets aiming) (gather (Set.unions (Map.elems aiming)))) (Target.aimingsBy id key ranges sets)) aimable
+   in if slotReading || increasesReadTargets
+        then any (\(ranges, sets) -> any (\aiming -> payable (Binding.withAnnouncedTargets (fmap (Set.map Recipient.ToObject) aiming)) (gather (Set.unions (Map.elems aiming)))) (Target.aimingsBy id key ranges sets)) aimable
         else
           payable Map.empty blind
             || (gather candidates /= blind && any (payable Map.empty . gather . Set.singleton) (Set.toList candidates))
@@ -621,7 +630,7 @@ candidateSlotsGiven pcs grants pools pid srcId modal fillable gs =
 -- `mCeiling` is CR 101.1's, evaluated off the ABILITY being activated rather than
 -- off the face (Cost.ceilingOf over ActivatedAbility.maximumX) and passed straight
 -- through: it bounds the search as well as the announcement, which is what makes
--- Blighted Nightmare's blight route terminate -- CostComponent.BlightX's demand
+-- Blighted Nightmare's blight route terminate -- an announced blight's demand
 -- never grows (Cost.demandGrowsWithX), so the climb has no other ground to stop
 -- on. Cast.affordableX takes the same argument off Face.maximumX.
 affordableX :: Maybe Natural -> [(Map.Map SlotName (Natural, Natural), Map.Map SlotName (Set.Set ObjectId))] -> Maybe Keyword -> Maybe (Set.Set ManaType.ManaType) -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Natural

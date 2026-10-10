@@ -6,11 +6,16 @@
           "cost": {
             "components": [
               {
-                "type": "SacrificeX",
+                "type": "Sacrifice",
                 "value": {
-                  "type": "HasSubtype",
-                  "value": {
-                    "type": "Squirrel"
+                  "count": {
+                    "type": "AnnouncedX"
+                  },
+                  "whichPermanents": {
+                    "type": "HasSubtype",
+                    "value": {
+                      "type": "Squirrel"
+                    }
                   }
                 }
               }

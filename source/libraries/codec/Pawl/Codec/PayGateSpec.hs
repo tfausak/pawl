@@ -10,6 +10,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CostAmount as CostAmount
 import qualified Pawl.Types.CostBasis as CostBasis
 import qualified Pawl.Types.CostChoice as CostChoice
 import qualified Pawl.Types.CostComponent as CostComponent
@@ -94,8 +95,8 @@ spec s = Spec.describe s "Pawl.Codec.PayGate" $ do
     Common.assertCodec
       s
       PayGate.codec
-      manaLeak {PayGate.cost = CostChoice.MkCostChoice (Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 3]), Cost.components = []} NonEmpty.:| [Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost []), Cost.components = [CostComponent.PayLife 3]}])}
-      " {\"payer\":{\"type\":\"ControllerOfBound\",\"value\":\"spell\"},\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]},\"orCosts\":[{\"mana\":[],\"components\":[{\"type\":\"PayLife\",\"value\":3}]}],\"branch\":{\"type\":\"IfNotPaid\"}} "
+      manaLeak {PayGate.cost = CostChoice.MkCostChoice (Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 3]), Cost.components = []} NonEmpty.:| [Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost []), Cost.components = [CostComponent.PayLife (CostAmount.Fixed 3)]}])}
+      " {\"payer\":{\"type\":\"ControllerOfBound\",\"value\":\"spell\"},\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]},\"orCosts\":[{\"mana\":[],\"components\":[{\"type\":\"PayLife\",\"value\":{\"type\":\"Fixed\",\"value\":3}}]}],\"branch\":{\"type\":\"IfNotPaid\"}} "
   Spec.it s "MkPayGate, a clause hanging off an earlier clause's offer" $
     Common.assertCodec
       s

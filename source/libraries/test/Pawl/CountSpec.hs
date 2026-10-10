@@ -998,7 +998,7 @@ ebonyOwlNetsukeSpec s registry =
 --   no owner at all            0   Filter.OwnedBy vacuously False, the bug
 --   neither conjunct           2   every cast counted
 --
--- The second case is castOwner's other road, and the board it needs is the one
+-- The second case is Game.ownerWithLastKnown's live road, and the board it needs is the one
 -- with a second Renewed Faith in alice's OWN hand: a spell still on the stack has
 -- no CR 608.2h record filed under its id, so a fold that reads only records
 -- would answer Nothing for it and count a spell alice owns.

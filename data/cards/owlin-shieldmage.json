@@ -12,7 +12,10 @@
               "components": [
                 {
                   "type": "PayLife",
-                  "value": 3
+                  "value": {
+                    "type": "Fixed",
+                    "value": 3
+                  }
                 }
               ],
               "mana": []

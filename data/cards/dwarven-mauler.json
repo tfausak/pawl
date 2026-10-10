@@ -17,24 +17,33 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "ReduceActivationCost",
+            "type": "ModifyCost",
             "value": {
-              "floor": 0,
-              "grantedBy": {
-                "type": "OfFamily",
+              "change": {
+                "type": "Reduce",
                 "value": {
-                  "type": "Equip"
+                  "amount": [
+                    {
+                      "type": "Generic",
+                      "value": 2
+                    }
+                  ]
                 }
               },
-              "reduction": [
-                {
-                  "type": "Generic",
-                  "value": 2
-                }
-              ],
-              "whichAbilities": {
+              "matching": {
                 "type": "And",
                 "value": []
+              },
+              "subject": {
+                "type": "Activations",
+                "value": {
+                  "grantedBy": {
+                    "type": "OfFamily",
+                    "value": {
+                      "type": "Equip"
+                    }
+                  }
+                }
               },
               "whichTargets": {
                 "type": "IsSource"

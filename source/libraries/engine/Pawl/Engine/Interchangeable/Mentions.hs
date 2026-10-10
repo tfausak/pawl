@@ -22,11 +22,10 @@ import qualified Pawl.Engine.Binding as Binding.Engine
 import qualified Pawl.Types.AbilityAddsMana as AbilityAddsMana
 import qualified Pawl.Types.ActivateManaAbilities as ActivateManaAbilities
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivationCriteria as ActivationCriteria
 import qualified Pawl.Types.ActivationProhibition as ActivationProhibition
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
-import qualified Pawl.Types.AddActivationCost as AddActivationCost
-import qualified Pawl.Types.AddSpellCost as AddSpellCost
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
@@ -106,10 +105,14 @@ import qualified Pawl.Types.CopyOriginal as CopyOriginal
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CostAddition as CostAddition
 import qualified Pawl.Types.CostBasis as CostBasis
+import qualified Pawl.Types.CostChange as CostChange
 import qualified Pawl.Types.CostChoice as CostChoice
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CostModifier as CostModifier
 import qualified Pawl.Types.CostReduction as CostReduction
+import qualified Pawl.Types.CostSubject as CostSubject
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counter as Counter
@@ -205,8 +208,6 @@ import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.HandAction as HandAction
 import qualified Pawl.Types.Impending as Impending
 import qualified Pawl.Types.InZone as InZone
-import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
-import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordCount as KeywordCount
 import qualified Pawl.Types.KeywordDesignator as KeywordDesignator
@@ -290,8 +291,6 @@ import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
 import qualified Pawl.Types.RandomCardInLibrary as RandomCardInLibrary
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
-import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
-import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Types.Reinforce as Reinforce
 import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
@@ -574,14 +573,6 @@ activationRestrictionNames asking x = case x of
 activeReplacementNames :: Asking -> ActiveReplacement.ActiveReplacement -> Bool
 activeReplacementNames asking x = case x of
   ActiveReplacement.MkActiveReplacement effect source _controller _timestamp expiry _uses _origin condition rider slots_ -> replacementEffectNames asking (const False) (grantedAbilityNames asking (const False)) (effectNames asking (const False) (grantedAbilityNames asking (const False))) effect || source == object asking || expiryNames asking expiry || any (conditionNames asking) condition || any (preventionRiderNames asking) rider || any (slotNames asking) (Map.keys slots_) || any (elem (object asking)) slots_
-
-addActivationCostNames :: Asking -> AddActivationCost.AddActivationCost -> Bool
-addActivationCostNames asking x = case x of
-  AddActivationCost.MkAddActivationCost whichAbilities _whichLoyalty components _scale -> filterNames asking whichAbilities || any (costComponentNames asking (keywordNames asking)) components
-
-addSpellCostNames :: Asking -> AddSpellCost.AddSpellCost -> Bool
-addSpellCostNames asking x = case x of
-  AddSpellCost.MkAddSpellCost whichSpells components _scale -> filterNames asking whichSpells || any (costComponentNames asking (keywordNames asking)) components
 
 affectPlayersNames :: Asking -> AffectPlayers.AffectPlayers -> Bool
 affectPlayersNames asking x = case x of
@@ -955,11 +946,9 @@ costComponentNames asking onKeyword x = case x of
   CostComponent.UntapThis -> False
   CostComponent.SacrificeThis -> False
   CostComponent.ReturnThis -> False
-  CostComponent.PayLife _natural -> False
-  CostComponent.PayLifeX -> False
+  CostComponent.PayLife _amount -> False
   CostComponent.PayHalfLife _rounding -> False
   CostComponent.Sacrifice sacrifice -> sacrificeNames asking sacrifice
-  CostComponent.SacrificeX filter_ -> filterNames asking filter_
   CostComponent.TapForTotalPower tapForTotalPower -> tapForTotalPowerNames asking tapForTotalPower
   CostComponent.TapPermanents tapPermanents -> tapPermanentsNames asking tapPermanents
   CostComponent.ReturnPermanents returnPermanents -> returnPermanentsNames asking returnPermanents
@@ -967,19 +956,15 @@ costComponentNames asking onKeyword x = case x of
   CostComponent.DiscardCards discardCards -> discardCardsNames asking discardCards
   CostComponent.DiscardThis _discardCause -> False
   CostComponent.PutCardFromHandOntoBattlefield filter_ -> filterNames asking filter_
-  CostComponent.PayEnergy _natural -> False
-  CostComponent.PayEnergyX -> False
+  CostComponent.PayEnergy _amount -> False
   CostComponent.AddLoyaltyToThis _natural -> False
-  CostComponent.RemoveLoyaltyFromThis _natural -> False
-  CostComponent.RemoveLoyaltyFromThisX -> False
+  CostComponent.RemoveLoyaltyFromThis _amount -> False
   CostComponent.RemoveCountersFromThis countersFromThis -> countersFromThisNames asking onKeyword countersFromThis
   CostComponent.RemoveCounters countersFromPermanents -> countersFromPermanentsNames asking onKeyword countersFromPermanents
-  CostComponent.RemovePlusOneCountersX filter_ -> filterNames asking filter_
   CostComponent.PutPlusOneCountersOnThis _natural -> False
-  CostComponent.Blight _natural -> False
+  CostComponent.Blight _amount -> False
   CostComponent.Forage -> False
   CostComponent.FlipCoin -> False
-  CostComponent.BlightX -> False
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileThis -> False
   CostComponent.ExileCardsFromGraveyard exileCardsFromGraveyard -> exileCardsFromGraveyardNames asking exileCardsFromGraveyard
@@ -994,9 +979,8 @@ costComponentNames asking onKeyword x = case x of
   CostComponent.MillCards _natural -> False
   CostComponent.RevealTopOfLibrary _natural -> False
   CostComponent.ChooseOpponent -> False
-  CostComponent.Waterbend _natural -> False
+  CostComponent.Waterbend _amount -> False
   CostComponent.WaterbendInstead _natural -> False
-  CostComponent.WaterbendX -> False
 
 costReductionNames :: Asking -> CostReduction.CostReduction -> Bool
 costReductionNames asking x = case x of
@@ -1649,14 +1633,6 @@ inZoneNames :: Asking -> InZone.InZone -> Bool
 inZoneNames asking x = case x of
   InZone.MkInZone _zone player -> playerRefNames asking player
 
-increaseActivationCostNames :: Asking -> IncreaseActivationCost.IncreaseActivationCost -> Bool
-increaseActivationCostNames asking x = case x of
-  IncreaseActivationCost.MkIncreaseActivationCost whichAbilities _whichKind _amount -> filterNames asking whichAbilities
-
-increaseSpellCostNames :: Asking -> IncreaseSpellCost.IncreaseSpellCost -> Bool
-increaseSpellCostNames asking x = case x of
-  IncreaseSpellCost.MkIncreaseSpellCost whichSpells _amount perTarget -> filterNames asking whichSpells || any (filterNames asking) perTarget
-
 keywordNames :: Asking -> Keyword.Keyword -> Bool
 keywordNames asking x = case x of
   Keyword.Deathtouch -> False
@@ -2160,18 +2136,36 @@ playerDesignationTallyNames :: Asking -> PlayerDesignationTally.PlayerDesignatio
 playerDesignationTallyNames asking x = case x of
   PlayerDesignationTally.MkPlayerDesignationTally player _designation -> playerRefNames asking player
 
+activationCriteriaNames :: Asking -> ActivationCriteria.ActivationCriteria -> Bool
+activationCriteriaNames asking x = case x of
+  ActivationCriteria.MkActivationCriteria grantedBy _whichKind _whichLoyalty -> any (keywordDesignatorNames asking) grantedBy
+
+costAdditionNames :: Asking -> CostAddition.CostAddition -> Bool
+costAdditionNames asking x = case x of
+  CostAddition.MkCostAddition components _scale -> any (costComponentNames asking (keywordNames asking)) components
+
+costChangeNames :: Asking -> CostChange.CostChange -> Bool
+costChangeNames asking x = case x of
+  CostChange.Increase _natural -> False
+  CostChange.Reduce _appliedReduction -> False
+  CostChange.Add costAddition -> costAdditionNames asking costAddition
+
+costModifierNames :: Asking -> CostModifier.CostModifier -> Bool
+costModifierNames asking x = case x of
+  CostModifier.MkCostModifier subject matching whichTargets perTarget _onlyFirst change -> costSubjectNames asking subject || filterNames asking matching || any (filterNames asking) whichTargets || any (filterNames asking) perTarget || costChangeNames asking change
+
+costSubjectNames :: Asking -> CostSubject.CostSubject -> Bool
+costSubjectNames asking x = case x of
+  CostSubject.Spells -> False
+  CostSubject.Activations activationCriteria -> activationCriteriaNames asking activationCriteria
+
 playerEffectNames :: Asking -> PlayerEffect.PlayerEffect -> Bool
 playerEffectNames asking x = case x of
   PlayerEffect.CantCastSpells -> False
   PlayerEffect.CantActivateAbilities keywordDesignator -> any (keywordDesignatorNames asking) keywordDesignator
   PlayerEffect.CantCastMoreThan _natural -> False
-  PlayerEffect.IncreaseSpellCost increaseSpellCost -> increaseSpellCostNames asking increaseSpellCost
-  PlayerEffect.IncreaseActivationCost increaseActivationCost -> increaseActivationCostNames asking increaseActivationCost
-  PlayerEffect.ReduceSpellCost reduceSpellCost -> reduceSpellCostNames asking reduceSpellCost
-  PlayerEffect.ReduceActivationCost reduceActivationCost -> reduceActivationCostNames asking reduceActivationCost
-  PlayerEffect.AddActivationCost addActivationCost -> addActivationCostNames asking addActivationCost
+  PlayerEffect.ModifyCost costModifier -> costModifierNames asking costModifier
   PlayerEffect.AlternativeActivationCost alternativeActivationCost -> alternativeActivationCostNames asking alternativeActivationCost
-  PlayerEffect.AddSpellCost addSpellCost -> addSpellCostNames asking addSpellCost
   PlayerEffect.PlayAdditionalLands _natural -> False
   PlayerEffect.NoMaximumHandSize -> False
   PlayerEffect.SetMaximumHandSize _natural -> False
@@ -2419,14 +2413,6 @@ recipientNames asking x = case x of
 redirectDamageNames :: Asking -> RedirectDamage.RedirectDamage -> Bool
 redirectDamageNames asking x = case x of
   RedirectDamage.MkRedirectDamage duration _kind amount from whatRecipient _whoRecipient to chosenSource -> durationNames asking duration || any (quantityNames asking) amount || any (objectRefNames asking) from || any (filterNames asking) whatRecipient || objectRefNames asking to || any (filterNames asking) chosenSource
-
-reduceActivationCostNames :: Asking -> ReduceActivationCost.ReduceActivationCost -> Bool
-reduceActivationCostNames asking x = case x of
-  ReduceActivationCost.MkReduceActivationCost whichAbilities grantedBy _whichKind whichTargets _onlyFirst _reduction _floor_ -> filterNames asking whichAbilities || any (keywordDesignatorNames asking) grantedBy || any (filterNames asking) whichTargets
-
-reduceSpellCostNames :: Asking -> ReduceSpellCost.ReduceSpellCost -> Bool
-reduceSpellCostNames asking x = case x of
-  ReduceSpellCost.MkReduceSpellCost whichSpells _reduction _coloredOnly perTarget -> filterNames asking whichSpells || any (filterNames asking) perTarget
 
 reinforceNames :: Asking -> (keyword -> Bool) -> Reinforce.Reinforce keyword -> Bool
 reinforceNames asking onKeyword x = case x of

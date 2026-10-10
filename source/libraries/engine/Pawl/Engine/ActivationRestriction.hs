@@ -32,7 +32,6 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
-import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Types.AbilityKind as AbilityKind
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
@@ -169,7 +168,7 @@ restrictionMet pid srcId ability gs restriction = case restriction of
     let moved = Game.withoutBeingCast gs
      in Condition.holds
           (Projection.fullView moved)
-          (SourceContext.sourceContext moved (Just pid) srcId)
+          (Projection.sourceContext moved (Just pid) srcId)
           moved
           srcId
           condition
@@ -288,7 +287,7 @@ recordActivation srcId ability gs =
         ((if prints ActivationRestriction.OnlyOnce then perGame else id) gs)
 
 -- CR 602.2: log that `pid` began activating an ability of `srcId` aimed at
--- `targets`, for Pawl.Types.ReduceActivationCost.onlyFirst to count. The source
+-- `targets`, for Pawl.Types.CostModifier.onlyFirst to count. The source
 -- and targets are snapshotted off `asOf`, the board the activation began on, so
 -- a cost that sacrificed the source still leaves it recorded as it was.
 --

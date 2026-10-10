@@ -1,6 +1,7 @@
 module Pawl.Engine.Game where
 
 import qualified Control.Applicative as Applicative
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
@@ -37,6 +38,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
+import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Discarded as Discarded
 import qualified Pawl.Types.DuplicateCard as DuplicateCard
 import Pawl.Types.Face (Face)
@@ -418,6 +420,35 @@ choose p = do
   State.modify' (\gs -> gs {GameState.lastChoice = GameState.nextTimestamp gs})
   ask p
 
+-- | @chooser@ picks one of @candidates@ through the prompt @question@ builds,
+-- THE ask-and-check of every choice of one player or object from a list the
+-- caller fixed. Nothing at no candidate (CR 101.3); elided at one, the options
+-- being indistinguishable. The answer is FILTERED rather than trusted, falling
+-- back to the first candidate, since every caller's choice is mandatory. The
+-- candidates are the caller's, CR 801.5a's range cut included.
+chooseAmong :: (Eq a) => (Decider.Decider -> PlayerId -> NonEmpty.NonEmpty a -> Prompt.Prompt a) -> PlayerId -> [a] -> Game (Maybe a)
+chooseAmong question chooser candidates = do
+  gs <- State.get
+  among choose (question (Decide.deciderFor chooser gs) chooser) candidates
+
+-- | One of @candidates@ drawn at random through the prompt @question@ builds:
+-- chooseAmong's shape for RANDOMNESS, so through `ask` and not `choose` (CR
+-- 701.9b's "at random" is not "the player chooses"). Nothing at no candidate,
+-- elided at one, the answer FILTERED rather than trusted.
+drawAmong :: (Eq a) => (NonEmpty.NonEmpty a -> Prompt.Prompt a) -> [a] -> Game (Maybe a)
+drawAmong = among ask
+
+-- chooseAmong and drawAmong's shared none / one / ask / check, @put@ being how
+-- the question is put.
+among :: (Eq a) => (Prompt.Prompt a -> Game a) -> (NonEmpty.NonEmpty a -> Prompt.Prompt a) -> [a] -> Game (Maybe a)
+among put question candidates = case candidates of
+  [] -> pure Nothing
+  [sole] -> pure (Just sole)
+  first : second : rest -> do
+    let offered = first NonEmpty.:| (second : rest)
+    answer <- put (question offered)
+    pure (Just (if elem answer offered then answer else first))
+
 -- CR 801.16: record that an object this player controls took part in what the
 -- game is doing now (GameState.loopInvolvement). Called where a triggered
 -- ability is put on the stack (Pawl.Engine.Engine.placeOne), which every cycle
@@ -631,38 +662,29 @@ attackTargetOf oid gs =
 -- attackTargetOf through CR 608.2h: for an object that has left, what it was
 -- attacking as it left (Pawl.Types.LastKnown.attacking).
 attackTargetWithLastKnown :: ObjectId -> GameState -> Maybe AttackTarget.AttackTarget
-attackTargetWithLastKnown oid gs = case lookupObject oid gs of
-  Just _ -> attackTargetOf oid gs
-  Nothing -> LastKnown.attackTarget =<< Map.lookup oid (GameState.lastKnown gs)
+attackTargetWithLastKnown oid gs = Monad.join (liveOrLastKnown (const (attackTargetOf oid gs)) LastKnown.attackTarget oid gs)
 
 -- CR 614.1c / 702.174a's chosen player, through CR 608.2h: the live object's
 -- Object.chosenPlayer, else the one it carried as it left
 -- (Pawl.Types.LastKnown.chosenPlayer).
 chosenPlayerWithLastKnown :: ObjectId -> GameState -> Maybe PlayerId
-chosenPlayerWithLastKnown oid gs = case lookupObject oid gs of
-  Just obj -> Object.chosenPlayer obj
-  Nothing -> LastKnown.chosenPlayer =<< Map.lookup oid (GameState.lastKnown gs)
+chosenPlayerWithLastKnown oid gs = Monad.join (liveOrLastKnown Object.chosenPlayer LastKnown.chosenPlayer oid gs)
 
 -- CR 614.1c / 607.2d's chosen colours, through CR 608.2h: the live object's
 -- Object.chosenColors, else the ones it carried as it left
 -- (Pawl.Types.LastKnown.chosenColors).
 chosenColorsWithLastKnown :: ObjectId -> GameState -> Set.Set Color.Color
-chosenColorsWithLastKnown oid gs = case lookupObject oid gs of
-  Just obj -> Object.chosenColors obj
-  Nothing -> maybe Set.empty LastKnown.chosenColors (Map.lookup oid (GameState.lastKnown gs))
+chosenColorsWithLastKnown oid gs = Maybe.fromMaybe Set.empty (liveOrLastKnown Object.chosenColors LastKnown.chosenColors oid gs)
 
--- chosenColorsWithLastKnown one choice over, for Object.chosenSubtype.
+-- chosenColorsWithLastKnown one choice over, for Object.chosenSubtype. The
+-- fallback is proved by the Kindred Boon scenario in data/scenarios/activate.
 chosenSubtypeWithLastKnown :: ObjectId -> GameState -> Maybe Subtype.Subtype
-chosenSubtypeWithLastKnown oid gs = case lookupObject oid gs of
-  Just obj -> Object.chosenSubtype obj
-  Nothing -> LastKnown.chosenSubtype =<< Map.lookup oid (GameState.lastKnown gs)
+chosenSubtypeWithLastKnown oid gs = Monad.join (liveOrLastKnown Object.chosenSubtype LastKnown.chosenSubtype oid gs)
 
 -- chosenColorsWithLastKnown for CR 201.4's chosen names (Object.chosenNames). The
 -- empty set where neither the object nor its last known information exists.
 chosenNamesWithLastKnown :: ObjectId -> GameState -> Set.Set CardName.CardName
-chosenNamesWithLastKnown oid gs = case lookupObject oid gs of
-  Just obj -> Object.chosenNames obj
-  Nothing -> maybe Set.empty LastKnown.chosenNames (Map.lookup oid (GameState.lastKnown gs))
+chosenNamesWithLastKnown oid gs = Maybe.fromMaybe Set.empty (liveOrLastKnown Object.chosenNames LastKnown.chosenNames oid gs)
 
 -- CR 509.1g: is this creature blocking? Combat.blockers is keyed by ATTACKER, so
 -- the answer is membership in some attacker's set rather than a key lookup, or
@@ -874,9 +896,7 @@ cardOf oid gs = cardOfSource gs (fmap Object.source (lookupObject oid gs))
 -- there, and answering it for one that is not would quietly resurrect a
 -- permanent for every projection and quantity read that goes through it.
 cardOfWithLastKnown :: ObjectId -> GameState -> Maybe Card
-cardOfWithLastKnown oid gs = case lookupObject oid gs of
-  Just obj -> cardOfSource gs (Just (Object.source obj))
-  Nothing -> cardOfSource gs (fmap LastKnown.source (Map.lookup oid (GameState.lastKnown gs)))
+cardOfWithLastKnown oid gs = cardOfSource gs (sourceOfWithLastKnown oid gs)
 
 -- The card behind a Source, if it has one. An ability on the stack does not: it
 -- is an object in its own right (CR 113.7a), and the card is its SOURCE's.
@@ -1751,9 +1771,31 @@ cardsOfWithLastKnown oid gs =
 -- `cardOfWithLastKnown`'s own lookup, stopping at the Source: the live object's
 -- first, then the record filed under the id it had while it existed (CR 608.2h).
 sourceOfWithLastKnown :: ObjectId -> GameState -> Maybe Source.Source
-sourceOfWithLastKnown oid gs = case lookupObject oid gs of
-  Just obj -> Just (Object.source obj)
-  Nothing -> fmap LastKnown.source (Map.lookup oid (GameState.lastKnown gs))
+sourceOfWithLastKnown = liveOrLastKnown Object.source LastKnown.source
+
+-- CR 108.3's owner through CR 608.2h: the live object's, else the one its record
+-- kept. Read off the object rather than a projected view, since nothing moves
+-- ownership. Pawl.CountSpec's Daredevil pair drives both arms; PlayerRef.OwnerOfBound
+-- (The Deck of Many Things' 20 band) is another reader.
+ownerWithLastKnown :: ObjectId -> GameState -> Maybe PlayerId
+ownerWithLastKnown = liveOrLastKnown Object.owner LastKnown.owner
+
+-- CR 113.7a / 608.2h: `live` of the object while the id names one, else
+-- `remembered` of the record filed under it as it left, else Nothing. THE
+-- liveness test every last-known reader shares, so the rule cannot mean one
+-- thing for keywords and another for control. Pawl.DamageSpec's "CR 608.2h a
+-- live source reads LIVE, even with a last-known entry filed under its id"
+-- proves the guard, and the Ownership Ledger scenario in data/scenarios/count
+-- the fallback.
+liveOrLastKnown :: (Object -> a) -> (LastKnown.LastKnown -> a) -> ObjectId -> GameState -> Maybe a
+liveOrLastKnown live remembered oid gs = case lookupObject oid gs of
+  Just obj -> Just (live obj)
+  Nothing -> fmap remembered (Map.lookup oid (GameState.lastKnown gs))
+
+-- CR 608.2h: this object's last known information, and only when the id names
+-- nothing, so a caller falls through to its live reader (liveOrLastKnown).
+lastKnownOf :: ObjectId -> GameState -> Maybe LastKnown.LastKnown
+lastKnownOf oid gs = Monad.join (liveOrLastKnown (const Nothing) Just oid gs)
 
 -- CR 708.2 / CR 708.8 over ONE object: write which face it is showing, and give
 -- it CR 613.7f's new timestamp -- "a permanent receives a new timestamp each time
@@ -2513,12 +2555,6 @@ neighbours you gs = case List.break (== you) (seatsThisTurn gs) of
      in Set.toList (Set.fromList (Maybe.maybeToList (Maybe.listToMaybe others) <> Maybe.maybeToList (Maybe.listToMaybe (reverse others))))
   (_, []) -> []
 
--- CR 801.10 / 801.5a: the players still in the game within @you@'s range -- the
--- table a spell or ability of theirs reaches, and the one a choice they make
--- offers. stillPlaying, in its order, under an unlimited range.
-reachableBy :: PlayerId -> GameState -> [PlayerId]
-reachableBy you gs = filter (\pid -> inRangeOf you pid gs) (stillPlaying gs)
-
 -- CR 102.3 with CR 104.2a: this player's opponents who are still in the game, in
 -- stillPlaying's PlayerId order -- which is the order the offers built from it
 -- were already in. A caller wanting the seating order filters turnOrderFrom
@@ -2565,10 +2601,13 @@ primaryOf gs pid =
 --
 -- CR 805.9 names one active player for an ABILITY; for these rules nothing
 -- does, so the active team decides, and CR 805.2 gives its unsettled choice to
--- its primary player. Asked only between two or more eligible active players;
--- the answer is filtered, not trusted. Without the shared team turns option
--- Turn.activePlayers is the active seat alone, so nothing is asked. Pawl.TeamSpec's
--- "CR 725.4 the active team's primary player names the new monarch" proves it.
+-- its primary player, asked through chooseAmong among the eligible active
+-- players. Without the shared team turns option Turn.activePlayers is the
+-- active seat alone, so nothing is asked. The team scenario "CR 725.4 the
+-- active team's primary player names the new monarch" proves it.
+--
+-- Not implemented: any CR 801.5a / 801.5c range cut on this team choice under
+-- limited range (#4918).
 --
 -- The walk anchors on the ACTIVE seat and excludes it, unlike
 -- Engine.nextStillPlaying's CR 800.4a walk, which anchors on the departing
@@ -2584,11 +2623,7 @@ heirOnDeparture eligible = do
         (before, []) -> before
   case live of
     [] -> pure (List.find eligible walk)
-    [one] -> pure (Just one)
-    first : rest -> do
-      let chooser = primaryOf gs active
-      answer <- choose (Prompt.ChooseActivePlayer (Decide.deciderFor chooser gs) chooser (first NonEmpty.:| rest))
-      pure (Just (if List.elem answer live then answer else first))
+    _ -> chooseAmong Prompt.ChooseActivePlayer (primaryOf gs active) live
 
 -- apnapOrder's generalisation: the seating roster rotated to start with the
 -- player NAMED rather than with the active player. CR 701.38a's vote is the

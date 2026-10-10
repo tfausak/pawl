@@ -3,7 +3,10 @@
     {
       "additionalCosts": [
         {
-          "type": "BlightX"
+          "type": "Blight",
+          "value": {
+            "type": "AnnouncedX"
+          }
         }
       ],
       "manaCost": [

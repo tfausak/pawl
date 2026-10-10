@@ -20,36 +20,48 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "AddActivationCost",
+            "type": "ModifyCost",
             "value": {
-              "components": [
-                {
-                  "type": "Sacrifice",
-                  "value": {
-                    "count": 1,
-                    "whichPermanents": {
-                      "type": "And",
-                      "value": [
-                        {
-                          "type": "HasCardType",
-                          "value": {
-                            "type": "Creature"
-                          }
+              "change": {
+                "type": "Add",
+                "value": {
+                  "components": [
+                    {
+                      "type": "Sacrifice",
+                      "value": {
+                        "count": {
+                          "type": "Fixed",
+                          "value": 1
                         },
-                        {
-                          "type": "Not",
-                          "value": {
-                            "type": "IsTarget"
-                          }
+                        "whichPermanents": {
+                          "type": "And",
+                          "value": [
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Creature"
+                              }
+                            },
+                            {
+                              "type": "Not",
+                              "value": {
+                                "type": "IsTarget"
+                              }
+                            }
+                          ]
                         }
-                      ]
+                      }
                     }
-                  }
+                  ]
                 }
-              ],
-              "whichAbilities": {
+              },
+              "matching": {
                 "type": "And",
                 "value": []
+              },
+              "subject": {
+                "type": "Activations",
+                "value": {}
               }
             }
           },

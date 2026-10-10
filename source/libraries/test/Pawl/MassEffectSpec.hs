@@ -499,7 +499,7 @@ portOfKarfellSpec s registry =
 -- reach: alice's own (which "your graveyard" would take), carol's (which "each
 -- opponent's" or "each player's" would take) and bob's two. The two legs below
 -- pin their answer to the LAST and the FIRST candidate offered, and
--- Resolve.zoneScopePlayers offers them in APNAP order (CR 101.4), so a scope
+-- Target.zoneScopePlayers offers them in APNAP order (CR 101.4), so a scope
 -- wider than the slot hands back carol's card on one leg and alice's on the
 -- other rather than bob's on both.
 --

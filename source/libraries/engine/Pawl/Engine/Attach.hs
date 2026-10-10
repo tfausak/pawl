@@ -24,13 +24,11 @@ module Pawl.Engine.Attach where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
-import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Engine.AttachRestriction as AttachRestriction
 import qualified Pawl.Engine.Card as Card
-import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
@@ -38,7 +36,6 @@ import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Players as Players
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
-import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Filter as Filter.Type
@@ -235,7 +232,7 @@ attachmentWith equippable src destination gs
 -- Target.lastKnownAdmits, which asks the same slot the same question about an
 -- object it can no longer enumerate.
 attachableWithLastKnown :: ObjectId -> ObjectId -> GameState -> Bool
-attachableWithLastKnown src host gs = case Projection.lastKnownOf host gs of
+attachableWithLastKnown src host gs = case Game.lastKnownOf host gs of
   Nothing -> Maybe.isJust (attachmentFor src (Recipient.ToObject host) gs)
   Just _ ->
     src /= host
@@ -403,7 +400,7 @@ groupHostsFor context subjects filter_ gs =
 -- slots it could name.
 turnUpHosts :: PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 turnUpHosts controller aura filter_ gs =
-  hostsFor (SourceContext.sourceContext gs (Just controller) aura) aura (Filter.Type.And [filter_, Filter.Type.CanHostSubject]) gs
+  hostsFor (Projection.sourceContext gs (Just controller) aura) aura (Filter.Type.And [filter_, Filter.Type.CanHostSubject]) gs
 
 -- Which of the offered destinations the player picks, or Nothing when the text
 -- admits none (CR 609.3: the effect does as much as it can, and that is nothing).
@@ -412,23 +409,11 @@ turnUpHosts controller aura filter_ gs =
 -- controller for an effect naming one destination (CR 608.2d), and the subject's
 -- own controller where CR 303.4d or CR 301.5c reassigns it -- see arbitrate.
 --
--- ELIDED AT ONE CANDIDATE, the Prompt.ChooseAttachment posture: with a single
--- destination there is nothing to decide. The current host is never among the
--- candidates (CR 701.3b), so it is not being withheld.
---
--- FILTERED, NOT TRUSTED: an answer naming something that was never offered falls
--- back to the first candidate, since a caller that got this far must pick
--- something.
+-- Asked through Game.chooseAmong. The current host is never among the
+-- candidates (CR 701.3b), so eliding the ask at one candidate withholds nothing.
 chooseHost :: PlayerId -> ObjectId -> [ObjectId] -> Game (Maybe ObjectId)
-chooseHost controller subject candidates = case candidates of
-  [] -> pure Nothing
-  first : rest -> case rest of
-    [] -> pure (Just first)
-    second : more -> do
-      gs <- State.get
-      let offered = first NonEmpty.:| (second : more)
-      answer <- Game.choose (Prompt.ChooseAttachment (Decide.deciderFor controller gs) controller subject offered)
-      pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
+chooseHost controller subject =
+  Game.chooseAmong (\decider asked -> Prompt.ChooseAttachment decider asked subject) controller
 
 -- CR 303.4d and CR 301.5c, whose closing sentences are the same rule twice: "an
 -- Aura can't enchant more than one object or player. If a spell or ability would

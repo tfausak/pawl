@@ -188,58 +188,66 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "ReduceSpellCost",
+            "type": "ModifyCost",
             "value": {
-              "reduction": [
-                {
-                  "type": "OfType",
-                  "value": {
-                    "type": "Colored",
-                    "value": {
-                      "type": "White"
+              "change": {
+                "type": "Reduce",
+                "value": {
+                  "amount": [
+                    {
+                      "type": "OfType",
+                      "value": {
+                        "type": "Colored",
+                        "value": {
+                          "type": "White"
+                        }
+                      }
+                    },
+                    {
+                      "type": "OfType",
+                      "value": {
+                        "type": "Colored",
+                        "value": {
+                          "type": "Blue"
+                        }
+                      }
+                    },
+                    {
+                      "type": "OfType",
+                      "value": {
+                        "type": "Colored",
+                        "value": {
+                          "type": "Black"
+                        }
+                      }
+                    },
+                    {
+                      "type": "OfType",
+                      "value": {
+                        "type": "Colored",
+                        "value": {
+                          "type": "Red"
+                        }
+                      }
+                    },
+                    {
+                      "type": "OfType",
+                      "value": {
+                        "type": "Colored",
+                        "value": {
+                          "type": "Green"
+                        }
+                      }
                     }
-                  }
-                },
-                {
-                  "type": "OfType",
-                  "value": {
-                    "type": "Colored",
-                    "value": {
-                      "type": "Blue"
-                    }
-                  }
-                },
-                {
-                  "type": "OfType",
-                  "value": {
-                    "type": "Colored",
-                    "value": {
-                      "type": "Black"
-                    }
-                  }
-                },
-                {
-                  "type": "OfType",
-                  "value": {
-                    "type": "Colored",
-                    "value": {
-                      "type": "Red"
-                    }
-                  }
-                },
-                {
-                  "type": "OfType",
-                  "value": {
-                    "type": "Colored",
-                    "value": {
-                      "type": "Green"
-                    }
-                  }
+                  ]
                 }
-              ],
-              "whichSpells": {
+              },
+              "matching": {
                 "type": "And",
                 "value": []
+              },
+              "subject": {
+                "type": "Spells"
               }
             }
           },

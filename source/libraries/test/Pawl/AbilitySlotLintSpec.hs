@@ -22,6 +22,7 @@ module Pawl.AbilitySlotLintSpec where
 -- the evaluator module Pawl.Engine.Filter may later be imported and must not collide.
 -- triggered ability's effects (Card.allEffects only reaches the spell).
 -- whole card written by somebody else and so an independent witness to the
+
 import qualified Data.Foldable as Foldable
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -38,6 +39,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Event.Binding as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword.Engine
+import qualified Pawl.Engine.Mint as Mint
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Resolve.Slots as Resolve
@@ -51,6 +53,7 @@ import qualified Pawl.Types.ActivationProhibition as ActivationProhibition
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
+import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Chooser as Chooser
@@ -116,7 +119,6 @@ import qualified Pawl.Types.TargetChooser as TargetChooser
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
-import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.WhenSpent as WhenSpent
@@ -495,13 +497,10 @@ modalTrigger ::
   [Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] ->
   TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 modalTrigger condition modes =
-  TriggeredAbility.MkTriggeredAbility
-    { TriggeredAbility.condition = condition,
-      TriggeredAbility.modal = Modal.MkModal (Seq.fromList modes) (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing,
-      TriggeredAbility.name = Nothing,
-      TriggeredAbility.limit = TriggerLimit.Unlimited
-    }
+  Mint.triggerOf
+    condition
+    Nothing
+    (Modal.MkModal (Seq.fromList modes) (ModeSelection.ChooseExactly 1))
 
 -- The slots an ARMING carrier declares as targets: the three carriers above that
 -- can arm a CR 603.7 delayed ability, which is all of them except the delayed
@@ -918,7 +917,7 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
     let target = SlotName.MkSlotName (Text.pack "target")
         narrowed =
           Mode.MkMode
-            (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Tap (ObjectRef.InSlot target)))))
+            (Seq.singleton (Mint.mandatory (Seq.singleton (Effect.Tap (ObjectRef.InSlot target)))))
             (Map.singleton target (TargetSlot.required Pool.Permanents (Just (Filter.Type.ControlledByBound Binding.triggerPlayer))))
     Spec.assertBool
       s
@@ -946,7 +945,7 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
         -- the caster's life gain, this reads the trigger's player.
         bounded amount =
           Mode.MkMode
-            (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Tap (ObjectRef.InSlot target)))))
+            (Seq.singleton (Mint.mandatory (Seq.singleton (Effect.Tap (ObjectRef.InSlot target)))))
             (Map.singleton target (TargetSlot.withAmount amount (TargetSlot.required Pool.Permanents (Just Filter.Type.ManaValueAtMostAmount))))
         thatPlayer = Quantity.Type.LifeGainedThisTurn (PlayerRef.InSlot Binding.triggerPlayer)
         you = Quantity.Type.LifeGainedThisTurn (PlayerRef.Relative PlayerRelation.You)
@@ -990,7 +989,7 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
     let target = SlotName.MkSlotName (Text.pack "target")
         chosen =
           Mode.MkMode
-            (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Tap (ObjectRef.InSlot target)))))
+            (Seq.singleton (Mint.mandatory (Seq.singleton (Effect.Tap (ObjectRef.InSlot target)))))
             (Map.singleton target (TargetSlot.chosenBy (TargetChooser.InSlot Binding.triggerPlayer) (TargetSlot.required Pool.Permanents Nothing)))
     Spec.assertBool
       s
@@ -1018,7 +1017,7 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "the lint itself catches a slot read only from a clause's condition" $ do
     let gated condition =
           Mode.MkMode
-            (Seq.fromList [Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal 1) Nothing))), Clause.MkClause Nothing (Just condition) Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal 1) Nothing)))])
+            (Seq.fromList [Mint.mandatory (Seq.singleton (Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal 1) Nothing))), Clause.MkClause Nothing (Just condition) Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal 1) Nothing)))])
             Map.empty
         atLeastOne measured = Condition.Type.Compares (Compares.MkCompares measured Comparison.AtLeast (Quantity.Type.Literal 1))
         -- "if that player has gained life this turn", the reference nested in the
@@ -1065,7 +1064,7 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "the lint itself catches a slot read only from inside a number" $ do
     let drawsTally ref =
           Mode.MkMode
-            (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.CardsDiscardedThisTurn ref) Nothing)))))
+            (Seq.singleton (Mint.mandatory (Seq.singleton (Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.CardsDiscardedThisTurn ref) Nothing)))))
             Map.empty
     Spec.assertBool
       s
@@ -1211,9 +1210,7 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "the lint itself catches a multi-target slot read one at a time" $ do
     let slot = SlotName.MkSlotName (Text.pack "creature")
         modeReading targetSlot readers =
-          Modal.MkModal
-            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList readers))) (Map.singleton slot targetSlot)))
-            (ModeSelection.ChooseExactly 1)
+          Mint.oneModeTargeting (Map.singleton slot targetSlot) (Seq.fromList readers)
         modeWith targetSlot reader = modeReading targetSlot [reader]
         two = TargetSlot.upTo 2 Pool.Creatures Nothing
         -- A NUMBER reading the same name: Quantity.InSlot asks for the slot's
@@ -1241,6 +1238,18 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
       s
       (not (modalCountsOffend (modeWith (TargetSlot.required Pool.Creatures Nothing) (Effect.TurnFaceUp slot))))
       "nor does a one-target slot read as one object"
+    -- An effect's own FILTER over the same two-target slot, the pair differing
+    -- in the atom alone: IsBound takes the whole set the slot names
+    -- (Binding.objectsBySlot), CR 208.1's ToughnessLessThanBound wants one
+    -- toughness and answers nothing for two (Filter.singularSlots).
+    Spec.assertBool
+      s
+      (not (modalCountsOffend (modeWith two (Effect.AttachAll (AttachAll.MkAttachAll (ObjectRef.InSlot slot) (Filter.Type.IsBound slot))))))
+      "a two-target slot read whole by a filter does not offend"
+    Spec.assertBool
+      s
+      (modalCountsOffend (modeWith two (Effect.AttachAll (AttachAll.MkAttachAll (ObjectRef.InSlot slot) (Filter.Type.ToughnessLessThanBound slot)))))
+      "but one a filter reads as one object does"
     -- CR 601.2c's "any number of target ...", which states no maximum to compare
     -- against: an unbounded slot is plural, so the same one-object reader offends.
     -- No card in the corpus makes this mistake, so this is the only observer the

@@ -7,7 +7,10 @@
             "components": [
               {
                 "type": "RemoveLoyaltyFromThis",
-                "value": 1
+                "value": {
+                  "type": "Fixed",
+                  "value": 1
+                }
               }
             ],
             "mana": []
@@ -98,10 +101,13 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "IncreaseSpellCost",
+            "type": "ModifyCost",
             "value": {
-              "amount": 1,
-              "whichSpells": {
+              "change": {
+                "type": "Increase",
+                "value": 1
+              },
+              "matching": {
                 "type": "Or",
                 "value": [
                   {
@@ -123,6 +129,9 @@
                     }
                   }
                 ]
+              },
+              "subject": {
+                "type": "Spells"
               }
             }
           },

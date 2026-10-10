@@ -313,12 +313,12 @@ activateAbilityWith runSubgame pid srcId ability = Event.announcing $ do
           -- TARGET-BLIND, unlike the gate above, and deliberately: that gate
           -- asks whether SOME aiming pays and may look ahead, while this is a
           -- CHOICE the player makes against one definite cost, and CR 601.2c's
-          -- targets are not announced until below. What that costs is nothing
-          -- here -- CR 118.13a's announcement is a choice of halves, every
-          -- activation-cost reducer in the pool reduces by GENERIC mana, and a
-          -- target-aware reduction therefore cannot change which nonhybrid
-          -- equivalent or Phyrexian half a player would announce. The reductions
-          -- themselves are gathered again below, once the targets exist.
+          -- targets are not announced until below. So no target-aware
+          -- adjustment is in view -- Dwarven Mauler's reduction, nor Kopala,
+          -- Warden of Waves' increase, which makes the targeted total DEARER
+          -- than this one -- and that is CR 601.2b's own order: the halves are
+          -- announced before the targets exist. Both are gathered again below,
+          -- once they do.
           let gathered = Cost.activationAdjustments Set.empty stamp AbilityKind.NonManaAbility (Cost.loyaltyKindOf (ActivatedAbility.cost ability)) pid srcId gs
           -- The Phyrexian life record is DISCARDED here: CR 702.150a reads what
           -- the player who CAST a spell announced, and no rule asks the same of
@@ -380,16 +380,18 @@ activateAbilityWith runSubgame pid srcId ability = Event.announcing $ do
               -- target this creature" is a reduction the pre-target gather above
               -- cannot see, and CR 601.2f's position after 601.2c is what makes
               -- reading them here the rule's own order rather than a shortcut.
-              -- Only the REDUCTIONS can differ between the two records --
-              -- ReduceActivationCost is the one arm carrying a target criterion
-              -- -- so the increases and the CR 601.2f components the announcement
-              -- above measured are the same ones charged below.
+              -- The increases and reductions can differ between the two records
+              -- (Kopala, Warden of Waves; Dwarven Mauler), and `totalWith` charges
+              -- this one's; the CR 601.2f components cannot, since
+              -- Pawl.Codec.CostModifier refuses a target criterion on an addition
+              -- to an activation, so the ones the announcement above measured are
+              -- the ones charged below.
               let aimedAt = Set.unions (fmap Activatable.recipientObjects (Map.elems chosen))
                   targeted = Cost.activationAdjustments aimedAt stamp AbilityKind.NonManaAbility (Cost.loyaltyKindOf (ActivatedAbility.cost ability)) pid srcId gs
               adjustments <- Cost.announceReductions pid srcId gs announcedCost targeted
               -- Cast.castProposed's lock of a computed amount, one road over.
               boundGs <- State.get
-              let paidCost = Cost.fixComputedIn (fmap Activatable.recipientObjects chosen) boundGs (Cost.totalWith adjustments announcedCost)
+              let paidCost = Cost.fixComputedIn chosen boundGs (Cost.totalWith adjustments announcedCost)
               -- CR 602.2: log the activation as BEGUN, before its payment, so a
               -- mana ability activated to pay it is logged after it (Tezzeret,
               -- Betrayer of Flesh's ruling) -- and off `announced`, CR 601.2c's

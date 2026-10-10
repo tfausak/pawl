@@ -24,7 +24,6 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.QuantitySlot as QuantitySlot
-import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Types.ActivateManaAbilities as ActivateManaAbilities
@@ -289,17 +288,16 @@ insertOne slot = joinTwo (oneSlot slot)
 --     under a fold is judged against the resolving object's bindings --
 --     Filter.matches' IsBound arm, against the Context's slotObjects -- exactly as
 --     one on an effect's own field is, and the pool writes the shape (Caldera
---     Breaker, Into the Wilds, Wild Evocation). Reported at SlotArity.Many, never
---     One: that arm reads the whole GROUP a slot names, and WHICH filter atom is
---     damaged by a plural slot is Pawl.EffectLintSpec's framedSlotsReadSingly,
---     which reaches these same filters through Pawl.CardSpec's effectFilters.
+--     Breaker, Into the Wilds, Wild Evocation). Classified by filterSlotsOf, as
+--     an effect's own Filter is: that arm reads the whole GROUP a slot names,
+--     and the atoms that read one thing are Filter.singularSlots'.
 quantitySlots :: Quantity.Type.Quantity -> Map.Map SlotName SlotArity
 quantitySlots quantity =
   joinSlots
     ( Map.union
         (Map.fromSet (const SlotArity.One) (Quantity.objectSlots quantity))
         (Map.fromSet (const SlotArity.Amount) (QuantitySlot.slots quantity))
-        : fmap (Map.fromSet (const SlotArity.Many) . Filter.boundSlots . Count.Type.filter) (QuantitySlot.nestedCounts quantity)
+        : fmap (filterSlotsOf . Count.Type.filter) (QuantitySlot.nestedCounts quantity)
           <> fmap (either playerRefSlots (`Map.singleton` SlotArity.Many)) (Set.toList (QuantitySlot.nestedRefs quantity))
     )
 
@@ -1982,10 +1980,11 @@ damageRewriteFilters rewrite = case rewrite of
   -- the rewrite's own.
   DamageRewrite.RunEffects _ -> []
 
--- One Filter's slot reads, at arity One -- the same shape modeSlots folds over a
--- mode's target-slot Filters.
+-- One Filter's slot reads, each at the arity its atom reads it with
+-- (Filter.slotArities): Many for an atom taking the whole set, which since
+-- Binding.objectsBySlot is every target of a multi-target slot at resolution too.
 filterSlotsOf :: Filter.Type.Filter Keyword.Type.Keyword -> Map.Map SlotName SlotArity
-filterSlotsOf = Map.fromSet (const SlotArity.One) . Filter.boundSlots
+filterSlotsOf = Filter.slotArities
 
 -- A CR 615.5 rider's slot reads, less the reserved amount and source slots that
 -- Pawl.Engine.Resolve.Effect.runPreventionRider binds as the rider runs.
@@ -2776,10 +2775,11 @@ boundSlots effect = case effect of
 
 -- CR 608.2b: the ONE recipient still legal in `slot`, for a reader that can take
 -- only one -- nothing when the slot named none, its target became illegal, or it
--- names SEVERAL. Pawl.CardSpec's plural-slot lint keeps a card from aiming one of
--- those at such a reader.
+-- names SEVERAL (Binding.oneBySlot). Pawl.AbilitySlotLintSpec's "no
+-- multi-target slot is read one at a time" keeps a card from aiming one of those
+-- at such a reader.
 legalOne :: SlotName -> Map.Map SlotName (Set Recipient) -> Maybe Recipient
-legalOne slot legal = Binding.onlyOne (Map.findWithDefault Set.empty slot legal)
+legalOne slot legal = Map.lookup slot (Binding.oneBySlot legal)
 
 -- The same read for a reader that takes them ALL, CR 608.2b's illegal ones
 -- already dropped.
@@ -2800,7 +2800,7 @@ playerRefPlayers legal controller gs =
 -- controller and owner.
 resolutionReads :: Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> Players.Reads
 resolutionReads legal controller gs =
-  Players.resolution (`Projection.controllerWithLastKnown` gs) (`Projection.ownerWithLastKnown` gs) legal controller gs
+  Players.resolution (`Projection.controllerWithLastKnown` gs) (`Game.ownerWithLastKnown` gs) legal controller gs
 
 -- CR 109.2's battlefield, narrowed by an effect-borne Filter and sorted into CR
 -- 608.2f's APNAP order. ObjectRef.EachMatching's whole answer, and the
@@ -2916,7 +2916,7 @@ objectRefObjects legal resolving controller source gs ref = case ref of
     let hosts = objectRefObjects legal resolving controller source gs (ObjectRef.InSlot slot)
         attachedTo host
           | Set.member host (GameState.battlefield gs) = Game.attachments host gs
-          | otherwise = maybe Set.empty LastKnown.attached (Projection.lastKnownOf host gs)
+          | otherwise = maybe Set.empty LastKnown.attached (Game.lastKnownOf host gs)
         attached = foldMap attachedTo hosts
      in filter (`Set.member` attached) (battlefieldMatching legal resolving controller source gs filter_)
   -- CR 400.7's link read back: each object the slot holds, followed through
@@ -2924,20 +2924,20 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   ObjectRef.FromAnywhere slot -> Maybe.mapMaybe (\oid -> Game.currentIncarnation oid gs) (objectRefObjects legal resolving controller source gs (ObjectRef.InSlot slot))
   -- EachMatching's sweep with CR 109.2's battlefield default switched off by the
   -- card's own words (CR 109.2a), over CR 400.1's per-player zone. Whose
-  -- graveyards is zoneScopePlayers below -- either the perspective's own
+  -- graveyards is Target.zoneScopePlayers -- either the perspective's own
   -- reading of CR 109.5 or the players another slot of this announcement targets
   -- -- and what matches within each is graveyardCardsOf.
   ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard scope filter_) ->
     -- With CR 303.4b's host filled for Animate Dead's "return enchanted
     -- creature card".
     let context = effectContext gs controller source legal (slotBindings resolving gs)
-     in concatMap (\pid -> graveyardCardsOf context gs pid filter_) (zoneScopePlayers legal controller gs scope)
+     in concatMap (\pid -> graveyardCardsOf context gs pid filter_) (Target.zoneScopePlayers (Just controller) legal scope gs)
   -- CR 400.1's per-player zone again, but only the RESOLVING CONTROLLER's, so no
   -- scope to fold over and no APNAP order to impose. In the zone's own order,
   -- which no rule reads: CR 402.3 leaves a hand's arrangement to its owner.
   ObjectRef.EachCardInYourHand -> Game.zoneMembers Zone.Hand controller gs
   -- The arm above's zone under EachCardInGraveyard's scope and filter: CR
-  -- 109.2a's reading again, over the hands zoneScopePlayers names rather
+  -- 109.2a's reading again, over the hands Target.zoneScopePlayers names rather
   -- than the resolving controller's alone. In APNAP order (CR 608.2f) across
   -- seats, and within a seat in the hand's own order, which no rule reads (CR
   -- 402.3) -- the arm above's answer.
@@ -2953,7 +2953,7 @@ objectRefObjects legal resolving controller source gs ref = case ref of
         held pid = case mFilter of
           Nothing -> Game.zoneMembers Zone.Hand pid gs
           Just filter_ -> handCardsOf context gs pid filter_
-     in concatMap held (zoneScopePlayers legal controller gs scope)
+     in concatMap held (Target.zoneScopePlayers (Just controller) legal scope gs)
   -- CR 400.1's other hidden per-player zone, and only the RESOLVING
   -- CONTROLLER's, so no scope to fold over and no APNAP order to impose --
   -- EachCardInYourHand's answer above. CR 400.12 is what makes "from your
@@ -3153,27 +3153,11 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- the Reveal arm, the Discard arm and Effect.MoveToZone's gather.
   ObjectRef.RandomCardInHand _ -> []
   -- Answered for real by randomCardsInGraveyard, over the graveyards
-  -- zoneScopePlayers names -- Effect.MoveToZone's gather, and that alone.
+  -- Target.zoneScopePlayers names -- Effect.MoveToZone's gather, and that alone.
   ObjectRef.RandomCardInGraveyard _ -> []
   -- Answered for real by randomCardsInLibrary -- Effect.MoveToZone's gather,
   -- and that alone.
   ObjectRef.RandomCardInLibrary _ -> []
-
--- The players a ZoneScope names, in APNAP order -- whose graveyards is
--- Target.zoneScopePlayers, the same answer a target pool over CR 400.1's
--- per-player zone gets, and the order imposed on it here is APNAP (CR 608.2f, CR
--- 101.4) restricted to the players still in the game. The seat half of both
--- graveyardCards and ObjectRef.ChosenCardInGraveyard's EachInScope chooser,
--- which asks each seat separately.
---
--- The bindings are the ones the CALLER holds, which is CR 608.2b's re-checked set
--- at resolution: an InSlot scope naming a slot whose target went illegal names
--- nobody, and CR 101.3 ignores that share of the effect.
-zoneScopePlayers :: Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> ZoneScope.ZoneScope -> [PlayerId]
-zoneScopePlayers bindings controller gs scope =
-  let named = Target.zoneScopePlayers (Just controller) bindings scope gs
-   in -- CR 801.10: only the zones of players in the controller's range.
-      filter (\pid -> elem pid named && Game.inRangeOf controller pid gs) (Game.apnapOrder gs)
 
 -- The cards in ONE player's graveyard matching the filter, in ascending
 -- ObjectId. The filter is matched in THIS EFFECT's context -- the caller's, so
@@ -3271,8 +3255,9 @@ resolvingBindings resolving gs = case Game.lookupObject resolving gs of
 -- is.
 --
 -- CR 607.2d's CHOSEN values -- CR 201.4's names, CR 105.2's colour and CR 205.3's
--- creature type -- come from Pawl.Engine.SourceContext, and this is their only
--- filler on the resolution side -- the search filter's and the mill tally's
+-- creature type -- come from Pawl.Engine.Projection.sourceContext, with the
+-- source's projected characteristics (CR 702.85a's cascade, CR 702.60a's
+-- ripple), and this is their only filler on the resolution side -- the search filter's and the mill tally's
 -- alike, which each overlaid the names for themselves until Petra Sphinx wanted
 -- them at an ObjectRef's own filter too, see #2992. What holds a CARD to the
 -- positions this fills is Pawl.FilterPositionLintSpec, not this function.
@@ -3280,8 +3265,7 @@ effectContext :: GameState -> PlayerId -> ObjectId -> Map.Map SlotName (Set Reci
 effectContext gs controller source legal bindings =
   Projection.framedBySlots
     gs
-    (Binding.objectsBySlot legal bindings)
-    (Binding.playersBySlot legal)
+    (Binding.recipientsBySlot legal bindings)
     -- CR 607.2d: the SOURCE's choices (CR 113.7), read LIVE for the group
     -- half's reason: CR 608.2c has the clauses carried out in order, so the
     -- name an earlier clause chose is part of the state a later one is read
@@ -3290,39 +3274,27 @@ effectContext gs controller source legal bindings =
     -- choicesOf, for the source that has already left (Conjurer's Ban).
     -- Brass Herald's "creature cards of the chosen type revealed this way" is
     -- the chosen subtype's proof (Pawl.ResolveSpec).
-    (SourceContext.sourceContext gs (Just controller) source)
+    (Projection.sourceContext gs (Just controller) source)
       { -- CR 608.2c: the numbers earlier clauses of THIS resolution stamped on
         -- slots, for the one Filter atom that compares a candidate against one
         -- (Filter.PowerIsAmountInSlot) -- Localized Destruction's "power equal to
         -- the amount of {E} paid this way". Live off the resolving object, the
         -- group half's own read, so a clause reads what the clause before it bound.
         Filter.boundAmounts = Map.mapMaybe Binding.Type.amount bindings,
-        Filter.slotStickers = Map.mapMaybe Binding.Type.sticker bindings,
-        -- CR 202.3 off the SOURCE, for the two atoms that compare a candidate
-        -- against it (Filter.ManaValueLessThanSource, CR 702.85a's cascade;
-        -- Filter.ManaValueEqualToSource, CR 702.53a's transmute and CR 702.71a's
-        -- transfigure).
-        -- The ONE filler of that field, which is what makes it a
-        -- resolution-position atom: it is Nothing everywhere else, and
-        -- Pawl.FilterPositionLintSpec is what keeps a card out of those
-        -- positions.
-        --
-        -- Through CR 608.2h's last-known reader: a cascade spell countered
-        -- while its trigger is still on the stack has left, and "this spell's
-        -- mana value" is a reference the trigger already made.
-        Filter.sourceManaValue = Filter.manaValue =<< Projection.viewWithLastKnownAnywhere gs source,
-        -- CR 201.2a off the SOURCE, for the one atom that compares a
-        -- candidate's names against them (Filter.SameNameAsSource, CR
-        -- 702.60a's ripple). The ONE filler of that field, the mana value's
-        -- reason one characteristic over: it is empty everywhere else, and
-        -- Pawl.FilterPositionLintSpec is what keeps a card out of those
-        -- positions.
-        --
-        -- Through CR 608.2h's last-known reader for that field's reason: a
-        -- ripple spell countered while its trigger is still on the stack has
-        -- left, and "this spell" is a reference the trigger already made.
-        Filter.sourceNames = foldMap Filter.names (Projection.viewWithLastKnownAnywhere gs source)
+        Filter.slotStickers = Map.mapMaybe Binding.Type.sticker bindings
       }
+
+-- effectContext with `slot` naming `oid` alone, for an effect applied once per
+-- object -- CR 701.10b's "that creature" under ModifyTarget's `each`. Re-framed
+-- through Projection.framedBySlots with the narrowed map rather than by
+-- overriding slotObjects, so every slot-derived field (names, controllers,
+-- toughness) reads that one object too.
+effectContextNaming :: SlotName -> ObjectId -> GameState -> PlayerId -> ObjectId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName Binding.Type.Binding -> Filter.Context
+effectContextNaming slot oid gs controller source legal bindings =
+  Projection.framedBySlots
+    gs
+    (Map.insert slot (Set.singleton (Recipient.ToObject oid)) (Binding.recipientsBySlot legal bindings))
+    (effectContext gs controller source legal bindings)
 
 -- Every object a resolution's TARGET slots name, CR 608.2b's legal ones only:
 -- what effectViewOf below answers through CR 608.2h's last-known reader.

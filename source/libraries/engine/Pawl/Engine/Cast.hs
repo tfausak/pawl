@@ -4,7 +4,6 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
-import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -30,7 +29,6 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Resolve.Slots as Slots
-import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.SplitSecond as SplitSecond
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
@@ -357,8 +355,8 @@ flashOn oid face gs =
 --     (#559), so no target set can be measured differently either side of it.
 --   * nothing counts a hand. No Pawl.Types.Count arm reaches a hand zone, so
 --     hand size cannot enter a cost or a filter.
---   * a cost adjustment carries a LITERAL amount. PlayerEffect.IncreaseSpellCost
---     and ReduceSpellCost hold a Natural or a ManaCost, never a Quantity, so no
+--   * a cost adjustment carries a LITERAL amount. Pawl.Types.CostChange's
+--     Increase and Reduce hold a Natural or a ManaCost, never a Quantity, so no
 --     adjustment can count anything but the spell's own targets (`perTarget`),
 --     which the first point keeps out of hidden zones -- and a count is the only
 --     route a zone read could take into Cost.total.
@@ -442,9 +440,9 @@ payableCost modes extra spending pid oid gs cost = any (\x -> payableCostAt mode
 -- creature sacrificed this way" makes its least X its dearest -- so every X up
 -- to the first whose COMPONENTS alone cannot be paid. That climb is monotone
 -- for Cost.greatestPayableX's reason, and it stops when a component's demand
--- grows with X (Cost.componentDemandGrowsWithX, SacrificeX's past the matching
--- permanents) or at CR 101.1's ceiling. A cost with neither keeps the least X,
--- the only value the climb could not overrun.
+-- grows with X (Cost.componentDemandGrowsWithX, an announced sacrifice's past
+-- the matching permanents) or at CR 101.1's ceiling. A cost with neither keeps
+-- the least X, the only value the climb could not overrun.
 gateXs :: PlayerId -> ObjectId -> GameState -> Cost Keyword -> [Natural]
 gateXs pid oid gs cost =
   let least = maybe 0 Face.minimumX (Game.faceOf oid gs)
@@ -553,7 +551,7 @@ payableCostAtGiven modes pcs sources x extra spending pid oid gs cost =
       adjustmentsFor aiming = Cost.plusReductions extra (Cost.spellAdjustments (Set.unions (Map.elems aiming)) pid oid priced)
       askWith adjustments aiming =
         let totalled = Cost.plusComponents adjustments substituted
-            slots = Binding.withAnnouncedTargets (fmap (Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList) aiming)
+            slots = Binding.withAnnouncedTargets aiming
          in Cost.canPaySomeCompletionGiven slots (PaymentSubject.Casting oid) spending sources pcs pid oid (fmap assisted . Cost.totalManas adjustments) (Cost.manaSubstitutions (Cost.Type.components totalled) slots pid oid gs) totalled gs
       -- The adjustments with nothing aimed at, which are the adjustments under
       -- EVERY aiming unless they read the targets (readsTargets below), so the
@@ -645,25 +643,24 @@ castAimable key announced x pid oid gs = case Game.faceOf oid gs of
 --     generic mana, which carries no colour, so the count is the same at every
 --     X too.
 --
---   * as LIFE (Cost.substituteXInComponent, a CostComponent.PayLifeX becoming a
---     PayLife). CR 119.4's floor is Event.canPayLife's >= against a life total X
---     cannot move either, so the same argument runs a second time. Hatred is the
---     card whose X reaches a cost only this way.
---
---   * as ENERGY (Cost.substituteXInComponent again, a CostComponent.PayEnergyX
---     becoming a PayEnergy). CR 118.3's >= against a counter total X cannot
---     move, so the life argument runs verbatim. Sphinx of the Revelation is the
---     card whose X reaches a cost only this way, and it does so from an
---     ACTIVATION cost, which is Activatable.affordableX's climb rather than this
---     one; the monotonicity argument is shared because substituteXInComponent
---     is.
---
---   * as a BLIGHT (Cost.substituteXInComponent again, a CostComponent.BlightX
---     becoming a Blight). Monotone VACUOUSLY, CR 701.68b refusing a blight only
---     where the player controls no creature and naming no number of counters
---     that is too many -- so this route never fails and the climb needs
---     `mCeiling` below to stop. Soul Immolation is the card whose X reaches a
+--   * as LIFE (Cost.substituteX, a CostComponent.PayLife's
+--     CostAmount.AnnouncedX becoming a fixed amount). CR 119.4's floor is
+--     Event.canPayLife's >= against a life total X cannot move either, so the
+--     same argument runs a second time. Hatred is the card whose X reaches a
 --     cost only this way.
+--
+--   * as ENERGY (Cost.substituteX again, over a CostComponent.PayEnergy). CR
+--     118.3's >= against a counter total X cannot move, so the life argument
+--     runs verbatim. Sphinx of the Revelation is the card whose X reaches a
+--     cost only this way, and it does so from an ACTIVATION cost, which is
+--     Activatable.affordableX's climb rather than this one; the monotonicity
+--     argument is shared because Cost.substituteX is.
+--
+--   * as a BLIGHT (Cost.substituteX again, over a CostComponent.Blight).
+--     Monotone VACUOUSLY, CR 701.68b refusing a blight only where the player
+--     controls no creature and naming no number of counters that is too many
+--     -- so this route never fails and the climb needs `mCeiling` below to
+--     stop. Soul Immolation is the card whose X reaches a cost only this way.
 --
 -- `mCeiling` is CR 101.1's, evaluated off the face being cast (Cost.maximumX)
 -- and passed straight through: it bounds the search as well as the
@@ -2624,19 +2621,12 @@ withPermissionCosts :: [CostComponent.CostComponent Keyword] -> Cost Keyword -> 
 withPermissionCosts extra cost = cost {Cost.Type.components = Cost.Type.components cost <> extra}
 
 -- CR 601.3 / 305.1: which of `options` (PlayerEffect.castPermissionOptions,
--- PlayerEffect.landPermissionOptions) the play of `oid` is made under. Asked
--- only where there are two: those already differ in the budget spent or the
--- rider given. FILTERED, NOT TRUSTED, the ChooseRingBearer posture: an answer
--- naming something never offered falls back to the first, since a play is
--- always made under something.
+-- PlayerEffect.landPermissionOptions) the play of `oid` is made under, asked
+-- through Game.chooseAmong: two already differ in the budget spent or the
+-- rider given, and a play is always made under something.
 choosePlayPermission :: PlayerId -> ObjectId -> [Maybe (ObjectId, CastFromZone.CastFromZone)] -> Game (Maybe (ObjectId, CastFromZone.CastFromZone))
-choosePlayPermission pid oid options = case options of
-  [] -> pure Nothing
-  [only] -> pure only
-  first : more -> do
-    gs <- State.get
-    answer <- Game.choose (Prompt.ChoosePlayPermission (Decide.deciderFor pid gs) pid oid (first NonEmpty.:| more))
-    pure (if elem answer options then answer else first)
+choosePlayPermission pid oid options =
+  Monad.join <$> Game.chooseAmong (\decider asked -> Prompt.ChoosePlayPermission decider asked oid) pid options
 
 -- CR 400.7h: "if an effect allows a nonland card to be cast, other parts of that
 -- effect can find the new object that card becomes after it moves to the stack as
@@ -2747,7 +2737,7 @@ clauseAppliesAt :: PlayerId -> ObjectId -> GameState -> Clause.Clause Card.Type.
 clauseAppliesAt pid sid gs clause = case Clause.condition clause of
   Nothing -> True
   Just condition
-    | isCastAnnouncementCondition condition -> Condition.holds (Projection.fullView gs) (SourceContext.sourceContext gs (Just pid) sid) gs sid condition
+    | isCastAnnouncementCondition condition -> Condition.holds (Projection.fullView gs) (Projection.sourceContext gs (Just pid) sid) gs sid condition
     | otherwise -> True
 
 -- CR 702.33g/702.113b judged BEFORE CR 601.2b's cost is even announced, which is
@@ -3403,10 +3393,15 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                   let aimedSets = Target.legalSets (Just pid) False (Binding.fromChoices Map.empty mAmount Seq.empty) sid slots announcedBoard
                       gatheredFor targets = Cost.plusReductions chosenReductions (Cost.spellAdjustments targets pid sid announcedBoard)
                       gathered = gatheredFor Set.empty
+                      -- Merged by value: aimings counting alike total alike. The
+                      -- empty aiming is among them only where every slot may take
+                      -- none: under Kopala, Warden of Waves it is the CHEAPEST
+                      -- total, so offering its routes would offer a half no legal
+                      -- aiming pays. Pawl.ManaSymbolSpec's "CR 601.2c Dismember at
+                      -- a Merfolk under Kopala is priced with its target" proves it.
+                      aimed = Set.toList . Set.fromList $ fmap (gatheredFor . Set.unions . Map.elems) (Target.aimingsBy Cost.aimedReferent (Cost.aimingKey pid sid announcedBoard announcedAtX) (Target.aimingRanges (Just pid) sid (Just (Maybe.fromMaybe 0 mAmount)) slots aimedSets announcedBoard) aimedSets)
                       aimedGathers
-                        | Cost.readsTargets pid sid announcedBoard =
-                            -- Merged by value: aimings counting alike total alike.
-                            Set.toList . Set.fromList $ gathered : fmap (gatheredFor . Set.unions . Map.elems) (Target.aimingsBy Cost.aimedReferent (Cost.aimingKey pid sid announcedBoard announcedAtX) (Target.aimingRanges (Just pid) sid (Just (Maybe.fromMaybe 0 mAmount)) slots aimedSets announcedBoard) aimedSets)
+                        | Cost.readsTargets pid sid announcedBoard && not (null aimed) = aimed
                         | otherwise = [gathered]
                       routeTotals mana = concatMap (`Cost.totalManas` mana) aimedGathers
                   let totalledCost = Cost.plusComponents gathered announcedAtX
@@ -3522,8 +3517,8 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                       -- below answers with.
                       --
                       -- CR 601.2f's ORDER of the reductions is asked at the same
-                      -- seam. A SPELL can observe it: no ReduceSpellCost states
-                      -- a floor, but two of them can still disagree about CR
+                      -- seam. A SPELL can observe it: no spell reduction in the
+                      -- pool states a floor, but two can still disagree about CR
                       -- 101.1's coloured-mana confinement, and Edgewalker beside
                       -- an unconfined typed reducer reaches two totals on one
                       -- Cleric spell (Pawl.PlayerEffectSpec's
@@ -3563,7 +3558,7 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                           -- locked in here, before any of it is paid, per its
                           -- ruling. A fence: the payment reads the same slots,
                           -- and no board changes a target's mana value mid-payment.
-                          paidCost = Cost.fixComputedIn (fmap (Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList) chosen) pricedGs (Cost.totalWith adjustments announcedCost {Cost.Type.components = Cost.Type.components lateCost <> announcedSuffix})
+                          paidCost = Cost.fixComputedIn chosen pricedGs (Cost.totalWith adjustments announcedCost {Cost.Type.components = Cost.Type.components lateCost <> announcedSuffix})
                       -- CR 702.51b / 702.66b / 702.126b: convoke, delve and
                       -- improvise apply once the total cost is determined, so the
                       -- offer is handed to the payment rather than made here --

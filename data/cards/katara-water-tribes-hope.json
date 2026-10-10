@@ -6,7 +6,10 @@
           "cost": {
             "components": [
               {
-                "type": "WaterbendX"
+                "type": "Waterbend",
+                "value": {
+                  "type": "AnnouncedX"
+                }
               }
             ],
             "mana": [

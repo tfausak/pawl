@@ -110,7 +110,7 @@ solvedness :: ObjectId.ObjectId -> GameState.GameState -> Bool
 solvedness oid gs = maybe False (Set.member Designation.Solved . Object.designations) (Game.lookupObject oid gs)
 
 -- The Case's first clause, which is not a CR 719 rule at all -- ordinary printed
--- text, and the same PlayerEffect.ReduceSpellCost Baral, Chief of Compliance
+-- text, and the same PlayerEffect.ModifyCost Baral, Chief of Compliance
 -- prints. Here to prove the transcription rather than the capability.
 reductionSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 reductionSpec s registry = Spec.describe s "The cost reduction" $ do

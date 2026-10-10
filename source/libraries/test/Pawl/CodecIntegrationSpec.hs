@@ -97,7 +97,7 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
   -- now; Condition's own per-constructor coverage lives in
   -- Pawl.Codec.ConditionSpec.
   -- PlayerEffect's own per-constructor coverage, including the Edgewalker
-  -- typed-mana ReduceSpellCost, lives in Pawl.Codec.PlayerEffectSpec now.
+  -- typed-mana reduction, lives in Pawl.Codec.CostChangeSpec now.
   -- StaticAbility's own per-constructor coverage, including the CR 613.6
   -- empty-modifications-array rejection, lives in Pawl.Codec.StaticAbilitySpec
   -- now. PlayerStaticAbility's own per-constructor coverage lives in

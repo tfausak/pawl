@@ -62,7 +62,6 @@ import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.Restamp as Restamp
 import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Engine.Saga as Saga
-import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Subtype as Subtype.Engine
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Integer as Integer
@@ -306,11 +305,7 @@ recordEventOver board event gs =
 involveActedOn :: GameEvent -> GameState -> GameState
 involveActedOn event gs
   | GameSettings.rangeOfInfluence (GameState.settings gs) == RangeOfInfluence.unlimited = gs
-  | otherwise = foldr Game.involve gs (Maybe.mapMaybe controllerOf (fst (participants event)))
-  where
-    controllerOf oid = case Projection.controllerOf oid gs of
-      Just pid -> Just pid
-      Nothing -> LastKnown.controller <$> Map.lookup oid (GameState.lastKnown gs)
+  | otherwise = foldr Game.involve gs (Maybe.mapMaybe (`Projection.controllerWithLastKnown` gs) (fst (participants event)))
 
 -- CR 704.3 / CR 608.2f: run `body` as ONE event, so every event it records
 -- shares an EventGroup and CR 603.10a's look-back can tell "at the same time"
@@ -1285,8 +1280,8 @@ eligible predicate source pid gs =
   let pool = maybe Map.empty Player.outsideTheGame (Map.lookup pid (GameState.players gs))
       -- CR 608.2h: the source's power as it is now, or as it last existed, for
       -- a wish that compares against it (Synthetic Wishful Djinn's "power less
-      -- than this creature's"). A thunk, Filter.Context.sourcePower's posture.
-      context = (SourceContext.sourceContext gs (Just pid) source) {Filter.sourcePower = Projection.powerWithLastKnownGiven Map.empty source gs}
+      -- than this creature's"), with every other source-derived field.
+      context = Projection.sourceContext gs (Just pid) source
       matchesFace face = Filter.matches context (Projection.viewOfCard face) predicate
       admits printingId = case Game.cardOfPrinting printingId gs of
         Nothing -> False
@@ -2381,9 +2376,10 @@ apply batch candidate event =
       EntryRewrite.ChooseColors count -> do
         let pick chosen _ = do
               gs <- State.get
-              case (Projection.controllerOf oid gs, filter (`Set.notMember` chosen) [minBound .. maxBound :: Color.Color]) of
-                (_, []) -> pure chosen
-                (_, [only]) -> pure (Set.insert only chosen)
+              let remaining = filter (`Set.notMember` chosen) [minBound .. maxBound :: Color.Color]
+              picked <- case Projection.controllerOf oid gs of
+                -- Through Game.chooseAmong, the choice being mandatory.
+                Just controller -> Game.chooseAmong (\decider who -> Prompt.ChooseColor decider who oid) controller remaining
                 -- Unreachable, and defensive for ChoiceOf's reason: the object is
                 -- materialized on the battlefield before this loop runs, so
                 -- controllerOf falls back to its owner. A WEAKER fallback than
@@ -2391,12 +2387,8 @@ apply batch candidate event =
                 -- decide something: there is no colour the card named to default
                 -- to, so the first offered is conjured. It stands only because the
                 -- branch cannot be reached.
-                (Nothing, first : _) -> pure (Set.insert first chosen)
-                (Just controller, first : second : more) -> do
-                  answer <- Game.choose (Prompt.ChooseColor (Decide.deciderFor controller gs) controller oid (first NonEmpty.:| (second : more)))
-                  -- Filtered, not trusted: an answer outside the offer falls
-                  -- back to its first colour, since the choice is mandatory.
-                  pure (Set.insert (if List.elem answer (first : second : more) then answer else first) chosen)
+                Nothing -> pure (Maybe.listToMaybe remaining)
+              pure (maybe chosen (`Set.insert` chosen) picked)
         picked <- Monad.foldM pick Set.empty [1 .. count]
         Replacement.consume (ReplacementCandidate.identity candidate)
         State.modify' $ \g ->
@@ -2945,20 +2937,14 @@ apply batch candidate event =
             -- RevealOrTapped's reason: an entry replacement applied before this
             -- one can have moved a card (CR 614.13).
             let offered = Replacement.graveyardCandidates controller filter_ gs
-            chosen <- case NonEmpty.nonEmpty offered of
-              -- Where the rules leave nothing to ask, don't prompt: with no
-              -- candidate nothing is exiled, and with ONE the instruction names
-              -- that card -- a forced selection rather than options a player
-              -- could tell apart, which is ObjectRef.ChosenCardInGraveyard's own
-              -- elision (CR 101.3).
-              Nothing -> pure Nothing
-              Just (only NonEmpty.:| []) -> pure (Just only)
-              Just candidates -> do
-                answer <- Game.choose (Prompt.ChooseCardInGraveyard (Decide.deciderFor controller gs) controller oid candidates Seq.empty)
-                -- FILTERED, NOT TRUSTED (#222): an answer naming a card that was
-                -- never offered would otherwise exile a card the printed
-                -- criterion excludes.
-                pure (Just (if List.elem answer offered then answer else NonEmpty.head candidates))
+            -- Asked through Game.chooseAmong: with no candidate nothing is
+            -- exiled, and with ONE the instruction names that card -- a forced
+            -- selection rather than options a player could tell apart, which
+            -- is ObjectRef.ChosenCardInGraveyard's own elision (CR 101.3).
+            -- FILTERED, NOT TRUSTED (#222): an answer naming a card that was
+            -- never offered would otherwise exile a card the printed criterion
+            -- excludes.
+            chosen <- Game.chooseAmong (\decider asked candidates -> Prompt.ChooseCardInGraveyard decider asked oid candidates Seq.empty) controller offered
             Monad.forM_ chosen $ \card -> do
               arrivals <- changeZoneReturning card Zone.Exile
               State.modify' $ \gs2 ->
@@ -3017,7 +3003,7 @@ apply batch candidate event =
           Nothing -> pure (Just event)
           Just controller -> do
             let entering oid2 = Set.member oid2 batch || Set.member oid2 (GameState.enteringSubjects gs)
-                hosts = filter (not . entering) (Attach.hostsFor (SourceContext.sourceContext gs (Just controller) oid) oid filter_ gs)
+                hosts = filter (not . entering) (Attach.hostsFor (Projection.sourceContext gs (Just controller) oid) oid filter_ gs)
             chosen <- Attach.chooseHost controller oid hosts
             -- CR 301.5e: no candidate leaves the Equipment on the battlefield
             -- unattached, and attachmentFor answering Nothing lands in the same
@@ -3241,7 +3227,7 @@ apply batch candidate event =
         let count = case n of
               Just printed -> printed
               Nothing ->
-                let context = SourceContext.sourceContext gs (Projection.controllerOf oid gs) oid
+                let context = Projection.sourceContext gs (Projection.controllerOf oid gs) oid
                     quantity = Quantity.Type.DamageDealtToPlayersThisTurn (PlayerRef.Relative PlayerRelation.Opponent)
                  in maybe 0 Integer.toNaturalSaturating (Quantity.evaluate (Projection.fullView gs) context gs oid quantity)
         Replacement.consume (ReplacementCandidate.identity candidate)
@@ -4374,7 +4360,7 @@ copiedReading src gs =
 -- entry rewrite, whose subject is on the battlefield by construction, and
 -- answering there for an object that is not would resurrect it.
 copiedSnapshotWithLastKnown :: ObjectId -> GameState -> PC.ProjectedCharacteristics
-copiedSnapshotWithLastKnown oid gs = case Projection.lastKnownOf oid gs of
+copiedSnapshotWithLastKnown oid gs = case Game.lastKnownOf oid gs of
   Just lk -> LastKnown.copiable lk
   Nothing -> copiedSnapshot oid gs
 
@@ -4457,7 +4443,7 @@ seatEnteringAura batch oid = do
   case Projection.controllerOf oid gs of
     Just controller | unattached && Set.member Subtype.Aura (Projection.subtypesOf oid gs) -> do
       let entering h = Set.member h batch || Set.member h (GameState.enteringSubjects gs)
-          hosts = filter (not . maybe False entering . Recipient.objectOf) (Attach.entryHostsFor (SourceContext.sourceContext gs (Just controller) oid) oid gs)
+          hosts = filter (not . maybe False entering . Recipient.objectOf) (Attach.entryHostsFor (Projection.sourceContext gs (Just controller) oid) oid gs)
       chosen <- Attach.chooseEntryHost controller oid hosts
       -- THE TAG the enchant slot produced, for changeZoneAttaching's reason:
       -- Sba.stillLegalEnchant compares the (pool, tag) pair.
@@ -4483,7 +4469,7 @@ pendingSacrifices chooser gs =
     Just obj <- [Game.lookupObject member gs],
     Object.zone obj /= Zone.Battlefield,
     (_, ReplacementEffect.EntryR (EntryR.MkEntryR pattern_ rewrite)) <- Projection.replacementsOf Zone.Battlefield member gs,
-    Filter.matches (SourceContext.sourceContext gs (Just controller) member) (Projection.viewOfObject member gs) pattern_,
+    Filter.matches (Projection.sourceContext gs (Just controller) member) (Projection.viewOfObject member gs) pattern_,
     (count, criterion) <- Maybe.maybeToList (Replacement.entryCostOf rewrite)
   ]
 
@@ -6342,7 +6328,7 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                     -- Aura's own enchant ability, so there is no resolution
                     -- whose slots the filter could name -- and CanHostSubject,
                     -- the whole filter here, names none.
-                    hosts = filter (not . maybe False (`Set.member` batch) . Recipient.objectOf) (Attach.entryHostsFor (SourceContext.sourceContext gs (Just chooser) oid) oid gs)
+                    hosts = filter (not . maybe False (`Set.member` batch) . Recipient.objectOf) (Attach.entryHostsFor (Projection.sourceContext gs (Just chooser) oid) oid gs)
                 chosen <- Attach.chooseEntryHost chooser oid hosts
                 -- THE TAG the Aura's own enchant slot produced, never a hand-built
                 -- ToObject: Sba.stillLegalEnchant compares the (pool, tag) pair, so

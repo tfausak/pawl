@@ -61,6 +61,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CostAmount as CostAmount
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CostDirection as CostDirection
 import qualified Pawl.Types.CostReduction as CostReduction
@@ -90,6 +91,7 @@ import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ManaUnit as ManaUnit
+import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.Move as Move
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -212,11 +214,11 @@ doorSpec s registry =
     Spec.it s "CR 701.68b Blight is payable only by a player who controls a creature" $ do
       piker <- S.printingOf s registry "Goblin Piker"
       let (oid, gs) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
-      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice oid (CostComponent.Blight 1) gs) "a creature its payer controls pays"
-      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.bob oid (CostComponent.Blight 1) gs)) "an opponent's creature does not"
+      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice oid (CostComponent.Blight (CostAmount.Fixed 1)) gs) "a creature its payer controls pays"
+      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.bob oid (CostComponent.Blight (CostAmount.Fixed 1)) gs)) "an opponent's creature does not"
       -- CR 122.6 puts any number of counters on any creature, so no N outruns a
       -- 2/1 -- rule 701.68b's "unable" has only the cause the rule itself names.
-      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice oid (CostComponent.Blight 9) gs) "and no N is too large for a candidate that exists"
+      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice oid (CostComponent.Blight (CostAmount.Fixed 9)) gs) "and no N is too large for a candidate that exists"
     -- CR 702.29a's "Discard this card", the exact mirror of SacrificeThis
     -- above: one names a permanent its controller owns the choice of, the other
     -- names a card in a hand. Asked of the ZONE and the OWNER, because CR 108.4
@@ -310,9 +312,9 @@ doorSpec s registry =
     Spec.it s "CR 118.3 a Sacrifice component counts matching permanents this player controls" $ do
       mountain <- S.printingOf s registry "Mountain"
       let gs = S.landsInPlay mountain 2
-          two = CostComponent.Sacrifice (Sacrifice.MkSacrifice 2 (Filter.Type.HasSubtype Subtype.Mountain))
-          three = CostComponent.Sacrifice (Sacrifice.MkSacrifice 3 (Filter.Type.HasSubtype Subtype.Mountain))
-          islands = CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.Type.HasSubtype Subtype.Island))
+          two = CostComponent.Sacrifice (Sacrifice.MkSacrifice (CostAmount.Fixed 2) (Filter.Type.HasSubtype Subtype.Mountain))
+          three = CostComponent.Sacrifice (Sacrifice.MkSacrifice (CostAmount.Fixed 3) (Filter.Type.HasSubtype Subtype.Mountain))
+          islands = CostComponent.Sacrifice (Sacrifice.MkSacrifice (CostAmount.Fixed 1) (Filter.Type.HasSubtype Subtype.Island))
       Spec.assertBool s (Cost.canPayComponent Map.empty S.alice S.noSource two gs) "two Mountains pay for two"
       Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice S.noSource three gs)) "but not for three"
       Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice S.noSource islands gs)) "and not for an Island"
@@ -326,14 +328,14 @@ doorSpec s registry =
       let (oid, gs0) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
           two = S.addPlayerCounter PlayerCounterKind.Energy 2 S.alice gs0
           one = S.addPlayerCounter PlayerCounterKind.Energy 1 S.alice gs0
-      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice oid (CostComponent.PayEnergy 2) two) "two energy pays PayEnergy 2"
-      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice oid (CostComponent.PayEnergy 2) one)) "one energy cannot"
+      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice oid (CostComponent.PayEnergy (CostAmount.Fixed 2)) two) "two energy pays PayEnergy 2"
+      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice oid (CostComponent.PayEnergy (CostAmount.Fixed 2)) one)) "one energy cannot"
     -- CR 107.14: paying energy removes exactly that many counters.
     Spec.it s "CR 107.14 paying PayEnergy removes that many energy counters" $ do
       piker <- S.printingOf s registry "Goblin Piker"
       let (oid, gs0) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
           three = S.addPlayerCounter PlayerCounterKind.Energy 3 S.alice gs0
-          after = S.runPure S.identityAnswer three (Monad.void (Cost.payComponent PaymentMoment.OutsideResolution Map.empty S.alice oid (CostComponent.PayEnergy 2)))
+          after = S.runPure S.identityAnswer three (Monad.void (Cost.payComponent PaymentMoment.OutsideResolution Map.empty S.alice oid (CostComponent.PayEnergy (CostAmount.Fixed 2))))
       Spec.assertEqWith s "one energy left" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 1
     -- CR 118.12's counter-placing cost (CR 701.63a's endure). The gate is the
     -- permanent still being on the battlefield to take the counters, and NOT
@@ -1280,7 +1282,7 @@ asmorFoodSpec s registry =
       let (asmorThree, _, _, three) = asmorFoodBoard asmorPrinting goldenEgg sphere childOfNight 3 0
           (asmorOne, _, _, one) = asmorFoodBoard asmorPrinting goldenEgg sphere childOfNight 1 2
           ability = theAbility asmorPrinting
-          component = CostComponent.Sacrifice (Sacrifice.MkSacrifice 2 (Filter.Type.HasSubtype Subtype.Food))
+          component = CostComponent.Sacrifice (Sacrifice.MkSacrifice (CostAmount.Fixed 2) (Filter.Type.HasSubtype Subtype.Food))
       Spec.assertEqWith s "the cost is two Foods and no mana at all" (ActivatedAbility.cost ability) (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [component])
       Spec.assertEqWith s "both boards have an empty stack" (GameState.stack three, GameState.stack one) ([], [])
       Spec.assertEqWith s "and alice has priority on both" (GameState.priority three, GameState.priority one) (Just S.alice, Just S.alice)
@@ -1617,11 +1619,11 @@ hatredSpec s registry =
       hatred <- S.printingOf s registry "Hatred"
       let (_, _, gs) = hatredBoard swamp piker hatred 20
           printed = Cost.Type.MkCost (Face.manaCost (S.combinedFace hatred)) (Face.additionalCosts (S.combinedFace hatred))
-      Spec.assertEqWith s "the printed additional cost is CR 601.2b's variable" (Face.additionalCosts (S.combinedFace hatred)) [CostComponent.PayLifeX]
+      Spec.assertEqWith s "the printed additional cost is CR 601.2b's variable" (Face.additionalCosts (S.combinedFace hatred)) [CostComponent.PayLife CostAmount.AnnouncedX]
       Spec.assertBool s (Cost.hasVariable printed) "so the cost has a variable, though its mana part has none"
       Spec.assertBool s (notElem ManaSymbol.Variable (foldMap ManaCost.unwrap (Face.manaCost (S.combinedFace hatred)))) "the mana part really has none"
-      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice S.noSource CostComponent.PayLifeX gs)) "and it is unpayable until announced"
-      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice S.noSource (CostComponent.PayLife 20) gs) "while the announced 20 it substitutes to is payable"
+      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice S.noSource (CostComponent.PayLife CostAmount.AnnouncedX) gs)) "and it is unpayable until announced"
+      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice S.noSource (CostComponent.PayLife (CostAmount.Fixed 20)) gs) "while the announced 20 it substitutes to is payable"
     -- The same fence one keyword action over, and the same board serves: alice
     -- controls a Goblin Piker, so CR 701.68b's only refusal does not apply and
     -- an announced blight IS payable -- which is what leaves the unannounced one
@@ -1635,11 +1637,11 @@ hatredSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       hatred <- S.printingOf s registry "Hatred"
       let (_, _, gs) = hatredBoard swamp piker hatred 20
-      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice S.noSource CostComponent.BlightX gs)) "unpayable until announced"
-      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice S.noSource (CostComponent.Blight 1) gs) "an announced 1 is payable"
-      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice S.noSource (CostComponent.Blight 99) gs) "and so is an announced 99, CR 701.68b naming no number that is too many"
-      Spec.assertBool s (Cost.hasVariable (Cost.Type.MkCost Nothing [CostComponent.BlightX])) "it is a CR 107.3 variable"
-      Spec.assertBool s (not (Cost.demandGrowsWithX (Cost.Type.MkCost Nothing [CostComponent.BlightX]))) "whose demand never grows, so only CR 101.1 can refuse a value"
+      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice S.noSource (CostComponent.Blight CostAmount.AnnouncedX) gs)) "unpayable until announced"
+      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice S.noSource (CostComponent.Blight (CostAmount.Fixed 1)) gs) "an announced 1 is payable"
+      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice S.noSource (CostComponent.Blight (CostAmount.Fixed 99)) gs) "and so is an announced 99, CR 701.68b naming no number that is too many"
+      Spec.assertBool s (Cost.hasVariable (Cost.Type.MkCost Nothing [CostComponent.Blight CostAmount.AnnouncedX])) "it is a CR 107.3 variable"
+      Spec.assertBool s (not (Cost.demandGrowsWithX (Cost.Type.MkCost Nothing [CostComponent.Blight CostAmount.AnnouncedX]))) "whose demand never grows, so only CR 101.1 can refuse a value"
     -- The fence one keyword action further over, and the half that differs: a
     -- waterbend cost's demand is the {X} in its own MANA part, so the cost
     -- Katara, Water Tribe's Hope states does grow with the value and the board
@@ -1652,10 +1654,10 @@ hatredSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       hatred <- S.printingOf s registry "Hatred"
       let (_, _, gs) = hatredBoard swamp piker hatred 20
-          announced = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Variable])) [CostComponent.WaterbendX]
-      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice S.noSource CostComponent.WaterbendX gs)) "unpayable until announced"
-      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice S.noSource (CostComponent.Waterbend 4) gs) "while the announced 4 it substitutes to is payable, rule 701.67a's licence spending nothing of its own"
-      Spec.assertBool s (Cost.hasVariable (Cost.Type.MkCost Nothing [CostComponent.WaterbendX])) "it is a CR 107.3 variable on its own"
+          announced = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Variable])) [CostComponent.Waterbend CostAmount.AnnouncedX]
+      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice S.noSource (CostComponent.Waterbend CostAmount.AnnouncedX) gs)) "unpayable until announced"
+      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice S.noSource (CostComponent.Waterbend (CostAmount.Fixed 4)) gs) "while the announced 4 it substitutes to is payable, rule 701.67a's licence spending nothing of its own"
+      Spec.assertBool s (Cost.hasVariable (Cost.Type.MkCost Nothing [CostComponent.Waterbend CostAmount.AnnouncedX])) "it is a CR 107.3 variable on its own"
       Spec.assertBool s (Cost.demandGrowsWithX announced) "and the cost it is printed in grows with the value, the {X} beside it being real mana"
     -- The third substrate, and the classification that separates it from the
     -- blight above: CR 118.3 measures an announced "Pay X {E}" against the
@@ -1669,11 +1671,11 @@ hatredSpec s registry =
       hatred <- S.printingOf s registry "Hatred"
       let (_, _, gs0) = hatredBoard swamp piker hatred 20
           gs = S.addPlayerCounter PlayerCounterKind.Energy 2 S.alice gs0
-      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice S.noSource CostComponent.PayEnergyX gs)) "unpayable until announced"
-      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice S.noSource (CostComponent.PayEnergy 2) gs) "an announced 2 is payable off two counters"
-      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice S.noSource (CostComponent.PayEnergy 3) gs)) "and an announced 3 is not"
-      Spec.assertBool s (Cost.hasVariable (Cost.Type.MkCost Nothing [CostComponent.PayEnergyX])) "it is a CR 107.3 variable"
-      Spec.assertBool s (Cost.demandGrowsWithX (Cost.Type.MkCost Nothing [CostComponent.PayEnergyX])) "whose demand grows, so the board itself refuses a big enough value"
+      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice S.noSource (CostComponent.PayEnergy CostAmount.AnnouncedX) gs)) "unpayable until announced"
+      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice S.noSource (CostComponent.PayEnergy (CostAmount.Fixed 2)) gs) "an announced 2 is payable off two counters"
+      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice S.noSource (CostComponent.PayEnergy (CostAmount.Fixed 3)) gs)) "and an announced 3 is not"
+      Spec.assertBool s (Cost.hasVariable (Cost.Type.MkCost Nothing [CostComponent.PayEnergy CostAmount.AnnouncedX])) "it is a CR 107.3 variable"
+      Spec.assertBool s (Cost.demandGrowsWithX (Cost.Type.MkCost Nothing [CostComponent.PayEnergy CostAmount.AnnouncedX])) "whose demand grows, so the board itself refuses a big enough value"
 
 -- Living Destiny {3}{G} Instant: "As an additional cost to cast this spell,
 -- reveal a creature card from your hand. You gain life equal to the revealed
@@ -2626,6 +2628,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   springleafDrumSpec s registry
   morcantSpec s registry
   unerringSlingSpec s registry
+  kopalaSpec s registry
+  battlefieldThaumaturgeSpec s registry
   melokuSpec s registry
   barkhideTrollSpec s registry
   zameckGuildmageCostSpec s registry
@@ -4165,9 +4169,9 @@ recordingSpreadRemovals answer p = case p of
 -- Scryfall 2026-09-26): "{B}, Remove X +1/+1 counters from among creatures you
 -- control: Target creature gets -X/-X until end of turn."
 --
--- The producer for CostComponent.RemovePlusOneCountersX, Novijen Sages' removal
--- with CR 107.3a's X as its count, announced at CR 601.2b and divided at CR
--- 601.2h.
+-- The producer for a CostComponent.RemoveCounters of an announced X, Novijen
+-- Sages' removal with CR 107.3a's X as its count, announced at CR 601.2b and
+-- divided at CR 601.2h.
 --
 -- THE BOARD: alice controls the Retribution over a Swamp, a Goblin Piker with
 -- one counter and a Hill Giant with two; bob's Hill Giant, the target, carries
@@ -4197,8 +4201,9 @@ retributionSpec s registry =
 
 -- Chatterfang, Squirrel General (Oracle text checked against Scryfall
 -- 2026-09-30): "{B}, Sacrifice X Squirrels: Target creature gets +X/-X until end
--- of turn." CostComponent.SacrificeX with a real choice: three Treetop Sentries
--- and Chatterfang itself are Squirrels, so X = 2 asks which two.
+-- of turn." A CostComponent.Sacrifice of an announced X with a real choice:
+-- three Treetop Sentries and Chatterfang itself are Squirrels, so X = 2 asks
+-- which two.
 --
 -- THE BOARD: alice controls Chatterfang, three Sentries and a Swamp; bob's Hill
 -- Giant is the target.
@@ -5302,9 +5307,9 @@ unpaidLeaper s leaperId gs = case Projection.abilitiesOf leaperId gs of
 -- CR 107.3a's variable in a waterbend cost, and ONE announcement fixes both
 -- halves of it: the {X} the licence scopes, in the cost's own mana part, and CR
 -- 701.67b's ceiling on how much of that generic taps may pay
--- (CostComponent.WaterbendX). The base power and toughness is what a paid cost is
--- read off -- a Goblin Piker is printed 2/1, so neither number the assertions
--- read can be its own.
+-- (CostComponent.Waterbend's CostAmount.AnnouncedX). The base power and
+-- toughness is what a paid cost is read off -- a Goblin Piker is printed 2/1, so
+-- neither number the assertions read can be its own.
 --
 -- "X can't be 0" is ActivatedAbility.minimumX (CR 101.1): the floor pair below
 -- proves the announcement side and the offer pair the gate.
@@ -6134,3 +6139,137 @@ targetCostSpec s registry =
           Spec.assertEqWith s "the Giant is destroyed when tapped, and survives untapped" (onBattlefield target (run (tapAll gs)), onBattlefield target (run gs)) (False, True)
           Spec.assertEqWith s "offered at the tapped Giant, refused at the untapped one" (S.castable S.alice seizedId (tapAll gs), S.castable S.alice seizedId gs) (True, False)
         _ -> Spec.assertFailure s "one Giant"
+
+-- Kopala, Warden of Waves {1}{U}{U} Legendary Creature -- Merfolk Wizard 2/2
+-- (Oracle text checked against Scryfall 2026-10-10): "Spells your opponents cast
+-- that target a Merfolk you control cost {2} more to cast. / Abilities your
+-- opponents activate that target a Merfolk you control cost {2} more to
+-- activate." Its ruling: "Spells and abilities that target more than one Merfolk
+-- you control cost only {2} more" -- a gate on the targets (CostModifier's
+-- whichTargets), not an amount per target.
+--
+-- THREE seats, so Kopala's "you" (CR 109.5: alice, its controller) is told from
+-- the paying player's (bob) and from another opponent's (carol, who controls a
+-- Merfolk too). Every cost is read off how many of bob's permanents are tapped.
+kopalaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+kopalaSpec s registry = Spec.describe s "Kopala, Warden of Waves" $ do
+  let board = do
+        kopala <- S.printingOf s registry "Kopala, Warden of Waves"
+        merfolk <- S.printingOf s registry "Coral Merfolk"
+        piker <- S.printingOf s registry "Goblin Piker"
+        sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+        distraction <- S.printingOf s registry "Fulgent Distraction"
+        plains <- S.printingOf s registry "Plains"
+        let (kopalaId, g1) = S.addPermanent kopala S.alice (S.landsFor plains S.bob 7 (Setup.emptyGame S.threePlayers))
+            (aliceMerfolk, g2) = S.addPermanent merfolk S.alice g1
+            (carolMerfolk, g3) = S.addPermanent merfolk S.carol g2
+            (pikerId, g4) = S.addPermanent piker S.bob g3
+            (sorcererId, g5) = S.addPermanent sorcerer S.bob g4
+            (distractionId, g6) = S.addHandCard distraction S.bob g5
+        pure (kopalaId, aliceMerfolk, carolMerfolk, pikerId, sorcererId, theAbility sorcerer, distractionId, g6)
+      aimingAt :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+      aimingAt wanted p = case p of
+        Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, legal) -> Set.filter (\r -> elem (Recipient.objectOf r) (fmap Just wanted)) legal) asked
+        _ -> S.identityAnswer p
+  -- Fulgent Distraction is {2}{W}; the pair differs in the aim alone.
+  Spec.it s "CR 601.2c / 601.2f an opponent's spell costs {2} more once, however many of alice's Merfolk it targets" $ do
+    (kopalaId, aliceMerfolk, carolMerfolk, pikerId, _, _, distractionId, gs) <- board
+    let castAt wanted = S.runPure (aimingAt wanted) gs (S.cast S.bob distractionId)
+        both = castAt [kopalaId, aliceMerfolk]
+        one = castAt [aliceMerfolk, pikerId]
+        carols = castAt [carolMerfolk, pikerId]
+    Spec.assertEqWith s "CR 109.5 two of alice's Merfolk: {4}{W}, five Plains, not seven" (S.tappedCount S.bob both) 5
+    Spec.assertEqWith s "one of alice's Merfolk beside bob's Piker: the same five" (S.tappedCount S.bob one) 5
+    Spec.assertEqWith s "carol's Merfolk is not a Merfolk alice controls: {2}{W}, three" (S.tappedCount S.bob carols) 3
+    Spec.assertEqWith s "and all three casts were made" (fmap (length . GameState.stack) [both, one, carols]) [1, 1, 1]
+  -- Prodigal Sorcerer's "{T}: This creature deals 1 damage to any target" costs
+  -- no mana, so the Sorcerer is the only permanent of bob's an untaxed
+  -- activation taps.
+  Spec.it s "CR 602.2b an opponent's ability targeting alice's Merfolk costs {2} more, and carol's does not" $ do
+    (_, aliceMerfolk, carolMerfolk, _, sorcererId, ability, _, gs) <- board
+    let shootAt victim = S.runPure (aimingAt [victim]) gs (Activate.activateAbility S.bob sorcererId ability)
+        atAlice = shootAt aliceMerfolk
+        atCarol = shootAt carolMerfolk
+    Spec.assertEqWith s "CR 601.2f at alice's Merfolk: the Sorcerer and two Plains" (S.tappedCount S.bob atAlice) 3
+    Spec.assertEqWith s "at carol's Merfolk: the Sorcerer alone" (S.tappedCount S.bob atCarol) 1
+    Spec.assertEqWith s "and both activations are on the stack" (fmap (length . GameState.stack) [atAlice, atCarol]) [1, 1]
+  -- Brittle Effigy's "{4}, {T}, Exile this artifact: Exile target creature",
+  -- where the only creatures are alice's two Merfolk: every legal aiming costs
+  -- {6}, so five Plains cannot pay it though the empty aiming would cost {4}. The
+  -- pair differs in one Plains, and a third board in one Goblin Piker of bob's,
+  -- a target Kopala does not tax.
+  Spec.it s "CR 601.2f / 602.2b a Brittle Effigy whose only targets are alice's Merfolk is not offered on five Plains" $ do
+    kopala <- S.printingOf s registry "Kopala, Warden of Waves"
+    merfolk <- S.printingOf s registry "Coral Merfolk"
+    piker <- S.printingOf s registry "Goblin Piker"
+    effigy <- S.printingOf s registry "Brittle Effigy"
+    plains <- S.printingOf s registry "Plains"
+    let boardWith lands =
+          let (_, g1) = S.addPermanent kopala S.alice (S.landsFor plains S.bob lands (Setup.emptyGame S.threePlayers))
+              (_, g2) = S.addPermanent merfolk S.alice g1
+           in S.addPermanent effigy S.bob g2
+        (fiveId, five) = boardWith 5
+        (sixId, six) = boardWith 6
+        (pikerEffigyId, withPiker) = let (eid, g) = boardWith 5 in (eid, snd (S.addPermanent piker S.bob g))
+    Spec.assertBool s (not (Activatable.activatable S.bob fiveId (theAbility effigy) five)) "CR 601.2f on five Plains every target costs {6}: not offered"
+    Spec.assertBool s (Activatable.activatable S.bob sixId (theAbility effigy) six) "on six Plains it is"
+    Spec.assertBool s (Activatable.activatable S.bob pikerEffigyId (theAbility effigy) withPiker) "and on five beside bob's own Piker, an untaxed target, it is"
+  -- The spell half of the gate above: Fulgent Distraction's two targets can
+  -- only be alice's two Merfolk, so four Plains cannot pay {4}{W} though the
+  -- untargeted cost is {2}{W}. The pair differs in one Plains.
+  Spec.it s "CR 601.2f a Fulgent Distraction whose only targets are alice's Merfolk is not castable on four Plains" $ do
+    kopala <- S.printingOf s registry "Kopala, Warden of Waves"
+    merfolk <- S.printingOf s registry "Coral Merfolk"
+    distraction <- S.printingOf s registry "Fulgent Distraction"
+    plains <- S.printingOf s registry "Plains"
+    let boardWith lands =
+          let (_, g1) = S.addPermanent kopala S.alice (S.landsFor plains S.bob lands (Setup.emptyGame S.threePlayers))
+              (_, g2) = S.addPermanent merfolk S.alice g1
+           in S.addHandCard distraction S.bob g2
+        (fourId, four) = boardWith 4
+        (fiveId, five) = boardWith 5
+    Spec.assertBool s (not (S.castable S.bob fourId four)) "CR 601.2f on four Plains both legal targets are taxed: not castable"
+    Spec.assertBool s (S.castable S.bob fiveId five) "on five Plains it is"
+  -- CR 109.2: "a Merfolk you control" names no zone, so it is a PERMANENT. A
+  -- Coral Merfolk spell alice is casting is a Merfolk she controls on the
+  -- stack, and bob's Essence Scatter ({1}{U}) at it is not taxed.
+  Spec.it s "CR 109.2 an opponent's spell targeting alice's Merfolk SPELL costs no more" $ do
+    kopala <- S.printingOf s registry "Kopala, Warden of Waves"
+    merfolk <- S.printingOf s registry "Coral Merfolk"
+    scatter <- S.printingOf s registry "Essence Scatter"
+    island <- S.printingOf s registry "Island"
+    let (_, g1) = S.addPermanent kopala S.alice (S.landsFor island S.bob 4 (Setup.emptyGame S.threePlayers))
+        (merfolkSpell, g2) = S.spellOnStack merfolk S.alice g1
+        (scatterId, g3) = S.addHandCard scatter S.bob g2
+        after = S.runPure (targeting merfolkSpell) g3 (S.cast S.bob scatterId)
+    Spec.assertEqWith s "CR 109.2 the Scatter at the Merfolk spell cost {1}{U}: two Islands" (S.tappedCount S.bob after) 2
+    Spec.assertEqWith s "and it is on the stack above the Merfolk" (length (GameState.stack after)) 2
+
+-- Battlefield Thaumaturge {1}{U} Creature -- Human Wizard 2/1 (Oracle text
+-- checked against Scryfall 2026-10-10): "Each instant and sorcery spell you cast
+-- costs {1} less to cast for each creature it targets." CR 109.2: a creature
+-- is a permanent, so a creature CARD in a graveyard is not one. The pair differs
+-- in what the instant targets: Doom Blade ({1}{B}) at bob's Goblin Piker, and
+-- Unbury ({1}{B}) at a creature card in alice's graveyard.
+battlefieldThaumaturgeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+battlefieldThaumaturgeSpec s registry = Spec.describe s "Battlefield Thaumaturge" $ do
+  Spec.it s "CR 109.2 a creature card in a graveyard is not a creature it targets" $ do
+    thaumaturge <- S.printingOf s registry "Battlefield Thaumaturge"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    blade <- S.printingOf s registry "Doom Blade"
+    unbury <- S.printingOf s registry "Unbury"
+    let (_, g1) = S.addPermanent thaumaturge S.alice (S.landsFor swamp S.alice 2 (Setup.emptyGame S.bothPlayers))
+        (pikerId, g2) = S.addPermanent piker S.bob g1
+        (deadPiker, g3) = S.addGraveyardCard piker S.alice g2
+        (bladeId, g4) = S.addHandCard blade S.alice g3
+        (unburyId, g5) = S.addHandCard unbury S.alice g4
+        firstMode :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+        firstMode victim p = case p of
+          Prompt.ChooseModes {} -> Seq.fromList [ModeIndex.MkModeIndex 0]
+          _ -> targeting victim p
+        bladed = S.runPure (targeting pikerId) g5 (S.cast S.alice bladeId)
+        unburied = S.runPure (firstMode deadPiker) g5 (S.cast S.alice unburyId)
+    Spec.assertEqWith s "CR 601.2f Doom Blade at bob's Piker cost {B}: one Swamp" (S.tappedCount S.alice bladed) 1
+    Spec.assertEqWith s "CR 109.2 Unbury at the Piker card cost {1}{B}: two Swamps" (S.tappedCount S.alice unburied) 2
+    Spec.assertEqWith s "and both were cast" (fmap (length . GameState.stack) [bladed, unburied]) [1, 1]

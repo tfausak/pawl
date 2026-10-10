@@ -51,6 +51,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Reinforce as Reinforce
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.Sacrifice as Sacrifice
+import qualified Pawl.Types.SlotArity as SlotArity
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Splice as Splice
 import qualified Pawl.Types.StickerKind as StickerKind
@@ -1009,75 +1010,36 @@ data Context = MkContext
     -- CR 208.1: the SOURCE's power, for the two atoms that compare a candidate
     -- against it (PowerLessThanSource, CR 702.134a; PowerGreaterThanSource, CR
     -- 702.149a). Not derivable from `source` here -- this module holds no game
-    -- state and cannot project -- so the caller that has the board supplies it:
-    -- Pawl.Engine.Target.admittedGiven for a target slot,
-    -- Pawl.Engine.Event.matchesTrigger for CR 702.149a's trigger condition, and
-    -- Pawl.Engine.CombatRestriction.cantBeBlockedBy and cantBlockCreatures for
-    -- CR 509.1b's pairwise restrictions (CR 701.54c, Spitfire Handler), and
-    -- Pawl.Engine.Event.eligible for a wish's filter (CR 400.11c, Synthetic
-    -- Wishful Djinn).
-    --
-    -- LAZY, and load-bearingly so: filling it costs a projection of the source,
-    -- and no filter that omits the atom ever forces it. That is the posture
-    -- View.attackedThisTurn takes for its event-log fold.
-    --
-    -- Nothing wherever the atom cannot appear, which `contextFor` below is the
-    -- spelling of.
-    sourcePower :: Maybe Integer,
-    -- CR 208.1: the SOURCE's toughness, for the one atom that compares a
-    -- candidate's power against it (PowerAtLeastSourceToughness, Ironclaw
-    -- Curse). sourcePower's sibling, filled through contextComparingPower by the
-    -- same callers, LAZY for its reason, and Nothing everywhere else, where the
-    -- atom matches nothing; Pawl.FilterPositionLintSpec keeps a card from
-    -- writing it there.
-    sourceToughness :: Maybe Integer,
-    -- CR 202.3: the SOURCE's mana value, for the two atoms that compare a
-    -- candidate against it (ManaValueLessThanSource, CR 702.85a;
-    -- ManaValueEqualToSource, CR 702.53a and CR 702.71a). sourcePower's
-    -- sibling one characteristic over, and undrivable from `source` here for that
-    -- field's reason -- this module holds no game state -- so the caller that has
-    -- the board supplies it: Pawl.Engine.Resolve.Slots.effectContext for a
-    -- resolution's own references, which is where rule 702.85a's walk and its
-    -- offer both read it.
-    --
-    -- LAZY, sourcePower's posture and load-bearingly so: filling it costs a
-    -- projection of the source, and no filter that omits the atom ever forces it.
-    --
-    -- Nothing wherever the atom cannot appear, which `contextFor` below is the
-    -- spelling of, and the atom then matches nothing. What keeps a CARD out of
-    -- those positions is Pawl.FilterPositionLintSpec's lint, sourcePower's pair.
-    sourceManaValue :: Maybe Integer,
-    -- CR 105.2: the SOURCE's colours, for the one atom that intersects a
-    -- candidate's against them (SharesColorWithSource, CR 702.78a's conspire).
-    -- sourceManaValue's sibling one characteristic over, and undrivable from
-    -- `source` here for that field's reason -- this module holds no game state --
-    -- so the caller that has the board supplies it: Pawl.Engine.Cost.tapCandidates,
-    -- which is where rule 702.78a's cost pool is drawn.
-    --
-    -- A SET rather than a Maybe, which is why it needs no laziness argument:
-    -- filling it costs a projection of the source, but the empty set is the right
-    -- answer wherever the atom cannot appear AND the right answer for a colourless
-    -- source, CR 105.2's own reading -- nothing shares a colour with either.
-    sourceColors :: Set.Set Color.Color,
-    -- CR 201.1 / 709.4a: the NAMES of the SOURCE, for the one atom that
-    -- intersects a candidate's against them (SameNameAsSource, CR 702.60a's
-    -- ripple). `slotNames` below asks the same question of a SLOT; this asks it
-    -- of CR 113.7's source, and is undrivable from `source` here for
-    -- sourceManaValue's reason -- this module holds no game state -- so the
-    -- caller that has the board supplies it:
-    -- Pawl.Engine.Resolve.Slots.effectContext, which is where rule 702.60a's
-    -- offer reads it.
-    --
-    -- A SET rather than a Maybe, sourceColors' shape one characteristic over:
-    -- the empty set is the right answer both where the atom cannot appear and
-    -- for a source with no name at all (CR 708.2a), and nothing shares a name
-    -- with either.
+    -- state and cannot project -- so Pawl.Engine.Projection.withCharacteristicsOf
+    -- fills it and the four fields below together, through last known
+    -- information (CR 608.2b's re-check, CR 608.2h's effects): in every context Pawl.Engine.Projection.sourceContext
+    -- frames, and in CR 509.1b's pairwise restrictions, which frame by the
+    -- creature being compared (Projection.pairwiseContext, Spitfire Handler).
     --
     -- LAZY, and load-bearingly so: filling it costs a projection of the source,
     -- and no filter that omits the atom ever forces it.
     --
-    -- What keeps a CARD out of the positions this is empty in is
-    -- Pawl.FilterPositionLintSpec's lint, sourceManaValue's pair.
+    -- Nothing in `contextFor` below and inside the CR 613 layer fold, whose
+    -- contexts (Pawl.Engine.SourceContext) cannot project their own source; the
+    -- atom then matches nothing, and Pawl.FilterPositionLintSpec keeps a card
+    -- out of those positions.
+    sourcePower :: Maybe Integer,
+    -- CR 208.1: the SOURCE's toughness, for PowerAtLeastSourceToughness
+    -- (Ironclaw Curse). Filled with sourcePower.
+    sourceToughness :: Maybe Integer,
+    -- CR 202.3: the SOURCE's mana value, for the atoms that compare a candidate
+    -- against it (ManaValueLessThanSource, CR 702.85a; ManaValueEqualToSource,
+    -- CR 702.53a and CR 702.71a; ManaValueGreaterThanSource, Kami of
+    -- Mourning). Filled with sourcePower.
+    sourceManaValue :: Maybe Integer,
+    -- CR 105.2: the SOURCE's colours, for SharesColorWithSource (CR 702.78a's
+    -- conspire). Filled with sourcePower. A SET rather than a Maybe: empty is
+    -- the right answer both where it is unfilled and for a colourless source.
+    sourceColors :: Set.Set Color.Color,
+    -- CR 201.1 / 709.4a: the NAMES of the SOURCE, for SameNameAsSource (CR
+    -- 702.60a's ripple); `slotNames` below asks the same of a SLOT. Filled with
+    -- sourcePower, and a SET for sourceColors' reason (CR 708.2a's nameless
+    -- object).
     sourceNames :: Set.Set CardName.CardName,
     -- CR 202.3, the computed half: the number the TARGET SLOT being matched names
     -- as its bound, for the three atoms that ask (ManaValueAtMostAmount,
@@ -1108,7 +1070,7 @@ data Context = MkContext
     -- and mean the same thing -- CR 700.2a's mode is refused only for what the
     -- announcement cannot change.
     --
-    -- False in contextFor and contextComparingPower below, and False at CR 601.2c
+    -- False in contextFor below, and False at CR 601.2c
     -- and CR 608.2b alike: by then the announcement holds the number, and a bound
     -- that still cannot be read is vacuously False -- the refusing direction, as
     -- slotNames' atom takes and slotControllers' atom does not.
@@ -1160,16 +1122,18 @@ data Context = MkContext
     --
     -- Pawl.Engine.Binding.objectsBySlot decides what each slot names, and
     -- Pawl.Engine.Projection.framedBySlots fills this field with every field
-    -- derived from it, for a target slot's filter (Pawl.Engine.Target), a
-    -- resolution's positions (Pawl.Engine.Resolve.Slots.effectContext) and CR
-    -- 603.4's two intervening-"if" checks. Four producers fill this field
-    -- alone: Pawl.Engine.Replacement.candidateContext, off the snapshot
-    -- ActiveReplacement.slots holds, the resolution that installed the row
-    -- being over; Pawl.Engine.Cost's candidate pools, off the announced stack
+    -- derived from it. What differs between producers is only WHICH slot map,
+    -- and each is the one its rule names: a target slot's filter
+    -- (Pawl.Engine.Target) reads the announcement (CR 601.2c); a resolution's
+    -- positions (Pawl.Engine.Resolve.Slots.effectContext) the targets CR 608.2b
+    -- left legal; CR 603.4's two intervening-"if" checks the trigger's own
+    -- bindings, before CR 608.2b; Pawl.Engine.Replacement.candidateContext the
+    -- snapshot ActiveReplacement.slots holds, the resolution that installed the
+    -- row being over; Pawl.Engine.Cost's candidate pools the announced stack
     -- object's bindings (Cost.announcedSlots), CR 601.2c choosing the targets
-    -- before CR 601.2h pays; Pawl.Engine.Event.Match.matchesTriggerGiven, off a
+    -- before CR 601.2h pays; Pawl.Engine.Event.Match.matchesTriggerGiven a
     -- delayed ability's captured environment (CR 603.7c); and
-    -- Pawl.Engine.Mana's priced count, off a payment's slots.
+    -- Pawl.Engine.Mana's priced count a payment's slots.
     --
     -- Outside those, contextFor leaves it empty, and every atom that reads it
     -- (IsBound, SameNameAsBound, IsControllerOfBound, Quantity.AgainstSlot) is then vacuously False or Nothing rather than
@@ -1213,8 +1177,7 @@ data Context = MkContext
     -- ever forces it -- which is what lets that one caller supply it for every
     -- tapping cost while only a crew ability's criterion pays for it.
     --
-    -- EMPTY in contextFor below and so in contextWithSlots and every other
-    -- builder, leaving the atom vacuously False and `Not CantCrewVehicles`
+    -- EMPTY in contextFor below and so in every other builder, leaving the atom vacuously False and `Not CantCrewVehicles`
     -- vacuously True: a position with no prohibition gathered admits every
     -- candidate, which is the direction a prohibition nobody printed must take.
     cantCrewVehicles :: Set.Set ObjectId.ObjectId,
@@ -1234,8 +1197,8 @@ data Context = MkContext
     -- LAZY, and load-bearingly so: filling it costs one projection per bound
     -- object, and no filter that omits the atom ever forces it.
     --
-    -- EMPTY in contextFor and contextWithSlots below, so the atom is vacuously
-    -- False in a position framedBySlots does not frame. Which
+    -- EMPTY in contextFor below, so the atom is vacuously False in a position
+    -- framedBySlots does not frame. Which
     -- direction an unfilled read takes is the ATOM's choice rather than a rule
     -- this record imposes: the arm in `matches` below decides it, and
     -- slotControllers' SameControllerAsBound chooses True where this one chooses
@@ -1386,7 +1349,7 @@ data Context = MkContext
     -- trigger's alone, and off the entering PERMANENT, which CR 400.7 left with no
     -- bindings to stamp it on.
     --
-    -- Empty in contextFor and contextComparingPower below, so a bound evaluated
+    -- Empty in contextFor below, so a bound evaluated
     -- outside a target slot and outside a resolution reads no announcement. What that unfilled read
     -- then ANSWERS is Pawl.Engine.Quantity's InSlot arm's call, not this record's:
     -- each reader of each field here picks its own vacuous direction, and
@@ -1486,8 +1449,7 @@ data Context = MkContext
     -- prevention shield's source half at the event, and a permanent's static
     -- ability is asked afresh every time.
     --
-    -- Nothing in contextFor below and so in contextWithSlots and
-    -- contextComparingPower too, so the atom is vacuously False in every position
+    -- Nothing in contextFor below, so the atom is vacuously False in every position
     -- but those four -- sourceAttachedTo's posture rather than slotControllers'.
     -- What keeps a card out of the other positions is Pawl.CardSpec's "CR 702.16k
     -- no card asks OfChosenPlayer outside a keyword's own filter", the sweep
@@ -1624,44 +1586,21 @@ data Context = MkContext
 contextFor :: Teams.Teams -> Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
 contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceToughness = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayers = [], recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, slotStickers = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, evaluated = Nothing, sourceEntrants = Set.empty, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColors = Set.empty, sourceChosenSubtype = Nothing, sourceLastExiled = Nothing}
 
--- contextFor with a resolution's -- or a trigger's -- slot objects supplied; see
--- slotObjects above for who supplies them.
-contextWithSlots :: Teams.Teams -> Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Map.Map SlotName.SlotName (Set.Set ObjectId.ObjectId) -> Context
-contextWithSlots t p s m = (contextFor t p s) {slotObjects = m}
-
--- The context Pawl.Engine.Cost.tapCandidates evaluates a cost component's
--- criterion in: contextWithSlots above plus CR 702.122d's gathered prohibition,
--- which only rule 702.122a's criterion asks about (CantCrewVehicles) and which
--- is therefore unforced for every other component that pool serves.
-contextCrewing :: Teams.Teams -> Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Map.Map SlotName.SlotName (Set.Set ObjectId.ObjectId) -> Set.Set ObjectId.ObjectId -> Context
-contextCrewing t p s m c = (contextWithSlots t p s m) {cantCrewVehicles = c}
-
 -- The ONE object a slot names, for the readers that can take no more than one --
 -- Quantity.AgainstSlot's evaluation, Count's IsControllerOfBound. Nothing where
 -- the slot names nothing AND where it names several: a reader that cannot take a
 -- group must not silently take one of its members, which is the doctrine
 -- Pawl.Engine.Binding.onlyOne states one type over. Filter.IsBound is the reader
 -- that CAN take them, and it goes to `slotObjects` itself.
+--
+-- Over the WHOLE slot's objects, where Binding.oneBySlot reads its targets alone,
+-- so a group of one answers its member here and a slot naming a player beside one
+-- object answers the object. No card reaches either: Binding.oneBySlot's note
+-- names the two lints that keep a singular read off such a slot.
 slotOneObject :: SlotName.SlotName -> Context -> Maybe ObjectId.ObjectId
 slotOneObject slot context = case Set.toList (Map.findWithDefault Set.empty slot (slotObjects context)) of
   [oid] -> Just oid
   _ -> Nothing
-
--- contextFor with the source's power and toughness supplied. Kept lazy at the call site, since
--- the field is: a Filter that never names the atom pays for no projection.
---
--- The defending player stays Nothing on both callers -- CR 702.149a's TRIGGER
--- match and CR 509.1b's pairwise blocking restriction. No filter reaching either
--- position names the atom: rule 702.39a's writes it in a target slot, and the
--- only card-written one is a CR 508.1c gate, which
--- Pawl.Engine.CombatRestriction.inForce evaluates through contextFor instead.
---
--- The source-derived fields are Nothing until a caller frames the record by
--- its source (Pawl.Engine.SourceContext.framedBy), as CR 702.149a's trigger
--- match does; CR 509.1b's pairwise restriction is framed by the creature being
--- compared, not by an ability's source, and leaves them unfilled.
-contextComparingPower :: Teams.Teams -> Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Maybe Integer -> Context
-contextComparingPower t p s n o = (contextFor t p (Just s)) {sourcePower = n, sourceToughness = o}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -3095,25 +3034,19 @@ rewriteComponent pairs component = case component of
   CostComponent.Behold (Behold.MkBehold n criterion) -> CostComponent.Behold (Behold.MkBehold n (rewrite pairs criterion))
   CostComponent.BeholdAndExile criterion -> CostComponent.BeholdAndExile (rewrite pairs criterion)
   CostComponent.RemoveCounters (CountersFromPermanents.MkCountersFromPermanents n which criterion spread) -> CostComponent.RemoveCounters (CountersFromPermanents.MkCountersFromPermanents n (rewriteWhichCounters pairs which) (rewrite pairs criterion) spread)
-  CostComponent.RemovePlusOneCountersX criterion -> CostComponent.RemovePlusOneCountersX (rewrite pairs criterion)
-  CostComponent.SacrificeX criterion -> CostComponent.SacrificeX (rewrite pairs criterion)
   CostComponent.TapThis -> component
   CostComponent.UntapThis -> component
   CostComponent.SacrificeThis -> component
   CostComponent.ReturnThis -> component
   CostComponent.PayLife _ -> component
   CostComponent.PayHalfLife _ -> component
-  CostComponent.PayLifeX -> component
-  CostComponent.PayEnergyX -> component
   CostComponent.DiscardThis _ -> component
   CostComponent.PayEnergy _ -> component
   CostComponent.AddLoyaltyToThis _ -> component
   CostComponent.RemoveLoyaltyFromThis _ -> component
-  CostComponent.RemoveLoyaltyFromThisX -> component
   CostComponent.RemoveCountersFromThis _ -> component
   CostComponent.PutPlusOneCountersOnThis _ -> component
   CostComponent.Blight _ -> component
-  CostComponent.BlightX -> component
   CostComponent.Forage -> component
   CostComponent.FlipCoin -> component
   CostComponent.ExileThisFromGraveyard -> component
@@ -3123,7 +3056,6 @@ rewriteComponent pairs component = case component of
   CostComponent.ChooseOpponent -> component
   CostComponent.Waterbend _ -> component
   CostComponent.WaterbendInstead _ -> component
-  CostComponent.WaterbendX -> component
 
 -- CR 603.2: replace every ControlledByBound atom whose slot this environment
 -- names with the baked ControlledByPlayer arm. What makes "target creature THAT
@@ -3347,7 +3279,7 @@ manaValueThresholds predicate = case predicate of
   -- caller's argument whole -- the arm below's reasoning: CR 601.3a's lookahead
   -- reads a player ability's prohibition filter, while this atom is written only
   -- into a resolution's own references (Pawl.Engine.Resolve.Slots.effectContext
-  -- is the one filler of Context's sourceManaValue), and
+  -- fills Context's sourceManaValue there), and
   -- Pawl.FilterPositionLintSpec is what keeps a card from writing it anywhere.
   Filter.ManaValueLessThanSource -> []
   -- The arm above's comparison one operator over, empty for its reason.
@@ -3694,23 +3626,27 @@ statesAQuality predicate = case predicate of
   -- never paid for.
   Filter.TagWasSpent _ -> True
 
--- Does the Filter compare a candidate against Context.sourcePower anywhere, so
--- that matching it under two different sources may admit different candidates?
+-- Does the Filter compare a candidate against anything Context holds about
+-- the SOURCE that a printed face can be told apart by -- its projected power,
+-- toughness, mana value, colours or names, or a value it chose -- so that
+-- matching it under two different sources may admit different candidates?
 -- Pawl.Engine.Replacement.readsSource's question for a draw-replacing wish (CR
--- 616.1), whose filter Pawl.Engine.Event.eligible matches with that field filled.
+-- 616.1), whose filter Pawl.Engine.Event.eligible matches under
+-- Pawl.Engine.Projection.sourceContext. The other source atoms read the
+-- candidate's identity, owner or host, which a card outside the game lacks.
 --
 -- Every nest is descended into, since `matches` judges a nest in the same
 -- Context; statesAQuality's exhaustive posture, for its reason.
-readsSourcePower :: Filter.Filter keyword -> Bool
-readsSourcePower predicate = case predicate of
-  Filter.And fs -> any readsSourcePower fs
-  Filter.Or fs -> any readsSourcePower fs
-  Filter.Not f -> readsSourcePower f
-  Filter.ControlsMoreThanYou _ f -> readsSourcePower f
+readsSourceValues :: Filter.Filter keyword -> Bool
+readsSourceValues predicate = case predicate of
+  Filter.And fs -> any readsSourceValues fs
+  Filter.Or fs -> any readsSourceValues fs
+  Filter.Not f -> readsSourceValues f
+  Filter.ControlsMoreThanYou _ f -> readsSourceValues f
   Filter.ManaValueAtMost _ -> False
-  Filter.ManaValueLessThanSource -> False
-  Filter.ManaValueGreaterThanSource -> False
-  Filter.ManaValueEqualToSource -> False
+  Filter.ManaValueLessThanSource -> True
+  Filter.ManaValueGreaterThanSource -> True
+  Filter.ManaValueEqualToSource -> True
   Filter.ManaValueIsEven -> False
   Filter.ManaValueAtMostAmount -> False
   Filter.ManaValueEqualToAmount -> False
@@ -3719,7 +3655,7 @@ readsSourcePower predicate = case predicate of
   Filter.HasSupertype _ -> False
   Filter.HasColor _ -> False
   Filter.IsMonocolored -> False
-  Filter.SharesColorWithSource -> False
+  Filter.SharesColorWithSource -> True
   Filter.HasSubtype _ -> False
   Filter.HasName _ -> False
   Filter.NameWordsAtLeast _ -> False
@@ -3734,7 +3670,7 @@ readsSourcePower predicate = case predicate of
   Filter.PowerLessThanSource -> True
   Filter.PowerGreaterThanSource -> True
   -- Reads the source's TOUGHNESS, never its power.
-  Filter.PowerAtLeastSourceToughness -> False
+  Filter.PowerAtLeastSourceToughness -> True
   Filter.PowerIsAmountInSlot _ -> False
   Filter.PowerAtLeastAmountInSlot _ -> False
   Filter.ControlledBy _ -> False
@@ -3749,21 +3685,21 @@ readsSourcePower predicate = case predicate of
   Filter.TargetsSource -> False
   Filter.TargetsOnlySource -> False
   Filter.HasSingleTarget -> False
-  Filter.TargetsOnlyOne f -> readsSourcePower f
-  Filter.TargetsMatching f -> readsSourcePower f
+  Filter.TargetsOnlyOne f -> readsSourceValues f
+  Filter.TargetsMatching f -> readsSourceValues f
   Filter.TargetsPlayer _ -> False
   Filter.IsBound _ -> False
   Filter.IsTarget -> False
   Filter.SameNameAsBound _ -> False
-  Filter.SameNameAsSource -> False
+  Filter.SameNameAsSource -> True
   Filter.SameOwnerAsSource -> False
   Filter.SameControllerAsBound _ -> False
   Filter.SameControllerAsHostOfBound _ -> False
   Filter.SharesCreatureTypeWithBound _ -> False
   Filter.ToughnessLessThanBound _ -> False
-  Filter.HasChosenName -> False
-  Filter.HasChosenColor -> False
-  Filter.HasChosenSubtype -> False
+  Filter.HasChosenName -> True
+  Filter.HasChosenColor -> True
+  Filter.HasChosenSubtype -> True
   Filter.IsLastExiledWithSource -> False
   Filter.OfChosenPlayer -> False
   Filter.OfRelatedPlayer _ -> False
@@ -3788,8 +3724,8 @@ readsSourcePower predicate = case predicate of
   Filter.ConvokedSourceThisTurn -> False
   Filter.SaddledSourceThisTurn -> False
   Filter.ControlledSinceTurnBegan -> False
-  Filter.AttachedTo f -> readsSourcePower f
-  Filter.HasAttached f -> readsSourcePower f
+  Filter.AttachedTo f -> readsSourceValues f
+  Filter.HasAttached f -> readsSourceValues f
   Filter.IsAttachedToSource -> False
   Filter.IsAttachedToEvaluated -> False
   Filter.IsHostOfSource -> False
@@ -3803,10 +3739,10 @@ readsSourcePower predicate = case predicate of
   Filter.IsActivatedAbility -> False
   Filter.IsAbility -> False
   Filter.IsEmblem -> False
-  Filter.FromSource f -> readsSourcePower f
+  Filter.FromSource f -> readsSourceValues f
   Filter.IsTapped -> False
   Filter.IsFaceDown -> False
-  Filter.RepresentedByCard f -> readsSourcePower f
+  Filter.RepresentedByCard f -> readsSourceValues f
   Filter.IsExiledFaceDown -> False
   Filter.Transformed -> False
   Filter.IsRingBearer -> False
@@ -3824,106 +3760,202 @@ readsSourcePower predicate = case predicate of
   Filter.WasCastFrom _ -> False
   Filter.TagWasSpent _ -> False
 
--- Every slot NAME a Filter carries, as one traversal: `boundSlots` below READS
--- them and `renameBound` REWRITES them. One walk rather than two, because the two
--- consumers disagreeing about which atoms name a slot is a live defect shape --
--- CR 700.2d's per-occurrence rename skipped every atom here while the lint below
--- reported them; see #2802.
---
--- The same descent `bakeBound` makes, and deliberately so: a position that
--- function does not bake is a position this one must not report as read, or the
--- lint would bless an atom the engine can never answer.
---
--- The catch-all is BEHAVIOURAL, not a convenience:
--- Pawl.Engine.Resolve.Slots.replacementRowReads walks a waiting replacement's Filters
--- through here to decide which of the installing resolution's bindings that row
--- CAPTURES, so an atom this function does not report is a slot the row does not
--- carry and the atom then answers vacuously False at the event. No -Werror
--- reaches it, and the lint cannot either, both sides being this one function.
-overBoundSlots :: (Applicative f) => (SlotName.SlotName -> f SlotName.SlotName) -> Filter.Filter Keyword.Type.Keyword -> f (Filter.Filter Keyword.Type.Keyword)
-overBoundSlots f predicate = case predicate of
-  Filter.ControlledByBound slot -> fmap Filter.ControlledByBound (f slot)
-  -- Named although `bakeBound` above leaves it standing, which the pairing
-  -- this function's comment states would otherwise forbid. What the pairing is
-  -- for is that a reported slot be ANSWERABLE, and this one is -- one module
-  -- over, at Pawl.Engine.Count.bakePerspective, which holds the board a
-  -- controller has to be projected off.
-  Filter.IsControllerOfBound slot -> fmap Filter.IsControllerOfBound (f slot)
-  -- Named although `bakeBound` leaves it standing too, and answerable in the
-  -- same sense the atom above is -- here rather than one module over, off the
-  -- Context `matches` is already handed.
-  Filter.IsBound slot -> fmap Filter.IsBound (f slot)
-  -- Reports the reserved slot it reads and is never renamed: CR 700.2d's rename
-  -- is of a card's own slot names, and this one is the engine's.
-  Filter.IsTarget -> fmap (const Filter.IsTarget) (f Binding.announcedTargets)
-  -- Named for the atom above's reason, and answerable in the same place: it
-  -- reads the Context too, one field over.
-  Filter.SameNameAsBound slot -> fmap Filter.SameNameAsBound (f slot)
-  -- Named for the atom above's reason, and here the report is BEHAVIOURAL as
-  -- well as a lint: Pawl.Engine.Target.jointlyJudged fires on boundSlots, and CR
-  -- 601.2c's joint check is the whole of what enforces this atom (the offer
-  -- widens for it).
-  Filter.SameControllerAsBound slot -> fmap Filter.SameControllerAsBound (f slot)
-  -- Named for the arm above's reason, one Context field over. NOT behavioural
-  -- here: this atom's offer never widens, so CR 601.2c's joint check has
-  -- nothing to narrow, and the report is the dataflow lint's alone.
-  Filter.SameControllerAsHostOfBound slot -> fmap Filter.SameControllerAsHostOfBound (f slot)
-  -- Named for SameControllerAsBound's reason, and BEHAVIOURAL in the same way:
-  -- the offer widens for it, and Pawl.Engine.Target.jointlyJudged, firing on
-  -- this report, is what narrows each of Unbury's two targets to the other's
-  -- types.
-  Filter.SharesCreatureTypeWithBound slot -> fmap Filter.SharesCreatureTypeWithBound (f slot)
-  -- Named for the arm above's reason: the slot names an OBJECT, whose toughness
-  -- the context reads.
-  Filter.ToughnessLessThanBound slot -> fmap Filter.ToughnessLessThanBound (f slot)
-  -- Named for IsBound's reason and answerable one field along again
-  -- (boundAmounts). The dataflow lint is what this report is for -- a card whose
-  -- filter reads an amount no clause of the mode ever bound is then a failing
-  -- test rather than a sweep that silently admits nothing.
-  Filter.PowerIsAmountInSlot slot -> fmap Filter.PowerIsAmountInSlot (f slot)
-  -- Named for the arm above's reason: the slot is an amount, and the dataflow
-  -- lint is what the report is for.
-  Filter.PowerAtLeastAmountInSlot slot -> fmap Filter.PowerAtLeastAmountInSlot (f slot)
-  Filter.And fs -> fmap Filter.And (traverse (overBoundSlots f) fs)
-  Filter.Or fs -> fmap Filter.Or (traverse (overBoundSlots f) fs)
-  Filter.Not g -> fmap Filter.Not (overBoundSlots f g)
-  -- Descended into because `bakeBound` descends into it, which is the pairing this
-  -- function's comment above insists on. The catch-all below would have absorbed
-  -- it silently, this being the first atom to carry a Filter DIRECTLY -- a
-  -- keyword's own filter (CR 702.29e) is out of both functions' reach alike, so
-  -- the pairing holds there by both sides declining.
-  Filter.ControlsMoreThanYou n g -> fmap (Filter.ControlsMoreThanYou n) (overBoundSlots f g)
-  -- Descended into for the atom above's reason and named explicitly for the same
-  -- one: `bakeBound` descends into the host's description, so the catch-all below
-  -- would silently bake a slot this function never reported.
-  Filter.AttachedTo g -> fmap Filter.AttachedTo (overBoundSlots f g)
-  -- Descended into for the atom above's reason and named explicitly for the same
-  -- one: `bakeBound` descends into the target's description, so the catch-all
-  -- below would silently bake a slot this function never reported.
-  Filter.TargetsOnlyOne g -> fmap Filter.TargetsOnlyOne (overBoundSlots f g)
-  Filter.TargetsMatching g -> fmap Filter.TargetsMatching (overBoundSlots f g)
-  -- Descended into for the atom above's reason and named explicitly for the same
-  -- one: `bakeBound` descends into the represented card's description, so the
-  -- catch-all below would silently bake a slot this function never reported.
-  Filter.RepresentedByCard g -> fmap Filter.RepresentedByCard (overBoundSlots f g)
-  -- Descended into for the atom above's reason, and named explicitly for the same
-  -- one: `bakeBound` descends into the source's description, so the catch-all
-  -- below would silently bake a slot this function never reported.
-  Filter.FromSource g -> fmap Filter.FromSource (overBoundSlots f g)
-  -- Descended into for the atom above's reason, and named explicitly for the same
-  -- one: `bakeBound` descends into the attacher's description, so the catch-all
-  -- below would silently bake a slot this function never reported.
-  Filter.HasAttached g -> fmap Filter.HasAttached (overBoundSlots f g)
-  _ -> pure predicate
-
 -- The slots a Filter READS. Pawl.Engine.Resolve.Slots.modeSlots folds this over a
 -- mode's target slots, which is what makes the card dataflow lint see a slot
 -- named in a FILTER rather than in an effect: a card reading "that player" under
 -- a condition that never binds one is then a failing test rather than a slot that
 -- silently admits nothing. Pawl.Engine.Resolve.Slots.replacementRowReads is the second,
--- behavioural consumer -- see overBoundSlots above.
+-- behavioural consumer -- see overBoundSlotsWith.
 boundSlots :: Filter.Filter Keyword.Type.Keyword -> Set.Set SlotName.SlotName
 boundSlots = Const.getConst . overBoundSlots (Const.Const . Set.singleton)
+
+-- Every slot a Filter NAMES, with the arity its atom reads it at, as one
+-- exhaustive traversal: `boundSlots` READS the names, `renameBound` REWRITES
+-- them (CR 700.2d), `singularSlots` keeps the ones read as ONE, and `slotArities`
+-- hands all of them to the dataflow and arity lints. One walk, because the
+-- consumers disagreeing about which atoms name a slot is a live defect shape
+-- (#2802), and with no fallthrough, so a new atom naming a slot is named by
+-- -Werror rather than absorbed. That matters beyond the lints:
+-- Pawl.Engine.Resolve.Slots.replacementRowReads decides which of the installing
+-- resolution's bindings a waiting replacement CAPTURES through here, and
+-- Pawl.Engine.Target.jointlyJudged fires CR 601.2c's joint check on
+-- boundSlots, which is the whole of what enforces SameControllerAsBound and
+-- SharesCreatureTypeWithBound (the offer widens for them).
+--
+-- The same descent `bakeBound` makes: a position that function does not bake is
+-- a position this one must not report as read. NOT descended into: the Filter a
+-- Keyword carries (CR 702.29e) and the one a CounterKind hides under a keyword
+-- (CR 122.1b), whose evaluators supply no slots at all.
+--
+-- ONE: the atom asks a single thing of the slot -- CR 208.1's toughness, CR
+-- 110.2's one controller or one player -- and answers nothing for a slot naming
+-- several (Binding.onlyOne's doctrine; Filter.slotOneObject). MANY: the atom
+-- takes the whole set the slot names (IsBound, SameNameAsBound and the rest).
+-- AMOUNT: the slot holds a number (Context's boundAmounts), never a recipient.
+overBoundSlotsWith :: (Applicative f) => (SlotArity.SlotArity -> SlotName.SlotName -> f SlotName.SlotName) -> Filter.Filter Keyword.Type.Keyword -> f (Filter.Filter Keyword.Type.Keyword)
+overBoundSlotsWith f predicate = case predicate of
+  Filter.HasCardType _ -> pure predicate
+  Filter.HasSupertype _ -> pure predicate
+  Filter.HasColor _ -> pure predicate
+  Filter.IsMonocolored -> pure predicate
+  Filter.SharesColorWithSource -> pure predicate
+  Filter.HasSubtype _ -> pure predicate
+  Filter.HasName _ -> pure predicate
+  Filter.HasNameOriginallyPrintedIn _ -> pure predicate
+  Filter.NameWordsAtLeast _ -> pure predicate
+  -- The keyword's own Filter, left alone for the reason above.
+  Filter.HasKeyword _ -> pure predicate
+  Filter.HasKeywordFamily _ -> pure predicate
+  Filter.PowerAtLeast _ -> pure predicate
+  Filter.PowerAtMost _ -> pure predicate
+  Filter.ToughnessGreaterThanPower -> pure predicate
+  Filter.PowerLessThanSource -> pure predicate
+  Filter.PowerGreaterThanSource -> pure predicate
+  Filter.PowerAtLeastSourceToughness -> pure predicate
+  -- The slot holds an AMOUNT (Context's boundAmounts), never a recipient.
+  Filter.PowerIsAmountInSlot slot -> fmap Filter.PowerIsAmountInSlot (f SlotArity.Amount slot)
+  Filter.PowerAtLeastAmountInSlot slot -> fmap Filter.PowerAtLeastAmountInSlot (f SlotArity.Amount slot)
+  Filter.ManaValueAtMost _ -> pure predicate
+  Filter.ManaValueLessThanSource -> pure predicate
+  Filter.ManaValueGreaterThanSource -> pure predicate
+  Filter.ManaValueEqualToSource -> pure predicate
+  Filter.ManaValueIsEven -> pure predicate
+  Filter.ManaValueAtMostAmount -> pure predicate
+  Filter.ManaValueEqualToAmount -> pure predicate
+  Filter.PowerAtMostAmount -> pure predicate
+  Filter.ControlledBy _ -> pure predicate
+  Filter.ControlledByDefendingPlayer -> pure predicate
+  -- A PLAYER slot, read singly all the same: `matches` answers it off a slot
+  -- naming exactly one player, and bakeBound off Binding.playerSlots, which is
+  -- Binding.onlyOne.
+  Filter.ControlledByBound slot -> fmap Filter.ControlledByBound (f SlotArity.One slot)
+  Filter.ControlledByPlayer _ -> pure predicate
+  Filter.ControlledByRecipient -> pure predicate
+  Filter.OwnedBy _ -> pure predicate
+  Filter.OwnedByRecipient -> pure predicate
+  Filter.IsSource -> pure predicate
+  Filter.IsObject _ -> pure predicate
+  Filter.TargetsSource -> pure predicate
+  Filter.TargetsOnlySource -> pure predicate
+  Filter.HasSingleTarget -> pure predicate
+  -- DESCENT, for AttachedTo's reason below: CR 115.1's atom carries the one
+  -- target's description, which a card author writes like any other filter.
+  Filter.TargetsOnlyOne g -> fmap Filter.TargetsOnlyOne (overBoundSlotsWith f g)
+  Filter.TargetsMatching g -> fmap Filter.TargetsMatching (overBoundSlotsWith f g)
+  Filter.TargetsPlayer _ -> pure predicate
+  -- Reads the whole bound set off Filter.Context, so a group is every one of its
+  -- members rather than nothing.
+  Filter.IsBound slot -> fmap Filter.IsBound (f SlotArity.Many slot)
+  Filter.IsTarget -> fmap (const Filter.IsTarget) (f SlotArity.Many Binding.announcedTargets)
+  -- Reads the whole set too, one field over.
+  Filter.SameNameAsBound slot -> fmap Filter.SameNameAsBound (f SlotArity.Many slot)
+  -- Names no slot at all: CR 702.60a's comparison is against the SOURCE, whose
+  -- names arrive on Filter.Context.
+  Filter.SameNameAsSource -> pure predicate
+  Filter.SameOwnerAsSource -> pure predicate
+  -- Reads the whole set too, one field further over.
+  Filter.SameControllerAsBound slot -> fmap Filter.SameControllerAsBound (f SlotArity.Many slot)
+  -- Reads the whole set too, off its own field: a slot naming a group answers
+  -- with every member's host's controller.
+  Filter.SameControllerAsHostOfBound slot -> fmap Filter.SameControllerAsHostOfBound (f SlotArity.Many slot)
+  -- Reads the whole set too, off its own field.
+  Filter.SharesCreatureTypeWithBound slot -> fmap Filter.SharesCreatureTypeWithBound (f SlotArity.Many slot)
+  -- CR 208.1's comparison wants ONE toughness, and
+  -- Pawl.Engine.Projection.framedBySlots declines a slot that names several.
+  Filter.ToughnessLessThanBound slot -> fmap Filter.ToughnessLessThanBound (f SlotArity.One slot)
+  Filter.HasChosenName -> pure predicate
+  -- Reads no slot either: CR 105.2's colour arrives on Filter.Context.
+  Filter.HasChosenColor -> pure predicate
+  -- Reads no slot either: CR 205.3's subtype arrives on Filter.Context.
+  Filter.HasChosenSubtype -> pure predicate
+  Filter.IsLastExiledWithSource -> pure predicate
+  -- Reads no slot at all: rule 702.16k's player arrives on Filter.Context.
+  Filter.OfChosenPlayer -> pure predicate
+  Filter.OfRelatedPlayer _ -> pure predicate
+  Filter.IsPlayer _ -> pure predicate
+  -- The candidate is the controller of the ONE object the slot names (CR
+  -- 608.2h), read through slotOneObject.
+  Filter.IsControllerOfBound slot -> fmap Filter.IsControllerOfBound (f SlotArity.One slot)
+  -- DESCENT: the nest is card text like any other, and an atom written into it
+  -- is read exactly as one written at the top level.
+  Filter.ControlsMoreThanYou n g -> fmap (Filter.ControlsMoreThanYou n) (overBoundSlotsWith f g)
+  Filter.CardsInGraveyardAtLeast _ -> pure predicate
+  Filter.IsAttacking -> pure predicate
+  Filter.IsAttackingPlayer _ -> pure predicate
+  Filter.IsAttackingPlaneswalker _ -> pure predicate
+  Filter.IsAttackingBattle _ -> pure predicate
+  Filter.DeclaredAttackedThisCombat -> pure predicate
+  Filter.IsBlocking -> pure predicate
+  Filter.IsBlocked -> pure predicate
+  Filter.DeclaredAttackerThisCombat -> pure predicate
+  Filter.DeclaredBlockerThisCombat -> pure predicate
+  Filter.AttackedThisTurn -> pure predicate
+  Filter.MilledThisTurn -> pure predicate
+  Filter.CantCrewVehicles -> pure predicate
+  Filter.DealtDamageThisTurn -> pure predicate
+  Filter.EnteredThisTurn -> pure predicate
+  Filter.CrewedSourceThisTurn -> pure predicate
+  Filter.ConvokedSourceThisTurn -> pure predicate
+  Filter.SaddledSourceThisTurn -> pure predicate
+  Filter.ControlledSinceTurnBegan -> pure predicate
+  -- DESCENT, for ControlsMoreThanYou's reason.
+  Filter.AttachedTo g -> fmap Filter.AttachedTo (overBoundSlotsWith f g)
+  -- DESCENT, for the atom above's reason.
+  Filter.HasAttached g -> fmap Filter.HasAttached (overBoundSlotsWith f g)
+  Filter.IsAttachedToSource -> pure predicate
+  Filter.IsAttachedToEvaluated -> pure predicate
+  Filter.IsHostOfSource -> pure predicate
+  Filter.EnteredWithSource -> pure predicate
+  Filter.AttachedNoLaterThanSource -> pure predicate
+  Filter.CanHostSubject -> pure predicate
+  Filter.CanAttachToSubject -> pure predicate
+  Filter.HostOfSubjectHasCardType _ -> pure predicate
+  Filter.IsCommander -> pure predicate
+  Filter.IsToken -> pure predicate
+  Filter.IsActivatedAbility -> pure predicate
+  Filter.IsAbility -> pure predicate
+  Filter.IsEmblem -> pure predicate
+  -- DESCENT, for RepresentedByCard's reason below.
+  Filter.FromSource g -> fmap Filter.FromSource (overBoundSlotsWith f g)
+  Filter.IsTapped -> pure predicate
+  Filter.IsFaceDown -> pure predicate
+  -- DESCENT, for the atom above's reason.
+  Filter.RepresentedByCard g -> fmap Filter.RepresentedByCard (overBoundSlotsWith f g)
+  Filter.IsExiledFaceDown -> pure predicate
+  Filter.Transformed -> pure predicate
+  Filter.IsRingBearer -> pure predicate
+  Filter.IsPaired -> pure predicate
+  Filter.IsPairedWithSource -> pure predicate
+  Filter.IsBlockedBySource -> pure predicate
+  Filter.HasDesignation _ -> pure predicate
+  -- The kind may be a whole Keyword hiding a Filter, left alone for the reason
+  -- the keyword atom above is.
+  Filter.HasCounters _ -> pure predicate
+  Filter.HasCountersOfAnyKind -> pure predicate
+  Filter.HasSticker _ -> pure predicate
+  Filter.Stickered -> pure predicate
+  Filter.HasNonManaActivatedAbility -> pure predicate
+  Filter.HasActivatedAbility -> pure predicate
+  Filter.IsInZone _ -> pure predicate
+  Filter.WasCastFrom _ -> pure predicate
+  Filter.TagWasSpent _ -> pure predicate
+  Filter.And fs -> fmap Filter.And (traverse (overBoundSlotsWith f) fs)
+  Filter.Or fs -> fmap Filter.Or (traverse (overBoundSlotsWith f) fs)
+  Filter.Not g -> fmap Filter.Not (overBoundSlotsWith f g)
+
+-- overBoundSlotsWith without the arity: CR 700.2d's rename.
+overBoundSlots :: (Applicative f) => (SlotName.SlotName -> f SlotName.SlotName) -> Filter.Filter Keyword.Type.Keyword -> f (Filter.Filter Keyword.Type.Keyword)
+overBoundSlots f = overBoundSlotsWith (const f)
+
+-- Every slot a Filter names, each at the narrowest arity it is read at.
+slotArities :: Filter.Filter Keyword.Type.Keyword -> Map.Map SlotName.SlotName SlotArity.SlotArity
+slotArities = Map.fromListWith min . Const.getConst . overBoundSlotsWith (\arity slot -> Const.Const [(slot, arity)])
+
+-- The slots a Filter reads as ONE object or ONE player -- the classification
+-- Pawl.Engine.Resolve.Slots.filterSlotsOf's arity lint and Pawl.CardSpec's
+-- clash lint both read.
+singularSlots :: Filter.Filter Keyword.Type.Keyword -> Set.Set SlotName.SlotName
+singularSlots = Map.keysSet . Map.filter (== SlotArity.One) . slotArities
 
 -- Every slot NAME a Filter carries, rewritten. CR 700.2d's per-occurrence rename
 -- is the caller (Pawl.Engine.Modal.instanceScope): a mode chosen twice renames

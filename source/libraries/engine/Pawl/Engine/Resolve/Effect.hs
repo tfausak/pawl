@@ -76,7 +76,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Recruit as Recruit
 import qualified Pawl.Engine.Replacement as Replacement
-import Pawl.Engine.Resolve.Slots (battlefieldMatching, boundSlots, conditionSlots, effectContext, effectObjectRefs, effectPlayerRefs, effectViewOf, graveyardCardsOf, handCardsOf, legalMany, legalOne, libraryCardsOf, matchingFromAmong, objectRefObjects, overRelations, playerRefPlayers, replacementRowSlots, resolutionReads, slotBindings, slotGroup, zoneScopePlayers)
+import Pawl.Engine.Resolve.Slots (battlefieldMatching, boundSlots, conditionSlots, effectContext, effectContextNaming, effectObjectRefs, effectPlayerRefs, effectViewOf, graveyardCardsOf, handCardsOf, legalMany, legalOne, libraryCardsOf, matchingFromAmong, objectRefObjects, overRelations, playerRefPlayers, replacementRowSlots, resolutionReads, slotBindings, slotGroup)
 import qualified Pawl.Engine.Restamp as Restamp
 import qualified Pawl.Engine.Ring as Ring
 import qualified Pawl.Engine.Room as Room
@@ -701,23 +701,19 @@ oneSeat legal controller gs ref = case playerRefPlayers legal controller gs ref 
 
 -- CR 608.2d's singular battlefield choice, hoisted so that every opcode making
 -- one asks it the same way: the candidates are the ability's own reading of the
--- Filter whoever chooses, the ask is skipped at no candidate (CR 101.3) and at
--- one (CR 608.2d admitting one legal announcement), and the answer is FILTERED
--- rather than trusted (#222).
+-- Filter whoever chooses, asked through Game.chooseAmong. The chooser is
+-- named only when two or more candidates make it a real choice, so CR 800.4g's
+-- reassignment is not asked for a choice that has one answer.
 chosenPermanentOf :: Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> PlayerRef -> Game [ObjectId]
 chosenPermanentOf legal resolving controller source filter_ chooser = do
   gs <- State.get
   case battlefieldMatching legal resolving controller source gs filter_ of
-    [] -> pure []
-    [only] -> pure [only]
-    first : second : more -> do
+    candidates@(_ : _ : _) -> do
       asked <- askedChooser source controller legal chooser
       case asked of
-        Just who -> do
-          let offered = first NonEmpty.:| (second : more)
-          answer <- Game.choose (Prompt.ChoosePermanent (Decide.deciderFor who gs) who source offered)
-          pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
+        Just who -> fmap Maybe.maybeToList (Game.chooseAmong (\decider answerer -> Prompt.ChoosePermanent decider answerer source) who candidates)
         Nothing -> pure []
+    atMostOne -> pure atMostOne
 
 askedChooser :: ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> PlayerRef -> Game (Maybe PlayerId)
 askedChooser source controller legal ref = do
@@ -988,7 +984,7 @@ alreadyTurnedFor resolving victim gs =
 -- 404.2), which no rule makes a batch's processing order.
 graveyardCards :: Filter.Context -> Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> ZoneScope.ZoneScope -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
 graveyardCards context bindings controller gs scope filter_ =
-  concatMap (\pid -> graveyardCardsOf context gs pid filter_) (zoneScopePlayers bindings controller gs scope)
+  concatMap (\pid -> graveyardCardsOf context gs pid filter_) (Target.zoneScopePlayers (Just controller) bindings scope gs)
 
 -- The seats an ObjectRef.ChosenCardInHand asks -- and an
 -- ObjectRef.RandomCardInHand reads -- in APNAP order. One list, not a chooser
@@ -1234,7 +1230,7 @@ sacrificerFor sacrificer controller gs oid = case sacrificer of
 slotOne :: SlotName -> ObjectId -> GameState -> Maybe ObjectId
 slotOne slot resolving gs = do
   obj <- Game.lookupObject resolving gs
-  Recipient.objectOf =<< Binding.onlyOne =<< Map.lookup slot (Binding.targetsOf (Object.bindings obj))
+  Map.lookup slot (Binding.objectSlots (Object.bindings obj))
 
 -- slotOne's PLAYER twin (CR 115.1), read the same way and with the same
 -- collapse: a slot that is unbound, holds a group, or holds an object names
@@ -1242,7 +1238,7 @@ slotOne slot resolving gs = do
 slotOnePlayer :: SlotName -> ObjectId -> GameState -> Maybe PlayerId
 slotOnePlayer slot resolving gs = do
   obj <- Game.lookupObject resolving gs
-  Recipient.playerOf =<< Binding.onlyOne =<< Map.lookup slot (Binding.targetsOf (Object.bindings obj))
+  Map.lookup slot (Binding.playerSlots (Object.bindings obj))
 
 -- The ONE player a slot names, from CR 608.2b's surviving recipients first and
 -- from the resolving object's own bindings otherwise. Two sources for
@@ -1884,22 +1880,11 @@ bakeDamagePatternRecipient legal resolving controller source gs pattern_ = case 
 -- re-check at the damage event -- CR 615.9 rechecks the source's PROPERTIES
 -- instead, which is DamagePattern.whatSource's job and not this one's.
 --
--- FILTERED, NOT TRUSTED, the ChooseBolster posture: an answer naming something
--- never offered falls back to the first candidate. The prompt is raised only for
--- TWO OR MORE candidates, one candidate being the whole of the rule's set.
+-- Asked through Game.chooseAmong.
 chooseDamageSource :: PlayerId -> ObjectId -> Filter.Context -> GameState -> Maybe (Filter.Type.Filter Keyword.Type.Keyword) -> Game (Maybe (Filter.Type.Filter Keyword.Type.Keyword, ObjectId))
 chooseDamageSource controller resolving context gs filter_ = case filter_ of
   Nothing -> pure Nothing
-  Just f -> case damageSourceCandidates context gs f of
-    [] -> pure Nothing
-    first : rest -> do
-      picked <- case rest of
-        [] -> pure first
-        second : more -> do
-          let offered = first NonEmpty.:| (second : more)
-          answer <- Game.choose (Prompt.ChooseDamageSource (Decide.deciderFor controller gs) controller resolving offered)
-          pure (if List.elem answer (NonEmpty.toList offered) then answer else first)
-      pure (Just (f, picked))
+  Just f -> fmap ((,) f) <$> Game.chooseAmong (\decider who -> Prompt.ChooseDamageSource decider who resolving) controller (damageSourceCandidates context gs f)
 
 -- CR 609.7a's candidate set, its four classes in the rule's own order: "a
 -- permanent; a spell on the stack (including a permanent spell); any object
@@ -2245,8 +2230,7 @@ controlledTeam controller target gs =
 -- its OWN owner (a hand's cards are that player's alone), who picks one card
 -- matching the filter. The candidates are read as the instruction is reached (CR
 -- 608.2c), the asks run in APNAP order (CR 608.2e, CR 101.4) through
--- handChoosers, and the answer is FILTERED rather than trusted. Elided at one
--- card and skipped at none (CR 101.3, CR 609.3).
+-- handChoosers, through Game.chooseAmong (CR 101.3, CR 609.3).
 --
 -- The ONE asking read of ObjectRef.ChosenCardInHand, shared by Effect.MoveToZone's
 -- gather, Effect.LookAt and Effect.ExchangeWithCardInHand, so they cannot ask
@@ -2264,13 +2248,7 @@ chooseCardsInHand ::
 chooseCardsInHand resolving source controller legal (ChosenCardInHand.MkChosenCardInHand player filter_) = do
   gs <- State.get
   let context = effectContext gs controller source legal (slotBindings resolving gs)
-      ask asked candidates = case candidates of
-        [] -> pure []
-        [only] -> pure [only]
-        first : second : more -> do
-          let offered = first NonEmpty.:| (second : more)
-          answer <- Game.choose (Prompt.ChooseCardInHand (Decide.deciderFor asked gs) asked source offered)
-          pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
+      ask asked candidates = Maybe.maybeToList <$> Game.chooseAmong (\decider who -> Prompt.ChooseCardInHand decider who source) asked candidates
   fmap concat . Monad.mapM (\pid -> ask pid (handCardsOf context gs pid filter_)) $
     handChoosers legal controller gs player
 
@@ -2311,9 +2289,8 @@ chooseCardsInHand resolving source controller legal (ChosenCardInHand.MkChosenCa
 -- CR 608.2d cannot choose the same card twice, "put two of them into your hand"
 -- naming two cards. One seat answering several asks in sequence is the same
 -- decision as one simultaneous choice of that many, CR 101.4c leaving the order
--- of a player's own simultaneous choices to that player. Elided at one candidate
--- and skipped at none (CR 101.3, CR 609.3). Filtered, not trusted: an answer
--- naming a card never offered falls back to the first candidate.
+-- of a player's own simultaneous choices to that player. Each ask goes through
+-- Game.chooseAmong (CR 101.3, CR 609.3).
 --
 -- An "up to" count (Uncovered Clues) is ONE ask over every candidate instead,
 -- asked at one and answerable with none, since declining is an answer the
@@ -2335,15 +2312,11 @@ chooseCardFromAmong resolving source controller legal chosen (ChosenCardFromAmon
       candidates = matchingFromAmong legal resolving controller source gs filter_ members
       pick asked n available
         | n <= (0 :: Natural) = pure []
-        | otherwise = case available of
-            [] -> pure []
-            [only] -> pure [only]
-            first : second : more -> do
-              let offered = first NonEmpty.:| (second : more)
-              answer <- Game.choose (Prompt.ChooseCardFromAmong (Decide.deciderFor asked gs) asked source offered)
-              let taken = if List.elem answer (NonEmpty.toList offered) then answer else first
-              rest <- pick asked (n - 1) (List.delete taken available)
-              pure (taken : rest)
+        | otherwise = do
+            picked <- Game.chooseAmong (\decider who -> Prompt.ChooseCardFromAmong decider who source) asked available
+            case picked of
+              Nothing -> pure []
+              Just taken -> (taken :) <$> pick asked (n - 1) (List.delete taken available)
       -- Filtered rather than trusted, and cut to the ceiling in the offer's
       -- order.
       pickUpTo asked
@@ -2422,7 +2395,7 @@ randomCardsInGraveyard resolving source controller legal (RandomCardInGraveyard.
       context = effectContext gs controller source legal (slotBindings resolving gs)
       wanted = maybe 0 Integer.toNaturalSaturating (Quantity.evaluateFor viewOf context gs resolving source count)
   fmap concat . Monad.mapM (\pid -> pickAtRandom wanted (graveyardCardsOf context gs pid filter_)) $
-    zoneScopePlayers legal controller gs scope
+    Target.zoneScopePlayers (Just controller) legal scope gs
 
 -- Alchemy's seek: the cards randomness names out of each library the ref
 -- reaches. The ONE asking read of ObjectRef.RandomCardInLibrary, made by
@@ -2447,24 +2420,17 @@ randomCardsInLibrary resolving source controller legal (RandomCardInLibrary.MkRa
   fmap concat . Monad.mapM (\pid -> pickAtRandom wanted (libraryCardsOf context gs pid filter_)) $
     handChoosers legal controller gs player
 
--- The random pick the three functions above share. The question goes to the
--- INTERPRETER rather than to a player or a roll, the answer is FILTERED against
--- the offer rather than trusted, Game.ask and not Game.choose (randomness is not
--- CR 104.4b's optional action), elided at one candidate and skipped at none (CR
--- 101.3, CR 609.3), and the count names DISTINCT cards, so each card named is
--- dropped from the candidates before the next ask.
+-- The random pick the three functions above share, each draw through
+-- Game.drawAmong (CR 101.3, CR 609.3). The count names DISTINCT cards, so each
+-- card named is dropped from the candidates before the next ask.
 pickAtRandom :: Natural -> [ObjectId] -> Game [ObjectId]
-pickAtRandom remaining candidates =
-  if remaining <= 0
-    then pure []
-    else case candidates of
-      [] -> pure []
-      [only] -> pure [only]
-      first : second : more -> do
-        answer <- Game.ask (Prompt.RandomObject (first NonEmpty.:| (second : more)))
-        let named = if List.elem answer candidates then answer else first
-        rest <- pickAtRandom (remaining - 1) (filter (/= named) candidates)
-        pure (named : rest)
+pickAtRandom remaining candidates
+  | remaining <= 0 = pure []
+  | otherwise = do
+      drawn <- Game.drawAmong Prompt.RandomObject candidates
+      case drawn of
+        Nothing -> pure []
+        Just named -> (named :) <$> pickAtRandom (remaining - 1) (filter (/= named) candidates)
 
 -- One effect, applied, wrapped in the window CR 607.2a's link is filed from:
 -- what was in exile before, and what is in it after.
@@ -3514,7 +3480,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices players filter_ quantity) ->
     let victims = playerRefPlayers legal controller gs players
         tooFewToGive victim = case evaluateForRecipient viewOf context gs resolving source victim quantity of
-          Just n | n > 0 -> n > List.genericLength (Replacement.sacrificeCandidates (Filter.perspective context) (Filter.slotObjects context) victim Nothing filter_ gs)
+          Just n | n > 0 -> n > List.genericLength (Replacement.sacrificeCandidates (Filter.perspective context) (Binding.recipientsBySlot legal (slotBindings resolving gs)) victim Nothing filter_ gs)
           _ -> False
      in not (null victims) && all tooFewToGive victims
   -- CR 701.38b lists the choices, and an object vote's empty list is the
@@ -3590,7 +3556,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
         positive count && case chooser of
           Chooser.TheController -> null (graveyardCards context legal controller gs scope filter_)
           Chooser.EachInScope ->
-            let scoped = zoneScopePlayers legal controller gs scope
+            let scoped = Target.zoneScopePlayers (Just controller) legal scope gs
              in not (null scoped) && all (\pid -> null (graveyardCardsOf context gs pid filter_)) scoped
           Chooser.BoundInSlot _ -> False
       ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong slot filter_ count _ _) ->
@@ -3822,7 +3788,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 freezeFor objs ctx = (objs, Projection.freezeQuantities gs resolving source ctx modification)
                 frozenSets = case each of
                   Nothing -> [freezeFor targets context]
-                  Just slot -> [freezeFor [t] context {Filter.slotObjects = Map.insert slot (Set.singleton t) (Filter.slotObjects context)} | t <- targets]
+                  Just slot -> [freezeFor [t] (effectContextNaming slot t gs controller source legal (slotBindings resolving gs)) | t <- targets]
                 store objs g m =
                   let (ts, g1) = Game.freshTimestamp g
                       eff =
@@ -3976,12 +3942,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             ordered = filter (\pid -> List.elem pid named) (Game.apnapOrder gs0)
             recipients = ordered <> filter (\pid -> List.notElem pid ordered) named
          in Monad.forM_ recipients $ \pid -> do
-              gs1 <- State.get
-              answer <- Game.choose (Prompt.ChooseManaType (Decide.deciderFor pid gs1) pid resolving offered)
-              -- Filtered, not trusted: an answer naming a type never offered
-              -- falls back to the first candidate, since the instruction is
-              -- mandatory and must put mana in a pool.
-              let manaType = if List.elem answer (NonEmpty.toList offered) then answer else NonEmpty.head offered
+              -- Through Game.chooseAmong, the instruction being mandatory.
+              -- Mana.produced answers Offers only for two or more types.
+              picked <- Game.chooseAmong (\decider who -> Prompt.ChooseManaType decider who resolving) pid (NonEmpty.toList offered)
+              let manaType = Maybe.fromMaybe (NonEmpty.head offered) picked
               State.modify' (Mana.addMana pid (replicate howMany (unitOf manaType)))
               recordAdded pid (Set.singleton manaType)
   -- CR 608.2c's instruction, carried out by somebody other than this spell's
@@ -4401,7 +4365,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- within the controller's range.
   Effect.ExileAllGraveyards -> do
     gs <- State.get
-    let gyCards = concatMap (\pid -> Game.zoneMembers Zone.Graveyard pid gs) (Game.reachableBy controller gs)
+    let gyCards = concatMap (\pid -> Game.zoneMembers Zone.Graveyard pid gs) (Players.table (Just controller) gs)
     Monad.void (Event.changeZonesTogether (fmap (\c -> (c, Zone.Exile)) gyCards))
   -- CR 103.5b (Serum Powder): the count is the hand size BEFORE the exile, which
   -- is why this is one opcode rather than an exile followed by a Draw. Both
@@ -4505,22 +4469,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- carries no Decider, so there is no promise about the chooser for a second
   -- constructor to make.
   --
-  -- Game.ask and not Game.choose, since randomness is not CR 104.4b's optional
-  -- action. The question goes to the INTERPRETER: the engine does not roll and no
-  -- player picks. Filtered rather than trusted, so an answer naming somebody
-  -- never offered falls back to the first candidate, the instruction being
-  -- mandatory.
+  -- Through Game.drawAmong: the question goes to the INTERPRETER, and the engine
+  -- does not roll and no player picks.
   Effect.ChoosePlayerAtRandom choice -> do
     gs <- State.get
     let slot = ChoosePlayerAtRandom.slot choice
         candidates = Maybe.fromMaybe [] (PlayerEffect.playersInScope (Just controller) gs (ChoosePlayerAtRandom.scope choice))
-    chosenPlayer <- case candidates of
-      [] -> pure Nothing
-      [sole] -> pure (Just sole)
-      first : second : rest -> do
-        let offered = first NonEmpty.:| (second : rest)
-        answer <- Game.ask (Prompt.RandomPlayer offered)
-        pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
+    chosenPlayer <- Game.drawAmong Prompt.RandomPlayer candidates
     Monad.forM_ chosenPlayer $ \pid -> State.modify' (bindPlayerSlot resolving slot (Set.singleton pid))
   -- CR 608.2d: the seat the payload names picks any number of the matching
   -- permanents -- Archfiend of Depravity's "that player chooses up to two
@@ -5336,20 +5291,17 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                     -- who took it: CR 101.4b lets a later chooser know them.
                     pick made asked n candidates
                       | n <= (0 :: Natural) = pure made
-                      | otherwise = case candidates of
-                          [] -> pure made
-                          [only] -> pure (made Seq.|> (asked, only))
-                          first : second : more -> do
-                            let offered = first NonEmpty.:| (second : more)
-                            answer <- Game.choose (Prompt.ChooseCardInGraveyard (Decide.deciderFor asked gs) asked source offered made)
-                            let taken = if List.elem answer (NonEmpty.toList offered) then answer else first
-                            pick (made Seq.|> (asked, taken)) asked (n - 1) (List.delete taken candidates)
+                      | otherwise = do
+                          picked <- Game.chooseAmong (\decider who pool -> Prompt.ChooseCardInGraveyard decider who source pool made) asked candidates
+                          case picked of
+                            Nothing -> pure made
+                            Just taken -> pick (made Seq.|> (asked, taken)) asked (n - 1) (List.delete taken candidates)
                     ask asked = fmap (fmap snd . Foldable.toList) . pick Seq.empty asked wanted
                 case chooser of
                   Chooser.TheController -> ask controller (graveyardCards (chooseContext gs) legal controller gs scope filter_)
                   Chooser.EachInScope ->
                     fmap (fmap snd . Foldable.toList) . Monad.foldM (\made pid -> pick made pid wanted (graveyardCardsOf (chooseContext gs) gs pid filter_)) Seq.empty $
-                      zoneScopePlayers legal controller gs scope
+                      Target.zoneScopePlayers (Just controller) legal scope gs
                   -- ONE chooser, read out of the slot a ChoosePlayer bound,
                   -- choosing out of their own graveyard. Through playerRefPlayers so
                   -- the slot is read as every other is (CR 608.2b): an unfilled,
@@ -5358,7 +5310,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   -- a chooser the scope does not name is offered nothing.
                   Chooser.BoundInSlot slot ->
                     case playerRefPlayers legal controller gs (PlayerRef.InSlot slot) of
-                      [pid] | List.elem pid (zoneScopePlayers legal controller gs scope) -> ask pid (graveyardCardsOf (chooseContext gs) gs pid filter_)
+                      [pid] | List.elem pid (Target.zoneScopePlayers (Just controller) legal scope gs) -> ask pid (graveyardCardsOf (chooseContext gs) gs pid filter_)
                       _ -> pure []
               -- The arm above over the hidden zone CR 400.2 makes a hand: what it
               -- says about when the candidates are read (CR 608.2c), about the asks
@@ -5637,7 +5589,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           Just h -> maybe (pure ()) (exchange card . Just) (Attach.attachmentFor card h before)
           Nothing
             | Set.member Subtype.Aura (Projection.subtypesOf card before) -> do
-                let hosts = filter ((/= Just source) . Recipient.objectOf) (Attach.entryHostsFor (SourceContext.sourceContext before (Just controller) card) card before)
+                let hosts = filter ((/= Just source) . Recipient.objectOf) (Attach.entryHostsFor (Projection.sourceContext before (Just controller) card) card before)
                 entryHost <- Attach.chooseEntryHost controller card hosts
                 maybe (pure ()) (exchange card . Just) (entryHost >>= \h -> Attach.attachmentFor card h before)
             | otherwise -> exchange card Nothing
@@ -5763,13 +5715,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             Monad.unless free (State.modify' (Sticker.payTickets oid picked))
             State.modify' (Sticker.put placer oid picked position)
             Monad.forM_ bound (\slot -> State.modify' (bindStickerSlot resolving slot picked))
-      Monad.when owned $ case Sticker.offered placer oid kinds (ticketCapOf resolving source controller legal gs cap) free gs of
-        [] -> pure ()
-        [only] -> place only
-        first : rest -> do
-          let offered = first NonEmpty.:| rest
-          answer <- Game.choose (Prompt.ChooseSticker (Decide.deciderFor placer gs) placer oid offered)
-          place (if List.elem answer offered then answer else first)
+      Monad.when owned $ do
+        picked <- Game.chooseAmong (\decider who -> Prompt.ChooseSticker decider who oid) placer (Sticker.offered placer oid kinds (ticketCapOf resolving source controller legal gs cap) free gs)
+        Monad.forM_ picked place
   -- CR 701.24a alone: randomize the named libraries so no player knows their
   -- order. Nothing moves, so there is no changeZone call and no CR 616.1
   -- opportunity -- the cards a "then shuffle" follows are still the objects they
@@ -6838,7 +6786,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- records as the draw.
   Effect.DrawGame -> do
     gs <- State.get
-    let drawn = Game.reachableBy controller gs
+    let drawn = Players.table (Just controller) gs
     Departure.leaveGameTogether Departure.Type.Drew (filter (`elem` drawn) (Game.apnapOrder gs))
   -- CR 119.7 / 119.8: redistribute life totals, each new total being CR 119.5's
   -- gain or loss of the necessary amount. The roster is CR 102.1's players IN the
@@ -6863,7 +6811,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- (#4493).
   Effect.RedistributeLifeTotals -> do
     gs <- State.get
-    let candidates = Game.reachableBy controller gs
+    let candidates = Players.table (Just controller) gs
         lifeOf pid = maybe 0 Player.life (Map.lookup pid (GameState.players gs))
         offered = fmap (\pid -> (pid, lifeOf pid)) candidates
     -- With one candidate or none every assignment is the same, so there is
@@ -6966,7 +6914,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   -- Replacement.sacrificeCandidates, which is what puts CR 101.2's
                   -- "can't be sacrificed" on this path: a prohibited permanent is
                   -- never the pick that satisfies the edict.
-                  let candidates = Replacement.sacrificeCandidates (Filter.perspective context) (Filter.slotObjects context) victim Nothing filter_ gs
+                  let candidates = Replacement.sacrificeCandidates (Filter.perspective context) (Binding.recipientsBySlot legal (slotBindings resolving gs)) victim Nothing filter_ gs
                       decider = Decide.deciderFor victim gs
                       -- `n > 0` above, so the clamp never decides anything here.
                       count = Integer.toNaturalSaturating n
@@ -7016,7 +6964,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           [] -> controller
         -- turnOrderFrom answers the SEATING roster (CR 800.5), so stillPlaying
         -- is what keeps a departed seat from being asked to vote.
-        voters = filter (\pid -> List.elem pid (Game.reachableBy controller gs)) (Game.turnOrderFrom begin gs)
+        voters = filter (\pid -> List.elem pid (Players.table (Just controller) gs)) (Game.turnOrderFrom begin gs)
         -- CR 701.38d: a seat given extra votes casts them ALL here, before the
         -- next seat votes -- "at the same time the player would otherwise have
         -- voted" (Brago's Representative). Each is its own prompt: that card's
@@ -7030,19 +6978,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         case candidates of
           -- CR 101.3: an empty list of choices, so nobody votes and nothing is bound.
           [] -> pure ()
-          first : rest -> do
-            ballots <- cast $ \voter -> case rest of
-              -- One choice is the whole of rule 701.38a's list, so voting decides
-              -- nothing and the prompt is elided -- where the rules leave nothing to
-              -- ask, don't prompt.
-              [] -> pure first
-              second : more -> do
-                let offered = first NonEmpty.:| (second : more)
-                answer <- Game.choose (Prompt.ChooseVote (Decide.deciderFor voter gs) voter resolving offered)
-                -- FILTERED, NOT TRUSTED, the ChooseBolster posture: an answer naming
-                -- something never offered falls back to the first choice, rule
-                -- 701.38a stating no way to abstain.
-                pure (if List.elem answer (NonEmpty.toList offered) then answer else first)
+          first : _ -> do
+            -- Through Game.chooseAmong, rule 701.38a stating no way to abstain.
+            ballots <- cast $ \voter -> Maybe.fromMaybe first <$> Game.chooseAmong (\decider who -> Prompt.ChooseVote decider who resolving) voter candidates
             let tallyOf oid = List.length (filter (== oid) ballots)
                 best = List.maximum (0 : fmap tallyOf candidates)
                 -- Every candidate on the winning tally, and none at all where nobody
@@ -7055,12 +6993,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- battlefield sweep can.
       VoteChoices.Words voteWords -> do
         let offered = NonEmpty.toList voteWords
-        ballots <- cast $ \voter -> case offered of
-          -- One word, the object vote's elision and for its reason.
-          [_] -> pure (NonEmpty.head voteWords)
-          _ -> do
-            answer <- Game.choose (Prompt.ChooseVoteWord (Decide.deciderFor voter gs) voter resolving voteWords)
-            pure (if List.elem answer offered then answer else NonEmpty.head voteWords)
+        ballots <- cast $ \voter -> Maybe.fromMaybe (NonEmpty.head voteWords) <$> Game.chooseAmong (\decider who -> Prompt.ChooseVoteWord decider who resolving) voter offered
         -- The aspect rule 701.38a's vote determines here is a NUMBER per word,
         -- bound on the SOURCE as Effect.FlipCoin's tallies are, for the clause
         -- rule 701.38b connects to that word to read as Quantity.InSlot.
@@ -7234,13 +7167,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         answered written answer = Maybe.fromMaybe (NonEmpty.head written) (List.find (\candidate -> conjuredName candidate == answer) (NonEmpty.toList written))
         -- The question `selection` names, put over a list of NAMES of two or
         -- more; a one-name list is taken outright.
-        pickName names = case names of
-          one NonEmpty.:| [] -> pure one
-          _ -> case selection of
-            ConjureSelection.AtRandom -> Game.ask (Prompt.RandomCard names)
-            ConjureSelection.ByChoice -> do
-              g <- State.get
-              Game.choose (Prompt.ChooseConjuredCard (Decide.deciderFor controller g) controller names)
+        pickName names =
+          Maybe.fromMaybe (NonEmpty.head names) <$> case selection of
+            ConjureSelection.AtRandom -> Game.drawAmong Prompt.RandomCard (NonEmpty.toList names)
+            ConjureSelection.ByChoice -> Game.chooseAmong Prompt.ChooseConjuredCard controller (NonEmpty.toList names)
         pickWritten written = fmap (\answer -> (answered written answer, Nothing)) (pickName (fmap conjuredName written))
         -- A REFERENCE pick (CR 108.1) asks the interpreter which of the
         -- reference's cards the filter admits -- ONCE, off the pre-effect board
@@ -7252,7 +7182,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         referenceAmount from = FromReference.amount from >>= evaluateForRecipient viewOf context gs resolving source controller
         pickReference predicate amount names = do
           answer <- pickName names
-          found <- Game.lookUpCard (if answer `elem` names then answer else NonEmpty.head names)
+          found <- Game.lookUpCard answer
           g <- State.get
           pure $ do
             card <- found >>= (`Game.cardOfPrinting` g)
@@ -8614,7 +8544,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           let halves = fmap Face.name (if locked then Room.unlockedHalves target gs else Room.lockedHalves target gs)
           case halves of
             [] -> pure ()
-            first : rest
+            _ : _
               -- "each locked door", which names them rather than choosing among
               -- them, so CR 709.5f's "chooses" has nothing to ask and no prompt
               -- is raised. The unlock is ONE write for CR 709.5i's sake; the
@@ -8624,13 +8554,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                     then Monad.mapM_ (Event.lockHalf target) halves
                     else Event.unlockHalves controller target (Set.fromList halves)
               | otherwise -> do
-                  half <- case rest of
-                    [] -> pure first
-                    second : more -> do
-                      let offered = first NonEmpty.:| (second : more)
-                      answered <- Game.choose (Prompt.ChooseHalf (Decide.deciderFor controller gs) controller target offered)
-                      pure (if List.elem answered (NonEmpty.toList offered) then answered else first)
-                  if locked then Event.lockHalf target half else Event.unlockHalves controller target (Set.singleton half)
+                  picked <- Game.chooseAmong (\decider who -> Prompt.ChooseHalf decider who target) controller halves
+                  Monad.forM_ picked $ \half ->
+                    if locked then Event.lockHalf target half else Event.unlockHalves controller target (Set.singleton half)
       _ -> pure ()
   -- CR 310.9f: the resolving controller becomes the slot's battle's protector,
   -- the previous one ceasing to be. A state write on Object.protector, which CR
@@ -8704,13 +8630,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             source
             gs
             (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.ControlledBy PlayerRelation.You])
-    victims <- case candidates of
-      [] -> pure []
-      [only] -> pure [only]
-      first : second : more -> do
-        let offered = first NonEmpty.:| (second : more)
-        answer <- Game.choose (Prompt.ChoosePermanent (Decide.deciderFor controller gs) controller source offered)
-        pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
+    victims <- Maybe.maybeToList <$> Game.chooseAmong (\decider who -> Prompt.ChoosePermanent decider who source) controller candidates
     Monad.forM_ victims $ \victim -> Event.simultaneously $ do
       Event.sacrifice controller victim
       State.modify' (Event.recordEvent (GameEvent.Exploited (Exploited.MkExploited source victim)))
@@ -8824,13 +8744,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.AttachAll (AttachAll.MkAttachAll ref filter_) -> do
     movers <- permanentsGathered legal resolving controller source ref
     gs <- State.get
-    destination <- case Attach.groupHostsFor (effectContext gs controller source legal (slotBindings resolving gs)) movers filter_ gs of
-      [] -> pure Nothing
-      [only] -> pure (Just only)
-      first : second : more -> do
-        let offered = first NonEmpty.:| (second : more)
-        answer <- Game.choose (Prompt.ChoosePermanent (Decide.deciderFor controller gs) controller source offered)
-        pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
+    destination <- Game.chooseAmong (\decider who -> Prompt.ChoosePermanent decider who source) controller (Attach.groupHostsFor (effectContext gs controller source legal (slotBindings resolving gs)) movers filter_ gs)
     -- Proposed as a bare ToObject; Event.attach re-tags it per mover, as
     -- AttachTarget's arm says.
     Foldable.for_ destination (attachTogether movers . Recipient.ToObject)
@@ -9413,19 +9327,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                         let asked = askedFor quantity
                          in if asked == 0
                               then pure Map.empty
-                              else case Map.keys onFrom of
-                                [] -> pure Map.empty
-                                first : rest -> do
-                                  kind <- case rest of
-                                    -- One kind on the object leaves nothing to decide.
-                                    [] -> pure first
-                                    second : more -> do
-                                      let offered = first NonEmpty.:| (second : more)
-                                      answer <- Game.choose (Prompt.ChooseMovedCounter (Decide.deciderFor controller gs) controller from to offered)
-                                      -- FILTERED, NOT TRUSTED: an answer naming a kind that is
-                                      -- not on the object is dropped for the first one offered.
-                                      pure (if Foldable.elem answer offered then answer else first)
-                                  move kind asked
+                              else do
+                                -- Through Game.chooseAmong: one kind on the object
+                                -- leaves nothing to decide.
+                                picked <- Game.chooseAmong (\decider who -> Prompt.ChooseMovedCounter decider who from to) controller (Map.keys onFrom)
+                                maybe (pure Map.empty) (`move` asked) picked
                       -- Resourceful Defense's "move any number of counters": the card
                       -- settles neither the kind nor the count, so ONE prompt asks for
                       -- both and the answer may spread across kinds -- which is the
@@ -9842,19 +9748,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         first : rest -> do
           let least = minimum (fmap snd (first : rest))
               tied = fmap fst (filter ((== least) . snd) (first : rest))
-          bolstered <- case tied of
-            -- Unreachable by construction, `least` being the minimum OF this
-            -- list; keeps the mandatory action mandatory.
-            [] -> pure (fst first)
-            one : others -> case others of
-              -- One creature at the minimum leaves nothing to ask.
-              [] -> pure one
-              second : more -> do
-                let offered = one NonEmpty.:| (second : more)
-                answer <- Game.choose (Prompt.ChooseBolster (Decide.deciderFor controller gs) controller resolving offered)
-                -- FILTERED, NOT TRUSTED: an answer never offered falls back to
-                -- the first candidate, the action being mandatory.
-                pure (if List.elem answer (NonEmpty.toList offered) then answer else one)
+          -- Through Game.chooseAmong. Nothing is unreachable by construction,
+          -- `least` being the minimum OF this list; the fallback keeps the
+          -- mandatory action mandatory.
+          bolstered <- Maybe.fromMaybe (fst first) <$> Game.chooseAmong (\decider who -> Prompt.ChooseBolster decider who resolving) controller tied
           -- CR 122.6: through the single funnel, so CR 614.16's counter
           -- replacements get their opportunity.
           Monad.when (n > 0) . Monad.void $
@@ -10534,7 +10431,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
 proliferateOnce :: PlayerId -> Game ()
 proliferateOnce controller = do
   gs <- State.get
-  let everyone = Game.reachableBy controller gs
+  let everyone = Players.table (Just controller) gs
       grants = Projection.controlGrants gs
       kindsOn oid = foldMap (Map.keys . Map.filter (> 0) . Object.counters) (Game.lookupObject oid gs)
       kindsFor pid = foldMap (Map.keys . Map.filter (> 0) . Player.counters) (Map.lookup pid (GameState.players gs))
@@ -11290,9 +11187,7 @@ namePosition oid = do
         Just pid -> Just pid
         Nothing -> fmap Object.owner (Game.lookupObject oid gs)
   case chooser of
-    Just pid | most > 0 -> do
-      answer <- Game.choose (Prompt.ChooseNamePosition (Decide.deciderFor pid gs) pid oid (0 NonEmpty.:| [1 .. most]))
-      pure (if answer <= most then answer else 0)
+    Just pid | most > 0 -> Maybe.fromMaybe 0 <$> Game.chooseAmong (\decider who -> Prompt.ChooseNamePosition decider who oid) pid [0 .. most]
     _ -> pure 0
 
 -- CR 123.6e's "that sticker": bind the placed sticker under @slot@, on
@@ -12245,7 +12140,7 @@ payGatePaidBy runSubgame resolving source controller offer earlier legal payer g
 -- The costs one offer of this gate may be paid with, one per option in printed
 -- order (PayGate.cost), with the slot map their components read: payGatePaidBy's
 -- CR 107.3 X, CR 118.6 description and "for each" multiplier, applied to each.
-gateCostOf :: ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> PayGate.PayGate -> GameState -> (Map.Map SlotName (Set ObjectId), NonEmpty.NonEmpty (Cost.Type.Cost Keyword.Type.Keyword))
+gateCostOf :: ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> PayGate.PayGate -> GameState -> (Map.Map SlotName (Set Recipient), NonEmpty.NonEmpty (Cost.Type.Cost Keyword.Type.Keyword))
 gateCostOf resolving source controller legal gate gs =
   let multiplier = case PayGate.perEach gate of
         Nothing -> 1
@@ -12258,7 +12153,7 @@ gateCostOf resolving source controller legal gate gs =
       -- other filter of this resolution reads -- CR 608.2b's legal targets, the
       -- reserved cost slots among them (Binding.discardedCard), and the groups.
       -- Pawl.ConjureSpec's Calim's Breath cases prove it.
-      slots = Binding.objectsBySlot legal (slotBindings resolving gs)
+      slots = Binding.recipientsBySlot legal (slotBindings resolving gs)
    in (slots, costs)
 
 -- CR 118.3 / 800.4f for one seat, before any offer: could this payer pay any
@@ -12283,7 +12178,7 @@ gateAffordable resolving source controller legal payer gate gs =
 -- outside them pays nothing. Then Prompt.ChooseToPay over the option picked, so
 -- an optional cost can still be declined. Proved by Pawl.ResolveSpec's "CR
 -- 118.12 a choice of costs" group.
-payGateAgreed :: ObjectId -> ObjectId -> PayOffer.PayOffer -> Seq.Seq (PlayerId, PaymentDecision.PaymentDecision) -> PlayerId -> PayGate.PayGate -> Map.Map SlotName (Set ObjectId) -> Maybe (Cost.Type.Cost Keyword.Type.Keyword) -> NonEmpty.NonEmpty (Cost.Type.Cost Keyword.Type.Keyword) -> Game (Maybe (Cost.Type.Cost Keyword.Type.Keyword))
+payGateAgreed :: ObjectId -> ObjectId -> PayOffer.PayOffer -> Seq.Seq (PlayerId, PaymentDecision.PaymentDecision) -> PlayerId -> PayGate.PayGate -> Map.Map SlotName (Set Recipient) -> Maybe (Cost.Type.Cost Keyword.Type.Keyword) -> NonEmpty.NonEmpty (Cost.Type.Cost Keyword.Type.Keyword) -> Game (Maybe (Cost.Type.Cost Keyword.Type.Keyword))
 payGateAgreed resolving source offer earlier payer gate slots owed options = do
   gs <- State.get
   let total cost = maybe cost (`Cost.plus` cost) owed
@@ -12307,7 +12202,7 @@ payGateAgreed resolving source offer earlier payer gate slots owed options = do
 
 -- The payment of a cost the payer agreed to, against `source` (CR 113.7a): the
 -- slots it bound when it was paid (foldPaid), Nothing when it was not.
-payGateCost :: Game Result -> Map.Map SlotName (Set ObjectId) -> PlayerId -> ObjectId -> Cost.Type.Cost Keyword.Type.Keyword -> Game (Maybe (Map.Map SlotName Binding.Type.Binding))
+payGateCost :: Game Result -> Map.Map SlotName (Set Recipient) -> PlayerId -> ObjectId -> Cost.Type.Cost Keyword.Type.Keyword -> Game (Maybe (Map.Map SlotName Binding.Type.Binding))
 payGateCost runSubgame slots payer source cost = do
   gs <- State.get
   -- CR 118.13b: a symbol payable in multiple ways is announced by the

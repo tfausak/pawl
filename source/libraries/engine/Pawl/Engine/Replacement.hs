@@ -439,7 +439,7 @@ collect sources floating =
         Just condition ->
           Condition.holds
             (Projection.fullView sources)
-            ((SourceContext.sourceContext sources (Just (ActiveReplacement.controller active)) (ActiveReplacement.source active)) {Filter.slotObjects = ActiveReplacement.slots active})
+            (Projection.framedBySlots sources (fmap (Set.map Recipient.ToObject) (ActiveReplacement.slots active)) (Projection.sourceContext sources (Just (ActiveReplacement.controller active)) (ActiveReplacement.source active)))
             (Projection.boardAsEntering sources)
             (ActiveReplacement.source active)
             condition
@@ -1196,7 +1196,7 @@ admitsEntry gs oid rewrite = case rewrite of
   -- handoff -- so "this turn" costs nothing here.
   EntryRewrite.Bloodthirst Nothing -> True
   EntryRewrite.Bloodthirst (Just _) ->
-    let context = SourceContext.sourceContext gs (Projection.controllerOf oid gs) oid
+    let context = Projection.sourceContext gs (Projection.controllerOf oid gs) oid
      in maybe False (> 0) (Quantity.evaluate (Projection.fullView gs) context gs oid (Quantity.Type.PlayersDealtDamageThisTurn (PlayerRef.Relative PlayerRelation.Opponent)))
   -- CR 702.150a's own first condition, the ability's rather than the pattern's:
   -- "If this permanent WOULD ENTER WITH ONE OR MORE LOYALTY COUNTERS ON IT". The
@@ -1572,13 +1572,13 @@ matchesZoneOwner gs candidate rel oid = relationHolds gs candidate rel (fmap Obj
 -- Treasures you control" names the payer -- and Nothing for a counter pattern,
 -- which names whose permanent through its own field.
 --
--- The source's frame rides along (SourceContext.framedBy), CR 607.2d's
+-- The source's frame rides along (Projection.framedBy), CR 607.2d's
 -- link from "choose a creature type" to a cost printed beside it: Doom Cannon's
 -- "Sacrifice a creature of the chosen type" (Pawl.CostSpec's Doom Cannon group).
-matchesPermanent :: (ObjectId -> Filter.View) -> GameState -> Maybe PlayerId -> Map.Map SlotName.SlotName (Set ObjectId) -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
+matchesPermanent :: (ObjectId -> Filter.View) -> GameState -> Maybe PlayerId -> Map.Map SlotName.SlotName (Set Recipient.Recipient) -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
 matchesPermanent viewOf gs you slots source filter_ oid =
-  let base = Filter.contextWithSlots (Game.teams gs) you source slots
-      context = maybe base (\asking -> SourceContext.framedBy asking gs base) source
+  let base = Projection.contextWithSlots gs you source slots
+      context = maybe base (\asking -> Projection.framedBy asking gs base) source
    in Filter.matches context (viewOf oid) filter_
 
 -- CR 701.21a: the permanents this player may sacrifice for a Filter, ascending --
@@ -1616,7 +1616,7 @@ matchesPermanent viewOf gs you slots source filter_ oid =
 -- entering permanent, who is also `pid` there, but the edict's CONTROLLER rather
 -- than its victim. data/scenarios/grim-hireling-sacrifices-x-treasures.json
 -- proves the cost reading.
-sacrificeCandidates :: Maybe PlayerId -> Map.Map SlotName.SlotName (Set ObjectId) -> PlayerId -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+sacrificeCandidates :: Maybe PlayerId -> Map.Map SlotName.SlotName (Set Recipient.Recipient) -> PlayerId -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 sacrificeCandidates you slots pid source filter_ gs =
   let viewOf = Projection.viewsOf gs
       matching = List.sort (filter (matchesPermanent viewOf gs you slots source filter_) (Projection.controls pid gs))
@@ -1720,10 +1720,12 @@ candidateContext :: GameState -> ReplacementCandidate -> Filter.Context
 candidateContext gs candidate =
   let source = ReplacementCandidate.source candidate
       choices = Maybe.fromMaybe (SourceContext.choicesOf source gs) (ReplacementCandidate.choices candidate)
-   in (SourceContext.framedWith choices source gs (SourceContext.sourceContext gs (ReplacementCandidate.controller candidate) source))
-        { Filter.slotObjects = ReplacementCandidate.slots candidate,
-          Filter.carrierChosenPlayer = Game.lookupObject source gs >>= Object.chosenPlayer
-        }
+   in Projection.framedBySlots
+        gs
+        (fmap (Set.map Recipient.ToObject) (ReplacementCandidate.slots candidate))
+        (Projection.framedWith choices source gs (Projection.sourceContext gs (ReplacementCandidate.controller candidate) source))
+          { Filter.carrierChosenPlayer = Game.lookupObject source gs >>= Object.chosenPlayer
+          }
 
 -- CR 614.12 for a token that does not exist yet: a lot's token is judged off
 -- the characteristics it would have on the battlefield -- its given text, or
@@ -2236,7 +2238,7 @@ readsApplier re = case re of
 -- graveyard to your hand" names the row's own source, so two dredgers in one
 -- graveyard return different cards and the drawer must be asked which. A
 -- draw-replacing wish answers True only where its filter reads the source's
--- power; every other arm's use of `source` is a test run BEFORE Event.apply --
+-- characteristics or choices; every other arm's use of `source` is a test run BEFORE Event.apply --
 -- `applies`, `scopes` -- which picks the candidates rather than what one does.
 --
 -- One arm per CONSTRUCTOR, with only DrawR's inner sum split: a new
@@ -2248,17 +2250,19 @@ readsSource effect = case effect of
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.Dredge _)) -> True
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.GainLife _)) -> False
   ReplacementEffect.DrawR (DrawR.MkDrawR _ DrawRewrite.YouDraw) -> False
-  -- CR 616.1: Event.eligible scans the pool under a Filter.Context framed by
-  -- this candidate's source, and the source's power is the one thing in it that
-  -- a printed face can be told apart by -- every other source-relative atom
-  -- reads a field of the candidate (its identity, targets, host, combat or crew
-  -- record) that a card outside the game lacks, or a context field eligible
-  -- leaves empty. So two Synthetic Wishful Djinns of different power offer
-  -- different cards and the drawer is asked, while two Rings of Ma'rûf
-  -- (`And []`) offer the same and are not. Pawl.OutsideTheGameSpec's "CR 616.1
-  -- two Djinns of different power are a choice, and the answer decides what
-  -- arrives" and "CR 616.1 two Rings' wishes are not a choice" prove both.
-  ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.FromOutsideTheGame payload)) -> Filter.readsSourcePower (FromOutsideTheGame.filter payload)
+  -- CR 616.1: Event.eligible scans the pool under Projection.sourceContext
+  -- framed by this candidate's source, so a filter naming any of the source's
+  -- characteristics or choices (Filter.readsSourceValues) can offer different
+  -- cards under two sources; every other source-relative atom reads a field of
+  -- the candidate (its identity, owner, targets, host, combat or crew record)
+  -- that a card outside the game lacks. So two Synthetic Wishful Djinns of
+  -- different power offer different cards and the drawer is asked, while two
+  -- Rings of Ma'rûf (`And []`) offer the same and are not.
+  -- Pawl.OutsideTheGameSpec's "CR 616.1 two Djinns of different power are a
+  -- choice, and the answer decides what arrives", "CR 616.1 two Rings' wishes
+  -- are not a choice" and "CR 616.1 two wishes sharing a colour with
+  -- differently coloured sources are a choice" prove them.
+  ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.FromOutsideTheGame payload)) -> Filter.readsSourceValues (FromOutsideTheGame.filter payload)
   ReplacementEffect.ZoneChangeR {} -> False
   ReplacementEffect.EntryR {} -> False
   ReplacementEffect.DamageR {} -> False
@@ -2552,7 +2556,7 @@ applyCopyExceptions this own exceptions snapshot =
 -- supplying Nothing would silently answer False if one did.
 legalCopyTargets :: Set ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> Zone.Zone -> ObjectId -> GameState -> [ObjectId]
 legalCopyTargets batch filter_ zone self gs =
-  let context = SourceContext.sourceContext gs (Projection.controllerOf self gs) self
+  let context = Projection.sourceContext gs (Projection.controllerOf self gs) self
       viewOf = Projection.viewsOf gs
       eligible oid =
         oid /= self
@@ -3067,7 +3071,7 @@ preventable viewOf gs de = not (any (\(src, pat) -> matchesDamagePattern viewOf 
 -- carried. Shared by the two questions of that shape so they cannot disagree
 -- about what "you" and IsSource mean.
 patternContext :: GameState -> Maybe ObjectId -> Filter.Context
-patternContext gs src = maybe id (`SourceContext.framedBy` gs) src (Filter.contextFor (Game.teams gs) (src >>= \oid -> Projection.controllerOf oid gs) src)
+patternContext gs src = maybe id (`Projection.framedBy` gs) src (Filter.contextFor (Game.teams gs) (src >>= \oid -> Projection.controllerOf oid gs) src)
 
 -- CR 614.9: is this rewrite a REDIRECTION -- "dealt instead to another permanent
 -- or player"? The classification `redirectable` below is gated on, in the genre

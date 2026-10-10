@@ -21,15 +21,23 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "IncreaseActivationCost",
+            "type": "ModifyCost",
             "value": {
-              "amount": 2,
-              "whichAbilities": {
+              "change": {
+                "type": "Increase",
+                "value": 2
+              },
+              "matching": {
                 "type": "And",
                 "value": []
               },
-              "whichKind": {
-                "type": "NonManaAbility"
+              "subject": {
+                "type": "Activations",
+                "value": {
+                  "whichKind": {
+                    "type": "NonManaAbility"
+                  }
+                }
               }
             }
           },

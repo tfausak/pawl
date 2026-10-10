@@ -78,7 +78,10 @@
             "components": [
               {
                 "type": "RemoveLoyaltyFromThis",
-                "value": 1
+                "value": {
+                  "type": "Fixed",
+                  "value": 1
+                }
               }
             ],
             "mana": []
@@ -147,7 +150,10 @@
             "components": [
               {
                 "type": "RemoveLoyaltyFromThis",
-                "value": 2
+                "value": {
+                  "type": "Fixed",
+                  "value": 2
+                }
               }
             ],
             "mana": []

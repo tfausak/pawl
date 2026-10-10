@@ -5,6 +5,7 @@
 module Pawl.Engine.Projection.View where
 
 import Control.Applicative ((<|>))
+import qualified Control.Monad as Monad
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import Data.Map.Strict (Map)
@@ -680,11 +681,7 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- artifact sacrificed to activate it still reads "from an artifact source".
       -- Nothing for anything that is not an ability on the stack. Lazy, so a
       -- Filter that never names the atom pays nothing.
-      Filter.abilitySource =
-        Game.abilitySourceOf oid gs >>= \src ->
-          if Map.member src (GameState.objects gs)
-            then peers src
-            else fmap (Count.lastKnownView peers src gs) (Map.lookup src (GameState.lastKnown gs)),
+      Filter.abilitySource = Game.abilitySourceOf oid gs >>= Count.orLastKnown peers gs,
       Filter.tapped = Game.isTapped oid gs,
       -- CR 110.5's other status, and the only site that fills the field. Read off
       -- Object.facing, never off the projection: CR 110.5a says status is not a
@@ -1421,7 +1418,7 @@ textBoxHolderOf oid gs =
 -- Akiri's pump after she dies" proves it.
 carriedSnapshotOf :: ObjectId -> ObjectId -> GameState -> Maybe ProjectedCharacteristics
 carriedSnapshotOf carrier holder gs
-  | holder /= carrier && not (Map.member holder (GameState.objects gs)) = fmap LastKnown.copiable (Map.lookup holder (GameState.lastKnown gs))
+  | holder /= carrier = Monad.join (Game.liveOrLastKnown (const (copiableSnapshotOf holder gs)) (Just . LastKnown.copiable) holder gs)
   | otherwise = copiableSnapshotOf holder gs
 
 -- CR 613.7a: the timestamp of the effects `carrier`'s static abilities
@@ -2494,6 +2491,4 @@ defaultControllerOf obj = Maybe.fromMaybe (Object.owner obj) (Object.enteredUnde
 -- CR 400.1 / 608.2h: the zone an object is in, or for an id that has ceased the
 -- zone its last-known record was filed from.
 lastZoneOf :: ObjectId -> GameState -> Maybe Zone.Zone
-lastZoneOf oid gs = case Game.lookupObject oid gs of
-  Just obj -> Just (Object.zone obj)
-  Nothing -> fmap LastKnown.zone (Map.lookup oid (GameState.lastKnown gs))
+lastZoneOf = Game.liveOrLastKnown Object.zone LastKnown.zone

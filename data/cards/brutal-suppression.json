@@ -17,23 +17,31 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "AddActivationCost",
+            "type": "ModifyCost",
             "value": {
-              "components": [
-                {
-                  "type": "Sacrifice",
-                  "value": {
-                    "count": 1,
-                    "whichPermanents": {
-                      "type": "HasCardType",
+              "change": {
+                "type": "Add",
+                "value": {
+                  "components": [
+                    {
+                      "type": "Sacrifice",
                       "value": {
-                        "type": "Land"
+                        "count": {
+                          "type": "Fixed",
+                          "value": 1
+                        },
+                        "whichPermanents": {
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Land"
+                          }
+                        }
                       }
                     }
-                  }
+                  ]
                 }
-              ],
-              "whichAbilities": {
+              },
+              "matching": {
                 "type": "And",
                 "value": [
                   {
@@ -49,6 +57,10 @@
                     }
                   }
                 ]
+              },
+              "subject": {
+                "type": "Activations",
+                "value": {}
               }
             }
           },

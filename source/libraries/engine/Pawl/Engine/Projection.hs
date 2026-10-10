@@ -107,6 +107,7 @@ import qualified Pawl.Types.RuleAbilities as RuleAbilities
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.SourceChoices as SourceChoices
 import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.StickerPlacement as StickerPlacement
@@ -1172,23 +1173,21 @@ viewWithLastKnown src gs oid =
 -- widens it again to every object a resolution's slots name.
 --
 -- Nothing when the object is gone and nothing was filed, which lands on the no-op
--- every caller gives an unevaluable quantity. Count.lastKnownView is the view of
--- the record, and says what it answers off it.
+-- every caller gives an unevaluable quantity. Count.orLastKnown is the fallback,
+-- and Count.lastKnownView says what the record answers.
 viewWithLastKnownAnywhere :: GameState -> Count.ViewOf
-viewWithLastKnownAnywhere gs oid =
-  if Map.member oid (GameState.objects gs)
-    then fullView gs oid
-    else fmap (Count.lastKnownView (fullView gs) oid gs) (Map.lookup oid (GameState.lastKnown gs))
+viewWithLastKnownAnywhere gs = Count.orLastKnown (fullView gs) gs
 
--- `context` with every SLOT-derived field filled from one slot map: the objects
--- each slot names (Pawl.Engine.Binding.objectsBySlot), the players
--- (Binding.playersBySlot), and what the board says about those objects -- CR
--- 201.2a's names, CR 110.2's controllers, CR 205.3m's creature types, CR
--- 208.1's toughness and CR 303.4b's host's controller. The slot-derived half
--- of what Pawl.Engine.SourceContext.framedBy is for the source: one filler, so
--- a target slot's filter (Pawl.Engine.Target.slotContext), a resolution's
--- (Pawl.Engine.Resolve.Slots.effectContext) and CR 603.4's two
--- intervening-"if" checks cannot answer "that creature" differently.
+-- `context` with every SLOT-derived field filled from one map of what each
+-- slot names (Pawl.Engine.Binding.recipientsBySlot): the objects, the players,
+-- and what the board says about those objects -- CR 201.2a's names, CR 110.2's
+-- controllers, CR 205.3m's creature types, CR 208.1's toughness and CR
+-- 303.4b's host's controller. The slot-derived half of what
+-- Pawl.Engine.SourceContext.framedBy is for the source: one filler, so a
+-- target slot's filter (Pawl.Engine.Target.slotContext), a resolution's
+-- (Pawl.Engine.Resolve.Slots.effectContext), CR 603.4's two intervening-"if"
+-- checks, a cost's candidate pools and a waiting replacement cannot answer
+-- "that creature" differently.
 --
 -- Through CR 608.2h's last-known reader, because a bound object is a reference
 -- the spell or ability already made: Bifurcate's creature may have left by the
@@ -1202,14 +1201,20 @@ viewWithLastKnownAnywhere gs oid =
 -- controller is the projected one, not its owner" in data/scenarios/aura
 -- proves.
 --
--- A key per slot the map names, so SameControllerAsBound's widening on an
--- absent key is CR 601.2c's slot nobody has answered yet. Toughness only for a
--- slot naming exactly ONE object: no printed comparison asks a group for one.
--- All thunks: a filter naming none of the atoms forces no projection.
-framedBySlots :: GameState -> Map SlotName (Set ObjectId) -> Map SlotName (Set PlayerId.PlayerId) -> Filter.Context -> Filter.Context
-framedBySlots gs objects players context =
+-- A key for every slot the map names, so a slot holding only a player, one
+-- answered with no target (CR 601.2c's "up to"), or one CR 608.2b emptied
+-- answers an EMPTY set and SameControllerAsBound and
+-- SharesCreatureTypeWithBound refuse there; only a slot nobody has answered yet
+-- is absent, where they widen. slotObjects keeps only the slots naming an
+-- object, its own doctrine. Toughness only for a slot naming exactly ONE
+-- object: no printed comparison asks a group for one. All thunks: a filter
+-- naming none of the atoms forces no projection.
+framedBySlots :: GameState -> Map SlotName (Set Recipient.Recipient) -> Filter.Context -> Filter.Context
+framedBySlots gs recipients context =
   let lastKnown = viewWithLastKnownAnywhere gs
-      over read_ = fmap (foldMap (foldMap read_ . lastKnown)) objects
+      objects = Binding.objectsOfSlots recipients
+      objectsOf = Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList
+      over read_ = fmap (foldMap (foldMap read_ . lastKnown) . objectsOf) recipients
       hostController oid = case Game.hostOf oid gs of
         Just host | Set.member host (GameState.battlefield gs) -> maybe Set.empty Set.singleton (controllerOf host gs)
         _ -> Set.empty
@@ -1218,30 +1223,79 @@ framedBySlots gs objects players context =
         _ -> Nothing
    in context
         { Filter.slotObjects = objects,
-          Filter.slotPlayers = players,
+          Filter.slotPlayers = Binding.playersBySlot recipients,
           Filter.slotNames = over Filter.names,
           Filter.slotControllers = over (maybe Set.empty Set.singleton . Filter.controller),
           Filter.slotCreatureTypes = over (Set.filter Subtype.isCreatureType . Filter.subtypes),
           Filter.slotToughnesses = Map.mapMaybe oneToughness objects,
-          Filter.slotHostControllers = fmap (foldMap hostController) objects
+          Filter.slotHostControllers = fmap (foldMap hostController . objectsOf) recipients
         }
 
--- framedBySlots off a whole binding environment as announced
--- (Binding.slotObjects): CR 603.4's intervening "if", which Event.Trigger checks
--- as the trigger is gathered and Stack again at CR 608.2a -- before CR 608.2b's
--- re-check, so no target has been dropped yet.
-framedByBindings :: GameState -> Map SlotName Binding.Type.Binding -> Filter.Context -> Filter.Context
-framedByBindings gs bindings = framedBySlots gs (Binding.slotObjects bindings) (Binding.slotPlayers bindings)
+-- Filter.contextFor with a recipient map framed in through framedBySlots, for
+-- a caller that holds the map rather than a binding environment: a cost's
+-- candidate pools (Pawl.Engine.Cost, off the announcement CR 601.2c made before
+-- CR 601.2h pays) and a sacrifice criterion
+-- (Pawl.Engine.Replacement.matchesPermanent).
+contextWithSlots :: GameState -> Maybe PlayerId.PlayerId -> Maybe ObjectId -> Map SlotName (Set Recipient.Recipient) -> Filter.Context
+contextWithSlots gs perspective source slots =
+  framedBySlots gs slots (Filter.contextFor (Game.teams gs) perspective source)
 
--- CR 608.2h: this object's last known information, and only when the id names
--- nothing, so a caller falls through to its live reader. Shared by the two
--- readers below so the rule cannot mean one thing for keywords and another for
--- control.
-lastKnownOf :: ObjectId -> GameState -> Maybe LastKnown.LastKnown
-lastKnownOf oid gs =
-  if Map.member oid (GameState.objects gs)
-    then Nothing
-    else Map.lookup oid (GameState.lastKnown gs)
+-- framedBySlots off a whole binding environment as announced
+-- (Binding.recipientsBySlot over its own targets): CR 603.4's intervening "if",
+-- which Event.Trigger checks as the trigger is gathered and Stack again at CR
+-- 608.2a -- before CR 608.2b's re-check, so no target has been dropped yet.
+framedByBindings :: GameState -> Map SlotName Binding.Type.Binding -> Filter.Context -> Filter.Context
+framedByBindings gs bindings = framedBySlots gs (Binding.recipientsBySlot (Binding.targetsOf bindings) bindings)
+
+-- Pawl.Engine.SourceContext.sourceContext with the source's projected
+-- characteristics filled too (withCharacteristicsOf): THE context a source's
+-- own ability is matched in, everywhere outside the CR 613 layer fold. The
+-- fold builds its contexts through SourceContext directly, since projecting the
+-- source from inside its own projection would not terminate.
+sourceContext :: GameState -> Maybe PlayerId.PlayerId -> ObjectId -> Filter.Context
+sourceContext gs perspective source =
+  framedBy source gs (Filter.contextFor (Game.teams gs) perspective (Just source))
+
+-- SourceContext.framedBy plus withCharacteristicsOf: every source-derived field.
+framedBy :: ObjectId -> GameState -> Filter.Context -> Filter.Context
+framedBy source gs = framedWith (SourceContext.choicesOf source gs) source gs
+
+-- SourceContext.framedWith plus withCharacteristicsOf: the choices supplied (a
+-- stored effect's, CR 608.2h), everything else read off the board.
+framedWith :: SourceChoices.SourceChoices -> ObjectId -> GameState -> Filter.Context -> Filter.Context
+framedWith choices source gs = withCharacteristicsOf source gs . SourceContext.framedWith choices source gs
+
+-- `context` with `object`'s projected power, toughness, mana value, colours and
+-- names as the source's (CR 613), through its last known information once it
+-- has left (viewWithLastKnownAnywhere): CR 608.2b's re-check and CR 608.2h's
+-- effects alike: the fields the
+-- source-comparison atoms read (Filter.PowerLessThanSource,
+-- Filter.ManaValueLessThanSource, Filter.SharesColorWithSource,
+-- Filter.SameNameAsSource and their siblings). Leaves every other field alone,
+-- so CR 509.1b's pairwise restrictions, framed by the creature being compared
+-- rather than by an ability's source, take these and not its choices.
+--
+-- All thunks over one view: a filter naming none of the atoms projects
+-- nothing. pairwiseContext is the CR 509.1b framing.
+withCharacteristicsOf :: ObjectId -> GameState -> Filter.Context -> Filter.Context
+withCharacteristicsOf object gs context =
+  let view = viewWithLastKnownAnywhere gs object
+   in context
+        { Filter.sourcePower = Filter.power =<< view,
+          Filter.sourceToughness = Filter.toughness =<< view,
+          Filter.sourceManaValue = Filter.manaValue =<< view,
+          Filter.sourceColors = foldMap Filter.colors view,
+          Filter.sourceNames = foldMap Filter.names view
+        }
+
+-- CR 509.1b: the context a pairwise blocking restriction or cost is matched
+-- in, framed by the creature being compared (Spitfire Handler's "this
+-- creature", Ironclaw Curse's blocker) rather than by the restriction's
+-- source: its controller and its projected characteristics, and none of the
+-- source's choices.
+pairwiseContext :: GameState -> ObjectId -> Filter.Context
+pairwiseContext gs creature =
+  withCharacteristicsOf creature gs (Filter.contextFor (Game.teams gs) (controllerOf creature gs) (Just creature))
 
 -- CR 603.10's first sentence: a permanent as a trigger event's own board sample
 -- (Event.Trigger.battlefieldAt) shows it -- the characteristics and controller it
@@ -1251,55 +1305,30 @@ sampledView :: ObjectId -> BattlefieldCandidate.BattlefieldCandidate PC.Projecte
 sampledView oid candidate gs =
   let pc = BattlefieldCandidate.characteristics candidate
       controller = BattlefieldCandidate.controller candidate
-   in case lastKnownOf oid gs of
+   in case Game.lastKnownOf oid gs of
         Just lk -> Count.lastKnownView (viewWithLastKnownAnywhere gs) oid gs lk {LastKnown.characteristics = pc, LastKnown.controller = controller}
         Nothing -> viewOfCharacteristics (viewWithLastKnownAnywhere gs) oid pc (Just controller) (countersOf oid gs) gs
 
--- keywordsOf with CR 608.2h's fallback (CR 702.2e, CR 702.15c, CR 702.90d); toxic
--- (rule 702.164) has no such clause and rides this by uniformity.
-keywordsWithLastKnown :: ObjectId -> GameState -> Map Keyword Natural
-keywordsWithLastKnown oid gs = case lastKnownOf oid gs of
-  Just lk -> PC.keywords (LastKnown.characteristics lk)
-  Nothing -> keywordsOf oid gs
-
--- controllerOf with the same fallback (CR 702.15b for why a controller is wanted;
--- CR 608.2h for the authority). LastKnown.controller is a PlayerId, so this
--- answers Just wherever the live reader would answer Nothing for a gone source.
+-- CR 110.2's controller off viewWithLastKnownAnywhere (CR 608.2h): controllerOf
+-- for an object that exists, the record's for one that has left, Nothing for an id
+-- naming neither. CR 702.15b is why a departed source's controller is wanted.
 controllerWithLastKnown :: ObjectId -> GameState -> Maybe PlayerId.PlayerId
-controllerWithLastKnown oid gs = case lastKnownOf oid gs of
-  Just lk -> Just (LastKnown.controller lk)
-  Nothing -> controllerOf oid gs
+controllerWithLastKnown oid gs = Filter.controller =<< viewWithLastKnownAnywhere gs oid
 
--- CR 108.3's owner, with the same fallback -- unlike control (CR 110.2) no
--- projection moves an owner (only CR 407.3's Game.setOwner writes one), so the
--- live half is Object.owner straight off the object. PlayerRef.OwnerOfBound's reader
--- (Pawl.Engine.Resolve.Slots.playerRefPlayers); The Deck of Many Things' 20
--- band is the producer.
-ownerWithLastKnown :: ObjectId -> GameState -> Maybe PlayerId.PlayerId
-ownerWithLastKnown oid gs = case lastKnownOf oid gs of
-  Just lk -> Just (LastKnown.owner lk)
-  Nothing -> fmap Object.owner (Game.lookupObject oid gs)
-
--- subtypesOf with the same fallback (CR 702.76a and CR 702.173a for why the
--- types are wanted; CR 608.2h for the authority) -- a creature that dealt combat
--- damage and then died still has to answer what its creature types were.
-subtypesWithLastKnown :: ObjectId -> GameState -> Set Subtype.Type.Subtype
-subtypesWithLastKnown oid gs = case lastKnownOf oid gs of
-  Just lk -> PC.subtypes (LastKnown.characteristics lk)
-  Nothing -> subtypesOf oid gs
-
--- `project` with the same fallback, for a reader that wants the WHOLE fold of a
--- gone object rather than one field of it: CR 603.3b's "the final chapter ability
--- of a Saga you control" needs both the subtype and the chapter abilities of a
--- Saga that may have left the battlefield before CR 117.5 gathered the trigger,
--- and CR 608.2h is the authority for answering at all. The record holds the
--- projection taken as the object ceased, so a Saga that was a COPY of another card
--- answers with the copy's chapters rather than the printed card's. Proved by
+-- `project` with CR 608.2h's fallback, for a reader that wants what the view does
+-- not carry: keyword COUNTS (CR 702.164b's toxic total, Damage.damageEvent),
+-- delayed-trigger text, or the whole fold of a gone object: CR 603.3b's "the
+-- final chapter ability of a Saga you control" needs both the subtype and the
+-- chapter abilities of a Saga that may have left the battlefield before CR 117.5
+-- gathered the trigger, and CR 608.2h is the authority for answering at all. The
+-- record holds the projection taken as the object ceased, so a Saga that was a
+-- COPY of another card answers with the copy's chapters rather than the printed
+-- card's. Proved by
 -- Pawl.TriggerSpec's "CR 608.2h the watcher reads the dead Saga's last known
 -- information" and its "CR 707.2 a COPY of the Saga answers with the copy's
 -- chapters".
 projectWithLastKnown :: ObjectId -> GameState -> ProjectedCharacteristics
-projectWithLastKnown oid gs = case lastKnownOf oid gs of
+projectWithLastKnown oid gs = case Game.lastKnownOf oid gs of
   Just lk -> LastKnown.characteristics lk
   Nothing -> project oid gs
 
@@ -1342,14 +1371,6 @@ armedDelayedAbility resolving source arm gs =
         Just (Source.OfTrigger triggered) -> Map.lookup name (TriggeredAbilitySource.delayed triggered)
         _ -> Nothing
    in Game.carriedDelayedAbility arm Applicative.<|> frozen Applicative.<|> declaredDelayedAbility source name gs
-
--- powerGiven with the same fallback, on CR 608.2b's own sentence about target
--- re-validation -- so a mentor (CR 702.134a) killed in response leaves its
--- trigger's target legal rather than fizzling it.
-powerWithLastKnownGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> Maybe Integer
-powerWithLastKnownGiven pcs oid gs = case lastKnownOf oid gs of
-  Just lk -> PC.power (LastKnown.characteristics lk)
-  Nothing -> powerGiven pcs oid gs
 
 -- The ViewOf a count gets when it is evaluated while `bound` is being applied:
 -- candidates projected through the layers BEFORE that one. EVERY object in the
@@ -4548,7 +4569,7 @@ projectDeciding = projectDecidingFrom noncreaturePT copiableCharacteristics
 -- CR 612.5: the seed textBoxAt folds an exchange partner from -- its copiable
 -- values while it exists, and CR 608.2h's record of them once it has left.
 textBoxSeed :: ObjectId -> GameState -> ProjectedCharacteristics
-textBoxSeed oid gs = maybe (copiableCharacteristics oid gs) LastKnown.copiable (lastKnownOf oid gs)
+textBoxSeed oid gs = maybe (copiableCharacteristics oid gs) LastKnown.copiable (Game.lastKnownOf oid gs)
 
 -- projectDeciding with its closing gate and its CR 613.2c seed named: `snapshot`
 -- departs from the gate, and textBoxAt from copiableCharacteristics.
@@ -5264,7 +5285,7 @@ replacementsOfGiven pcs zone oid gs =
 printedRowLives :: ObjectId -> GameState -> PrintedReplacement.PrintedReplacement card ability effect -> Bool
 printedRowLives oid gs pr = case PrintedReplacement.condition pr of
   Nothing -> True
-  Just cond -> Condition.holds (fullView gs) (SourceContext.sourceContext gs (controllerOf oid gs) oid) (boardAsEntering gs) oid cond
+  Just cond -> Condition.holds (fullView gs) (sourceContext gs (controllerOf oid gs) oid) (boardAsEntering gs) oid cond
 
 -- CR 113.6b: does this printed replacement row function from `zone`?
 -- functionsFromZone's twin for rows, with the same empty-set reading -- a row

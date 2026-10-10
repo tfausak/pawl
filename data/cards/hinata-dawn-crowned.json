@@ -47,21 +47,29 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "ReduceSpellCost",
+            "type": "ModifyCost",
             "value": {
+              "change": {
+                "type": "Reduce",
+                "value": {
+                  "amount": [
+                    {
+                      "type": "Generic",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              "matching": {
+                "type": "And",
+                "value": []
+              },
               "perTarget": {
                 "type": "And",
                 "value": []
               },
-              "reduction": [
-                {
-                  "type": "Generic",
-                  "value": 1
-                }
-              ],
-              "whichSpells": {
-                "type": "And",
-                "value": []
+              "subject": {
+                "type": "Spells"
               }
             }
           },
@@ -71,16 +79,22 @@
         },
         {
           "effect": {
-            "type": "IncreaseSpellCost",
+            "type": "ModifyCost",
             "value": {
-              "amount": 1,
+              "change": {
+                "type": "Increase",
+                "value": 1
+              },
+              "matching": {
+                "type": "And",
+                "value": []
+              },
               "perTarget": {
                 "type": "And",
                 "value": []
               },
-              "whichSpells": {
-                "type": "And",
-                "value": []
+              "subject": {
+                "type": "Spells"
               }
             }
           },

@@ -42,16 +42,15 @@ module Pawl.Engine.Battle where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
-import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
-import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mint as Mint
+import qualified Pawl.Engine.Players as Players
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardType as CardType
@@ -114,12 +113,8 @@ protectorOf oid gs = Object.protector =<< Game.lookupObject oid gs
 -- 508.1i's attack cost was paid, and "the protector of the battle that creature
 -- was attacking" then has no live object to read
 -- (Pawl.Engine.Defender.playerOf's battle arm).
---
--- Reads GameState.lastKnown alone, so it answers only where protectorOf cannot:
--- Pawl.Engine.Projection.lastKnownOf's guard is the same membership test read the
--- other way round, and this module sits below that one.
 lastKnownProtectorOf :: ObjectId.ObjectId -> GameState -> Maybe PlayerId.PlayerId
-lastKnownProtectorOf oid gs = LastKnown.protector =<< Map.lookup oid (GameState.lastKnown gs)
+lastKnownProtectorOf oid gs = LastKnown.protector =<< Game.lastKnownOf oid gs
 
 -- CR 310.5 / CR 704.5x: is any attacking creature currently attacking this battle?
 --
@@ -242,13 +237,9 @@ needsProtector teams pc controller playing attacked designated = case designated
 -- state-based re-choice (Pawl.Engine.Sba). Sharing it is what keeps the candidate
 -- rule in one place: a re-choice must offer exactly what the entry choice offered.
 --
--- Elided at one candidate, and the ANSWER is still the same: one candidate is one
--- outcome, so the options are indistinguishable and the engine decides nothing by
--- not asking. See Prompt.ChooseProtector.
---
--- Filters rather than trusts the answer, the posture Combat.designateDefenders and
--- Sba.chooseLegendVictims both take: an interpreter that names a player who is not
--- a candidate gets the head of the list instead of an illegal designation.
+-- Asked through Game.chooseAmong, over the players within the controller's range
+-- (CR 801.5a): the range-of-influence scenario "CR 801.5a a Siege's protector is
+-- chosen only from opponents within range" proves the cut.
 designateProtector ::
   PC.ProjectedCharacteristics ->
   PlayerId.PlayerId ->
@@ -256,17 +247,10 @@ designateProtector ::
   Game (Maybe PlayerId.PlayerId)
 designateProtector pc controller oid = do
   gs <- State.get
-  case NonEmpty.nonEmpty (protectorCandidates (Game.teams gs) pc controller (Game.stillPlaying gs)) of
-    Nothing -> pure Nothing
-    Just candidates
-      | null (NonEmpty.tail candidates) -> pure (Just (NonEmpty.head candidates))
-      | otherwise -> do
-          let decider = Decide.deciderFor controller gs
-          answer <- Game.choose (Prompt.ChooseProtector decider controller oid candidates)
-          pure . Just $
-            if List.elem answer (NonEmpty.toList candidates)
-              then answer
-              else NonEmpty.head candidates
+  Game.chooseAmong
+    (\decider asked -> Prompt.ChooseProtector decider asked oid)
+    controller
+    (protectorCandidates (Game.teams gs) pc controller (Players.table (Just controller) gs))
 
 -- CR 310.12b: "Sieges have the intrinsic ability 'When the last defense counter is
 -- removed from this permanent, exile it, then you may cast it transformed without

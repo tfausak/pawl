@@ -1,6 +1,6 @@
 {
   "description": "CR 111.7 a token that died and ceased to exist is no card put into a graveyard",
-  "note": "Synthetic Grave Census gains life for each card put into a graveyard this turn. The Goblin Piker token placed with 12 damage dies to CR 704.5g and CR 704.5d sweeps it from the graveyard before the count, so the fold has no object to read and must fall back on the departed record (arrivedView's lookup guard); a blank view would count it as a card. Pairs with the nontoken Piker board.",
+  "note": "Synthetic Grave Census gains life for each card put into a graveyard this turn. The Goblin Piker token placed with 12 damage dies to CR 704.5g and CR 704.5d sweeps it from the graveyard before the count, so the fold has no object to read and must fall back on the departed record (Count.orLastKnown's liveness guard); a blank view would count it as a card. Pairs with the nontoken Piker board.",
   "board": {
     "seats": [
       {

@@ -17,9 +17,7 @@ module Pawl.Engine.Blight where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
-import qualified Data.List.NonEmpty as NonEmpty
 import Numeric.Natural (Natural)
-import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
@@ -81,15 +79,11 @@ canBlight pid gs = not (null (candidates pid gs))
 -- "target", so nothing was declared on the stack (CR 601.2c) and there is no CR
 -- 608.2b legality to re-check.
 --
--- The prompt is raised only for TWO OR MORE candidates. One creature is the whole
--- of the rule's candidate set, so performing the action decides nothing -- where
--- the rules leave nothing to ask, don't prompt.
---
--- FILTERED, NOT TRUSTED, the ChooseBolster posture: an answer naming something
--- never offered falls back to the first candidate. That holds for the cost callers
--- too, where the alternative would be Pawl.Engine.Cost's reject-not-repair --
--- rule 701.68a states no way to fail once a creature exists, so a payment lost to
--- a bad answer would be a refusal the rules do not offer.
+-- Asked through Game.chooseAmong, whose repair of a bad answer holds for the
+-- cost callers too, where the alternative would be Pawl.Engine.Cost's
+-- reject-not-repair -- rule 701.68a states no way to fail once a creature
+-- exists, so a payment lost to a bad answer would be a refusal the rules do not
+-- offer.
 --
 -- N of zero still chooses, and CR 122.6 is why the choice is made anyway: rule
 -- 701.68a's process is "put N -1\/-1 counters on a creature you control", so the
@@ -99,17 +93,12 @@ blight :: CounterCause.CounterCause -> ObjectId -> Natural -> Game (Maybe Object
 blight cause resolving n = do
   let pid = CounterCause.putter cause
   gs <- State.get
-  case candidates pid gs of
+  picked <- Game.chooseAmong (\decider asked -> Prompt.ChooseBlight decider asked resolving) pid (candidates pid gs)
+  case picked of
     -- CR 701.68b for a cost, CR 101.3 for an effect: a player controlling no
     -- creature blights nothing.
-    [] -> pure Nothing
-    first : rest -> do
-      blighted <- case rest of
-        [] -> pure first
-        second : more -> do
-          let offered = first NonEmpty.:| (second : more)
-          answer <- Game.choose (Prompt.ChooseBlight (Decide.deciderFor pid gs) pid resolving offered)
-          pure (if List.elem answer (NonEmpty.toList offered) then answer else first)
+    Nothing -> pure Nothing
+    Just blighted -> do
       -- CR 122.6: through the single funnel, so CR 614.1's counter replacements
       -- (Vorinclex, Monstrous Raider) get their opportunity -- and, where the
       -- cause is an effect, CR 614.16's (Doubling Season).

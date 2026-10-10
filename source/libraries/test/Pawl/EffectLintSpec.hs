@@ -20,6 +20,7 @@ module Pawl.EffectLintSpec where
 -- the evaluator module Pawl.Engine.Filter may later be imported and must not collide.
 -- triggered ability's effects (Card.allEffects only reaches the spell).
 -- whole card written by somebody else and so an independent witness to the
+
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -33,6 +34,7 @@ import qualified Pawl.Codec.Card as Card.Codec
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Codec.Face as Face.Codec
 import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.Mint as Mint
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect.Engine
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.QuantitySlot as QuantitySlot
@@ -140,7 +142,6 @@ import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
-import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MoveCounters as MoveCounters
@@ -1060,13 +1061,8 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   -- written and any of the three is legitimate: Rule of Law and Thalia say
   -- AnyPlayer, Silence's stored prohibition says Opponent, and Prowling
   -- Serpopard says You.
-  PlayerEffect.IncreaseSpellCost {} -> False
-  PlayerEffect.IncreaseActivationCost {} -> False
-  PlayerEffect.ReduceSpellCost {} -> False
-  PlayerEffect.ReduceActivationCost {} -> False
-  PlayerEffect.AddActivationCost {} -> False
+  PlayerEffect.ModifyCost {} -> False
   PlayerEffect.AlternativeActivationCost {} -> False
-  PlayerEffect.AddSpellCost {} -> False
   PlayerEffect.CantCastSpells -> False
   PlayerEffect.CantActivateAbilities _ -> False
   PlayerEffect.CantCastMoreThan _ -> False
@@ -1131,13 +1127,8 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.CantBecomeMonarch -> False
   PlayerEffect.CantSetSchemesInMotion -> False
   PlayerEffect.CantAttackWithCreatures -> False
-  PlayerEffect.IncreaseSpellCost {} -> False
-  PlayerEffect.IncreaseActivationCost {} -> False
-  PlayerEffect.ReduceSpellCost {} -> False
-  PlayerEffect.ReduceActivationCost {} -> False
-  PlayerEffect.AddActivationCost {} -> False
+  PlayerEffect.ModifyCost {} -> False
   PlayerEffect.AlternativeActivationCost {} -> False
-  PlayerEffect.AddSpellCost {} -> False
   PlayerEffect.CantCastSpells -> False
   PlayerEffect.CantActivateAbilities _ -> False
   PlayerEffect.CantCastMoreThan _ -> False
@@ -2152,7 +2143,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
         --
         -- A slot read from inside a NUMBER is not one of these arms either:
         -- Quantity.AgainstSlot reaches Filter.slotOneObject, which declines a
-        -- group exactly as Binding.onlyOne does, and readSinglyInQuantities
+        -- group of several as Binding.onlyOne does, and readSinglyInQuantities
         -- below is its leg. Filter.IsControllerOfBound, the third reader through
         -- that funnel, is filterSlotsReadSingly's; Filter.IsBound reads the whole
         -- set, so it is no risk and no fence for the others either.
@@ -2347,18 +2338,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
         clauseFace gate optionality =
           (vanillaFace "Planted" instantLine)
             { Face.spell =
-                Modal.MkModal
-                  ( Seq.singleton
-                      ( Mode.MkMode
-                          ( Seq.fromList
-                              [ Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton destruction),
-                                Clause.MkClause Nothing Nothing Nothing optionality gate Seq.empty
-                              ]
-                          )
-                          Map.empty
-                      )
-                  )
-                  (ModeSelection.ChooseExactly 1)
+                Mint.oneModeOf Map.empty (Seq.fromList [Mint.mandatory (Seq.singleton destruction), Clause.MkClause Nothing Nothing Nothing optionality gate Seq.empty])
             }
         payerFace ref = clauseFace (Just (PayGate.MkPayGate ref (CostChoice.MkCostChoice (Cost.Type.MkCost Nothing [] NonEmpty.:| [])) Nothing PayBranch.IfNotPaid PayObligation.Optional Nothing Nothing)) Optionality.Mandatory
         askerFace ref = clauseFace Nothing (Optionality.Optional ref)
@@ -2738,9 +2718,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     let victim = Filter.Type.HasCardType CardType.Creature
         reading = Effect.Transform (ObjectRef.EachMatching victim)
         oneEffectSpell effects =
-          Modal.MkModal
-            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) Map.empty))
-            (ModeSelection.ChooseExactly 1)
+          Mint.oneMode (Seq.fromList effects)
         token =
           oneFaced
             (vanillaFace "Nightmare" (spellLine CardType.Creature Set.empty Set.empty))
@@ -3542,9 +3520,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     let planted effect =
           (vanillaFace "Planted" instantLine)
             { Face.spell =
-                Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-                  (ModeSelection.ChooseExactly 1)
+                Mint.oneMode (Seq.singleton effect)
             }
         prohibition = Effect.AffectPlayers (AffectPlayers.MkAffectPlayers Duration.UntilUsed (AffectedPlayers.Scoped (PlayerScope.Related PlayerRelation.You)) PlayerEffect.CantCastSpells)
         pump = Effect.ModifyTarget (ModifyTarget.MkModifyTarget Duration.UntilUsed (Modification.GainKeyword Keyword.Flying) (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)) Nothing)

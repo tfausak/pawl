@@ -47,6 +47,7 @@ import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.Planechase as Planechase
 import qualified Pawl.Engine.PlayerDesignation as PlayerDesignation
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
+import qualified Pawl.Engine.Players as Players
 import qualified Pawl.Engine.Plot as Plot
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
@@ -1015,7 +1016,7 @@ placeBorne srcId pending = do
           -- time this ability has resolved this turn" reads this object's Source.
           -- Inserted over the captured environment, whose thisAbility names the
           -- ability that armed a delayed trigger rather than the trigger itself.
-          let placedSource = maybe (Projection.copiableCharacteristics srcId gs) LastKnown.copiable (Projection.lastKnownOf srcId gs)
+          let placedSource = maybe (Projection.copiableCharacteristics srcId gs) LastKnown.copiable (Game.lastKnownOf srcId gs)
           State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setThisAbility abilId (Binding.setPlacedSourceCopy placedSource (Binding.setYou controller (Binding.setTriggerSource srcId (Map.unionWith Binding.mergeBinding (Target.stampDefendingPlayers srcId chosen g (Binding.fromChoices chosen enteredX chosenModes)) (PendingTrigger.bindings pending)))))}) abilId (GameState.objects g)})
           -- CR 601.2c through CR 603.3d: each chosen object became a target, which
           -- is what CR 702.21a's ward watches. Raised only on an announcement the
@@ -1247,7 +1248,7 @@ checkMandatoryLoop = do
       gap = now - Timestamp.unwrap (GameState.lastChoice gs)
       recent = Timestamp.MkTimestamp (now - div mandatoryLoopLimit 2)
       involved = Map.keys (Map.filter (>= recent) (GameState.loopInvolvement gs))
-      drawn = Set.fromList (concatMap (`Game.reachableBy` gs) involved)
+      drawn = Set.fromList (concatMap (\pid -> Players.table (Just pid) gs) involved)
       ranged = GameSettings.rangeOfInfluence (GameState.settings gs) /= RangeOfInfluence.unlimited
   Monad.when (Maybe.isNothing (GameState.result gs) && gap >= mandatoryLoopLimit) $
     if ranged && not (Set.null drawn)
@@ -2115,14 +2116,7 @@ playSubgame = do
   -- CR 729.2: randomly determine which player goes first. The engine asks; the
   -- interpreter rolls. Only the players still in the main game are in the subgame
   -- (CR 729.4). Not asked when the answer is forced.
-  starter <- case NonEmpty.nonEmpty (Game.stillPlayingInOrder parent) of
-    Nothing -> pure (GameState.activePlayer parent)
-    Just order -> case order of
-      only NonEmpty.:| [] -> pure only
-      _ -> do
-        answer <- Game.ask (Prompt.RandomFirstPlayer order)
-        -- Filtered, not trusted: a subgame cannot start with an unseated player.
-        pure (if List.elem answer (NonEmpty.toList order) then answer else NonEmpty.head order)
+  starter <- Maybe.fromMaybe (GameState.activePlayer parent) <$> Game.drawAmong Prompt.RandomFirstPlayer (Game.stillPlayingInOrder parent)
   -- CR 100.6a: the one match-scoped tally, raised BEFORE the subgame is built
   -- so the subgame it counts is inside its own answer (Shahrazad and Sindbad's
   -- "if there haven't been any subgames this match" is false inside the subgame

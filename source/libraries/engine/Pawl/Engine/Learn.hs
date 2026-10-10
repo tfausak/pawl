@@ -14,6 +14,7 @@
 -- printing worded that way is what would need it.
 module Pawl.Engine.Learn where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -71,10 +72,11 @@ lessonFromOutside =
 -- reveal. That is CR 608.2d's "the player can't choose an option that's illegal
 -- or impossible" rather than anything rule 701.48 states.
 --
--- FILTERED, NOT TRUSTED, Pawl.Engine.Forage's posture -- but falling back to
--- DECLINING rather than to the offered set's front, because rule 701.48a's "you
--- may" makes declining a legal answer on every board this reaches, where forage
--- is mandatory once canForage holds.
+-- The branch is FILTERED, NOT TRUSTED, but falls back to DECLINING rather than
+-- to the offered set's front, because rule 701.48a's "you may" makes declining
+-- a legal answer on every board this reaches -- which is why it is not asked
+-- through Game.chooseAmong. The discard, mandatory once that branch is taken,
+-- is.
 --
 -- CR 701.48a's "if you do, draw a card" is sequenced rather than conditional
 -- here: the discard below cannot fail once the card was chosen off the hand, so
@@ -95,15 +97,9 @@ learn pid resolving source = do
   case mode of
     Nothing -> pure ()
     Just LearnMode.TakeLesson -> Event.bringInto lessonFromOutside source pid
-    Just LearnMode.DiscardAndDraw -> case hand of
-      [] -> pure ()
-      first : rest -> do
-        discarded <- case rest of
-          [] -> pure first
-          second : more -> do
-            let cards = first NonEmpty.:| (second : more)
-            answer <- Game.choose (Prompt.ChooseCardInHand (Decide.deciderFor pid gs) pid resolving cards)
-            pure (if List.elem answer (NonEmpty.toList cards) then answer else first)
+    Just LearnMode.DiscardAndDraw -> do
+      picked <- Game.chooseAmong (\decider asked -> Prompt.ChooseCardInHand decider asked resolving) pid hand
+      Monad.forM_ picked $ \discarded -> do
         -- CR 701.9a, through the one funnel a discard goes through, so anything
         -- watching for a discard sees it. Ordinary rather than ByEffect: rule
         -- 701.48a's "you may discard a card. If you do, draw" makes the discard a

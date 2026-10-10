@@ -4,7 +4,6 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
-import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -48,6 +47,7 @@ import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Prevention as Prevention
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 
@@ -223,11 +223,11 @@ lethalRemaining gs oid =
 -- in the same instant, and it keeps the CR 608.2i record self-contained.
 --
 -- Lifelink's rider carries WHO rather than WHETHER, because CR 702.15b's answer
--- is a player. Projection.controllerWithLastKnown delegates to controllerOf,
--- which is both of that rule's clauses at once and answers in any zone, which is
--- what CR 702.15d needs.
+-- is a player. Projection.controllerWithLastKnown answers controllerOf for a
+-- source that exists, which is both of that rule's clauses at once and answers in
+-- any zone, which is what CR 702.15d needs.
 --
--- Read through the ...WithLastKnown pair rather than the plain readers, because
+-- Read through the ...WithLastKnown readers rather than the plain ones, because
 -- the source may already have CEASED by the time it deals damage -- Ghitu
 -- Fire-Eater sacrifices itself to pay for the ability that then deals its
 -- damage. The plain readers answer False, 0 and Nothing for an id that names
@@ -235,7 +235,7 @@ lethalRemaining gs oid =
 -- was, against CR 702.2e, CR 702.15c, CR 702.90d, CR 702.80b and CR 608.2h.
 --
 -- One fallback for all of the riders, not one each: they are read here at a
--- single site off readers that share one liveness test (Projection.lastKnownOf),
+-- single site off readers that share one liveness test (Game.lastKnownOf),
 -- so deathtouch and lifelink cannot come to disagree about whether the source is
 -- still there. Every damage the engine deals is built here, so no assignment
 -- site can capture two riders and forget the third.
@@ -249,7 +249,9 @@ lethalRemaining gs oid =
 -- card, which is why the answer is frozen here.
 damageEvent :: GameState -> DamageKind.DamageKind -> ObjectId -> Recipient.Recipient -> Natural -> DamageEvent.DamageEvent
 damageEvent gs kind source target amount =
-  let keywords = Projection.keywordsWithLastKnown source gs
+  let -- One projection for the keyword and creature-type riders.
+      characteristics = Projection.projectWithLastKnown source gs
+      keywords = PC.keywords characteristics
       has keyword = Map.member keyword keywords
       -- CR 702.164b: toxic is parameterized, so its rider is the SUM of every
       -- instance's N rather than a membership test -- Projection.totalToxic's
@@ -271,7 +273,7 @@ damageEvent gs kind source target amount =
               then controller
               else Nothing,
           DamageEvent.dealtByController = controller,
-          DamageEvent.dealtByCreatureTypes = Set.filter Subtype.isCreatureType (Projection.subtypesWithLastKnown source gs),
+          DamageEvent.dealtByCreatureTypes = Set.filter Subtype.isCreatureType (PC.subtypes characteristics),
           DamageEvent.dealtByCommander = Commander.isCommander source gs,
           DamageEvent.kind = kind
         }
@@ -518,12 +520,15 @@ attackerAssignment gs contested (attacker, target) = case Projection.combatDamag
 --
 -- CR 805.9: under the shared team turns option "the active player" is one
 -- active player, chosen by the banding ability's controller -- the controller
--- of the banding creature among them. Asked only with two or more active
--- players still playing; the answer is filtered, not trusted. Banding creatures
--- with different controllers leave that choice to the team, and CR 805.2 gives
--- a team's unsettled choice to its primary player. Pawl.TeamSpec's "CR 805.9
--- the banding creature's controller names the active player who divides"
--- proves both.
+-- of the banding creature among them, asked through Game.chooseAmong among the
+-- active players still playing and within the chooser's range (CR 801.5a).
+-- Banding creatures with different controllers leave that choice to the team,
+-- and CR 805.2 gives a team's unsettled choice to its primary player. The team
+-- scenario "CR 805.9 the banding creature's controller names the active player
+-- who divides" proves both, its "a departed teammate is not offered" sibling
+-- the still-playing cut (CR 800.4a), and the range-of-influence scenario "CR
+-- 801.5a / 805.9 the banding creature's controller names an active player
+-- within range" the range cut.
 blockerChooser :: GameState -> [ObjectId] -> PlayerId -> Game PlayerId
 blockerChooser gs attackers controller =
   case (banding, ListUtils.nubOrd (Maybe.mapMaybe (`Projection.controllerOf` gs) banding)) of
@@ -532,13 +537,8 @@ blockerChooser gs attackers controller =
       let chooser = case controllers of
             [one] -> one
             _ -> Game.primaryOf gs (GameState.activePlayer gs)
-          live = filter (`List.elem` Game.stillPlaying gs) (Turn.activePlayers gs)
-       in case live of
-            [] -> pure (GameState.activePlayer gs)
-            [one] -> pure one
-            first : rest -> do
-              answer <- Game.choose (Prompt.ChoosePlayer (Decide.deciderFor chooser gs) chooser source (first NonEmpty.:| rest))
-              pure (if List.elem answer live then answer else first)
+          live = filter (\pid -> List.elem pid (Game.stillPlaying gs) && Game.inRangeOf chooser pid gs) (Turn.activePlayers gs)
+       in fmap (Maybe.fromMaybe (GameState.activePlayer gs)) (Game.chooseAmong (\decider asked -> Prompt.ChoosePlayer decider asked source) chooser live)
   where
     banding = filter (\attacker -> Projection.hasKeyword Keyword.Banding attacker gs) attackers
 

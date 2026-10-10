@@ -17,12 +17,9 @@ module Pawl.Engine.ManifestDread where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
-import qualified Data.List as List
-import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import Numeric.Natural (Natural)
-import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Types.EntryRiders as EntryRiders
@@ -68,9 +65,9 @@ riders =
 -- object `source`.
 --
 -- Which card is manifested is the player's choice (CR 608.2d), asked as
--- Prompt.ChooseCardFromAmong and filtered rather than trusted; one card is no
--- choice (the Paranormal Analyst ruling: a one-card library manifests that
--- card) and none is nothing to do.
+-- Prompt.ChooseCardFromAmong through Game.chooseAmong; one card is no choice
+-- (the Paranormal Analyst ruling: a one-card library manifests that card) and
+-- none is nothing to do.
 --
 -- "Not manifested this way" is read off the board after the manifest: a looked-at
 -- card still in the library is one the manifest did not take, which is CR
@@ -85,13 +82,7 @@ manifestDread :: ObjectId -> PlayerId -> Game ()
 manifestDread source pid = do
   gs <- State.get
   let looked = take 2 (Game.zoneMembers Zone.Library pid gs)
-  chosen <- case looked of
-    [] -> pure Nothing
-    [only] -> pure (Just only)
-    first : second : more -> do
-      let offered = first NonEmpty.:| (second : more)
-      answer <- Game.choose (Prompt.ChooseCardFromAmong (Decide.deciderFor pid gs) pid source offered)
-      pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
+  chosen <- Game.chooseAmong (\decider asked -> Prompt.ChooseCardFromAmong decider asked source) pid looked
   Monad.forM_ chosen $ \card ->
     Event.simultaneously (Monad.void (Event.changeZoneEntering card Zone.Battlefield LibraryPosition.defaultValue riders (Just pid)))
   after <- State.get

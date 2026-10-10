@@ -76,7 +76,10 @@
           "cost": {
             "components": [
               {
-                "type": "RemoveLoyaltyFromThisX"
+                "type": "RemoveLoyaltyFromThis",
+                "value": {
+                  "type": "AnnouncedX"
+                }
               }
             ],
             "mana": []
@@ -189,7 +192,10 @@
             "components": [
               {
                 "type": "RemoveLoyaltyFromThis",
-                "value": 7
+                "value": {
+                  "type": "Fixed",
+                  "value": 7
+                }
               }
             ],
             "mana": []
@@ -249,17 +255,25 @@
                                 "playerAbilities": [
                                   {
                                     "effect": {
-                                      "type": "ReduceSpellCost",
+                                      "type": "ModifyCost",
                                       "value": {
-                                        "reduction": [
-                                          {
-                                            "type": "Generic",
-                                            "value": 2
+                                        "change": {
+                                          "type": "Reduce",
+                                          "value": {
+                                            "amount": [
+                                              {
+                                                "type": "Generic",
+                                                "value": 2
+                                              }
+                                            ]
                                           }
-                                        ],
-                                        "whichSpells": {
+                                        },
+                                        "matching": {
                                           "type": "And",
                                           "value": []
+                                        },
+                                        "subject": {
+                                          "type": "Spells"
                                         }
                                       }
                                     },
