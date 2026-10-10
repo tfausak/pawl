@@ -188,7 +188,6 @@ import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SelfCountersRemoved as SelfCountersRemoved
 import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
 import qualified Pawl.Types.SlotName as SlotName
-import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.Splice as Splice
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.StepBegins as StepBegins
@@ -5752,10 +5751,7 @@ poisonous n =
               (Quantity.Literal (toInteger n))
           )
    in Mint.trigger
-        -- A PLAYER and not an opponent: rules 702.70a, 702.112a and 702.115a all
-        -- word their trigger "deals combat damage to a player", where Akki
-        -- Lavarunner and Questing Beast print "to an opponent".
-        (TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer)
+        Mint.dealsCombatDamageToAPlayer
         (Seq.singleton effect)
 
 -- CR 702.115a: poisonous' condition and poisonous' "that player" -- the same
@@ -5796,10 +5792,7 @@ ingest =
               Nothing
           )
    in Mint.trigger
-        -- A PLAYER and not an opponent: rules 702.70a, 702.112a and 702.115a all
-        -- word their trigger "deals combat damage to a player", where Akki
-        -- Lavarunner and Questing Beast print "to an opponent".
-        (TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer)
+        Mint.dealsCombatDamageToAPlayer
         (Seq.singleton effect)
 
 -- The slots rule 702.116a's loop needs: the opponent this iteration is aimed at,
@@ -5935,7 +5928,7 @@ myriad =
             Map.empty
             ( Seq.fromList
                 [ Mint.mandatory (Seq.singleton loop),
-                  Clause.MkClause Nothing (Just anyToken) Nothing Optionality.Mandatory Nothing (Seq.singleton arm)
+                  Mint.mandatoryIf anyToken (Seq.singleton arm)
                 ]
             )
         )
@@ -6306,20 +6299,9 @@ prowess =
               Nothing
           )
    in Mint.trigger
-        ( TriggerCondition.SpellCast
-            SpellCast.MkSpellCast
-              { SpellCast.filter = Filter.And [Filter.ControlledBy PlayerRelation.You, Filter.Not (Filter.HasCardType CardType.Creature)],
-                SpellCast.scope = TurnScope.EachTurn,
-                -- CR 702.108a names no zone: prowess triggers on a noncreature
-                -- spell cast from anywhere.
-                SpellCast.zone = Nothing,
-                -- And no ordinal either: every noncreature spell cast fires it,
-                -- not one chosen occurrence of the turn.
-                SpellCast.ordinal = Nothing,
-                SpellCast.phase = Nothing,
-                SpellCast.copies = False
-              }
-        )
+        -- CR 702.108a names no zone and no ordinal: every noncreature spell cast
+        -- from anywhere fires it.
+        (Mint.spellCast (Filter.And [Filter.ControlledBy PlayerRelation.You, Filter.Not (Filter.HasCardType CardType.Creature)]))
         (Seq.singleton effect)
 
 -- CR 702.101a: whenever you cast a spell, you may pay {W/B}; if you do, each
@@ -6353,16 +6335,7 @@ extort =
       gain = Effect.GainLife (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.InSlot drained))
       clause = Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory (Just gate) (Seq.fromList [loss, gain])
    in Mint.triggerOf
-        ( TriggerCondition.SpellCast
-            SpellCast.MkSpellCast
-              { SpellCast.filter = Filter.ControlledBy PlayerRelation.You,
-                SpellCast.scope = TurnScope.EachTurn,
-                SpellCast.zone = Nothing,
-                SpellCast.ordinal = Nothing,
-                SpellCast.phase = Nothing,
-                SpellCast.copies = False
-              }
-        )
+        (Mint.spellCast (Filter.ControlledBy PlayerRelation.You))
         Nothing
         (Mint.oneModeOf Map.empty (Seq.singleton clause))
 
@@ -6409,16 +6382,7 @@ increment =
               (Quantity.Literal 1)
           )
    in Mint.triggerIf
-        ( TriggerCondition.SpellCast
-            SpellCast.MkSpellCast
-              { SpellCast.filter = Filter.ControlledBy PlayerRelation.You,
-                SpellCast.scope = TurnScope.EachTurn,
-                SpellCast.zone = Nothing,
-                SpellCast.ordinal = Nothing,
-                SpellCast.phase = Nothing,
-                SpellCast.copies = False
-              }
-        )
+        (Mint.spellCast (Filter.ControlledBy PlayerRelation.You))
         (Condition.All [isCreature, Condition.Any [spentExceeds Quantity.Power, spentExceeds Quantity.Toughness]])
         (Seq.singleton grow)
 
@@ -6958,10 +6922,7 @@ renown n =
   let grow = Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Literal (toInteger n)) (ObjectRef.InSlot Binding.triggerSource))
       designate = Effect.Designate (Designate.MkDesignate Designation.Renowned Binding.triggerSource Nothing)
    in Mint.triggerIf
-        -- A PLAYER and not an opponent: rules 702.70a, 702.112a and 702.115a all
-        -- word their trigger "deals combat damage to a player", where Akki
-        -- Lavarunner and Questing Beast print "to an opponent".
-        (TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer)
+        Mint.dealsCombatDamageToAPlayer
         (Condition.Compares (Compares.MkCompares (Quantity.HasDesignation Designation.Renowned) Comparison.AtMost (Quantity.Literal 0)))
         (Seq.fromList [grow, designate])
 
@@ -7437,7 +7398,7 @@ backup (Backup.MkBackup n above) =
       clauses =
         Seq.fromList
           [ Mint.mandatory (Seq.singleton counters),
-            Clause.MkClause Nothing (Just another) Nothing Optionality.Mandatory Nothing (Seq.singleton grant)
+            Mint.mandatoryIf another (Seq.singleton grant)
           ]
    in Mint.triggerOf
         TriggerCondition.SelfEnters
@@ -8737,7 +8698,7 @@ reboundUpkeep =
               OfferCast.controlWhileResolving = False,
               OfferCast.slot = Nothing
             }
-   in Mint.trigger (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn)) (Seq.singleton effect)
+   in Mint.trigger Mint.yourUpkeep (Seq.singleton effect)
 
 -- The slot rule 702.88a's "this card" is bound into as the spell is exiled,
 -- becameSlot's position: CR 603.7c's environment, captured at the arming rather
@@ -8786,7 +8747,7 @@ cipherTrigger card =
               OfferCast.controlWhileResolving = False,
               OfferCast.slot = Nothing
             }
-   in Mint.trigger (TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer) (Seq.singleton effect)
+   in Mint.trigger Mint.dealsCombatDamageToAPlayer (Seq.singleton effect)
 
 -- CR 702.50a's "except for its epic ability", written into the copiable snapshot
 -- that Pawl.Engine.Resolve.finishSpell archives: the copy rule 702.50a's delayed
@@ -8846,7 +8807,7 @@ epicCopy =
               -- being epic's own sentence rather than CR 707.10's.
               CopyStackObject.exceptions = []
             }
-   in Mint.trigger (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn)) (Seq.singleton effect)
+   in Mint.trigger Mint.yourUpkeep (Seq.singleton effect)
 
 -- CR 702.192a: does this object have paradigm? hasEpic's membership, read off
 -- Projection.keywordsOf by Pawl.Engine.Resolve.applyParadigm for the same reason.
@@ -9083,7 +9044,7 @@ timeCounterUpkeep :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 timeCounterUpkeep =
   let effect = Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.Time (Quantity.Literal 1) Binding.triggerSource Nothing)
    in Mint.triggerIf
-        (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn))
+        Mint.yourUpkeep
         suspendedNow
         (Seq.singleton effect)
 
@@ -9130,23 +9091,15 @@ fading :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 fading =
   let counted = Quantity.ObjectCounters CounterKind.Fade
       sacrificeClause =
-        Clause.MkClause
-          Nothing
-          (Just (Condition.Compares (Compares.MkCompares counted Comparison.AtMost (Quantity.Literal 0))))
-          Nothing
-          Optionality.Mandatory
-          Nothing
+        Mint.mandatoryIf
+          (Condition.Compares (Compares.MkCompares counted Comparison.AtMost (Quantity.Literal 0)))
           (Seq.singleton (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.triggerSource, SacrificeEffect.sacrificer = Sacrificer.EffectController, SacrificeEffect.sacrificed = Nothing}))
       removeClause =
-        Clause.MkClause
-          Nothing
-          (Just (Condition.Compares (Compares.MkCompares counted Comparison.AtLeast (Quantity.Literal 1))))
-          Nothing
-          Optionality.Mandatory
-          Nothing
+        Mint.mandatoryIf
+          (Condition.Compares (Compares.MkCompares counted Comparison.AtLeast (Quantity.Literal 1)))
           (Seq.singleton (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.Fade (Quantity.Literal 1) Binding.triggerSource Nothing)))
    in Mint.triggerOf
-        (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn))
+        Mint.yourUpkeep
         Nothing
         (Mint.oneModeOf Map.empty (Seq.fromList [sacrificeClause, removeClause]))
 
@@ -9207,7 +9160,7 @@ cumulativeUpkeep cost =
             PayGate.offeredAt = Nothing
           }
    in Mint.triggerOf
-        (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn))
+        Mint.yourUpkeep
         (Just onBattlefield)
         (Mint.oneModeOf Map.empty (Seq.fromList [ageClause, upkeepClause]))
 
@@ -9264,7 +9217,7 @@ echo cost =
           (Just gate)
           (Seq.singleton (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.triggerSource, SacrificeEffect.sacrificer = Sacrificer.EffectController, SacrificeEffect.sacrificed = Nothing}))
    in Mint.triggerOf
-        (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn))
+        Mint.yourUpkeep
         (Just cameUnderYourControl)
         (Mint.oneModeOf Map.empty (Seq.singleton sacrifice))
 
@@ -9361,12 +9314,8 @@ championEnters quality =
               (Quantity.Literal 0)
           )
       sacrifice =
-        Clause.MkClause
-          Nothing
-          (Just nothingExiled)
-          Nothing
-          Optionality.Mandatory
-          Nothing
+        Mint.mandatoryIf
+          nothingExiled
           (Seq.singleton (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.triggerSource, SacrificeEffect.sacrificer = Sacrificer.EffectController, SacrificeEffect.sacrificed = Nothing}))
    in Mint.triggerOf
         TriggerCondition.SelfEnters
