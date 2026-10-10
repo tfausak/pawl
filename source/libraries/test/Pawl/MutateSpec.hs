@@ -609,6 +609,34 @@ spec s registry = Spec.describe s "Mutate" $ do
     Spec.assertEqWith s "setup: CR 110.5 the status itself is set" (fmap Object.flipped (Game.lookupObject host after)) (Just True)
     Spec.assertEqWith s "setup: the 1/1 connected, which is what fired the trigger" (S.lifeOf S.bob after) (Just 19)
     Spec.assertEqWith s "setup: the two cards represent one permanent, the flip card on top" (componentNames host after) [CardName.MkCardName (Text.pack "Akki Lavarunner"), CardName.MkCardName (Text.pack "Cubwarden")]
+  -- CR 613.7 / 707.3 over CR 730.2h: Mirrorweave makes the flipped merged
+  -- Tok-Tok a copy of bob's Craw Wurm. Its copy effect is later than the merge's,
+  -- so the merged permanent is a 6/4 Craw Wurm, and its flipped status has no
+  -- effect on a copy of a card with no flip half (CR 110.5c).
+  Spec.it s "CR 707.3 Mirrorweave makes a flipped merged permanent a copy of a creature with no flip half" $ do
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    akki <- S.printingOf s registry "Akki Lavarunner"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    wurm <- S.printingOf s registry "Craw Wurm"
+    mirrorweave <- S.printingOf s registry "Mirrorweave"
+    let (host, board, spellId) = mutateBoard plains akki cubwarden
+        flipped = S.runCombat S.aggressiveAnswer (intoCombat (merging MutateSide.Under host board spellId))
+        (wurmId, withWurm) = S.addPermanent wurm S.bob (S.landsFor island S.alice 4 flipped)
+        (staged, weaveId) = S.handOne mirrorweave withWurm
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just wurmId) . Recipient.objectOf) . snd) sets
+          _ -> S.identityAnswer p
+        woven = S.runPure answer staged (S.cast S.alice weaveId >> Stack.resolveTop >> Engine.settleForPriority)
+    Spec.assertEqWith
+      s
+      "CR 613.7 the later copy effect wins: the flipped merged permanent is a 6/4 Craw Wurm"
+      (Projection.namesOf host woven, S.powerToughnessOf host woven)
+      (Set.singleton (CardName.MkCardName (Text.pack "Craw Wurm")), Just (6, 4))
+    Spec.assertBool s (not (Game.flipsOver host woven)) "CR 707.3 and a copy of a card with no flip half has nothing to flip to"
+    Spec.assertEqWith s "setup: CR 110.5 the status is kept" (fmap Object.flipped (Game.lookupObject host woven)) (Just True)
+    Spec.assertEqWith s "setup: before Mirrorweave it was a 2/2 Tok-Tok" (Projection.namesOf host flipped, S.powerToughnessOf host flipped) (Set.singleton (CardName.MkCardName (Text.pack "Tok-Tok, Volcano Born")), Just (2, 2))
   -- CR 730.2h over the OTHER order, which is the whole of what this case adds:
   -- "if a merged permanent contains a flip card" reaches a component ANYWHERE
   -- among them, where CR 730.2a's topmost component is only where the
