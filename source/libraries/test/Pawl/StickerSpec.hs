@@ -837,3 +837,68 @@ spec s registry = Spec.describe s "Sticker" $ do
     Spec.assertEqWith s "CR 123.7 the card in the graveyard flies" (flies stickered) True
     Spec.assertEqWith s "CR 613.7 a sticker placed after Yixlid Jailer entered still flies" (flies jailedFirst) True
     Spec.assertEqWith s "CR 613.7 Yixlid Jailer entering after the sticker takes flying away" (flies jailedAfter) False
+  -- Review Focus 1. The counter goes on first, so a 7c counter landing after
+  -- the 7b set is the only reading that gives 6/2.
+  Spec.it s "CR 613.4b-c Grizzly Bears with a +1/+1 counter under Otter's 5/1 sticker is a 6/2" $ do
+    sheets <- committedSheets
+    bears <- S.printingOf s registry "Grizzly Bears"
+    let (bearsId, g1) = S.addPermanent bears S.alice (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))
+        after = Sticker.put S.alice bearsId otterFiveOne Nothing (S.addCounter CounterKind.PlusOnePlusOne 1 bearsId g1)
+    Spec.assertEqWith s "CR 613.4b-c a 6/2" (Projection.powerOf bearsId after, Projection.toughnessOf bearsId after) (Just 6, Just 2)
+  Spec.it s "CR 123.8/613.7 of two P/T stickers the later one wins, either way round" $ do
+    sheets <- committedSheets
+    bears <- S.printingOf s registry "Grizzly Bears"
+    let (bearsId, g1) = S.addPermanent bears S.alice (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))
+        both first second = Sticker.put S.alice bearsId second Nothing (Sticker.put S.alice bearsId first Nothing g1)
+        pt gs = (Projection.powerOf bearsId gs, Projection.toughnessOf bearsId gs)
+    Spec.assertEqWith s "CR 613.7 5/1 then 1/4 is a 1/4" (pt (both otterFiveOne minotaurOneFour)) (Just 1, Just 4)
+    Spec.assertEqWith s "CR 613.7 1/4 then 5/1 is a 5/1" (pt (both minotaurOneFour otterFiveOne)) (Just 5, Just 1)
+  -- Review Focus 2. Consulate Dreadnought is a 7/11 Vehicle; Bonesplitter has
+  -- no P/T.
+  Spec.it s "CR 123.8/208.3a a P/T sticker sets a Vehicle card's P/T off the battlefield and none on Bonesplitter" $ do
+    sheets <- committedSheets
+    dreadnought <- S.printingOf s registry "Consulate Dreadnought"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    let base = withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)
+        stickeredBy add card = let (oid, gs) = add card S.alice base in (oid, Sticker.put S.alice oid otterFiveOne Nothing gs)
+        pt (oid, gs) = (Projection.powerOf oid gs, Projection.toughnessOf oid gs)
+    Spec.assertEqWith s "CR 123.8 a Consulate Dreadnought card in a graveyard is a 5/1" (pt (stickeredBy S.addGraveyardCard dreadnought)) (Just 5, Just 1)
+    Spec.assertEqWith s "CR 123.8 a Bonesplitter card in a graveyard has no P/T" (pt (stickeredBy S.addGraveyardCard bonesplitter)) (Nothing, Nothing)
+    Spec.assertEqWith s "CR 208.3a nor has an uncrewed Dreadnought on the battlefield" (pt (stickeredBy S.addPermanent dreadnought)) (Nothing, Nothing)
+  -- The off-battlefield read through a real reader: "creature cards with power
+  -- 2 or less". Hill Giant is a 2/3 by Night's sticker; the Bears a 5/1 by
+  -- Otter's.
+  Spec.it s "CR 123.8 Graceful Restoration offers the Hill Giant its sticker makes a 2/3, not the Bears it makes a 5/1" $ do
+    sheets <- committedSheets
+    restoration <- S.printingOf s registry "Graceful Restoration"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    giant <- S.printingOf s registry "Hill Giant"
+    plains <- S.printingOf s registry "Plains"
+    swamp <- S.printingOf s registry "Swamp"
+    let base = mainPhaseForAlice (S.landsFor plains S.alice 4 (S.landsFor swamp S.alice 1 (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))))
+        (bearsCard, g1) = S.addGraveyardCard bears S.alice base
+        (giantCard, g2) = S.addGraveyardCard giant S.alice g1
+        stickered = Sticker.put S.alice giantCard nightTwoThree Nothing (Sticker.put S.alice bearsCard otterFiveOne Nothing g2)
+        (spellId, board) = S.addHandCard restoration S.alice stickered
+        recording :: Prompt.Prompt r -> State.State [ObjectId.ObjectId] r
+        recording p = case p of
+          Prompt.ChooseModes {} -> pure (secondMode p)
+          Prompt.ChooseTargets _ _ _ sets -> do
+            State.put (concatMap (Maybe.mapMaybe Recipient.objectOf . Set.toList . snd) (Map.elems sets))
+            pure (fmap snd sets)
+          _ -> pure (S.identityAnswer p)
+        offered = State.execState (Engine.runGame recording board (S.cast S.alice spellId)) []
+    Spec.assertEqWith s "CR 123.8 only the Hill Giant card is offered" offered [giantCard]
+  -- Review Focus 5's second half; CLAUDE.md's Clone tripwire for both grants.
+  Spec.it s "CR 123.1/707.2 a Clone of a stickered Grizzly Bears is a 2/2 that does not fly" $ do
+    sheets <- committedSheets
+    bears <- S.printingOf s registry "Grizzly Bears"
+    clone <- S.printingOf s registry "Clone"
+    let (bearsId, g1) = S.addPermanent bears S.alice (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))
+        stickered = Sticker.put S.alice bearsId hotDogFlying Nothing (Sticker.put S.alice bearsId otterFiveOne Nothing g1)
+        (_, staged) = S.spellOnStack clone S.alice stickered
+        cloned = S.settleSba (S.runPure (copying bearsId) staged Stack.resolveTop)
+        clones = [oid | oid <- Game.zoneMembers Zone.Battlefield S.alice cloned, oid /= bearsId]
+        shape oid = (Projection.powerOf oid cloned, Projection.toughnessOf oid cloned, Projection.hasKeyword Keyword.Flying oid cloned)
+    Spec.assertEqWith s "CR 707.2 the Clone is a 2/2 without flying" (fmap shape clones) [(Just 2, Just 2, False)]
+    Spec.assertEqWith s "and the Bears it copied is a 5/1 that flies" (shape bearsId) (Just 5, Just 1, True)

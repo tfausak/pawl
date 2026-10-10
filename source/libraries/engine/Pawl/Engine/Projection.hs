@@ -94,6 +94,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.Plus as Plus
+import qualified Pawl.Types.PowerToughnessSticker as PowerToughnessSticker
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -3126,7 +3127,8 @@ honeAffected =
 
 -- CR 123.6 / 123.7 / 613.7k: each sticker on an object is a continuous effect
 -- on it at the sticker's own timestamp -- a name sticker's word in layer 3 (CR
--- 612.9) and an ability sticker's abilities in layer 6 (CR 613.1f). Every
+-- 612.9), an ability sticker's abilities in layer 6 (CR 613.1f) and a P/T
+-- sticker's numbers in layer 7b (CR 613.4b). Every
 -- object: both reach a card in any zone, and a hidden-zone move has already
 -- taken the sticker off (CR 123.5). Cased on the sticker's kind (CR 123.1);
 -- what an ability sticker grants is handed over unread (stickerGrants).
@@ -3146,6 +3148,16 @@ stickerGathered gs =
             gModification = m
           }
       itself oid = Affected.TheseObjects (Set.singleton oid)
+      -- CR 123.8 / 208.3a: a creature, or a creature or Vehicle card off the
+      -- battlefield. On the battlefield CR 208.3 (noncreaturePT) masks a
+      -- Vehicle until it becomes a creature.
+      setsPT =
+        Affected.MatchingAnywhere
+          ( Filter.Type.And
+              [ Filter.Type.IsSource,
+                Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.HasSubtype Subtype.Type.Vehicle]
+              ]
+          )
       parts oid placement =
         let ref = StickerPlacement.sticker placement
             named =
@@ -3154,7 +3166,11 @@ stickerGathered gs =
                 Just ws <- [Game.stickerWords ref gs]
               ]
             granted = fmap (at oid placement Layer.Ability (itself oid)) (foldMap stickerGrants (Game.abilityStickerOf ref gs))
-         in named <> granted
+            sized =
+              [ at oid placement Layer.SetPT setsPT (Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness (Just (Quantity.Type.Literal (PowerToughnessSticker.power pt))) (Just (Quantity.Type.Literal (PowerToughnessSticker.toughness pt)))))
+              | Just pt <- [Game.powerToughnessStickerOf ref gs]
+              ]
+         in named <> granted <> sized
    in [part | (oid, obj) <- Map.toList (GameState.objects gs), placement <- Foldable.toList (Object.stickers obj), part <- parts oid placement]
 
 -- CR 123.7 / 613.1f: an ability sticker's abilities as layer-6 grants, one per
