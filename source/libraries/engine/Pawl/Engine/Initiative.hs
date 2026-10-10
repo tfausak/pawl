@@ -30,7 +30,6 @@ import qualified Data.Sequence as Seq
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mint as Mint
-import qualified Pawl.Types.BeginningStep as BeginningStep
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Effect as Effect
 import Pawl.Types.Game (Game)
@@ -39,13 +38,10 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.InitiativeTarget as InitiativeTarget
-import qualified Pawl.Types.Phase as Phase
 import Pawl.Types.PlayerId (PlayerId)
-import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
-import qualified Pawl.Types.TurnScope as TurnScope
 
 -- CR 726.2 / 701.49d: "ventures into Undercity" -- a venture indicating the
 -- dungeon type Undercity (CR 205.3p), which Pawl.Engine.Dungeon.enterable reads
@@ -61,7 +57,7 @@ ventureIntoUndercity = Effect.Venture (Just Subtype.Undercity)
 upkeepVenture :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 upkeepVenture =
   Mint.trigger
-    (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn))
+    Mint.yourUpkeep
     (Seq.singleton ventureIntoUndercity)
 
 -- CR 726.2, second: "whenever one or more creatures a player controls deal

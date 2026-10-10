@@ -5,21 +5,30 @@ module Pawl.Engine.Mint where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
+import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Clause as Clause
 import Pawl.Types.Condition (Condition)
 import Pawl.Types.Effect (Effect)
+import Pawl.Types.Filter (Filter)
+import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import Pawl.Types.Optionality (Optionality)
 import qualified Pawl.Types.Optionality as Optionality
+import Pawl.Types.PayGate (PayGate)
+import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import Pawl.Types.SlotName (SlotName)
+import qualified Pawl.Types.SpellCast as SpellCast
+import qualified Pawl.Types.StepBegins as StepBegins
 import Pawl.Types.TargetSlot (TargetSlot)
 import Pawl.Types.TriggerCondition (TriggerCondition)
+import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.TurnScope as TurnScope
 
 -- | One clause (CR 608.2e) of these effects in order (CR 608.2c), with this
 -- optionality and nothing else: no "if you do", no "if", no "otherwise", no
@@ -30,6 +39,16 @@ clause optionality = Clause.MkClause Nothing Nothing Nothing optionality Nothing
 -- | A `clause` its controller must follow.
 mandatory :: Seq.Seq (Effect card ability) -> Clause.Clause card ability
 mandatory = clause Optionality.Mandatory
+
+-- | A `mandatory` clause that runs only if this condition holds as it resolves:
+-- a printed "if" scoped to one clause (CR 608.2c).
+mandatoryIf :: Condition -> Seq.Seq (Effect card ability) -> Clause.Clause card ability
+mandatoryIf condition = Clause.MkClause Nothing (Just condition) Nothing Optionality.Mandatory Nothing
+
+-- | A `mandatory` clause hung on this CR 118.12 payment offer: "unless", or
+-- "you may pay ... if you do", by the gate's branch.
+mandatoryPaying :: PayGate -> Seq.Seq (Effect card ability) -> Clause.Clause card ability
+mandatoryPaying gate = Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory (Just gate)
 
 -- | A `clause` its controller may decline as it resolves: "you may" (CR 603.5).
 youMay :: Seq.Seq (Effect card ability) -> Clause.Clause card ability
@@ -72,3 +91,29 @@ triggerOf condition intervening modal =
       TriggeredAbility.name = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
     }
+
+-- | "At the beginning of your upkeep" (CR 503.1): ControllersTurn with the
+-- ability's controller as "you".
+yourUpkeep :: TriggerCondition
+yourUpkeep = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn)
+
+-- | "Whenever ... casts a spell" (CR 601.2i), the filter naming whose and
+-- which: from any zone, on every occurrence rather than one counted one, and
+-- never for a copy.
+spellCast :: Filter Keyword -> TriggerCondition
+spellCast filter_ =
+  TriggerCondition.SpellCast
+    SpellCast.MkSpellCast
+      { SpellCast.filter = filter_,
+        SpellCast.scope = TurnScope.EachTurn,
+        SpellCast.zone = Nothing,
+        SpellCast.ordinal = Nothing,
+        SpellCast.phase = Nothing,
+        SpellCast.copies = False
+      }
+
+-- | "Whenever this creature deals combat damage to a player". A PLAYER and not
+-- an opponent: rules 702.70a, 702.99a, 702.112a and 702.115a all word it so,
+-- where Akki Lavarunner and Questing Beast print "to an opponent".
+dealsCombatDamageToAPlayer :: TriggerCondition
+dealsCombatDamageToAPlayer = TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer
