@@ -23,6 +23,7 @@ import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mint as Mint
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Sba as Sba
@@ -60,9 +61,6 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.ManaCost as ManaCost
-import qualified Pawl.Types.Modal as Modal
-import qualified Pawl.Types.Mode as Mode
-import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -95,13 +93,12 @@ answersFor answer gs game = snd (Replay.record answer gs game)
 -- Coating each have exactly one). Total: the empty-ability fallback is
 -- unreachable in this fixture.
 -- Same shape as ActivateSpec.theAbility -- duplicated per this test suite's
--- existing convention of group-local helpers (ActivateSpec and ManaSpec
--- already duplicate singleModeAbility the same way) rather than centralizing
--- a helper this small in Support.
+-- existing convention of group-local helpers rather than centralizing a helper
+-- this small in Support.
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)
 theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] 0 (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1)) [] Activator.Controller Nothing Nothing Nothing
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] 0 (Mint.oneModeOf Map.empty Seq.empty) [] Activator.Controller Nothing Nothing Nothing
 
 wasAskedToReplace :: [Response.Response] -> Bool
 wasAskedToReplace responses =

@@ -26,6 +26,7 @@ import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mint as Mint
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Replay as Replay
@@ -46,7 +47,6 @@ import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
-import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Concession as Concession
@@ -72,13 +72,11 @@ import qualified Pawl.Types.MeldSource as MeldSource
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
-import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.MulliganOffer as MulliganOffer
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
-import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.OutsideObject as OutsideObject
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
@@ -2461,9 +2459,7 @@ restartOnStack mountain =
           { ActivatedAbility.cost =
               Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
             ActivatedAbility.modal =
-              Modal.MkModal
-                (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.RestartGame Nothing)))) Map.empty))
-                (ModeSelection.ChooseExactly 1),
+              Mint.oneMode (Seq.singleton (Effect.RestartGame Nothing)),
             ActivatedAbility.maximumX = [],
             ActivatedAbility.minimumX = 0,
             ActivatedAbility.restrictions = [],

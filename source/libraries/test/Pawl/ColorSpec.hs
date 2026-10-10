@@ -30,6 +30,7 @@ import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mint as Mint
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -51,10 +52,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Layer as Layer
 import qualified Pawl.Types.ManaCost as ManaCost
-import qualified Pawl.Types.Modal as Modal
-import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
-import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -91,7 +89,7 @@ modeTargetSlot printing idx = case fmap Map.elems (Card.modeTargetSlots idx (S.c
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] 0 (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1)) [] Activator.Controller Nothing Nothing Nothing
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] 0 (Mint.oneModeOf Map.empty Seq.empty) [] Activator.Controller Nothing Nothing Nothing
 
 -- Koth's loyalty abilities in printed order: +2, -3, -7.
 kothUltimate :: Int

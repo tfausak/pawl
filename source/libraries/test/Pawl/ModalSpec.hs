@@ -17,6 +17,7 @@ import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Goad as Goad
+import qualified Pawl.Engine.Mint as Mint
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
@@ -29,7 +30,6 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ChooseBetween as ChooseBetween
-import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Draw as Draw
@@ -47,7 +47,6 @@ import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
-import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -196,8 +195,8 @@ modalReaderSpec s = Spec.describe s "M4h Modal reader" $ do
     let m =
           ModalT.MkModal
             ( Seq.fromList
-                [ Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1) Nothing))))) Map.empty,
-                  Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2) Nothing))))) Map.empty
+                [ Mode.MkMode (Seq.singleton (Mint.mandatory (Seq.singleton (Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1) Nothing))))) Map.empty,
+                  Mode.MkMode (Seq.singleton (Mint.mandatory (Seq.singleton (Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2) Nothing))))) Map.empty
                 ]
             )
             (ModeSelection.ChooseExactly 1) ::

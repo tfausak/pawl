@@ -81,7 +81,6 @@ import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
-import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.TypeLine as TypeLine
@@ -399,17 +398,12 @@ theRingDrainsOnCombatDamage =
               LifeLossCause.ByEffect
               Nothing
           )
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.PermanentDealsCombatDamageToPlayer (PermanentDealsCombatDamageToPlayer.MkPermanentDealsCombatDamageToPlayer yourRingBearer PlayerRelation.AnyPlayer),
-          TriggeredAbility.modal =
-            Mint.oneMode (Seq.singleton effect),
-          -- No intervening "if" (CR 603.4): rule 701.54c gives the emblem the ability
-          -- or does not, and an ability that exists and declines to trigger is a
-          -- different thing.
-          TriggeredAbility.intervening = Nothing,
-          TriggeredAbility.name = Nothing,
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+   in -- No intervening "if" (CR 603.4): rule 701.54c gives the emblem the ability
+      -- or does not, and an ability that exists and declines to trigger is a
+      -- different thing.
+      Mint.trigger
+        (TriggerCondition.PermanentDealsCombatDamageToPlayer (PermanentDealsCombatDamageToPlayer.MkPermanentDealsCombatDamageToPlayer yourRingBearer PlayerRelation.AnyPlayer))
+        (Seq.singleton effect)
 
 -- | CR 701.54c's first clause, "Your Ring-bearer is legendary", as the emblem's one
 -- static ability. Rulebook text minted here rather than card data, on this module's
