@@ -1,7 +1,6 @@
 module Pawl.Engine.Binding where
 
 import Control.Applicative ((<|>))
-import qualified Control.Monad as Monad
 import qualified Data.Foldable as Foldable
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -1416,18 +1415,18 @@ targetsOf = Map.filter (not . Set.null) . Map.mapMaybe Binding.targets
 
 -- The ONE object each of a binding environment's TARGET slots names, for a
 -- reader that compares a slot against a single id -- Pawl.Engine.Event.Match's
--- "that creature" trigger conditions. A Filter.Context's slot map is
--- objectsBySlot below, which keeps a slot naming several.
+-- "that creature" trigger conditions. oneBySlot's object half over the
+-- environment's own targets; a Filter.Context's slot map is objectsBySlot
+-- below, which keeps a slot naming several.
 objectSlots :: Map SlotName Binding -> Map SlotName ObjectId
 objectSlots = objectsIn . targetsOf
 
--- The PLAYERS a binding environment names, one slot at a time: objectSlots' twin
--- on the other kind of Recipient, and what Pawl.Engine.Filter.bakeBound
--- substitutes into a target slot's CR 603.2 "that player" atom.
+-- The PLAYER each target slot names, objectSlots' twin on the other kind of
+-- Recipient, and what Pawl.Engine.Filter.bakeBound substitutes into a target
+-- slot's CR 603.2 "that player" atom.
 --
--- No CR 608.2b legality filter, objectSlots' reason unchanged and sharper here:
--- the slot this is read for is `triggerPlayer`, which the EVENT bound and which
--- was never a target to become illegal.
+-- No CR 608.2b legality filter: the slot this is read for is `triggerPlayer`,
+-- which the EVENT bound and which was never a target to become illegal.
 playerSlots :: Map SlotName Binding -> Map SlotName PlayerId
 playerSlots = playersIn . targetsOf
 
@@ -1449,26 +1448,44 @@ slotPlayers = playersBySlot . targetsOf
 playersBySlot :: Map SlotName (Set Recipient) -> Map SlotName (Set PlayerId)
 playersBySlot = fmap (Set.fromList . Maybe.mapMaybe Recipient.playerOf . Set.toList)
 
--- playerSlots' inner half, over the PROJECTED targets a resolution already holds
--- rather than over a whole environment. Pawl.Engine.Resolve reads it that way:
--- its arms carry CR 601.2c's chosen recipients (already filtered by CR 608.2b)
--- rather than the object's bindings, and that is what a CR 611.2b duration's
--- condition is baked against at Pawl.Engine.Expiry.arm.
+-- oneBySlot's player half, over the PROJECTED targets a resolution already
+-- holds rather than over a whole environment. Pawl.Engine.Resolve reads it
+-- that way: its arms carry CR 601.2c's chosen recipients (already filtered by
+-- CR 608.2b) rather than the object's bindings, and that is what a CR 611.2b
+-- duration's condition is baked against at Pawl.Engine.Expiry.arm.
 playersIn :: Map SlotName (Set Recipient) -> Map SlotName PlayerId
-playersIn = Map.mapMaybe (Recipient.playerOf Monad.<=< onlyOne)
+playersIn = Map.mapMaybe Recipient.playerOf . oneBySlot
 
--- playersIn's twin on the OBJECT recipients, which is objectSlots' inner half:
--- what Pawl.Engine.Quantity.bakeBound bakes a ControllerOfBound or OwnerOfBound
--- to as a CR 611.2b duration begins.
+-- oneBySlot's object half, playersIn's twin: what Pawl.Engine.Quantity.bakeBound
+-- bakes a ControllerOfBound or OwnerOfBound to as a CR 611.2b duration begins.
 objectsIn :: Map SlotName (Set Recipient) -> Map SlotName ObjectId
-objectsIn = Map.mapMaybe (Recipient.objectOf Monad.<=< onlyOne)
+objectsIn = Map.mapMaybe Recipient.objectOf . oneBySlot
+
+-- The ONE recipient each slot of a TARGET map names: the singular read every
+-- helper above narrows, so a slot naming a player and an object answers neither
+-- (onlyOne's doctrine), and a slot an instruction bound to a GROUP is not in
+-- the map to answer at all.
+--
+-- Targets only, deliberately, where recipientsBySlot below reads the whole
+-- slot. The CR has no binding shape to choose between: a singular back
+-- reference ("that creature", CR 608.2c) has a singular antecedent, so each
+-- binder writes one object as the single shape (Resolve.bindMinted) and a
+-- group only where the instruction may produce several. A singular reader of
+-- a slot that can hold a group is therefore a card authored against the wrong
+-- antecedent, and Pawl.EffectLintSpec's "no card reads a slot a plural move
+-- bound with a singular reader" rejects it -- a lint that holds only while a
+-- group, even of one, answers Nothing here rather than working on the boards
+-- where it happens to hold one. Pawl.AbilitySlotLintSpec's "no multi-target
+-- slot is read one at a time" is the same fence for a slot CR 601.2c gave
+-- several targets.
+oneBySlot :: Map SlotName (Set Recipient) -> Map SlotName Recipient
+oneBySlot = Map.mapMaybe onlyOne
 
 -- The ONE recipient a slot names, or Nothing when it names none or several. What
 -- every reader that can point at one object and no more asks of a slot -- CR
 -- 601.2c lets a slot hold several, and a reader that cannot take them must not
 -- silently take one of them. Pawl.Engine.Filter.slotOneObject states the same
--- doctrine over a Filter.Context, and Pawl.CardSpec's "no multi-target slot is
--- read one at a time" rejects a card that aims such a slot at one of them.
+-- doctrine over a Filter.Context's whole slot.
 onlyOne :: Set Recipient -> Maybe Recipient
 onlyOne rs = case Set.toList rs of
   [r] -> Just r
