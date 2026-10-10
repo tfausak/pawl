@@ -30,7 +30,6 @@ import qualified Pawl.Types.Emperors as Emperors
 import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
 import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.Face as Face
-import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameSettings as GameSettings
@@ -40,7 +39,6 @@ import qualified Pawl.Types.GraveyardOrder as GraveyardOrder
 import Pawl.Types.HandActionPerformer (HandActionPerformer)
 import qualified Pawl.Types.LeftTheGame as LeftTheGame
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
-import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -50,10 +48,8 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.RestartSignal as RestartSignal
-import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Status as Status
-import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Zone as Zone
@@ -348,76 +344,9 @@ placeCard :: Zone.Zone -> PlayerId -> PrintingId.PrintingId -> GameState -> (Obj
 placeCard zone pid printingId gs =
   let (oid, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
-      obj = blankObject oid zone pid printingId ts
+      obj = Game.cardObject oid pid printingId zone ts
       withObject = gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2)}
    in (oid, Game.insertIntoZone zone LibraryPosition.Bottom pid oid withObject)
-
--- | A card's object as it first exists, before anything has happened to it.
-blankObject :: ObjectId -> Zone.Zone -> PlayerId -> PrintingId.PrintingId -> Timestamp.Timestamp -> Object.Object
-blankObject oid zone pid printingId ts =
-  Object.MkObject
-    { Object.owner = pid,
-      Object.identity = Just (Game.mintIdentity oid pid),
-      Object.enteredUnder = Nothing,
-      Object.source = Source.OfCard printingId,
-      Object.zone = zone,
-      Object.tapped = TapState.Untapped,
-      Object.facing = Facing.FaceUp,
-      Object.flipped = False,
-      Object.exiledFaceDown = False,
-      Object.exileLookers = Set.empty,
-      Object.damage = 0,
-      Object.sickness = Sickness.Sick,
-      Object.controlClock = Map.empty,
-      Object.bindings = Map.empty,
-      Object.counters = Map.empty,
-      Object.counterTimestamps = Map.empty,
-      Object.attachedTo = Nothing,
-      Object.chosenColors = Set.empty,
-      Object.chosenSubtype = Nothing,
-      Object.chosenNames = Set.empty,
-      Object.chosenPlayer = Nothing,
-      Object.timestamp = ts,
-      Object.face = Nothing,
-      Object.turnedOverAt = Nothing,
-      Object.worldSince = Nothing,
-      Object.playableFromExile = Nothing,
-      Object.plotted = Nothing,
-      Object.foretold = Nothing,
-      Object.foretellCostReduction = Nothing,
-      Object.warped = Nothing,
-      Object.preparedCopyOf = Nothing,
-      Object.ringBearerFor = Nothing,
-      Object.stickers = Seq.empty,
-      Object.duplicate = Nothing,
-      Object.paired = Nothing,
-      Object.protector = Nothing,
-      Object.ventureRoom = Nothing,
-      Object.classLevel = Nothing,
-      Object.unlockedHalves = Set.empty,
-      Object.designations = Set.empty,
-      Object.designationValues = Map.empty,
-      Object.storedResults = Map.empty,
-      Object.paidCosts = Map.empty,
-      Object.tributePaid = False,
-      Object.bestowed = False,
-      Object.mutating = False,
-      Object.prototyped = False,
-      Object.boughtBack = False,
-      Object.unannounced = False,
-      Object.spliced = Seq.empty,
-      Object.phyrexianLifePaid = 0,
-      Object.manaSpent = Mana.MkMana [],
-      Object.announcedX = Nothing,
-      Object.castFrom = Nothing,
-      Object.castUsing = Nothing,
-      Object.castGrant = Nothing,
-      Object.detainedUntil = Set.empty,
-      Object.goadedBy = Set.empty,
-      Object.doesNotUntapFor = 0,
-      Object.exertedBy = Set.empty,
-      Object.activatedOnce = Map.empty
-    }
 
 -- Build each player's library from their deck's multiset, shuffle, draw.
 -- CR 103.1: build this player's library from their deck -- and, for a Commander

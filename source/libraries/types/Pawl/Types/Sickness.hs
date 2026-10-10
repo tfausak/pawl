@@ -25,7 +25,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- Everything else writes `Sick`, CR 400.7 making a zone change or a new token a
 -- new object no player has controlled for any time. The exception is an object
 -- built directly onto the stack or into the command zone -- an ability, an emblem
--- -- stamped `Settled` under its own controller: every reader is
+-- -- stamped `Settled` under its own controller by Object.newSettled: every reader is
 -- battlefield-gated, so the value is inert rather than an assertion. A spell is
 -- not in that group; it reaches the stack through Event.changeZone.
 data Sickness
