@@ -1738,15 +1738,17 @@ sourceOfWithLastKnown oid gs = case lookupObject oid gs of
 -- silently restamp a face-down card in exile, whose stamp names its
 -- Pawl.Types.Pile.
 --
--- Not implemented: CR 613.7k's sticker restamp after this CR 613.7f timestamp
--- (#872).
+-- CR 613.7k: the stickers on it take new timestamps right after its own.
+-- Pawl.StickerSpec's "a turned-up permanent's name sticker restamps after an
+-- earlier Witness Protection" proves it.
 turnFacing :: Facing.Facing -> ObjectId -> GameState -> GameState
 turnFacing facing oid gs =
   let (ts, stamped) = freshTimestamp gs
       restamps = Set.member oid (GameState.battlefield gs)
       next = if restamps then stamped else gs
       adjust o = o {Object.facing = facing, Object.timestamp = if restamps then ts else Object.timestamp o}
-   in next {GameState.objects = Map.adjust adjust oid (GameState.objects next)}
+      turned = next {GameState.objects = Map.adjust adjust oid (GameState.objects next)}
+   in if restamps then restampStickers oid turned else turned
 
 -- CR 712.16 / 730.2j: the permanent is represented by a double-faced card or
 -- token, or is melded or merged with a double-faced component, so it can't be
@@ -1801,13 +1803,13 @@ isDoubleFacedPermanent oid gs = case lookupObject oid gs of
 -- footing Object.face is stored on: CR 712.9's first Example turns on a Clone
 -- being a one-faced card whatever it copied, and that is the same read.
 --
--- Not implemented: CR 613.7k's sticker restamp after this CR 613.7g timestamp
--- (#872).
+-- CR 613.7k: the stickers on it take new timestamps right after its own. A
+-- regression fence: no test transforms a stickered permanent.
 turnFaceOver :: Timestamp.Timestamp -> ObjectId -> GameState -> GameState
 turnFaceOver now oid gs = case (turnsTo oid gs, lookupObject oid gs) of
   (Just name, Just object) ->
     let (ts, stamped) = freshTimestamp gs
-     in stamped {GameState.objects = Map.insert oid (turnedTo name object) {Object.turnedOverAt = Just now, Object.timestamp = ts} (GameState.objects stamped)}
+     in restampStickers oid stamped {GameState.objects = Map.insert oid (turnedTo name object) {Object.turnedOverAt = Just now, Object.timestamp = ts} (GameState.objects stamped)}
   _ -> gs
 
 -- CR 701.27a's write on the object itself: show `name`, and for a merged

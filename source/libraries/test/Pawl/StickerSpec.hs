@@ -697,3 +697,21 @@ spec s registry = Spec.describe s "Sticker" $ do
         (_, after, _) = entersNaming harold (placingAt (Just bearsId) otter 1) g2
     Spec.assertEqWith s "CR 123.6a Grizzly Otter Bears is a 3/3" (Projection.powerOf bearsId after) (Just 3)
     Spec.assertEqWith s "CR 123.6a Trespasser, one word, is still a 2/1" (Projection.powerOf tId after) (Just 2)
+  -- CR 613.7f gives the turned-up Tracker a new timestamp and CR 613.7k gives
+  -- its sticker one right after it, now later than the Aura: the word shows.
+  Spec.it s "CR 613.7k a turned-up permanent's name sticker restamps after an earlier Witness Protection" $ do
+    sheets <- committedSheets
+    baaallerina <- S.printingOf s registry "Baaallerina"
+    tracker <- S.printingOf s registry "Ainok Tracker"
+    protection <- S.printingOf s registry "Witness Protection"
+    breakOpen <- S.printingOf s registry "Break Open"
+    mountain <- S.printingOf s registry "Mountain"
+    let (trackerId, g1) = S.addPermanent tracker S.alice (S.landsFor mountain S.bob 2 (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)))
+        hidden = g1 {GameState.objects = Map.adjust (\o -> o {Object.facing = Facing.faceDown FaceDownReason.TurnedFaceDown}) trackerId (GameState.objects g1)}
+        (_, named, _) = entersNaming baaallerina (placingAt (Just trackerId) night 0) hidden
+        (auraId, g2) = S.addPermanent protection S.alice named
+        enchanted = S.attach auraId trackerId g2
+        (breakId, g3) = S.addHandCard breakOpen S.bob enchanted
+        revealed = S.runPure (namingTarget trackerId) (g3 {GameState.priority = Just S.bob}) (S.cast S.bob breakId >> Stack.resolveTop)
+    Spec.assertEqWith s "CR 613.7k face up, the restamped sticker follows the Aura: Night Legitimate Businessperson" (nameTexts trackerId revealed) [Text.pack "Night Legitimate Businessperson"]
+    Spec.assertEqWith s "CR 613.7 face down, the later Aura hides the word" (nameTexts trackerId enchanted) [Text.pack "Legitimate Businessperson"]
