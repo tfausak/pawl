@@ -80,13 +80,35 @@ spec s = Spec.describe s "Pawl.Engine.Binding" $ do
     Spec.assertEq s (Binding.targetsOf m) $ Map.singleton slot (Set.singleton r)
 
   -- CR 601.2c: a slot may name several targets, and a reader that can take only
-  -- one must decline rather than pick. Pawl.CardSpec's arity lint is what keeps a
-  -- card from reaching this in the first place, so this is the only place the
-  -- declining itself is asserted.
+  -- one must decline rather than pick. Pawl.AbilitySlotLintSpec's "no
+  -- multi-target slot is read one at a time" keeps a card from reaching this in
+  -- the first place, so this is the only place the declining itself is asserted.
   Spec.it s "onlyOne takes a lone recipient" $
     Spec.assertEq s (Binding.onlyOne (Set.singleton (Recipient.ToPlayer S.alice))) (Just (Recipient.ToPlayer S.alice))
   Spec.it s "onlyOne declines a slot that names several" $
     Spec.assertEq s (Binding.onlyOne (Set.fromList [Recipient.ToPlayer S.alice, Recipient.ToPlayer S.bob])) Nothing
+
+  -- The singular readers take a slot's TARGETS alone (Binding.oneBySlot's note),
+  -- so a group never answers one, even a group of one, while the whole-slot
+  -- reader names its member. Paired with the single binding of the same object.
+  Spec.it s "a singular reader declines a group of one that the whole-slot reader names" $
+    let oid = ObjectId.MkObjectId 7
+        group = Map.singleton slotTokens (Binding.toObjects (Seq.singleton oid))
+        single = Map.singleton slotTokens (Binding.toObject oid)
+     in Spec.assertEqWith s "the group of one answers no singular read" (Binding.objectSlots group) Map.empty
+          *> Spec.assertEqWith s "the single binding answers it" (Binding.objectSlots single) (Map.singleton slotTokens oid)
+          *> Spec.assertEqWith s "the whole-slot reader names the member" (Binding.slotObjects group) (Map.singleton slotTokens (Set.singleton oid))
+
+  -- onlyOne's doctrine over the recipients rather than over one kind of them: a
+  -- slot naming a player beside an object names several, so neither half
+  -- answers. Paired with the object alone.
+  Spec.it s "a singular reader declines a slot naming a player beside an object" $
+    let oid = ObjectId.MkObjectId 7
+        mixed = Map.singleton slotTokens (Binding.toRecipients (Set.fromList [Recipient.ToPlayer S.alice, Recipient.ToObject oid]))
+        alone = Map.singleton slotTokens (Binding.toRecipients (Set.singleton (Recipient.ToObject oid)))
+     in Spec.assertEqWith s "the mixed slot answers no object" (Binding.objectSlots mixed) Map.empty
+          *> Spec.assertEqWith s "nor a player" (Binding.playerSlots mixed) Map.empty
+          *> Spec.assertEqWith s "the object alone answers" (Binding.objectSlots alone) (Map.singleton slotTokens oid)
 
   -- An empty answer is no binding at all, which is what keeps CR 608.2b measuring
   -- the slots FILLED rather than the slots offered (CR 115.6).
