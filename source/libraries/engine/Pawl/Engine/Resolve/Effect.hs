@@ -8483,10 +8483,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     Nothing -> pure ()
     Just battle -> State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.protector = Just controller}) battle (GameState.objects g)})
   -- CR 702.100b and CR 702.149c: the slot's permanent evolves or trains only if
-  -- the placement put one or more counters on it, so a placement CR 614.16
-  -- replaced away to nothing marks nothing. The event names that permanent, each
-  -- rule's "it". The Solemnity scenarios under data/scenarios/attack-keyword-trigger/
-  -- prove the gate.
+  -- the placement put one or more counters on it, so a placement replaced away
+  -- (CR 614.16) or forbidden marks nothing. The event names that permanent, each
+  -- rule's "it". The scenario "CR 702.100b a placement Solemnity forbids is no
+  -- evolution" proves the gate.
   Effect.CounterAndMark (PermanentActed.MkPermanentActed action slot) -> case legalOne slot legal >>= Recipient.objectOf of
     Nothing -> pure ()
     Just target -> do
