@@ -24,13 +24,11 @@ module Pawl.Engine.Attach where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
-import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Engine.AttachRestriction as AttachRestriction
 import qualified Pawl.Engine.Card as Card
-import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
@@ -411,23 +409,11 @@ turnUpHosts controller aura filter_ gs =
 -- controller for an effect naming one destination (CR 608.2d), and the subject's
 -- own controller where CR 303.4d or CR 301.5c reassigns it -- see arbitrate.
 --
--- ELIDED AT ONE CANDIDATE, the Prompt.ChooseAttachment posture: with a single
--- destination there is nothing to decide. The current host is never among the
--- candidates (CR 701.3b), so it is not being withheld.
---
--- FILTERED, NOT TRUSTED: an answer naming something that was never offered falls
--- back to the first candidate, since a caller that got this far must pick
--- something.
+-- Asked through Game.chooseAmong. The current host is never among the
+-- candidates (CR 701.3b), so eliding the ask at one candidate withholds nothing.
 chooseHost :: PlayerId -> ObjectId -> [ObjectId] -> Game (Maybe ObjectId)
-chooseHost controller subject candidates = case candidates of
-  [] -> pure Nothing
-  first : rest -> case rest of
-    [] -> pure (Just first)
-    second : more -> do
-      gs <- State.get
-      let offered = first NonEmpty.:| (second : more)
-      answer <- Game.choose (Prompt.ChooseAttachment (Decide.deciderFor controller gs) controller subject offered)
-      pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
+chooseHost controller subject =
+  Game.chooseAmong (\decider asked -> Prompt.ChooseAttachment decider asked subject) controller
 
 -- CR 303.4d and CR 301.5c, whose closing sentences are the same rule twice: "an
 -- Aura can't enchant more than one object or player. If a spell or ability would

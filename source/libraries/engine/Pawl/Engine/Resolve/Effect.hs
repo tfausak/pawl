@@ -76,7 +76,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Recruit as Recruit
 import qualified Pawl.Engine.Replacement as Replacement
-import Pawl.Engine.Resolve.Slots (battlefieldMatching, boundSlots, conditionSlots, effectContext, effectContextNaming, effectObjectRefs, effectPlayerRefs, effectViewOf, graveyardCardsOf, handCardsOf, legalMany, legalOne, libraryCardsOf, matchingFromAmong, objectRefObjects, overRelations, playerRefPlayers, replacementRowSlots, resolutionReads, slotBindings, slotGroup, zoneScopePlayers)
+import Pawl.Engine.Resolve.Slots (battlefieldMatching, boundSlots, conditionSlots, effectContext, effectContextNaming, effectObjectRefs, effectPlayerRefs, effectViewOf, graveyardCardsOf, handCardsOf, legalMany, legalOne, libraryCardsOf, matchingFromAmong, objectRefObjects, overRelations, playerRefPlayers, replacementRowSlots, resolutionReads, slotBindings, slotGroup)
 import qualified Pawl.Engine.Restamp as Restamp
 import qualified Pawl.Engine.Ring as Ring
 import qualified Pawl.Engine.Room as Room
@@ -701,23 +701,19 @@ oneSeat legal controller gs ref = case playerRefPlayers legal controller gs ref 
 
 -- CR 608.2d's singular battlefield choice, hoisted so that every opcode making
 -- one asks it the same way: the candidates are the ability's own reading of the
--- Filter whoever chooses, the ask is skipped at no candidate (CR 101.3) and at
--- one (CR 608.2d admitting one legal announcement), and the answer is FILTERED
--- rather than trusted (#222).
+-- Filter whoever chooses, asked through Game.chooseAmong. The chooser is
+-- named only when two or more candidates make it a real choice, so CR 800.4g's
+-- reassignment is not asked for a choice that has one answer.
 chosenPermanentOf :: Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> PlayerRef -> Game [ObjectId]
 chosenPermanentOf legal resolving controller source filter_ chooser = do
   gs <- State.get
   case battlefieldMatching legal resolving controller source gs filter_ of
-    [] -> pure []
-    [only] -> pure [only]
-    first : second : more -> do
+    candidates@(_ : _ : _) -> do
       asked <- askedChooser source controller legal chooser
       case asked of
-        Just who -> do
-          let offered = first NonEmpty.:| (second : more)
-          answer <- Game.choose (Prompt.ChoosePermanent (Decide.deciderFor who gs) who source offered)
-          pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
+        Just who -> fmap Maybe.maybeToList (Game.chooseAmong (\decider answerer -> Prompt.ChoosePermanent decider answerer source) who candidates)
         Nothing -> pure []
+    atMostOne -> pure atMostOne
 
 askedChooser :: ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> PlayerRef -> Game (Maybe PlayerId)
 askedChooser source controller legal ref = do
@@ -988,7 +984,7 @@ alreadyTurnedFor resolving victim gs =
 -- 404.2), which no rule makes a batch's processing order.
 graveyardCards :: Filter.Context -> Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> ZoneScope.ZoneScope -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
 graveyardCards context bindings controller gs scope filter_ =
-  concatMap (\pid -> graveyardCardsOf context gs pid filter_) (zoneScopePlayers bindings controller gs scope)
+  concatMap (\pid -> graveyardCardsOf context gs pid filter_) (Target.zoneScopePlayers (Just controller) bindings scope gs)
 
 -- The seats an ObjectRef.ChosenCardInHand asks -- and an
 -- ObjectRef.RandomCardInHand reads -- in APNAP order. One list, not a chooser
@@ -2422,7 +2418,7 @@ randomCardsInGraveyard resolving source controller legal (RandomCardInGraveyard.
       context = effectContext gs controller source legal (slotBindings resolving gs)
       wanted = maybe 0 Integer.toNaturalSaturating (Quantity.evaluateFor viewOf context gs resolving source count)
   fmap concat . Monad.mapM (\pid -> pickAtRandom wanted (graveyardCardsOf context gs pid filter_)) $
-    zoneScopePlayers legal controller gs scope
+    Target.zoneScopePlayers (Just controller) legal scope gs
 
 -- Alchemy's seek: the cards randomness names out of each library the ref
 -- reaches. The ONE asking read of ObjectRef.RandomCardInLibrary, made by
@@ -3589,7 +3585,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
         positive count && case chooser of
           Chooser.TheController -> null (graveyardCards context legal controller gs scope filter_)
           Chooser.EachInScope ->
-            let scoped = zoneScopePlayers legal controller gs scope
+            let scoped = Target.zoneScopePlayers (Just controller) legal scope gs
              in not (null scoped) && all (\pid -> null (graveyardCardsOf context gs pid filter_)) scoped
           Chooser.BoundInSlot _ -> False
       ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong slot filter_ count _ _) ->
@@ -4400,7 +4396,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- within the controller's range.
   Effect.ExileAllGraveyards -> do
     gs <- State.get
-    let gyCards = concatMap (\pid -> Game.zoneMembers Zone.Graveyard pid gs) (Game.reachableBy controller gs)
+    let gyCards = concatMap (\pid -> Game.zoneMembers Zone.Graveyard pid gs) (Players.table (Just controller) gs)
     Monad.void (Event.changeZonesTogether (fmap (\c -> (c, Zone.Exile)) gyCards))
   -- CR 103.5b (Serum Powder): the count is the hand size BEFORE the exile, which
   -- is why this is one opcode rather than an exile followed by a Draw. Both
@@ -5348,7 +5344,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   Chooser.TheController -> ask controller (graveyardCards (chooseContext gs) legal controller gs scope filter_)
                   Chooser.EachInScope ->
                     fmap (fmap snd . Foldable.toList) . Monad.foldM (\made pid -> pick made pid wanted (graveyardCardsOf (chooseContext gs) gs pid filter_)) Seq.empty $
-                      zoneScopePlayers legal controller gs scope
+                      Target.zoneScopePlayers (Just controller) legal scope gs
                   -- ONE chooser, read out of the slot a ChoosePlayer bound,
                   -- choosing out of their own graveyard. Through playerRefPlayers so
                   -- the slot is read as every other is (CR 608.2b): an unfilled,
@@ -5357,7 +5353,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   -- a chooser the scope does not name is offered nothing.
                   Chooser.BoundInSlot slot ->
                     case playerRefPlayers legal controller gs (PlayerRef.InSlot slot) of
-                      [pid] | List.elem pid (zoneScopePlayers legal controller gs scope) -> ask pid (graveyardCardsOf (chooseContext gs) gs pid filter_)
+                      [pid] | List.elem pid (Target.zoneScopePlayers (Just controller) legal scope gs) -> ask pid (graveyardCardsOf (chooseContext gs) gs pid filter_)
                       _ -> pure []
               -- The arm above over the hidden zone CR 400.2 makes a hand: what it
               -- says about when the candidates are read (CR 608.2c), about the asks
@@ -6834,7 +6830,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- records as the draw.
   Effect.DrawGame -> do
     gs <- State.get
-    let drawn = Game.reachableBy controller gs
+    let drawn = Players.table (Just controller) gs
     Departure.leaveGameTogether Departure.Type.Drew (filter (`elem` drawn) (Game.apnapOrder gs))
   -- CR 119.7 / 119.8: redistribute life totals, each new total being CR 119.5's
   -- gain or loss of the necessary amount. The roster is CR 102.1's players IN the
@@ -6859,7 +6855,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- (#4493).
   Effect.RedistributeLifeTotals -> do
     gs <- State.get
-    let candidates = Game.reachableBy controller gs
+    let candidates = Players.table (Just controller) gs
         lifeOf pid = maybe 0 Player.life (Map.lookup pid (GameState.players gs))
         offered = fmap (\pid -> (pid, lifeOf pid)) candidates
     -- With one candidate or none every assignment is the same, so there is
@@ -7012,7 +7008,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           [] -> controller
         -- turnOrderFrom answers the SEATING roster (CR 800.5), so stillPlaying
         -- is what keeps a departed seat from being asked to vote.
-        voters = filter (\pid -> List.elem pid (Game.reachableBy controller gs)) (Game.turnOrderFrom begin gs)
+        voters = filter (\pid -> List.elem pid (Players.table (Just controller) gs)) (Game.turnOrderFrom begin gs)
         -- CR 701.38d: a seat given extra votes casts them ALL here, before the
         -- next seat votes -- "at the same time the player would otherwise have
         -- voted" (Brago's Representative). Each is its own prompt: that card's
@@ -10530,7 +10526,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
 proliferateOnce :: PlayerId -> Game ()
 proliferateOnce controller = do
   gs <- State.get
-  let everyone = Game.reachableBy controller gs
+  let everyone = Players.table (Just controller) gs
       grants = Projection.controlGrants gs
       kindsOn oid = foldMap (Map.keys . Map.filter (> 0) . Object.counters) (Game.lookupObject oid gs)
       kindsFor pid = foldMap (Map.keys . Map.filter (> 0) . Player.counters) (Map.lookup pid (GameState.players gs))

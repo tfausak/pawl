@@ -36,6 +36,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
+import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Discarded as Discarded
 import qualified Pawl.Types.DuplicateCard as DuplicateCard
 import Pawl.Types.Face (Face)
@@ -387,6 +388,22 @@ choose :: Prompt.Prompt a -> Game a
 choose p = do
   State.modify' (\gs -> gs {GameState.lastChoice = GameState.nextTimestamp gs})
   ask p
+
+-- | @chooser@ picks one of @candidates@ through the prompt @question@ builds,
+-- THE ask-and-check of every choice of one player or object from a list the
+-- caller fixed. Nothing at no candidate (CR 101.3); elided at one, the options
+-- being indistinguishable. The answer is FILTERED rather than trusted, falling
+-- back to the first candidate, since every caller's choice is mandatory. The
+-- candidates are the caller's, CR 801.5a's range cut included.
+chooseAmong :: (Eq a) => (Decider.Decider -> PlayerId -> NonEmpty.NonEmpty a -> Prompt.Prompt a) -> PlayerId -> [a] -> Game (Maybe a)
+chooseAmong question chooser candidates = case candidates of
+  [] -> pure Nothing
+  [sole] -> pure (Just sole)
+  first : second : rest -> do
+    gs <- State.get
+    let offered = first NonEmpty.:| (second : rest)
+    answer <- choose (question (Decide.deciderFor chooser gs) chooser offered)
+    pure (Just (if elem answer offered then answer else first))
 
 -- CR 801.16: record that an object this player controls took part in what the
 -- game is doing now (GameState.loopInvolvement). Called where a triggered
@@ -2483,12 +2500,6 @@ neighbours you gs = case List.break (== you) (seatsThisTurn gs) of
      in Set.toList (Set.fromList (Maybe.maybeToList (Maybe.listToMaybe others) <> Maybe.maybeToList (Maybe.listToMaybe (reverse others))))
   (_, []) -> []
 
--- CR 801.10 / 801.5a: the players still in the game within @you@'s range -- the
--- table a spell or ability of theirs reaches, and the one a choice they make
--- offers. stillPlaying, in its order, under an unlimited range.
-reachableBy :: PlayerId -> GameState -> [PlayerId]
-reachableBy you gs = filter (\pid -> inRangeOf you pid gs) (stillPlaying gs)
-
 -- CR 102.3 with CR 104.2a: this player's opponents who are still in the game, in
 -- stillPlaying's PlayerId order -- which is the order the offers built from it
 -- were already in. A caller wanting the seating order filters turnOrderFrom
@@ -2535,10 +2546,13 @@ primaryOf gs pid =
 --
 -- CR 805.9 names one active player for an ABILITY; for these rules nothing
 -- does, so the active team decides, and CR 805.2 gives its unsettled choice to
--- its primary player. Asked only between two or more eligible active players;
--- the answer is filtered, not trusted. Without the shared team turns option
--- Turn.activePlayers is the active seat alone, so nothing is asked. Pawl.TeamSpec's
--- "CR 725.4 the active team's primary player names the new monarch" proves it.
+-- its primary player, asked through chooseAmong among the eligible active
+-- players within their range (CR 801.5a). Without the shared team turns option
+-- Turn.activePlayers is the active seat alone, so nothing is asked. The team
+-- scenario "CR 725.4 the active team's primary player names the new monarch"
+-- proves the ask, and the range-of-influence scenario "CR 801.5a / 725.4 the
+-- active team's primary player names a monarch within range" the cut. A primary
+-- player reaching no eligible active player takes the first of them.
 --
 -- The walk anchors on the ACTIVE seat and excludes it, unlike
 -- Engine.nextStillPlaying's CR 800.4a walk, which anchors on the departing
@@ -2552,13 +2566,10 @@ heirOnDeparture eligible = do
       walk = case List.break (== active) (GameState.turnOrder gs) of
         (before, _ : after) -> after <> before
         (before, []) -> before
+      chooser = primaryOf gs active
   case live of
     [] -> pure (List.find eligible walk)
-    [one] -> pure (Just one)
-    first : rest -> do
-      let chooser = primaryOf gs active
-      answer <- choose (Prompt.ChooseActivePlayer (Decide.deciderFor chooser gs) chooser (first NonEmpty.:| rest))
-      pure (Just (if List.elem answer live then answer else first))
+    first : _ -> fmap (Just . Maybe.fromMaybe first) (chooseAmong Prompt.ChooseActivePlayer chooser (filter (\pid -> inRangeOf chooser pid gs) live))
 
 -- apnapOrder's generalisation: the seating roster rotated to start with the
 -- player NAMED rather than with the active player. CR 701.38a's vote is the

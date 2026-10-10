@@ -13,7 +13,7 @@
 -- worldVictims (CR 801.12), Pawl.Engine.Event.Trigger's eventWithinRange (CR
 -- 801.7), Pawl.Engine.Replacement's reaches, preventsInRange and
 -- redirectDestination (CR 801.13), Pawl.Engine.Resolve.Slots'
--- playerRefPlayers, zoneScopePlayers and battlefieldMatching,
+-- playerRefPlayers and battlefieldMatching, Pawl.Engine.Target.zoneScopePlayers,
 -- Pawl.Engine.Resolve.Effect's objectRefRecipients, Pawl.Engine.Count's
 -- playersFor and the choice offers Pawl.Engine.Players.offer and
 -- Game.inRangeOf feed (CR 801.5a, 801.10, 801.11), and
