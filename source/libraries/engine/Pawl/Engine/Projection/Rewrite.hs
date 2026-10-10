@@ -173,6 +173,7 @@ import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
 import qualified Pawl.Types.PermanentsDealCombatDamageToPlayer as PermanentsDealCombatDamageToPlayer
+import qualified Pawl.Types.PlacesSticker as PlacesSticker
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
@@ -2048,7 +2049,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PlayerWaterbends _ -> condition
   TriggerCondition.PlayerAirbends _ -> condition
   TriggerCondition.PlayerFirebends _ -> condition
-  TriggerCondition.PlacesSticker _ -> condition
+  TriggerCondition.PlacesSticker p -> TriggerCondition.PlacesSticker p {PlacesSticker.object = Filter.rewrite pairs (PlacesSticker.object p)}
   TriggerCondition.PlayerCompletesDungeon _ -> condition
   TriggerCondition.PlayerSurveils _ -> condition
   TriggerCondition.PlayerPlaysLand payload -> TriggerCondition.PlayerPlaysLand payload {PlaysLand.filter = Filter.rewrite pairs (PlaysLand.filter payload)}
@@ -2243,6 +2244,8 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.PartySize _ -> quantity
   Quantity.Type.ObjectCounters _ -> quantity
   Quantity.Type.ObjectCountersOfAnyKind -> quantity
+  Quantity.Type.LettersOnNameStickers _ -> quantity
+  Quantity.Type.NameStickers -> quantity
   Quantity.Type.OpponentsAttacked _ -> quantity
   Quantity.Type.AttackersDeclaredThisTurn _ -> quantity
   Quantity.Type.AttackersDeclaredThisCombat -> quantity

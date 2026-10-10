@@ -2693,7 +2693,7 @@ everyTriggerCondition =
     TriggerCondition.PlayerFirebends PlayerRelation.You,
     TriggerCondition.PlayerFirebends PlayerRelation.Opponent,
     TriggerCondition.PlayerFirebends PlayerRelation.AnyPlayer,
-    TriggerCondition.PlacesSticker (PlacesSticker.MkPlacesSticker PlayerRelation.You (Set.singleton StickerKind.Art))
+    TriggerCondition.PlacesSticker (PlacesSticker.MkPlacesSticker PlayerRelation.You (Set.singleton StickerKind.Art) (Filter.Type.And []))
   ]
 
 -- CR 702.46 soulshift N, the first minted keyword ability that TARGETS A CARD IN

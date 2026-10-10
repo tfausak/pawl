@@ -273,6 +273,7 @@ import qualified Pawl.Types.PermissionLimit as PermissionLimit
 import qualified Pawl.Types.PermissionPool as PermissionPool
 import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
+import qualified Pawl.Types.PlacesSticker as PlacesSticker
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
@@ -4221,6 +4222,8 @@ quantityKindFilters quantity = case quantity of
   -- The kind-agnostic reading of that same tally: no CounterKind beside it, so
   -- nothing to dig out.
   Quantity.Type.ObjectCountersOfAnyKind -> []
+  Quantity.Type.LettersOnNameStickers _ -> []
+  Quantity.Type.NameStickers -> []
   Quantity.Type.OpponentsAttacked _ -> []
   Quantity.Type.AttackersDeclaredThisTurn _ -> []
   Quantity.Type.AttackersDeclaredThisCombat -> []
@@ -4623,7 +4626,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PlayerWaterbends _ -> []
   TriggerCondition.PlayerAirbends _ -> []
   TriggerCondition.PlayerFirebends _ -> []
-  TriggerCondition.PlacesSticker _ -> []
+  TriggerCondition.PlacesSticker placesSticker -> unframed [PlacesSticker.object placesSticker]
   -- CR 701.44b DOES carry one, a predicate over the explorer -- Wildgrowth
   -- Walker's "a creature you control" -- which the card lint must sweep.
   TriggerCondition.PermanentExplores f -> unframed [f]

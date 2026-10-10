@@ -660,3 +660,29 @@ spec s registry = Spec.describe s "Sticker" $ do
     Spec.assertEqWith s "CR 123.6e two +1/+1 counters for Otter" (S.counterOf CounterKind.PlusOnePlusOne saurusId after) 2
     Spec.assertEqWith s "CR 123.6a it is _____-o-saurus Otter" (nameTexts saurusId after) [Text.pack "_____-o-saurus Otter"]
     Spec.assertEqWith s "CR 123.6a one word, two positions" asked [Positioned S.alice [0, 1]]
+  Spec.it s "CR 123.6 Trespasser gets +1/+0 for its one name sticker" $ do
+    sheets <- committedSheets
+    trespasser <- S.printingOf s registry "_____ _____ _____ Trespasser"
+    island <- S.printingOf s registry "Island"
+    let (tId, g1, asked) = entersNaming trespasser (placingAt Nothing otter 1) (S.landsFor island S.alice 4 (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)))
+        board = mainPhaseForAlice g1
+        after = case Activatable.abilitiesFor tId board of
+          [ability] -> S.runPure S.identityAnswer board (Activate.activateAbility S.alice tId ability >> Stack.resolveTop)
+          _ -> board
+    Spec.assertEqWith s "CR 123.6 one name sticker: power 3" (Projection.powerOf tId after) (Just 3)
+    Spec.assertEqWith s "CR 123.6a three blanks and one word: two positions" asked [Positioned S.alice [0, 1]]
+  -- Two boards: Balls of Fire's own sticker triggers it; a sticker on the
+  -- Bears does not, though Balls of Fire carries an Otter of its own.
+  Spec.it s "CR 123.6d Otter's capital O counts: _____ Balls of Fire deals bob 1, and only for its own sticker" $ do
+    sheets <- committedSheets
+    balls <- S.printingOf s registry "_____ Balls of Fire"
+    baaallerina <- S.printingOf s registry "Baaallerina"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    let base = withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)
+        atBob how = how {namingPrefers = (== Recipient.ToPlayer S.bob)}
+        (_, own, _) = entersNaming balls (atBob (placingAt Nothing otter 0)) base
+        (ballsId, g1) = S.addPermanent balls S.alice base
+        (bearsId, g2) = S.addPermanent bears S.alice (Sticker.put S.alice ballsId otter (Just 0) g1)
+        (_, other, _) = entersNaming baaallerina (atBob (placingAt (Just bearsId) night 0)) g2
+    Spec.assertEqWith s "CR 123.6d bob takes 1 for Otter's O" (S.lifeOf S.bob own) (Just 19)
+    Spec.assertEqWith s "CR 123.3 a sticker on another permanent does not trigger it" (S.lifeOf S.bob other) (Just 20)

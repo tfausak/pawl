@@ -4200,6 +4200,8 @@ quantityReads q = case q of
   Quantity.Type.PartySize _ -> Set.fromList [Controller, Types, Subtypes]
   Quantity.Type.ObjectCounters _ -> Set.empty
   Quantity.Type.ObjectCountersOfAnyKind -> Set.empty
+  Quantity.Type.LettersOnNameStickers _ -> Set.empty
+  Quantity.Type.NameStickers -> Set.empty
   Quantity.Type.HasDesignation _ -> Set.empty
   Quantity.Type.DesignationValue _ -> Set.empty
   Quantity.Type.StoredResultsOfSameValue -> Set.empty

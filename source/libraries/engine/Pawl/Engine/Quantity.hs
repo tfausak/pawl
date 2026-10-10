@@ -596,6 +596,9 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- for a gone object too. An object with no counters at all sums to 0, which is the
         -- answer "it had no counters on it" wants rather than a Nothing.
         Quantity.ObjectCountersOfAnyKind -> fmap (toInteger . sum . Filter.counters) mView
+        -- CR 123.6d off the view, ObjectCounters' posture.
+        Quantity.LettersOnNameStickers letters -> fmap (toInteger . sum . fmap (NameWords.letterCount letters) . Filter.nameStickers) mView
+        Quantity.NameStickers -> fmap (toInteger . length . Filter.nameStickers) mView
         -- The designation as a 0/1, off the same view ObjectCounters reads -- so CR
         -- 608.2h's last known information answers for an object that is gone, which is
         -- what rule 702.112a's intervening "if" needs on resolution, and what CR 701.37a's
@@ -1333,6 +1336,8 @@ objectSlots quantity = case quantity of
   Quantity.PartySize _ -> Set.empty
   Quantity.ObjectCounters _ -> Set.empty
   Quantity.ObjectCountersOfAnyKind -> Set.empty
+  Quantity.LettersOnNameStickers _ -> Set.empty
+  Quantity.NameStickers -> Set.empty
   Quantity.HasDesignation _ -> Set.empty
   Quantity.DesignationValue _ -> Set.empty
   Quantity.StoredResultsOfSameValue -> Set.empty
@@ -1620,6 +1625,8 @@ readsX quantity = case quantity of
   Quantity.PartySize _ -> False
   Quantity.ObjectCounters _ -> False
   Quantity.ObjectCountersOfAnyKind -> False
+  Quantity.LettersOnNameStickers _ -> False
+  Quantity.NameStickers -> False
   Quantity.HasDesignation _ -> False
   Quantity.DesignationValue _ -> False
   Quantity.StoredResultsOfSameValue -> False

@@ -2533,6 +2533,7 @@ stubView table oid =
                 Filter.transformed = False,
                 Filter.counters = Map.empty,
                 Filter.stickerKinds = Seq.empty,
+                Filter.nameStickers = Seq.empty,
                 Filter.ringBearerFor = Nothing,
                 Filter.paired = Nothing,
                 Filter.designations = Set.empty,

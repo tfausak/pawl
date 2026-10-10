@@ -111,6 +111,18 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.UniqueVowelsOnSticker (SlotName.MkSlotName (Text.pack "placed")))
       " {\"type\":\"UniqueVowelsOnSticker\",\"value\":\"placed\"} "
+  Spec.it s "LettersOnNameStickers" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.LettersOnNameStickers (Text.pack "o"))
+      " {\"type\":\"LettersOnNameStickers\",\"value\":\"o\"} "
+  Spec.it s "NameStickers, a bare tag" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      Quantity.NameStickers
+      " {\"type\":\"NameStickers\"} "
   Spec.it s "Star" $
     Common.assertCodec
       s

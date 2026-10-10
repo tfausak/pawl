@@ -1,5 +1,6 @@
 module Pawl.Types.Quantity where
 
+import qualified Data.Text as Text
 import qualified Pawl.Types.AgainstLastCardExiledWith as AgainstLastCardExiledWith
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.CastFrom as CastFrom
@@ -69,6 +70,15 @@ data Quantity
   | -- | CR 123.6e: the unique vowels on the sticker that slot holds; 0 when it
     -- holds none.
     UniqueVowelsOnSticker SlotName.SlotName
+  | -- | CR 123.6d: how many of these letters, either case, are on the name
+    -- stickers on the object this is evaluated against.
+    LettersOnNameStickers Text.Text
+  | -- | CR 123.6: how many name stickers are on the object this is evaluated
+    -- against.
+    --
+    -- Not implemented: a letter condition on the count, "with eight or more
+    -- letters" (#N3).
+    NameStickers
   | -- | CR 208.2 / 208.2a: the printed star -- notation, which the projection
     -- seed substitutes (Projection.baseCharacteristics) and evaluate answers
     -- Nothing for.

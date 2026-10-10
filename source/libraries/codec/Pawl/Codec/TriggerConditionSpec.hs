@@ -1488,8 +1488,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
     Common.assertCodec
       s
       TriggerCondition.codec
-      (TriggerCondition.PlacesSticker (PlacesSticker.MkPlacesSticker PlayerRelation.You (Set.singleton StickerKind.Art)))
+      (TriggerCondition.PlacesSticker (PlacesSticker.MkPlacesSticker PlayerRelation.You (Set.singleton StickerKind.Art) (Filter.And [])))
       " {\"type\":\"PlacesSticker\",\"value\":{\"placer\":{\"type\":\"You\"},\"kinds\":[{\"type\":\"Art\"}]}} "
+  Spec.it s "PlacesSticker carries the object it went on" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlacesSticker (PlacesSticker.MkPlacesSticker PlayerRelation.You (Set.singleton StickerKind.Art) Filter.IsSource))
+      " {\"type\":\"PlacesSticker\",\"value\":{\"placer\":{\"type\":\"You\"},\"kinds\":[{\"type\":\"Art\"}],\"object\":{\"type\":\"IsSource\"}}} "
   -- CR 509.3d's bystander form. A real Filter rather than the trivial `And []`:
   -- the payload is over the ATTACKER, and CR 701.54c's is a Ring-bearer test.
   Spec.it s "PermanentBecomesBlockedBy round-trips" $

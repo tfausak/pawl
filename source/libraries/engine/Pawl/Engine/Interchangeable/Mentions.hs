@@ -257,6 +257,7 @@ import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
 import qualified Pawl.Types.PermanentsDealCombatDamageToPlayer as PermanentsDealCombatDamageToPlayer
+import qualified Pawl.Types.PlacesSticker as PlacesSticker
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerCounterTally as PlayerCounterTally
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
@@ -2339,6 +2340,8 @@ quantityNames asking x = case x of
   Quantity.PlayerCounters playerCounterTally -> playerCounterTallyNames asking playerCounterTally
   Quantity.ObjectCounters counterKind -> counterKindNames asking (keywordNames asking) counterKind
   Quantity.ObjectCountersOfAnyKind -> False
+  Quantity.LettersOnNameStickers _ -> False
+  Quantity.NameStickers -> False
   Quantity.HasDesignation _designation -> False
   Quantity.DesignationValue _designation -> False
   Quantity.StoredResultsOfSameValue -> False
@@ -2830,7 +2833,7 @@ triggerConditionNames asking x = case x of
   TriggerCondition.PlayerWaterbends _playerRelation -> False
   TriggerCondition.PlayerAirbends _playerRelation -> False
   TriggerCondition.PlayerFirebends _playerRelation -> False
-  TriggerCondition.PlacesSticker _placesSticker -> False
+  TriggerCondition.PlacesSticker placesSticker -> filterNames asking (PlacesSticker.object placesSticker)
 
 triggeredAbilityNames :: Asking -> (card -> Bool) -> (ability -> Bool) -> TriggeredAbility.TriggeredAbility card ability -> Bool
 triggeredAbilityNames asking onCard onAbility x = case x of
