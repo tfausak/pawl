@@ -15,6 +15,8 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.StickerKind as StickerKind
+import qualified Pawl.Types.StickerRef as StickerRef
 
 -- | MkBinding at its all-Nothing unit (Binding.empty).
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -26,7 +28,7 @@ spec s = Spec.describe s "Pawl.Codec.Binding" $ do
       Binding.empty
       " {} "
   -- A codec totality check, not a claim about a reachable game state: no real
-  -- slot carries all five fields at once. The stand-in snapshot is needed
+  -- slot carries all six fields at once. The stand-in snapshot is needed
   -- because this sublibrary cannot reach the registry or Projection.project.
   Spec.it s "MkBinding, every field populated" $
     Common.assertCodec
@@ -37,13 +39,14 @@ spec s = Spec.describe s "Pawl.Codec.Binding" $ do
             Binding.amount = Just 3,
             Binding.modes = Just (Seq.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 2, ModeIndex.MkModeIndex 2]),
             Binding.copy = Just ProjectedCharacteristicsSpec.testCharacteristics,
-            Binding.objects = Just (Seq.fromList [ObjectId.MkObjectId 7, ObjectId.MkObjectId 4])
+            Binding.objects = Just (Seq.fromList [ObjectId.MkObjectId 7, ObjectId.MkObjectId 4]),
+            Binding.sticker = Just (StickerRef.MkStickerRef (PlayerId.MkPlayerId 0) 2 StickerKind.Name 1)
           }
       )
       ( "{\"targets\":[{\"type\":\"ToPlayer\",\"value\":0}],"
           <> "\"amount\":3,\"modes\":[0,2,2],\"copy\":"
           <> ProjectedCharacteristicsSpec.testCharacteristicsJson
-          <> ",\"objects\":[7,4]}"
+          <> ",\"objects\":[7,4],\"sticker\":{\"owner\":0,\"sheet\":2,\"kind\":{\"type\":\"Name\"},\"index\":1}}"
       )
   -- A name-keyed map is a JSON OBJECT keyed by the slot name, written in
   -- ascending key order. The two entries are inserted in DESCENDING slot-name

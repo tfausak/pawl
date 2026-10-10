@@ -11,6 +11,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Ord as Ord
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
@@ -79,7 +80,10 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.Status as Status
+import qualified Pawl.Types.StickerKind as StickerKind
 import qualified Pawl.Types.StickerPlacement as StickerPlacement
+import qualified Pawl.Types.StickerRef as StickerRef
+import qualified Pawl.Types.StickerSheet as StickerSheet
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
@@ -223,6 +227,20 @@ restampStickers oid gs = case lookupObject oid gs of
            in (acc Seq.|> placement {StickerPlacement.timestamp = ts}, g')
         (restamped, stamped) = Foldable.foldl' step (Seq.empty, gs) (Object.stickers obj)
      in stamped {GameState.objects = Map.adjust (\o -> o {Object.stickers = restamped}) oid (GameState.objects stamped)}
+
+-- | CR 123.6: the words printed on a name sticker, off its owner's sheet;
+-- Nothing for another kind or a reference naming no sticker.
+stickerWords :: StickerRef.StickerRef -> GameState -> Maybe Text.Text
+stickerWords ref gs = case StickerRef.kind ref of
+  StickerKind.Name -> do
+    player <- Map.lookup (StickerRef.owner ref) (GameState.players gs)
+    slot <- Natural.toInt (StickerRef.sheet ref)
+    sheet <- Seq.lookup slot (Player.stickerSheets player)
+    i <- Natural.toInt (StickerRef.index ref)
+    Seq.lookup i (StickerSheet.names sheet)
+  StickerKind.Ability -> Nothing
+  StickerKind.PowerToughness -> Nothing
+  StickerKind.Art -> Nothing
 
 freshPrintingId :: GameState -> (PrintingId.PrintingId, GameState)
 freshPrintingId gs =
@@ -677,6 +695,12 @@ pileHolderIn hint oid piles = case hint of
 -- `pid` -- the player who started the game with it or brought it in.
 mintIdentity :: ObjectId -> PlayerId -> CardIdentity.CardIdentity
 mintIdentity oid pid = CardIdentity.MkCardIdentity {CardIdentity.serial = ObjectId.unwrap oid, CardIdentity.startingOwner = pid}
+
+-- | A card's object as it first exists under `oid`, owned by `pid`, before
+-- anything has happened to it: Object.new with the card's identity minted.
+cardObject :: ObjectId -> PlayerId -> PrintingId.PrintingId -> Zone -> Timestamp.Timestamp -> Object.Object
+cardObject oid pid printingId zone ts =
+  (Object.new pid (Source.OfCard printingId) zone ts) {Object.identity = Just (mintIdentity oid pid)}
 
 -- CR 108.3 / 407.3: this player now owns the object. A write on the object as
 -- it stands and not a zone change, so CR 400.7 mints nothing; CR 400.3 reads
@@ -1720,15 +1744,17 @@ sourceOfWithLastKnown oid gs = case lookupObject oid gs of
 -- silently restamp a face-down card in exile, whose stamp names its
 -- Pawl.Types.Pile.
 --
--- Not implemented: CR 613.7k's sticker restamp after this CR 613.7f timestamp
--- (#872).
+-- CR 613.7k: the stickers on it take new timestamps right after its own.
+-- Pawl.StickerSpec's "a turned-up permanent's name sticker restamps after an
+-- earlier Witness Protection" proves it.
 turnFacing :: Facing.Facing -> ObjectId -> GameState -> GameState
 turnFacing facing oid gs =
   let (ts, stamped) = freshTimestamp gs
       restamps = Set.member oid (GameState.battlefield gs)
       next = if restamps then stamped else gs
       adjust o = o {Object.facing = facing, Object.timestamp = if restamps then ts else Object.timestamp o}
-   in next {GameState.objects = Map.adjust adjust oid (GameState.objects next)}
+      turned = next {GameState.objects = Map.adjust adjust oid (GameState.objects next)}
+   in if restamps then restampStickers oid turned else turned
 
 -- CR 712.16 / 730.2j: the permanent is represented by a double-faced card or
 -- token, or is melded or merged with a double-faced component, so it can't be
@@ -1783,13 +1809,13 @@ isDoubleFacedPermanent oid gs = case lookupObject oid gs of
 -- footing Object.face is stored on: CR 712.9's first Example turns on a Clone
 -- being a one-faced card whatever it copied, and that is the same read.
 --
--- Not implemented: CR 613.7k's sticker restamp after this CR 613.7g timestamp
--- (#872).
+-- CR 613.7k: the stickers on it take new timestamps right after its own. A
+-- regression fence: no test transforms a stickered permanent.
 turnFaceOver :: Timestamp.Timestamp -> ObjectId -> GameState -> GameState
 turnFaceOver now oid gs = case (turnsTo oid gs, lookupObject oid gs) of
   (Just name, Just object) ->
     let (ts, stamped) = freshTimestamp gs
-     in stamped {GameState.objects = Map.insert oid (turnedTo name object) {Object.turnedOverAt = Just now, Object.timestamp = ts} (GameState.objects stamped)}
+     in restampStickers oid stamped {GameState.objects = Map.insert oid (turnedTo name object) {Object.turnedOverAt = Just now, Object.timestamp = ts} (GameState.objects stamped)}
   _ -> gs
 
 -- CR 701.27a's write on the object itself: show `name`, and for a merged

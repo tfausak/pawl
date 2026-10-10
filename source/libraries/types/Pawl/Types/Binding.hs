@@ -7,6 +7,7 @@ import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.StickerRef as StickerRef
 
 -- | CR 601.2: the cast-time choices bound to one named slot of a spell or ability
 -- on the stack. A record, not a sum: a field per binding kind, and a kind absent
@@ -75,10 +76,13 @@ data Binding = MkBinding
     -- OTHER ObjectRef readers do not depend on it -- CR 611.2c's continuous effects freeze a SET
     -- and the one-shots are CR 608.2f-simultaneous batches -- but ordering the
     -- field arbitrarily would be inventing an order the game does not have.
-    objects :: Maybe (Seq.Seq ObjectId.ObjectId)
+    objects :: Maybe (Seq.Seq ObjectId.ObjectId),
+    -- | CR 123.6e's "that sticker": the sticker an Effect.PutSticker placed,
+    -- under its @bound@ slot. Nothing for every other slot.
+    sticker :: Maybe StickerRef.StickerRef
   }
   deriving (Eq, Ord, Show)
 
 -- | The empty binding: no choice of any kind. The unit for merging.
 empty :: Binding
-empty = MkBinding {targets = Nothing, amount = Nothing, modes = Nothing, copy = Nothing, objects = Nothing}
+empty = MkBinding {targets = Nothing, amount = Nothing, modes = Nothing, copy = Nothing, objects = Nothing, sticker = Nothing}

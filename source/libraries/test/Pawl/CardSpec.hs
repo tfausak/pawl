@@ -274,6 +274,7 @@ import qualified Pawl.Types.PermissionLimit as PermissionLimit
 import qualified Pawl.Types.PermissionPool as PermissionPool
 import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
+import qualified Pawl.Types.PlacesSticker as PlacesSticker
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
@@ -693,7 +694,7 @@ objectRefPositions =
         ("unsuspect", Effect.Unsuspect (plantedRef "us"), [plantedRef "us"]),
         ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary Nothing (NonEmpty.singleton (plantedRef "sl"))), [plantedRef "sl"]),
         ("ante", Effect.Ante (Ante.MkAnte (PlayerRef.Relative PlayerRelation.You) (plantedRef "an") Nothing), [plantedRef "an"]),
-        ("put-sticker", Effect.PutSticker (PutSticker.MkPutSticker (PlayerRef.Relative PlayerRelation.You) (plantedRef "ps") (Set.singleton StickerKind.Art)), [plantedRef "ps"]),
+        ("put-sticker", Effect.PutSticker (PutSticker.MkPutSticker (PlayerRef.Relative PlayerRelation.You) (plantedRef "ps") (Set.singleton StickerKind.Art) Nothing), [plantedRef "ps"]),
         ("set-owner", Effect.SetOwner (SetOwner.MkSetOwner (PlayerRef.Relative PlayerRelation.You) (plantedRef "so")), [plantedRef "so"]),
         ("exchange-ownership", Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership (plantedRef "eo") (plantedRef "ep")), [plantedRef "eo", plantedRef "ep"]),
         ("exchange-top", Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary (plantedRef "et") (PlayerRef.Relative PlayerRelation.You)), [plantedRef "et"]),
@@ -753,7 +754,7 @@ playerRefPositions =
         ("take-extra-turn", Effect.TakeExtraTurn TakeExtraTurn.MkTakeExtraTurn {TakeExtraTurn.player = plantedPlayer "te", TakeExtraTurn.skips = Set.empty, TakeExtraTurn.count = Quantity.Type.Literal 1}, [plantedPlayer "te"]),
         ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary (Just (plantedPlayer "si")) (NonEmpty.singleton (plantedRef "si"))), [plantedPlayer "si"]),
         ("ante", Effect.Ante (Ante.MkAnte (plantedPlayer "ap") (plantedRef "ap") Nothing), [plantedPlayer "ap"]),
-        ("put-sticker", Effect.PutSticker (PutSticker.MkPutSticker (plantedPlayer "pp") (plantedRef "pp") (Set.singleton StickerKind.Art)), [plantedPlayer "pp"]),
+        ("put-sticker", Effect.PutSticker (PutSticker.MkPutSticker (plantedPlayer "pp") (plantedRef "pp") (Set.singleton StickerKind.Art) Nothing), [plantedPlayer "pp"]),
         ("set-owner", Effect.SetOwner (SetOwner.MkSetOwner (plantedPlayer "sp") (plantedRef "sp")), [plantedPlayer "sp"]),
         ("exchange-top", Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary (plantedRef "ep") (plantedPlayer "ep")), [plantedPlayer "ep"]),
         ("shuffle", Effect.Shuffle (plantedPlayer "sh"), [plantedPlayer "sh"]),
@@ -986,6 +987,8 @@ modificationCounts modification = case modification of
   -- Its Filter's Counts are reached through modificationFilters, GainEnchant's
   -- answer.
   Modification.AddNamesMatching _ -> []
+  Modification.SetName _ -> []
+  Modification.InsertNameWords _ -> []
   -- The extra text descends as GainAbility's does; a PlayerRef holds no Count.
   Modification.HasFullText ft -> concatMap (modificationCounts . Modification.GainAbility) (FullText.alsoHas ft)
   -- Payload-free, both of them, so there is no Count to sweep.
@@ -4160,6 +4163,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.InSlot _ -> []
   Quantity.Type.WasBound _ -> []
   Quantity.Type.BoundCount _ -> []
+  Quantity.Type.UniqueVowelsOnSticker _ -> []
   Quantity.Type.Star -> []
   Quantity.Type.Plus (Plus.MkPlus a b) -> quantityKindFilters a <> quantityKindFilters b
   Quantity.Type.Halved (Halved.MkHalved _ inner) -> quantityKindFilters inner
@@ -4213,6 +4217,8 @@ quantityKindFilters quantity = case quantity of
   -- The kind-agnostic reading of that same tally: no CounterKind beside it, so
   -- nothing to dig out.
   Quantity.Type.ObjectCountersOfAnyKind -> []
+  Quantity.Type.LettersOnNameStickers _ -> []
+  Quantity.Type.NameStickers -> []
   Quantity.Type.OpponentsAttacked _ -> []
   Quantity.Type.AttackersDeclaredThisTurn _ -> []
   Quantity.Type.AttackersDeclaredThisCombat -> []
@@ -4363,6 +4369,8 @@ modificationFilters modification = case modification of
   Modification.ExchangeTextBoxes -> []
   -- CR 612.7's filter is card text like GainEnchant's slot, and is swept.
   Modification.AddNamesMatching f -> unframed [f]
+  Modification.SetName _ -> []
+  Modification.InsertNameWords _ -> []
   -- Nothing HERE, GainAbility's answer: grantedModifications hands the extra
   -- text to the outer granted-ability sweeps.
   Modification.HasFullText _ -> []
@@ -4614,7 +4622,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PlayerWaterbends _ -> []
   TriggerCondition.PlayerAirbends _ -> []
   TriggerCondition.PlayerFirebends _ -> []
-  TriggerCondition.PlacesSticker _ -> []
+  TriggerCondition.PlacesSticker placesSticker -> unframed [PlacesSticker.object placesSticker]
   -- CR 701.44b DOES carry one, a predicate over the explorer -- Wildgrowth
   -- Walker's "a creature you control" -- which the card lint must sweep.
   TriggerCondition.PermanentExplores f -> unframed [f]
@@ -4920,6 +4928,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.SharesColorWithSource -> []
   Filter.Type.HasSubtype _ -> []
   Filter.Type.HasName _ -> []
+  Filter.Type.NameWordsAtLeast _ -> []
   Filter.Type.HasNameOriginallyPrintedIn _ -> []
   -- The keyword's own Filter, left alone for the reason above.
   Filter.Type.HasKeyword _ -> []
@@ -6313,7 +6322,7 @@ effectFilters effect = case effect of
   Effect.TakeExtraTurn takeExtraTurn -> frame Unframed (quantityFilters (TakeExtraTurn.count takeExtraTurn))
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ refs) -> frame SourceHostFramed (foldMap objectRefFilters refs)
   Effect.Ante (Ante.MkAnte _ ref _) -> frame SourceHostFramed (objectRefFilters ref)
-  Effect.PutSticker (PutSticker.MkPutSticker _ ref _) -> frame SourceHostFramed (objectRefFilters ref)
+  Effect.PutSticker (PutSticker.MkPutSticker _ ref _ _) -> frame SourceHostFramed (objectRefFilters ref)
   Effect.SetOwner (SetOwner.MkSetOwner _ ref) -> frame SourceHostFramed (objectRefFilters ref)
   Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership one other) -> frame SourceHostFramed (objectRefFilters one <> objectRefFilters other)
   Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary ref _) -> frame SourceHostFramed (objectRefFilters ref)

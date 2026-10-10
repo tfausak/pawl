@@ -60,8 +60,9 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- the stack has the cast half's alone (CR 709.3b), and a face-down object
     -- has NONE (CR 708.2a) -- an empty set rather than an empty name.
     --
-    -- Layer 3 adds to it: CR 612.7's Spy Kit unions in every name of the game's
-    -- reference that its filter matches (Modification.AddNamesMatching).
+    -- Layer 3 changes it: CR 612.7's Spy Kit unions in every name of the game's
+    -- reference that its filter matches (Modification.AddNamesMatching), and
+    -- CR 123.6's name stickers insert into it (Modification.InsertNameWords).
     names :: Set.Set CardName.CardName,
     -- | CR 205.4a: the object's supertypes after the layer fold -- the third part
     -- of the layer-4 type line. Copiable for name's reason: a Clone of a legend

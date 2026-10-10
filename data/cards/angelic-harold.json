@@ -1,0 +1,171 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Flying"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Angelic Harold",
+      "oracleText": "Flying\nWhen Angelic Harold enters, you may put a name sticker on a nonland permanent you own.\nEach creature you control with three or more words in its name gets +1/+1.",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Creature"
+                  }
+                },
+                {
+                  "type": "ControlledBy",
+                  "value": {
+                    "type": "You"
+                  }
+                },
+                {
+                  "type": "NameWordsAtLeast",
+                  "value": 3
+                }
+              ]
+            }
+          },
+          "modifications": [
+            {
+              "type": "ModifyPowerToughness",
+              "value": {
+                "power": {
+                  "type": "Literal",
+                  "value": 1
+                },
+                "toughness": {
+                  "type": "Literal",
+                  "value": 1
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfEnters"
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "PutSticker",
+                        "value": {
+                          "kinds": [
+                            {
+                              "type": "Name"
+                            }
+                          ],
+                          "player": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          "ref": {
+                            "type": "ChosenPermanent",
+                            "value": {
+                              "filter": {
+                                "type": "And",
+                                "value": [
+                                  {
+                                    "type": "Not",
+                                    "value": {
+                                      "type": "HasCardType",
+                                      "value": {
+                                        "type": "Land"
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "type": "OwnedBy",
+                                    "value": {
+                                      "type": "You"
+                                    }
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ],
+                    "optionality": {
+                      "type": "Optional"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Angel"
+          },
+          {
+            "type": "Performer"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

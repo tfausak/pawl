@@ -7,9 +7,11 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Keyword as Keyword
+import qualified Pawl.Engine.NameWords as NameWords
 import qualified Pawl.Types.Behold as Behold
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -52,6 +54,7 @@ import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Splice as Splice
 import qualified Pawl.Types.StickerKind as StickerKind
+import qualified Pawl.Types.StickerRef as StickerRef
 import qualified Pawl.Types.StoredResult as StoredResult
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -601,6 +604,9 @@ data View = MkView
     -- | CR 123.1 / 123.4: the kinds of the stickers on the candidate, one per
     -- sticker. Off the object: CR 123.1 keeps stickers out of the copiable values.
     stickerKinds :: Seq.Seq StickerKind.StickerKind,
+    -- | CR 123.6: the word on each name sticker on the candidate, in placement
+    -- order. Off the object, stickerKinds' posture.
+    nameStickers :: Seq.Seq Text.Text,
     -- CR 701.54a-b: which player this candidate is the Ring-bearer FOR, or Nothing
     -- for the overwhelming majority of permanents, which carry no such
     -- designation. Read straight off Object.ringBearerFor -- CR 701.54b makes it a
@@ -943,6 +949,7 @@ playerView pid =
       counters = Map.empty,
       -- CR 123.1: a sticker is on an object, and CR 109.1 makes a player none.
       stickerKinds = Seq.empty,
+      nameStickers = Seq.empty,
       -- CR 701.54b: Ring-bearer is a designation A PERMANENT can have, and a
       -- player is not one -- the same shape CR 725.1's monarch has with the two
       -- sides swapped.
@@ -1381,6 +1388,10 @@ data Context = MkContext
     -- each reader of each field here picks its own vacuous direction, and
     -- slotControllers above is the one that picks the widening one.
     boundAmounts :: Map.Map SlotName.SlotName Natural.Natural,
+    -- | CR 123.6e's "that sticker": the sticker an earlier instruction bound at
+    -- each slot. Empty in contextFor; filled by Resolve.Slots.effectContext and
+    -- Target.slotContext.
+    slotStickers :: Map.Map SlotName.SlotName StickerRef.StickerRef,
     -- CR 303.4b's "enchanted": WHICH object the SOURCE is attached to, for the one
     -- atom that compares a candidate against it (IsHostOfSource). The id and not a
     -- view, because the answer is one reading of the source and the same for every
@@ -1607,7 +1618,7 @@ data Context = MkContext
 -- here owes both halves of the same pair: which way its unfilled read answers,
 -- and what holds a card to the positions that fill it.
 contextFor :: Teams.Teams -> Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceToughness = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayers = [], recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, evaluated = Nothing, sourceEntrants = Set.empty, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColors = Set.empty, sourceChosenSubtype = Nothing, sourceLastExiled = Nothing}
+contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceToughness = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayers = [], recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, slotStickers = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, evaluated = Nothing, sourceEntrants = Set.empty, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColors = Set.empty, sourceChosenSubtype = Nothing, sourceLastExiled = Nothing}
 
 -- contextFor with a resolution's -- or a trigger's -- slot objects supplied; see
 -- slotObjects above for who supplies them.
@@ -1667,6 +1678,7 @@ matches context view predicate = case predicate of
   -- CR 709.4a's own test, said the way that rule says it: membership, so an
   -- object showing several names matches on any one of them.
   Filter.HasName n -> Set.member n (names view)
+  Filter.NameWordsAtLeast n -> any (\named -> NameWords.wordCount named >= n) (names view)
   -- The same membership test, against the set CR 206.3 defines rather than one
   -- name the card gives. ANY of the candidate's names, which is CR 709.4a's
   -- reading exactly as HasName's is -- Pawl.FilterSpec's "CR 709.4a matches an
@@ -2362,6 +2374,7 @@ rewrite pairs predicate = case predicate of
   -- word ... that is the same as a Magic color word, basic land type, or
   -- creature type". This function's pairs are exactly such a subtype swap.
   Filter.HasName _ -> predicate
+  Filter.NameWordsAtLeast _ -> predicate
   -- Untouched for HasName's reason, one indirection along: the atom names an
   -- expansion, and the names it stands for are card names too.
   Filter.HasNameOriginallyPrintedIn _ -> predicate
@@ -3153,6 +3166,7 @@ bakeBound players predicate = case predicate of
   Filter.SharesColorWithSource -> predicate
   Filter.HasSubtype _ -> predicate
   Filter.HasName _ -> predicate
+  Filter.NameWordsAtLeast _ -> predicate
   Filter.HasNameOriginallyPrintedIn _ -> predicate
   Filter.HasKeyword _ -> predicate
   Filter.HasKeywordFamily _ -> predicate
@@ -3359,6 +3373,7 @@ manaValueThresholds predicate = case predicate of
   Filter.SharesColorWithSource -> []
   Filter.HasSubtype _ -> []
   Filter.HasName _ -> []
+  Filter.NameWordsAtLeast _ -> []
   Filter.HasNameOriginallyPrintedIn _ -> []
   Filter.HasKeyword _ -> []
   Filter.HasKeywordFamily _ -> []
@@ -3536,6 +3551,7 @@ statesAQuality predicate = case predicate of
   -- specific description a search can give -- so the searcher may decline to
   -- find one that is there, and CR 701.23d's "must find" does not apply.
   Filter.HasName _ -> True
+  Filter.NameWordsAtLeast _ -> True
   -- CR 701.23b for HasName's reason: "with a name originally printed in the
   -- Arabian Nights expansion" states a quality as squarely as one name does.
   Filter.HasNameOriginallyPrintedIn _ -> True
@@ -3702,6 +3718,7 @@ readsSourcePower predicate = case predicate of
   Filter.SharesColorWithSource -> False
   Filter.HasSubtype _ -> False
   Filter.HasName _ -> False
+  Filter.NameWordsAtLeast _ -> False
   Filter.HasNameOriginallyPrintedIn _ -> False
   -- A keyword's own Filter is compared, never matched (statesAQuality's
   -- HasKeyword arm), so nothing inside it reads the context.

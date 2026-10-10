@@ -25,25 +25,20 @@ module Pawl.Engine.Prepare where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
-import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.Designation as Designation
-import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
-import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Printing as Printing
-import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
-import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 722.2a: does this object have a PREPARE SPELL -- "an object for which these
@@ -161,75 +156,18 @@ mint oid gs =
           (copyId, gs2) = Game.freshObjectId gs1
           (ts, gs3) = Game.freshTimestamp gs2
           copy =
-            Object.MkObject
-              { Object.owner = controller,
-                Object.identity = Nothing,
-                Object.enteredUnder = Nothing,
-                Object.source = Source.OfCardCopy printingId,
-                Object.zone = Zone.Exile,
-                Object.tapped = TapState.Untapped,
-                Object.facing = Facing.FaceUp,
-                Object.flipped = False,
-                -- CR 406.3's "exiled face down" is written by the effect that
+            (Object.new controller (Source.OfCardCopy printingId) Zone.Exile ts)
+              { -- CR 406.3's "exiled face down" is written by the effect that
                 -- exiles; rule 722.3c states no such rider, so the copy is
                 -- ordinary face-up exile that everybody may look at.
                 Object.exiledFaceDown = False,
-                Object.exileLookers = Set.empty,
-                Object.damage = 0,
-                Object.sickness = Sickness.Sick,
-                Object.controlClock = Map.empty,
-                Object.bindings = Map.empty,
-                Object.counters = Map.empty,
-                Object.counterTimestamps = Map.empty,
-                Object.attachedTo = Nothing,
-                Object.chosenColors = Set.empty,
-                Object.chosenSubtype = Nothing,
-                Object.chosenNames = Set.empty,
-                Object.chosenPlayer = Nothing,
-                Object.timestamp = ts,
                 -- One face, so there is no half to single out (CR 709.3b).
                 Object.face = Nothing,
-                Object.turnedOverAt = Nothing,
-                Object.worldSince = Nothing,
                 -- CR 722.3c's permission names the prepared permanent's
                 -- controller LIVE, so it is asked of `preparedCopyOf` below
                 -- rather than frozen into an ExilePlayPermission here.
                 Object.playableFromExile = Nothing,
-                Object.plotted = Nothing,
-                Object.foretold = Nothing,
-                Object.foretellCostReduction = Nothing,
-                Object.warped = Nothing,
-                Object.preparedCopyOf = Just oid,
-                Object.ringBearerFor = Nothing,
-                Object.stickers = Seq.empty,
-                Object.duplicate = Nothing,
-                Object.paired = Nothing,
-                Object.protector = Nothing,
-                Object.ventureRoom = Nothing,
-                Object.classLevel = Nothing,
-                Object.unlockedHalves = Set.empty,
-                Object.designations = Set.empty,
-                Object.designationValues = Map.empty,
-                Object.storedResults = Map.empty,
-                Object.paidCosts = Map.empty,
-                Object.tributePaid = False,
-                Object.bestowed = False,
-                Object.mutating = False,
-                Object.prototyped = False,
-                Object.boughtBack = False,
-                Object.unannounced = False,
-                Object.spliced = Seq.empty,
-                Object.phyrexianLifePaid = 0,
-                Object.manaSpent = Mana.MkMana [],
-                Object.announcedX = Nothing,
-                Object.castFrom = Nothing,
-                Object.castUsing = Nothing,
-                Object.castGrant = Nothing,
-                Object.detainedUntil = Set.empty,
-                Object.goadedBy = Set.empty,
-                Object.doesNotUntapFor = 0,
-                Object.exertedBy = Set.empty,
-                Object.activatedOnce = Map.empty
+                Object.preparedCopyOf = Just oid
               }
        in Game.insertIntoZone
             Zone.Exile

@@ -1,0 +1,82 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Annihilator",
+          "value": 2
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 12
+        }
+      ],
+      "name": "It That Betrays",
+      "oracleText": "Annihilator 2 (Whenever this creature attacks, defending player sacrifices two permanents of their choice.)\nWhenever an opponent sacrifices a nontoken permanent, put that card onto the battlefield under your control.",
+      "power": {
+        "type": "Literal",
+        "value": 11
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 11
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "PermanentSacrificed",
+            "value": {
+              "filter": {
+                "type": "Not",
+                "value": {
+                  "type": "IsToken"
+                }
+              },
+              "player": {
+                "type": "Opponent"
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "MoveToZone",
+                        "value": {
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "became"
+                          },
+                          "zone": {
+                            "type": "Battlefield"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Eldrazi"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

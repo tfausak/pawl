@@ -257,6 +257,7 @@ import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
 import qualified Pawl.Types.PermanentsDealCombatDamageToPlayer as PermanentsDealCombatDamageToPlayer
+import qualified Pawl.Types.PlacesSticker as PlacesSticker
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerCounterTally as PlayerCounterTally
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
@@ -427,6 +428,7 @@ filterNames asking criterion = case criterion of
   Filter.SharesColorWithSource -> False
   Filter.HasSubtype _subtype -> False
   Filter.HasName _name -> False
+  Filter.NameWordsAtLeast _n -> False
   Filter.HasNameOriginallyPrintedIn _expansion -> False
   Filter.HasKeyword _keyword -> False
   Filter.HasKeywordFamily _family -> False
@@ -720,7 +722,7 @@ beholdNames asking x = case x of
 
 bindingNames :: Asking -> Binding.Binding -> Bool
 bindingNames asking x = case x of
-  Binding.MkBinding targets _amount _modes copy objects -> any (any (recipientNames asking)) targets || any (projectedCharacteristicsNames asking) copy || any (elem (object asking)) objects
+  Binding.MkBinding targets _amount _modes copy objects _sticker -> any (any (recipientNames asking)) targets || any (projectedCharacteristicsNames asking) copy || any (elem (object asking)) objects
 
 blightNames :: Asking -> Blight.Blight -> Bool
 blightNames asking x = case x of
@@ -1985,6 +1987,8 @@ modificationNames asking onAbility x = case x of
   Modification.ChangeSubtypeWord _changeSubtypeWord -> False
   Modification.ExchangeTextBoxes -> False
   Modification.AddNamesMatching filter_ -> filterNames asking filter_
+  Modification.SetName _cardName -> False
+  Modification.InsertNameWords _nameInsertion -> False
   Modification.HasFullText fullText -> fullTextNames asking onAbility fullText
   Modification.SetController _playerId -> False
   Modification.SetControllerToSource -> False
@@ -2316,6 +2320,7 @@ quantityNames asking x = case x of
   Quantity.InSlot slotName -> slotNames asking slotName
   Quantity.WasBound slotName -> slotNames asking slotName
   Quantity.BoundCount slotName -> slotNames asking slotName
+  Quantity.UniqueVowelsOnSticker slotName -> slotNames asking slotName
   Quantity.Star -> False
   Quantity.Plus plus -> plusNames asking (quantityNames asking) plus
   Quantity.Halved halved -> halvedNames asking (quantityNames asking) halved
@@ -2335,6 +2340,8 @@ quantityNames asking x = case x of
   Quantity.PlayerCounters playerCounterTally -> playerCounterTallyNames asking playerCounterTally
   Quantity.ObjectCounters counterKind -> counterKindNames asking (keywordNames asking) counterKind
   Quantity.ObjectCountersOfAnyKind -> False
+  Quantity.LettersOnNameStickers _ -> False
+  Quantity.NameStickers -> False
   Quantity.HasDesignation _designation -> False
   Quantity.DesignationValue _designation -> False
   Quantity.StoredResultsOfSameValue -> False
@@ -2569,7 +2576,7 @@ anteNames asking x = case x of
 
 putStickerNames :: Asking -> PutSticker.PutSticker -> Bool
 putStickerNames asking x = case x of
-  PutSticker.MkPutSticker player ref _kinds -> playerRefNames asking player || objectRefNames asking ref
+  PutSticker.MkPutSticker player ref _kinds bound -> playerRefNames asking player || objectRefNames asking ref || any (slotNames asking) bound
 
 shuffleIntoLibraryNames :: Asking -> ShuffleIntoLibrary.ShuffleIntoLibrary -> Bool
 shuffleIntoLibraryNames asking x = case x of
@@ -2827,7 +2834,7 @@ triggerConditionNames asking x = case x of
   TriggerCondition.PlayerWaterbends _playerRelation -> False
   TriggerCondition.PlayerAirbends _playerRelation -> False
   TriggerCondition.PlayerFirebends _playerRelation -> False
-  TriggerCondition.PlacesSticker _placesSticker -> False
+  TriggerCondition.PlacesSticker placesSticker -> filterNames asking (PlacesSticker.object placesSticker)
 
 triggeredAbilityNames :: Asking -> (card -> Bool) -> (ability -> Bool) -> TriggeredAbility.TriggeredAbility card ability -> Bool
 triggeredAbilityNames asking onCard onAbility x = case x of

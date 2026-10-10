@@ -69,6 +69,7 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       (Filter.HasName (CardName.MkCardName (Text.pack "The Underworld Cookbook")))
       " {\"type\":\"HasName\",\"value\":\"The Underworld Cookbook\"} "
+  Spec.it s "NameWordsAtLeast" $ Common.assertCodec s codec (Filter.NameWordsAtLeast 3) " {\"type\":\"NameWordsAtLeast\",\"value\":3} "
   Spec.it s "HasNameOriginallyPrintedIn" $
     Common.assertCodec
       s

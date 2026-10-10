@@ -54,10 +54,11 @@ available pid kinds gs = case Map.lookup pid (GameState.players gs) of
      in filter (\ref -> Set.notMember ref used) offered
 
 -- | CR 123.3 / 613.7k: put the sticker on the object, stamped now, and record
--- the placement for "whenever you place a sticker".
-put :: PlayerId -> ObjectId -> StickerRef.StickerRef -> GameState -> GameState
-put placer oid ref gs =
+-- the placement for "whenever you place a sticker". CR 123.6b: @position@ is a
+-- name sticker's.
+put :: PlayerId -> ObjectId -> StickerRef.StickerRef -> Maybe Natural -> GameState -> GameState
+put placer oid ref position gs =
   let (ts, stamped) = Game.freshTimestamp gs
-      placement = StickerPlacement.MkStickerPlacement {StickerPlacement.sticker = ref, StickerPlacement.timestamp = ts}
+      placement = StickerPlacement.MkStickerPlacement {StickerPlacement.sticker = ref, StickerPlacement.timestamp = ts, StickerPlacement.position = position}
       placed = stamped {GameState.objects = Map.adjust (\o -> o {Object.stickers = Object.stickers o Seq.|> placement}) oid (GameState.objects stamped)}
    in Event.recordEvent (GameEvent.StickerPut StickerPut.MkStickerPut {StickerPut.placer = placer, StickerPut.object = oid, StickerPut.kind = StickerRef.kind ref}) placed

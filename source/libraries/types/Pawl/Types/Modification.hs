@@ -3,6 +3,7 @@ module Pawl.Types.Modification where
 import qualified Data.Set as Set
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
@@ -13,6 +14,7 @@ import qualified Pawl.Types.FullText as FullText
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
+import qualified Pawl.Types.NameInsertion as NameInsertion
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
@@ -388,6 +390,12 @@ data Modification ability
   | -- | layer 3, CR 613.1c / 612.6: this object has the full text of the top
     -- card of a graveyard (Volrath's Shapeshifter).
     HasFullText (FullText.FullText ability)
+  | -- | layer 3, CR 612.8: this object has only this name (Witness Protection).
+    SetName CardName.CardName
+  | -- | layer 3, CR 123.6 / 612.9: a name sticker's word in this object's
+    -- names. Engine-minted (Pawl.Engine.Projection.stickerGathered); no card
+    -- authors it.
+    InsertNameWords NameInsertion.NameInsertion
   | -- | layer 2, CR 613.1b: set this object's controller. The PlayerId is BAKED at
     -- effect creation (CR 611.2c) by Resolve.applyEffect, never chosen: the
     -- effect's source's controller for GainControl, the OTHER permanent's

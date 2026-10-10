@@ -847,6 +847,7 @@ withinOffer prompt chosen = case prompt of
   Prompt.Type.ChooseCardsFromAmong _ _ _ cards _ -> all (`elem` cards) chosen
   Prompt.Type.ChooseDungeon _ _ dungeons -> chosen `elem` dungeons
   Prompt.Type.ChooseSticker _ _ _ offered -> chosen `elem` offered
+  Prompt.Type.ChooseNamePosition _ _ _ positions -> chosen `elem` positions
   Prompt.Type.ChooseCompanion _ _ companions -> all (`elem` companions) chosen
   Prompt.Type.ChooseRoom _ _ _ rooms -> chosen `elem` rooms
   Prompt.Type.ChooseHalf _ _ _ names -> chosen `elem` names

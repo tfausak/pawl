@@ -3,6 +3,7 @@
 module Pawl.Engine.Restamp where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -21,6 +22,7 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.StickerPlacement as StickerPlacement
 import Pawl.Types.Timestamp (Timestamp)
 import qualified Pawl.Types.Zone as Zone
 
@@ -137,7 +139,7 @@ reassign start ordered gs =
       effects = GameState.continuousEffects gs
       fresh ts = ts >= start
       blockOf oid =
-        let own = foldMap (\obj -> Object.timestamp obj : filter fresh (Map.elems (Object.counterTimestamps obj))) (Map.lookup oid objects)
+        let own = foldMap (\obj -> Object.timestamp obj : filter fresh (Map.elems (Object.counterTimestamps obj) <> fmap StickerPlacement.timestamp (Foldable.toList (Object.stickers obj)))) (Map.lookup oid objects)
             sourced = [ContinuousEffect.timestamp e | e <- effects, ContinuousEffect.source e == oid, fresh (ContinuousEffect.timestamp e)]
          in Set.toAscList (Set.fromList (own <> sourced))
       -- A stamp two blocks share -- one an instruction minted for all of them --
@@ -146,10 +148,11 @@ reassign start ordered gs =
       mapping = Map.fromList (zip dealt (List.sort dealt))
       remap ts = Map.findWithDefault ts ts mapping
       member = (`elem` ordered)
-      -- Not implemented: CR 613.7k's sticker restamp under this CR 613.7m
-      -- reorder (#872).
+      -- CR 613.7k: a sticker's stamp is dealt out with its object's block, so
+      -- it stays right after the object's. A regression fence: no test reorders
+      -- a stickered entrant.
       restampObject oid obj
-        | member oid = obj {Object.timestamp = remap (Object.timestamp obj), Object.counterTimestamps = fmap remap (Object.counterTimestamps obj)}
+        | member oid = obj {Object.timestamp = remap (Object.timestamp obj), Object.counterTimestamps = fmap remap (Object.counterTimestamps obj), Object.stickers = fmap (\p -> p {StickerPlacement.timestamp = remap (StickerPlacement.timestamp p)}) (Object.stickers obj)}
         | otherwise = obj
       restampEffect e
         | member (ContinuousEffect.source e) = e {ContinuousEffect.timestamp = remap (ContinuousEffect.timestamp e)}

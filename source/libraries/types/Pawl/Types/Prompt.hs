@@ -356,6 +356,9 @@ data Prompt r where
   -- | CR 123.3: which available sticker the placer puts on this object.
   -- ChooseDungeon's posture: asked at two or more, filtered rather than trusted.
   ChooseSticker :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty StickerRef.StickerRef -> Prompt StickerRef.StickerRef
+  -- | CR 123.6b: after how many words of this object's name the controller
+  -- puts a name sticker's word.
+  ChooseNamePosition :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty Natural.Natural -> Prompt Natural.Natural
   -- | CR 103.2b \/ 702.139a: which card, if any, a player reveals from outside
   -- the game as their companion, before the game begins. An OutsideCard for
   -- ChooseFromOutsideTheGame's reason: in a subgame a main-game object is

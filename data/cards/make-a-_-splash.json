@@ -1,0 +1,137 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Flash"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Make a _____ Splash",
+      "oracleText": "Flash\nWhen this enchantment enters, you may put a name sticker on it.\nWhenever you put a sticker on this enchantment, tap up to X target creatures, where X is the number of u's in name stickers on this enchantment.",
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfEnters"
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "PutSticker",
+                        "value": {
+                          "kinds": [
+                            {
+                              "type": "Name"
+                            }
+                          ],
+                          "player": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "self"
+                          }
+                        }
+                      }
+                    ],
+                    "optionality": {
+                      "type": "Optional"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "condition": {
+            "type": "PlacesSticker",
+            "value": {
+              "kinds": [
+                {
+                  "type": "Name"
+                },
+                {
+                  "type": "Ability"
+                },
+                {
+                  "type": "PowerToughness"
+                },
+                {
+                  "type": "Art"
+                }
+              ],
+              "object": {
+                "type": "IsSource"
+              },
+              "placer": {
+                "type": "You"
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Tap",
+                        "value": {
+                          "type": "InSlot",
+                          "value": "targets"
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "targetSlots": {
+                  "targets": {
+                    "count": {
+                      "type": "UpToComputed",
+                      "value": {
+                        "type": "LettersOnNameStickers",
+                        "value": "u"
+                      }
+                    },
+                    "pool": {
+                      "type": "Creatures"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}
