@@ -1902,17 +1902,9 @@ announceReductions pid oid gs cost adjustments =
         Nothing -> pure symbol
         -- Unreachable: reductionHalvesOf answers Just only where it has halves
         -- to offer. Left rather than made partial, and the symbol survives.
-        Just [] -> pure symbol
-        -- The degenerate `Hybrid t t`: both halves are the same symbol, so the
-        -- answer cannot be observed and asking would be a prompt with one button.
-        Just [only] -> pure only
-        Just halves@(first : others) -> do
-          answer <-
-            Game.choose
-              (Prompt.ChooseReductionHalf (Decide.deciderFor pid gs) pid oid symbol (first NonEmpty.:| others))
-          -- FILTERED, NOT TRUSTED, the Mana.announce posture: an answer that is
-          -- not one of the offered halves falls back to the first.
-          pure (if elem answer halves then answer else first)
+        -- Through Game.chooseAmong. The degenerate `Hybrid t t` offers one
+        -- half, so the answer cannot be observed and nothing is asked.
+        Just halves -> Maybe.fromMaybe symbol <$> Game.chooseAmong (\decider who -> Prompt.ChooseReductionHalf decider who oid symbol) pid halves
       chooseAll reduction =
         fmap
           (\xs -> reduction {AppliedReduction.amount = ManaCost.MkManaCost xs})
@@ -2401,9 +2393,9 @@ beholdCandidates slots pid oid criterion gs =
 --
 -- DISTINCT: each pick is withheld from the asks after it, so no object is beheld
 -- twice -- Pawl.CostSpec's "CR 701.4a three Elementals are three objects" is the
--- proof. One Prompt.ChooseBehold per object, raised only while the pool left
--- holds more than the objects still owed; at exactly that many every one is
--- beheld and there is nothing to choose. FILTERED and not trusted (#222).
+-- proof. One Prompt.ChooseBehold per object, through Game.chooseAmong, and
+-- only while the pool left holds more than the objects still owed; at exactly
+-- that many every one is beheld and there is nothing to choose.
 --
 -- Each is revealed where it is in the hand, conditioned on the ZONE rather than
 -- on which half the answer came from, so the two halves cannot disagree.
@@ -2411,19 +2403,15 @@ beholdObjects :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> Play
 beholdObjects slots pid oid n criterion = do
   gs <- State.get
   let pool = beholdCandidates slots pid oid criterion gs
-      decider = Decide.deciderFor pid gs
       pick chosen owed
         | owed == 0 = pure (Just (reverse chosen))
-        | otherwise =
+        | otherwise = do
             let left = filter (`notElem` chosen) pool
-             in case left of
-                  first : second : more
-                    | Natural.length left > owed -> do
-                        answer <- Game.choose (Prompt.ChooseBehold decider pid oid (first NonEmpty.:| (second : more)))
-                        pick ((if List.elem answer left then answer else first) : chosen) (owed - 1)
-                  first : _
-                    | Natural.length left >= owed -> pick (first : chosen) (owed - 1)
-                  _ -> pure Nothing
+            picked <- case compare (Natural.length left) owed of
+              LT -> pure Nothing
+              EQ -> pure (Maybe.listToMaybe left)
+              GT -> Game.chooseAmong (\decider who -> Prompt.ChooseBehold decider who oid) pid left
+            maybe (pure Nothing) (\one -> pick (one : chosen) (owed - 1)) picked
   beheld <- pick [] n
   Monad.forM_ (Maybe.fromMaybe [] beheld) $ \chosen ->
     Monad.when (fmap Object.zone (Game.lookupObject chosen gs) == Just Zone.Hand) (Event.reveal RevealCause.Ordinary pid chosen)
@@ -6591,45 +6579,31 @@ payPayable moment slots pid oid component = case component of
   -- owner the default already names.
   CostComponent.PutCardFromHandOntoBattlefield criterion -> do
     gs <- State.get
-    let held = putOntoBattlefieldCandidates slots pid oid criterion gs
-        decider = Decide.deciderFor pid gs
-    case held of
-      [] -> pure Payment.Unpaid
-      first : rest -> do
-        chosen <- case rest of
-          [] -> pure first
-          second : more -> do
-            answer <- Game.choose (Prompt.ChooseCardInHand decider pid oid (first NonEmpty.:| (second : more)))
-            pure (if List.elem answer held then answer else first)
+    picked <- Game.chooseAmong (\decider who -> Prompt.ChooseCardInHand decider who oid) pid (putOntoBattlefieldCandidates slots pid oid criterion gs)
+    case picked of
+      Nothing -> pure Payment.Unpaid
+      Just chosen -> do
         Event.changeZone chosen Zone.Battlefield
         pure bindsNothing
   -- CR 406.2's move out of the hidden hand, PutCardFromHandOntoBattlefield's arm
   -- above with the other destination: the candidates are re-read HERE so an
   -- earlier component of the same cost that emptied the hand leaves this Unpaid,
-  -- and the prompt is raised only at two or more, one candidate leaving nothing
-  -- to put to anybody. FILTERED and not trusted (#222) -- an answer naming a card
-  -- that was never offered falls back to the first.
+  -- and asked through Game.chooseAmong.
   --
   -- Through Event.changeZone, CR 400.7's funnel, so the exile is a zone change
   -- like any other and a CR 603.6a leaves-the-hand watcher sees it.
   CostComponent.ExileCardFromHand criterion -> do
     gs <- State.get
-    let held = exileFromHandCandidates slots pid oid criterion gs
-        decider = Decide.deciderFor pid gs
-    case held of
-      [] -> pure Payment.Unpaid
-      first : rest -> do
-        chosen <- case rest of
-          [] -> pure first
-          second : more -> do
-            answer <- Game.choose (Prompt.ChooseCardInHand decider pid oid (first NonEmpty.:| (second : more)))
-            pure (if List.elem answer held then answer else first)
+    picked <- Game.chooseAmong (\decider who -> Prompt.ChooseCardInHand decider who oid) pid (exileFromHandCandidates slots pid oid criterion gs)
+    case picked of
+      Nothing -> pure Payment.Unpaid
+      Just chosen -> do
         Event.changeZone chosen Zone.Exile
         pure bindsNothing
   -- CR 701.20a's reveal as a cost, the arm above's pool and prompt with no zone
   -- change at the end of it (CR 701.20b): the candidates are re-read HERE so an
   -- earlier component of the same cost that emptied the hand leaves this Unpaid,
-  -- and the prompt is raised only at two or more. FILTERED and not trusted (#222).
+  -- and asked through Game.chooseAmong.
   --
   -- Binds Binding.revealedCard, so "the revealed card's mana value" has a name to
   -- read at resolution (Living Destiny); Pawl.Engine.Cast folds the payment's slots
@@ -6644,16 +6618,10 @@ payPayable moment slots pid oid component = case component of
   -- (CR 701.20e), and it is a fence rather than proven behaviour.
   CostComponent.RevealCardFromHand criterion -> do
     gs <- State.get
-    let held = revealFromHandCandidates slots pid oid criterion gs
-        decider = Decide.deciderFor pid gs
-    case held of
-      [] -> pure Payment.Unpaid
-      first : rest -> do
-        chosen <- case rest of
-          [] -> pure first
-          second : more -> do
-            answer <- Game.choose (Prompt.ChooseCardInHand decider pid oid (first NonEmpty.:| (second : more)))
-            pure (if List.elem answer held then answer else first)
+    picked <- Game.chooseAmong (\decider who -> Prompt.ChooseCardInHand decider who oid) pid (revealFromHandCandidates slots pid oid criterion gs)
+    case picked of
+      Nothing -> pure Payment.Unpaid
+      Just chosen -> do
         Event.reveal RevealCause.Ordinary pid chosen
         pure (Payment.Paid (Binding.paidObjects Binding.revealedCard (Set.singleton (Recipient.ToObject chosen))))
   -- CR 701.4a's two-zone choice through `beholdObjects`: this many distinct

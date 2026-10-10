@@ -4,7 +4,6 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
-import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -1851,18 +1850,12 @@ drawFromPiles perspective picked = do
       -- "target", which CR 115.3 forbids naming one card twice.
       drawOut pile = go []
         where
-          go taken n =
-            if n == 0
-              then pure taken
-              else do
+          go taken n
+            | n == 0 = pure taken
+            | otherwise = do
                 gs <- State.get
-                case filter (`notElem` taken) (pileMembers perspective pile gs) of
-                  [] -> pure taken
-                  [only] -> go (only : taken) (n - 1)
-                  first : second : more -> do
-                    let offered = first NonEmpty.:| (second : more)
-                    answer <- Game.ask (Prompt.RandomObject offered)
-                    go ((if List.elem answer (NonEmpty.toList offered) then answer else first) : taken) (n - 1)
+                card <- Game.drawAmong Prompt.RandomObject (filter (`notElem` taken) (pileMembers perspective pile gs))
+                maybe (pure taken) (\one -> go (one : taken) (n - 1)) card
   drawn <- Map.traverseWithKey drawOut wanted
   pure (Set.union named (Set.fromList (fmap Recipient.ToObject (concat (Map.elems drawn)))))
 
