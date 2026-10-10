@@ -991,19 +991,7 @@ craft spec =
             { MoveToZone.ref = ObjectRef.InSlot Binding.exiledCard,
               MoveToZone.zone = Zone.Battlefield,
               MoveToZone.riders =
-                EntryRiders.MkEntryRiders
-                  { EntryRiders.tapped = TapState.Untapped,
-                    EntryRiders.attacking = Nothing,
-                    EntryRiders.blocking = Nothing,
-                    EntryRiders.transformed = True,
-                    EntryRiders.counters = Map.empty,
-                    EntryRiders.underOwner = True,
-                    EntryRiders.exiledFaceDown = False,
-                    EntryRiders.attachedTo = Nothing,
-                    EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False,
-                    EntryRiders.characteristics = Seq.empty
-                  },
+                EntryRiders.defaultValue {EntryRiders.transformed = True, EntryRiders.underOwner = True},
               MoveToZone.slot = Nothing,
               MoveToZone.origin = Just Zone.Exile,
               MoveToZone.placement = LibraryPlacement.defaultValue,
@@ -1146,19 +1134,7 @@ ninjutsu cost =
             { MoveToZone.ref = ObjectRef.InSlot Binding.triggerSource,
               MoveToZone.zone = Zone.Battlefield,
               MoveToZone.riders =
-                EntryRiders.MkEntryRiders
-                  { EntryRiders.tapped = TapState.Tapped,
-                    EntryRiders.attacking = Just (EntryAttack.SameAs Binding.returnedPermanent),
-                    EntryRiders.blocking = Nothing,
-                    EntryRiders.transformed = False,
-                    EntryRiders.counters = Map.empty,
-                    EntryRiders.underOwner = False,
-                    EntryRiders.exiledFaceDown = False,
-                    EntryRiders.attachedTo = Nothing,
-                    EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False,
-                    EntryRiders.characteristics = Seq.empty
-                  },
+                EntryRiders.defaultValue {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = Just (EntryAttack.SameAs Binding.returnedPermanent)},
               -- Nothing looks back at the move, so it binds no slot.
               MoveToZone.slot = Nothing,
               MoveToZone.origin = Just Zone.Hand,
@@ -1446,19 +1422,7 @@ unearth cost =
             { MoveToZone.ref = ObjectRef.InSlot Binding.triggerSource,
               MoveToZone.zone = Zone.Battlefield,
               MoveToZone.riders =
-                EntryRiders.MkEntryRiders
-                  { EntryRiders.tapped = TapState.Untapped,
-                    EntryRiders.attacking = Nothing,
-                    EntryRiders.blocking = Nothing,
-                    EntryRiders.transformed = False,
-                    EntryRiders.counters = Map.empty,
-                    EntryRiders.underOwner = False,
-                    EntryRiders.exiledFaceDown = False,
-                    EntryRiders.attachedTo = Nothing,
-                    EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False,
-                    EntryRiders.characteristics = Seq.empty
-                  },
+                EntryRiders.defaultValue,
               MoveToZone.slot = Just unearthSlot,
               MoveToZone.origin = Just Zone.Graveyard,
               MoveToZone.placement = LibraryPlacement.defaultValue,
@@ -1549,19 +1513,7 @@ unearthExile =
             { MoveToZone.ref = ObjectRef.InSlot unearthSlot,
               MoveToZone.zone = Zone.Exile,
               MoveToZone.riders =
-                EntryRiders.MkEntryRiders
-                  { EntryRiders.tapped = TapState.Untapped,
-                    EntryRiders.attacking = Nothing,
-                    EntryRiders.blocking = Nothing,
-                    EntryRiders.transformed = False,
-                    EntryRiders.counters = Map.empty,
-                    EntryRiders.underOwner = False,
-                    EntryRiders.exiledFaceDown = False,
-                    EntryRiders.attachedTo = Nothing,
-                    EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False,
-                    EntryRiders.characteristics = Seq.empty
-                  },
+                EntryRiders.defaultValue,
               MoveToZone.slot = Nothing,
               MoveToZone.origin = Nothing,
               MoveToZone.placement = LibraryPlacement.defaultValue,
@@ -1613,19 +1565,7 @@ graveyardTokenCopy exceptions cost =
             { CreateCopy.quantity = CreateCopy.defaultQuantity,
               CreateCopy.ref = ObjectRef.InSlot Binding.triggerSource,
               CreateCopy.riders =
-                EntryRiders.MkEntryRiders
-                  { EntryRiders.tapped = TapState.Untapped,
-                    EntryRiders.attacking = Nothing,
-                    EntryRiders.blocking = Nothing,
-                    EntryRiders.transformed = False,
-                    EntryRiders.counters = Map.empty,
-                    EntryRiders.underOwner = False,
-                    EntryRiders.exiledFaceDown = False,
-                    EntryRiders.attachedTo = Nothing,
-                    EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False,
-                    EntryRiders.characteristics = Seq.empty
-                  },
+                EntryRiders.defaultValue,
               -- Nothing looks back at the token, so it binds no slot.
               CreateCopy.slot = Nothing,
               CreateCopy.exceptions = exceptions
@@ -1733,23 +1673,11 @@ encore cost =
           CreateCopy.MkCreateCopy
             { CreateCopy.quantity = CreateCopy.defaultQuantity,
               CreateCopy.ref = ObjectRef.InSlot Binding.triggerSource,
+              -- Not attacking: rule 702.141a's token is created during a main
+              -- phase (CR 602.5d) and REQUIRED to attack later, where myriad's
+              -- arrives already attacking mid-combat.
               CreateCopy.riders =
-                EntryRiders.MkEntryRiders
-                  { EntryRiders.tapped = TapState.Untapped,
-                    -- NOT EntryAttack: rule 702.141a's token is created during a
-                    -- main phase (CR 602.5d) and REQUIRED to attack later, where
-                    -- myriad's arrives already attacking mid-combat.
-                    EntryRiders.attacking = Nothing,
-                    EntryRiders.blocking = Nothing,
-                    EntryRiders.transformed = False,
-                    EntryRiders.counters = Map.empty,
-                    EntryRiders.underOwner = False,
-                    EntryRiders.exiledFaceDown = False,
-                    EntryRiders.attachedTo = Nothing,
-                    EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False,
-                    EntryRiders.characteristics = Seq.empty
-                  },
+                EntryRiders.defaultValue,
               CreateCopy.slot = Just encoreTokenSlot,
               CreateCopy.exceptions = []
             }
@@ -5774,19 +5702,7 @@ ingest =
           ( MoveToZone.MkMoveToZone
               (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.InSlot Binding.triggerPlayer) (Quantity.Literal 1)))
               Zone.Exile
-              EntryRiders.MkEntryRiders
-                { EntryRiders.tapped = TapState.Untapped,
-                  EntryRiders.attacking = Nothing,
-                  EntryRiders.blocking = Nothing,
-                  EntryRiders.transformed = False,
-                  EntryRiders.counters = Map.empty,
-                  EntryRiders.underOwner = False,
-                  EntryRiders.exiledFaceDown = False,
-                  EntryRiders.attachedTo = Nothing,
-                  EntryRiders.faceDown = Nothing,
-                  EntryRiders.noted = False,
-                  EntryRiders.characteristics = Seq.empty
-                }
+              EntryRiders.defaultValue
               Nothing
               Nothing
               LibraryPlacement.defaultValue
@@ -5828,19 +5744,7 @@ myriadExile =
             { MoveToZone.ref = ObjectRef.InSlot myriadTokenSlot,
               MoveToZone.zone = Zone.Exile,
               MoveToZone.riders =
-                EntryRiders.MkEntryRiders
-                  { EntryRiders.tapped = TapState.Untapped,
-                    EntryRiders.attacking = Nothing,
-                    EntryRiders.blocking = Nothing,
-                    EntryRiders.transformed = False,
-                    EntryRiders.counters = Map.empty,
-                    EntryRiders.underOwner = False,
-                    EntryRiders.exiledFaceDown = False,
-                    EntryRiders.attachedTo = Nothing,
-                    EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False,
-                    EntryRiders.characteristics = Seq.empty
-                  },
+                EntryRiders.defaultValue,
               MoveToZone.slot = Nothing,
               MoveToZone.origin = Nothing,
               MoveToZone.placement = LibraryPlacement.defaultValue,
@@ -5885,19 +5789,7 @@ myriad =
             { CreateCopy.quantity = CreateCopy.defaultQuantity,
               CreateCopy.ref = ObjectRef.EachMatching Filter.IsSource,
               CreateCopy.riders =
-                EntryRiders.MkEntryRiders
-                  { EntryRiders.tapped = TapState.Tapped,
-                    EntryRiders.attacking = Just (EntryAttack.UnderPlayer myriadOpponentSlot),
-                    EntryRiders.blocking = Nothing,
-                    EntryRiders.transformed = False,
-                    EntryRiders.counters = Map.empty,
-                    EntryRiders.underOwner = False,
-                    EntryRiders.exiledFaceDown = False,
-                    EntryRiders.attachedTo = Nothing,
-                    EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False,
-                    EntryRiders.characteristics = Seq.empty
-                  },
+                EntryRiders.defaultValue {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = Just (EntryAttack.UnderPlayer myriadOpponentSlot)},
               CreateCopy.slot = Just myriadTokenSlot,
               CreateCopy.exceptions = []
             }
@@ -5970,19 +5862,7 @@ mobilize n =
             { Create.quantity = keywordCount n,
               Create.card = warriorToken,
               Create.riders =
-                EntryRiders.MkEntryRiders
-                  { EntryRiders.tapped = TapState.Tapped,
-                    EntryRiders.attacking = Just EntryAttack.Chosen,
-                    EntryRiders.blocking = Nothing,
-                    EntryRiders.transformed = False,
-                    EntryRiders.counters = Map.empty,
-                    EntryRiders.underOwner = False,
-                    EntryRiders.exiledFaceDown = False,
-                    EntryRiders.attachedTo = Nothing,
-                    EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False,
-                    EntryRiders.characteristics = Seq.empty
-                  },
+                EntryRiders.defaultValue {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = Just EntryAttack.Chosen},
               Create.slot = Just mobilizeTokenSlot,
               -- CR 111.2 under CR 109.5: the keyword ability's own controller.
               Create.creator = PlayerRef.Relative PlayerRelation.You
@@ -6767,19 +6647,7 @@ dashReturn =
             { MoveToZone.ref = ObjectRef.InSlot becameSlot,
               MoveToZone.zone = Zone.Hand,
               MoveToZone.riders =
-                EntryRiders.MkEntryRiders
-                  { EntryRiders.tapped = TapState.Untapped,
-                    EntryRiders.attacking = Nothing,
-                    EntryRiders.blocking = Nothing,
-                    EntryRiders.transformed = False,
-                    EntryRiders.counters = Map.empty,
-                    EntryRiders.underOwner = False,
-                    EntryRiders.exiledFaceDown = False,
-                    EntryRiders.attachedTo = Nothing,
-                    EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False,
-                    EntryRiders.characteristics = Seq.empty
-                  },
+                EntryRiders.defaultValue,
               MoveToZone.slot = Nothing,
               MoveToZone.origin = Nothing,
               MoveToZone.placement = LibraryPlacement.defaultValue,
@@ -6831,19 +6699,7 @@ warpExile =
             { MoveToZone.ref = ObjectRef.InSlot becameSlot,
               MoveToZone.zone = Zone.Exile,
               MoveToZone.riders =
-                EntryRiders.MkEntryRiders
-                  { EntryRiders.tapped = TapState.Untapped,
-                    EntryRiders.attacking = Nothing,
-                    EntryRiders.blocking = Nothing,
-                    EntryRiders.transformed = False,
-                    EntryRiders.counters = Map.empty,
-                    EntryRiders.underOwner = False,
-                    EntryRiders.exiledFaceDown = False,
-                    EntryRiders.attachedTo = Nothing,
-                    EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False,
-                    EntryRiders.characteristics = Seq.empty
-                  },
+                EntryRiders.defaultValue,
               MoveToZone.slot = Just warpedSlot,
               MoveToZone.origin = Nothing,
               MoveToZone.placement = LibraryPlacement.defaultValue,
@@ -6974,19 +6830,7 @@ returns kind =
           ( MoveToZone.MkMoveToZone
               (ObjectRef.InSlot Binding.became)
               Zone.Battlefield
-              EntryRiders.MkEntryRiders
-                { EntryRiders.tapped = TapState.Untapped,
-                  EntryRiders.attacking = Nothing,
-                  EntryRiders.blocking = Nothing,
-                  EntryRiders.transformed = False,
-                  EntryRiders.counters = Map.singleton kind (Quantity.Literal 1),
-                  EntryRiders.underOwner = True,
-                  EntryRiders.exiledFaceDown = False,
-                  EntryRiders.attachedTo = Nothing,
-                  EntryRiders.faceDown = Nothing,
-                  EntryRiders.noted = False,
-                  EntryRiders.characteristics = Seq.empty
-                }
+              EntryRiders.defaultValue {EntryRiders.counters = Map.singleton kind (Quantity.Literal 1), EntryRiders.underOwner = True}
               Nothing
               Nothing
               LibraryPlacement.defaultValue
@@ -7075,19 +6919,7 @@ giftToken tapped token =
       { Create.quantity = Quantity.Literal 1,
         Create.card = token,
         Create.riders =
-          EntryRiders.MkEntryRiders
-            { EntryRiders.tapped = tapped,
-              EntryRiders.attacking = Nothing,
-              EntryRiders.blocking = Nothing,
-              EntryRiders.transformed = False,
-              EntryRiders.counters = Map.empty,
-              EntryRiders.underOwner = False,
-              EntryRiders.exiledFaceDown = False,
-              EntryRiders.attachedTo = Nothing,
-              EntryRiders.faceDown = Nothing,
-              EntryRiders.noted = False,
-              EntryRiders.characteristics = Seq.empty
-            },
+          EntryRiders.defaultValue {EntryRiders.tapped = tapped},
         Create.slot = Nothing,
         Create.creator = PlayerRef.ChosenPlayerOfBound Binding.triggerSource
       }
@@ -7122,19 +6954,7 @@ paidTokenCopies keyword quantity exceptions =
             { CreateCopy.quantity = quantity,
               CreateCopy.ref = ObjectRef.InSlot Binding.triggerSource,
               CreateCopy.riders =
-                EntryRiders.MkEntryRiders
-                  { EntryRiders.tapped = TapState.Untapped,
-                    EntryRiders.attacking = Nothing,
-                    EntryRiders.blocking = Nothing,
-                    EntryRiders.transformed = False,
-                    EntryRiders.counters = Map.empty,
-                    EntryRiders.underOwner = False,
-                    EntryRiders.exiledFaceDown = False,
-                    EntryRiders.attachedTo = Nothing,
-                    EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False,
-                    EntryRiders.characteristics = Seq.empty
-                  },
+                EntryRiders.defaultValue,
               CreateCopy.slot = Nothing,
               CreateCopy.exceptions = exceptions
             }
@@ -7166,19 +6986,7 @@ afterlife n =
             { Create.quantity = Quantity.Literal (toInteger n),
               Create.card = spiritToken,
               Create.riders =
-                EntryRiders.MkEntryRiders
-                  { EntryRiders.tapped = TapState.Untapped,
-                    EntryRiders.attacking = Nothing,
-                    EntryRiders.blocking = Nothing,
-                    EntryRiders.transformed = False,
-                    EntryRiders.counters = Map.empty,
-                    EntryRiders.underOwner = False,
-                    EntryRiders.exiledFaceDown = False,
-                    EntryRiders.attachedTo = Nothing,
-                    EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False,
-                    EntryRiders.characteristics = Seq.empty
-                  },
+                EntryRiders.defaultValue,
               Create.slot = Nothing,
               -- CR 111.2 under CR 109.5: the keyword ability's own controller.
               Create.creator = PlayerRef.Relative PlayerRelation.You
@@ -7322,19 +7130,7 @@ fabricate n =
             { Create.quantity = Quantity.Literal (toInteger n),
               Create.card = servoToken,
               Create.riders =
-                EntryRiders.MkEntryRiders
-                  { EntryRiders.tapped = TapState.Untapped,
-                    EntryRiders.attacking = Nothing,
-                    EntryRiders.blocking = Nothing,
-                    EntryRiders.transformed = False,
-                    EntryRiders.counters = Map.empty,
-                    EntryRiders.underOwner = False,
-                    EntryRiders.exiledFaceDown = False,
-                    EntryRiders.attachedTo = Nothing,
-                    EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False,
-                    EntryRiders.characteristics = Seq.empty
-                  },
+                EntryRiders.defaultValue,
               Create.slot = Nothing,
               -- CR 111.2 under CR 109.5: the keyword ability's own controller.
               Create.creator = PlayerRef.Relative PlayerRelation.You
@@ -7522,19 +7318,7 @@ attachToOwnToken token =
             { Create.quantity = Quantity.Literal 1,
               Create.card = token,
               Create.riders =
-                EntryRiders.MkEntryRiders
-                  { EntryRiders.tapped = TapState.Untapped,
-                    EntryRiders.attacking = Nothing,
-                    EntryRiders.blocking = Nothing,
-                    EntryRiders.transformed = False,
-                    EntryRiders.counters = Map.empty,
-                    EntryRiders.underOwner = False,
-                    EntryRiders.exiledFaceDown = False,
-                    EntryRiders.attachedTo = Nothing,
-                    EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False,
-                    EntryRiders.characteristics = Seq.empty
-                  },
+                EntryRiders.defaultValue,
               -- The slot holds every token minted (Resolve.bindMinted), which
               -- where CR 614.16 doubled the count is two Germs; CR 301.5c then
               -- gives the Equipment's controller the choice of which one it
@@ -7721,19 +7505,7 @@ tokenCard name typeLine colors stats abilities =
 hideaway :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 hideaway n =
   let plain =
-        EntryRiders.MkEntryRiders
-          { EntryRiders.tapped = TapState.Untapped,
-            EntryRiders.attacking = Nothing,
-            EntryRiders.blocking = Nothing,
-            EntryRiders.transformed = False,
-            EntryRiders.counters = Map.empty,
-            EntryRiders.underOwner = False,
-            EntryRiders.exiledFaceDown = False,
-            EntryRiders.attachedTo = Nothing,
-            EntryRiders.faceDown = Nothing,
-            EntryRiders.noted = False,
-            EntryRiders.characteristics = Seq.empty
-          }
+        EntryRiders.defaultValue
       look =
         Effect.LookAt
           ( LookAt.MkLookAt
@@ -7807,19 +7579,7 @@ soulshift n =
           ( MoveToZone.MkMoveToZone
               (ObjectRef.InSlot soulshiftTarget)
               Zone.Hand
-              EntryRiders.MkEntryRiders
-                { EntryRiders.tapped = TapState.Untapped,
-                  EntryRiders.attacking = Nothing,
-                  EntryRiders.blocking = Nothing,
-                  EntryRiders.transformed = False,
-                  EntryRiders.counters = Map.empty,
-                  EntryRiders.underOwner = False,
-                  EntryRiders.exiledFaceDown = False,
-                  EntryRiders.attachedTo = Nothing,
-                  EntryRiders.faceDown = Nothing,
-                  EntryRiders.noted = False,
-                  EntryRiders.characteristics = Seq.empty
-                }
+              EntryRiders.defaultValue
               Nothing
               Nothing
               LibraryPlacement.defaultValue
@@ -8109,19 +7869,7 @@ recover cost =
             { MoveToZone.ref = ObjectRef.InSlot Binding.triggerSource,
               MoveToZone.zone = zone,
               MoveToZone.riders =
-                EntryRiders.MkEntryRiders
-                  { EntryRiders.tapped = TapState.Untapped,
-                    EntryRiders.attacking = Nothing,
-                    EntryRiders.blocking = Nothing,
-                    EntryRiders.transformed = False,
-                    EntryRiders.counters = Map.empty,
-                    EntryRiders.underOwner = False,
-                    EntryRiders.exiledFaceDown = False,
-                    EntryRiders.attachedTo = Nothing,
-                    EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False,
-                    EntryRiders.characteristics = Seq.empty
-                  },
+                EntryRiders.defaultValue,
               MoveToZone.slot = Nothing,
               MoveToZone.origin = Just Zone.Graveyard,
               MoveToZone.placement = LibraryPlacement.defaultValue,
@@ -8371,19 +8119,7 @@ demonstrateOpponent = SlotName.MkSlotName (Text.pack "demonstrated")
 cascade :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 cascade =
   let plain =
-        EntryRiders.MkEntryRiders
-          { EntryRiders.tapped = TapState.Untapped,
-            EntryRiders.attacking = Nothing,
-            EntryRiders.blocking = Nothing,
-            EntryRiders.transformed = False,
-            EntryRiders.counters = Map.empty,
-            EntryRiders.underOwner = False,
-            EntryRiders.exiledFaceDown = False,
-            EntryRiders.attachedTo = Nothing,
-            EntryRiders.faceDown = Nothing,
-            EntryRiders.noted = False,
-            EntryRiders.characteristics = Seq.empty
-          }
+        EntryRiders.defaultValue
       match = Filter.And [Filter.Not (Filter.HasCardType CardType.Land), Filter.ManaValueLessThanSource]
       exile =
         Effect.MoveToZone
@@ -8484,19 +8220,7 @@ cascadeExiled = SlotName.MkSlotName (Text.pack "cascaded")
 ripple :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 ripple n =
   let plain =
-        EntryRiders.MkEntryRiders
-          { EntryRiders.tapped = TapState.Untapped,
-            EntryRiders.attacking = Nothing,
-            EntryRiders.blocking = Nothing,
-            EntryRiders.transformed = False,
-            EntryRiders.counters = Map.empty,
-            EntryRiders.underOwner = False,
-            EntryRiders.exiledFaceDown = False,
-            EntryRiders.attachedTo = Nothing,
-            EntryRiders.faceDown = Nothing,
-            EntryRiders.noted = False,
-            EntryRiders.characteristics = Seq.empty
-          }
+        EntryRiders.defaultValue
       show_ =
         Effect.Reveal
           ( Reveal.MkReveal
@@ -8917,19 +8641,7 @@ madnessCast manaCost payload =
             { MoveToZone.ref = ObjectRef.InSlot Binding.triggerSource,
               MoveToZone.zone = Zone.Graveyard,
               MoveToZone.riders =
-                EntryRiders.MkEntryRiders
-                  { EntryRiders.tapped = TapState.Untapped,
-                    EntryRiders.attacking = Nothing,
-                    EntryRiders.blocking = Nothing,
-                    EntryRiders.transformed = False,
-                    EntryRiders.counters = Map.empty,
-                    EntryRiders.underOwner = False,
-                    EntryRiders.exiledFaceDown = False,
-                    EntryRiders.attachedTo = Nothing,
-                    EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False,
-                    EntryRiders.characteristics = Seq.empty
-                  },
+                EntryRiders.defaultValue,
               MoveToZone.slot = Nothing,
               MoveToZone.origin = Nothing,
               MoveToZone.placement = LibraryPlacement.defaultValue,
@@ -8982,19 +8694,7 @@ castUsingEntry castUsing =
   if sneakWindowed castUsing
     then
       Just
-        EntryRiders.MkEntryRiders
-          { EntryRiders.tapped = TapState.Tapped,
-            EntryRiders.attacking = Just (EntryAttack.SameAs Binding.returnedPermanent),
-            EntryRiders.blocking = Nothing,
-            EntryRiders.transformed = False,
-            EntryRiders.counters = Map.empty,
-            EntryRiders.underOwner = False,
-            EntryRiders.exiledFaceDown = False,
-            EntryRiders.attachedTo = Nothing,
-            EntryRiders.faceDown = Nothing,
-            EntryRiders.noted = False,
-            EntryRiders.characteristics = Seq.empty
-          }
+        EntryRiders.defaultValue {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = Just (EntryAttack.SameAs Binding.returnedPermanent)}
     else Nothing
 
 -- CR 611.2b's Master Thief clause, "for as long as you control this creature",
@@ -9337,16 +9037,4 @@ championLeaves =
 -- overrides `underOwner`, CR 702.72a's "under its owner's control".
 championRiders :: EntryRiders.EntryRiders Quantity.Quantity ability
 championRiders =
-  EntryRiders.MkEntryRiders
-    { EntryRiders.tapped = TapState.Untapped,
-      EntryRiders.attacking = Nothing,
-      EntryRiders.blocking = Nothing,
-      EntryRiders.transformed = False,
-      EntryRiders.counters = Map.empty,
-      EntryRiders.underOwner = False,
-      EntryRiders.exiledFaceDown = False,
-      EntryRiders.attachedTo = Nothing,
-      EntryRiders.faceDown = Nothing,
-      EntryRiders.noted = False,
-      EntryRiders.characteristics = Seq.empty
-    }
+  EntryRiders.defaultValue

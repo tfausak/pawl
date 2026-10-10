@@ -558,8 +558,6 @@ library codec
     Pawl.Codec.DuplicateCard
     Pawl.Codec.DuplicateCardSpec
     Pawl.Codec.Duration
-    Pawl.Codec.DurationRef
-    Pawl.Codec.DurationRefSpec
     Pawl.Codec.DurationSpec
     Pawl.Codec.DuringPhase
     Pawl.Codec.DuringPhaseSpec
@@ -593,6 +591,8 @@ library codec
     Pawl.Codec.EntryFlipSpec
     Pawl.Codec.EntryOption
     Pawl.Codec.EntryOptionSpec
+    Pawl.Codec.EntryPrice
+    Pawl.Codec.EntryPriceSpec
     Pawl.Codec.EntryR
     Pawl.Codec.EntryRestriction
     Pawl.Codec.EntryRestrictionSpec
@@ -685,6 +685,8 @@ library codec
     Pawl.Codec.FromReference
     Pawl.Codec.FromReferenceSpec
     Pawl.Codec.FullText
+    Pawl.Codec.GainControl
+    Pawl.Codec.GainControlSpec
     Pawl.Codec.GameEvent
     Pawl.Codec.GameEventSpec
     Pawl.Codec.GameSettings
@@ -692,8 +694,6 @@ library codec
     Pawl.Codec.GameState
     Pawl.Codec.Gift
     Pawl.Codec.GiftSpec
-    Pawl.Codec.GiveControl
-    Pawl.Codec.GiveControlSpec
     Pawl.Codec.GrantedAbility
     Pawl.Codec.GrantedAbilitySpec
     Pawl.Codec.GrantLookAtExiled
@@ -2251,7 +2251,6 @@ library types
     Pawl.Types.DungeonRoom
     Pawl.Types.DuplicateCard
     Pawl.Types.Duration
-    Pawl.Types.DurationRef
     Pawl.Types.DuringPhase
     Pawl.Types.EachCardFromAmong
     Pawl.Types.EachCardInGraveyard
@@ -2269,6 +2268,7 @@ library types
     Pawl.Types.EntryBlock
     Pawl.Types.EntryFlip
     Pawl.Types.EntryOption
+    Pawl.Types.EntryPrice
     Pawl.Types.EntryR
     Pawl.Types.EntryRefusal
     Pawl.Types.EntryRestriction
@@ -2319,12 +2319,12 @@ library types
     Pawl.Types.FromOutsideTheGame
     Pawl.Types.FromReference
     Pawl.Types.FullText
+    Pawl.Types.GainControl
     Pawl.Types.Game
     Pawl.Types.GameEvent
     Pawl.Types.GameSettings
     Pawl.Types.GameState
     Pawl.Types.Gift
-    Pawl.Types.GiveControl
     Pawl.Types.GrantedAbility
     Pawl.Types.GrantLookAtExiled
     Pawl.Types.GrantPlayFromExile

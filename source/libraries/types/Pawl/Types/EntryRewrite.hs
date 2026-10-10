@@ -6,6 +6,7 @@ import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.EntersWith as EntersWith
 import qualified Pawl.Types.EntryFlip as EntryFlip
 import qualified Pawl.Types.EntryOption as EntryOption
+import qualified Pawl.Types.EntryPrice as EntryPrice
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
@@ -26,8 +27,8 @@ import qualified Pawl.Types.WithCounters as WithCounters
 -- below carries a card's effects, and neither module may name the other. And in
 -- the ABILITY for Pawl.Types.CopyException's GainAbility, which AsCopy carries.
 --
--- SacrificeAnyNumber, ExileFromGraveyard, PayLifeOrTapped and SacrificeToEnter
--- are the constructors whose choice SPENDS something. Each is paid inside the
+-- SacrificeAnyNumber, ExileFromGraveyard, OrTapped's life price and
+-- SacrificeToEnter are the constructors whose choice SPENDS something. Each is paid inside the
 -- entry loop that made it, so the next member of a batch cannot choose what an
 -- earlier one already spent (CR 614.13b). The first three cannot be left owing
 -- what they cannot pay; SacrificeToEnter's fixed count can, so its arm carries
@@ -179,13 +180,10 @@ data EntryRewrite ability effect
     -- stamped on the entering incarnation rather than routed through the tap
     -- funnel, so no becomes-tapped event exists (CR 110.5b).
     Tapped
-  | -- | CR 614.1c / Razorgrass Field: "you may pay N life. If you don't, it enters
-    -- tapped" -- the arm above's rewrite with a price on avoiding it.
-    PayLifeOrTapped Natural.Natural
-  | -- | CR 614.1c / Rustic Clachan: "you may reveal a [matching] card from your
-    -- hand. If you don't, it enters tapped" -- PayLifeOrTapped one price over, and
-    -- not a cost, CR 701.20a's reveal changing no zone.
-    RevealOrTapped (Filter.Filter Keyword.Keyword)
+  | -- | CR 614.1c / Razorgrass Field, Rustic Clachan: "you may [price]. If you
+    -- don't, it enters tapped" -- the arm above's rewrite with a price on
+    -- avoiding it.
+    OrTapped EntryPrice.EntryPrice
   | -- | CR 702.145b via CR 614.1d: daybound's static ability making a permanent
     -- enter transformed, ranked its own CR 616.1d bucket. Collected on every entry
     -- and not only the stack's, which is what lets Pawl.MeldSpec's "CR 701.27g a

@@ -1050,7 +1050,7 @@ zoneScopePlayers perspective bindings scope gs =
       named = case scope of
         ZoneScope.Scoped playerScope -> Maybe.fromMaybe [] (PlayerEffect.playersInScope perspective gs playerScope)
         ZoneScope.InSlot slot ->
-          filter (`elem` reached) (Maybe.mapMaybe playerOf (Set.toList (Map.findWithDefault Set.empty slot bindings)))
+          filter (`elem` reached) (Maybe.mapMaybe Recipient.playerOf (Set.toList (Map.findWithDefault Set.empty slot bindings)))
         ZoneScope.ControllerOfBound slot ->
           filter (`elem` reached) $
             Maybe.mapMaybe
@@ -1065,17 +1065,6 @@ graveyardsOf pids gs =
   Set.fromList
     . fmap Recipient.ToObject
     $ concatMap (\pid -> Game.zoneMembers Zone.Graveyard pid gs) pids
-
--- The player a Recipient names, if it names one. Recipient.objectOf's twin on
--- the CR 115.1 player side.
-playerOf :: Recipient -> Maybe PlayerId
-playerOf recipient = case recipient of
-  Recipient.ToPlayer pid -> Just pid
-  Recipient.ToCreature _ -> Nothing
-  Recipient.ToPlaneswalker _ -> Nothing
-  Recipient.ToBattle _ -> Nothing
-  Recipient.ToObject _ -> Nothing
-  Recipient.ToPile _ -> Nothing
 
 -- CR 406.1: the cards in the exile zone, tagged ToObject -- Riftsweeper's
 -- "choose target face-up exiled card". CR 115.2's clause (a) again, the same
@@ -1610,7 +1599,7 @@ slotCapacities counting x slots sets gs =
                 Nothing -> Natural.length legal
                 Just namedSlot ->
                   let candidates = legalOf named
-                      pids = Maybe.mapMaybe playerOf (Set.toList candidates)
+                      pids = Maybe.mapMaybe Recipient.playerOf (Set.toList candidates)
                       k = snd (announcedRange counting x namedSlot (Natural.length candidates))
                       per = List.sortBy (flip compare) (fmap (\pid -> Natural.length (Set.intersection legal (graveyardsOf [pid] gs))) pids)
                       elsewhere = Natural.length (Set.difference legal (graveyardsOf pids gs))

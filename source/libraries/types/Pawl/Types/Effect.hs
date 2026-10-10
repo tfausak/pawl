@@ -36,7 +36,6 @@ import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.DoesNotUntapNext as DoesNotUntapNext
 import qualified Pawl.Types.Draw as Draw
-import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.Earthbend as Earthbend
 import qualified Pawl.Types.ExchangeBlocks as ExchangeBlocks
 import qualified Pawl.Types.ExchangeOwnership as ExchangeOwnership
@@ -56,7 +55,7 @@ import qualified Pawl.Types.ForbidBeingBlocked as ForbidBeingBlocked
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.ForbidUntap as ForbidUntap
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
-import qualified Pawl.Types.GiveControl as GiveControl
+import qualified Pawl.Types.GainControl as GainControl
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.InitiativeTarget as InitiativeTarget
@@ -536,13 +535,10 @@ data Effect card ability
     -- is the only card that does). EndTurn's shape, differing in what CR 724.2d
     -- leaves at the head of the schedule.
     EndCombatPhase
-  | -- | CR 613.1b / 611.2c: install a layer-2 control effect on the objects the
-    -- ObjectRef names, for a duration; the new controller is derived from this
-    -- effect's source, and each object whose controller changed is re-Sicked (CR
-    -- 302.6).
-    GainControl DurationRef.DurationRef
-  | -- | CR 613.1b / 804.2: GainControl indefinitely to a NAMED player.
-    GiveControl GiveControl.GiveControl
+  | -- | CR 613.1b / 611.2c: install a layer-2 control effect giving one player
+    -- the objects the ObjectRef names, for a duration; each object whose
+    -- controller changed is re-Sicked (CR 302.6).
+    GainControl GainControl.GainControl
   | -- | CR 701.12b: the two permanents the ControlSides names swap controllers
     -- indefinitely (Switcheroo, Avarice Totem); one controller means the
     -- exchange does nothing.

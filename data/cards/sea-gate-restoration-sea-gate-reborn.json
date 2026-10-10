@@ -169,8 +169,11 @@
                 "type": "IsSource"
               },
               "rewrite": {
-                "type": "PayLifeOrTapped",
-                "value": 3
+                "type": "OrTapped",
+                "value": {
+                  "type": "PayLife",
+                  "value": 3
+                }
               }
             }
           }

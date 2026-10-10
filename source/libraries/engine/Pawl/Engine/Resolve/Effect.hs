@@ -76,7 +76,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Recruit as Recruit
 import qualified Pawl.Engine.Replacement as Replacement
-import Pawl.Engine.Resolve.Slots (battlefieldMatching, boundSlots, conditionSlots, effectContext, effectContextNaming, effectObjectRefs, effectPlayerRefs, effectViewOf, graveyardCardsOf, handCardsOf, legalMany, legalOne, libraryCardsOf, matchingFromAmong, objectRefObjects, overRelations, playerRefPlayers, replacementRowSlots, resolutionReads, slotBindings, slotGroup)
+import Pawl.Engine.Resolve.Slots (battlefieldMatching, boundSlots, conditionSlots, effectContext, effectContextNaming, effectObjectRefs, effectPlayerRefs, effectViewOf, graveyardCardsOf, handCardsOf, legalMany, legalOne, libraryCardsOf, matchingFromAmong, objectRefObjects, overRelations, playerRefPlayers, playerRefSlots, replacementRowSlots, resolutionReads, slotBindings, slotGroup)
 import qualified Pawl.Engine.Restamp as Restamp
 import qualified Pawl.Engine.Ring as Ring
 import qualified Pawl.Engine.Room as Room
@@ -204,7 +204,6 @@ import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.DoesNotUntapNext as DoesNotUntapNext
 import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Duration as Duration
-import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.Earthbend as Earthbend.Type
 import Pawl.Types.Effect (Effect)
@@ -243,11 +242,11 @@ import qualified Pawl.Types.ForbidBeingBlocked as ForbidBeingBlocked
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.ForbidUntap as ForbidUntap
 import qualified Pawl.Types.FromReference as FromReference
+import qualified Pawl.Types.GainControl as GainControl
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
-import qualified Pawl.Types.GiveControl as GiveControl
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -3174,7 +3173,10 @@ conjuredName card = Face.name (NonEmpty.head (Card.Type.faces card))
 -- Lion's "you may reveal a planeswalker card from among them and put it into
 -- your hand" moves nothing when the reveal found nothing. Pawl.MassEffectSpec's
 -- "CR 608.2d Carth the Lion's reveal is not offered without a planeswalker among
--- them" proves it.
+-- them" proves it. A PlayerRef naming no slot ("you") is no such read and
+-- leaves the instruction dependent; one naming a slot is a read of its own, so
+-- the instruction is weighed. Pawl.MassEffectSpec's "CR 608.2d a GainControl to
+-- you of a slot the reveal defines is dependent on it" proves the first half.
 --
 -- An EMPTY clause is not impossible, for the reason clauseIsInert gives.
 clauseIsImpossible :: ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> GameState -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
@@ -3187,7 +3189,7 @@ clauseIsImpossible resolving source controller legal gs clause =
         _ -> False
       dependent defined effect =
         let refs = effectObjectRefs effect
-         in not (null refs) && null (effectPlayerRefs effect) && all (readsOnly defined) refs
+         in not (null refs) && all (Map.null . playerRefSlots) (effectPlayerRefs effect) && all (readsOnly defined) refs
       independent = [effect | (defined, effect) <- zip definedBefore effects, not (dependent defined effect)]
    in not (null independent) && all (effectIsImpossible resolving source controller legal gs) independent
 
@@ -3389,7 +3391,6 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.EndTurn {} -> False
   Effect.EndCombatPhase {} -> False
   Effect.GainControl {} -> False
-  Effect.GiveControl {} -> False
   Effect.ExchangeControl {} -> False
   Effect.SetOwner {} -> False
   Effect.ExchangeOwnership {} -> False
@@ -10301,14 +10302,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- this process are put onto the stack there" is one mechanism, not two.
         State.modify' (\gs -> gs {GameState.endTurnSignal = EndTurnSignal.Ended})
       _ -> pure ()
-  Effect.GainControl (DurationRef.MkDurationRef duration ref) ->
-    State.modify' (installControl legal resolving controller source controller duration ref)
-  -- GainControl's arm with the new controller read off the PlayerRef rather than
-  -- being `controller`. Exactly one player or nothing: a slot CR 608.2b emptied
-  -- names nobody to give the object to.
-  Effect.GiveControl (GiveControl.MkGiveControl player ref) ->
-    State.modify' $ \gs -> case playerRefPlayers legal controller gs player of
-      [recipient] -> installControl legal resolving controller source recipient Duration.Indefinite ref gs
+  -- Exactly one new controller or nothing: a slot CR 608.2b emptied names
+  -- nobody to give the object to.
+  Effect.GainControl (GainControl.MkGainControl duration ref to) ->
+    State.modify' $ \gs -> case playerRefPlayers legal controller gs to of
+      [recipient] -> installControl legal resolving controller source recipient duration ref gs
       _ -> gs
   -- CR 701.12b: each of the two permanents goes to the other's controller,
   -- simultaneously. TWO stored effects, because Modification.SetController names
@@ -10924,15 +10922,13 @@ throwDice runSubgame controller sides named perDie = do
       -- payManaWindow -- the path every cast, activation and CR 118.12 gate
       -- also takes.
       --
-      -- The bound slots are dropped, and that is not an elision: the cost is
-      -- printed on the MODIFIER's object, not on the one resolving, so no
-      -- text of the resolving object can name what it took, and the
-      -- modifier's own change to the die reads no slot.
-      payForModifier payer oid cost = do
-        (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced payer oid pure cost
-        began <- State.get
-        outcome <- Cost.pay (performManaAbility runSubgame) began PaymentMoment.DuringResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced payer oid announced
-        pure (case outcome of Payment.Paid _ -> True; Payment.Unpaid -> False)
+      -- payGateCost's payment, read against no slots and with the bound slots
+      -- dropped, which is not an elision: the cost is printed on the
+      -- MODIFIER's object, not on the one resolving, so no text of the
+      -- resolving object can name what it took, and the modifier's own change
+      -- to the die reads no slot. Proved by Pawl.DiceSpec's "CR 701.67a a
+      -- modifier's waterbend cost is weighed" case.
+      payForModifier payer oid cost = Maybe.isJust <$> payGateCost runSubgame Map.empty payer oid cost
       -- Goblin Bookie's "Activate only any time it makes sense", read as a
       -- window inside CR 706.2's modification step, beside the static offers
       -- above. No rule grants one: CR 117.1b ties activation to
@@ -11920,8 +11916,7 @@ frozenAffected :: GameState -> [ObjectId] -> [ObjectId]
 frozenAffected gs = filter (not . (`Phasing.isPhasedOut` gs))
 
 -- CR 613.1b / 611.2c: install a layer-2 control effect giving `recipient` the
--- objects `ref` names, for `duration` -- GainControl's arm and GiveControl's,
--- which differ only in who the recipient is.
+-- objects `ref` names, for `duration` -- GainControl's arm.
 installControl :: Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId -> ObjectId -> PlayerId -> Duration.Duration -> ObjectRef.ObjectRef -> GameState -> GameState
 installControl legal resolving controller source recipient duration ref gs =
   -- Enumerated ONCE by the shared sweep; a player recipient, an illegal slot
@@ -11930,8 +11925,8 @@ installControl legal resolving controller source recipient duration ref gs =
     [] -> gs
     targets
       -- CR 800.4b: an object doesn't change to the control of a player who has
-      -- left the game. GainControl's recipient is `controller`, baked at trigger
-      -- time (CR 113.8), and CR 800.4a's exile clause is not a state-based
+      -- left the game. A recipient read relative to `controller` is baked at
+      -- trigger time (CR 113.8), and CR 800.4a's exile clause is not a state-based
       -- action, so it has already run and does not run again; without this guard
       -- the permanent would sit on the battlefield controlled by a player not in
       -- the game.

@@ -14,7 +14,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Pawl.CardSpec (Framing (ActivationCostFramed, AffectedSetFramed, AttachDestination, ClauseGateFramed, EntryAttachDestination, HandSweepFramed, InTargetSlot, KeywordFramed, LifeLossAmountFramed, ManaRestrictionFramed, MillTallyFramed, MintedTargetSlot, OutsideTheGameFramed, PlayerEffectFramed, ReplacementRowFramed, SearchFramed, SlotlessCostFramed, SourceHostFramed, StandingHostFramed, StoredPlayerEffectFramed, TriggerConditionFramed, Unframed), anyFace, cardCounts, cardFilters, cardResolutionEffects, conditionFilters, counterKindFilters, durationFilters, effectFilters, entryRewriteFilters, filterSlotsReadSingly, framedSlotsReadSingly, keywordFilters, modalFilters, objectRefFilters, oneEffectTrigger, oneFaced, payGateFilters, quantityFilters, replacementEffectFilters, riderFilters, triggerConditionFilters, turnUpRewriteFilters)
 import qualified Pawl.Codec.Card as Card
-import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Codec.Face as Face.Codec
 import qualified Pawl.Codec.Filter as Filter.Codec
 import qualified Pawl.Codec.Keyword as Keyword.Codec
@@ -80,7 +79,6 @@ import qualified Pawl.Types.DestructionR as DestructionR
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Duration as Duration
-import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.EachCardInHand as EachCardInHand
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntersWith as EntersWith
@@ -94,6 +92,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.FromReference as FromReference
+import qualified Pawl.Types.GainControl as GainControl
 import qualified Pawl.Types.HandAction as HandAction
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
@@ -2384,7 +2383,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
             -- or trigger condition deep, so the tagging survives the quoting
             -- position rather than only the leaf.
             ("CR 603.8's state trigger", holds (triggerConditionFilters (TriggerCondition.StateIs counting))),
-            ("a stored duration's clause", holds (effectFilters (Effect.GainControl (DurationRef.MkDurationRef (Duration.ForAsLongAs counting) anywhere)))),
+            ("a stored duration's clause", holds (effectFilters (Effect.GainControl (GainControl.MkGainControl (Duration.ForAsLongAs counting) anywhere (PlayerRef.Relative PlayerRelation.You))))),
             ("a depth under an opcode", holds (effectFilters (Effect.Tap topDepth)))
           ]
     -- Ordered FIRST, and the assertion this case exists for: every position digs
@@ -2792,7 +2791,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         planted =
           (S.combinedFace piker)
             { Face.spell =
-                Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures Nothing)) (Seq.singleton (Effect.GainControl (DurationRef.MkDurationRef (Duration.ForAsLongAs crowned) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))))
+                Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures Nothing)) (Seq.singleton (Effect.GainControl (GainControl.MkGainControl (Duration.ForAsLongAs crowned) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (PlayerRef.Relative PlayerRelation.You))))
             }
     Spec.assertEqWith s "a planted reference is seen" (atoms planted) 1
   -- The sweep above passes VACUOUSLY for every card but Aura Graft, and Aura

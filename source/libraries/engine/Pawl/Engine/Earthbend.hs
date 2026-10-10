@@ -23,7 +23,6 @@
 -- TriggerCondition.PlayerEarthbends reads it.
 module Pawl.Engine.Earthbend where
 
-import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Binding as Binding
@@ -136,19 +135,7 @@ returnAbility =
             { MoveToZone.ref = ObjectRef.InSlot Binding.became,
               MoveToZone.zone = Zone.Battlefield,
               MoveToZone.riders =
-                EntryRiders.MkEntryRiders
-                  { EntryRiders.tapped = TapState.Tapped,
-                    EntryRiders.attacking = Nothing,
-                    EntryRiders.blocking = Nothing,
-                    EntryRiders.transformed = False,
-                    EntryRiders.counters = Map.empty,
-                    EntryRiders.underOwner = False,
-                    EntryRiders.exiledFaceDown = False,
-                    EntryRiders.attachedTo = Nothing,
-                    EntryRiders.faceDown = Nothing,
-                    EntryRiders.noted = False,
-                    EntryRiders.characteristics = Seq.empty
-                  },
+                EntryRiders.defaultValue {EntryRiders.tapped = TapState.Tapped},
               MoveToZone.slot = Nothing,
               MoveToZone.origin = Nothing,
               MoveToZone.placement = LibraryPlacement.defaultValue,

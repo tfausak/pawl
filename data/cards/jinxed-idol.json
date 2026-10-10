@@ -30,15 +30,18 @@
                   {
                     "effects": [
                       {
-                        "type": "GiveControl",
+                        "type": "GainControl",
                         "value": {
-                          "player": {
-                            "type": "InSlot",
-                            "value": "target"
+                          "duration": {
+                            "type": "Indefinite"
                           },
                           "ref": {
                             "type": "InSlot",
                             "value": "self"
+                          },
+                          "to": {
+                            "type": "InSlot",
+                            "value": "target"
                           }
                         }
                       }
