@@ -1952,18 +1952,9 @@ designateDefenders = do
             then -- CR 802.2: the action is taken and asks nothing. The whole
             -- candidate list is the answer, already in CR 802.4's APNAP order.
               pure (NonEmpty.toList candidates)
-            else case candidates of
-              only NonEmpty.:| [] -> pure [only]
-              _ -> do
-                -- CR 723.1 on top of CR 800.4h: the reassigned seat is who the
-                -- rule asks, and a player controlling THEM answers for them.
-                let decider = Decide.deciderFor chooser gs
-                answer <- Game.choose (Prompt.ChooseDefender decider chooser candidates)
-                pure
-                  [ if List.elem answer (NonEmpty.toList candidates)
-                      then answer
-                      else NonEmpty.head candidates
-                  ]
+            else -- CR 723.1 on top of CR 800.4h: the reassigned seat is who the
+            -- rule asks, and a player controlling THEM answers for them.
+              Maybe.maybeToList <$> Game.chooseAmong Prompt.ChooseDefender chooser (NonEmpty.toList candidates)
         State.modify' $ \g ->
           g {GameState.combat = (GameState.combat g) {Combat.defenders = chosen}}
 
@@ -1977,16 +1968,8 @@ designateDefenders = do
 -- degrades to the first candidate, the defending player -- designateDefenders'
 -- posture and Replay.defaultAnswer's value for this prompt.
 announceAttackTarget :: PlayerId -> ObjectId -> NonEmpty.NonEmpty AttackTarget.AttackTarget -> Game AttackTarget.AttackTarget
-announceAttackTarget pid oid options = case options of
-  only NonEmpty.:| [] -> pure only
-  _ -> do
-    gs <- State.get
-    let decider = Decide.deciderFor pid gs
-    answer <- Game.choose (Prompt.ChooseAttackTarget decider pid oid options)
-    pure $
-      if List.elem answer (NonEmpty.toList options)
-        then answer
-        else NonEmpty.head options
+announceAttackTarget pid oid options =
+  Maybe.fromMaybe (NonEmpty.head options) <$> Game.chooseAmong (\decider who -> Prompt.ChooseAttackTarget decider who oid) pid (NonEmpty.toList options)
 
 -- CR 508.1: the active player chooses which creatures attack (CR 508.1a), the
 -- declaration is judged against CR 508.1c's restrictions and CR 508.1d's
@@ -2636,17 +2619,8 @@ putOntoBattlefieldBlocking choice oid = do
         not (Projection.isBattleOf oid start) -> do
           mAttacker <- case choice of
             SpecifiedAttacker attacker -> pure (if blockable controller attacker then Just attacker else Nothing)
-            AnyAttacker -> case NonEmpty.nonEmpty (filter (blockable controller) (Map.keys (Combat.attackers (GameState.combat start)))) of
-              Nothing -> pure Nothing
-              Just (only NonEmpty.:| []) -> pure (Just only)
-              Just candidates -> do
-                answer <- Game.choose (Prompt.ChoosePermanent (Decide.deciderFor controller start) controller oid candidates)
-                -- An out-of-list answer degrades to the first candidate,
-                -- announceAttackTarget's posture.
-                pure . Just $
-                  if List.elem answer (NonEmpty.toList candidates)
-                    then answer
-                    else NonEmpty.head candidates
+            -- Through Game.chooseAmong, announceAttackTarget's posture.
+            AnyAttacker -> Game.chooseAmong (\decider who -> Prompt.ChoosePermanent decider who oid) controller (filter (blockable controller) (Map.keys (Combat.attackers (GameState.combat start))))
           Monad.forM_ mAttacker (enterBlocking controller oid)
     _ -> pure ()
 

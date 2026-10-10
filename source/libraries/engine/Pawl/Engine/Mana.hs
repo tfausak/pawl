@@ -50,6 +50,7 @@ import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostAmount as CostAmount
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.ExileLink as ExileLink
 import qualified Pawl.Types.ExilePermanents as ExilePermanents
@@ -1822,8 +1823,7 @@ announce subject capacity spending pid oid total outside outsideEnergy claimed (
                 (\totalled -> canPayCommitting subject capacity spending pid (outside + extra + life) outsideEnergy claimed totalled gs)
                 (total (ManaCost.MkManaCost (reverse done <> ways <> tail_)))
          in any candidate (completions rest)
-      -- One symbol's announcement. Asked only where two routes are payable, and
-      -- FILTERED, NOT TRUSTED where it is asked.
+      -- One symbol's announcement, through Game.chooseAmong.
       --
       -- With NO payable route the cost is unpayable and there is nothing to
       -- announce: the payment fails (CR 118.6, CR 601.2h). `fallback` is returned
@@ -1847,13 +1847,8 @@ announce subject capacity spending pid oid total outside outsideEnergy claimed (
       -- re-asking their own payability predicate at the announced value before
       -- calling Cost.announce at all: Cast.castSpell (#417) and
       -- Activate.activateAbility (#544).
-      choose :: (Eq a) => a -> [a] -> (NonEmpty.NonEmpty a -> Prompt.Prompt a) -> Game a
-      choose fallback offers mkPrompt = case offers of
-        [] -> pure fallback
-        [only] -> pure only
-        first : others -> do
-          answer <- Game.choose (mkPrompt (first NonEmpty.:| others))
-          pure (if List.elem answer offers then answer else first)
+      choose :: (Eq a) => a -> [a] -> (Decider.Decider -> PlayerId -> NonEmpty.NonEmpty a -> Prompt.Prompt a) -> Game a
+      choose fallback offers question = Maybe.fromMaybe fallback <$> Game.chooseAmong question pid offers
       -- `paidWithLife` counts the symbols the third accumulator's haddock
       -- describes; it moves in lockstep with `committed` and is carried separately
       -- for the reason given there.
@@ -1866,8 +1861,8 @@ announce subject capacity spending pid oid total outside outsideEnergy claimed (
                 (if stillPayable done rest gs committed [asMana] then [PhyrexianPayment.PaysMana] else [])
                   <> (if stillPayable done rest gs (committed + phyrexianLife) [] then [PhyrexianPayment.PaysLife] else [])
           announced <-
-            choose PhyrexianPayment.PaysMana offers $
-              Prompt.AnnouncePhyrexianPayment (Decide.deciderFor pid gs) pid oid symbol
+            choose PhyrexianPayment.PaysMana offers $ \decider who ->
+              Prompt.AnnouncePhyrexianPayment decider who oid symbol
           case announced of
             PhyrexianPayment.PaysMana -> go (asMana : done) committed paidWithLife rest
             PhyrexianPayment.PaysLife -> go done (committed + phyrexianLife) (paidWithLife + 1) rest
@@ -1890,14 +1885,14 @@ announce subject capacity spending pid oid total outside outsideEnergy claimed (
                 (if not (null payableHalves) then [PhyrexianPayment.PaysMana] else [])
                   <> (if stillPayable done rest gs (committed + phyrexianLife) [] then [PhyrexianPayment.PaysLife] else [])
           announced <-
-            choose PhyrexianPayment.PaysMana offers $
-              Prompt.AnnouncePhyrexianPayment (Decide.deciderFor pid gs) pid oid symbol
+            choose PhyrexianPayment.PaysMana offers $ \decider who ->
+              Prompt.AnnouncePhyrexianPayment decider who oid symbol
           case announced of
             PhyrexianPayment.PaysLife -> go done (committed + phyrexianLife) (paidWithLife + 1) rest
             PhyrexianPayment.PaysMana -> do
               half <-
-                choose (ManaType.Colored l) payableHalves $
-                  Prompt.AnnounceHybridHalf (Decide.deciderFor pid gs) pid oid symbol
+                choose (ManaType.Colored l) payableHalves $ \decider who ->
+                  Prompt.AnnounceHybridHalf decider who oid symbol
               go (ManaSymbol.OfType half : done) committed paidWithLife rest
         -- CR 107.4e: "a monocolored hybrid symbol such as {2/B} can be paid with
         -- either one black mana or two mana of any type." Neither way commits life,
@@ -1912,8 +1907,8 @@ announce subject capacity spending pid oid total outside outsideEnergy claimed (
                 (if stillPayable done rest gs committed [asTyped] then [HybridPayment.PaysTyped] else [])
                   <> (if stillPayable done rest gs committed [asGeneric] then [HybridPayment.PaysGeneric] else [])
           announced <-
-            choose HybridPayment.PaysTyped offers $
-              Prompt.AnnounceHybridPayment (Decide.deciderFor pid gs) pid oid manaType
+            choose HybridPayment.PaysTyped offers $ \decider who ->
+              Prompt.AnnounceHybridPayment decider who oid manaType
           case announced of
             HybridPayment.PaysTyped -> go (asTyped : done) committed paidWithLife rest
             HybridPayment.PaysGeneric -> go (asGeneric : done) committed paidWithLife rest
@@ -1927,8 +1922,8 @@ announce subject capacity spending pid oid total outside outsideEnergy claimed (
           gs <- State.get
           let offers = filter (\half -> stillPayable done rest gs committed [ManaSymbol.OfType half]) (hybridHalves a b)
           announced <-
-            choose a offers $
-              Prompt.AnnounceHybridHalf (Decide.deciderFor pid gs) pid oid symbol
+            choose a offers $ \decider who ->
+              Prompt.AnnounceHybridHalf decider who oid symbol
           go (ManaSymbol.OfType announced : done) committed paidWithLife rest
         other : rest -> go (other : done) committed paidWithLife rest
    in go [] 0 0 symbols
