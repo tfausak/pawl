@@ -992,3 +992,32 @@ spec s registry = Spec.describe s "Sticker" $ do
         murdered = S.settleSba (S.runPure (namingTarget bearsId) g4 (S.cast S.bob murderId >> Stack.resolveTop))
     Spec.assertEqWith s "CR 123.7a/702.12b the Bears survives Murder" (Set.member bearsId (GameState.battlefield murdered)) True
     Spec.assertEqWith s "CR 613.1f Shadowspear took Pin Collection's indestructible" (Projection.hasKeyword Keyword.Indestructible pinId murdered) False
+  -- One board, two answers: Night's menace (ability) or Otter's 5/1 (P/T) on
+  -- the Bears. Alice's one ticket and Tusk's make two.
+  Spec.it s "CR 123.7 Tusk and Whiskers puts a +1/+1 counter on a creature that takes an ability sticker, and none for a P/T sticker" $ do
+    sheets <- committedSheets
+    tusk <- S.printingOf s registry "Tusk and Whiskers"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    forest <- S.printingOf s registry "Forest"
+    plains <- S.printingOf s registry "Plains"
+    let base = mainPhaseForAlice (S.addPlayerCounter PlayerCounterKind.Ticket 1 S.alice (S.landsFor forest S.alice 3 (S.landsFor plains S.alice 1 (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)))))
+        (tuskId, g1) = S.addPermanent tusk S.alice base
+        (bearsId, board) = S.addPermanent bears S.alice g1
+        activatedWith ref = case Activatable.abilitiesFor tuskId board of
+          [ability] -> snd (fst (State.runState (Engine.runGame (placingRef 0 (Just bearsId) ref) board (Activate.activateAbility S.alice tuskId ability >> drain)) (MkOffers [] [] 0)))
+          _ -> board
+        menaced = activatedWith nightMenace
+        sized = activatedWith otterFiveOne
+    Spec.assertEqWith s "CR 123.7 the Bears that took menace has one +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne bearsId menaced) 1
+    Spec.assertEqWith s "and menace, with both of alice's tickets spent" (Projection.hasKeyword Keyword.Menace bearsId menaced, S.playerCounterOf PlayerCounterKind.Ticket S.alice menaced) (True, 0)
+    Spec.assertEqWith s "the Bears that took a P/T sticker has none" (S.counterOf CounterKind.PlusOnePlusOne bearsId sized) 0
+  -- The "on a creature" half: Pin Collection is an artifact.
+  Spec.it s "CR 123.7 Tusk and Whiskers puts no counter on Pin Collection when Pin stickers itself" $ do
+    sheets <- committedSheets
+    tusk <- S.printingOf s registry "Tusk and Whiskers"
+    pin <- S.printingOf s registry "Pin Collection"
+    plains <- S.printingOf s registry "Plains"
+    let (_, g1) = S.addPermanent tusk S.alice (S.landsFor plains S.alice 4 (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)))
+        (pinId, after, _) = castPin pin 3 hotDogFlying g1
+    Spec.assertEqWith s "Pin Collection took the sticker" (fmap (\p -> fmap (Seq.length . Object.stickers) (Game.lookupObject p after)) pinId) (Just (Just 1))
+    Spec.assertEqWith s "CR 123.7 and no +1/+1 counter" (fmap (\p -> S.counterOf CounterKind.PlusOnePlusOne p after) pinId) (Just 0)

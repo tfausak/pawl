@@ -68,6 +68,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.SpellWasCopied as SpellWasCopied
 import qualified Pawl.Types.StepBegan as StepBegan
+import qualified Pawl.Types.StickerPut as StickerPut
 import qualified Pawl.Types.TappedForMana as TappedForMana
 import Pawl.Types.TriggerCondition (TriggerCondition)
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -491,6 +492,11 @@ eventBindingsOver board gs bearerBecame becameInGraveyard bearer you cond event 
   -- one slot cannot name them all.
   (TriggerCondition.PermanentGetsCounters _, GameEvent.CountersPut change) ->
     Binding.setBecame (CounterChange.object change) Map.empty
+  -- CR 123.3's "that creature": the object the sticker went on, which the event
+  -- carries (Tusk and Whiskers). No zone change, so CR 400.7e's slot is the
+  -- printed word, PermanentGetsCounters' reason.
+  (TriggerCondition.PlacesSticker _, GameEvent.StickerPut put) ->
+    Binding.setBecame (StickerPut.object put) Map.empty
   -- "That player": the discarder, which CR 701.9a makes one player and the event
   -- carries directly. The same reserved slot CR 702.70a's poisonous uses, for the
   -- same reason -- a player the EVENT names, which CR 109.5's `you` cannot stand
@@ -1363,7 +1369,8 @@ eventBindingSlots cond = case cond of
   TriggerCondition.PlayerWaterbends _ -> Set.empty
   TriggerCondition.PlayerAirbends _ -> Set.empty
   TriggerCondition.PlayerFirebends _ -> Set.empty
-  TriggerCondition.PlacesSticker _ -> Set.empty
+  -- The object the sticker went on, for Tusk and Whiskers' "that creature".
+  TriggerCondition.PlacesSticker _ -> Set.singleton Binding.became
   -- Nothing here either. CR 706.1's event names the roller, but Feywild
   -- Trickster's payload points at no one -- it creates a token for its own
   -- controller -- and a card printing "that player" is what would earn a slot.
