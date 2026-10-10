@@ -1187,12 +1187,12 @@ calculate arithmetic = case arithmetic of
 -- the same answer as substituting at the top: Tarmogoyf's printed 1+* is 1 when
 -- its count cannot be determined, because it is the COUNT that becomes 0 and
 -- not the sum. Every Pawl.Types.Arithmetic calculation descends for that one
--- reason -- but only Plus's descent changes an answer on its own. Half of CR 208.2a's substituted 0
--- is 0 whichever way it rounds, so Malignus, whose whole CDA is a Halved, reads
--- 0 with no opponents either way; a multiple of that 0 is 0 as well, and no
--- printed characteristic-defining P/T contains a Negate at all. Those three arms
--- are consistency rather than a card's behaviour -- a Times wrapping a Plus
--- would differ, and no printed box holds one.
+-- reason -- but only Plus's descent changes an answer on its own. Half of CR
+-- 208.2a's substituted 0 is 0 whichever way it rounds, so Malignus, whose whole
+-- CDA is a Halved, reads 0 with no opponents either way; a multiple of that 0 is
+-- 0 as well, and no printed characteristic-defining P/T contains a Negate at
+-- all. Those three descents are consistency rather than a card's behaviour -- a
+-- Times wrapping a Plus would differ, and no printed box holds one.
 --
 -- SCOPED TO THE CHARACTERISTIC-DEFINING ABILITY, as CR 208.2a is: the caller is
 -- Projection.applyCharacteristicPT, which layer 7a runs for an object in any
