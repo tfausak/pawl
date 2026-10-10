@@ -1,0 +1,121 @@
+{
+  "description": "CR 701.19c the named Troll may still activate its regeneration, and the shield is not applied",
+  "note": "Hurr Jackal names bob's Uthden Troll in bob's upkeep. In his draw step bob activates the Troll's own {R}: Regenerate, which CR 701.19c says the prohibition does not preclude, so the runner fails if it is not offered. After the shield resolves, alice's Lightning Bolt deals lethal damage and the Troll dies: the shield is not applied. A prohibition read without its kind would refuse the activation.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Hurr Jackal",
+            "label": "jackal",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "a-mountain"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Lightning Bolt",
+            "label": "bolt"
+          }
+        ],
+        "library": [
+          {
+            "card": "Mountain"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Uthden Troll",
+            "label": "troll"
+          },
+          {
+            "card": "Mountain",
+            "label": "b-mountain"
+          }
+        ],
+        "library": [
+          {
+            "card": "Mountain"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": []
+      }
+    },
+    {
+      "turn": 2,
+      "step": "Upkeep",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$jackal",
+          "targets": [
+            "$troll"
+          ],
+          "mana": [
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "DrawStep",
+      "player": "bob",
+      "do": {
+        "Activate": {
+          "object": "$troll",
+          "mana": [
+            "$b-mountain"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$bolt",
+          "targets": [
+            "$troll"
+          ],
+          "mana": [
+            "$a-mountain"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "BeginningOfCombat",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Graveyard",
+          "card": "Uthden Troll",
+          "count": 1
+        }
+      }
+    }
+  ]
+}
