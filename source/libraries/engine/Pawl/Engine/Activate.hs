@@ -42,7 +42,6 @@ import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.Result (Result)
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Saddling as Saddling
-import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.Zone as Zone
@@ -120,20 +119,17 @@ activateAbilityWith runSubgame pid srcId ability = Event.announcing $ do
   let (abilId, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
       obj =
-        ( Object.new
-            pid
-            ( Source.OfAbility
-                ActivatedAbilitySource.MkActivatedAbilitySource
-                  { ActivatedAbilitySource.source = srcId,
-                    ActivatedAbilitySource.ability = ability,
-                    ActivatedAbilitySource.delayed = Projection.delayedSnapshotOf srcId gs
-                  }
-            )
-            Zone.Stack
-            ts
-        )
-          { Object.sickness = Sickness.Settled pid
-          }
+        Object.newSettled
+          pid
+          ( Source.OfAbility
+              ActivatedAbilitySource.MkActivatedAbilitySource
+                { ActivatedAbilitySource.source = srcId,
+                  ActivatedAbilitySource.ability = ability,
+                  ActivatedAbilitySource.delayed = Projection.delayedSnapshotOf srcId gs
+                }
+          )
+          Zone.Stack
+          ts
       onStack = Game.putOnStack abilId gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2)}
       decider = Decide.deciderFor pid gs
       -- CR 602.2b/700.2a, mirroring Cast.castSpell's mode block: a selection with

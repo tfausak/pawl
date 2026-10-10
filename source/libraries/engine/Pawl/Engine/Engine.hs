@@ -807,7 +807,7 @@ placeSourceless pending = do
       allModes = Seq.fromList (fmap ModeIndex.MkModeIndex (take modeCount [0 ..]))
       bindings = Binding.setYou controller (Map.union provided (Binding.fromChoices Map.empty Nothing allModes))
       obj =
-        ( Object.new
+        ( Object.newSettled
             controller
             ( Source.OfInherentTrigger
                 InherentTriggerSource.MkInherentTriggerSource
@@ -818,8 +818,7 @@ placeSourceless pending = do
             Zone.Stack
             ts
         )
-          { Object.sickness = Sickness.Settled controller,
-            Object.bindings = bindings
+          { Object.bindings = bindings
           }
   State.put (Game.putOnStack abilId gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2)})
 
@@ -893,28 +892,25 @@ placeBorne srcId pending = do
       legal = Target.fillableModes (Just controller) bound srcId Map.empty modal gs
       selection = Modal.Type.selection modal
       obj =
-        ( Object.new
-            controller
-            ( Source.OfTrigger
-                TriggeredAbilitySource.MkTriggeredAbilitySource
-                  { TriggeredAbilitySource.source = srcId,
-                    TriggeredAbilitySource.ability = ability,
-                    -- CR 603.7a's creation moment, for a delayed entry's firing
-                    -- and Nothing for every other trigger. The one thing on the
-                    -- stack that tells the two apart (CR 701.27f).
-                    TriggeredAbilitySource.createdAt = PendingTrigger.createdAt pending,
-                    -- CR 113.7a's frozen declarations. Not implemented: freezing
-                    -- them as the ability triggers; they are read here, at
-                    -- placement, so a copy effect applied in between changes them
-                    -- (#4846).
-                    TriggeredAbilitySource.delayed = Projection.delayedSnapshotOf srcId gs
-                  }
-            )
-            Zone.Stack
-            ts
-        )
-          { Object.sickness = Sickness.Settled controller
-          }
+        Object.newSettled
+          controller
+          ( Source.OfTrigger
+              TriggeredAbilitySource.MkTriggeredAbilitySource
+                { TriggeredAbilitySource.source = srcId,
+                  TriggeredAbilitySource.ability = ability,
+                  -- CR 603.7a's creation moment, for a delayed entry's firing
+                  -- and Nothing for every other trigger. The one thing on the
+                  -- stack that tells the two apart (CR 701.27f).
+                  TriggeredAbilitySource.createdAt = PendingTrigger.createdAt pending,
+                  -- CR 113.7a's frozen declarations. Not implemented: freezing
+                  -- them as the ability triggers; they are read here, at
+                  -- placement, so a copy effect applied in between changes them
+                  -- (#4846).
+                  TriggeredAbilitySource.delayed = Projection.delayedSnapshotOf srcId gs
+                }
+          )
+          Zone.Stack
+          ts
   State.put (Game.putOnStack abilId gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2)})
   if not (Modal.selectionPossible legal selection)
     then -- CR 603.3c: no selection satisfies the instruction.

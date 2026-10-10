@@ -2,9 +2,6 @@
 
 module Pawl.Codec.Object where
 
-import qualified Data.Map.Strict as Map
-import qualified Data.Sequence as Seq
-import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Codec.Binding as Binding
@@ -44,12 +41,13 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.CounterKind as CounterKind.Type
 import qualified Pawl.Types.Designation as Designation.Type
-import qualified Pawl.Types.Facing as Facing.Type
 import qualified Pawl.Types.Keyword as Keyword.Type
-import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.Object as Object
-import qualified Pawl.Types.TapState as TapState.Type
+import qualified Pawl.Types.PlayerId as PlayerId.Type
+import qualified Pawl.Types.PrintingId as PrintingId.Type
+import qualified Pawl.Types.Source as Source.Type
 import qualified Pawl.Types.Timestamp as Timestamp.Type
+import qualified Pawl.Types.Zone as Zone.Type
 
 -- | CR 701.37c's X for one designation. A pair per mark through
 -- 'Common.keyedList', because the key is structured, so it cannot be an object
@@ -70,11 +68,16 @@ counterTimestamp = Fields.object $ do
   timestamp <- Fields.required "timestamp" Timestamp.codec snd
   pure (kind, timestamp)
 
+-- | Object.new, whose four arguments are 'Fields.required' keys and so are never
+-- read off it: the one place every defaulted key's default comes from.
+defaults :: Object.Object
+defaults = Object.new (PlayerId.Type.MkPlayerId 0) (Source.Type.OfCard (PrintingId.Type.MkPrintingId 0)) Zone.Type.Hand (Timestamp.Type.MkTimestamp 0)
+
 -- | `owner`, `source`, `zone`, `timestamp` and `sickness` are 'Fields.required'
 -- -- none of them has a value that means "unset" -- and every other field is
--- 'Fields.defaulted', so an object that has done nothing writes those keys and
--- nothing else. An absence and the default are the same value in both
--- directions, so the states the type's own haddock distinguishes survive: CR
+-- 'Fields.defaulted' to its value in Object.new (read off `defaults`), so an
+-- object that has done nothing writes those keys and nothing else. An absence
+-- and the default are the same value in both directions, so the states the type's own haddock distinguishes survive: CR
 -- 109.4's object with no controller at all is `enteredUnder` absent, and CR
 -- 702.170a's un-plotted card is `plotted` absent against a `"plotted":0` for one
 -- plotted on turn 0.
@@ -89,68 +92,68 @@ counterTimestamp = Fields.object $ do
 codec :: Codec.Codec Object.Object
 codec = Fields.object $ do
   owner <- Fields.required "owner" PlayerId.codec Object.owner
-  identity <- Fields.defaulted "identity" Nothing (Common.maybe CardIdentity.codec) Object.identity
-  enteredUnder <- Fields.defaulted "enteredUnder" Nothing (Common.maybe PlayerId.codec) Object.enteredUnder
+  identity <- Fields.defaulted "identity" (Object.identity defaults) (Common.maybe CardIdentity.codec) Object.identity
+  enteredUnder <- Fields.defaulted "enteredUnder" (Object.enteredUnder defaults) (Common.maybe PlayerId.codec) Object.enteredUnder
   source <- Fields.required "source" Source.codec Object.source
   zone <- Fields.required "zone" Zone.codec Object.zone
-  tapped <- Fields.defaulted "tapped" TapState.Type.Untapped TapState.codec Object.tapped
-  facing <- Fields.defaulted "facing" Facing.Type.FaceUp Facing.codec Object.facing
-  flipped <- Fields.defaulted "flipped" False Common.boolean Object.flipped
-  exiledFaceDown <- Fields.defaulted "exiledFaceDown" False Common.boolean Object.exiledFaceDown
-  damage <- Fields.defaulted "damage" 0 Common.natural Object.damage
+  tapped <- Fields.defaulted "tapped" (Object.tapped defaults) TapState.codec Object.tapped
+  facing <- Fields.defaulted "facing" (Object.facing defaults) Facing.codec Object.facing
+  flipped <- Fields.defaulted "flipped" (Object.flipped defaults) Common.boolean Object.flipped
+  exiledFaceDown <- Fields.defaulted "exiledFaceDown" (Object.exiledFaceDown defaults) Common.boolean Object.exiledFaceDown
+  damage <- Fields.defaulted "damage" (Object.damage defaults) Common.natural Object.damage
   sickness <- Fields.required "sickness" Sickness.codec Object.sickness
-  controlClock <- Fields.defaulted "controlClock" Map.empty (Common.keyedList ControlClock.entry) Object.controlClock
-  bindings <- Fields.defaulted "bindings" Map.empty Binding.codecMap Object.bindings
-  counters <- Fields.defaulted "counters" Map.empty (Common.multiset (CounterKind.codec Keyword.codec)) Object.counters
-  counterTimestamps <- Fields.defaulted "counterTimestamps" Map.empty (Common.keyedList counterTimestamp) Object.counterTimestamps
-  attachedTo <- Fields.defaulted "attachedTo" Nothing (Common.maybe Recipient.codec) Object.attachedTo
-  chosenColors <- Fields.defaulted "chosenColors" Set.empty (Common.set Color.codec) Object.chosenColors
-  chosenSubtype <- Fields.defaulted "chosenSubtype" Nothing (Common.maybe Subtype.codec) Object.chosenSubtype
-  chosenNames <- Fields.defaulted "chosenNames" Set.empty (Common.set CardName.codec) Object.chosenNames
-  chosenPlayer <- Fields.defaulted "chosenPlayer" Nothing (Common.maybe PlayerId.codec) Object.chosenPlayer
+  controlClock <- Fields.defaulted "controlClock" (Object.controlClock defaults) (Common.keyedList ControlClock.entry) Object.controlClock
+  bindings <- Fields.defaulted "bindings" (Object.bindings defaults) Binding.codecMap Object.bindings
+  counters <- Fields.defaulted "counters" (Object.counters defaults) (Common.multiset (CounterKind.codec Keyword.codec)) Object.counters
+  counterTimestamps <- Fields.defaulted "counterTimestamps" (Object.counterTimestamps defaults) (Common.keyedList counterTimestamp) Object.counterTimestamps
+  attachedTo <- Fields.defaulted "attachedTo" (Object.attachedTo defaults) (Common.maybe Recipient.codec) Object.attachedTo
+  chosenColors <- Fields.defaulted "chosenColors" (Object.chosenColors defaults) (Common.set Color.codec) Object.chosenColors
+  chosenSubtype <- Fields.defaulted "chosenSubtype" (Object.chosenSubtype defaults) (Common.maybe Subtype.codec) Object.chosenSubtype
+  chosenNames <- Fields.defaulted "chosenNames" (Object.chosenNames defaults) (Common.set CardName.codec) Object.chosenNames
+  chosenPlayer <- Fields.defaulted "chosenPlayer" (Object.chosenPlayer defaults) (Common.maybe PlayerId.codec) Object.chosenPlayer
   timestamp <- Fields.required "timestamp" Timestamp.codec Object.timestamp
-  face <- Fields.defaulted "face" Nothing (Common.maybe CardName.codec) Object.face
-  turnedOverAt <- Fields.defaulted "turnedOverAt" Nothing (Common.maybe Timestamp.codec) Object.turnedOverAt
-  worldSince <- Fields.defaulted "worldSince" Nothing (Common.maybe Timestamp.codec) Object.worldSince
-  playableFromExile <- Fields.defaulted "playableFromExile" Nothing (Common.maybe ExilePlayPermission.codec) Object.playableFromExile
-  plotted <- Fields.defaulted "plotted" Nothing (Common.maybe Common.natural) Object.plotted
-  foretold <- Fields.defaulted "foretold" Nothing (Common.maybe Common.natural) Object.foretold
-  foretellCostReduction <- Fields.defaulted "foretellCostReduction" Nothing (Common.maybe ManaCost.codec) Object.foretellCostReduction
-  warped <- Fields.defaulted "warped" Nothing (Common.maybe Common.natural) Object.warped
-  preparedCopyOf <- Fields.defaulted "preparedCopyOf" Nothing (Common.maybe ObjectId.codec) Object.preparedCopyOf
-  ringBearerFor <- Fields.defaulted "ringBearerFor" Nothing (Common.maybe PlayerId.codec) Object.ringBearerFor
-  paired <- Fields.defaulted "paired" Nothing (Common.maybe Pairing.codec) Object.paired
-  duplicate <- Fields.defaulted "duplicate" Nothing (Common.maybe ProjectedCharacteristics.codec) Object.duplicate
-  stickers <- Fields.defaulted "stickers" Seq.empty (Common.seq StickerPlacement.codec) Object.stickers
-  protector <- Fields.defaulted "protector" Nothing (Common.maybe PlayerId.codec) Object.protector
-  ventureRoom <- Fields.defaulted "ventureRoom" Nothing (Common.maybe RoomIndex.codec) Object.ventureRoom
-  classLevel <- Fields.defaulted "classLevel" Nothing (Common.maybe ClassLevel.codec) Object.classLevel
-  unlockedHalves <- Fields.defaulted "unlockedHalves" Set.empty (Common.set RoomHalf.codec) Object.unlockedHalves
-  designations <- Fields.defaulted "designations" Set.empty (Common.set Designation.codec) Object.designations
-  designationValues <- Fields.defaulted "designationValues" Map.empty (Common.keyedList designationValue) Object.designationValues
-  storedResults <- Fields.defaulted "storedResults" Map.empty (Common.multiset StoredResult.codec) Object.storedResults
-  paidCosts <- Fields.defaulted "paidCosts" Map.empty (Common.multiset Keyword.codec) Object.paidCosts
-  tributePaid <- Fields.defaulted "tributePaid" False Common.boolean Object.tributePaid
-  bestowed <- Fields.defaulted "bestowed" False Common.boolean Object.bestowed
-  mutating <- Fields.defaulted "mutating" False Common.boolean Object.mutating
-  prototyped <- Fields.defaulted "prototyped" False Common.boolean Object.prototyped
-  boughtBack <- Fields.defaulted "boughtBack" False Common.boolean Object.boughtBack
-  unannounced <- Fields.defaulted "unannounced" False Common.boolean Object.unannounced
-  spliced <- Fields.defaulted "spliced" Seq.empty (Common.seq PrintingId.codec) Object.spliced
-  phyrexianLifePaid <- Fields.defaulted "phyrexianLifePaid" 0 Common.natural Object.phyrexianLifePaid
-  manaSpent <- Fields.defaulted "manaSpent" (Mana.Type.MkMana []) Mana.codec Object.manaSpent
-  announcedX <- Fields.defaulted "announcedX" Nothing (Common.maybe Common.natural) Object.announcedX
-  castFrom <- Fields.defaulted "castFrom" Nothing (Common.maybe Zone.codec) Object.castFrom
-  castUsing <- Fields.defaulted "castUsing" Nothing (Common.maybe Keyword.codec) Object.castUsing
-  castGrant <- Fields.defaulted "castGrant" Nothing (Common.maybe Keyword.codec) Object.castGrant
-  exileLookers <- Fields.defaulted "exileLookers" Set.empty (Common.set ExileLooker.codec) Object.exileLookers
-  detainedUntil <- Fields.defaulted "detainedUntil" Set.empty (Common.set PlayerId.codec) Object.detainedUntil
-  goadedBy <- Fields.defaulted "goadedBy" Set.empty (Common.set PlayerId.codec) Object.goadedBy
-  doesNotUntapFor <- Fields.defaulted "doesNotUntapFor" 0 Common.natural Object.doesNotUntapFor
-  exertedBy <- Fields.defaulted "exertedBy" Set.empty (Common.set PlayerId.codec) Object.exertedBy
+  face <- Fields.defaulted "face" (Object.face defaults) (Common.maybe CardName.codec) Object.face
+  turnedOverAt <- Fields.defaulted "turnedOverAt" (Object.turnedOverAt defaults) (Common.maybe Timestamp.codec) Object.turnedOverAt
+  worldSince <- Fields.defaulted "worldSince" (Object.worldSince defaults) (Common.maybe Timestamp.codec) Object.worldSince
+  playableFromExile <- Fields.defaulted "playableFromExile" (Object.playableFromExile defaults) (Common.maybe ExilePlayPermission.codec) Object.playableFromExile
+  plotted <- Fields.defaulted "plotted" (Object.plotted defaults) (Common.maybe Common.natural) Object.plotted
+  foretold <- Fields.defaulted "foretold" (Object.foretold defaults) (Common.maybe Common.natural) Object.foretold
+  foretellCostReduction <- Fields.defaulted "foretellCostReduction" (Object.foretellCostReduction defaults) (Common.maybe ManaCost.codec) Object.foretellCostReduction
+  warped <- Fields.defaulted "warped" (Object.warped defaults) (Common.maybe Common.natural) Object.warped
+  preparedCopyOf <- Fields.defaulted "preparedCopyOf" (Object.preparedCopyOf defaults) (Common.maybe ObjectId.codec) Object.preparedCopyOf
+  ringBearerFor <- Fields.defaulted "ringBearerFor" (Object.ringBearerFor defaults) (Common.maybe PlayerId.codec) Object.ringBearerFor
+  paired <- Fields.defaulted "paired" (Object.paired defaults) (Common.maybe Pairing.codec) Object.paired
+  duplicate <- Fields.defaulted "duplicate" (Object.duplicate defaults) (Common.maybe ProjectedCharacteristics.codec) Object.duplicate
+  stickers <- Fields.defaulted "stickers" (Object.stickers defaults) (Common.seq StickerPlacement.codec) Object.stickers
+  protector <- Fields.defaulted "protector" (Object.protector defaults) (Common.maybe PlayerId.codec) Object.protector
+  ventureRoom <- Fields.defaulted "ventureRoom" (Object.ventureRoom defaults) (Common.maybe RoomIndex.codec) Object.ventureRoom
+  classLevel <- Fields.defaulted "classLevel" (Object.classLevel defaults) (Common.maybe ClassLevel.codec) Object.classLevel
+  unlockedHalves <- Fields.defaulted "unlockedHalves" (Object.unlockedHalves defaults) (Common.set RoomHalf.codec) Object.unlockedHalves
+  designations <- Fields.defaulted "designations" (Object.designations defaults) (Common.set Designation.codec) Object.designations
+  designationValues <- Fields.defaulted "designationValues" (Object.designationValues defaults) (Common.keyedList designationValue) Object.designationValues
+  storedResults <- Fields.defaulted "storedResults" (Object.storedResults defaults) (Common.multiset StoredResult.codec) Object.storedResults
+  paidCosts <- Fields.defaulted "paidCosts" (Object.paidCosts defaults) (Common.multiset Keyword.codec) Object.paidCosts
+  tributePaid <- Fields.defaulted "tributePaid" (Object.tributePaid defaults) Common.boolean Object.tributePaid
+  bestowed <- Fields.defaulted "bestowed" (Object.bestowed defaults) Common.boolean Object.bestowed
+  mutating <- Fields.defaulted "mutating" (Object.mutating defaults) Common.boolean Object.mutating
+  prototyped <- Fields.defaulted "prototyped" (Object.prototyped defaults) Common.boolean Object.prototyped
+  boughtBack <- Fields.defaulted "boughtBack" (Object.boughtBack defaults) Common.boolean Object.boughtBack
+  unannounced <- Fields.defaulted "unannounced" (Object.unannounced defaults) Common.boolean Object.unannounced
+  spliced <- Fields.defaulted "spliced" (Object.spliced defaults) (Common.seq PrintingId.codec) Object.spliced
+  phyrexianLifePaid <- Fields.defaulted "phyrexianLifePaid" (Object.phyrexianLifePaid defaults) Common.natural Object.phyrexianLifePaid
+  manaSpent <- Fields.defaulted "manaSpent" (Object.manaSpent defaults) Mana.codec Object.manaSpent
+  announcedX <- Fields.defaulted "announcedX" (Object.announcedX defaults) (Common.maybe Common.natural) Object.announcedX
+  castFrom <- Fields.defaulted "castFrom" (Object.castFrom defaults) (Common.maybe Zone.codec) Object.castFrom
+  castUsing <- Fields.defaulted "castUsing" (Object.castUsing defaults) (Common.maybe Keyword.codec) Object.castUsing
+  castGrant <- Fields.defaulted "castGrant" (Object.castGrant defaults) (Common.maybe Keyword.codec) Object.castGrant
+  exileLookers <- Fields.defaulted "exileLookers" (Object.exileLookers defaults) (Common.set ExileLooker.codec) Object.exileLookers
+  detainedUntil <- Fields.defaulted "detainedUntil" (Object.detainedUntil defaults) (Common.set PlayerId.codec) Object.detainedUntil
+  goadedBy <- Fields.defaulted "goadedBy" (Object.goadedBy defaults) (Common.set PlayerId.codec) Object.goadedBy
+  doesNotUntapFor <- Fields.defaulted "doesNotUntapFor" (Object.doesNotUntapFor defaults) Common.natural Object.doesNotUntapFor
+  exertedBy <- Fields.defaulted "exertedBy" (Object.exertedBy defaults) (Common.set PlayerId.codec) Object.exertedBy
   -- Common.repeats rather than multiset: a spend count never falls to zero,
   -- and one entry per spend is the array this field was before it counted.
-  activatedOnce <- Fields.defaulted "activatedOnce" Map.empty (Common.repeats (ActivatedAbility.codec Card.codec (GrantedAbility.codec Card.codec))) Object.activatedOnce
+  activatedOnce <- Fields.defaulted "activatedOnce" (Object.activatedOnce defaults) (Common.repeats (ActivatedAbility.codec Card.codec (GrantedAbility.codec Card.codec))) Object.activatedOnce
   pure
     Object.MkObject
       { Object.owner = owner,

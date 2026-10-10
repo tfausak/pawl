@@ -2473,7 +2473,7 @@ restartOnStack mountain =
             ActivatedAbility.keyword = Nothing
           }
       abilObj =
-        ( Object.new
+        ( Object.newSettled
             S.bob
             ( Source.OfAbility
                 ActivatedAbilitySource.MkActivatedAbilitySource
@@ -2485,8 +2485,7 @@ restartOnStack mountain =
             Zone.Stack
             ts
         )
-          { Object.sickness = Sickness.Settled S.bob,
-            Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
+          { Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
           }
    in g4
         { GameState.objects = Map.insert abilId abilObj (GameState.objects g4),

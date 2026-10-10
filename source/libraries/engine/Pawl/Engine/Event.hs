@@ -1200,11 +1200,7 @@ createEmblem pid card = do
       -- object it backs, and carrying no print-level data because an emblem is not
       -- a card (CR 114.5).
       emblemId <- State.state (Game.intern (Printing.ofCard card))
-      let mkObj ts =
-            (Object.new pid (Source.OfEmblem emblemId) Zone.Command ts)
-              { Object.sickness = Sickness.Settled pid
-              }
-      Just <$> placeObject pid mkObj Zone.Command LibraryPosition.defaultValue
+      Just <$> placeObject pid (Object.newSettled pid (Source.OfEmblem emblemId) Zone.Command) Zone.Command LibraryPosition.defaultValue
 
 -- CR 400.11: the cards a player owns that are not in any of the game's zones,
 -- and the roads that bring one in. Outside the game is NOT a zone (CR 400.11),

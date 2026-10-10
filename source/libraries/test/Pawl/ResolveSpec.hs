@@ -664,7 +664,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (ts, g2) = Game.freshTimestamp g1
         slot = SlotName.MkSlotName (Text.pack "target")
         abilObj =
-          ( Object.new
+          ( Object.newSettled
               S.alice
               ( Source.OfAbility
                   ActivatedAbilitySource.MkActivatedAbilitySource
@@ -676,8 +676,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Zone.Stack
               ts
           )
-            { Object.sickness = Sickness.Settled S.alice,
-              Object.bindings = Binding.fromChoices (Map.singleton slot (Set.singleton (Recipient.ToPlayer S.bob))) Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
+            { Object.bindings = Binding.fromChoices (Map.singleton slot (Set.singleton (Recipient.ToPlayer S.bob))) Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
             }
         g3 =
           g2
@@ -708,9 +707,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          (Object.new S.alice (Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = ObjectId.MkObjectId 0, ActivatedAbilitySource.ability = ability, ActivatedAbilitySource.delayed = Map.empty}) Zone.Stack ts)
-            { Object.sickness = Sickness.Settled S.alice,
-              Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
+          (Object.newSettled S.alice (Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = ObjectId.MkObjectId 0, ActivatedAbilitySource.ability = ability, ActivatedAbilitySource.delayed = Map.empty}) Zone.Stack ts)
+            { Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
             }
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findFirst g4 Stack.resolveTop)
@@ -725,9 +723,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          (Object.new S.alice (Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = ObjectId.MkObjectId 0, ActivatedAbilitySource.ability = ability, ActivatedAbilitySource.delayed = Map.empty}) Zone.Stack ts)
-            { Object.sickness = Sickness.Settled S.alice,
-              Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
+          (Object.newSettled S.alice (Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = ObjectId.MkObjectId 0, ActivatedAbilitySource.ability = ability, ActivatedAbilitySource.delayed = Map.empty}) Zone.Stack ts)
+            { Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
             }
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findNothing g4 Stack.resolveTop)
@@ -761,9 +758,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          (Object.new S.alice (Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = ObjectId.MkObjectId 0, ActivatedAbilitySource.ability = ability, ActivatedAbilitySource.delayed = Map.empty}) Zone.Stack ts)
-            { Object.sickness = Sickness.Settled S.alice,
-              Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
+          (Object.newSettled S.alice (Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = ObjectId.MkObjectId 0, ActivatedAbilitySource.ability = ability, ActivatedAbilitySource.delayed = Map.empty}) Zone.Stack ts)
+            { Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
             }
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findFirst g4 Stack.resolveTop)
@@ -793,9 +789,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          (Object.new S.alice (Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = ObjectId.MkObjectId 0, ActivatedAbilitySource.ability = ability, ActivatedAbilitySource.delayed = Map.empty}) Zone.Stack ts)
-            { Object.sickness = Sickness.Settled S.alice,
-              Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
+          (Object.newSettled S.alice (Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = ObjectId.MkObjectId 0, ActivatedAbilitySource.ability = ability, ActivatedAbilitySource.delayed = Map.empty}) Zone.Stack ts)
+            { Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
             }
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure (findForbidden pikerId) g4 Stack.resolveTop)
@@ -1266,7 +1261,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g4) = Game.freshObjectId g3
         (ts, g5) = Game.freshTimestamp g4
         abilObj =
-          ( Object.new
+          ( Object.newSettled
               S.alice
               ( Source.OfTrigger
                   TriggeredAbilitySource.MkTriggeredAbilitySource
@@ -1279,8 +1274,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Zone.Stack
               ts
           )
-            { Object.sickness = Sickness.Settled S.alice,
-              Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
+            { Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
             }
         g6 = g5 {GameState.objects = Map.insert abilId abilObj (GameState.objects g5), GameState.stack = abilId : GameState.stack g5}
         resolved = snd (Engine.runGamePure S.identityAnswer g6 Stack.resolveTop)
@@ -1326,7 +1320,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          ( Object.new
+          ( Object.newSettled
               S.alice
               ( Source.OfAbility
                   ActivatedAbilitySource.MkActivatedAbilitySource
@@ -1338,8 +1332,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Zone.Stack
               ts
           )
-            { Object.sickness = Sickness.Settled S.alice,
-              Object.bindings = Binding.fromChoices (Map.singleton slot (Set.singleton (Recipient.ToPlayer S.bob))) Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
+            { Object.bindings = Binding.fromChoices (Map.singleton slot (Set.singleton (Recipient.ToPlayer S.bob))) Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
             }
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = abilId : GameState.stack g3}
         resolved = snd (Engine.runGamePure S.identityAnswer g4 Stack.resolveTop)
@@ -1396,7 +1389,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               ActivatedAbility.keyword = Nothing
             }
         abilObj =
-          ( Object.new
+          ( Object.newSettled
               S.bob
               ( Source.OfAbility
                   ActivatedAbilitySource.MkActivatedAbilitySource
@@ -1408,8 +1401,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Zone.Stack
               ts
           )
-            { Object.sickness = Sickness.Settled S.bob,
-              Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
+            { Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
             }
         g6 = g5 {GameState.objects = Map.insert abilId abilObj (GameState.objects g5), GameState.stack = abilId : GameState.stack g5}
         after = snd (Engine.runGamePure S.identityAnswer g6 Stack.resolveTop)
@@ -1623,7 +1615,7 @@ installControlBy mindslaver controller target gs0 =
       (abilId, gs2) = Game.freshObjectId gs1
       (ts, gs3) = Game.freshTimestamp gs2
       abilObj =
-        ( Object.new
+        ( Object.newSettled
             controller
             ( Source.OfAbility
                 ActivatedAbilitySource.MkActivatedAbilitySource
@@ -1635,8 +1627,7 @@ installControlBy mindslaver controller target gs0 =
             Zone.Stack
             ts
         )
-          { Object.sickness = Sickness.Settled controller,
-            Object.bindings = Binding.fromChoices (Map.singleton slot (Set.singleton (Recipient.ToPlayer target))) Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
+          { Object.bindings = Binding.fromChoices (Map.singleton slot (Set.singleton (Recipient.ToPlayer target))) Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
           }
       gs4 = gs3 {GameState.objects = Map.insert abilId abilObj (GameState.objects gs3), GameState.stack = abilId : GameState.stack gs3}
    in snd (Engine.runGamePure S.identityAnswer gs4 Stack.resolveTop)

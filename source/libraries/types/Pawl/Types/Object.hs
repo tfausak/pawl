@@ -1015,6 +1015,13 @@ new o s z t =
       stickers = Seq.empty
     }
 
+-- | 'new' for an object built directly onto the stack or into the command zone
+-- (an ability, an emblem, a dungeon), stamped settled under its owner, who
+-- controls it. Inert rather than a CR 302.6 claim: every reader of `sickness`
+-- is battlefield-gated.
+newSettled :: PlayerId.PlayerId -> Source.Source -> Zone.Zone -> Timestamp.Timestamp -> Object
+newSettled o s z t = (new o s z t) {sickness = Sickness.Settled o}
+
 -- | CR 400.7: "an object that moves from one zone to another becomes a new
 -- object with no memory of, or relation to, its previous existence" -- the
 -- forgetting, as one function: 'new', keeping `owner`, `identity`, `source` and

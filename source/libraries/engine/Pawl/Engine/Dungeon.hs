@@ -42,7 +42,6 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.RoomIndex as RoomIndex
-import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -230,9 +229,8 @@ enter pid quality = do
       let (oid, gs1) = Game.freshObjectId gs
           (ts, gs2) = Game.freshTimestamp gs1
           obj =
-            (Object.new pid (Source.OfCard printingId) Zone.Command ts)
+            (Object.newSettled pid (Source.OfCard printingId) Zone.Command ts)
               { Object.identity = Just (Game.mintIdentity oid pid),
-                Object.sickness = Sickness.Settled pid,
                 -- CR 309.4a: "as a player puts a dungeon they own into the command
                 -- zone, they put their venture marker on the topmost room".
                 Object.ventureRoom = Just RoomIndex.topmost
