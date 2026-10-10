@@ -1559,7 +1559,7 @@ triggeredAbilityCounts ability =
 -- restated so the lint and the announcement cannot disagree about which cards get
 -- asked. It reads BOTH halves of a cost: CR 601.2b's "such as an {X} in its mana
 -- cost" is an example, and CR 107.3a lists the additional cost beside the mana
--- cost -- Hatred's only X is a CostComponent.PayLifeX. Nothing (CR 118.6, an
+-- cost -- Hatred's only X is a CostComponent.PayLife's. Nothing (CR 118.6, an
 -- unpayable cost) declares nothing.
 declaresVariable :: Cost.Type.Cost Keyword.Keyword -> Bool
 declaresVariable = Cost.hasVariable
@@ -1615,13 +1615,12 @@ collectsEvidenceAsCost =
 -- Does this cost WATERBEND? collectsEvidenceAsCost's shape exactly: CR 601.2h's
 -- payment binds Binding.waterbendCost (Pawl.Engine.Cost.payComponent's
 -- Waterbend arm), which is what "if this spell's additional cost was paid"
--- reads -- printed only on a card whose own cost waterbends. WaterbendX counts:
--- the announcement rewrites it to a Waterbend before it is paid.
+-- reads -- printed only on a card whose own cost waterbends, its amount
+-- announced or not.
 waterbendsAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
 waterbendsAsCost =
   let isWaterbend component = case component of
         CostComponent.Waterbend _ -> True
-        CostComponent.WaterbendX -> True
         _ -> False
    in any isWaterbend . Cost.Type.components
 
@@ -1642,8 +1641,6 @@ sacrificesAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
 sacrificesAsCost =
   let isSacrifice component = case component of
         CostComponent.Sacrifice {} -> True
-        -- Paid as a Sacrifice once X is announced (Cost.substituteX).
-        CostComponent.SacrificeX {} -> True
         _ -> False
    in any isSacrifice . Cost.Type.components
 
@@ -3888,24 +3885,16 @@ costComponentFilters component = case component of
   CostComponent.ReturnThis -> []
   CostComponent.PayLife _ -> []
   CostComponent.PayHalfLife _ -> []
-  CostComponent.PayLifeX -> []
-  CostComponent.PayEnergyX -> []
   CostComponent.DiscardThis _ -> []
   CostComponent.PayEnergy _ -> []
   CostComponent.AddLoyaltyToThis _ -> []
   CostComponent.RemoveLoyaltyFromThis _ -> []
-  CostComponent.RemoveLoyaltyFromThisX -> []
   CostComponent.RemoveCountersFromThis _ -> []
   -- CR 118.1's removal aimed elsewhere: Zameck Guildmage's "a creature you
-  -- control".
+  -- control", Retribution of the Ancients' "creatures you control".
   CostComponent.RemoveCounters (CountersFromPermanents.MkCountersFromPermanents _ _ f _) -> [f]
-  -- Retribution of the Ancients' "creatures you control", X counters from among
-  -- them.
-  CostComponent.RemovePlusOneCountersX f -> [f]
-  CostComponent.SacrificeX f -> [f]
   CostComponent.PutPlusOneCountersOnThis _ -> []
   CostComponent.Blight _ -> []
-  CostComponent.BlightX -> []
   CostComponent.Forage -> []
   CostComponent.FlipCoin -> []
   CostComponent.ExileThisFromGraveyard -> []
@@ -3919,7 +3908,6 @@ costComponentFilters component = case component of
   CostComponent.ChooseOpponent -> []
   CostComponent.Waterbend _ -> []
   CostComponent.WaterbendInstead _ -> []
-  CostComponent.WaterbendX -> []
 
 -- The Filter narrowing a target slot's CR 115 pool -- "target creature with
 -- flying" -- and CR 303.4a's enchant slot, which is a TargetSlot too.

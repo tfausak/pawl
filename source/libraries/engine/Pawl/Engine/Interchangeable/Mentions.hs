@@ -956,10 +956,8 @@ costComponentNames asking onKeyword x = case x of
   CostComponent.SacrificeThis -> False
   CostComponent.ReturnThis -> False
   CostComponent.PayLife _natural -> False
-  CostComponent.PayLifeX -> False
   CostComponent.PayHalfLife _rounding -> False
   CostComponent.Sacrifice sacrifice -> sacrificeNames asking sacrifice
-  CostComponent.SacrificeX filter_ -> filterNames asking filter_
   CostComponent.TapForTotalPower tapForTotalPower -> tapForTotalPowerNames asking tapForTotalPower
   CostComponent.TapPermanents tapPermanents -> tapPermanentsNames asking tapPermanents
   CostComponent.ReturnPermanents returnPermanents -> returnPermanentsNames asking returnPermanents
@@ -968,18 +966,14 @@ costComponentNames asking onKeyword x = case x of
   CostComponent.DiscardThis _discardCause -> False
   CostComponent.PutCardFromHandOntoBattlefield filter_ -> filterNames asking filter_
   CostComponent.PayEnergy _natural -> False
-  CostComponent.PayEnergyX -> False
   CostComponent.AddLoyaltyToThis _natural -> False
   CostComponent.RemoveLoyaltyFromThis _natural -> False
-  CostComponent.RemoveLoyaltyFromThisX -> False
   CostComponent.RemoveCountersFromThis countersFromThis -> countersFromThisNames asking onKeyword countersFromThis
   CostComponent.RemoveCounters countersFromPermanents -> countersFromPermanentsNames asking onKeyword countersFromPermanents
-  CostComponent.RemovePlusOneCountersX filter_ -> filterNames asking filter_
   CostComponent.PutPlusOneCountersOnThis _natural -> False
   CostComponent.Blight _natural -> False
   CostComponent.Forage -> False
   CostComponent.FlipCoin -> False
-  CostComponent.BlightX -> False
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileThis -> False
   CostComponent.ExileCardsFromGraveyard exileCardsFromGraveyard -> exileCardsFromGraveyardNames asking exileCardsFromGraveyard
@@ -996,7 +990,6 @@ costComponentNames asking onKeyword x = case x of
   CostComponent.ChooseOpponent -> False
   CostComponent.Waterbend _natural -> False
   CostComponent.WaterbendInstead _natural -> False
-  CostComponent.WaterbendX -> False
 
 costReductionNames :: Asking -> CostReduction.CostReduction -> Bool
 costReductionNames asking x = case x of

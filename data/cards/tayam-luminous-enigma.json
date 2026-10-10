@@ -8,7 +8,10 @@
               {
                 "type": "RemoveCounters",
                 "value": {
-                  "count": 3,
+                  "count": {
+                    "type": "Fixed",
+                    "value": 3
+                  },
                   "kind": {
                     "type": "OfAnyKind"
                   },

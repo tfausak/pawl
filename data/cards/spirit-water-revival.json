@@ -10,7 +10,10 @@
             "components": [
               {
                 "type": "Waterbend",
-                "value": 6
+                "value": {
+                  "type": "Fixed",
+                  "value": 6
+                }
               }
             ],
             "mana": [

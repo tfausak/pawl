@@ -620,7 +620,7 @@ candidateSlotsGiven pcs grants pools pid srcId modal fillable gs =
 -- `mCeiling` is CR 101.1's, evaluated off the ABILITY being activated rather than
 -- off the face (Cost.ceilingOf over ActivatedAbility.maximumX) and passed straight
 -- through: it bounds the search as well as the announcement, which is what makes
--- Blighted Nightmare's blight route terminate -- CostComponent.BlightX's demand
+-- Blighted Nightmare's blight route terminate -- an announced blight's demand
 -- never grows (Cost.demandGrowsWithX), so the climb has no other ground to stop
 -- on. Cast.affordableX takes the same argument off Face.maximumX.
 affordableX :: Maybe Natural -> [(Map.Map SlotName (Natural, Natural), Map.Map SlotName (Set.Set ObjectId))] -> Maybe Keyword -> Maybe (Set.Set ManaType.ManaType) -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Natural

@@ -254,19 +254,13 @@ costMovesLibraryCard component = case component of
   CostComponent.TapPermanents {} -> False
   CostComponent.PayLife _ -> False
   CostComponent.PayHalfLife _ -> False
-  CostComponent.PayLifeX -> False
-  CostComponent.PayEnergyX -> False
   CostComponent.PayEnergy _ -> False
   CostComponent.AddLoyaltyToThis _ -> False
   CostComponent.RemoveLoyaltyFromThis _ -> False
-  CostComponent.RemoveLoyaltyFromThisX -> False
   CostComponent.RemoveCountersFromThis _ -> False
   CostComponent.RemoveCounters {} -> False
-  CostComponent.RemovePlusOneCountersX _ -> False
-  CostComponent.SacrificeX _ -> False
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
-  CostComponent.BlightX -> False
   -- CR 701.61a moves cards out of a GRAVEYARD and a Food off the battlefield,
   -- neither of which is a library, so this cost leaves CR 605.1a's clause intact
   -- -- Thornvault Forager's "{T}, Forage: Add two mana" is a mana ability.
@@ -278,7 +272,6 @@ costMovesLibraryCard component = case component of
   CostComponent.ChooseOpponent -> False
   CostComponent.Waterbend _ -> False
   CostComponent.WaterbendInstead _ -> False
-  CostComponent.WaterbendX -> False
 
 -- CR 605: does this effect add mana, and on what instruction? Read by
 -- Mana.isManaAbility to keep mana abilities off the stack, and by

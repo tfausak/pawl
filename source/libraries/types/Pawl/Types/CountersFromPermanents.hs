@@ -1,6 +1,6 @@
 module Pawl.Types.CountersFromPermanents where
 
-import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.CostAmount as CostAmount
 import qualified Pawl.Types.CounterSpread as CounterSpread
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.WhichCounters as WhichCounters
@@ -16,7 +16,7 @@ import qualified Pawl.Types.WhichCounters as WhichCounters
 -- PARAMETRIC in the keyword for the Filter it carries, exactly as
 -- Pawl.Types.CostComponent is.
 data CountersFromPermanents keyword = MkCountersFromPermanents
-  { count :: Natural.Natural,
+  { count :: CostAmount.CostAmount,
     kind :: WhichCounters.WhichCounters keyword,
     whichPermanent :: Filter.Filter keyword,
     spread :: CounterSpread.CounterSpread

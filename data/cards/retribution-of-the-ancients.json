@@ -6,23 +6,37 @@
           "cost": {
             "components": [
               {
-                "type": "RemovePlusOneCountersX",
+                "type": "RemoveCounters",
                 "value": {
-                  "type": "And",
-                  "value": [
-                    {
-                      "type": "HasCardType",
-                      "value": {
-                        "type": "Creature"
-                      }
-                    },
-                    {
-                      "type": "ControlledBy",
-                      "value": {
-                        "type": "You"
-                      }
+                  "count": {
+                    "type": "AnnouncedX"
+                  },
+                  "kind": {
+                    "type": "OfKind",
+                    "value": {
+                      "type": "PlusOnePlusOne"
                     }
-                  ]
+                  },
+                  "spread": {
+                    "type": "FromAmong"
+                  },
+                  "whichPermanent": {
+                    "type": "And",
+                    "value": [
+                      {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Creature"
+                        }
+                      },
+                      {
+                        "type": "ControlledBy",
+                        "value": {
+                          "type": "You"
+                        }
+                      }
+                    ]
+                  }
                 }
               }
             ],

@@ -3025,25 +3025,19 @@ rewriteComponent pairs component = case component of
   CostComponent.Behold (Behold.MkBehold n criterion) -> CostComponent.Behold (Behold.MkBehold n (rewrite pairs criterion))
   CostComponent.BeholdAndExile criterion -> CostComponent.BeholdAndExile (rewrite pairs criterion)
   CostComponent.RemoveCounters (CountersFromPermanents.MkCountersFromPermanents n which criterion spread) -> CostComponent.RemoveCounters (CountersFromPermanents.MkCountersFromPermanents n (rewriteWhichCounters pairs which) (rewrite pairs criterion) spread)
-  CostComponent.RemovePlusOneCountersX criterion -> CostComponent.RemovePlusOneCountersX (rewrite pairs criterion)
-  CostComponent.SacrificeX criterion -> CostComponent.SacrificeX (rewrite pairs criterion)
   CostComponent.TapThis -> component
   CostComponent.UntapThis -> component
   CostComponent.SacrificeThis -> component
   CostComponent.ReturnThis -> component
   CostComponent.PayLife _ -> component
   CostComponent.PayHalfLife _ -> component
-  CostComponent.PayLifeX -> component
-  CostComponent.PayEnergyX -> component
   CostComponent.DiscardThis _ -> component
   CostComponent.PayEnergy _ -> component
   CostComponent.AddLoyaltyToThis _ -> component
   CostComponent.RemoveLoyaltyFromThis _ -> component
-  CostComponent.RemoveLoyaltyFromThisX -> component
   CostComponent.RemoveCountersFromThis _ -> component
   CostComponent.PutPlusOneCountersOnThis _ -> component
   CostComponent.Blight _ -> component
-  CostComponent.BlightX -> component
   CostComponent.Forage -> component
   CostComponent.FlipCoin -> component
   CostComponent.ExileThisFromGraveyard -> component
@@ -3053,7 +3047,6 @@ rewriteComponent pairs component = case component of
   CostComponent.ChooseOpponent -> component
   CostComponent.Waterbend _ -> component
   CostComponent.WaterbendInstead _ -> component
-  CostComponent.WaterbendX -> component
 
 -- CR 603.2: replace every ControlledByBound atom whose slot this environment
 -- names with the baked ControlledByPlayer arm. What makes "target creature THAT

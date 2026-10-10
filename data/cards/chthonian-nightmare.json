@@ -6,12 +6,18 @@
           "cost": {
             "components": [
               {
-                "type": "PayEnergyX"
+                "type": "PayEnergy",
+                "value": {
+                  "type": "AnnouncedX"
+                }
               },
               {
                 "type": "Sacrifice",
                 "value": {
-                  "count": 1,
+                  "count": {
+                    "type": "Fixed",
+                    "value": 1
+                  },
                   "whichPermanents": {
                     "type": "HasCardType",
                     "value": {

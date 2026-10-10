@@ -3,7 +3,10 @@
     {
       "additionalCosts": [
         {
-          "type": "PayLifeX"
+          "type": "PayLife",
+          "value": {
+            "type": "AnnouncedX"
+          }
         }
       ],
       "manaCost": [

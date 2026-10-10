@@ -7,11 +7,17 @@
             "components": [
               {
                 "type": "PayLife",
-                "value": 1
+                "value": {
+                  "type": "Fixed",
+                  "value": 1
+                }
               },
               {
                 "type": "Blight",
-                "value": 2
+                "value": {
+                  "type": "Fixed",
+                  "value": 2
+                }
               }
             ],
             "mana": []

@@ -30,6 +30,7 @@ import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CostAmount as CostAmount
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterSpread as CounterSpread
@@ -144,8 +145,8 @@ combatReplaySpec s =
       -- CR 601.2h: Jarad, Golgari Lich Lord's two halves, the printed cost whose
       -- payment order is the payer's.
       orderComponents =
-        [ CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.Type.HasSubtype Subtype.Swamp)),
-          CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.Type.HasSubtype Subtype.Forest))
+        [ CostComponent.Sacrifice (Sacrifice.MkSacrifice (CostAmount.Fixed 1) (Filter.Type.HasSubtype Subtype.Swamp)),
+          CostComponent.Sacrifice (Sacrifice.MkSacrifice (CostAmount.Fixed 1) (Filter.Type.HasSubtype Subtype.Forest))
         ]
    in Spec.describe s "CombatReplay" $ do
         Spec.it s "attackers round-trip through the transcript" $

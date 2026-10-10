@@ -7,6 +7,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Behold as Behold
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CostAmount as CostAmount
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterSpread as CounterSpread
@@ -62,15 +63,15 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
     Common.assertCodec
       s
       codec
-      (CostComponent.PayLife 2)
-      " {\"type\":\"PayLife\",\"value\":2} "
+      (CostComponent.PayLife (CostAmount.Fixed 2))
+      " {\"type\":\"PayLife\",\"value\":{\"type\":\"Fixed\",\"value\":2}} "
   -- CR 601.2b's announced X, which carries no number until it is announced.
-  Spec.it s "PayLifeX" $
+  Spec.it s "PayLife of an announced X" $
     Common.assertCodec
       s
       codec
-      CostComponent.PayLifeX
-      " {\"type\":\"PayLifeX\"} "
+      (CostComponent.PayLife CostAmount.AnnouncedX)
+      " {\"type\":\"PayLife\",\"value\":{\"type\":\"AnnouncedX\"}} "
   Spec.it s "PayHalfLife" $
     Common.assertCodec
       s
@@ -82,8 +83,8 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
     Common.assertCodec
       s
       codec
-      (CostComponent.Sacrifice (Sacrifice.MkSacrifice 2 (Filter.HasSubtype Subtype.Mountain)))
-      " {\"type\":\"Sacrifice\",\"value\":{\"count\":2,\"whichPermanents\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Mountain\"}}}} "
+      (CostComponent.Sacrifice (Sacrifice.MkSacrifice (CostAmount.Fixed 2) (Filter.HasSubtype Subtype.Mountain)))
+      " {\"type\":\"Sacrifice\",\"value\":{\"count\":{\"type\":\"Fixed\",\"value\":2},\"whichPermanents\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Mountain\"}}}} "
   -- The THRESHOLD and the Filter ride the payload positionally, Sacrifice's
   -- shape -- but the Natural means something else here (CR 702.122a's total
   -- power, not a count of objects), which is why the two are separate arms.
@@ -132,16 +133,15 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
     Common.assertCodec
       s
       codec
-      (CostComponent.PayEnergy 2)
-      " {\"type\":\"PayEnergy\",\"value\":2} "
-  -- CR 107.3a's X in the arm above, nullary on the wire for PayLifeX's reason:
-  -- the announcement supplies the number, so the card states none.
-  Spec.it s "PayEnergyX" $
+      (CostComponent.PayEnergy (CostAmount.Fixed 2))
+      " {\"type\":\"PayEnergy\",\"value\":{\"type\":\"Fixed\",\"value\":2}} "
+  -- CR 107.3a's X in the arm above: the announcement supplies the number.
+  Spec.it s "PayEnergy of an announced X" $
     Common.assertCodec
       s
       codec
-      CostComponent.PayEnergyX
-      " {\"type\":\"PayEnergyX\"} "
+      (CostComponent.PayEnergy CostAmount.AnnouncedX)
+      " {\"type\":\"PayEnergy\",\"value\":{\"type\":\"AnnouncedX\"}} "
   -- CR 606.4's two halves.
   Spec.it s "AddLoyaltyToThis" $
     Common.assertCodec
@@ -153,16 +153,15 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
     Common.assertCodec
       s
       codec
-      (CostComponent.RemoveLoyaltyFromThis 1)
-      " {\"type\":\"RemoveLoyaltyFromThis\",\"value\":1} "
-  -- Its X form, nullary on the wire for PayLifeX's reason: Tamiyo, Compleated
-  -- Sage's [-X].
-  Spec.it s "RemoveLoyaltyFromThisX" $
+      (CostComponent.RemoveLoyaltyFromThis (CostAmount.Fixed 1))
+      " {\"type\":\"RemoveLoyaltyFromThis\",\"value\":{\"type\":\"Fixed\",\"value\":1}} "
+  -- Its X form: Tamiyo, Compleated Sage's [-X].
+  Spec.it s "RemoveLoyaltyFromThis of an announced X" $
     Common.assertCodec
       s
       codec
-      CostComponent.RemoveLoyaltyFromThisX
-      " {\"type\":\"RemoveLoyaltyFromThisX\"} "
+      (CostComponent.RemoveLoyaltyFromThis CostAmount.AnnouncedX)
+      " {\"type\":\"RemoveLoyaltyFromThis\",\"value\":{\"type\":\"AnnouncedX\"}} "
   -- CR 118.1's counter removal as an activation cost, Barkhide Troll's.
   Spec.it s "RemoveCountersFromThis" $
     Common.assertCodec
@@ -175,22 +174,22 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
     Common.assertCodec
       s
       codec
-      (CostComponent.RemoveCounters (CountersFromPermanents.MkCountersFromPermanents 1 (WhichCounters.OfKind CounterKind.PlusOnePlusOne) (Filter.HasCardType CardType.Creature) CounterSpread.FromOne))
-      " {\"type\":\"RemoveCounters\",\"value\":{\"count\":1,\"kind\":{\"type\":\"OfKind\",\"value\":{\"type\":\"PlusOnePlusOne\"}},\"whichPermanent\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
-  -- Its X form, Retribution of the Ancients'.
-  Spec.it s "RemovePlusOneCountersX" $
+      (CostComponent.RemoveCounters (CountersFromPermanents.MkCountersFromPermanents (CostAmount.Fixed 1) (WhichCounters.OfKind CounterKind.PlusOnePlusOne) (Filter.HasCardType CardType.Creature) CounterSpread.FromOne))
+      " {\"type\":\"RemoveCounters\",\"value\":{\"count\":{\"type\":\"Fixed\",\"value\":1},\"kind\":{\"type\":\"OfKind\",\"value\":{\"type\":\"PlusOnePlusOne\"}},\"whichPermanent\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+  -- Its X form spread from among, Retribution of the Ancients'.
+  Spec.it s "RemoveCounters of an announced X" $
     Common.assertCodec
       s
       codec
-      (CostComponent.RemovePlusOneCountersX (Filter.HasCardType CardType.Creature))
-      " {\"type\":\"RemovePlusOneCountersX\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
+      (CostComponent.RemoveCounters (CountersFromPermanents.MkCountersFromPermanents CostAmount.AnnouncedX (WhichCounters.OfKind CounterKind.PlusOnePlusOne) (Filter.HasCardType CardType.Creature) CounterSpread.FromAmong))
+      " {\"type\":\"RemoveCounters\",\"value\":{\"count\":{\"type\":\"AnnouncedX\"},\"kind\":{\"type\":\"OfKind\",\"value\":{\"type\":\"PlusOnePlusOne\"}},\"spread\":{\"type\":\"FromAmong\"},\"whichPermanent\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
   -- Sacrifice's X form, Grim Hireling's.
-  Spec.it s "SacrificeX" $
+  Spec.it s "Sacrifice of an announced X" $
     Common.assertCodec
       s
       codec
-      (CostComponent.SacrificeX (Filter.HasCardType CardType.Creature))
-      " {\"type\":\"SacrificeX\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
+      (CostComponent.Sacrifice (Sacrifice.MkSacrifice CostAmount.AnnouncedX (Filter.HasCardType CardType.Creature)))
+      " {\"type\":\"Sacrifice\",\"value\":{\"count\":{\"type\":\"AnnouncedX\"},\"whichPermanents\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
   -- CR 118.12's counter-placing cost, CR 701.63a's endure.
   Spec.it s "PutPlusOneCountersOnThis" $
     Common.assertCodec
@@ -203,16 +202,15 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
     Common.assertCodec
       s
       codec
-      (CostComponent.Blight 2)
-      " {\"type\":\"Blight\",\"value\":2} "
-  -- CR 107.3a's X in the arm above, nullary on the wire for PayLifeX's reason:
-  -- the announcement supplies the number, so the card states none.
-  Spec.it s "BlightX" $
+      (CostComponent.Blight (CostAmount.Fixed 2))
+      " {\"type\":\"Blight\",\"value\":{\"type\":\"Fixed\",\"value\":2}} "
+  -- CR 107.3a's X in the arm above: the announcement supplies the number.
+  Spec.it s "Blight of an announced X" $
     Common.assertCodec
       s
       codec
-      CostComponent.BlightX
-      " {\"type\":\"BlightX\"} "
+      (CostComponent.Blight CostAmount.AnnouncedX)
+      " {\"type\":\"Blight\",\"value\":{\"type\":\"AnnouncedX\"}} "
   -- CR 701.61a as a cost, nullary on the wire because the rule states no number:
   -- Thornvault Forager's "{T}, Forage".
   Spec.it s "Forage" $
@@ -343,8 +341,8 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
     Common.assertCodec
       s
       codec
-      (CostComponent.Waterbend 4)
-      " {\"type\":\"Waterbend\",\"value\":4} "
+      (CostComponent.Waterbend (CostAmount.Fixed 4))
+      " {\"type\":\"Waterbend\",\"value\":{\"type\":\"Fixed\",\"value\":4}} "
   -- Hama, the Bloodbender's alternative cost, never printed.
   Spec.it s "WaterbendInstead" $
     Common.assertCodec
@@ -352,13 +350,13 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       (CostComponent.WaterbendInstead 3)
       " {\"type\":\"WaterbendInstead\",\"value\":3} "
-  -- CR 107.3a's variable of the same cost: nullary, the amount arriving with the
+  -- CR 107.3a's variable of the same cost: the amount arrives with the
   -- announcement rather than off the card (Pawl.Engine.Cost.substituteX).
-  Spec.it s "WaterbendX" $
+  Spec.it s "Waterbend of an announced X" $
     Common.assertCodec
       s
       codec
-      CostComponent.WaterbendX
-      " {\"type\":\"WaterbendX\"} "
+      (CostComponent.Waterbend CostAmount.AnnouncedX)
+      " {\"type\":\"Waterbend\",\"value\":{\"type\":\"AnnouncedX\"}} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s codec
