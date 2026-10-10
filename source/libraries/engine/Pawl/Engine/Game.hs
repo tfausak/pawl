@@ -20,6 +20,7 @@ import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AbilityName as AbilityName
+import qualified Pawl.Types.AbilitySticker as AbilitySticker
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.ActiveCopy as ActiveCopy
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
@@ -69,6 +70,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PowerToughnessSticker as PowerToughnessSticker
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Program as Program
@@ -228,18 +230,46 @@ restampStickers oid gs = case lookupObject oid gs of
         (restamped, stamped) = Foldable.foldl' step (Seq.empty, gs) (Object.stickers obj)
      in stamped {GameState.objects = Map.adjust (\o -> o {Object.stickers = restamped}) oid (GameState.objects stamped)}
 
--- | CR 123.6: the words printed on a name sticker, off its owner's sheet;
--- Nothing for another kind or a reference naming no sticker.
+-- | CR 123.2: the sheet a sticker is printed on, among its owner's brought
+-- sheets.
+stickerSheetOf :: StickerRef.StickerRef -> GameState -> Maybe StickerSheet.StickerSheet
+stickerSheetOf ref gs = do
+  player <- Map.lookup (StickerRef.owner ref) (GameState.players gs)
+  slot <- Natural.toInt (StickerRef.sheet ref)
+  Seq.lookup slot (Player.stickerSheets player)
+
+-- | CR 123.6: a name sticker's words; Nothing for every other kind.
 stickerWords :: StickerRef.StickerRef -> GameState -> Maybe Text.Text
 stickerWords ref gs = case StickerRef.kind ref of
   StickerKind.Name -> do
-    player <- Map.lookup (StickerRef.owner ref) (GameState.players gs)
-    slot <- Natural.toInt (StickerRef.sheet ref)
-    sheet <- Seq.lookup slot (Player.stickerSheets player)
+    sheet <- stickerSheetOf ref gs
     i <- Natural.toInt (StickerRef.index ref)
     Seq.lookup i (StickerSheet.names sheet)
   StickerKind.Ability -> Nothing
   StickerKind.PowerToughness -> Nothing
+  StickerKind.Art -> Nothing
+
+-- | CR 123.7: an ability sticker's printed abilities; Nothing for every other
+-- kind.
+abilityStickerOf :: StickerRef.StickerRef -> GameState -> Maybe AbilitySticker.AbilitySticker
+abilityStickerOf ref gs = case StickerRef.kind ref of
+  StickerKind.Ability -> do
+    sheet <- stickerSheetOf ref gs
+    i <- Natural.toInt (StickerRef.index ref)
+    Seq.lookup i (StickerSheet.abilities sheet)
+  StickerKind.Name -> Nothing
+  StickerKind.PowerToughness -> Nothing
+  StickerKind.Art -> Nothing
+
+-- | CR 123.8: a P/T sticker's printed numbers; Nothing for every other kind.
+powerToughnessStickerOf :: StickerRef.StickerRef -> GameState -> Maybe PowerToughnessSticker.PowerToughnessSticker
+powerToughnessStickerOf ref gs = case StickerRef.kind ref of
+  StickerKind.PowerToughness -> do
+    sheet <- stickerSheetOf ref gs
+    i <- Natural.toInt (StickerRef.index ref)
+    Seq.lookup i (StickerSheet.powerToughness sheet)
+  StickerKind.Name -> Nothing
+  StickerKind.Ability -> Nothing
   StickerKind.Art -> Nothing
 
 freshPrintingId :: GameState -> (PrintingId.PrintingId, GameState)

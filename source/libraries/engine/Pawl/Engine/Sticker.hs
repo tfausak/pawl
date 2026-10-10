@@ -12,6 +12,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Extra.Natural as Natural
+import qualified Pawl.Types.AbilitySticker as AbilitySticker
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -19,6 +20,7 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PowerToughnessSticker as PowerToughnessSticker
 import qualified Pawl.Types.StickerKind as StickerKind
 import qualified Pawl.Types.StickerPlacement as StickerPlacement
 import qualified Pawl.Types.StickerPut as StickerPut
@@ -52,6 +54,15 @@ available pid kinds gs = case Map.lookup pid (GameState.players gs) of
             Set.member (StickerRef.kind ref) kinds
           ]
      in filter (\ref -> Set.notMember ref used) offered
+
+-- | CR 123.3c / 107.17a: a sticker's ticket cost, printed on its sheet; a name
+-- or art sticker has none.
+ticketCost :: StickerRef.StickerRef -> GameState -> Natural
+ticketCost ref gs = case StickerRef.kind ref of
+  StickerKind.Ability -> maybe 0 AbilitySticker.tickets (Game.abilityStickerOf ref gs)
+  StickerKind.PowerToughness -> maybe 0 PowerToughnessSticker.tickets (Game.powerToughnessStickerOf ref gs)
+  StickerKind.Name -> 0
+  StickerKind.Art -> 0
 
 -- | CR 123.3 / 613.7k: put the sticker on the object, stamped now, and record
 -- the placement for "whenever you place a sticker". CR 123.6b: @position@ is a

@@ -23,6 +23,7 @@ import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Keyword as KeywordEngine
 import qualified Pawl.Engine.NameWords as NameWords
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
@@ -44,6 +45,7 @@ import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ModeIndex as ModeIndex
@@ -140,6 +142,43 @@ slimy = nameSticker 1 0
 otter :: StickerRef.StickerRef
 otter = nameSticker 2 1
 
+-- One of alice's stickers, by its sheet's position, its kind and its index
+-- among that sheet's stickers of the kind.
+aliceSticker :: Natural -> StickerKind.StickerKind -> Natural -> StickerRef.StickerRef
+aliceSticker slot kind i = StickerRef.MkStickerRef {StickerRef.owner = S.alice, StickerRef.sheet = slot, StickerRef.kind = kind, StickerRef.index = i}
+
+-- Night's menace (2 tickets), Hot Dog Minotaur's flying (3) and Juggler's
+-- indestructible (4).
+nightMenace :: StickerRef.StickerRef
+nightMenace = aliceSticker 0 StickerKind.Ability 0
+
+hotDogFlying :: StickerRef.StickerRef
+hotDogFlying = aliceSticker 3 StickerKind.Ability 1
+
+jugglerIndestructible :: StickerRef.StickerRef
+jugglerIndestructible = aliceSticker 4 StickerKind.Ability 1
+
+-- The four 2-ticket P/T stickers: 2/3, 2/4, 5/1 and 1/4.
+nightTwoThree :: StickerRef.StickerRef
+nightTwoThree = aliceSticker 0 StickerKind.PowerToughness 0
+
+slimyTwoFour :: StickerRef.StickerRef
+slimyTwoFour = aliceSticker 1 StickerKind.PowerToughness 0
+
+otterFiveOne :: StickerRef.StickerRef
+otterFiveOne = aliceSticker 2 StickerKind.PowerToughness 0
+
+minotaurOneFour :: StickerRef.StickerRef
+minotaurOneFour = aliceSticker 3 StickerKind.PowerToughness 0
+
+-- committedSheets, then Unsanctioned Ancient Juggler at position 4.
+withJuggler :: IO [StickerSheet.StickerSheet]
+withJuggler = do
+  sheets <- committedSheets
+  root <- StickerSheets.defaultRoot
+  loaded <- StickerSheets.loadRoot root
+  pure (sheets <> [sheet | (_, Right sheet) <- loaded, StickerSheet.name sheet == Text.pack "Unsanctioned Ancient Juggler"])
+
 -- The names an object shows, as text.
 nameTexts :: ObjectId.ObjectId -> GameState.GameState -> [Text.Text]
 nameTexts oid gs = fmap CardName.unwrap (Set.toList (Projection.namesOf oid gs))
@@ -177,6 +216,16 @@ placing onto p = case p of
     State.modify' (\o -> o {stickers = NonEmpty.toList offered : stickers o})
     pure (NonEmpty.head offered)
   _ -> pure (S.identityAnswer p)
+
+-- `placing`, answering ChooseX with `x` and ChooseSticker with `ref` where it
+-- is offered, the first offered otherwise.
+placingRef :: Natural -> Maybe ObjectId.ObjectId -> StickerRef.StickerRef -> Prompt.Prompt r -> State.State Offers r
+placingRef x onto ref p = case p of
+  Prompt.ChooseX {} -> pure x
+  Prompt.ChooseSticker _ _ _ offered -> do
+    State.modify' (\o -> o {stickers = NonEmpty.toList offered : stickers o})
+    pure (if List.elem ref offered then ref else NonEmpty.head offered)
+  _ -> placing onto p
 
 -- Settle and resolve until the stack is empty.
 drain :: Game.Type.Game ()
@@ -738,3 +787,22 @@ spec s registry = Spec.describe s "Sticker" $ do
           Nothing -> False
         (_, after, _) = entersNaming splash ((placingAt Nothing (nameSticker 0 1) 0) {namingPrefers = bobs}) g2
     Spec.assertEqWith s "CR 123.6d one Piker is tapped" (S.tappedCount S.bob after) 1
+  Spec.it s "CR 123.3c/107.17a a sticker's ticket cost is printed on its sheet, and name and art stickers cost nothing" $ do
+    sheets <- withJuggler
+    let gs = withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)
+    Spec.assertEqWith s "the five sheets load" (length sheets) 5
+    Spec.assertEqWith s "CR 123.3c four, two, none and none" (fmap (\ref -> Sticker.ticketCost ref gs) [jugglerIndestructible, otterFiveOne, night, aliceSticker 2 StickerKind.Art 0]) [4, 2, 0, 0]
+    Spec.assertEqWith s "CR 123.8 Otter's sticker is a 5/1" (fmap (\pt -> (PowerToughnessSticker.power pt, PowerToughnessSticker.toughness pt)) (Game.powerToughnessStickerOf otterFiveOne gs)) (Just (5, 1))
+    Spec.assertEqWith s "CR 123.7 Juggler's second ability sticker is indestructible" (fmap (Map.keys . AbilitySticker.keywords) (Game.abilityStickerOf jugglerIndestructible gs)) (Just [Keyword.Indestructible])
+    Spec.assertEqWith s "and a P/T sticker has no abilities" (Game.abilityStickerOf otterFiveOne gs) Nothing
+  -- #N2's tripwire: a static or rule ability on an ability sticker, or a
+  -- keyword rule 702 states as one, does not reach the stickered object.
+  Spec.it s "CR 123.7 no committed ability sticker carries a static or rule ability (#N2)" $ do
+    root <- StickerSheets.defaultRoot
+    loaded <- StickerSheets.loadRoot root
+    let selfOnly g = case g of
+          GrantedAbility.Static _ -> True
+          GrantedAbility.Rules _ -> True
+          _ -> False
+        offends a = any selfOnly (AbilitySticker.abilities a) || not (null (KeywordEngine.mintedStaticAbilitiesOf (Map.keysSet (AbilitySticker.keywords a))))
+    Spec.assertEqWith s "no such sheet" [StickerSheet.name sheet | (_, Right sheet) <- loaded, a <- Foldable.toList (StickerSheet.abilities sheet), offends a] []
