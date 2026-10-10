@@ -32,8 +32,9 @@ counter = Fields.object $ do
   count <- Fields.required "count" Quantity.codec snd
   pure (kind, count)
 
--- | Every field is defaulted, so riders equal to 'defaultValue' write the empty
--- object -- and their own key is then elided by whichever effect carries them.
+-- | Every field is defaulted, so riders equal to 'EntryRiders.defaultValue'
+-- write the empty object -- and their own key is then elided by whichever
+-- effect carries them.
 codec :: (Typeable.Typeable ability, Eq ability) => Codec.Codec ability -> Codec.Codec (EntryRiders.EntryRiders Quantity.Type.Quantity ability)
 codec abilityCodec = Fields.object $ do
   tapped <- Fields.defaulted "tapped" (EntryRiders.tapped EntryRiders.defaultValue) TapState.codec EntryRiders.tapped
