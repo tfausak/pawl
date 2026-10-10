@@ -381,7 +381,7 @@ data GameState = MkGameState
     -- 602.5c's identically worded twins, as Object.activatedOnce is.
     activatedThisTurn :: Map.Map ObjectId.ObjectId (Map.Map (ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)) Natural.Natural),
     -- | CR 602.2: every activated ability begun this turn, oldest first, as
-    -- Pawl.Types.ReduceActivationCost.onlyFirst asks after it; cleared at turn
+    -- Pawl.Types.CostModifier.onlyFirst asks after it; cleared at turn
     -- handoff. Written by Pawl.Engine.ActivationRestriction.logActivation. A
     -- new reader owes an entry in Pawl.Engine.Fragmented.historyReaders.
     activationsThisTurn :: Seq.Seq PastActivation.PastActivation,

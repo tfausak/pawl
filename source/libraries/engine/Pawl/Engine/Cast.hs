@@ -356,8 +356,8 @@ flashOn oid face gs =
 --     (#559), so no target set can be measured differently either side of it.
 --   * nothing counts a hand. No Pawl.Types.Count arm reaches a hand zone, so
 --     hand size cannot enter a cost or a filter.
---   * a cost adjustment carries a LITERAL amount. PlayerEffect.IncreaseSpellCost
---     and ReduceSpellCost hold a Natural or a ManaCost, never a Quantity, so no
+--   * a cost adjustment carries a LITERAL amount. Pawl.Types.CostChange's
+--     Increase and Reduce hold a Natural or a ManaCost, never a Quantity, so no
 --     adjustment can count anything but the spell's own targets (`perTarget`),
 --     which the first point keeps out of hidden zones -- and a count is the only
 --     route a zone read could take into Cost.total.
@@ -3520,8 +3520,8 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                       -- below answers with.
                       --
                       -- CR 601.2f's ORDER of the reductions is asked at the same
-                      -- seam. A SPELL can observe it: no ReduceSpellCost states
-                      -- a floor, but two of them can still disagree about CR
+                      -- seam. A SPELL can observe it: no spell reduction in the
+                      -- pool states a floor, but two can still disagree about CR
                       -- 101.1's coloured-mana confinement, and Edgewalker beside
                       -- an unconfined typed reducer reaches two totals on one
                       -- Cleric spell (Pawl.PlayerEffectSpec's

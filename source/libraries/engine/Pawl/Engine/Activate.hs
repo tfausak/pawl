@@ -380,10 +380,12 @@ activateAbilityWith runSubgame pid srcId ability = Event.announcing $ do
               -- target this creature" is a reduction the pre-target gather above
               -- cannot see, and CR 601.2f's position after 601.2c is what makes
               -- reading them here the rule's own order rather than a shortcut.
-              -- Only the REDUCTIONS can differ between the two records --
-              -- ReduceActivationCost is the one arm carrying a target criterion
-              -- -- so the increases and the CR 601.2f components the announcement
-              -- above measured are the same ones charged below.
+              -- The increases and reductions can differ between the two records
+              -- (Kopala, Warden of Waves; Dwarven Mauler), and `totalWith` charges
+              -- this one's; the CR 601.2f components cannot, since
+              -- Pawl.Codec.CostModifier refuses a target criterion on an addition
+              -- to an activation, so the ones the announcement above measured are
+              -- the ones charged below.
               let aimedAt = Set.unions (fmap Activatable.recipientObjects (Map.elems chosen))
                   targeted = Cost.activationAdjustments aimedAt stamp AbilityKind.NonManaAbility (Cost.loyaltyKindOf (ActivatedAbility.cost ability)) pid srcId gs
               adjustments <- Cost.announceReductions pid srcId gs announcedCost targeted

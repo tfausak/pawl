@@ -6,7 +6,7 @@ import qualified Pawl.Types.ObjectSnapshot as ObjectSnapshot
 import qualified Pawl.Types.PlayerId as PlayerId
 
 -- | CR 602.2: one activated ability a player began to activate this turn, kept
--- as the facts Pawl.Types.ReduceActivationCost's criteria ask of an activation,
+-- as the facts Pawl.Types.CostModifier's criteria ask of an activation,
 -- so "the FIRST activated ability you activate" (Professor Hojo) can be asked
 -- of the turn's history whatever has happened to the objects since.
 --
@@ -18,9 +18,9 @@ data PastActivation = MkPastActivation
     -- | The ability's source as the activation began.
     source :: ObjectSnapshot.ObjectSnapshot,
     -- | The rule 702 keyword the ability is under
-    -- (Pawl.Types.ActivatedAbility.keyword), for ReduceActivationCost.grantedBy.
+    -- (Pawl.Types.ActivatedAbility.keyword), for ActivationCriteria.grantedBy.
     keyword :: Maybe Keyword.Keyword,
-    -- | CR 605.1a's side of the ability, for ReduceActivationCost.whichKind.
+    -- | CR 605.1a's side of the ability, for ActivationCriteria.whichKind.
     kind :: AbilityKind.AbilityKind,
     -- | CR 601.2c's object targets, as they stood when announced.
     targets :: [ObjectSnapshot.ObjectSnapshot]

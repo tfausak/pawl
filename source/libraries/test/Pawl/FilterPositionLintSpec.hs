@@ -61,8 +61,11 @@ import qualified Pawl.Types.ConjureEntry as ConjureEntry
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostAmount as CostAmount
+import qualified Pawl.Types.CostChange as CostChange
 import qualified Pawl.Types.CostChoice as CostChoice
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CostModifier as CostModifier
+import qualified Pawl.Types.CostSubject as CostSubject
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPattern as CounterPattern
@@ -93,7 +96,6 @@ import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.FromReference as FromReference
 import qualified Pawl.Types.HandAction as HandAction
 import qualified Pawl.Types.InZone as InZone
-import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -479,7 +481,7 @@ isTargetTag = Text.pack "IsTarget"
 -- How many Filter.IsTarget atoms sit OUTSIDE a cost an announcement pays, the
 -- only positions Binding.announcedTargets is stamped for: a spell's additional
 -- costs, an activated ability's cost (an object with a "cost" beside a "modal"),
--- and the components an AddSpellCost or AddActivationCost adds. Anywhere else --
+-- and the components a cost modifier's CostChange.Add adds. Anywhere else --
 -- a triggered ability above all, which is never stamped -- the atom is a silent
 -- False, isBoundOffends' offence one atom over. Counted off the encoding, so a
 -- grant nested inside an effect is reached too.
@@ -490,7 +492,7 @@ isTargetStrays value = case value of
         nameOf p = String.unwrap (Pair.name p)
         has k = any ((== Text.pack k) . nameOf) pairs
         activated = has "cost" && has "modal" && not (has "condition")
-        adding = any (\p -> nameOf p == Text.pack "type" && elem (Pair.value p) (fmap (Value.String . String.MkString . Text.pack) ["AddSpellCost", "AddActivationCost"])) pairs
+        adding = any (\p -> nameOf p == Text.pack "type" && Pair.value p == Value.String (String.MkString (Text.pack "Add"))) pairs
         paid p =
           elem (nameOf p) (fmap Text.pack ["additionalCosts", "additionalCostChoices"])
             || (activated && nameOf p == Text.pack "cost")
@@ -2884,7 +2886,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
             ( "CR 613.11's spell-cost modifier",
               base
                 { Face.playerAbilities =
-                    [PlayerStaticAbility.MkPlayerStaticAbility {PlayerStaticAbility.scope = PlayerScope.Related PlayerRelation.You, PlayerStaticAbility.condition = Nothing, PlayerStaticAbility.name = Nothing, PlayerStaticAbility.effect = PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost buried 1 Nothing)}]
+                    [PlayerStaticAbility.MkPlayerStaticAbility {PlayerStaticAbility.scope = PlayerScope.Related PlayerRelation.You, PlayerStaticAbility.condition = Nothing, PlayerStaticAbility.name = Nothing, PlayerStaticAbility.effect = PlayerEffect.ModifyCost (CostModifier.MkCostModifier CostSubject.Spells buried Nothing Nothing Nothing (CostChange.Increase 1))}]
                 }
             ),
             ( "CR 508.1c's combat restriction",

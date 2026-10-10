@@ -97,11 +97,18 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "IncreaseActivationCost",
+            "type": "ModifyCost",
             "value": {
-              "amount": 3,
-              "whichAbilities": {
+              "change": {
+                "type": "Increase",
+                "value": 3
+              },
+              "matching": {
                 "type": "IsHostOfSource"
+              },
+              "subject": {
+                "type": "Activations",
+                "value": {}
               }
             }
           },

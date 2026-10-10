@@ -15,7 +15,7 @@ import qualified Pawl.Types.Keyword as Keyword
 -- nothing else builds one.
 --
 -- The increases and the reductions are kept APART, never summed into one signed
--- delta, for Pawl.Types.PlayerEffect.ReduceSpellCost's stated reason: CR 601.2f
+-- delta, for Pawl.Types.CostChange's stated reason: CR 601.2f
 -- applies every increase before any reduction, and CR 118.7a gives a reduction a
 -- restriction an increase does not have. They do not even have the same shape --
 -- an increase is an amount of generic mana, and a reduction is an

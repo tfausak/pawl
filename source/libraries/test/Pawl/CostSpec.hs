@@ -2627,6 +2627,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   springleafDrumSpec s registry
   morcantSpec s registry
   unerringSlingSpec s registry
+  kopalaSpec s registry
   melokuSpec s registry
   barkhideTrollSpec s registry
   zameckGuildmageCostSpec s registry
@@ -6136,3 +6137,94 @@ targetCostSpec s registry =
           Spec.assertEqWith s "the Giant is destroyed when tapped, and survives untapped" (onBattlefield target (run (tapAll gs)), onBattlefield target (run gs)) (False, True)
           Spec.assertEqWith s "offered at the tapped Giant, refused at the untapped one" (S.castable S.alice seizedId (tapAll gs), S.castable S.alice seizedId gs) (True, False)
         _ -> Spec.assertFailure s "one Giant"
+
+-- Kopala, Warden of Waves {1}{U}{U} Legendary Creature -- Merfolk Wizard 2/2
+-- (Oracle text checked against Scryfall 2026-10-10): "Spells your opponents cast
+-- that target a Merfolk you control cost {2} more to cast. / Abilities your
+-- opponents activate that target a Merfolk you control cost {2} more to
+-- activate." Its ruling: "Spells and abilities that target more than one Merfolk
+-- you control cost only {2} more" -- a gate on the targets (CostModifier's
+-- whichTargets), not an amount per target.
+--
+-- THREE seats, so Kopala's "you" (CR 109.5: alice, its controller) is told from
+-- the paying player's (bob) and from another opponent's (carol, who controls a
+-- Merfolk too). Every cost is read off how many of bob's permanents are tapped.
+kopalaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+kopalaSpec s registry = Spec.describe s "Kopala, Warden of Waves" $ do
+  let board = do
+        kopala <- S.printingOf s registry "Kopala, Warden of Waves"
+        merfolk <- S.printingOf s registry "Coral Merfolk"
+        piker <- S.printingOf s registry "Goblin Piker"
+        sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+        distraction <- S.printingOf s registry "Fulgent Distraction"
+        plains <- S.printingOf s registry "Plains"
+        let (kopalaId, g1) = S.addPermanent kopala S.alice (S.landsFor plains S.bob 7 (Setup.emptyGame S.threePlayers))
+            (aliceMerfolk, g2) = S.addPermanent merfolk S.alice g1
+            (carolMerfolk, g3) = S.addPermanent merfolk S.carol g2
+            (pikerId, g4) = S.addPermanent piker S.bob g3
+            (sorcererId, g5) = S.addPermanent sorcerer S.bob g4
+            (distractionId, g6) = S.addHandCard distraction S.bob g5
+        pure (kopalaId, aliceMerfolk, carolMerfolk, pikerId, sorcererId, theAbility sorcerer, distractionId, g6)
+      aimingAt :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+      aimingAt wanted p = case p of
+        Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, legal) -> Set.filter (\r -> elem (Recipient.objectOf r) (fmap Just wanted)) legal) asked
+        _ -> S.identityAnswer p
+  -- Fulgent Distraction is {2}{W}; the pair differs in the aim alone.
+  Spec.it s "CR 601.2c / 601.2f an opponent's spell costs {2} more once, however many of alice's Merfolk it targets" $ do
+    (kopalaId, aliceMerfolk, carolMerfolk, pikerId, _, _, distractionId, gs) <- board
+    let castAt wanted = S.runPure (aimingAt wanted) gs (S.cast S.bob distractionId)
+        both = castAt [kopalaId, aliceMerfolk]
+        one = castAt [aliceMerfolk, pikerId]
+        carols = castAt [carolMerfolk, pikerId]
+    Spec.assertEqWith s "CR 109.5 two of alice's Merfolk: {4}{W}, five Plains, not seven" (S.tappedCount S.bob both) 5
+    Spec.assertEqWith s "one of alice's Merfolk beside bob's Piker: the same five" (S.tappedCount S.bob one) 5
+    Spec.assertEqWith s "carol's Merfolk is not a Merfolk alice controls: {2}{W}, three" (S.tappedCount S.bob carols) 3
+    Spec.assertEqWith s "and all three casts were made" (fmap (length . GameState.stack) [both, one, carols]) [1, 1, 1]
+  -- Prodigal Sorcerer's "{T}: This creature deals 1 damage to any target" costs
+  -- no mana, so the Sorcerer is the only permanent of bob's an untaxed
+  -- activation taps.
+  Spec.it s "CR 602.2b an opponent's ability targeting alice's Merfolk costs {2} more, and carol's does not" $ do
+    (_, aliceMerfolk, carolMerfolk, _, sorcererId, ability, _, gs) <- board
+    let shootAt victim = S.runPure (aimingAt [victim]) gs (Activate.activateAbility S.bob sorcererId ability)
+        atAlice = shootAt aliceMerfolk
+        atCarol = shootAt carolMerfolk
+    Spec.assertEqWith s "CR 601.2f at alice's Merfolk: the Sorcerer and two Plains" (S.tappedCount S.bob atAlice) 3
+    Spec.assertEqWith s "at carol's Merfolk: the Sorcerer alone" (S.tappedCount S.bob atCarol) 1
+    Spec.assertEqWith s "and both activations are on the stack" (fmap (length . GameState.stack) [atAlice, atCarol]) [1, 1]
+  -- Brittle Effigy's "{4}, {T}, Exile this artifact: Exile target creature",
+  -- where the only creatures are alice's two Merfolk: every legal aiming costs
+  -- {6}, so five Plains cannot pay it though the empty aiming would cost {4}. The
+  -- pair differs in one Plains, and a third board in one Goblin Piker of bob's,
+  -- a target Kopala does not tax.
+  Spec.it s "CR 601.2f / 602.2b a Brittle Effigy whose only targets are alice's Merfolk is not offered on five Plains" $ do
+    kopala <- S.printingOf s registry "Kopala, Warden of Waves"
+    merfolk <- S.printingOf s registry "Coral Merfolk"
+    piker <- S.printingOf s registry "Goblin Piker"
+    effigy <- S.printingOf s registry "Brittle Effigy"
+    plains <- S.printingOf s registry "Plains"
+    let boardWith lands =
+          let (_, g1) = S.addPermanent kopala S.alice (S.landsFor plains S.bob lands (Setup.emptyGame S.threePlayers))
+              (_, g2) = S.addPermanent merfolk S.alice g1
+           in S.addPermanent effigy S.bob g2
+        (fiveId, five) = boardWith 5
+        (sixId, six) = boardWith 6
+        (pikerEffigyId, withPiker) = let (eid, g) = boardWith 5 in (eid, snd (S.addPermanent piker S.bob g))
+    Spec.assertBool s (not (Activatable.activatable S.bob fiveId (theAbility effigy) five)) "CR 601.2f on five Plains every target costs {6}: not offered"
+    Spec.assertBool s (Activatable.activatable S.bob sixId (theAbility effigy) six) "on six Plains it is"
+    Spec.assertBool s (Activatable.activatable S.bob pikerEffigyId (theAbility effigy) withPiker) "and on five beside bob's own Piker, an untaxed target, it is"
+  -- The spell half of the gate above: Fulgent Distraction's two targets can
+  -- only be alice's two Merfolk, so four Plains cannot pay {4}{W} though the
+  -- untargeted cost is {2}{W}. The pair differs in one Plains.
+  Spec.it s "CR 601.2f a Fulgent Distraction whose only targets are alice's Merfolk is not castable on four Plains" $ do
+    kopala <- S.printingOf s registry "Kopala, Warden of Waves"
+    merfolk <- S.printingOf s registry "Coral Merfolk"
+    distraction <- S.printingOf s registry "Fulgent Distraction"
+    plains <- S.printingOf s registry "Plains"
+    let boardWith lands =
+          let (_, g1) = S.addPermanent kopala S.alice (S.landsFor plains S.bob lands (Setup.emptyGame S.threePlayers))
+              (_, g2) = S.addPermanent merfolk S.alice g1
+           in S.addHandCard distraction S.bob g2
+        (fourId, four) = boardWith 4
+        (fiveId, five) = boardWith 5
+    Spec.assertBool s (not (S.castable S.bob fourId four)) "CR 601.2f on four Plains both legal targets are taxed: not castable"
+    Spec.assertBool s (S.castable S.bob fiveId five) "on five Plains it is"

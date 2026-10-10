@@ -11,12 +11,10 @@ import qualified Pawl.Types.ManaCost as ManaCost
 -- reductions applying to one cost can disagree about either.
 -- Pawl.Engine.Cost.applyAdjustments folds them one at a time for that reason.
 --
--- Built only by Pawl.Engine.PlayerEffect's gatherers, by
--- Pawl.Engine.Cost.spellAdjustments and by Pawl.Engine.Cost.plusReductions, which
--- is where CR 702.119a's amount joins them; it is the element type of
--- Pawl.Types.CostAdjustments.reductions and has no wire form of its own, the
--- card-facing shapes being Pawl.Types.ReduceSpellCost,
--- Pawl.Types.ReduceActivationCost and Pawl.Types.CostReduction.
+-- The card-facing payload of Pawl.Types.CostChange's Reduce arm too, which is
+-- why it has a wire form; the element type of
+-- Pawl.Types.CostAdjustments.reductions, where Pawl.Engine.Cost.spellAdjustments
+-- and Pawl.Engine.Cost.plusReductions (CR 702.119a's amount) also build one.
 data AppliedReduction = MkAppliedReduction
   { -- | What comes off, as an amount of MANA rather than a number: CR 118.7
     -- reduces a cost by mana of a stated type, and Sapphire Medallion's {1} and
@@ -28,9 +26,9 @@ data AppliedReduction = MkAppliedReduction
     --
     -- Zero is "no floor", and needs no Maybe to say so: CR 601.2f already floors
     -- every total at {0}, so a floor of zero constrains nothing. It is what every
-    -- SPELL cost carries -- no printed spell-cost reducer states this sentence --
-    -- and what an activation-cost reducer without the sentence (Blossoming
-    -- Tortoise) carries too.
+    -- reducer without the sentence carries (Blossoming Tortoise); Scryfall
+    -- o:"to less than one mana", 2026-10-10, finds the sentence only on
+    -- activation-cost reducers, though a spell's would be read the same way.
     --
     -- A floor never RAISES a cost that was already below it, which is
     -- Heartstone's own ruling ("It will not add a {1} to abilities with no

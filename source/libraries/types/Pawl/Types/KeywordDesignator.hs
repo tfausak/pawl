@@ -7,7 +7,7 @@ import qualified Pawl.Types.KeywordFamily as KeywordFamily
 -- about the ability rather than about the object that has it -- Fluctuator's
 -- "cycling abilities you activate", Bureau Headmaster's "equip abilities you
 -- activate", Boom Scholar's "exhaust abilities of other permanents you control".
--- Pawl.Types.ReduceActivationCost's @grantedBy@ is the one asker, and it is
+-- Pawl.Types.ActivationCriteria's @grantedBy@ is the one asker, and it is
 -- compared against Pawl.Types.ActivatedAbility.keyword, the whole keyword an
 -- ability carries.
 --

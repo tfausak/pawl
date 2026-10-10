@@ -26,10 +26,13 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "IncreaseSpellCost",
+            "type": "ModifyCost",
             "value": {
-              "amount": 1,
-              "whichSpells": {
+              "change": {
+                "type": "Increase",
+                "value": 1
+              },
+              "matching": {
                 "type": "Not",
                 "value": {
                   "type": "HasCardType",
@@ -37,6 +40,9 @@
                     "type": "Creature"
                   }
                 }
+              },
+              "subject": {
+                "type": "Spells"
               }
             }
           },

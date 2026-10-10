@@ -126,7 +126,7 @@ data ActivatedAbility card ability = MkActivatedAbility
     -- Pawl.CardSpec's "CR 702 no card claims a keyword minted an ability it
     -- printed" is the lint that holds a card to the second side of it.
     --
-    -- Pawl.Types.ReduceActivationCost.grantedBy is what asks, through
+    -- Pawl.Types.ActivationCriteria.grantedBy is what asks, through
     -- Pawl.Engine.Keyword.designates, so that Bureau Headmaster's "equip
     -- abilities you activate" reaches rule 702.6a's ability and not a printed
     -- twin of it, and Boom Scholar's "exhaust abilities of other permanents you

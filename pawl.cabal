@@ -102,6 +102,7 @@ library codec
     Pawl.Codec.ActivateManaAbilities
     Pawl.Codec.ActivateManaAbilitiesSpec
     Pawl.Codec.Activation
+    Pawl.Codec.ActivationCriteria
     Pawl.Codec.ActivationProhibition
     Pawl.Codec.ActivationProhibitionSpec
     Pawl.Codec.ActivationRestriction
@@ -131,10 +132,6 @@ library codec
     Pawl.Codec.ActiveUnregeneratableSpec
     Pawl.Codec.ActiveUntapProhibition
     Pawl.Codec.ActiveUntapProhibitionSpec
-    Pawl.Codec.AddActivationCost
-    Pawl.Codec.AddActivationCostSpec
-    Pawl.Codec.AddSpellCost
-    Pawl.Codec.AddSpellCostSpec
     Pawl.Codec.Affected
     Pawl.Codec.AffectedPlayers
     Pawl.Codec.AffectedPlayersSpec
@@ -169,6 +166,7 @@ library codec
     Pawl.Codec.AnyNumberDiscardSpec
     Pawl.Codec.AnyNumberMatching
     Pawl.Codec.AnyNumberMatchingSpec
+    Pawl.Codec.AppliedReduction
     Pawl.Codec.ArmDelayedTrigger
     Pawl.Codec.ArmDelayedTriggerSpec
     Pawl.Codec.Arrival
@@ -396,10 +394,13 @@ library codec
     Pawl.Codec.CopyTargets
     Pawl.Codec.CopyTargetsSpec
     Pawl.Codec.Cost
+    Pawl.Codec.CostAddition
     Pawl.Codec.CostAmount
     Pawl.Codec.CostAmountSpec
     Pawl.Codec.CostBasis
     Pawl.Codec.CostBasisSpec
+    Pawl.Codec.CostChange
+    Pawl.Codec.CostChangeSpec
     Pawl.Codec.CostChoice
     Pawl.Codec.CostChoiceSpec
     Pawl.Codec.CostComponent
@@ -408,11 +409,15 @@ library codec
     Pawl.Codec.CostDirectionSpec
     Pawl.Codec.CostKeyword
     Pawl.Codec.CostKeywordSpec
+    Pawl.Codec.CostModifier
+    Pawl.Codec.CostModifierSpec
     Pawl.Codec.CostReduction
     Pawl.Codec.CostReductionSpec
     Pawl.Codec.CostScale
     Pawl.Codec.CostScaleSpec
     Pawl.Codec.CostSpec
+    Pawl.Codec.CostSubject
+    Pawl.Codec.CostSubjectSpec
     Pawl.Codec.Count
     Pawl.Codec.CountedDiscard
     Pawl.Codec.CountedDiscardSpec
@@ -712,10 +717,6 @@ library codec
     Pawl.Codec.IgnoredAbilitySpec
     Pawl.Codec.Impending
     Pawl.Codec.ImpendingSpec
-    Pawl.Codec.IncreaseActivationCost
-    Pawl.Codec.IncreaseActivationCostSpec
-    Pawl.Codec.IncreaseSpellCost
-    Pawl.Codec.IncreaseSpellCostSpec
     Pawl.Codec.InherentTriggerSource
     Pawl.Codec.InherentTriggerSourceSpec
     Pawl.Codec.InitiativeTarget
@@ -1076,10 +1077,6 @@ library codec
     Pawl.Codec.RecipientSpec
     Pawl.Codec.RedirectDamage
     Pawl.Codec.RedirectDamageSpec
-    Pawl.Codec.ReduceActivationCost
-    Pawl.Codec.ReduceActivationCostSpec
-    Pawl.Codec.ReduceSpellCost
-    Pawl.Codec.ReduceSpellCostSpec
     Pawl.Codec.Reference
     Pawl.Codec.ReferenceSpec
     Pawl.Codec.Regenerability
@@ -2000,6 +1997,7 @@ library types
     Pawl.Types.ActivatedAbilitySource
     Pawl.Types.ActivateManaAbilities
     Pawl.Types.Activation
+    Pawl.Types.ActivationCriteria
     Pawl.Types.ActivationProhibition
     Pawl.Types.ActivationRestriction
     Pawl.Types.Activations
@@ -2015,8 +2013,6 @@ library types
     Pawl.Types.ActiveReplacement
     Pawl.Types.ActiveUnregeneratable
     Pawl.Types.ActiveUntapProhibition
-    Pawl.Types.AddActivationCost
-    Pawl.Types.AddSpellCost
     Pawl.Types.Affected
     Pawl.Types.AffectedPlayers
     Pawl.Types.AffectedUnless
@@ -2163,15 +2159,19 @@ library types
     Pawl.Types.CopyStackObject
     Pawl.Types.CopyTargets
     Pawl.Types.Cost
+    Pawl.Types.CostAddition
     Pawl.Types.CostAdjustments
     Pawl.Types.CostAmount
     Pawl.Types.CostBasis
+    Pawl.Types.CostChange
     Pawl.Types.CostChoice
     Pawl.Types.CostComponent
     Pawl.Types.CostDirection
     Pawl.Types.CostKeyword
+    Pawl.Types.CostModifier
     Pawl.Types.CostReduction
     Pawl.Types.CostScale
+    Pawl.Types.CostSubject
     Pawl.Types.Count
     Pawl.Types.CountedDiscard
     Pawl.Types.Counter
@@ -2341,8 +2341,6 @@ library types
     Pawl.Types.IfTaken
     Pawl.Types.IgnoredAbility
     Pawl.Types.Impending
-    Pawl.Types.IncreaseActivationCost
-    Pawl.Types.IncreaseSpellCost
     Pawl.Types.InherentTriggerSource
     Pawl.Types.InitiativeTarget
     Pawl.Types.InstanceOrdinal
@@ -2551,8 +2549,6 @@ library types
     Pawl.Types.Readiness
     Pawl.Types.Recipient
     Pawl.Types.RedirectDamage
-    Pawl.Types.ReduceActivationCost
-    Pawl.Types.ReduceSpellCost
     Pawl.Types.Reference
     Pawl.Types.Regenerability
     Pawl.Types.Reinforce

@@ -20,39 +20,47 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "AddSpellCost",
+            "type": "ModifyCost",
             "value": {
-              "components": [
-                {
-                  "type": "Sacrifice",
-                  "value": {
-                    "count": {
-                      "type": "Fixed",
-                      "value": 1
-                    },
-                    "whichPermanents": {
-                      "type": "And",
-                      "value": [
-                        {
-                          "type": "HasCardType",
-                          "value": {
-                            "type": "Creature"
-                          }
+              "change": {
+                "type": "Add",
+                "value": {
+                  "components": [
+                    {
+                      "type": "Sacrifice",
+                      "value": {
+                        "count": {
+                          "type": "Fixed",
+                          "value": 1
                         },
-                        {
-                          "type": "Not",
-                          "value": {
-                            "type": "IsTarget"
-                          }
+                        "whichPermanents": {
+                          "type": "And",
+                          "value": [
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Creature"
+                              }
+                            },
+                            {
+                              "type": "Not",
+                              "value": {
+                                "type": "IsTarget"
+                              }
+                            }
+                          ]
                         }
-                      ]
+                      }
                     }
-                  }
+                  ]
                 }
-              ],
-              "whichSpells": {
+              },
+              "matching": {
                 "type": "And",
                 "value": []
+              },
+              "subject": {
+                "type": "Spells"
               }
             }
           },

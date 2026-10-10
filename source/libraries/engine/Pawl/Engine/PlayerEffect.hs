@@ -54,17 +54,20 @@ import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AbilityKind as AbilityKind
 import qualified Pawl.Types.AbilityName as AbilityName
+import qualified Pawl.Types.ActivationCriteria as ActivationCriteria
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
-import qualified Pawl.Types.AddActivationCost as AddActivationCost
-import qualified Pawl.Types.AddSpellCost as AddSpellCost
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.AlternativeActivationCost as AlternativeActivationCost
 import qualified Pawl.Types.AppliedReduction as AppliedReduction
 import qualified Pawl.Types.CantSearchLibraries as CantSearchLibraries
 import qualified Pawl.Types.CastFromZone as CastFromZone
+import qualified Pawl.Types.CostAddition as CostAddition
 import Pawl.Types.CostAdjustments (CostAdjustments)
 import qualified Pawl.Types.CostAdjustments as CostAdjustments
+import qualified Pawl.Types.CostChange as CostChange
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CostModifier as CostModifier
+import qualified Pawl.Types.CostSubject as CostSubject
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.ExileLink as ExileLink
 import qualified Pawl.Types.Face as Face
@@ -73,8 +76,6 @@ import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.InZone as InZone
-import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
-import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.KeywordDesignator as KeywordDesignator
 import qualified Pawl.Types.LoyaltyKind as LoyaltyKind
@@ -102,8 +103,6 @@ import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.PlotFromZone as PlotFromZone
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Recipient as Recipient
-import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
-import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import Pawl.Types.RowSource (RowSource)
 import qualified Pawl.Types.RowSource as RowSource
 import qualified Pawl.Types.SlotName as SlotName
@@ -579,13 +578,8 @@ prohibitsCasting pid oid variable gs =
         PlayerEffect.CantCastSpells -> True
         PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan limit -> cast >= limit
-        PlayerEffect.IncreaseSpellCost {} -> False
-        PlayerEffect.IncreaseActivationCost {} -> False
-        PlayerEffect.ReduceSpellCost {} -> False
-        PlayerEffect.ReduceActivationCost {} -> False
-        PlayerEffect.AddActivationCost {} -> False
+        PlayerEffect.ModifyCost {} -> False
         PlayerEffect.AlternativeActivationCost {} -> False
-        PlayerEffect.AddSpellCost {} -> False
         -- CR 305.2 raises how many LANDS may be played, and a land is never
         -- cast (CR 305.1), so this grant reaches nothing here.
         PlayerEffect.PlayAdditionalLands _ -> False
@@ -690,7 +684,7 @@ prohibitsCasting pid oid variable gs =
 -- A row naming no designator refuses every ability (Sen Triplets); one naming
 -- a designator refuses only the abilities it designates, Kang the Conqueror's
 -- "power-up abilities" -- a citation compared to a citation, as
--- ReduceActivationCost.grantedBy is.
+-- ActivationCriteria.grantedBy is.
 --
 -- Given the rows the caller has already gathered, which is what lets
 -- Pawl.Engine.Cost.manaActivationsGiven ask it inside its own hoisted sweep
@@ -757,13 +751,8 @@ prohibitsPlayingLand pid oid gs =
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.IncreaseSpellCost {} -> False
-        PlayerEffect.IncreaseActivationCost {} -> False
-        PlayerEffect.ReduceSpellCost {} -> False
-        PlayerEffect.ReduceActivationCost {} -> False
-        PlayerEffect.AddActivationCost {} -> False
+        PlayerEffect.ModifyCost {} -> False
         PlayerEffect.AlternativeActivationCost {} -> False
-        PlayerEffect.AddSpellCost {} -> False
         -- CR 305.2 raises HOW MANY lands may be played, never WHICH: a grant is
         -- no permission for a land this rule stops. landPlaysAllowed below is
         -- the gate that reads it.
@@ -843,13 +832,8 @@ prohibitsSearching pid owner causeController gs =
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.IncreaseSpellCost {} -> False
-        PlayerEffect.IncreaseActivationCost {} -> False
-        PlayerEffect.ReduceSpellCost {} -> False
-        PlayerEffect.ReduceActivationCost {} -> False
-        PlayerEffect.AddActivationCost {} -> False
+        PlayerEffect.ModifyCost {} -> False
         PlayerEffect.AlternativeActivationCost {} -> False
-        PlayerEffect.AddSpellCost {} -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
@@ -912,13 +896,8 @@ prohibitsCounters pid kind gs =
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.IncreaseSpellCost {} -> False
-        PlayerEffect.IncreaseActivationCost {} -> False
-        PlayerEffect.ReduceSpellCost {} -> False
-        PlayerEffect.ReduceActivationCost {} -> False
-        PlayerEffect.AddActivationCost {} -> False
+        PlayerEffect.ModifyCost {} -> False
         PlayerEffect.AlternativeActivationCost {} -> False
-        PlayerEffect.AddSpellCost {} -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
@@ -982,13 +961,8 @@ prohibitsBecomingMonarch pid gs =
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.IncreaseSpellCost {} -> False
-        PlayerEffect.IncreaseActivationCost {} -> False
-        PlayerEffect.ReduceSpellCost {} -> False
-        PlayerEffect.ReduceActivationCost {} -> False
-        PlayerEffect.AddActivationCost {} -> False
+        PlayerEffect.ModifyCost {} -> False
         PlayerEffect.AlternativeActivationCost {} -> False
-        PlayerEffect.AddSpellCost {} -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
@@ -1041,13 +1015,8 @@ schemesCantBeSetInMotion gs =
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.IncreaseSpellCost {} -> False
-        PlayerEffect.IncreaseActivationCost {} -> False
-        PlayerEffect.ReduceSpellCost {} -> False
-        PlayerEffect.ReduceActivationCost {} -> False
-        PlayerEffect.AddActivationCost {} -> False
+        PlayerEffect.ModifyCost {} -> False
         PlayerEffect.AlternativeActivationCost {} -> False
-        PlayerEffect.AddSpellCost {} -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
@@ -1095,13 +1064,8 @@ prohibitsAttackingWithCreatures pid gs =
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.IncreaseSpellCost {} -> False
-        PlayerEffect.IncreaseActivationCost {} -> False
-        PlayerEffect.ReduceSpellCost {} -> False
-        PlayerEffect.ReduceActivationCost {} -> False
-        PlayerEffect.AddActivationCost {} -> False
+        PlayerEffect.ModifyCost {} -> False
         PlayerEffect.AlternativeActivationCost {} -> False
-        PlayerEffect.AddSpellCost {} -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
@@ -1336,215 +1300,79 @@ admitsAtManaValue pid permission oid manaValue gs = case permission of
      in if null rows then admits (liveSource (Just sid)) else any admits rows
 
 -- CR 613.11 / 601.2f: the cost increases, the cost reductions and the additional
--- non-mana components that apply to `pid` CASTING `oid`.
+-- non-mana components that apply to `pid` CASTING `oid` -- `modifierAdjustments`
+-- over the rows whose subject is CostSubject.Spells and whose criterion matches
+-- the spell. activationCostAdjustments below is the other subject.
 --
--- The SPELL half of CR 601.2f, and the constructors it gathers are the whole of
--- the discriminator this module has: an arm read here is one whose sentence says
--- "spells", so Thalia's tax cannot reach an activation cost however her Filter
--- reads. activationCostAdjustments below is the other half.
+-- matchesObjectFrom is called only for a ModifyCost row, so a board with no
+-- Thalia and no Medallion runs no projections at all.
 --
--- No floor: no printed spell-cost reducer states Heartstone's sentence, so every
--- reduction gathered here is paired with a floor of zero and CR 601.2f's own {0}
--- is the only floor a spell's total has.
---
--- matchesObjectFrom is called only from inside an arm that already matched a
--- cost-modifying constructor, so a board with no Thalia and no Medallion runs no
--- projections at all.
---
--- `targets` is CR 601.2c's announcement, which a per-target amount counts
--- (perTargetCount); empty for a caller standing before CR 601.2c.
+-- `targets` is CR 601.2c's announcement, which `whichTargets` and `perTarget`
+-- read; empty for a caller standing before CR 601.2c.
 spellCostAdjustments :: Set.Set Recipient.Recipient -> PlayerId -> ObjectId -> GameState -> CostAdjustments
 spellCostAdjustments targets pid oid gs =
-  let matching :: RowSource -> Filter Keyword -> a -> Maybe a
-      matching source criterion amount = if matchesObjectFrom source criterion oid gs then Just amount else Nothing
-      times source = maybe 1 (perTargetCount targets pid source gs)
-      increaseOf (source, effect) = case effect of
-        PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost criterion amount perTarget) ->
-          matching source criterion (amount * times source perTarget)
-        -- Oppressive Rays, turned away by the CONSTRUCTOR and not by its Filter
+  let reaches source modifier = case CostModifier.subject modifier of
+        -- Not implemented: a spell's `onlyFirst` (#4924), which
+        -- Pawl.Codec.CostModifier refuses.
+        CostSubject.Spells -> Maybe.isNothing (CostModifier.onlyFirst modifier) && matchesObjectFrom source (CostModifier.matching modifier) oid gs
+        -- Oppressive Rays, turned away by the SUBJECT and not by its Filter
         -- -- the mirror of what keeps Thalia off an activation cost in
-        -- activationCostAdjustmentsGiven below, and the same #90.
-        PlayerEffect.IncreaseActivationCost {} -> Nothing
-        PlayerEffect.ReduceSpellCost {} -> Nothing
-        PlayerEffect.ReduceActivationCost {} -> Nothing
-        PlayerEffect.AddActivationCost {} -> Nothing
-        PlayerEffect.AlternativeActivationCost {} -> Nothing
-        PlayerEffect.AddSpellCost {} -> Nothing
-        PlayerEffect.CantCastSpells -> Nothing
-        PlayerEffect.CantActivateAbilities _ -> Nothing
-        PlayerEffect.CantCastMoreThan _ -> Nothing
-        PlayerEffect.PlayAdditionalLands _ -> Nothing
-        PlayerEffect.NoMaximumHandSize -> Nothing
-        PlayerEffect.SetMaximumHandSize _ -> Nothing
-        PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
-        PlayerEffect.ReduceMaximumHandSize _ -> Nothing
-        PlayerEffect.DontLoseUnspentMana _ -> Nothing
-        PlayerEffect.LoseLifeForUnspentMana -> Nothing
-        PlayerEffect.SpendManaAsThough _ -> Nothing
-        PlayerEffect.CantBeTargetedBy _ -> Nothing
-        PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
-        PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
-        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> Nothing
-        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> Nothing
-        PlayerEffect.CantBeCountered _ -> Nothing
-        PlayerEffect.DamageCantBePrevented _ -> Nothing
-        PlayerEffect.DamageCantBeRedirected _ -> Nothing
-        PlayerEffect.CantSearchLibraries _ -> Nothing
-        PlayerEffect.HasProtectionFrom _ -> Nothing
-        PlayerEffect.CantBecomeMonarch -> Nothing
-        PlayerEffect.CantSetSchemesInMotion -> Nothing
-        PlayerEffect.CantAttackWithCreatures -> Nothing
-        PlayerEffect.CantCastMatching _ -> Nothing
-        PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
-        PlayerEffect.CantPlayLands _ -> Nothing
-        PlayerEffect.CastFrom _ -> Nothing
-        PlayerEffect.PlayLandsFrom _ -> Nothing
-        PlayerEffect.PlotFrom _ -> Nothing
-        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
-        PlayerEffect.CantGetCounters _ -> Nothing
-        PlayerEffect.StateCoinFlip _ -> Nothing
-        PlayerEffect.ModifyDieRoll _ -> Nothing
-        PlayerEffect.AdditionalVotes _ -> Nothing
-        PlayerEffect.AdditionalSurveilCards _ -> Nothing
-        PlayerEffect.CantGainLife -> Nothing
-        PlayerEffect.CantLoseLife -> Nothing
-      reductionOf (source, effect) = case effect of
-        -- A per-target reduction is REPEATED rather than multiplied, as
-        -- Pawl.Engine.Cost.selfReductions repeats Thrasta's, so a typed amount
-        -- needs no arithmetic.
-        PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost criterion amount coloredOnly perTarget) ->
-          let repeated = ManaCost.MkManaCost (concat (List.genericReplicate (times source perTarget) (ManaCost.unwrap amount)))
-           in fmap (\a -> (a, coloredOnly)) (matching source criterion repeated)
-        PlayerEffect.IncreaseSpellCost {} -> Nothing
-        PlayerEffect.IncreaseActivationCost {} -> Nothing
-        -- The arms this whole split exists for: an ability's reduction is not a
-        -- spell's, and neither is an ability's added component, so both are
-        -- gathered by activationCostAdjustments and never here. AddSpellCost is
-        -- gathered here, by additionOf below, and never there.
-        PlayerEffect.ReduceActivationCost {} -> Nothing
-        PlayerEffect.AddActivationCost {} -> Nothing
-        PlayerEffect.AlternativeActivationCost {} -> Nothing
-        PlayerEffect.AddSpellCost {} -> Nothing
-        PlayerEffect.CantCastSpells -> Nothing
-        PlayerEffect.CantActivateAbilities _ -> Nothing
-        PlayerEffect.CantCastMoreThan _ -> Nothing
-        PlayerEffect.PlayAdditionalLands _ -> Nothing
-        PlayerEffect.NoMaximumHandSize -> Nothing
-        PlayerEffect.SetMaximumHandSize _ -> Nothing
-        PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
-        PlayerEffect.ReduceMaximumHandSize _ -> Nothing
-        PlayerEffect.DontLoseUnspentMana _ -> Nothing
-        PlayerEffect.LoseLifeForUnspentMana -> Nothing
-        PlayerEffect.SpendManaAsThough _ -> Nothing
-        PlayerEffect.CantBeTargetedBy _ -> Nothing
-        PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
-        PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
-        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> Nothing
-        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> Nothing
-        PlayerEffect.CantBeCountered _ -> Nothing
-        PlayerEffect.DamageCantBePrevented _ -> Nothing
-        PlayerEffect.DamageCantBeRedirected _ -> Nothing
-        PlayerEffect.CantSearchLibraries _ -> Nothing
-        PlayerEffect.HasProtectionFrom _ -> Nothing
-        PlayerEffect.CantBecomeMonarch -> Nothing
-        PlayerEffect.CantSetSchemesInMotion -> Nothing
-        PlayerEffect.CantAttackWithCreatures -> Nothing
-        PlayerEffect.CantCastMatching _ -> Nothing
-        PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
-        PlayerEffect.CantPlayLands _ -> Nothing
-        PlayerEffect.CastFrom _ -> Nothing
-        PlayerEffect.PlayLandsFrom _ -> Nothing
-        PlayerEffect.PlotFrom _ -> Nothing
-        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
-        PlayerEffect.CantGetCounters _ -> Nothing
-        PlayerEffect.StateCoinFlip _ -> Nothing
-        PlayerEffect.ModifyDieRoll _ -> Nothing
-        PlayerEffect.AdditionalVotes _ -> Nothing
-        PlayerEffect.AdditionalSurveilCards _ -> Nothing
-        PlayerEffect.CantGainLife -> Nothing
-        PlayerEffect.CantLoseLife -> Nothing
-      -- CR 601.2f's "plus all additional costs", the non-mana half, reaching a
-      -- SPELL: CR 118.8's "or applied to a spell or ability from another effect"
-      -- (Drought's "Spells cost an additional \"Sacrifice a Swamp\" to cast").
-      -- The sibling of activationCostAdjustments' own additionOf below, and
-      -- CONCATENATED for its reason -- two effects each adding a cost both add
-      -- it. Each component keeps its effect's SCALE; Pawl.Engine.Cost.plusComponents
-      -- is where that is cashed, since only it holds the cost being adjusted.
-      additionOf (source, effect) = case effect of
-        PlayerEffect.AddSpellCost (AddSpellCost.MkAddSpellCost criterion components scale) ->
-          matching source criterion (fmap ((,) scale) components)
-        PlayerEffect.IncreaseSpellCost {} -> Nothing
-        PlayerEffect.IncreaseActivationCost {} -> Nothing
-        PlayerEffect.ReduceSpellCost {} -> Nothing
-        PlayerEffect.ReduceActivationCost {} -> Nothing
-        PlayerEffect.AddActivationCost {} -> Nothing
-        PlayerEffect.AlternativeActivationCost {} -> Nothing
-        PlayerEffect.CantCastSpells -> Nothing
-        PlayerEffect.CantActivateAbilities _ -> Nothing
-        PlayerEffect.CantCastMoreThan _ -> Nothing
-        PlayerEffect.PlayAdditionalLands _ -> Nothing
-        PlayerEffect.NoMaximumHandSize -> Nothing
-        PlayerEffect.SetMaximumHandSize _ -> Nothing
-        PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
-        PlayerEffect.ReduceMaximumHandSize _ -> Nothing
-        PlayerEffect.DontLoseUnspentMana _ -> Nothing
-        PlayerEffect.LoseLifeForUnspentMana -> Nothing
-        PlayerEffect.SpendManaAsThough _ -> Nothing
-        PlayerEffect.CantBeTargetedBy _ -> Nothing
-        PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
-        PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
-        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> Nothing
-        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> Nothing
-        PlayerEffect.CantBeCountered _ -> Nothing
-        PlayerEffect.DamageCantBePrevented _ -> Nothing
-        PlayerEffect.DamageCantBeRedirected _ -> Nothing
-        PlayerEffect.CantSearchLibraries _ -> Nothing
-        PlayerEffect.HasProtectionFrom _ -> Nothing
-        PlayerEffect.CantBecomeMonarch -> Nothing
-        PlayerEffect.CantSetSchemesInMotion -> Nothing
-        PlayerEffect.CantAttackWithCreatures -> Nothing
-        PlayerEffect.CantCastMatching _ -> Nothing
-        PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
-        PlayerEffect.CantPlayLands _ -> Nothing
-        PlayerEffect.CastFrom _ -> Nothing
-        PlayerEffect.PlayLandsFrom _ -> Nothing
-        PlayerEffect.PlotFrom _ -> Nothing
-        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
-        PlayerEffect.CantGetCounters _ -> Nothing
-        PlayerEffect.StateCoinFlip _ -> Nothing
-        PlayerEffect.ModifyDieRoll _ -> Nothing
-        PlayerEffect.AdditionalVotes _ -> Nothing
-        PlayerEffect.AdditionalSurveilCards _ -> Nothing
-        PlayerEffect.CantGainLife -> Nothing
-        PlayerEffect.CantLoseLife -> Nothing
-      effects = applying pid gs
+        -- activationCostAdjustmentsGiven below (#90).
+        CostSubject.Activations _ -> False
+   in modifierAdjustments
+        [(source, modifier) | (source, PlayerEffect.ModifyCost modifier) <- applying pid gs, reaches source modifier]
+        (\source wanted -> any (perTargetMatches pid source gs wanted) (Set.toList targets))
+        (\source wanted -> perTargetCount targets pid source gs wanted)
+
+-- CR 601.2f, once for both subjects (CR 602.2b): the adjustments the given
+-- modifiers make, every one of them already known to reach the payment. `aims`
+-- answers `whichTargets` -- SOME announced target matches, once however many do
+-- (Kopala, Warden of Waves' ruling) -- and `counted` answers `perTarget`, the
+-- distinct announced targets matching, which repeats the change.
+--
+-- A repeated reduction is its amount REPEATED rather than multiplied, as
+-- Pawl.Engine.Cost.selfReductions repeats Thrasta's, so a typed amount needs no
+-- arithmetic; a repeated addition is its components repeated. Each reduction
+-- keeps its OWN floor and colour confinement (Pawl.Types.AppliedReduction),
+-- which Pawl.Engine.Cost.applyAdjustments applies as that reduction lands.
+--
+-- Additions are CONCATENATED rather than resolved between, because two effects
+-- each adding a cost both add it, and each keeps its SCALE for
+-- Pawl.Engine.Cost.plusComponents to cash against the cost being adjusted.
+modifierAdjustments :: [(RowSource, CostModifier.CostModifier)] -> (RowSource -> Filter Keyword -> Bool) -> (RowSource -> Filter Keyword -> Natural) -> CostAdjustments
+modifierAdjustments rows aims counted =
+  let applying' = [(source, modifier, maybe 1 (counted source) (CostModifier.perTarget modifier)) | (source, modifier) <- rows, maybe True (aims source) (CostModifier.whichTargets modifier)]
    in CostAdjustments.MkCostAdjustments
-        { CostAdjustments.increases = Maybe.mapMaybe increaseOf effects,
-          -- Every spell-cost reduction carries a floor of ZERO, for the reason
-          -- the header gives: no printed spell-cost reducer states Heartstone's
-          -- sentence. The coloured-mana confinement rides through from the card
-          -- (Edgewalker), CR 118.7b-d being the default it overrides.
+        { CostAdjustments.increases = [amount * times | (_, modifier, times) <- applying', CostChange.Increase amount <- [CostModifier.change modifier]],
           CostAdjustments.reductions =
-            fmap
-              (\(amount, coloredOnly) -> AppliedReduction.MkAppliedReduction amount 0 coloredOnly)
-              (Maybe.mapMaybe reductionOf effects),
+            [ reduction {AppliedReduction.amount = ManaCost.MkManaCost (concat (List.genericReplicate times (ManaCost.unwrap (AppliedReduction.amount reduction))))}
+            | (_, modifier, times) <- applying',
+              CostChange.Reduce reduction <- [CostModifier.change modifier]
+            ],
           -- A spell's own PRINTED additional costs are NOT among these: those are
           -- card text and arrive through Pawl.Engine.Cost.plus at CR 601.2b. What
-          -- is gathered here is CR 118.8's other half, a cost applied to the
-          -- spell from another effect.
-          CostAdjustments.components = concat (Maybe.mapMaybe additionOf effects)
+          -- is gathered here is CR 118.8's other half, a cost applied from
+          -- another effect.
+          CostAdjustments.components =
+            [ (CostAddition.scale addition, component)
+            | (_, modifier, times) <- applying',
+              CostChange.Add addition <- [CostModifier.change modifier],
+              component <- concat (List.genericReplicate times (CostAddition.components addition))
+            ]
         }
 
--- Whether a cost change applying to `pid` casting `oid` counts the spell's
--- targets (`perTarget`), so a gate standing before CR 601.2c has to search the
--- aimings (Pawl.Engine.Cost.readsTargets).
+-- Whether a cost change applying to `pid` casting `oid` reads the spell's
+-- targets (`whichTargets` or `perTarget`), so a gate standing before CR 601.2c
+-- has to search the aimings (Pawl.Engine.Cost.readsTargets).
 spellCostReadsTargets :: PlayerId -> ObjectId -> GameState -> Bool
 spellCostReadsTargets pid oid gs =
-  let counts (source, effect) = case effect of
-        PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost criterion _ (Just _)) -> matchesObjectFrom source criterion oid gs
-        PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost criterion _ _ (Just _)) -> matchesObjectFrom source criterion oid gs
+  let readsTargets (source, effect) = case effect of
+        PlayerEffect.ModifyCost modifier ->
+          CostModifier.subject modifier == CostSubject.Spells
+            && (Maybe.isJust (CostModifier.whichTargets modifier) || Maybe.isJust (CostModifier.perTarget modifier))
+            && matchesObjectFrom source (CostModifier.matching modifier) oid gs
         _ -> False
-   in any counts (applying pid gs)
+   in any readsTargets (applying pid gs)
 
 -- CR 601.2c / 601.2f: how many times a per-target cost change applies -- the
 -- DISTINCT objects and players among the announced `targets` that `wanted`
@@ -1564,11 +1392,25 @@ perTargetCount targets pid source gs wanted =
 -- question of a single recipient.
 perTargetMatches :: PlayerId -> RowSource -> GameState -> Filter Keyword -> Recipient.Recipient -> Bool
 perTargetMatches pid source gs wanted r =
-  maybe False (\view -> Filter.matches (contextFor (Just pid) source gs) view wanted) (Projection.viewOfRecipient (Projection.fullView gs) gs r)
+  maybe False (\view -> Filter.matches (contextFor (Just (targetPerspective pid source gs)) source gs) view wanted) (Projection.viewOfRecipient (Projection.fullView gs) gs r)
+
+-- CR 109.5: the "you" a cost modifier's TARGET criteria are read with -- the
+-- controller of the row's source, which is Kopala, Warden of Waves' "a Merfolk
+-- you control" under a row scoped to that controller's opponents. Not the
+-- target's own controller, which would make Professor Hojo's "a creature you
+-- control" true of every creature, and not the paying player, who is Kopala's
+-- opponent. Pawl.PlayerEffectSpec's Kopala group on three seats proves it.
+--
+-- The paying player where the source has no controller to read -- a stored
+-- row whose spell has left the stack -- which coincides with the source's
+-- controller for every such row in `data/cards/`, each scoped to "you". A fence,
+-- not a proof.
+targetPerspective :: PlayerId -> RowSource -> GameState -> PlayerId
+targetPerspective pid source gs = Maybe.fromMaybe pid (RowSource.object source >>= \oid -> Projection.controllerOf oid gs)
 
 -- Every question a cost change in force for `pid` asks of ONE target, answered:
--- a per-target change's filter (perTargetCount) and ReduceActivationCost's
--- whichTargets (activationCostAdjustmentsGiven's `aims`). These are the only
+-- its `whichTargets` and its `perTarget` (modifierAdjustments' `aims` and
+-- `counted`). These are the only
 -- reads the gathered adjustments make of CR 601.2c's targets, so two targets
 -- answering alike are interchangeable to them (Pawl.Engine.Cost.aimingSignature).
 -- Asked of every such change in force rather than only those reaching the cost
@@ -1576,11 +1418,11 @@ perTargetMatches pid source gs wanted r =
 targetQuestions :: PlayerId -> GameState -> Recipient.Recipient -> [Bool]
 targetQuestions pid gs r =
   let ask (source, effect) = case effect of
-        PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost _ _ (Just wanted)) -> [perTargetMatches pid source gs wanted r]
-        PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost _ _ _ (Just wanted)) -> [perTargetMatches pid source gs wanted r]
-        PlayerEffect.ReduceActivationCost reduction -> case ReduceActivationCost.whichTargets reduction of
-          Just wanted -> [maybe False (\oid -> matchesObjectFor pid source wanted oid gs) (Recipient.objectOf r)]
-          Nothing -> []
+        PlayerEffect.ModifyCost modifier ->
+          let matches wanted = case CostModifier.subject modifier of
+                CostSubject.Spells -> perTargetMatches pid source gs wanted r
+                CostSubject.Activations _ -> maybe False (\oid -> matchesObjectFor (targetPerspective pid source gs) source wanted oid gs) (Recipient.objectOf r)
+           in fmap matches (Maybe.catMaybes [CostModifier.whichTargets modifier, CostModifier.perTarget modifier])
         _ -> []
    in concatMap ask (applying pid gs)
 
@@ -1590,7 +1432,7 @@ targetQuestions pid gs r =
 -- matching the criteria? Reduced or not, and whether or not the effect asking
 -- existed yet (Tezzeret, Betrayer of Flesh's ruling). Asked of
 -- GameState.activationsThisTurn's snapshots rather than the live board, with the
--- same four criteria Pawl.Types.ReduceActivationCost carries; `source` is the
+-- criteria Pawl.Types.CostModifier carries; `source` is the
 -- asking effect's own permanent, which Filter.IsSource reads.
 firstActivation :: PlayerId -> RowSource -> Filter Keyword -> Maybe KeywordDesignator.KeywordDesignator -> Maybe AbilityKind.AbilityKind -> Maybe (Filter Keyword) -> GameState -> TurnScope.TurnScope -> Bool
 firstActivation pid source criterion granted wantedKind aimedAt gs scope =
@@ -1604,7 +1446,7 @@ firstActivation pid source criterion granted wantedKind aimedAt gs scope =
           && matchesSnapshot (ObjectSnapshot.controller (PastActivation.source past)) criterion (PastActivation.source past)
           && maybe True (\g -> any (Keyword.designates g) (PastActivation.keyword past)) granted
           && maybe True (== PastActivation.kind past) wantedKind
-          && maybe True (\f -> any (matchesSnapshot (Just pid) f) (PastActivation.targets past)) aimedAt
+          && maybe True (\f -> any (matchesSnapshot (Just (targetPerspective pid source gs)) f) (PastActivation.targets past)) aimedAt
    in Turn.turnScopeAdmits gs scope (GameState.activePlayer gs) pid
         && not (any admits (GameState.activationsThisTurn gs))
 
@@ -1623,60 +1465,28 @@ alternativeActivationCosts pid stamp gs =
         _ -> Nothing
    in Maybe.mapMaybe offered (applying pid gs)
 
--- CR 613.11 / 601.2f: the cost reductions that apply to `pid` ACTIVATING an
--- ability of `srcId`, with the floor those reductions impose (CR 101.1 card
--- text), plus the additional non-mana components other effects add to that cost
--- (CR 601.2f's "plus all additional costs", reaching an activation cost by CR
--- 602.2b). The ABILITY half of CR 601.2f, and the sibling of
--- spellCostAdjustments above.
+-- CR 613.11 / 601.2f through CR 602.2b: the cost increases, reductions and
+-- additional components that apply to `pid` ACTIVATING an ability of `srcId`
+-- -- `modifierAdjustments` over the rows whose subject is
+-- CostSubject.Activations, the sibling of spellCostAdjustments above.
 --
--- The criterion is matched against `srcId`, the ability's SOURCE PERMANENT, which
--- is what Heartstone's "activated abilities of creatures" narrows -- so the same
--- matchesObject that reads a spell's characteristics for the caster reads a
--- permanent's here, and the permanent is projected rather than printed for the
--- same reason (an animated Vehicle's abilities are a creature's).
---
--- `stamp` is the SECOND criterion, and the one the source filter cannot say:
--- which rule-702 keyword's rules the ability being activated is under, read off
--- Pawl.Types.ActivatedAbility.keyword by the caller. A reducer carrying no
--- grantedBy ignores it, which is every reducer whose sentence says "activated
--- abilities"; Fluctuator's says "cycling abilities" and carries CR 702.29a's
--- family, Boom Scholar's says "exhaust abilities" and carries CR 702.177a's
--- nullary keyword. Compared through Pawl.Types.KeywordDesignator and never
--- inspected further: a designator is a rulebook citation, so nothing here learns
--- what the reduced ability DOES.
---
--- `kind` is the criterion BOTH payloads read: CR 605.1a's classification of the
--- ability being activated, which Suppression Field's "unless they're mana
--- abilities" narrows an increase by and Zirda, the Dawnwaker's "that aren't mana
--- abilities" narrows a reduction by. The caller answers it, because only the
+-- The criterion is matched against `srcId`, the ability's SOURCE PERMANENT
+-- (Heartstone's "activated abilities of creatures"), projected rather than
+-- printed (an animated Vehicle's abilities are a creature's). `stamp`, `kind`
+-- and `loyalty` are the facts about the ABILITY that Pawl.Types.ActivationCriteria
+-- asks: its rule-702 keyword (Fluctuator's "cycling abilities"), CR 605.1a's
+-- classification (Zirda's "that aren't mana abilities") and CR 606.2's (Carth
+-- the Lion's "loyalty abilities"). The caller answers them, because only the
 -- caller has the ability -- Pawl.Engine.Cost.manaActivationAdjustmentsGiven is
--- the mana window and says so, and Pawl.Engine.Activate's three sites are
--- reached only for an ability activatableGiven has already refused to call a
--- mana ability (CR 605.3b). Compared and never inspected further, exactly as
--- `stamp` is: which side of a rulebook classification the ability falls on,
--- never what it does.
+-- the mana window and says so. Each is compared and never inspected further: a
+-- rulebook citation or classification, never what the ability does.
 --
--- `targets` is the THIRD criterion and the one that arrives from a different
--- MOMENT: CR 601.2c's announced targets, which CR 601.2f's reductions may name
--- (Dwarven Mauler's "equip abilities you activate that target this creature").
--- A caller that has not reached CR 601.2c hands the empty set, and every reducer
--- whose sentence names a target is then simply inapplicable -- see
+-- `targets` arrives from a different MOMENT: CR 601.2c's announced targets,
+-- which `whichTargets` and `perTarget` read (Dwarven Mauler, Kopala). A caller
+-- that has not reached CR 601.2c hands the empty set -- see
 -- Pawl.Engine.Activate.activateAbility, which gathers once before the targets
--- exist and again after. A caller that has to MEASURE the cost before that
--- moment hands one candidate target at a time instead, and takes the best
--- answer (Pawl.Engine.Activatable.aimingSomewhere).
---
--- The MANA increases are gathered too (Oppressive Rays), and CR 601.2f orders
--- every one of them before any reduction -- which is Cost.applyAdjustments'
--- doing rather than this gather's, since the record has no order in it. The
--- non-mana additions beside them are a different field for
--- Pawl.Types.CostAdjustments.components' stated reason.
---
--- Each reduction keeps ITS OWN floor rather than the pool taking the maximum: the
--- sentence says "this effect", so an effect that states no floor is not bound by
--- another's, and Pawl.Engine.Cost.applyAdjustments applies each floor as its own
--- reduction lands.
+-- exist and again after -- and a caller that has to MEASURE the cost before
+-- that moment searches the aimings (Pawl.Engine.Activatable.aimingSomewhere).
 activationCostAdjustments :: Set.Set ObjectId -> Maybe Keyword -> AbilityKind.AbilityKind -> LoyaltyKind.LoyaltyKind -> PlayerId -> ObjectId -> GameState -> CostAdjustments
 activationCostAdjustments targets stamp kind loyalty pid srcId gs = activationCostAdjustmentsGiven (applying pid gs) pid targets stamp kind loyalty srcId gs
 
@@ -1696,207 +1506,39 @@ activationCostAdjustments targets stamp kind loyalty pid srcId gs = activationCo
 -- criterion is matched through matchesObjectFrom, which needs it.
 activationCostAdjustmentsGiven :: [(RowSource, PlayerEffect)] -> PlayerId -> Set.Set ObjectId -> Maybe Keyword -> AbilityKind.AbilityKind -> LoyaltyKind.LoyaltyKind -> ObjectId -> GameState -> CostAdjustments
 activationCostAdjustmentsGiven effects pid targets stamp kind loyalty srcId gs =
-  let -- CR 601.2c's chosen targets, asked of ReduceActivationCost's third
-      -- criterion: Dwarven Mauler's "equip abilities you activate THAT TARGET
-      -- THIS CREATURE". ANY rather than all, which is what the sentence says of
-      -- an ability announcing more than one target, and False on an empty set --
-      -- an ability that targets nothing is not an ability that targets this
-      -- creature.
+  let -- CR 601.2c's chosen targets: Dwarven Mauler's "equip abilities you
+      -- activate THAT TARGET THIS CREATURE", Kopala's "that target a Merfolk you
+      -- control". False on an empty set -- an ability that targets nothing is
+      -- not an ability that targets this creature.
       --
-      -- Matched through the same matchesObjectFrom the other two criteria use, so
-      -- the filter is asked against the TARGET's projection with the reducer's own
-      -- permanent as Pawl.Engine.Filter's source -- which is what makes
-      -- Filter.IsSource read "this creature" here.
-      --
-      -- CR 109.5's "you" is the ACTIVATOR, `pid`, whose effects these are --
-      -- not the target's own controller, which would make Professor Hojo's "a
-      -- creature you control" true of every creature.
-      aims source criterion = any (\oid -> matchesObjectFor pid source criterion oid gs) (Set.toList targets)
-      isFirst source criterion granted wantedKind aimedAt = firstActivation pid source criterion granted wantedKind aimedAt gs
-      -- CR 601.2f's MANA increase, the half CostAdjustments.increases was an
-      -- empty literal for until Oppressive Rays gave it a producer; see #1242.
-      -- No family beside the criterion, IncreaseActivationCost's own reason --
-      -- but `kind` is read, and CR 605.1a is the whole of that read: Suppression
-      -- Field's "unless they're mana abilities" is a fact about the ability being
-      -- activated, which no source filter could answer. An increase carrying no
-      -- `whichKind` ignores it, which is Oppressive Rays.
-      increaseOf (source, effect) = case effect of
-        PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost criterion wanted amount) ->
-          if matchesObjectFrom source criterion srcId gs && maybe True (== kind) wanted then Just amount else Nothing
-        -- Thalia, turned away by the CONSTRUCTOR and not by her Filter, which is
-        -- what keeps her off Mindslaver's activation (#90) -- the reading
-        -- Pawl.Types.PlayerEffect's IncreaseActivationCost haddock states.
-        PlayerEffect.IncreaseSpellCost {} -> Nothing
-        PlayerEffect.ReduceActivationCost {} -> Nothing
-        PlayerEffect.ReduceSpellCost {} -> Nothing
-        PlayerEffect.AddActivationCost {} -> Nothing
-        PlayerEffect.AlternativeActivationCost {} -> Nothing
-        PlayerEffect.AddSpellCost {} -> Nothing
-        PlayerEffect.CantCastSpells -> Nothing
-        PlayerEffect.CantActivateAbilities _ -> Nothing
-        PlayerEffect.CantCastMoreThan _ -> Nothing
-        PlayerEffect.PlayAdditionalLands _ -> Nothing
-        PlayerEffect.NoMaximumHandSize -> Nothing
-        PlayerEffect.SetMaximumHandSize _ -> Nothing
-        PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
-        PlayerEffect.ReduceMaximumHandSize _ -> Nothing
-        PlayerEffect.DontLoseUnspentMana _ -> Nothing
-        PlayerEffect.LoseLifeForUnspentMana -> Nothing
-        PlayerEffect.SpendManaAsThough _ -> Nothing
-        PlayerEffect.CantBeTargetedBy _ -> Nothing
-        PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
-        PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
-        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> Nothing
-        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> Nothing
-        PlayerEffect.CantBeCountered _ -> Nothing
-        PlayerEffect.DamageCantBePrevented _ -> Nothing
-        PlayerEffect.DamageCantBeRedirected _ -> Nothing
-        PlayerEffect.CantSearchLibraries _ -> Nothing
-        PlayerEffect.HasProtectionFrom _ -> Nothing
-        PlayerEffect.CantBecomeMonarch -> Nothing
-        PlayerEffect.CantSetSchemesInMotion -> Nothing
-        PlayerEffect.CantAttackWithCreatures -> Nothing
-        PlayerEffect.CantCastMatching _ -> Nothing
-        PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
-        PlayerEffect.CantPlayLands _ -> Nothing
-        PlayerEffect.CastFrom _ -> Nothing
-        PlayerEffect.PlayLandsFrom _ -> Nothing
-        PlayerEffect.PlotFrom _ -> Nothing
-        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
-        PlayerEffect.CantGetCounters _ -> Nothing
-        PlayerEffect.StateCoinFlip _ -> Nothing
-        PlayerEffect.ModifyDieRoll _ -> Nothing
-        PlayerEffect.AdditionalVotes _ -> Nothing
-        PlayerEffect.AdditionalSurveilCards _ -> Nothing
-        PlayerEffect.CantGainLife -> Nothing
-        PlayerEffect.CantLoseLife -> Nothing
-      reductionOf (source, effect) = case effect of
-        PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost criterion granted wantedKind aimedAt onlyFirst amount floor_) ->
-          -- Never confined to coloured mana: no printed activation-cost reducer
-          -- states Edgewalker's sentence, so CR 118.7b-d's spill stands.
-          --
-          -- `kind` is read here exactly as increaseOf above reads it, and CR
-          -- 605.1a is the whole of that read: Zirda, the Dawnwaker's "abilities
-          -- you activate that aren't mana abilities" is a fact about the ability
-          -- being activated, which neither the source filter nor the rule-702
-          -- family could answer. A reduction carrying no `whichKind` ignores it,
-          -- which is every other reducer in `data/cards/`.
-          if matchesObjectFrom source criterion srcId gs && maybe True (\g -> any (Keyword.designates g) stamp) granted && maybe True (== kind) wantedKind && maybe True (aims source) aimedAt && maybe True (isFirst source criterion granted wantedKind aimedAt) onlyFirst
-            then Just (AppliedReduction.MkAppliedReduction amount floor_ False)
-            else Nothing
-        -- The non-mana addition, gathered by `additionOf` below: CR 601.2f's
-        -- arithmetic has nothing to do to a component, so it never joins the
-        -- reductions.
-        PlayerEffect.AddActivationCost {} -> Nothing
-        PlayerEffect.AlternativeActivationCost {} -> Nothing
-        PlayerEffect.AddSpellCost {} -> Nothing
-        -- Thalia and Sapphire Medallion, turned away by the constructor and not
-        -- by their Filters, which is exactly what keeps a noncreature permanent's
-        -- activated ability untaxed (#90).
-        PlayerEffect.IncreaseSpellCost {} -> Nothing
-        PlayerEffect.IncreaseActivationCost {} -> Nothing
-        PlayerEffect.ReduceSpellCost {} -> Nothing
-        PlayerEffect.CantCastSpells -> Nothing
-        PlayerEffect.CantActivateAbilities _ -> Nothing
-        PlayerEffect.CantCastMoreThan _ -> Nothing
-        PlayerEffect.PlayAdditionalLands _ -> Nothing
-        PlayerEffect.NoMaximumHandSize -> Nothing
-        PlayerEffect.SetMaximumHandSize _ -> Nothing
-        PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
-        PlayerEffect.ReduceMaximumHandSize _ -> Nothing
-        PlayerEffect.DontLoseUnspentMana _ -> Nothing
-        PlayerEffect.LoseLifeForUnspentMana -> Nothing
-        PlayerEffect.SpendManaAsThough _ -> Nothing
-        PlayerEffect.CantBeTargetedBy _ -> Nothing
-        PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
-        PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
-        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> Nothing
-        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> Nothing
-        PlayerEffect.CantBeCountered _ -> Nothing
-        PlayerEffect.DamageCantBePrevented _ -> Nothing
-        PlayerEffect.DamageCantBeRedirected _ -> Nothing
-        PlayerEffect.CantSearchLibraries _ -> Nothing
-        PlayerEffect.HasProtectionFrom _ -> Nothing
-        PlayerEffect.CantBecomeMonarch -> Nothing
-        PlayerEffect.CantSetSchemesInMotion -> Nothing
-        PlayerEffect.CantAttackWithCreatures -> Nothing
-        PlayerEffect.CantCastMatching _ -> Nothing
-        PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
-        PlayerEffect.CantPlayLands _ -> Nothing
-        PlayerEffect.CastFrom _ -> Nothing
-        PlayerEffect.PlayLandsFrom _ -> Nothing
-        PlayerEffect.PlotFrom _ -> Nothing
-        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
-        PlayerEffect.CantGetCounters _ -> Nothing
-        PlayerEffect.StateCoinFlip _ -> Nothing
-        PlayerEffect.ModifyDieRoll _ -> Nothing
-        PlayerEffect.AdditionalVotes _ -> Nothing
-        PlayerEffect.AdditionalSurveilCards _ -> Nothing
-        PlayerEffect.CantGainLife -> Nothing
-        PlayerEffect.CantLoseLife -> Nothing
-      -- CR 601.2f's "plus all additional costs", the non-mana half: Brutal
-      -- Suppression's "Sacrifice a land". Gathered against the SAME criterion
-      -- reading the reductions use -- the ability's source permanent -- and
-      -- CONCATENATED rather than resolved between, because two effects each
-      -- adding a cost both add it (CR 601.2f totals them all in).
-      --
-      -- `loyalty` is read here the way `kind` is read above, and CR 606.2 is the
-      -- whole of that read: Carth the Lion's "Planeswalkers' loyalty abilities
-      -- you activate" is a fact about the ability being activated, which the
-      -- source filter cannot answer -- a planeswalker's granted mana ability (A
-      -- Realm Reborn) sits on a permanent the filter matches. An addition
-      -- carrying no `whichLoyalty` ignores it, which is Brutal Suppression and
-      -- Drought.
-      additionOf (source, effect) = case effect of
-        PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost criterion wantedLoyalty components scale) ->
-          if matchesObjectFrom source criterion srcId gs && maybe True (== loyalty) wantedLoyalty
-            then Just (fmap ((,) scale) components)
-            else Nothing
-        -- CR 118.9: not an addition; Activatable.costsFor offers it at 601.2b.
-        PlayerEffect.AlternativeActivationCost {} -> Nothing
-        PlayerEffect.AddSpellCost {} -> Nothing
-        PlayerEffect.ReduceActivationCost {} -> Nothing
-        PlayerEffect.IncreaseSpellCost {} -> Nothing
-        PlayerEffect.IncreaseActivationCost {} -> Nothing
-        PlayerEffect.ReduceSpellCost {} -> Nothing
-        PlayerEffect.CantCastSpells -> Nothing
-        PlayerEffect.CantActivateAbilities _ -> Nothing
-        PlayerEffect.CantCastMoreThan _ -> Nothing
-        PlayerEffect.PlayAdditionalLands _ -> Nothing
-        PlayerEffect.NoMaximumHandSize -> Nothing
-        PlayerEffect.SetMaximumHandSize _ -> Nothing
-        PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
-        PlayerEffect.ReduceMaximumHandSize _ -> Nothing
-        PlayerEffect.DontLoseUnspentMana _ -> Nothing
-        PlayerEffect.LoseLifeForUnspentMana -> Nothing
-        PlayerEffect.SpendManaAsThough _ -> Nothing
-        PlayerEffect.CantBeTargetedBy _ -> Nothing
-        PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
-        PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
-        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> Nothing
-        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> Nothing
-        PlayerEffect.CantBeCountered _ -> Nothing
-        PlayerEffect.DamageCantBePrevented _ -> Nothing
-        PlayerEffect.DamageCantBeRedirected _ -> Nothing
-        PlayerEffect.CantSearchLibraries _ -> Nothing
-        PlayerEffect.HasProtectionFrom _ -> Nothing
-        PlayerEffect.CantBecomeMonarch -> Nothing
-        PlayerEffect.CantSetSchemesInMotion -> Nothing
-        PlayerEffect.CantAttackWithCreatures -> Nothing
-        PlayerEffect.CantCastMatching _ -> Nothing
-        PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
-        PlayerEffect.CantPlayLands _ -> Nothing
-        PlayerEffect.CastFrom _ -> Nothing
-        PlayerEffect.PlayLandsFrom _ -> Nothing
-        PlayerEffect.PlotFrom _ -> Nothing
-        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
-        PlayerEffect.CantGetCounters _ -> Nothing
-        PlayerEffect.StateCoinFlip _ -> Nothing
-        PlayerEffect.ModifyDieRoll _ -> Nothing
-        PlayerEffect.AdditionalVotes _ -> Nothing
-        PlayerEffect.AdditionalSurveilCards _ -> Nothing
-        PlayerEffect.CantGainLife -> Nothing
-        PlayerEffect.CantLoseLife -> Nothing
+      -- Asked against the TARGET's projection with the modifier's own permanent
+      -- as Pawl.Engine.Filter's source, which is what makes Filter.IsSource read
+      -- "this creature" here, and with `targetPerspective`'s "you".
+      matchingTargets source wanted = filter (\oid -> matchesObjectFor (targetPerspective pid source gs) source wanted oid gs) (Set.toList targets)
+      -- The source filter, then the three facts about the ABILITY being
+      -- activated that no source filter can answer (Pawl.Types.ActivationCriteria):
+      -- its rule-702 keyword off `stamp`, CR 605.1a's `kind` and CR 606.2's
+      -- `loyalty`, each compared and never inspected further. Then Professor
+      -- Hojo's "first", asked with the same criteria.
+      reaches source modifier = case CostModifier.subject modifier of
+        CostSubject.Activations criteria ->
+          let granted = ActivationCriteria.grantedBy criteria
+              wantedKind = ActivationCriteria.whichKind criteria
+              criterion = CostModifier.matching modifier
+           in matchesObjectFrom source criterion srcId gs
+                && maybe True (\g -> any (Keyword.designates g) stamp) granted
+                && maybe True (== kind) wantedKind
+                && maybe True (== loyalty) (ActivationCriteria.whichLoyalty criteria)
+                && maybe True (firstActivation pid source criterion granted wantedKind (CostModifier.whichTargets modifier) gs) (CostModifier.onlyFirst modifier)
+        -- Thalia and Sapphire Medallion, turned away by the SUBJECT and not by
+        -- their Filters, which is what keeps a noncreature permanent's activated
+        -- ability untaxed (#90).
+        CostSubject.Spells -> False
+      gathered =
+        modifierAdjustments
+          [(source, modifier) | (source, PlayerEffect.ModifyCost modifier) <- effects, reaches source modifier]
+          (\source wanted -> not (null (matchingTargets source wanted)))
+          (\source wanted -> Natural.length (matchingTargets source wanted))
       -- CR 702.193a/b: power-up's own reduction by "this permanent's mana cost",
       -- the rule's and not an effect's, so it is asked of the ability's stamp
       -- rather than gathered off a row. Read off the projection, so a copy
@@ -1908,11 +1550,7 @@ activationCostAdjustmentsGiven effects pid targets stamp kind loyalty srcId gs =
             | manaCost <- Maybe.maybeToList (PC.manaCost (Projection.project srcId gs))
             ]
         | otherwise = []
-   in CostAdjustments.MkCostAdjustments
-        { CostAdjustments.increases = Maybe.mapMaybe increaseOf effects,
-          CostAdjustments.reductions = ruleReduction <> Maybe.mapMaybe reductionOf effects,
-          CostAdjustments.components = concat (Maybe.mapMaybe additionOf effects)
-        }
+   in gathered {CostAdjustments.reductions = ruleReduction <> CostAdjustments.reductions gathered}
 
 -- CR 601.3b: may `pid` begin to cast `oid` as though it had flash (Vedalken
 -- Orrery)? By CR 702.8a that means "any time you could cast an instant", which CR
@@ -2009,13 +1647,8 @@ landPlayFlashGrant effect = case effect of
   PlayerEffect.CantCastSpells -> Nothing
   PlayerEffect.CantActivateAbilities _ -> Nothing
   PlayerEffect.CantCastMoreThan _ -> Nothing
-  PlayerEffect.IncreaseSpellCost {} -> Nothing
-  PlayerEffect.IncreaseActivationCost {} -> Nothing
-  PlayerEffect.ReduceSpellCost {} -> Nothing
-  PlayerEffect.ReduceActivationCost {} -> Nothing
-  PlayerEffect.AddActivationCost {} -> Nothing
+  PlayerEffect.ModifyCost {} -> Nothing
   PlayerEffect.AlternativeActivationCost {} -> Nothing
-  PlayerEffect.AddSpellCost {} -> Nothing
   PlayerEffect.PlayAdditionalLands _ -> Nothing
   PlayerEffect.NoMaximumHandSize -> Nothing
   PlayerEffect.SetMaximumHandSize _ -> Nothing
@@ -2252,13 +1885,8 @@ castPermissionsFrom pid zone oid gs =
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.IncreaseSpellCost {} -> False
-        PlayerEffect.IncreaseActivationCost {} -> False
-        PlayerEffect.ReduceSpellCost {} -> False
-        PlayerEffect.ReduceActivationCost {} -> False
-        PlayerEffect.AddActivationCost {} -> False
+        PlayerEffect.ModifyCost {} -> False
         PlayerEffect.AlternativeActivationCost {} -> False
-        PlayerEffect.AddSpellCost {} -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
         PlayerEffect.IncreaseMaximumHandSize _ -> False
@@ -2537,13 +2165,8 @@ mayCastFromHandWithoutPayingManaCost pid oid gs =
         -- two compose at Pawl.Engine.Cost.total, which is handed whichever
         -- candidate CR 601.2b settled on -- so a reduction applied to {0} still
         -- floors at {0} and neither reader knows of the other.
-        PlayerEffect.IncreaseSpellCost {} -> False
-        PlayerEffect.IncreaseActivationCost {} -> False
-        PlayerEffect.ReduceSpellCost {} -> False
-        PlayerEffect.ReduceActivationCost {} -> False
-        PlayerEffect.AddActivationCost {} -> False
+        PlayerEffect.ModifyCost {} -> False
         PlayerEffect.AlternativeActivationCost {} -> False
-        PlayerEffect.AddSpellCost {} -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
         PlayerEffect.IncreaseMaximumHandSize _ -> False
@@ -2611,13 +2234,8 @@ playLandPiles pid gs =
         PlayerEffect.CantCastSpells -> []
         PlayerEffect.CantActivateAbilities _ -> []
         PlayerEffect.CantCastMoreThan _ -> []
-        PlayerEffect.IncreaseSpellCost {} -> []
-        PlayerEffect.IncreaseActivationCost {} -> []
-        PlayerEffect.ReduceSpellCost {} -> []
-        PlayerEffect.ReduceActivationCost {} -> []
-        PlayerEffect.AddActivationCost {} -> []
+        PlayerEffect.ModifyCost {} -> []
         PlayerEffect.AlternativeActivationCost {} -> []
-        PlayerEffect.AddSpellCost {} -> []
         PlayerEffect.NoMaximumHandSize -> []
         PlayerEffect.SetMaximumHandSize _ -> []
         PlayerEffect.IncreaseMaximumHandSize _ -> []
@@ -2696,13 +2314,8 @@ protectedFromTargeting rows caster pid gs =
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.IncreaseSpellCost {} -> False
-        PlayerEffect.IncreaseActivationCost {} -> False
-        PlayerEffect.ReduceSpellCost {} -> False
-        PlayerEffect.ReduceActivationCost {} -> False
-        PlayerEffect.AddActivationCost {} -> False
+        PlayerEffect.ModifyCost {} -> False
         PlayerEffect.AlternativeActivationCost {} -> False
-        PlayerEffect.AddSpellCost {} -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
@@ -2801,13 +2414,8 @@ protectedFromGiven rows aimer oid gs =
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.IncreaseSpellCost {} -> False
-        PlayerEffect.IncreaseActivationCost {} -> False
-        PlayerEffect.ReduceSpellCost {} -> False
-        PlayerEffect.ReduceActivationCost {} -> False
-        PlayerEffect.AddActivationCost {} -> False
+        PlayerEffect.ModifyCost {} -> False
         PlayerEffect.AlternativeActivationCost {} -> False
-        PlayerEffect.AddSpellCost {} -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
@@ -2887,13 +2495,8 @@ protectionCarriers gs =
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
-        PlayerEffect.IncreaseSpellCost {} -> Nothing
-        PlayerEffect.IncreaseActivationCost {} -> Nothing
-        PlayerEffect.ReduceSpellCost {} -> Nothing
-        PlayerEffect.ReduceActivationCost {} -> Nothing
-        PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.ModifyCost {} -> Nothing
         PlayerEffect.AlternativeActivationCost {} -> Nothing
-        PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
@@ -2965,13 +2568,8 @@ landPlaysAllowed pid gs =
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
-        PlayerEffect.IncreaseSpellCost {} -> Nothing
-        PlayerEffect.IncreaseActivationCost {} -> Nothing
-        PlayerEffect.ReduceSpellCost {} -> Nothing
-        PlayerEffect.ReduceActivationCost {} -> Nothing
-        PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.ModifyCost {} -> Nothing
         PlayerEffect.AlternativeActivationCost {} -> Nothing
-        PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
         PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
@@ -3029,13 +2627,8 @@ votesAllowed pid gs =
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan {} -> Nothing
-        PlayerEffect.IncreaseSpellCost {} -> Nothing
-        PlayerEffect.IncreaseActivationCost {} -> Nothing
-        PlayerEffect.ReduceSpellCost {} -> Nothing
-        PlayerEffect.ReduceActivationCost {} -> Nothing
-        PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.ModifyCost {} -> Nothing
         PlayerEffect.AlternativeActivationCost {} -> Nothing
-        PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.PlayAdditionalLands {} -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize {} -> Nothing
@@ -3086,13 +2679,8 @@ surveilExtra pid gs =
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan {} -> Nothing
-        PlayerEffect.IncreaseSpellCost {} -> Nothing
-        PlayerEffect.IncreaseActivationCost {} -> Nothing
-        PlayerEffect.ReduceSpellCost {} -> Nothing
-        PlayerEffect.ReduceActivationCost {} -> Nothing
-        PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.ModifyCost {} -> Nothing
         PlayerEffect.AlternativeActivationCost {} -> Nothing
-        PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.PlayAdditionalLands {} -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize {} -> Nothing
@@ -3181,13 +2769,8 @@ maximumHandSize pid gs =
         PlayerEffect.CantCastSpells -> current
         PlayerEffect.CantActivateAbilities _ -> current
         PlayerEffect.CantCastMoreThan _ -> current
-        PlayerEffect.IncreaseSpellCost {} -> current
-        PlayerEffect.IncreaseActivationCost {} -> current
-        PlayerEffect.ReduceSpellCost {} -> current
-        PlayerEffect.ReduceActivationCost {} -> current
-        PlayerEffect.AddActivationCost {} -> current
+        PlayerEffect.ModifyCost {} -> current
         PlayerEffect.AlternativeActivationCost {} -> current
-        PlayerEffect.AddSpellCost {} -> current
         PlayerEffect.PlayAdditionalLands _ -> current
         PlayerEffect.DontLoseUnspentMana _ -> current
         PlayerEffect.LoseLifeForUnspentMana -> current
@@ -3256,13 +2839,8 @@ keepsUnspentMana pid gs =
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
-        PlayerEffect.IncreaseSpellCost {} -> Nothing
-        PlayerEffect.IncreaseActivationCost {} -> Nothing
-        PlayerEffect.ReduceSpellCost {} -> Nothing
-        PlayerEffect.ReduceActivationCost {} -> Nothing
-        PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.ModifyCost {} -> Nothing
         PlayerEffect.AlternativeActivationCost {} -> Nothing
-        PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
@@ -3321,13 +2899,8 @@ losesLifeForUnspentMana pid gs =
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.IncreaseSpellCost _ -> False
-        PlayerEffect.IncreaseActivationCost _ -> False
-        PlayerEffect.ReduceSpellCost _ -> False
-        PlayerEffect.ReduceActivationCost _ -> False
-        PlayerEffect.AddActivationCost _ -> False
+        PlayerEffect.ModifyCost {} -> False
         PlayerEffect.AlternativeActivationCost _ -> False
-        PlayerEffect.AddSpellCost _ -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
@@ -3393,13 +2966,8 @@ prohibitsGainingLife pid gs =
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.IncreaseSpellCost _ -> False
-        PlayerEffect.IncreaseActivationCost _ -> False
-        PlayerEffect.ReduceSpellCost _ -> False
-        PlayerEffect.ReduceActivationCost _ -> False
-        PlayerEffect.AddActivationCost _ -> False
+        PlayerEffect.ModifyCost {} -> False
         PlayerEffect.AlternativeActivationCost _ -> False
-        PlayerEffect.AddSpellCost _ -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
@@ -3460,13 +3028,8 @@ prohibitsLosingLife pid gs =
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.IncreaseSpellCost _ -> False
-        PlayerEffect.IncreaseActivationCost _ -> False
-        PlayerEffect.ReduceSpellCost _ -> False
-        PlayerEffect.ReduceActivationCost _ -> False
-        PlayerEffect.AddActivationCost _ -> False
+        PlayerEffect.ModifyCost {} -> False
         PlayerEffect.AlternativeActivationCost _ -> False
-        PlayerEffect.AddSpellCost _ -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
@@ -3528,13 +3091,8 @@ spendManaAsThough pid gs =
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
-        PlayerEffect.IncreaseSpellCost {} -> Nothing
-        PlayerEffect.IncreaseActivationCost {} -> Nothing
-        PlayerEffect.ReduceSpellCost {} -> Nothing
-        PlayerEffect.ReduceActivationCost {} -> Nothing
-        PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.ModifyCost {} -> Nothing
         PlayerEffect.AlternativeActivationCost {} -> Nothing
-        PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
@@ -3624,13 +3182,8 @@ cantBeCountered pid oid gs =
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.IncreaseSpellCost {} -> False
-        PlayerEffect.IncreaseActivationCost {} -> False
-        PlayerEffect.ReduceSpellCost {} -> False
-        PlayerEffect.ReduceActivationCost {} -> False
-        PlayerEffect.AddActivationCost {} -> False
+        PlayerEffect.ModifyCost {} -> False
         PlayerEffect.AlternativeActivationCost {} -> False
-        PlayerEffect.AddSpellCost {} -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
@@ -3740,13 +3293,8 @@ unpreventable gs =
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
-        PlayerEffect.IncreaseSpellCost {} -> Nothing
-        PlayerEffect.IncreaseActivationCost {} -> Nothing
-        PlayerEffect.ReduceSpellCost {} -> Nothing
-        PlayerEffect.ReduceActivationCost {} -> Nothing
-        PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.ModifyCost {} -> Nothing
         PlayerEffect.AlternativeActivationCost {} -> Nothing
-        PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
@@ -3814,13 +3362,8 @@ unredirectable gs =
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
-        PlayerEffect.IncreaseSpellCost {} -> Nothing
-        PlayerEffect.IncreaseActivationCost {} -> Nothing
-        PlayerEffect.ReduceSpellCost {} -> Nothing
-        PlayerEffect.ReduceActivationCost {} -> Nothing
-        PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.ModifyCost {} -> Nothing
         PlayerEffect.AlternativeActivationCost {} -> Nothing
-        PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
@@ -3869,13 +3412,8 @@ statedFlips pid gs =
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
-        PlayerEffect.IncreaseSpellCost {} -> Nothing
-        PlayerEffect.IncreaseActivationCost {} -> Nothing
-        PlayerEffect.ReduceSpellCost {} -> Nothing
-        PlayerEffect.ReduceActivationCost {} -> Nothing
-        PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.ModifyCost {} -> Nothing
         PlayerEffect.AlternativeActivationCost {} -> Nothing
-        PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
@@ -3939,13 +3477,8 @@ rollModifiers pid gs =
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
-        PlayerEffect.IncreaseSpellCost {} -> Nothing
-        PlayerEffect.IncreaseActivationCost {} -> Nothing
-        PlayerEffect.ReduceSpellCost {} -> Nothing
-        PlayerEffect.ReduceActivationCost {} -> Nothing
-        PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.ModifyCost {} -> Nothing
         PlayerEffect.AlternativeActivationCost {} -> Nothing
-        PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
@@ -3998,7 +3531,7 @@ spentByCast = spentGrants castUse
 
 -- CR 611.2a: the criterion naming the spells whose CAST uses up a one-shot row
 -- on this effect's axis, or Nothing where no cast does: castFlashGrant's axis,
--- and CR 601.2f's spell-cost reduction (Hardened Berserker's "the next spell you
+-- and CR 601.2f's spell-cost modifier (Hardened Berserker's "the next spell you
 -- cast this turn costs {1} less"), spent by the next spell its own Filter names
 -- whatever that spell's cost leaves it to take off. The fallthrough is to
 -- castFlashGrant, whose own is exhaustive. Pawl.EffectLintSpec reads it too: a
@@ -4007,7 +3540,7 @@ spentByCast = spentGrants castUse
 -- spell" is the proof.
 castUse :: PlayerEffect -> Maybe (Filter Keyword)
 castUse effect = case effect of
-  PlayerEffect.ReduceSpellCost reduction -> Just (ReduceSpellCost.whichSpells reduction)
+  PlayerEffect.ModifyCost modifier | CostModifier.subject modifier == CostSubject.Spells -> Just (CostModifier.matching modifier)
   _ -> castFlashGrant effect
 
 -- CR 611.2a / 601.1a's other half: the rows `pid` would spend by playing `oid`
@@ -4042,13 +3575,8 @@ overPlayerRefs f effect = case effect of
   PlayerEffect.CantCastSpells -> pure effect
   PlayerEffect.CantActivateAbilities _ -> pure effect
   PlayerEffect.CantCastMoreThan _ -> pure effect
-  PlayerEffect.IncreaseSpellCost _ -> pure effect
-  PlayerEffect.IncreaseActivationCost _ -> pure effect
-  PlayerEffect.ReduceSpellCost _ -> pure effect
-  PlayerEffect.ReduceActivationCost _ -> pure effect
-  PlayerEffect.AddActivationCost _ -> pure effect
+  PlayerEffect.ModifyCost {} -> pure effect
   PlayerEffect.AlternativeActivationCost _ -> pure effect
-  PlayerEffect.AddSpellCost _ -> pure effect
   PlayerEffect.PlayAdditionalLands _ -> pure effect
   PlayerEffect.NoMaximumHandSize -> pure effect
   PlayerEffect.SetMaximumHandSize _ -> pure effect
@@ -4114,13 +3642,8 @@ overDamagePatterns f effect = case effect of
   PlayerEffect.CantCastSpells -> pure effect
   PlayerEffect.CantActivateAbilities _ -> pure effect
   PlayerEffect.CantCastMoreThan _ -> pure effect
-  PlayerEffect.IncreaseSpellCost _ -> pure effect
-  PlayerEffect.IncreaseActivationCost _ -> pure effect
-  PlayerEffect.ReduceSpellCost _ -> pure effect
-  PlayerEffect.ReduceActivationCost _ -> pure effect
-  PlayerEffect.AddActivationCost _ -> pure effect
+  PlayerEffect.ModifyCost {} -> pure effect
   PlayerEffect.AlternativeActivationCost _ -> pure effect
-  PlayerEffect.AddSpellCost _ -> pure effect
   PlayerEffect.PlayAdditionalLands _ -> pure effect
   PlayerEffect.NoMaximumHandSize -> pure effect
   PlayerEffect.SetMaximumHandSize _ -> pure effect

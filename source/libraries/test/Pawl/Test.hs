@@ -50,8 +50,6 @@ import qualified Pawl.Codec.ActivePlayerEffectSpec
 import qualified Pawl.Codec.ActiveReplacementSpec
 import qualified Pawl.Codec.ActiveUnregeneratableSpec
 import qualified Pawl.Codec.ActiveUntapProhibitionSpec
-import qualified Pawl.Codec.AddActivationCostSpec
-import qualified Pawl.Codec.AddSpellCostSpec
 import qualified Pawl.Codec.AffectPlayersSpec
 import qualified Pawl.Codec.AffectedPlayersSpec
 import qualified Pawl.Codec.AffectedSpec
@@ -178,13 +176,16 @@ import qualified Pawl.Codec.CopyStackObjectSpec
 import qualified Pawl.Codec.CopyTargetsSpec
 import qualified Pawl.Codec.CostAmountSpec
 import qualified Pawl.Codec.CostBasisSpec
+import qualified Pawl.Codec.CostChangeSpec
 import qualified Pawl.Codec.CostChoiceSpec
 import qualified Pawl.Codec.CostComponentSpec
 import qualified Pawl.Codec.CostDirectionSpec
 import qualified Pawl.Codec.CostKeywordSpec
+import qualified Pawl.Codec.CostModifierSpec
 import qualified Pawl.Codec.CostReductionSpec
 import qualified Pawl.Codec.CostScaleSpec
 import qualified Pawl.Codec.CostSpec
+import qualified Pawl.Codec.CostSubjectSpec
 import qualified Pawl.Codec.CountIsSpec
 import qualified Pawl.Codec.CountSpec
 import qualified Pawl.Codec.CountedDiscardSpec
@@ -332,8 +333,6 @@ import qualified Pawl.Codec.IfTakenSpec
 import qualified Pawl.Codec.IgnoredAbilitySpec
 import qualified Pawl.Codec.ImpendingSpec
 import qualified Pawl.Codec.InZoneSpec
-import qualified Pawl.Codec.IncreaseActivationCostSpec
-import qualified Pawl.Codec.IncreaseSpellCostSpec
 import qualified Pawl.Codec.InherentTriggerSourceSpec
 import qualified Pawl.Codec.InitiativeTargetSpec
 import qualified Pawl.Codec.InstanceOrdinalSpec
@@ -508,8 +507,6 @@ import qualified Pawl.Codec.RangeOfInfluenceSpec
 import qualified Pawl.Codec.ReadinessSpec
 import qualified Pawl.Codec.RecipientSpec
 import qualified Pawl.Codec.RedirectDamageSpec
-import qualified Pawl.Codec.ReduceActivationCostSpec
-import qualified Pawl.Codec.ReduceSpellCostSpec
 import qualified Pawl.Codec.ReferenceSpec
 import qualified Pawl.Codec.RegenerabilitySpec
 import qualified Pawl.Codec.ReinforceSpec
@@ -897,8 +894,6 @@ spec s registry = do
   Pawl.Codec.ActiveUnregeneratableSpec.spec s
   Pawl.Codec.ActiveUntapProhibitionSpec.spec s
   Pawl.Codec.ActiveEvasionSpec.spec s
-  Pawl.Codec.AddActivationCostSpec.spec s
-  Pawl.Codec.AddSpellCostSpec.spec s
   Pawl.Codec.ActivateManaAbilitiesSpec.spec s
   Pawl.Codec.AffectPlayersSpec.spec s
   Pawl.Codec.AffectedPlayersSpec.spec s
@@ -1023,6 +1018,9 @@ spec s registry = do
   Pawl.Codec.CostBasisSpec.spec s
   Pawl.Codec.CostChoiceSpec.spec s
   Pawl.Codec.CostAmountSpec.spec s
+  Pawl.Codec.CostChangeSpec.spec s
+  Pawl.Codec.CostModifierSpec.spec s
+  Pawl.Codec.CostSubjectSpec.spec s
   Pawl.Codec.CostComponentSpec.spec s
   Pawl.Codec.CostDirectionSpec.spec s
   Pawl.Codec.CostKeywordSpec.spec s
@@ -1177,8 +1175,6 @@ spec s registry = do
   Pawl.Codec.HybridSpec.spec s
   Pawl.Codec.IgnoredAbilitySpec.spec s
   Pawl.Codec.InZoneSpec.spec s
-  Pawl.Codec.IncreaseActivationCostSpec.spec s
-  Pawl.Codec.IncreaseSpellCostSpec.spec s
   Pawl.Codec.InherentTriggerSourceSpec.spec s
   Pawl.Codec.InstanceOrdinalSpec.spec s
   Pawl.Codec.KeywordDesignatorSpec.spec s
@@ -1372,8 +1368,6 @@ spec s registry = do
   Pawl.Codec.QuantitySpec.spec s
   Pawl.Codec.RecipientSpec.spec s
   Pawl.Codec.RedirectDamageSpec.spec s
-  Pawl.Codec.ReduceActivationCostSpec.spec s
-  Pawl.Codec.ReduceSpellCostSpec.spec s
   Pawl.Codec.RegenerabilitySpec.spec s
   Pawl.Codec.ReinforceSpec.spec s
   Pawl.Codec.RemoveCountersSpec.spec s

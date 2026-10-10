@@ -134,12 +134,18 @@
             }
           },
           "effect": {
-            "type": "IncreaseSpellCost",
+            "type": "ModifyCost",
             "value": {
-              "amount": 1,
-              "whichSpells": {
+              "change": {
+                "type": "Increase",
+                "value": 1
+              },
+              "matching": {
                 "type": "And",
                 "value": []
+              },
+              "subject": {
+                "type": "Spells"
               }
             }
           },

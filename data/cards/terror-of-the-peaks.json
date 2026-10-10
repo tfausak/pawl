@@ -35,19 +35,27 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "AddSpellCost",
+            "type": "ModifyCost",
             "value": {
-              "components": [
-                {
-                  "type": "PayLife",
-                  "value": {
-                    "type": "Fixed",
-                    "value": 3
-                  }
+              "change": {
+                "type": "Add",
+                "value": {
+                  "components": [
+                    {
+                      "type": "PayLife",
+                      "value": {
+                        "type": "Fixed",
+                        "value": 3
+                      }
+                    }
+                  ]
                 }
-              ],
-              "whichSpells": {
+              },
+              "matching": {
                 "type": "TargetsSource"
+              },
+              "subject": {
+                "type": "Spells"
               }
             }
           },

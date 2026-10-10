@@ -21,21 +21,20 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "ReduceSpellCost",
+            "type": "ModifyCost",
             "value": {
-              "perTarget": {
-                "type": "HasCardType",
+              "change": {
+                "type": "Reduce",
                 "value": {
-                  "type": "Creature"
+                  "amount": [
+                    {
+                      "type": "Generic",
+                      "value": 1
+                    }
+                  ]
                 }
               },
-              "reduction": [
-                {
-                  "type": "Generic",
-                  "value": 1
-                }
-              ],
-              "whichSpells": {
+              "matching": {
                 "type": "Or",
                 "value": [
                   {
@@ -51,6 +50,15 @@
                     }
                   }
                 ]
+              },
+              "perTarget": {
+                "type": "HasCardType",
+                "value": {
+                  "type": "Creature"
+                }
+              },
+              "subject": {
+                "type": "Spells"
               }
             }
           },

@@ -62,8 +62,6 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationProhibition as ActivationProhibition
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.Activator as Activator
-import qualified Pawl.Types.AddActivationCost as AddActivationCost
-import qualified Pawl.Types.AddSpellCost as AddSpellCost
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
@@ -130,8 +128,11 @@ import qualified Pawl.Types.CopyOriginal as CopyOriginal
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CostAddition as CostAddition
+import qualified Pawl.Types.CostChange as CostChange
 import qualified Pawl.Types.CostChoice as CostChoice
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CostModifier as CostModifier
 import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
@@ -219,8 +220,6 @@ import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.HandAction as HandAction
 import qualified Pawl.Types.Impending as Impending
 import qualified Pawl.Types.InZone as InZone
-import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
-import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordCount as KeywordCount
 import qualified Pawl.Types.KeywordTally as KeywordTally
@@ -306,8 +305,6 @@ import qualified Pawl.Types.RandomCardInGraveyard as RandomCardInGraveyard
 import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
 import qualified Pawl.Types.RandomCardInLibrary as RandomCardInLibrary
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
-import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
-import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Reinforce as Reinforce
 import qualified Pawl.Types.RemovalCount as RemovalCount
@@ -4901,38 +4898,22 @@ damagePatternFilters pattern_ = DamagePattern.whatSource pattern_ : Maybe.maybeT
 -- 701.6a).
 playerEffectFilters :: PlayerEffect.PlayerEffect -> [Filter.Type.Filter Keyword.Keyword]
 playerEffectFilters playerEffect = case playerEffect of
-  -- BOTH Filters, ReduceActivationCost's reason below: `perTarget` asks about
-  -- the spell's targets through the same context.
-  PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost f _ targets) -> f : Maybe.maybeToList targets
-  -- CR 601.2f at the ACTIVATION moment, Oppressive Rays' third line. Its Filter
-  -- names the ability's SOURCE PERMANENT, exactly as ReduceActivationCost's
-  -- below does. The whichKind beside it is not returned, for the reason that
-  -- arm's grantedBy is not: CR 605.1a's classification is no more a Filter than
-  -- a rule-702 family is.
-  PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost f _ _) -> [f]
-  PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost f _ _ targets) -> f : Maybe.maybeToList targets
-  -- CR 601.2f's other moment: Heartstone's Filter narrows the ability's SOURCE
-  -- PERMANENT rather than a spell, and is authored the same way. The grantedBy
-  -- and whichKind beside it are not returned: neither a KeywordFamily nor CR
-  -- 605.1a's classification is a Filter, so the lints this list feeds have
-  -- nothing to say about either.
-  --
-  -- BOTH Filters, and they are held to one standard because they are evaluated
-  -- through one context: `whichTargets` (Dwarven Mauler's "that target this
-  -- creature") asks about the ability's chosen TARGET rather than its source, but
-  -- Pawl.Engine.PlayerEffect.matchesObjectFrom builds the same Context for it, so
-  -- the same framing and the same atom vocabulary apply.
-  PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost f _ _ targets _ _ _) -> f : Maybe.maybeToList targets
-  -- CR 601.2f's addition carries a Filter in two places: its own criterion
-  -- ("nontoken Rebels"), and one inside each component it adds ("sacrifice a
-  -- land"). Both are authored by the card, so both are linted, and the inner
-  -- ones go through costComponentFilters so an added component and a printed
-  -- one are held to one standard.
-  PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost f _ components _) -> f : concatMap costComponentFilters components
+  -- CR 601.2f at either moment: the criterion names the SPELL or the ability's
+  -- SOURCE PERMANENT. The two target Filters (Kopala's "that target a Merfolk",
+  -- Dwarven Mauler's "that target this creature", Hinata's "for each target")
+  -- ask about a chosen TARGET instead, but Pawl.Engine.PlayerEffect builds the
+  -- same Context for them, so the same framing and the same atom vocabulary
+  -- apply. An addition's components carry one each ("sacrifice a SWAMP"), held
+  -- to a printed component's standard through costComponentFilters. The
+  -- subject's criteria are not returned: neither a rule-702 designator nor CR
+  -- 605.1a's or 606.2's classification is a Filter.
+  PlayerEffect.ModifyCost (CostModifier.MkCostModifier _ f targets perTarget _ change) ->
+    f
+      : Maybe.maybeToList targets <> Maybe.maybeToList perTarget <> case change of
+        CostChange.Add addition -> concatMap costComponentFilters (CostAddition.components addition)
+        CostChange.Increase _ -> []
+        CostChange.Reduce _ -> []
   PlayerEffect.AlternativeActivationCost _ -> []
-  -- The spell-side twin, whose Filter names the SPELL (Drought's is universal)
-  -- and whose components carry one of their own ("sacrifice a SWAMP").
-  PlayerEffect.AddSpellCost (AddSpellCost.MkAddSpellCost f components _) -> f : concatMap costComponentFilters components
   PlayerEffect.CantCastSpells -> []
   PlayerEffect.CantActivateAbilities _ -> []
   PlayerEffect.CantCastMoreThan _ -> []
