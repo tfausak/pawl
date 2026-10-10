@@ -69,7 +69,7 @@ resolution controllerRead ownerRead slots controller gs =
         { perspective = Just controller,
           bound = True,
           slotPlayers = \slot -> fmap (Maybe.mapMaybe Recipient.playerOf . Set.toList) (Map.lookup slot slots),
-          slotObject = \slot -> Map.lookup slot slots >>= Binding.onlyOne >>= Recipient.objectOf,
+          slotObject = \slot -> Map.lookup slot (Binding.objectsIn slots),
           controllerOf = controllerRead,
           ownerOf = ownerRead,
           roster = reached,

@@ -1230,7 +1230,7 @@ sacrificerFor sacrificer controller gs oid = case sacrificer of
 slotOne :: SlotName -> ObjectId -> GameState -> Maybe ObjectId
 slotOne slot resolving gs = do
   obj <- Game.lookupObject resolving gs
-  Recipient.objectOf =<< Binding.onlyOne =<< Map.lookup slot (Binding.targetsOf (Object.bindings obj))
+  Map.lookup slot (Binding.objectSlots (Object.bindings obj))
 
 -- slotOne's PLAYER twin (CR 115.1), read the same way and with the same
 -- collapse: a slot that is unbound, holds a group, or holds an object names
@@ -1238,7 +1238,7 @@ slotOne slot resolving gs = do
 slotOnePlayer :: SlotName -> ObjectId -> GameState -> Maybe PlayerId
 slotOnePlayer slot resolving gs = do
   obj <- Game.lookupObject resolving gs
-  Recipient.playerOf =<< Binding.onlyOne =<< Map.lookup slot (Binding.targetsOf (Object.bindings obj))
+  Map.lookup slot (Binding.playerSlots (Object.bindings obj))
 
 -- The ONE player a slot names, from CR 608.2b's surviving recipients first and
 -- from the resolving object's own bindings otherwise. Two sources for
