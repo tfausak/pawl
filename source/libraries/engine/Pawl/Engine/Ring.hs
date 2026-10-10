@@ -30,7 +30,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Binding as Binding
-import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mint as Mint
@@ -546,9 +545,9 @@ designate pid oid =
 -- their count go up. That is why the count is bumped unconditionally at the end
 -- rather than inside the branch that designates.
 --
--- The candidate list is ascending, so both the single-candidate shortcut and a
--- transcript are deterministic -- Resolve's AttachTarget and PlayerSacrifices
--- posture. Creature-ness is the PROJECTED question (CR 613.1d), so an
+-- Asked through Game.chooseAmong. The candidate list is ascending, so both the
+-- single-candidate shortcut and a transcript are deterministic -- Resolve's
+-- AttachTarget and PlayerSacrifices posture. Creature-ness is the PROJECTED question (CR 613.1d), so an
 -- Opalescence'd enchantment is a legal choice.
 --
 -- CR 701.54d's GameEvent.RingTempted goes in beside the count, at the one place
@@ -569,22 +568,10 @@ tempt pid = do
   Monad.unless (hasTheRing pid gs0) (Monad.void (Event.createEmblem pid (theRingEmblem (temptationsOf pid gs0))))
   gs1 <- State.get
   let candidates = List.sort (filter (\oid -> Projection.isCreatureOf oid gs1) (Projection.controls pid gs1))
-  case candidates of
-    -- CR 701.54d: an impossible choice is not a failed temptation.
-    [] -> pure ()
-    first : rest -> do
-      chosen <- case rest of
-        -- One creature is the whole of "a creature you control", and rule 701.54a
-        -- is not a "may" -- where the rules leave nothing to ask, don't prompt.
-        [] -> pure first
-        second : more -> do
-          let offered = first NonEmpty.:| (second : more)
-          -- FILTERED, NOT TRUSTED, the ChooseAttachment posture: an answer naming
-          -- something never offered falls back to the first candidate, since the
-          -- action is mandatory and must designate someone.
-          answer <- Game.choose (Prompt.ChooseRingBearer (Decide.deciderFor pid gs1) pid offered)
-          pure (if List.elem answer (NonEmpty.toList offered) then answer else first)
-      designate pid chosen
+  -- CR 701.54d: an impossible choice is not a failed temptation, so no
+  -- creature designates nothing. Rule 701.54a is not a "may".
+  chosen <- Game.chooseAmong Prompt.ChooseRingBearer pid candidates
+  Monad.forM_ chosen (designate pid)
   -- CR 701.54d: the temptation itself, which is what a count of temptations
   -- counts and what a "Whenever the Ring tempts you" ability triggers on.
   State.modify'
