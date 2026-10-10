@@ -1647,9 +1647,10 @@ rewriteCopyException pairs exception = case exception of
   CopyException.AddSupertypes _ -> exception
   CopyException.RemoveSupertypes _ -> exception
   -- CR 201.1's name is the one CR 612.2 rules out in so many words: "an effect
-  -- that changes a color word or a subtype can't change a card name". CR 612.7's
-  -- Spy Kit is the effect that does, and it adds names in layer 3
-  -- (Modification.AddNamesMatching) rather than rewriting this clause.
+  -- that changes a color word or a subtype can't change a card name". The
+  -- effects that do are CR 612.7-612.9's, in layer 3 (Modification's
+  -- AddNamesMatching, SetName and InsertNameWords), rather than a rewrite of
+  -- this clause.
   CopyException.SetName _ -> exception
   -- CR 612.2 names colour words, but the only text changer that supplies a WORD
   -- PAIR here swaps subtypes -- CR 612.5's exchange of text boxes names no word

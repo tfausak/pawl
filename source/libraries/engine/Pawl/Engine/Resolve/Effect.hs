@@ -5751,9 +5751,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         several -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList several))
   -- CR 123.3: each placer chooses a sticker of an allowed kind not on any
   -- object they own and puts it on each named object. CR 123.3b: an object
-  -- the placer does not own takes nothing; a regression fence, since the one
-  -- producer's own filter already says "you own". Placing nothing writes
-  -- nothing, so happenedBetween reads it as not having happened.
+  -- the placer does not own takes nothing; a regression fence, since no test
+  -- has a placer control an "on it" producer they do not own (Wizards of the
+  -- _____ stolen as it enters). Placing nothing writes nothing, so
+  -- happenedBetween reads it as not having happened.
   -- CR 123.6b: the object's controller places a name sticker's word
   -- (namePosition).
   Effect.PutSticker (PutSticker.MkPutSticker player ref kinds bound) -> do
