@@ -1007,7 +1007,7 @@ becameSlotSpec s registry =
               -- bounce and re-filed under the id representativeEvents uses, so the
               -- pin cannot be satisfied by a record shaped to suit it. Nothing
               -- lands under the departed id in `objects`, which is what
-              -- Projection.lastKnownOf's liveness guard requires.
+              -- Game.lastKnownOf's liveness guard requires.
               (pikerId, placed) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
               bounced = S.runPure S.identityAnswer placed (Event.changeZone pikerId Zone.Hand)
               empty = Setup.emptyGame S.bothPlayers

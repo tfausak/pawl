@@ -471,7 +471,7 @@ lastKnownAdmits perspective source slot host gs =
    in -- lastKnownOf first, so a host that is still on the board falls to False
       -- here rather than being answered off the live view viewWithLastKnownAnywhere
       -- would hand back: that board is attachmentFor's question, not this one.
-      Maybe.isJust (Projection.lastKnownOf host gs)
+      Maybe.isJust (Game.lastKnownOf host gs)
         && Maybe.maybe False admits (Projection.viewWithLastKnownAnywhere gs host)
 
 -- Which pools could have held an object that no longer exists, judged from its
