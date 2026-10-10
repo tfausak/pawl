@@ -2913,7 +2913,7 @@ objectRefObjects legal resolving controller source gs ref = case ref of
     let hosts = objectRefObjects legal resolving controller source gs (ObjectRef.InSlot slot)
         attachedTo host
           | Set.member host (GameState.battlefield gs) = Game.attachments host gs
-          | otherwise = maybe Set.empty LastKnown.attached (Projection.lastKnownOf host gs)
+          | otherwise = maybe Set.empty LastKnown.attached (Game.lastKnownOf host gs)
         attached = foldMap attachedTo hosts
      in filter (`Set.member` attached) (battlefieldMatching legal resolving controller source gs filter_)
   -- CR 400.7's link read back: each object the slot holds, followed through

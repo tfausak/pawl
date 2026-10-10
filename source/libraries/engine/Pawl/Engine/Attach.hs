@@ -232,7 +232,7 @@ attachmentWith equippable src destination gs
 -- Target.lastKnownAdmits, which asks the same slot the same question about an
 -- object it can no longer enumerate.
 attachableWithLastKnown :: ObjectId -> ObjectId -> GameState -> Bool
-attachableWithLastKnown src host gs = case Projection.lastKnownOf host gs of
+attachableWithLastKnown src host gs = case Game.lastKnownOf host gs of
   Nothing -> Maybe.isJust (attachmentFor src (Recipient.ToObject host) gs)
   Just _ ->
     src /= host

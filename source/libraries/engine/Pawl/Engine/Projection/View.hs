@@ -678,11 +678,7 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- artifact sacrificed to activate it still reads "from an artifact source".
       -- Nothing for anything that is not an ability on the stack. Lazy, so a
       -- Filter that never names the atom pays nothing.
-      Filter.abilitySource =
-        Game.abilitySourceOf oid gs >>= \src ->
-          if Map.member src (GameState.objects gs)
-            then peers src
-            else fmap (Count.lastKnownView peers src gs) (Map.lookup src (GameState.lastKnown gs)),
+      Filter.abilitySource = Game.abilitySourceOf oid gs >>= Count.orLastKnown peers gs,
       Filter.tapped = Game.isTapped oid gs,
       -- CR 110.5's other status, and the only site that fills the field. Read off
       -- Object.facing, never off the projection: CR 110.5a says status is not a

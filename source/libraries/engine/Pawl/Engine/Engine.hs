@@ -1009,7 +1009,7 @@ placeBorne srcId pending = do
           -- time this ability has resolved this turn" reads this object's Source.
           -- Inserted over the captured environment, whose thisAbility names the
           -- ability that armed a delayed trigger rather than the trigger itself.
-          let placedSource = maybe (Projection.copiableCharacteristics srcId gs) LastKnown.copiable (Projection.lastKnownOf srcId gs)
+          let placedSource = maybe (Projection.copiableCharacteristics srcId gs) LastKnown.copiable (Game.lastKnownOf srcId gs)
           State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setThisAbility abilId (Binding.setPlacedSourceCopy placedSource (Binding.setYou controller (Binding.setTriggerSource srcId (Map.unionWith Binding.mergeBinding (Target.stampDefendingPlayers srcId chosen g (Binding.fromChoices chosen Nothing chosenModes)) (PendingTrigger.bindings pending)))))}) abilId (GameState.objects g)})
           -- CR 601.2c through CR 603.3d: each chosen object became a target, which
           -- is what CR 702.21a's ward watches. Raised only on an announcement the

@@ -934,6 +934,17 @@ castOwner gs spell = case Game.lookupObject spell gs of
   Just object -> Just (Object.owner object)
   Nothing -> fmap LastKnown.owner (Map.lookup spell (GameState.lastKnown gs))
 
+-- CR 113.7a / 608.2h: `live`'s view of an object that exists, else the view of
+-- the record filed under its id once it has left (lastKnownView), else Nothing.
+-- The one "live, else last known" fallback over a whole view: every single
+-- characteristic a departed object is asked for is a field of this view
+-- (Pawl.Engine.Projection.controllerWithLastKnown) or of the record's projection
+-- (Pawl.Engine.Projection.projectWithLastKnown), never a fallback of its own.
+orLastKnown :: ViewOf -> GameState -> ViewOf
+orLastKnown live gs oid = case Game.lastKnownOf oid gs of
+  Just lastKnown -> Just (lastKnownView live oid gs lastKnown)
+  Nothing -> if Map.member oid (GameState.objects gs) then live oid else Nothing
+
 -- CR 608.2h: an object that has ceased, as its record shows it -- the one view
 -- of a LastKnown, read by a trigger or an intervening "if" asking about the
 -- object an event named (Pawl.Engine.Projection.viewWithLastKnownAnywhere), by

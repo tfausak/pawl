@@ -1742,6 +1742,19 @@ sourceOfWithLastKnown oid gs = case lookupObject oid gs of
   Just obj -> Just (Object.source obj)
   Nothing -> fmap LastKnown.source (Map.lookup oid (GameState.lastKnown gs))
 
+-- CR 608.2h: this object's last known information, and only when the id names
+-- nothing, so a caller falls through to its live reader. THE liveness test every
+-- last-known reader shares (Pawl.Engine.Count.orLastKnown,
+-- Pawl.Engine.Projection.projectWithLastKnown), so the rule cannot mean one thing
+-- for keywords and another for control. Pawl.DamageSpec's "CR 608.2h a live
+-- source reads LIVE, even with a last-known entry filed under its id" proves the
+-- guard.
+lastKnownOf :: ObjectId -> GameState -> Maybe LastKnown.LastKnown
+lastKnownOf oid gs =
+  if Map.member oid (GameState.objects gs)
+    then Nothing
+    else Map.lookup oid (GameState.lastKnown gs)
+
 -- CR 708.2 / CR 708.8 over ONE object: write which face it is showing, and give
 -- it CR 613.7f's new timestamp -- "a permanent receives a new timestamp each time
 -- it turns face up or face down". The primitive BOTH turning-over roads share,

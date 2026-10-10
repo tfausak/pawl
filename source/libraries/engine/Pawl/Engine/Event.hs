@@ -305,11 +305,7 @@ recordEventOver board event gs =
 involveActedOn :: GameEvent -> GameState -> GameState
 involveActedOn event gs
   | GameSettings.rangeOfInfluence (GameState.settings gs) == RangeOfInfluence.unlimited = gs
-  | otherwise = foldr Game.involve gs (Maybe.mapMaybe controllerOf (fst (participants event)))
-  where
-    controllerOf oid = case Projection.controllerOf oid gs of
-      Just pid -> Just pid
-      Nothing -> LastKnown.controller <$> Map.lookup oid (GameState.lastKnown gs)
+  | otherwise = foldr Game.involve gs (Maybe.mapMaybe (`Projection.controllerWithLastKnown` gs) (fst (participants event)))
 
 -- CR 704.3 / CR 608.2f: run `body` as ONE event, so every event it records
 -- shares an EventGroup and CR 603.10a's look-back can tell "at the same time"
@@ -4373,7 +4369,7 @@ copiedReading src gs =
 -- entry rewrite, whose subject is on the battlefield by construction, and
 -- answering there for an object that is not would resurrect it.
 copiedSnapshotWithLastKnown :: ObjectId -> GameState -> PC.ProjectedCharacteristics
-copiedSnapshotWithLastKnown oid gs = case Projection.lastKnownOf oid gs of
+copiedSnapshotWithLastKnown oid gs = case Game.lastKnownOf oid gs of
   Just lk -> LastKnown.copiable lk
   Nothing -> copiedSnapshot oid gs
 

@@ -1161,13 +1161,10 @@ viewWithLastKnown src gs oid =
 -- widens it again to every object a resolution's slots name.
 --
 -- Nothing when the object is gone and nothing was filed, which lands on the no-op
--- every caller gives an unevaluable quantity. Count.lastKnownView is the view of
--- the record, and says what it answers off it.
+-- every caller gives an unevaluable quantity. Count.orLastKnown is the fallback,
+-- and Count.lastKnownView says what the record answers.
 viewWithLastKnownAnywhere :: GameState -> Count.ViewOf
-viewWithLastKnownAnywhere gs oid =
-  if Map.member oid (GameState.objects gs)
-    then fullView gs oid
-    else fmap (Count.lastKnownView (fullView gs) oid gs) (Map.lookup oid (GameState.lastKnown gs))
+viewWithLastKnownAnywhere gs = Count.orLastKnown (fullView gs) gs
 
 -- `context` with every SLOT-derived field filled from one map of what each
 -- slot names (Pawl.Engine.Binding.recipientsBySlot): the objects, the players,
@@ -1288,16 +1285,6 @@ pairwiseContext :: GameState -> ObjectId -> Filter.Context
 pairwiseContext gs creature =
   withCharacteristicsOf creature gs (Filter.contextFor (Game.teams gs) (controllerOf creature gs) (Just creature))
 
--- CR 608.2h: this object's last known information, and only when the id names
--- nothing, so a caller falls through to its live reader. Shared by the two
--- readers below so the rule cannot mean one thing for keywords and another for
--- control.
-lastKnownOf :: ObjectId -> GameState -> Maybe LastKnown.LastKnown
-lastKnownOf oid gs =
-  if Map.member oid (GameState.objects gs)
-    then Nothing
-    else Map.lookup oid (GameState.lastKnown gs)
-
 -- CR 603.10's first sentence: a permanent as a trigger event's own board sample
 -- (Event.Trigger.battlefieldAt) shows it -- the characteristics and controller it
 -- had immediately after the event -- whether it still stands or has since left,
@@ -1306,55 +1293,36 @@ sampledView :: ObjectId -> BattlefieldCandidate.BattlefieldCandidate PC.Projecte
 sampledView oid candidate gs =
   let pc = BattlefieldCandidate.characteristics candidate
       controller = BattlefieldCandidate.controller candidate
-   in case lastKnownOf oid gs of
+   in case Game.lastKnownOf oid gs of
         Just lk -> Count.lastKnownView (viewWithLastKnownAnywhere gs) oid gs lk {LastKnown.characteristics = pc, LastKnown.controller = controller}
         Nothing -> viewOfCharacteristics (viewWithLastKnownAnywhere gs) oid pc (Just controller) (countersOf oid gs) gs
 
--- keywordsOf with CR 608.2h's fallback (CR 702.2e, CR 702.15c, CR 702.90d); toxic
--- (rule 702.164) has no such clause and rides this by uniformity.
-keywordsWithLastKnown :: ObjectId -> GameState -> Map Keyword Natural
-keywordsWithLastKnown oid gs = case lastKnownOf oid gs of
-  Just lk -> PC.keywords (LastKnown.characteristics lk)
-  Nothing -> keywordsOf oid gs
-
--- controllerOf with the same fallback (CR 702.15b for why a controller is wanted;
--- CR 608.2h for the authority). LastKnown.controller is a PlayerId, so this
--- answers Just wherever the live reader would answer Nothing for a gone source.
+-- CR 110.2's controller off viewWithLastKnownAnywhere (CR 608.2h): controllerOf
+-- for an object that exists, the record's for one that has left, Nothing for an id
+-- naming neither. CR 702.15b is why a departed source's controller is wanted.
 controllerWithLastKnown :: ObjectId -> GameState -> Maybe PlayerId.PlayerId
-controllerWithLastKnown oid gs = case lastKnownOf oid gs of
-  Just lk -> Just (LastKnown.controller lk)
-  Nothing -> controllerOf oid gs
+controllerWithLastKnown oid gs = Filter.controller =<< viewWithLastKnownAnywhere gs oid
 
--- CR 108.3's owner, with the same fallback -- unlike control (CR 110.2) no
--- projection moves an owner (only CR 407.3's Game.setOwner writes one), so the
--- live half is Object.owner straight off the object. PlayerRef.OwnerOfBound's reader
+-- CR 108.3's owner off the same view. PlayerRef.OwnerOfBound's reader
 -- (Pawl.Engine.Resolve.Slots.playerRefPlayers); The Deck of Many Things' 20
 -- band is the producer.
 ownerWithLastKnown :: ObjectId -> GameState -> Maybe PlayerId.PlayerId
-ownerWithLastKnown oid gs = case lastKnownOf oid gs of
-  Just lk -> Just (LastKnown.owner lk)
-  Nothing -> fmap Object.owner (Game.lookupObject oid gs)
+ownerWithLastKnown oid gs = Filter.owner =<< viewWithLastKnownAnywhere gs oid
 
--- subtypesOf with the same fallback (CR 702.76a and CR 702.173a for why the
--- types are wanted; CR 608.2h for the authority) -- a creature that dealt combat
--- damage and then died still has to answer what its creature types were.
-subtypesWithLastKnown :: ObjectId -> GameState -> Set Subtype.Type.Subtype
-subtypesWithLastKnown oid gs = case lastKnownOf oid gs of
-  Just lk -> PC.subtypes (LastKnown.characteristics lk)
-  Nothing -> subtypesOf oid gs
-
--- `project` with the same fallback, for a reader that wants the WHOLE fold of a
--- gone object rather than one field of it: CR 603.3b's "the final chapter ability
--- of a Saga you control" needs both the subtype and the chapter abilities of a
--- Saga that may have left the battlefield before CR 117.5 gathered the trigger,
--- and CR 608.2h is the authority for answering at all. The record holds the
--- projection taken as the object ceased, so a Saga that was a COPY of another card
--- answers with the copy's chapters rather than the printed card's. Proved by
+-- `project` with CR 608.2h's fallback, for a reader that wants what the view does
+-- not carry: keyword COUNTS (CR 702.164b's toxic total, Damage.damageEvent),
+-- delayed-trigger text, or the whole fold of a gone object: CR 603.3b's "the
+-- final chapter ability of a Saga you control" needs both the subtype and the
+-- chapter abilities of a Saga that may have left the battlefield before CR 117.5
+-- gathered the trigger, and CR 608.2h is the authority for answering at all. The
+-- record holds the projection taken as the object ceased, so a Saga that was a
+-- COPY of another card answers with the copy's chapters rather than the printed
+-- card's. Proved by
 -- Pawl.TriggerSpec's "CR 608.2h the watcher reads the dead Saga's last known
 -- information" and its "CR 707.2 a COPY of the Saga answers with the copy's
 -- chapters".
 projectWithLastKnown :: ObjectId -> GameState -> ProjectedCharacteristics
-projectWithLastKnown oid gs = case lastKnownOf oid gs of
+projectWithLastKnown oid gs = case Game.lastKnownOf oid gs of
   Just lk -> LastKnown.characteristics lk
   Nothing -> project oid gs
 
@@ -4546,7 +4514,7 @@ projectDeciding = projectDecidingFrom noncreaturePT copiableCharacteristics
 -- CR 612.5: the seed textBoxAt folds an exchange partner from -- its copiable
 -- values while it exists, and CR 608.2h's record of them once it has left.
 textBoxSeed :: ObjectId -> GameState -> ProjectedCharacteristics
-textBoxSeed oid gs = maybe (copiableCharacteristics oid gs) LastKnown.copiable (lastKnownOf oid gs)
+textBoxSeed oid gs = maybe (copiableCharacteristics oid gs) LastKnown.copiable (Game.lastKnownOf oid gs)
 
 -- projectDeciding with its closing gate and its CR 613.2c seed named: `snapshot`
 -- departs from the gate, and textBoxAt from copiableCharacteristics.
