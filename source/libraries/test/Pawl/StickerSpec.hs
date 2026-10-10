@@ -39,11 +39,13 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilitySticker as AbilitySticker
 import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Game as Game.Type
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -64,6 +66,7 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.StickerKind as StickerKind
 import qualified Pawl.Types.StickerPlacement as StickerPlacement
 import qualified Pawl.Types.StickerRef as StickerRef
@@ -1021,3 +1024,21 @@ spec s registry = Spec.describe s "Sticker" $ do
         (pinId, after, _) = castPin pin 3 hotDogFlying g1
     Spec.assertEqWith s "Pin Collection took the sticker" (fmap (\p -> fmap (Seq.length . Object.stickers) (Game.lookupObject p after)) pinId) (Just (Just 1))
     Spec.assertEqWith s "CR 123.7 and no +1/+1 counter" (fmap (\p -> S.counterOf CounterKind.PlusOnePlusOne p after) pinId) (Just 0)
+  -- Review Focus 5. Ambassador's own trigger puts Otter's 5/1 on the Bears;
+  -- Hot Dog Minotaur's 1/4 goes on Bonesplitter, a noncreature whose P/T CR
+  -- 208.3 blanks, and Night's 2-ticket menace on the Bears. 5+1 and 1+4: the
+  -- menace sticker's cost is no part of it, and Bonesplitter's sticker is.
+  Spec.it s "CR 123.8a Ambassador Blorpityblorpboop becomes a 6/5 from the P/T stickers on alice's permanents" $ do
+    sheets <- committedSheets
+    ambassador <- S.printingOf s registry "Ambassador Blorpityblorpboop"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    let (bearsId, g1) = S.addPermanent bears S.alice (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))
+        (splitterId, g2) = S.addPermanent bonesplitter S.alice g1
+        (ambassadorId, entered) = S.entersWithTrigger ambassador S.alice g2
+        placed = snd (fst (State.runState (Engine.runGame (placingRef 0 (Just bearsId) otterFiveOne) entered drain) (MkOffers [] [] 0)))
+        stickered = Sticker.put S.alice bearsId nightMenace Nothing (Sticker.put S.alice splitterId minotaurOneFour Nothing placed)
+        atCombat = (S.withEvents [GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Combat CombatStep.BeginningOfCombat) S.alice)] stickered) {GameState.phase = Phase.Combat CombatStep.BeginningOfCombat}
+        combat = snd (fst (State.runState (Engine.runGame (placing Nothing) atCombat drain) (MkOffers [] [] 0)))
+    Spec.assertEqWith s "CR 123.8a Ambassador is a 6/5" (Projection.powerOf ambassadorId combat, Projection.toughnessOf ambassadorId combat) (Just 6, Just 5)
+    Spec.assertEqWith s "CR 123.3c alice paid two of its three tickets" (S.playerCounterOf PlayerCounterKind.Ticket S.alice combat) 1

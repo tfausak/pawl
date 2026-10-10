@@ -4320,6 +4320,8 @@ quantityReads q = case q of
   Quantity.Type.ObjectCountersOfAnyKind -> Set.empty
   Quantity.Type.LettersOnNameStickers _ -> Set.empty
   Quantity.Type.NameStickers -> Set.empty
+  Quantity.Type.PowerOfStickers -> Set.empty
+  Quantity.Type.ToughnessOfStickers -> Set.empty
   Quantity.Type.HasDesignation _ -> Set.empty
   Quantity.Type.DesignationValue _ -> Set.empty
   Quantity.Type.StoredResultsOfSameValue -> Set.empty

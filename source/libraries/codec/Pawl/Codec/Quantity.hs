@@ -54,6 +54,8 @@ codec =
       Arm.payload "BoundCount" SlotName.codec Quantity.BoundCount (\x -> case x of Quantity.BoundCount y -> Just y; _ -> Nothing),
       Arm.payload "LettersOnNameStickers" Common.text Quantity.LettersOnNameStickers (\x -> case x of Quantity.LettersOnNameStickers y -> Just y; _ -> Nothing),
       Arm.nullary "NameStickers" Quantity.NameStickers,
+      Arm.nullary "PowerOfStickers" Quantity.PowerOfStickers,
+      Arm.nullary "ToughnessOfStickers" Quantity.ToughnessOfStickers,
       Arm.payload "UniqueVowelsOnSticker" SlotName.codec Quantity.UniqueVowelsOnSticker (\x -> case x of Quantity.UniqueVowelsOnSticker y -> Just y; _ -> Nothing),
       Arm.nullary "Star" Quantity.Star,
       Arm.payload "Plus" (Plus.codec codec) Quantity.Plus (\x -> case x of Quantity.Plus y -> Just y; _ -> Nothing),
@@ -240,6 +242,8 @@ tagOf x = case x of
   Quantity.UniqueVowelsOnSticker {} -> "UniqueVowelsOnSticker"
   Quantity.LettersOnNameStickers {} -> "LettersOnNameStickers"
   Quantity.NameStickers {} -> "NameStickers"
+  Quantity.PowerOfStickers {} -> "PowerOfStickers"
+  Quantity.ToughnessOfStickers {} -> "ToughnessOfStickers"
   Quantity.Star {} -> "Star"
   Quantity.Plus {} -> "Plus"
   Quantity.Halved {} -> "Halved"

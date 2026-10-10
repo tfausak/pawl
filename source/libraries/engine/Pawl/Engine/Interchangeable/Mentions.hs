@@ -2343,6 +2343,8 @@ quantityNames asking x = case x of
   Quantity.ObjectCountersOfAnyKind -> False
   Quantity.LettersOnNameStickers _ -> False
   Quantity.NameStickers -> False
+  Quantity.PowerOfStickers -> False
+  Quantity.ToughnessOfStickers -> False
   Quantity.HasDesignation _designation -> False
   Quantity.DesignationValue _designation -> False
   Quantity.StoredResultsOfSameValue -> False

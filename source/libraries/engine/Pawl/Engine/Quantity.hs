@@ -575,6 +575,8 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- CR 123.6d off the view, ObjectCounters' posture.
         Quantity.LettersOnNameStickers letters -> fmap (toInteger . sum . fmap (NameWords.letterCount letters) . Filter.nameStickers) mView
         Quantity.NameStickers -> fmap (toInteger . length . Filter.nameStickers) mView
+        Quantity.PowerOfStickers -> fmap (sum . fmap fst . Filter.stickerPowerToughness) mView
+        Quantity.ToughnessOfStickers -> fmap (sum . fmap snd . Filter.stickerPowerToughness) mView
         -- The designation as a 0/1, off the same view ObjectCounters reads -- so CR
         -- 608.2h's last known information answers for an object that is gone, which is
         -- what rule 702.112a's intervening "if" needs on resolution, and what CR 701.37a's
@@ -1314,6 +1316,8 @@ objectSlots quantity = case quantity of
   Quantity.ObjectCountersOfAnyKind -> Set.empty
   Quantity.LettersOnNameStickers _ -> Set.empty
   Quantity.NameStickers -> Set.empty
+  Quantity.PowerOfStickers -> Set.empty
+  Quantity.ToughnessOfStickers -> Set.empty
   Quantity.HasDesignation _ -> Set.empty
   Quantity.DesignationValue _ -> Set.empty
   Quantity.StoredResultsOfSameValue -> Set.empty
@@ -1600,6 +1604,8 @@ readsX quantity = case quantity of
   Quantity.ObjectCountersOfAnyKind -> False
   Quantity.LettersOnNameStickers _ -> False
   Quantity.NameStickers -> False
+  Quantity.PowerOfStickers -> False
+  Quantity.ToughnessOfStickers -> False
   Quantity.HasDesignation _ -> False
   Quantity.DesignationValue _ -> False
   Quantity.StoredResultsOfSameValue -> False

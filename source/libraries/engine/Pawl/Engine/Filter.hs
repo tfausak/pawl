@@ -607,6 +607,9 @@ data View = MkView
     -- | CR 123.6: the word on each name sticker on the candidate, in placement
     -- order. Off the object, stickerKinds' posture.
     nameStickers :: Seq.Seq Text.Text,
+    -- | CR 123.8a: the printed power and toughness on each P/T sticker on the
+    -- candidate, in placement order. Off the object, stickerKinds' posture.
+    stickerPowerToughness :: Seq.Seq (Integer, Integer),
     -- CR 701.54a-b: which player this candidate is the Ring-bearer FOR, or Nothing
     -- for the overwhelming majority of permanents, which carry no such
     -- designation. Read straight off Object.ringBearerFor -- CR 701.54b makes it a
@@ -950,6 +953,7 @@ playerView pid =
       -- CR 123.1: a sticker is on an object, and CR 109.1 makes a player none.
       stickerKinds = Seq.empty,
       nameStickers = Seq.empty,
+      stickerPowerToughness = Seq.empty,
       -- CR 701.54b: Ring-bearer is a designation A PERMANENT can have, and a
       -- player is not one -- the same shape CR 725.1's monarch has with the two
       -- sides swapped.
