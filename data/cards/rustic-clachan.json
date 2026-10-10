@@ -75,11 +75,14 @@
                 "type": "IsSource"
               },
               "rewrite": {
-                "type": "RevealOrTapped",
+                "type": "OrTapped",
                 "value": {
-                  "type": "HasSubtype",
+                  "type": "Reveal",
                   "value": {
-                    "type": "Kithkin"
+                    "type": "HasSubtype",
+                    "value": {
+                      "type": "Kithkin"
+                    }
                   }
                 }
               }

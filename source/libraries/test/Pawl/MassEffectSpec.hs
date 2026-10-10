@@ -32,22 +32,31 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Departure as Departure.Type
+import qualified Pawl.Types.Duration as Duration
+import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
+import qualified Pawl.Types.GainControl as GainControl
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.Modal as Modal.Type
+import qualified Pawl.Types.Mode as Mode
+import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
@@ -55,6 +64,7 @@ import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
 
 -- The names of the cards in one player's copy of a zone, in that zone's order.
@@ -1324,6 +1334,31 @@ carthTheLionSpec s registry =
               ((_, after), asked) = Replay.record answer placed Stack.resolveTop
           Spec.assertEqWith s "CR 608.2d the may was never put" [d | Response.ChoseOptional d <- asked] []
           Spec.assertEqWith s "nothing reached alice's hand" (namesIn Zone.Hand S.alice after) []
+          Spec.assertEqWith s "and nothing was revealed" (revealed after) []
+        -- The same board under a test-local Carth whose put-into-hand is a
+        -- GainControl of the revealed card, which no printing states: the
+        -- dependent instruction carries a PlayerRef ("you", unslotted), which
+        -- names nothing an earlier choice could have left empty, so it is still
+        -- the reveal's fate and the "may" is still not put.
+        Spec.it s "CR 608.2d a GainControl to you of a slot the reveal defines is dependent on it" $ do
+          carth <- S.cardOf s registry "Carth the Lion"
+          printings <- Monad.mapM (S.printingOf s registry) ["Swamp", "Bird Maiden", "Forest", "Murder", "Goblin Piker", "Murder", "Island", "Island"]
+          let control effect = case effect of
+                Effect.MoveToZone move
+                  | MoveToZone.zone move == Zone.Hand ->
+                      Effect.GainControl (GainControl.MkGainControl Duration.Indefinite (MoveToZone.ref move) (PlayerRef.Relative PlayerRelation.You))
+                other -> other
+              overClause c = c {Clause.effects = fmap control (Clause.effects c)}
+              overModal m = m {Modal.Type.modes = fmap (\mode -> mode {Mode.clauses = fmap overClause (Mode.clauses mode)}) (Modal.Type.modes m)}
+              overAbility a = a {TriggeredAbility.modal = overModal (TriggeredAbility.modal a)}
+              variant = carth {Card.Type.faces = fmap (\face -> face {Face.triggeredAbilities = fmap overAbility (Face.triggeredAbilities face)}) (Card.Type.faces carth)}
+              (stocked, _) = stock printings (Setup.emptyGame S.bothPlayers)
+              (_, entered) = S.entersWithTrigger (Printing.ofCard variant) S.alice stocked
+              answer :: Prompt.Prompt r -> r
+              answer = answering (Just 0) Nothing
+              placed = S.runPure answer entered Engine.placePendingTriggers
+              ((_, after), asked) = Replay.record answer placed Stack.resolveTop
+          Spec.assertEqWith s "CR 608.2d the may was never put" [d | Response.ChoseOptional d <- asked] []
           Spec.assertEqWith s "and nothing was revealed" (revealed after) []
         -- CR 603.5: the printed "may" is a real choice. Declining reveals nothing
         -- and sends all seven to the bottom -- the look still ran, so this cannot

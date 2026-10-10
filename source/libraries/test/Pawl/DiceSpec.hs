@@ -101,18 +101,29 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CostAmount as CostAmount
+import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ModifiedRoll as ModifiedRoll
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
+import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.RollAdjustment as RollAdjustment
@@ -802,6 +813,31 @@ nightShiftSpec s registry = Spec.describe s "IncreaseOrDecrease" $ do
     -- The paired board, one thing different: no Night Shift.
     let (bare, _) = nightShiftRun [5, 2] [] [Just (0, RollAdjustment.Increase)] 1 spell board
     Spec.assertEqWith s "CR 706.1: without it the 5 stands" (S.countOnBattlefieldByName knight S.alice bare) 5
+  -- CR 701.67a reaches a waterbend cost wherever it is paid, so CR 118.13's
+  -- announcement of a modifier's Phyrexian symbol weighs its taps as the gate
+  -- did. A test-local Night Shift costing {1}{W/P} and waterbend {1}, which no
+  -- printing states: alice has no mana left after the Endeavor and one untapped
+  -- creature, so paying 2 life and tapping the creature is the only route. An
+  -- announcement blind to the taps finds none, falls back to the mana, and the
+  -- payment fails.
+  Spec.it s "CR 701.67a a modifier's waterbend cost is weighed when its Phyrexian symbol is announced" $ do
+    (spell, _, _, board) <- endeavorBoard s registry
+    shift <- S.cardOf s registry "Night Shift of the Living Dead"
+    maiden <- S.printingOf s registry "Bird Maiden"
+    let waterbent = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.Phyrexian Color.White]), Cost.Type.components = [CostComponent.Waterbend (CostAmount.Fixed 1)]}
+        recost effect = case effect of
+          PlayerEffect.ModifyDieRoll offer -> PlayerEffect.ModifyDieRoll offer {ModifiedRoll.cost = Just waterbent}
+          other -> other
+        restate ability = ability {PlayerStaticAbility.effect = recost (PlayerStaticAbility.effect ability)}
+        variant = shift {Card.Type.faces = fmap (\face -> face {Face.playerAbilities = fmap restate (Face.playerAbilities face)}) (Card.Type.faces shift)}
+        (bird, withBird) = S.addPermanent maiden S.alice board
+        shifted = snd (S.addPermanent (Printing.ofCard variant) S.alice withBird)
+        (after, shown) = nightShiftRun [5, 2] [] [Just (0, RollAdjustment.Increase)] 1 spell shifted
+    -- THE GAMEPLAY ASSERTION: the 5 was pushed to 6, so six Knights.
+    Spec.assertEqWith s "CR 706.2a: the waterbent shift moves the 5 to 6" (S.countOnBattlefieldByName knight S.alice after) 6
+    Spec.assertEqWith s "CR 107.4f: the Phyrexian symbol was paid with 2 life" (S.lifeOf S.alice after) (Just 18)
+    Spec.assertEqWith s "CR 701.67a: the creature was tapped for the generic" (Object.tapped <$> Game.lookupObject bird after) (Just TapState.Tapped)
+    Spec.assertEqWith s "the offer was raised" shown [[5, 2]]
   Spec.it s "CR 706.2b a declined shift is offered again once another applies" $ do
     (spell, _, _, board) <- endeavorBoard s registry
     shift <- S.printingOf s registry "Night Shift of the Living Dead"
@@ -866,7 +902,7 @@ zombieEmployee = CardName.MkCardName (Text.pack "Zombie Employee Token")
 -- each shift offer SHOWED, which the board cannot say.
 --
 -- Declines for an unplanned shift offer, and six for an unplanned throw,
--- rerollAnswer's reasons.
+-- rerollAnswer's reasons. Takes every waterbend tap offered.
 nightShiftAnswer :: Natural.Natural -> Prompt.Prompt r -> State.State ([Natural.Natural], [OptionalDecision.OptionalDecision], [Maybe (Natural.Natural, RollAdjustment.RollAdjustment)], [[Integer]]) r
 nightShiftAnswer index p = case p of
   Prompt.RollDie _ -> do
@@ -885,6 +921,8 @@ nightShiftAnswer index p = case p of
       h : t -> State.put (rolls, rerolls, t, NonEmpty.toList results : shown) >> pure h
       [] -> State.put (rolls, rerolls, [], NonEmpty.toList results : shown) >> pure Nothing
   Prompt.ChooseDieResult {} -> pure index
+  -- CR 701.67a's offer, ascending: the last entry taps the most.
+  Prompt.ChooseCost _ _ _ offered@(_ : _) -> pure (last offered)
   _ -> pure (S.identityAnswer p)
 
 -- Cast the Endeavor, resolve it, then place and drain whatever triggered (CR

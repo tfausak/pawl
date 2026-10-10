@@ -18,7 +18,6 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Cast as Cast
@@ -67,13 +66,13 @@ import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Duration as Duration
-import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryBlock as EntryBlock
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.GainControl as GainControl
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -166,7 +165,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
               S.bob
               (Map.singleton slot (Set.singleton (Recipient.ToObject myr)))
               (Map.singleton slot (Set.singleton (Recipient.ToObject myr)))
-              (Effect.GainControl (DurationRef.MkDurationRef Duration.Indefinite (ObjectRef.InSlot slot)))
+              (Effect.GainControl (GainControl.MkGainControl Duration.Indefinite (ObjectRef.InSlot slot) (PlayerRef.Relative PlayerRelation.You)))
         control =
           S.runPure S.identityAnswer board $
             Resolve.applyEffect
@@ -175,7 +174,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
               S.bob
               (Map.singleton slot (Set.singleton (Recipient.ToObject myr)))
               (Map.singleton slot (Set.singleton (Recipient.ToObject myr)))
-              (Effect.GainControl (DurationRef.MkDurationRef Duration.Indefinite (ObjectRef.InSlot slot)))
+              (Effect.GainControl (GainControl.MkGainControl Duration.Indefinite (ObjectRef.InSlot slot) (PlayerRef.Relative PlayerRelation.You)))
     Spec.assertEqWith s "no control effect is stored for a departed controller" (GameState.continuousEffects after) []
     Spec.assertEqWith s "and the Myr's controller is unchanged" (Projection.controllerOf myr after) (Just S.carol)
     Spec.assertEqWith s "the same call for a player still in the game DOES store one -- the guard is what did it" (length (GameState.continuousEffects control)) 1

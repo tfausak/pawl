@@ -920,10 +920,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- in this turn's log: CR 707.10's copy was never cast.
         Quantity.SpellsCastBefore -> do
           oid <- mOid
-          let casts = Maybe.mapMaybe (Game.castOf . LoggedEvent.event) (Foldable.toList (GameState.events gs))
-          case break ((== oid) . SpellWasCast.spell) casts of
-            (_, []) -> Nothing
-            (before, _) -> Just (toInteger (length before))
+          fmap (toInteger . length) (Game.castsBefore oid gs)
         -- CR 700.4 / 702.69a: how many permanents, of any controller, were put into
         -- a graveyard from the battlefield this turn. The arm above's log fold with
         -- no keying on the evaluation's own object: rule 702.69a counts the whole

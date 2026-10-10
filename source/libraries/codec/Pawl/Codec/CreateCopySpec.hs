@@ -3,7 +3,6 @@ module Pawl.Codec.CreateCopySpec where
 import qualified Data.Map as Map
 import qualified Data.Text as Text
 import qualified Pawl.Codec.CreateCopy as CreateCopy
-import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CounterKind as CounterKind

@@ -16,7 +16,6 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
-import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.AttackTarget as AttackTarget
@@ -645,7 +644,7 @@ eventBindingsOver board gs bearerBecame becameInGraveyard bearer you cond event 
     Binding.setEventAmount
       ( sum
           ( Map.filterWithKey
-              (\recipient _ -> maybe False (PlayerRelation.holds (Game.teams gs) relation you) (Target.playerOf recipient))
+              (\recipient _ -> maybe False (PlayerRelation.holds (Game.teams gs) relation you) (Recipient.playerOf recipient))
               (Map.unionsWith (+) (DamagePrevented.amounts prevented))
           )
       )

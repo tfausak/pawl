@@ -31,7 +31,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Pawl.CardSpec (Framing (SourceHostFramed), MintedKind (MintedEmblem), anyFace, cardAuthoredEffects, cardFilters, cardReplacementEffects, cardResolutionEffects, conditionQuantities, copyTargetsRefs, delayedDeclarations, durationConditions, effectFilters, effectMintedFaces, effectWithNested, enchantSlots, faceModals, frame, framedSlotsReadSingly, grantedActivatedAbilities, grantedModifications, grantedTriggeredAbilities, instantLine, mintedFaces, mintedFacesTagged, objectRefFilters, oneFaced, overFaces, replacementEffectRiders, restrictionFilters, spellLine, triggerConditionFilters, triggerConditionSlots, vanillaFace)
 import qualified Pawl.Codec.Card as Card.Codec
-import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Codec.Face as Face.Codec
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Mint as Mint
@@ -104,7 +103,6 @@ import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.DrawR as DrawR
 import qualified Pawl.Types.DungeonRoom as DungeonRoom
 import qualified Pawl.Types.Duration as Duration
-import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.Earthbend as Earthbend
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRiders as EntryRiders
@@ -125,7 +123,7 @@ import qualified Pawl.Types.ForbidBeingBlocked as ForbidBeingBlocked
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.ForbidUntap as ForbidUntap
 import qualified Pawl.Types.FromReference as FromReference
-import qualified Pawl.Types.GiveControl as GiveControl
+import qualified Pawl.Types.GainControl as GainControl
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -384,8 +382,7 @@ ownQuantities effect = case effect of
   Effect.AddPhases _ -> []
   Effect.EndTurn -> []
   Effect.EndCombatPhase -> []
-  Effect.GainControl (DurationRef.MkDurationRef duration _) -> durationQuantities duration
-  Effect.GiveControl _ -> []
+  Effect.GainControl (GainControl.MkGainControl duration _ _) -> durationQuantities duration
   Effect.ExchangeControl _ -> []
   Effect.ArmDelayedTrigger {} -> []
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ _) -> durationQuantities duration
@@ -1535,8 +1532,7 @@ effectObjectRefs effect =
         Effect.AddPhases {} -> []
         Effect.EndTurn -> []
         Effect.EndCombatPhase -> []
-        Effect.GainControl (DurationRef.MkDurationRef _ ref) -> read_ [ref]
-        Effect.GiveControl (GiveControl.MkGiveControl _ ref) -> read_ [ref]
+        Effect.GainControl (GainControl.MkGainControl _ ref _) -> read_ [ref]
         Effect.ExchangeControl _ -> []
         Effect.ArmDelayedTrigger {} -> []
         Effect.AffectPlayers {} -> []

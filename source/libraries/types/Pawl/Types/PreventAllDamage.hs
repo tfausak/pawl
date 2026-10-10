@@ -12,10 +12,7 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 -- | CR 615.1 / 615.3's UNBOUNDED prevention shield: over whom, of what kind,
 -- for how long, and CR 615.5's additional effect riding it.
 
--- Pawl.Types.PreventNextDamage with the Quantity removed, and its own type
--- rather than Pawl.Types.DurationRef because both the kind and the rider are
--- fields GainControl -- that payload's other sharer -- does not want. That is
--- DurationRef's own instruction.
+-- Pawl.Types.PreventNextDamage with the Quantity removed.
 --
 -- Parametric in the EFFECT rather than in the card, for
 -- Pawl.Types.PreventNextDamage's reason: Pawl.Types.Effect holds this record and

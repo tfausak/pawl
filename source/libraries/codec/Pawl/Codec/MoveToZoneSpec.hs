@@ -1,7 +1,6 @@
 module Pawl.Codec.MoveToZoneSpec where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Codec.MoveToZone as MoveToZone
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec

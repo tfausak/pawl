@@ -32,6 +32,7 @@ import qualified Pawl.Engine.Keyword as Keyword.Engine
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Requirement as Requirement
+import qualified Pawl.Engine.Snapshot as Snapshot
 import qualified Pawl.Engine.Summoning as Summoning
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Integer as Integer
@@ -424,15 +425,15 @@ isCreatureObjectGiven = Projection.isCreatureGiven
 -- dropped in attemptAttackDeclaration rather than here, which is the same
 -- posture and one step later.
 --
--- canAttackGiven is the half a LOOP wants: `grants`, `pcs`, `restricted` and
+-- canAttackGiven is the half a LOOP wants: the board, `restricted` and
 -- `waived` are each one battlefield-wide walk, taken once per declaration pass. An
 -- absent projection is a cache miss the projection recovers from, while an absent
 -- restriction set is a wrong answer -- which is why canAttack computes one.
 canAttack :: PlayerId -> ObjectId -> GameState -> Bool
-canAttack pid oid gs = canAttackGiven (Projection.controlGrants gs) Map.empty (CombatRestriction.cantAttack [oid] gs) (AttackPermission.waivesDefender [oid] gs) pid oid gs
+canAttack pid oid gs = canAttackGiven (Snapshot.onDemand gs) (CombatRestriction.cantAttack [oid] gs) (AttackPermission.waivesDefender [oid] gs) pid oid gs
 
-canAttackGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> Set ObjectId -> Set ObjectId -> PlayerId -> ObjectId -> GameState -> Bool
-canAttackGiven grants pcs restricted waived pid oid gs = case Game.lookupObject oid gs of
+canAttackGiven :: Snapshot.Snapshot -> Set ObjectId -> Set ObjectId -> PlayerId -> ObjectId -> GameState -> Bool
+canAttackGiven (Snapshot.MkSnapshot pcs grants) restricted waived pid oid gs = case Game.lookupObject oid gs of
   Nothing -> False
   Just obj ->
     Projection.controllerOfGiven grants oid gs == Just pid
@@ -472,12 +473,11 @@ sideOf pid gs = pid : filter (\p -> p /= pid && Turn.sharesTurn gs pid p) (Game.
 
 legalAttackers :: PlayerId -> GameState -> [ObjectId]
 legalAttackers pid gs =
-  let grants = Projection.controlGrants gs
-      pcs = Projection.projectAll gs
-      controlled = Projection.controlsGiven grants pid gs
+  let board = Snapshot.whole gs
+      controlled = Projection.controlsGiven (Snapshot.grants board) pid gs
       restricted = CombatRestriction.cantAttack controlled gs
       waived = AttackPermission.waivesDefender controlled gs
-   in filter (\oid -> canAttackGiven grants pcs restricted waived pid oid gs) controlled
+   in filter (\oid -> canAttackGiven board restricted waived pid oid gs) controlled
 
 -- CR 506.5: a creature attacks alone if it is the only creature DECLARED as an
 -- attacker during the declare attackers step. `alone` is the set of candidates a
@@ -1068,10 +1068,10 @@ forcedAttackDeclaration (_, best) =
 -- canBlockGiven/legalBlockersGiven are canAttackGiven's pair, hoisted for the
 -- same reason and with the same snapshot argument.
 canBlock :: PlayerId -> ObjectId -> GameState -> Bool
-canBlock pid oid gs = canBlockGiven (Projection.controlGrants gs) Map.empty (CombatRestriction.cantBlock (Just pid) [oid] gs) pid oid gs
+canBlock pid oid gs = canBlockGiven (Snapshot.onDemand gs) (CombatRestriction.cantBlock (Just pid) [oid] gs) pid oid gs
 
-canBlockGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> Set ObjectId -> PlayerId -> ObjectId -> GameState -> Bool
-canBlockGiven grants pcs restricted pid oid gs = case Game.lookupObject oid gs of
+canBlockGiven :: Snapshot.Snapshot -> Set ObjectId -> PlayerId -> ObjectId -> GameState -> Bool
+canBlockGiven (Snapshot.MkSnapshot pcs grants) restricted pid oid gs = case Game.lookupObject oid gs of
   Nothing -> False
   Just obj ->
     Projection.controllerOfGiven grants oid gs == Just pid
@@ -1089,19 +1089,19 @@ canBlockGiven grants pcs restricted pid oid gs = case Game.lookupObject oid gs o
       && not (Set.member oid restricted)
 
 legalBlockers :: PlayerId -> GameState -> [ObjectId]
-legalBlockers pid gs = legalBlockersGiven (Projection.controlGrants gs) (Projection.projectAll gs) pid gs
+legalBlockers pid gs = legalBlockersGiven (Snapshot.whole gs) pid gs
 
 -- The restriction walk is taken HERE rather than handed in: nothing but this
 -- filter reads it, where the grant list and the projection are shared with the
 -- whole blocking search.
-legalBlockersGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> [ObjectId]
-legalBlockersGiven grants pcs pid gs =
-  let controlled = Projection.controlsGiven grants pid gs
+legalBlockersGiven :: Snapshot.Snapshot -> PlayerId -> GameState -> [ObjectId]
+legalBlockersGiven board pid gs =
+  let controlled = Projection.controlsGiven (Snapshot.grants board) pid gs
       -- CR 509.1a's defending player is `pid`, the one declaring blocks, so a
       -- CR 508.5 gate about them is read at that seat. Unobserved by any board;
       -- CombatRestriction.cantBlock says why.
       restricted = CombatRestriction.cantBlock (Just pid) controlled gs
-   in filter (\oid -> canBlockGiven grants pcs restricted pid oid gs) controlled
+   in filter (\oid -> canBlockGiven board restricted pid oid gs) controlled
 
 -- CR 702.9b: a creature with flying can't be blocked except by creatures with
 -- flying and/or reach (CR 702.17b).
@@ -1225,10 +1225,10 @@ skulkAllowsGiven pcs blocker attacker gs =
 -- rides the constructor, so there is no single Keyword value to ask about. All
 -- four of CR 702.14c's clauses, the keyword carrying a Filter.
 landwalkAllows :: ObjectId -> GameState -> Bool
-landwalkAllows attacker gs = landwalkAllowsGiven (Projection.controlGrants gs) Map.empty attacker gs
+landwalkAllows attacker gs = landwalkAllowsGiven (Snapshot.onDemand gs) attacker gs
 
-landwalkAllowsGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> Bool
-landwalkAllowsGiven grants pcs attacker gs =
+landwalkAllowsGiven :: Snapshot.Snapshot -> ObjectId -> GameState -> Bool
+landwalkAllowsGiven (Snapshot.MkSnapshot pcs grants) attacker gs =
   let -- A wildcard rather than an exhaustive case: this asks about ONE named
       -- constructor rather than classifying every keyword.
       landCriterionOf keyword = case keyword of
@@ -1300,7 +1300,7 @@ menaceAllowsGiven pcs declaration gs =
 -- blockDeclarationAllowed.
 pairAllowed :: [ObjectId] -> [ObjectId] -> ObjectId -> ObjectId -> GameState -> Bool
 pairAllowed candidates attackers blocker attacker gs =
-  pairAllowedGiven (Projection.controlGrants gs) Map.empty (CombatRestriction.barredBlocks candidates attackers gs) candidates attackers blocker attacker gs
+  pairAllowedGiven (Snapshot.onDemand gs) (CombatRestriction.barredBlocks candidates attackers gs) candidates attackers blocker attacker gs
 
 -- pairAllowed against a pre-projected board: this is asked once per (blocker,
 -- attacker) PAIR, so each evasion read would otherwise be a fresh gather in a
@@ -1310,8 +1310,8 @@ pairAllowed candidates attackers blocker attacker gs =
 -- `barred` is CR 509.1b's PAIRWISE restrictions, stated on either side of the
 -- pair, decided for every pair by CombatRestriction.barredBlocks. An EMPTY
 -- set is a board stating no such restriction rather than a cache miss.
-pairAllowedGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> Set (ObjectId, ObjectId) -> [ObjectId] -> [ObjectId] -> ObjectId -> ObjectId -> GameState -> Bool
-pairAllowedGiven grants pcs barred candidates attackers blocker attacker gs =
+pairAllowedGiven :: Snapshot.Snapshot -> Set (ObjectId, ObjectId) -> [ObjectId] -> [ObjectId] -> ObjectId -> ObjectId -> GameState -> Bool
+pairAllowedGiven board@(Snapshot.MkSnapshot pcs _) barred candidates attackers blocker attacker gs =
   -- CR 509.1a: the blocker must be one this player could block with at all, and
   -- the attacker must actually be attacking.
   List.elem blocker candidates
@@ -1322,7 +1322,7 @@ pairAllowedGiven grants pcs barred candidates attackers blocker attacker gs =
     && shadowAllowsGiven pcs blocker attacker gs
     && horsemanshipAllowsGiven pcs blocker attacker gs
     && skulkAllowsGiven pcs blocker attacker gs
-    && landwalkAllowsGiven grants pcs attacker gs
+    && landwalkAllowsGiven board attacker gs
     && not (Set.member (blocker, attacker) barred)
 
 -- CR 509.1b: the defending player checks each creature for RESTRICTIONS, and if
@@ -1493,12 +1493,12 @@ choicesUpTo n attackers =
 -- placement is the whole of the rule -- a taxed block is still legal, it is only
 -- never one the defending player must reach for.
 blockCeiling :: PlayerId -> GameState -> (Requirement.Instances (ObjectId, ObjectId), Map ObjectId (Set ObjectId))
-blockCeiling pid gs = blockCeilingGiven (Projection.controlGrants gs) (Projection.projectAll gs) pid gs
+blockCeiling pid gs = blockCeilingGiven (Snapshot.whole gs) pid gs
 
-blockCeilingGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> (Requirement.Instances (ObjectId, ObjectId), Map ObjectId (Set ObjectId))
-blockCeilingGiven grants pcs pid gs =
-  let (candidates, attackers, barred, limit) = blockScopeGiven grants pcs pid gs
-      able blocker attacker = pairAllowedGiven grants pcs barred candidates attackers blocker attacker gs
+blockCeilingGiven :: Snapshot.Snapshot -> PlayerId -> GameState -> (Requirement.Instances (ObjectId, ObjectId), Map ObjectId (Set ObjectId))
+blockCeilingGiven board pid gs =
+  let (candidates, attackers, barred, limit) = blockScopeGiven board pid gs
+      able blocker attacker = pairAllowedGiven board barred candidates attackers blocker attacker gs
       arity = blockArityGiven candidates gs
       requirements = BlockRequirement.instances able candidates attackers gs
       -- CR 509.1c's cost clause is a filter on the PAIRS the search may
@@ -1509,7 +1509,7 @@ blockCeilingGiven grants pcs pid gs =
    in ( requirements,
         if Requirement.vacuous requirements
           then Map.empty
-          else bestBlockDeclaration requirements limit arity pcs freely candidates attackers gs
+          else bestBlockDeclaration requirements limit arity (Snapshot.projected board) freely candidates attackers gs
       )
 
 -- CR 509.1: is this declaration one the defending player may make? Both checks
@@ -1522,15 +1522,14 @@ blockCeilingGiven grants pcs pid gs =
 -- demands. CR 509.1d-509.1f's determination and payment are declareBlockers'.
 legalBlockDeclaration :: PlayerId -> Map ObjectId (Set ObjectId) -> GameState -> Bool
 legalBlockDeclaration pid declaration gs =
-  let grants = Projection.controlGrants gs
-      pcs = Projection.projectAll gs
+  let board = Snapshot.whole gs
       -- pairAllowedGiven refuses a pair whose attacker is not on `attackers`,
       -- which is CR 802.4a's restriction.
-      (candidates, attackers, barred, limit) = blockScopeGiven grants pcs pid gs
-      able blocker attacker = pairAllowedGiven grants pcs barred candidates attackers blocker attacker gs
+      (candidates, attackers, barred, limit) = blockScopeGiven board pid gs
+      able blocker attacker = pairAllowedGiven board barred candidates attackers blocker attacker gs
       arity = blockArityGiven candidates gs
-      (requirements, best) = blockCeilingGiven grants pcs pid gs
-   in blockDeclarationAllowed limit arity pcs able declaration gs
+      (requirements, best) = blockCeilingGiven board pid gs
+   in blockDeclarationAllowed limit arity (Snapshot.projected board) able declaration gs
         && requirementsMet requirements declaration >= requirementsMet requirements best
 
 -- CR 509.1 / 805.10d: what a block declaration by `pid`'s side is judged over --
@@ -1545,11 +1544,11 @@ legalBlockDeclaration pid declaration gs =
 -- read at the attacker's defending player instead (`barredBlocks`).
 -- One walk for the whole search: CR 509.1b's pairwise restrictions are decided
 -- once here and read by every pair the caller judges.
-blockScopeGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> ([ObjectId], [ObjectId], Set (ObjectId, ObjectId), Maybe Natural)
-blockScopeGiven grants pcs pid gs =
+blockScopeGiven :: Snapshot.Snapshot -> PlayerId -> GameState -> ([ObjectId], [ObjectId], Set (ObjectId, ObjectId), Maybe Natural)
+blockScopeGiven board pid gs =
   let side = sideOf pid gs
       attackers = concatMap (`attackersOn` gs) side
-      seats = fmap (\p -> (p, legalBlockersGiven grants pcs p gs)) side
+      seats = fmap (\p -> (p, legalBlockersGiven board p gs)) side
       barred = CombatRestriction.barredBlocks (concatMap snd seats) attackers gs
       limit = case Maybe.mapMaybe (\p -> CombatRestriction.blockLimit (Just p) gs) side of
         [] -> Nothing
@@ -2779,7 +2778,7 @@ recordDeclaredBlockers oids g =
 attemptBlockDeclaration :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> [ObjectId] -> Set (Map ObjectId (Set ObjectId)) -> Game ()
 attemptBlockDeclaration perform pid attacking rejected = do
   gs <- State.get
-  let (candidates, _, _, _) = blockScopeGiven (Projection.controlGrants gs) (Projection.projectAll gs) pid gs
+  let (candidates, _, _, _) = blockScopeGiven (Snapshot.whole gs) pid gs
       -- CR 805.10d: the defending player a blocker is declared by is the one
       -- controlling it, which blockScopeGiven made one of `pid`'s side.
       blockerOf oid = Maybe.fromMaybe pid (Projection.controllerOf oid gs)

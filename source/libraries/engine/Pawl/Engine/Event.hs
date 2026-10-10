@@ -124,6 +124,7 @@ import qualified Pawl.Types.Effect as Effect.Type
 import qualified Pawl.Types.EnteringTogether as EnteringTogether
 import qualified Pawl.Types.EntersWith as EntersWith
 import qualified Pawl.Types.EntryFlip as EntryFlip
+import qualified Pawl.Types.EntryPrice as EntryPrice
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRefusal as EntryRefusal
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
@@ -637,8 +638,8 @@ payLife pid n = do
     recordEvent (GameEvent.LifeLost (LifeChange.MkLifeChange pid settled)) . Game.adjustLife pid (negate (toInteger settled))
 
 -- CR 110.5b: stamp the tapped status onto an entering permanent, the write shared
--- by EntryRewrite.Tapped (CR 614.1d), by the declining half of both
--- EntryRewrite.PayLifeOrTapped and EntryRewrite.RevealOrTapped (CR 614.1c), and
+-- by EntryRewrite.Tapped (CR 614.1d), by the declining half of
+-- EntryRewrite.OrTapped (CR 614.1c), and
 -- by the taking half of EntryRewrite.AsCopy's `tapped` (Vesuva) -- which is why
 -- it is one function: those sentences differ in what they charge and not in what
 -- they leave on the board.
@@ -2191,7 +2192,7 @@ apply batch candidate event =
                 then -- With nothing eligible, declining is the only legal answer
                 -- -- a forced selection rather than an elision of options a
                 -- player could tell apart -- so the prompt is skipped rather
-                -- than asked and overruled. RevealOrTapped's posture below.
+                -- than asked and overruled. OrTapped's reveal posture below.
                 -- One candidate IS still asked: the card's "may" makes
                 -- declining a real fork.
                   pure Nothing
@@ -2696,7 +2697,7 @@ apply batch candidate event =
       -- CHOSEN, so paying any later than this leaves five 3/3s instead of one.
       --
       -- That argument covers the costs no earlier choice can leave unpayable:
-      -- this one is "any number", PayLifeOrTapped may be declined, and the exile
+      -- this one is "any number", OrTapped's life may be declined, and the exile
       -- (EntryRewrite.ExileFromGraveyard) does as much as it can (CR 101.3).
       -- EntryRewrite.SacrificeToEnter's fixed count can be starved, so THIS
       -- answer is judged against the fixed costs of the members still to come
@@ -2855,7 +2856,7 @@ apply batch candidate event =
       -- answer rather than an omission.
       --
       -- WHICH CARDS is Replacement.amplifiableFromHand, read HERE at CR 614.12a's
-      -- moment for RevealOrTapped's reason: an entry replacement applied before
+      -- moment for OrTapped's reveal reason: an entry replacement applied before
       -- this one can have moved a card (CR 614.13). Rule 702.38a's exclusion of
       -- cards entering beside this one falls out of that read; the helper says
       -- why.
@@ -2867,7 +2868,7 @@ apply batch candidate event =
       -- retyped, so this is the right door rather than a demonstrated behaviour.
       --
       -- Through `reveal`, CR 701.20a's own funnel, so every shown card reaches the
-      -- public log -- the RevealOrTapped arm's road, and a reveal is not a cost
+      -- public log -- OrTapped's reveal road, and a reveal is not a cost
       -- here either.
       --
       -- The counters go through addEnteringCounters, so CR 614.16 reaches them in
@@ -2934,7 +2935,7 @@ apply batch candidate event =
           Nothing -> pure (Just event)
           Just controller -> do
             -- The graveyard is read HERE, at CR 614.12a's moment, for
-            -- RevealOrTapped's reason: an entry replacement applied before this
+            -- OrTapped's reveal reason: an entry replacement applied before this
             -- one can have moved a card (CR 614.13).
             let offered = Replacement.graveyardCandidates controller filter_ gs
             -- Asked through Game.chooseAmong: with no candidate nothing is
@@ -3332,20 +3333,14 @@ apply batch candidate event =
         Replacement.consume (ReplacementCandidate.identity candidate)
         enterTapped oid
         pure (Just event)
-      -- CR 614.1c with CR 119.4: "As this land enters, you may pay N life. If you
-      -- don't, it enters tapped" (Razorgrass Field). The arm above's write, with a
+      -- CR 614.1c: "As this land enters, you may [price]. If you don't, it enters
+      -- tapped" (Razorgrass Field, Rustic Clachan). The arm above's write, with a
       -- price on avoiding it -- so declining here leaves exactly the board Zof
       -- Bloodbog's unconditional sentence leaves, down to the same stamp.
       --
-      -- NEVER ELIDED where the payment is possible. Life against an untapped land
-      -- is a real fork on any board -- it is why the cycle is printed -- so the
-      -- prompt is raised every time the entering object has a controller who can
-      -- afford it.
-      --
-      -- Through payLife, CR 119.4's own door, and NOT a subtraction from the life
-      -- total: rule 119.4's last clause makes the payment a life loss like any
-      -- other, so a card watching for life loss sees this one.
-      EntryRewrite.PayLifeOrTapped n -> do
+      -- NEVER ELIDED where the price can be paid. Paying against an untapped land
+      -- is a real fork on any board -- it is why the cycles are printed.
+      EntryRewrite.OrTapped price -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         gs <- State.get
         case Projection.controllerOf oid gs of
@@ -3354,71 +3349,53 @@ apply batch candidate event =
           -- falls back to its owner. Tapped rather than untapped, because with
           -- nobody to ask nobody paid -- which is the card's own stated default,
           -- "if you don't, it enters tapped".
-          Nothing -> do
-            enterTapped oid
-            pure (Just event)
-          Just controller -> do
+          Nothing -> enterTapped oid
+          Just controller -> case price of
             -- CR 119.4: a player may pay N life only if their life total is at
             -- least N. Below that, declining is the only legal answer -- a forced
             -- selection, not an elision of options a player could tell apart --
             -- so the prompt is skipped rather than asked and overruled. CR 119.4b
             -- keeps 0 payable at any total, so a zero amount is still asked.
-            answer <-
-              if canPayLife controller n gs
-                then Game.choose (Prompt.ChoosePayLifeOnEntry (Decide.deciderFor controller gs) controller oid n)
-                else pure OptionalDecision.Declines
-            case answer of
-              OptionalDecision.Exercises -> payLife controller n
-              OptionalDecision.Declines -> enterTapped oid
-            pure (Just event)
-      -- CR 614.1c with CR 701.20a: "As this land enters, you may reveal a Kithkin
-      -- card from your hand. If you don't, this land enters tapped" (Rustic
-      -- Clachan). The arm above with a different price -- showing a card instead
-      -- of spending life -- and the same declining half, down to the same stamp.
-      --
-      -- Through `reveal`, CR 701.20a's own funnel, so the shown card reaches the
-      -- public log with the projection a player at the table would see. Nothing
-      -- moves and nothing changes (CR 701.20b), which is why the paying half is
-      -- the reveal alone: this is not a cost, so no CR 118 payment and no
-      -- rollback is involved.
-      --
-      -- NEVER ELIDED where a matching card is held. Showing a card nobody could
-      -- have made you show, against a land that comes in tapped, is a real fork on
-      -- any board -- it is why the cycle is printed.
-      EntryRewrite.RevealOrTapped filter_ -> do
-        Replacement.consume (ReplacementCandidate.identity candidate)
-        gs <- State.get
-        case Projection.controllerOf oid gs of
-          -- Unreachable, and defensive for the arm above's reason: the object is
-          -- materialized on the battlefield before this loop runs, so controllerOf
-          -- falls back to its owner. Tapped rather than untapped, because with
-          -- nobody to ask nobody revealed -- the card's own stated default.
-          Nothing -> do
-            enterTapped oid
-            pure (Just event)
-          Just controller -> do
-            -- The hand is read HERE, at CR 614.12a's moment, and not off any
-            -- earlier snapshot: an entry replacement applied before this one can
-            -- have moved a card (CR 614.13), and the offer must be what the
-            -- player actually holds as the choice is made.
-            let candidates = Replacement.revealableFromHand controller filter_ gs
-            answer <- case NonEmpty.nonEmpty candidates of
-              -- Holding nothing that matches, declining is the only legal answer
-              -- -- a forced selection rather than an elision of options a player
-              -- could tell apart -- so the prompt is skipped rather than asked and
-              -- overruled.
-              Nothing -> pure Nothing
-              Just offered -> Game.choose (Prompt.ChooseRevealOnEntry (Decide.deciderFor controller gs) controller oid offered)
-            -- FILTERED, NOT TRUSTED, AsCopy's posture above: this list is the only
-            -- thing enforcing the printed criterion, so honouring an unoffered
-            -- answer would let any card in hand keep the land untapped. A
-            -- REGRESSION FENCE rather than proven behaviour -- the offer is the
-            -- only thing an ordinary game answers from, so it takes a transcript
-            -- naming a card that was never offered to reach the refusal.
-            case answer of
-              Just shown | List.elem shown candidates -> reveal RevealCause.Ordinary controller shown
-              _ -> enterTapped oid
-            pure (Just event)
+            --
+            -- Through payLife, CR 119.4's own door, and NOT a subtraction from the
+            -- life total: rule 119.4's last clause makes the payment a life loss
+            -- like any other, so a card watching for life loss sees this one.
+            EntryPrice.PayLife n -> do
+              answer <-
+                if canPayLife controller n gs
+                  then Game.choose (Prompt.ChoosePayLifeOnEntry (Decide.deciderFor controller gs) controller oid n)
+                  else pure OptionalDecision.Declines
+              case answer of
+                OptionalDecision.Exercises -> payLife controller n
+                OptionalDecision.Declines -> enterTapped oid
+            -- CR 701.20a: through `reveal`, its own funnel, so the shown card
+            -- reaches the public log with the projection a player at the table
+            -- would see. Nothing moves and nothing changes (CR 701.20b), so this
+            -- is not a cost: no CR 118 payment and no rollback is involved.
+            EntryPrice.Reveal filter_ -> do
+              -- The hand is read HERE, at CR 614.12a's moment, and not off any
+              -- earlier snapshot: an entry replacement applied before this one
+              -- can have moved a card (CR 614.13), and the offer must be what the
+              -- player actually holds as the choice is made.
+              let candidates = Replacement.revealableFromHand controller filter_ gs
+              answer <- case NonEmpty.nonEmpty candidates of
+                -- Holding nothing that matches, declining is the only legal
+                -- answer -- a forced selection rather than an elision of options
+                -- a player could tell apart -- so the prompt is skipped rather
+                -- than asked and overruled.
+                Nothing -> pure Nothing
+                Just offered -> Game.choose (Prompt.ChooseRevealOnEntry (Decide.deciderFor controller gs) controller oid offered)
+              -- FILTERED, NOT TRUSTED, AsCopy's posture above: this list is the
+              -- only thing enforcing the printed criterion, so honouring an
+              -- unoffered answer would let any card in hand keep the land
+              -- untapped. A REGRESSION FENCE rather than proven behaviour -- the
+              -- offer is the only thing an ordinary game answers from, so it
+              -- takes a transcript naming a card that was never offered to reach
+              -- the refusal.
+              case answer of
+                Just shown | List.elem shown candidates -> reveal RevealCause.Ordinary controller shown
+                _ -> enterTapped oid
+        pure (Just event)
       -- CR 702.145b's first static ability: "if it is night and this permanent
       -- is represented by a double-faced card, it enters transformed." The one
       -- producer CR 616.1d's bucket has, and CR 616.1d names no origin zone, so
@@ -4651,8 +4628,8 @@ lockHalf oid half =
 -- halves, and it has no halves at all. Nothing calls this for one, but the guard
 -- is the rule rather than defensiveness.
 --
--- Nothing -- a designation written for an object whose card cannot be found --
--- answers False, there being no faces to compare against.
+-- Nothing -- an object with no halves (Game.halvesOf) -- answers False, there
+-- being no faces to compare against.
 fullyUnlockedAfter :: Set RoomHalf.RoomHalf -> Maybe Card -> Bool
 fullyUnlockedAfter halves card = case card of
   Nothing -> False
@@ -6005,7 +5982,13 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
               -- neither half was cast as a spell, it enters with neither unlocked
               -- designation." A Room put onto the battlefield by an effect
               -- reaches this with `shown` Nothing and enters with both doors shut.
-              unlocking = dest == Zone.Battlefield && Maybe.isJust (Game.halvesOf oid gs)
+              unlocking = dest == Zone.Battlefield && Maybe.isJust halves
+              -- CR 709.5b: the halves the object HAS, its copiable values', read
+              -- once for both mkObj's designation and the CR 709.5i flag below.
+              halves = Game.halvesOf oid gs
+              -- CR 709.5d's designation is a POSITION (CR 709.5c), so the cast
+              -- half's name is placed against the halves the permanent has.
+              entryUnlocked = if unlocking then foldMap Set.singleton (shown >>= \n -> Card.halfPositionOf n =<< halves) else Set.empty
               -- CR 110.5's status the ARRIVING incarnation will carry. Named
               -- because two readers want it: mkObj's `facing` field below, whose
               -- comment has the reasoning, and the CR 303.4f gate further down,
@@ -6084,9 +6067,7 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                     -- between, one of which stops being right the moment the
                     -- second door opens.
                     Object.face = if dest == requestedDest && not unlocking then shown else Nothing,
-                    -- CR 709.5d's designation is a POSITION (CR 709.5c), so the cast
-                    -- half's name is placed against the halves the permanent has.
-                    Object.unlockedHalves = if unlocking then foldMap Set.singleton (shown >>= \n -> Card.halfPositionOf n =<< Game.halvesOf oid gs) else Set.empty,
+                    Object.unlockedHalves = entryUnlocked,
                     -- CR 708.4 / 708.3: the object is turned face down BEFORE it
                     -- is put onto the stack or enters the battlefield, so this is
                     -- part of the move rather than a stamp on what the move
@@ -6707,14 +6688,13 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                   -- which is logged first.
                   --
                   -- CR 709.5i's flag is computed here too, through the same
-                  -- `fullyUnlockedAfter` unlockHalves uses, and against the designations
-                  -- `mkObj` actually wrote. Reading `shown` back rather than the stored
-                  -- object, so the two writers answer the question the same way from the
-                  -- same input. Always False on THIS route, and that is CR 709.5d rather
-                  -- than a shortcut: an entry gives at most ONE designation, so a
-                  -- two-door Room can never arrive fully unlocked. CR 709.5i's second
-                  -- branch is reached from unlockHalves instead, which can give both at
-                  -- once.
+                  -- `fullyUnlockedAfter` unlockHalves uses, against the designations
+                  -- `mkObj` wrote (`entryUnlocked`) and the copiable halves
+                  -- (Game.halvesOf) unlockHalves reads too. Always False on THIS
+                  -- route, and that is CR 709.5d rather than a shortcut: an entry
+                  -- gives at most ONE designation, so a two-door Room can never
+                  -- arrive fully unlocked. CR 709.5i's second branch is reached from
+                  -- unlockHalves instead, which can give both at once.
                   --
                   -- The ACTOR is CR 110.2a's entry controller, the `chooser` above:
                   -- rule 709.5d gives the designation with no player taking an action,
@@ -6722,7 +6702,7 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                   -- connects to it -- which is also the player a Room's own "when you
                   -- unlock this door" reads as "you" (CR 109.5).
                   Monad.forM_ (if unlocking then Maybe.maybeToList shown else []) $ \half ->
-                    State.modify' (recordEvent (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked newId (Maybe.fromMaybe pid under) half (fullyUnlockedAfter (foldMap Set.singleton (shown >>= \n -> Card.halfPositionOf n =<< Game.halvesOf oid gs)) (Game.cardOf oid gs)))))
+                    State.modify' (recordEvent (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked newId (Maybe.fromMaybe pid under) half (fullyUnlockedAfter entryUnlocked halves))))
                   -- CR 603.2g: record the RESOLVED event, carrying the NEW object's id --
                   -- what an enters trigger scans -- alongside the id it had in `fromZone`,
                   -- which is the key `lastKnown` is filed under and so the only route back
@@ -8241,7 +8221,8 @@ meldable victims gs = do
 --
 -- CR 730.2h's flip components are stamped as a SECOND reading of the same merge,
 -- both sides read again through Projection.copiableCharacteristicsFlipped, and
--- Projection.stampedSnapshotOf spends it once the merged permanent is flipped.
+-- Projection.stampedSnapshotOf spends it once the merged permanent is flipped --
+-- off a rewoven stored copy row's PC.flipped while one covers the permanent.
 -- Two readings rather than one because CR 110.5a keeps status out of the
 -- characteristics: flipping is no CR 613 layer to fold in later, and CR 730.2a
 -- fixes this stamp's timestamp at the merge, so what the flip may reach is
@@ -8296,8 +8277,18 @@ merge sid target side = do
             -- expiry and timestamp and carries the merge read over it.
             -- Pawl.MutateSpec's "CR 730.2a/613.7 a merge outranks Mirrorweave's
             -- copy at once and is recomputed when it ends" proves both.
+            --
+            -- The row carries CR 730.2h's flipped reading of the merge as its
+            -- PC.flipped, the stamp's own slot for it, since a row has no
+            -- Binding.flippedCopyOf beside it. Pawl.MutateSpec's "CR 730.2h a
+            -- merge over Mirrorweave's copy of a flip card flips with the
+            -- abilities from under" proves it.
             alone row = row {ActiveCopy.objects = Set.singleton target}
-            rewoven row = (alone row) {ActiveCopy.snapshot = reading Projection.copiableCharacteristicsFaceUp unrowed {GameState.copyEffects = alone row : GameState.copyEffects unrowed}}
+            rewoven row =
+              let board = unrowed {GameState.copyEffects = alone row : GameState.copyEffects unrowed}
+                  faceUp = reading Projection.copiableCharacteristicsFaceUp board
+                  flipped = reading Projection.copiableCharacteristicsFlipped board
+               in (alone row) {ActiveCopy.snapshot = if flipped == faceUp then faceUp else faceUp {PC.flipped = Just flipped}}
             rows = fmap rewoven (filter (Set.member target . ActiveCopy.objects) (GameState.copyEffects gs))
         State.modify' (`forgetObject` sid)
         State.modify'

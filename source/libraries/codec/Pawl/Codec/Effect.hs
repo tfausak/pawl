@@ -48,7 +48,6 @@ import qualified Pawl.Codec.Destroy as Destroy
 import qualified Pawl.Codec.Discard as Discard
 import qualified Pawl.Codec.DoesNotUntapNext as DoesNotUntapNext
 import qualified Pawl.Codec.Draw as Draw
-import qualified Pawl.Codec.DurationRef as DurationRef
 import qualified Pawl.Codec.Earthbend as Earthbend
 import qualified Pawl.Codec.ExchangeBlocks as ExchangeBlocks
 import qualified Pawl.Codec.ExchangeOwnership as ExchangeOwnership
@@ -68,7 +67,7 @@ import qualified Pawl.Codec.ForbidBeingBlocked as ForbidBeingBlocked
 import qualified Pawl.Codec.ForbidBlock as ForbidBlock
 import qualified Pawl.Codec.ForbidUntap as ForbidUntap
 import qualified Pawl.Codec.FromOutsideTheGame as FromOutsideTheGame
-import qualified Pawl.Codec.GiveControl as GiveControl
+import qualified Pawl.Codec.GainControl as GainControl
 import qualified Pawl.Codec.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Codec.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Codec.InitiativeTarget as InitiativeTarget
@@ -251,8 +250,7 @@ codec cardCodec abilityCodec =
           Arm.payload "AddPhases" (Common.list ExtraPhase.codec) Effect.AddPhases (\x -> case x of Effect.AddPhases y -> Just y; _ -> Nothing),
           Arm.nullary "EndTurn" Effect.EndTurn,
           Arm.nullary "EndCombatPhase" Effect.EndCombatPhase,
-          Arm.payload "GainControl" DurationRef.codec Effect.GainControl (\x -> case x of Effect.GainControl y -> Just y; _ -> Nothing),
-          Arm.payload "GiveControl" GiveControl.codec Effect.GiveControl (\x -> case x of Effect.GiveControl y -> Just y; _ -> Nothing),
+          Arm.payload "GainControl" GainControl.codec Effect.GainControl (\x -> case x of Effect.GainControl y -> Just y; _ -> Nothing),
           Arm.payload "ExchangeControl" ControlSides.codec Effect.ExchangeControl (\x -> case x of Effect.ExchangeControl y -> Just y; _ -> Nothing),
           Arm.payload "ArmDelayedTrigger" (ArmDelayedTrigger.codec abilityCodec) Effect.ArmDelayedTrigger (\x -> case x of Effect.ArmDelayedTrigger y -> Just y; _ -> Nothing),
           Arm.payload "AffectPlayers" AffectPlayers.codec Effect.AffectPlayers (\x -> case x of Effect.AffectPlayers y -> Just y; _ -> Nothing),
@@ -431,7 +429,6 @@ tagOf x = case x of
   Effect.EndTurn {} -> "EndTurn"
   Effect.EndCombatPhase {} -> "EndCombatPhase"
   Effect.GainControl {} -> "GainControl"
-  Effect.GiveControl {} -> "GiveControl"
   Effect.ExchangeControl {} -> "ExchangeControl"
   Effect.ArmDelayedTrigger {} -> "ArmDelayedTrigger"
   Effect.AffectPlayers {} -> "AffectPlayers"

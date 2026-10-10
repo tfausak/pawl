@@ -25,6 +25,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Engine.Saga as Saga
+import qualified Pawl.Engine.Snapshot as Snapshot
 import qualified Pawl.Engine.Speed as Speed
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Int as Int
@@ -379,8 +380,8 @@ isBestowed gs oid = maybe False Object.bestowed (Game.lookupObject oid gs)
 -- performStateBasedActions subtracts it rather than this predicate: a bestowed
 -- Aura matching here becomes unattached and ceases to be bestowed instead of
 -- being buried.
-fallsOff :: Map.Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Target.Pools -> GameState -> ObjectId -> Bool
-fallsOff pcs grants pools gs oid = case Map.lookup oid pcs of
+fallsOff :: Target.Pools -> GameState -> ObjectId -> Bool
+fallsOff pools gs oid = case Map.lookup oid pcs of
   Nothing -> False
   Just pc | Set.notMember Subtype.Aura (PC.subtypes pc) -> False
   Just pc -> case Card.foldEnchant (PC.enchant pc) of
@@ -391,7 +392,7 @@ fallsOff pcs grants pools gs oid = case Map.lookup oid pcs of
         Nothing -> True
         Just recipient ->
           Recipient.objectOf recipient == Just oid
-            || not (stillLegalEnchant pcs grants pools gs oid slot recipient)
+            || not (stillLegalEnchant pools gs oid slot recipient)
             -- CR 303.4c's "and other applicable effects", which the enchant
             -- slot above cannot see: the HOST's own prohibition on what may
             -- enchant it (CR 303.4's last sentence, CR 101.2), read through
@@ -428,6 +429,8 @@ fallsOff pcs grants pools gs oid = case Map.lookup oid pcs of
             -- CR 801.8: an object or player outside the Aura's controller's
             -- range of influence.
             || outOfReach grants gs oid recipient
+  where
+    Snapshot.MkSnapshot pcs grants = Target.board pools
 
 -- CR 303.4c: is `recipient` still one the enchanting Aura `source`'s enchant
 -- slot ADMITS?
@@ -484,10 +487,10 @@ fallsOff pcs grants pools gs oid = case Map.lookup oid pcs of
 -- naming CR 202.3's computed bound is one whose Filter reads it, and this arm is
 -- the no-Filter shape. Nothing prints such an enchant ability, so the arm is
 -- matched rather than widened.
-stillLegalEnchant :: Map.Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Target.Pools -> GameState -> ObjectId -> TargetSlot.TargetSlot -> Recipient.Recipient -> Bool
-stillLegalEnchant pcs grants pools gs source slot recipient = case (slot, recipient) of
+stillLegalEnchant :: Target.Pools -> GameState -> ObjectId -> TargetSlot.TargetSlot -> Recipient.Recipient -> Bool
+stillLegalEnchant pools gs source slot recipient = case (slot, recipient) of
   (TargetSlot.MkTargetSlot Pool.Creatures Nothing count Nothing Nothing Nothing, Recipient.ToCreature target) | count == SlotCount.Printed TargetCount.one ->
-    case Map.lookup target pcs of
+    case Map.lookup target (Snapshot.projected (Target.board pools)) of
       Nothing -> False
       Just pc ->
         Set.member CardType.Creature (PC.cardTypes pc)
@@ -496,7 +499,7 @@ stillLegalEnchant pcs grants pools gs source slot recipient = case (slot, recipi
             Just obj -> List.elem (Object.owner obj) (Game.stillPlaying gs)
   -- The Aura is on the battlefield when this SBA asks, so its controller is
   -- live -- the CR 608.2b case this perspective exists for cannot arise here.
-  _ -> Target.stillAdmitted pcs grants pools (Projection.controllerOfGiven grants source gs) source recipient slot gs
+  _ -> Target.stillAdmitted pools (Projection.controllerOfGiven (Snapshot.grants (Target.board pools)) source gs) source recipient slot gs
 
 -- CR 704.5j: the same-named legendary groups one player controls, as a list of
 -- groups, each with two or more members. Both halves are read from the
@@ -712,7 +715,7 @@ checkOnce = do
       -- see #430. Both stay THUNKS -- a board with no filtered Aura on it forces
       -- neither -- which is the posture Target.legalRecipientsGiven argues for.
       grants = Projection.controlGrants gs
-      pools = Target.poolsGiven pcs gs
+      pools = Target.poolsOf (Snapshot.MkSnapshot pcs grants) gs
       classify oid = case Map.lookup oid pcs of
         Nothing -> Nothing
         Just pc
@@ -743,7 +746,7 @@ checkOnce = do
       -- ability no longer admits. Judged against the SAME pre-pass pcs/gs as
       -- every other classification above -- see fallsOff's Haddock for why an
       -- Aura whose creature dies THIS pass survives it and falls off the next.
-      unattachedAuras = filter (\oid -> fallsOff pcs grants pools gs oid && not (isBestowed gs oid)) onBattlefield
+      unattachedAuras = filter (\oid -> fallsOff pools gs oid && not (isBestowed gs oid)) onBattlefield
       -- CR 702.103f: a bestowed Aura that becomes unattached, or is attached to
       -- an illegal object or player, "ceases to be bestowed" instead -- "an
       -- exception to rule 704.5m", which is why this is subtracted from
@@ -755,7 +758,7 @@ checkOnce = do
       -- a bestowed permanent whose host dies THIS pass unbestows on the next --
       -- fallsOff's own timing, and the rule's, since the Aura is still legally
       -- attached until the pass that sees the host gone.
-      unbestowing = filter (\oid -> fallsOff pcs grants pools gs oid && isBestowed gs oid) onBattlefield
+      unbestowing = filter (\oid -> fallsOff pools gs oid && isBestowed gs oid) onBattlefield
       -- CR 704.5n and CR 704.5p: computed from the same pre-pass state, for the
       -- same reason. One list because they share an action -- detach, stay on
       -- the battlefield -- and differ only in why the attachment is illegal.

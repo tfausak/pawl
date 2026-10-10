@@ -21,6 +21,7 @@ import qualified Pawl.Engine.Plane as Plane
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Engine.Snapshot as Snapshot
 import qualified Pawl.Engine.SplitSecond as SplitSecond
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
@@ -603,8 +604,8 @@ recipientObjects = Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList
 -- Only the FILLABLE modes (CR 700.2a), which is the set activatableGiven's mode
 -- conjunct measures: a slot belonging to a mode this board cannot choose is not
 -- a target this activation could name.
-candidateSlotsGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Target.Pools -> PlayerId -> ObjectId -> Modal.Type.Modal Card.Card (GrantedAbility.GrantedAbility Card.Card) -> Set.Set ModeIndex.ModeIndex -> GameState -> [(Map.Map SlotName (Natural, Natural), Map.Map SlotName (Set.Set ObjectId))]
-candidateSlotsGiven pcs grants pools pid srcId modal fillable gs =
+candidateSlotsGiven :: Target.Pools -> PlayerId -> ObjectId -> Modal.Type.Modal Card.Card (GrantedAbility.GrantedAbility Card.Card) -> Set.Set ModeIndex.ModeIndex -> GameState -> [(Map.Map SlotName (Natural, Natural), Map.Map SlotName (Set.Set ObjectId))]
+candidateSlotsGiven pools pid srcId modal fillable gs =
   let -- CR 601.2c's per-player copies, as the announcement will offer them. A
       -- REGRESSION FENCE: no card pairs a per-player slot with a target-reading cost.
       slotsOf chosen = Target.announcedSlots pid srcId gs (Modal.modesTargetSlots chosen modal)
@@ -616,7 +617,7 @@ candidateSlotsGiven pcs grants pools pid srcId modal fillable gs =
       -- agree, which they must: one is the offer gate and the other is what
       -- affordableX measures the cost against, and a gate and an announcement may
       -- not disagree about what a cost is.
-      setsOf slots = Target.legalSetsGiven pcs grants pools (Just pid) True Map.empty srcId slots gs
+      setsOf slots = Target.legalSetsGiven pools (Just pid) True Map.empty srcId slots gs
       -- Before CR 601.2b, so a count reading the X admits every count.
       aimableOf slots = let sets = setsOf slots in (Target.aimingRanges (Just pid) srcId Nothing slots sets gs, fmap recipientObjects sets)
    in fmap (aimableOf . slotsOf) (Modal.selections fillable (Modal.Type.selection modal))
@@ -660,8 +661,8 @@ costsFor pid ability gs =
 -- Action.ActivateManaAbility with priority, and by Cost.payMana inside a
 -- payment -- and both of them go through Cost.tapForMana.
 --
--- activatableGiven is the half Action.legalActions wants: `grants` is one
--- control-grant walk, `pcs` one whole-board projection and `sources` one sweep
+-- activatableGiven is the half Action.legalActions wants: `pools` carries one
+-- control-grant walk and one whole-board projection, and `sources` is one sweep
 -- of this player's mana sources, each taken once for the enumeration instead of
 -- once per permanent per ability (#200, #316, #1073). EVERY conjunct is given
 -- that board, the last two included. They ask about OTHER objects -- the target
@@ -686,26 +687,27 @@ costsFor pid ability gs =
 -- that line -- an allocation ceiling held it until measuring bytes was judged
 -- too compiler-specific to keep (gap #578).
 --
--- `activatable` keeps Map.empty deliberately. Its one engine caller is
+-- `activatable` takes Snapshot.onDemand deliberately. Its one engine caller is
 -- Pawl.Engine.Resolve.Effect's die-roll window, which asks about a handful of
 -- abilities once per roll, so the slower per-object Projection.projectGiven
 -- fallback costs little, and it makes the plain path a genuinely independent computation a
 -- differential test could hold the threaded one against -- its `sources` is
--- built off that same Map.empty for the same reason.
+-- built off that same board for the same reason.
 activatable :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> GameState -> Bool
 activatable pid srcId ability gs =
-  let grants = Projection.controlGrants gs
-   in activatableGiven grants Map.empty (Target.poolsGiven Map.empty gs) (Cost.supplyManaSourcesGiven grants Map.empty pid gs) pid srcId ability gs
+  let board = Snapshot.onDemand gs
+   in activatableGiven (Target.poolsOf board gs) (Cost.supplyManaSourcesGiven (Snapshot.grants board) (Snapshot.projected board) pid gs) pid srcId ability gs
 
-activatableGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Target.Pools -> [ObjectId] -> PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> GameState -> Bool
-activatableGiven grants pcs pools sources pid srcId ability gs =
-  let modal = ActivatedAbility.modal ability
-      fillable = Target.fillableModesGiven pcs grants pools (Just pid) Map.empty srcId Map.empty modal gs
+activatableGiven :: Target.Pools -> [ObjectId] -> PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> GameState -> Bool
+activatableGiven pools sources pid srcId ability gs =
+  let Snapshot.MkSnapshot pcs grants = Target.board pools
+      modal = ActivatedAbility.modal ability
+      fillable = Target.fillableModesGiven pools (Just pid) Map.empty srcId Map.empty modal gs
       -- CR 601.2c's targets do not exist at an offer, so the cost conjunct is
       -- handed the ones this activation could still name -- see
       -- aimingSomewhere. Shared with the mode conjunct's own `fillable` rather
       -- than taken twice: they are the same question (CR 700.2a).
-      aimable = candidateSlotsGiven pcs grants pools pid srcId modal fillable gs
+      aimable = candidateSlotsGiven pools pid srcId modal fillable gs
    in mayActivateGiven grants pid srcId ability gs
         -- CR 801.6. Not asked of a mana ability's windows (Cost.manaActivations):
         -- their sources are the permanents the player controls

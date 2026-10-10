@@ -5,6 +5,7 @@ import qualified Pawl.Codec.AsCopy as AsCopy
 import qualified Pawl.Codec.EntersWith as EntersWith
 import qualified Pawl.Codec.EntryFlip as EntryFlip
 import qualified Pawl.Codec.EntryOption as EntryOption
+import qualified Pawl.Codec.EntryPrice as EntryPrice
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.SacrificeAnyNumber as SacrificeAnyNumber
@@ -55,8 +56,7 @@ codec abilityCodec effectCodec =
       Arm.payload "Compleated" Common.natural EntryRewrite.Compleated (\x -> case x of EntryRewrite.Compleated y -> Just y; _ -> Nothing),
       Arm.nullary "Tapped" EntryRewrite.Tapped,
       Arm.nullary "EntersTransformed" EntryRewrite.EntersTransformed,
-      Arm.payload "PayLifeOrTapped" Common.natural EntryRewrite.PayLifeOrTapped (\x -> case x of EntryRewrite.PayLifeOrTapped y -> Just y; _ -> Nothing),
-      Arm.payload "RevealOrTapped" (Filter.codec Keyword.codec) EntryRewrite.RevealOrTapped (\x -> case x of EntryRewrite.RevealOrTapped y -> Just y; _ -> Nothing),
+      Arm.payload "OrTapped" EntryPrice.codec EntryRewrite.OrTapped (\x -> case x of EntryRewrite.OrTapped y -> Just y; _ -> Nothing),
       Arm.payload "SacrificeAnyNumber" SacrificeAnyNumber.codec EntryRewrite.SacrificeAnyNumber (\x -> case x of EntryRewrite.SacrificeAnyNumber y -> Just y; _ -> Nothing),
       Arm.payload "SacrificeToEnter" SacrificeToEnter.codec EntryRewrite.SacrificeToEnter (\x -> case x of EntryRewrite.SacrificeToEnter y -> Just y; _ -> Nothing),
       Arm.payload "ExileFromGraveyard" (Filter.codec Keyword.codec) EntryRewrite.ExileFromGraveyard (\x -> case x of EntryRewrite.ExileFromGraveyard y -> Just y; _ -> Nothing),
@@ -89,8 +89,7 @@ tagOf x = case x of
   EntryRewrite.Compleated {} -> "Compleated"
   EntryRewrite.Tapped {} -> "Tapped"
   EntryRewrite.EntersTransformed {} -> "EntersTransformed"
-  EntryRewrite.PayLifeOrTapped {} -> "PayLifeOrTapped"
-  EntryRewrite.RevealOrTapped {} -> "RevealOrTapped"
+  EntryRewrite.OrTapped {} -> "OrTapped"
   EntryRewrite.SacrificeAnyNumber {} -> "SacrificeAnyNumber"
   EntryRewrite.SacrificeToEnter {} -> "SacrificeToEnter"
   EntryRewrite.ExileFromGraveyard {} -> "ExileFromGraveyard"

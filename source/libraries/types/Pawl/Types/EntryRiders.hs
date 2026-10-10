@@ -236,3 +236,28 @@ data EntryRiders count ability = MkEntryRiders
     characteristics :: Seq.Seq (Modification.Modification ability)
   }
   deriving (Eq, Ord, Show)
+
+-- | The value every carrier elides: a card file carries riders only when the
+-- effect really does say otherwise (CR 110.5b for tapped, CR 508.4 for a
+-- creature put onto the battlefield attacking, CR 509.4 for one put onto the
+-- battlefield blocking, CR 303.4i for the object it arrives attached to, CR
+-- 712.14 for the front face a
+-- double-faced card enters showing by default, CR 122.6 for the counters an
+-- object enters with, CR 110.2a for who it enters under, CR 406.3 for an exiled
+-- card being kept face up, CR 110.5b for a permanent entering face up, CR
+-- 611.2e for a permanent entering under no effect of the instruction's).
+defaultValue :: EntryRiders count ability
+defaultValue =
+  MkEntryRiders
+    { tapped = TapState.Untapped,
+      attacking = Nothing,
+      blocking = Nothing,
+      transformed = False,
+      counters = Map.empty,
+      underOwner = False,
+      exiledFaceDown = False,
+      attachedTo = Nothing,
+      faceDown = Nothing,
+      noted = False,
+      characteristics = Seq.empty
+    }

@@ -1,7 +1,5 @@
 module Pawl.Codec.CreateSpec where
 
-import qualified Data.Map.Strict as Map
-import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Create as Create
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -14,7 +12,6 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
-import qualified Pawl.Types.TapState as TapState
 
 -- | The @card@ and @ability@ parameters are instantiated at 'Text.Text': this
 -- codec reaches them only through the supplied codecs, so any type proves the
@@ -29,19 +26,7 @@ you = PlayerRef.Relative PlayerRelation.You
 
 plain :: EntryRiders.EntryRiders Quantity.Quantity Text.Text
 plain =
-  EntryRiders.MkEntryRiders
-    { EntryRiders.tapped = TapState.Untapped,
-      EntryRiders.attacking = Nothing,
-      EntryRiders.blocking = Nothing,
-      EntryRiders.transformed = False,
-      EntryRiders.counters = Map.empty,
-      EntryRiders.underOwner = False,
-      EntryRiders.exiledFaceDown = False,
-      EntryRiders.attachedTo = Nothing,
-      EntryRiders.faceDown = Nothing,
-      EntryRiders.noted = False,
-      EntryRiders.characteristics = Seq.empty
-    }
+  EntryRiders.defaultValue
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Create" $ do

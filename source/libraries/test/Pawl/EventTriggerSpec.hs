@@ -7,8 +7,10 @@
 module Pawl.EventTriggerSpec where
 
 import qualified Control.Monad as Monad
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -17,6 +19,8 @@ import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Event.Match as Match
+import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
@@ -38,6 +42,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -48,6 +53,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TriggerSource as TriggerSource
@@ -928,6 +934,27 @@ clarionSpiritSpec s registry =
               Spec.assertEqWith s "the handoff clears the log the count reads" (GameState.events handed) Seq.empty
               Spec.assertEqWith s "and the new turn's second cast fires it again" (spiritsOf S.alice nextTurn) 2
             _ -> Spec.assertFailure s "fixture should put four Boil in alice's hand"
+        -- A spell the log holds no cast of has no ordinal, as it has no storm
+        -- count: Game.castsBefore answers Nothing for both readers. No real
+        -- board reaches it (CR 601.2i logs the cast before CR 603.2 checks), so
+        -- the never-cast Boil in hand stands in for it.
+        Spec.it s "CR 601.2i a spell with no cast in the log has no place among the turn's casts" $ do
+          mountain <- S.printingOf s registry "Mountain"
+          clarion <- S.printingOf s registry "Clarion Spirit"
+          boil <- S.printingOf s registry "Boil"
+          case handOf boil S.alice 2 (board mountain clarion) of
+            ([first, uncast], gs) -> do
+              let afterFirst = castAndResolve S.alice first gs
+                  logged = Maybe.mapMaybe (Game.castOf . LoggedEvent.event) (Foldable.toList (GameState.events afterFirst))
+                  context = Filter.contextFor (Game.teams afterFirst) (Just S.alice) Nothing
+                  ordinal oid = Match.castOrdinal context (Filter.Type.And []) Nothing oid afterFirst
+              case logged of
+                [cast] -> do
+                  Spec.assertEqWith s "the uncast Boil has no ordinal" (ordinal uncast) Nothing
+                  Spec.assertEqWith s "and no casts before it" (fmap length (Game.castsBefore uncast afterFirst)) Nothing
+                  Spec.assertEqWith s "while the cast one is the first" (ordinal (SpellWasCast.spell cast)) (Just 1)
+                other -> Spec.assertFailure s ("expected one logged cast, got " <> show (length other))
+            _ -> Spec.assertFailure s "fixture should put two Boil in alice's hand"
 
 -- CR 113.6k: the first ability in the pool that functions from the STACK. The
 -- same rule that put Narcomoeba's in a graveyard, one zone over.
