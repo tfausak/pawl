@@ -2238,7 +2238,7 @@ readsApplier re = case re of
 -- graveyard to your hand" names the row's own source, so two dredgers in one
 -- graveyard return different cards and the drawer must be asked which. A
 -- draw-replacing wish answers True only where its filter reads the source's
--- power; every other arm's use of `source` is a test run BEFORE Event.apply --
+-- characteristics or choices; every other arm's use of `source` is a test run BEFORE Event.apply --
 -- `applies`, `scopes` -- which picks the candidates rather than what one does.
 --
 -- One arm per CONSTRUCTOR, with only DrawR's inner sum split: a new
@@ -2250,17 +2250,19 @@ readsSource effect = case effect of
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.Dredge _)) -> True
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.GainLife _)) -> False
   ReplacementEffect.DrawR (DrawR.MkDrawR _ DrawRewrite.YouDraw) -> False
-  -- CR 616.1: Event.eligible scans the pool under a Filter.Context framed by
-  -- this candidate's source, and the source's power is the one thing in it that
-  -- a printed face can be told apart by -- every other source-relative atom
-  -- reads a field of the candidate (its identity, targets, host, combat or crew
-  -- record) that a card outside the game lacks, or a context field eligible
-  -- leaves empty. So two Synthetic Wishful Djinns of different power offer
-  -- different cards and the drawer is asked, while two Rings of Ma'rûf
-  -- (`And []`) offer the same and are not. Pawl.OutsideTheGameSpec's "CR 616.1
-  -- two Djinns of different power are a choice, and the answer decides what
-  -- arrives" and "CR 616.1 two Rings' wishes are not a choice" prove both.
-  ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.FromOutsideTheGame payload)) -> Filter.readsSourcePower (FromOutsideTheGame.filter payload)
+  -- CR 616.1: Event.eligible scans the pool under Projection.sourceContext
+  -- framed by this candidate's source, so a filter naming any of the source's
+  -- characteristics or choices (Filter.readsSourceValues) can offer different
+  -- cards under two sources; every other source-relative atom reads a field of
+  -- the candidate (its identity, owner, targets, host, combat or crew record)
+  -- that a card outside the game lacks. So two Synthetic Wishful Djinns of
+  -- different power offer different cards and the drawer is asked, while two
+  -- Rings of Ma'rûf (`And []`) offer the same and are not.
+  -- Pawl.OutsideTheGameSpec's "CR 616.1 two Djinns of different power are a
+  -- choice, and the answer decides what arrives", "CR 616.1 two Rings' wishes
+  -- are not a choice" and "CR 616.1 two wishes sharing a colour with
+  -- differently coloured sources are a choice" prove them.
+  ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.FromOutsideTheGame payload)) -> Filter.readsSourceValues (FromOutsideTheGame.filter payload)
   ReplacementEffect.ZoneChangeR {} -> False
   ReplacementEffect.EntryR {} -> False
   ReplacementEffect.DamageR {} -> False

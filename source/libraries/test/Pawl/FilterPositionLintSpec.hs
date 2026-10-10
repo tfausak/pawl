@@ -2621,7 +2621,26 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                 Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buried))) Seq.empty
             }
     Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
-  -- CR 702.140a's comparison is the atom above's sibling one characteristic over,
+  -- CR 702.78a's comparison is the atom above's sibling one characteristic
+  -- over, filled by the same filler and empty in the same positions. Only
+  -- Pawl.Engine.Keyword writes it -- conspire -- and this is what keeps that
+  -- true.
+  Spec.it s "CR 702.78a no card writes a source-colour comparison" $ do
+    ps <- S.allPrintings s
+    let atoms c = jsonAtoms (Text.pack "SharesColorWithSource") (Codec.encode (Face.Codec.codec Card.codec) c)
+        offenders = filter (anyFace (\c -> atoms c /= 0) . Printing.card) ps
+    Spec.assertEqWith s "the atom is the engine's alone" (fmap (S.nameOf . Printing.card) offenders) []
+    -- NOT vacuous, the sweeps above's reason: the same counter over a hand-built
+    -- face that DOES carry the atom finds it.
+    piker <- S.printingOf s registry "Goblin Piker"
+    let buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.SharesColorWithSource]]
+        planted =
+          (S.combinedFace piker)
+            { Face.spell =
+                Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buried))) Seq.empty
+            }
+    Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
+  -- CR 702.140a's comparison is the source-name atom's sibling one characteristic over,
   -- and its one filler is Pawl.Engine.Target.slotContext -- so it is answerable
   -- only inside a TARGET SLOT's own filter and would be a silent False in an
   -- affected set, a Count filter, a cost criterion or a search filter. Only

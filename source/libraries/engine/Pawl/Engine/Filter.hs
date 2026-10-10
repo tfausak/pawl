@@ -1007,8 +1007,8 @@ data Context = MkContext
     -- against it (PowerLessThanSource, CR 702.134a; PowerGreaterThanSource, CR
     -- 702.149a). Not derivable from `source` here -- this module holds no game
     -- state and cannot project -- so Pawl.Engine.Projection.withCharacteristicsOf
-    -- fills it and the four fields below together, through CR 608.2h's last
-    -- known information: in every context Pawl.Engine.Projection.sourceContext
+    -- fills it and the four fields below together, through last known
+    -- information (CR 608.2b's re-check, CR 608.2h's effects): in every context Pawl.Engine.Projection.sourceContext
     -- frames, and in CR 509.1b's pairwise restrictions, which frame by the
     -- creature being compared (Projection.pairwiseContext, Spitfire Handler).
     --
@@ -3624,23 +3624,27 @@ statesAQuality predicate = case predicate of
   -- never paid for.
   Filter.TagWasSpent _ -> True
 
--- Does the Filter compare a candidate against Context.sourcePower anywhere, so
--- that matching it under two different sources may admit different candidates?
+-- Does the Filter compare a candidate against anything Context holds about
+-- the SOURCE that a printed face can be told apart by -- its projected power,
+-- toughness, mana value, colours or names, or a value it chose -- so that
+-- matching it under two different sources may admit different candidates?
 -- Pawl.Engine.Replacement.readsSource's question for a draw-replacing wish (CR
--- 616.1), whose filter Pawl.Engine.Event.eligible matches with that field filled.
+-- 616.1), whose filter Pawl.Engine.Event.eligible matches under
+-- Pawl.Engine.Projection.sourceContext. The other source atoms read the
+-- candidate's identity, owner or host, which a card outside the game lacks.
 --
 -- Every nest is descended into, since `matches` judges a nest in the same
 -- Context; statesAQuality's exhaustive posture, for its reason.
-readsSourcePower :: Filter.Filter keyword -> Bool
-readsSourcePower predicate = case predicate of
-  Filter.And fs -> any readsSourcePower fs
-  Filter.Or fs -> any readsSourcePower fs
-  Filter.Not f -> readsSourcePower f
-  Filter.ControlsMoreThanYou _ f -> readsSourcePower f
+readsSourceValues :: Filter.Filter keyword -> Bool
+readsSourceValues predicate = case predicate of
+  Filter.And fs -> any readsSourceValues fs
+  Filter.Or fs -> any readsSourceValues fs
+  Filter.Not f -> readsSourceValues f
+  Filter.ControlsMoreThanYou _ f -> readsSourceValues f
   Filter.ManaValueAtMost _ -> False
-  Filter.ManaValueLessThanSource -> False
-  Filter.ManaValueGreaterThanSource -> False
-  Filter.ManaValueEqualToSource -> False
+  Filter.ManaValueLessThanSource -> True
+  Filter.ManaValueGreaterThanSource -> True
+  Filter.ManaValueEqualToSource -> True
   Filter.ManaValueIsEven -> False
   Filter.ManaValueAtMostAmount -> False
   Filter.ManaValueEqualToAmount -> False
@@ -3649,7 +3653,7 @@ readsSourcePower predicate = case predicate of
   Filter.HasSupertype _ -> False
   Filter.HasColor _ -> False
   Filter.IsMonocolored -> False
-  Filter.SharesColorWithSource -> False
+  Filter.SharesColorWithSource -> True
   Filter.HasSubtype _ -> False
   Filter.HasName _ -> False
   Filter.NameWordsAtLeast _ -> False
@@ -3664,7 +3668,7 @@ readsSourcePower predicate = case predicate of
   Filter.PowerLessThanSource -> True
   Filter.PowerGreaterThanSource -> True
   -- Reads the source's TOUGHNESS, never its power.
-  Filter.PowerAtLeastSourceToughness -> False
+  Filter.PowerAtLeastSourceToughness -> True
   Filter.PowerIsAmountInSlot _ -> False
   Filter.PowerAtLeastAmountInSlot _ -> False
   Filter.ControlledBy _ -> False
@@ -3679,21 +3683,21 @@ readsSourcePower predicate = case predicate of
   Filter.TargetsSource -> False
   Filter.TargetsOnlySource -> False
   Filter.HasSingleTarget -> False
-  Filter.TargetsOnlyOne f -> readsSourcePower f
-  Filter.TargetsMatching f -> readsSourcePower f
+  Filter.TargetsOnlyOne f -> readsSourceValues f
+  Filter.TargetsMatching f -> readsSourceValues f
   Filter.TargetsPlayer _ -> False
   Filter.IsBound _ -> False
   Filter.IsTarget -> False
   Filter.SameNameAsBound _ -> False
-  Filter.SameNameAsSource -> False
+  Filter.SameNameAsSource -> True
   Filter.SameOwnerAsSource -> False
   Filter.SameControllerAsBound _ -> False
   Filter.SameControllerAsHostOfBound _ -> False
   Filter.SharesCreatureTypeWithBound _ -> False
   Filter.ToughnessLessThanBound _ -> False
-  Filter.HasChosenName -> False
-  Filter.HasChosenColor -> False
-  Filter.HasChosenSubtype -> False
+  Filter.HasChosenName -> True
+  Filter.HasChosenColor -> True
+  Filter.HasChosenSubtype -> True
   Filter.IsLastExiledWithSource -> False
   Filter.OfChosenPlayer -> False
   Filter.OfRelatedPlayer _ -> False
@@ -3718,8 +3722,8 @@ readsSourcePower predicate = case predicate of
   Filter.ConvokedSourceThisTurn -> False
   Filter.SaddledSourceThisTurn -> False
   Filter.ControlledSinceTurnBegan -> False
-  Filter.AttachedTo f -> readsSourcePower f
-  Filter.HasAttached f -> readsSourcePower f
+  Filter.AttachedTo f -> readsSourceValues f
+  Filter.HasAttached f -> readsSourceValues f
   Filter.IsAttachedToSource -> False
   Filter.IsAttachedToEvaluated -> False
   Filter.IsHostOfSource -> False
@@ -3733,10 +3737,10 @@ readsSourcePower predicate = case predicate of
   Filter.IsActivatedAbility -> False
   Filter.IsAbility -> False
   Filter.IsEmblem -> False
-  Filter.FromSource f -> readsSourcePower f
+  Filter.FromSource f -> readsSourceValues f
   Filter.IsTapped -> False
   Filter.IsFaceDown -> False
-  Filter.RepresentedByCard f -> readsSourcePower f
+  Filter.RepresentedByCard f -> readsSourceValues f
   Filter.IsExiledFaceDown -> False
   Filter.Transformed -> False
   Filter.IsRingBearer -> False

@@ -1257,8 +1257,9 @@ framedWith :: SourceChoices.SourceChoices -> ObjectId -> GameState -> Filter.Con
 framedWith choices source gs = withCharacteristicsOf source gs . SourceContext.framedWith choices source gs
 
 -- `context` with `object`'s projected power, toughness, mana value, colours and
--- names as the source's (CR 613), through CR 608.2h's last known information
--- once it has left (viewWithLastKnownAnywhere): the fields the
+-- names as the source's (CR 613), through its last known information once it
+-- has left (viewWithLastKnownAnywhere): CR 608.2b's re-check and CR 608.2h's
+-- effects alike: the fields the
 -- source-comparison atoms read (Filter.PowerLessThanSource,
 -- Filter.ManaValueLessThanSource, Filter.SharesColorWithSource,
 -- Filter.SameNameAsSource and their siblings). Leaves every other field alone,

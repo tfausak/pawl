@@ -1,6 +1,6 @@
 {
-  "description": "CR 608.2h a mentor killed in response still mentors",
-  "note": "CR 608.2b re-checks rule 702.134a's power comparison as the ability resolves, and CR 608.2h answers the source's half from last known information once it has left. Alice bolts her own Blade Instructor with its mentor trigger on the stack; its power as it last existed, 3, is still greater than the Goblin Piker's 2, so the Piker takes the counter (Blade Instructor's 2018-10-05 ruling). An engine reading the departed source live would find no power and fizzle the trigger. Readings are taken at the combat damage step, before damage.",
+  "description": "CR 608.2b a mentor killed in response still mentors",
+  "note": "CR 608.2b re-checks rule 702.134a's power comparison as the ability resolves, using the source's last known information once it has left the zone it was in. Alice bolts her own Blade Instructor with its mentor trigger on the stack; its power as it last existed, 3, is still greater than the Goblin Piker's 2, so the Piker takes the counter (Blade Instructor's 2018-10-05 ruling). An engine reading the departed source live would find no power and fizzle the trigger. Readings are taken at the combat damage step, before damage.",
   "board": {
     "seats": [
       {

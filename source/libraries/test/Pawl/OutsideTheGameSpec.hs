@@ -59,11 +59,14 @@ import Pawl.PreventionSpec (answersFor, wasAskedToReplace)
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Deck as Deck
+import qualified Pawl.Types.DrawR as DrawR
+import qualified Pawl.Types.DrawRewrite as DrawRewrite
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter
@@ -89,6 +92,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.SearchPlace as SearchPlace
 import qualified Pawl.Types.SlotName as SlotName
@@ -1110,6 +1114,36 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
     Spec.assertEqWith s "setup: both Rings were exiled, so both rows stand" (Set.member secondId (GameState.battlefield twice), length (GameState.replacements twice)) (False, 2)
     Spec.assertBool s (not (wasAskedToReplace (answersFor S.identityAnswer twice (Event.drawCard S.alice)))) "no ChooseReplacement was raised"
     Spec.assertEqWith s "CR 400.11c and the card she owns outside the game reached her hand" (printingsIn Zone.Hand S.alice (S.runPure S.identityAnswer twice (Event.drawCard S.alice))) [signInBlood]
+  -- The two Rings' rows again, each re-aimed at a filter reading the source's
+  -- COLOURS (Filter.SharesColorWithSource) and re-sourced onto a red Goblin
+  -- Piker and a blue Coral Merfolk. A direct board: no card writes
+  -- that atom into a wish. The pool holds one Hill Giant (red): through the
+  -- Piker's row it arrives, through the Merfolk's nothing does, so treating the
+  -- rows as alike would decide her draw for her.
+  Spec.it s "CR 616.1 two wishes sharing a colour with differently coloured sources are a choice" $ do
+    plains <- S.printingOf s registry "Plains"
+    ring <- S.printingOf s registry "Ring of Ma'rûf"
+    piker <- S.printingOf s registry "Goblin Piker"
+    giant <- S.printingOf s registry "Hill Giant"
+    merfolk <- S.printingOf s registry "Coral Merfolk"
+    let (armed, _) = ringBoard plains ring piker giant True
+        (secondId, g1) = S.addPermanent ring S.alice (S.landsFor plains S.alice 5 armed)
+        twice = case Face.activatedAbilities (S.combinedFace ring) of
+          ability : _ -> S.runPure S.identityAnswer g1 (Activate.activateAbility S.alice secondId ability >> Stack.resolveTop)
+          [] -> g1
+        (red, g2) = S.addPermanent piker S.alice twice
+        (blue, g3) = S.addPermanent merfolk S.alice g2
+        sharing row = case ActiveReplacement.effect row of
+          ReplacementEffect.DrawR (DrawR.MkDrawR w (DrawRewrite.FromOutsideTheGame p)) ->
+            row {ActiveReplacement.effect = ReplacementEffect.DrawR (DrawR.MkDrawR w (DrawRewrite.FromOutsideTheGame p {FromOutsideTheGame.filter = Filter.SharesColorWithSource}))}
+          _ -> row
+        board = g3 {GameState.replacements = zipWith (\src row -> (sharing row) {ActiveReplacement.source = src}) [red, blue] (GameState.replacements g3)}
+        drawn preferred = S.runPure (preferringRow preferred) board (Event.drawCard S.alice)
+    Spec.assertEqWith s "setup: two rows stand, sourced on the Piker and the Merfolk" (fmap ActiveReplacement.source (GameState.replacements board)) [red, blue]
+    -- THE BEHAVIOUR, ahead of every proxy.
+    Spec.assertEqWith s "CR 616.1 through the red Piker's row the Hill Giant reached her hand" (printingsIn Zone.Hand S.alice (drawn red)) [giant]
+    Spec.assertEqWith s "CR 616.1 through the blue Merfolk's row nothing did" (printingsIn Zone.Hand S.alice (drawn blue)) []
+    Spec.assertBool s (wasAskedToReplace (answersFor (preferringRow red) board (Event.drawCard S.alice))) "a ChooseReplacement was raised"
   -- CR 315.3: "conspiracy cards that aren't in the game can't be brought into the
   -- game". The first case's board with Sentinel Dispatch in the pool instead of
   -- Sign in Blood: the draw is still replaced, and nothing arrives (CR 609.3).
