@@ -623,7 +623,7 @@ data TriggerCondition
     -- Walker), the actor being the bearer itself or one the Filter admits.
     --
     -- Not implemented: a card bearing two exert paragraphs, whose two
-    -- PermanentAction.Exert triggers would each see both exerts.
+    -- PermanentAction.Exert triggers would each see both exerts (#4946).
     PermanentActs (PermanentActed.PermanentActed ActingPermanent.ActingPermanent)
   | -- | CR 603.2: "whenever [a player] <acts>", the actor read against CR
     -- 109.5's "you" (Matoya, Archon Elder; Synthetic Blight Chronicler).

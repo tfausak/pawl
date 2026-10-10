@@ -2595,9 +2595,9 @@ zonesTriggeredFrom cond =
         TriggerCondition.Visit -> battlefield
         TriggerCondition.PlayerWinsCoinFlip _ -> battlefield
         TriggerCondition.PlayerLosesCoinFlip _ -> battlefield
-        -- CR 113.6's default, and CR 701.3a makes it the only possible answer for the
-        -- PermanentActs exert's reason: the host of an attachment is a permanent, so the bearer
-        -- is on the battlefield whenever this can match.
+        -- CR 113.6's default, and CR 701.3a makes it the only possible answer, for
+        -- the exert's reason in PermanentActs' arm: the host of an attachment is a
+        -- permanent, so the bearer is on the battlefield whenever this can match.
         TriggerCondition.SelfBecomesAttachedBy _ -> battlefield
         TriggerCondition.SelfBecomesAttachedTo _ -> battlefield
         -- The battlefield too, even though CR 701.3d's own routes include the bearer

@@ -1050,8 +1050,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       (TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated Designation.Monstrous Filter.IsSource))
       " {\"type\":\"PermanentBecomesDesignated\",\"value\":{\"designation\":{\"type\":\"Monstrous\"},\"filter\":{\"type\":\"IsSource\"}}} "
   -- CR 702.134c's marker, read through the source's attachment, so nullary:
-  -- neither the mentor nor the mentored creature is named by
-  -- the condition.
+  -- neither the mentor nor the mentored creature is named by the condition.
   Spec.it s "AttachedCreatureMentors" $
     Common.assertCodec
       s
@@ -1284,8 +1283,8 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.SelfBecomesPlotted
       " {\"type\":\"SelfBecomesPlotted\"} "
-  -- CR 603.12's reflexive, nullary: the whole condition
-  -- is the word "when you do", and what it says about is the entry's existence.
+  -- CR 603.12's reflexive, nullary: the whole condition is the word "when you
+  -- do", and what it says about is the entry's existence.
   Spec.it s "Reflexive round-trips" $
     Common.assertCodec
       s

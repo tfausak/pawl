@@ -358,8 +358,7 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.Transformed Transformed.MkTransformed {Transformed.object = ObjectId.MkObjectId 5, Transformed.characteristics = ProjectedCharacteristicsSpec.testCharacteristics, Transformed.controller = Nothing, Transformed.attachments = Set.empty})
       ("{\"type\":\"Transformed\",\"value\":{\"object\":5,\"characteristics\":" <> ProjectedCharacteristicsSpec.testCharacteristicsJson <> "}}")
-  -- CR 702.112b. One id: the designation says only
-  -- which permanent got it.
+  -- CR 702.112b. One id: the designation says only which permanent got it.
   Spec.it s "BecameDesignated Renowned" $
     Common.assertCodec
       s

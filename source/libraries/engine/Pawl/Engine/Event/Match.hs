@@ -7913,7 +7913,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LifeGained {} -> False
   -- CR 702.110b: the BEARER exploited a creature -- its controller sacrificed one
   -- as rule 702.110a's ability resolved. PermanentActs' Self reading, line for
-  -- line and for its reasons: a bare id comparison on the exploiter, no view and no Filter.
+  -- line and for its reasons: a bare id comparison on the exploiter, no view
+  -- and no Filter.
   TriggerCondition.SelfExploits -> case event of
     GameEvent.PermanentActed _ -> False
     GameEvent.BecameCrewed _ -> False
