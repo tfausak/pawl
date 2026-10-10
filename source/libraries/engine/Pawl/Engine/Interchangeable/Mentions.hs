@@ -428,6 +428,7 @@ filterNames asking criterion = case criterion of
   Filter.SharesColorWithSource -> False
   Filter.HasSubtype _subtype -> False
   Filter.HasName _name -> False
+  Filter.NameWordsAtLeast _n -> False
   Filter.HasNameOriginallyPrintedIn _expansion -> False
   Filter.HasKeyword _keyword -> False
   Filter.HasKeywordFamily _family -> False

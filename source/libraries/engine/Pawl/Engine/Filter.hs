@@ -11,6 +11,7 @@ import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Keyword as Keyword
+import qualified Pawl.Engine.NameWords as NameWords
 import qualified Pawl.Types.Behold as Behold
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -1683,6 +1684,7 @@ matches context view predicate = case predicate of
   -- CR 709.4a's own test, said the way that rule says it: membership, so an
   -- object showing several names matches on any one of them.
   Filter.HasName n -> Set.member n (names view)
+  Filter.NameWordsAtLeast n -> any (\named -> NameWords.wordCount named >= n) (names view)
   -- The same membership test, against the set CR 206.3 defines rather than one
   -- name the card gives. ANY of the candidate's names, which is CR 709.4a's
   -- reading exactly as HasName's is -- Pawl.FilterSpec's "CR 709.4a matches an
@@ -2378,6 +2380,7 @@ rewrite pairs predicate = case predicate of
   -- word ... that is the same as a Magic color word, basic land type, or
   -- creature type". This function's pairs are exactly such a subtype swap.
   Filter.HasName _ -> predicate
+  Filter.NameWordsAtLeast _ -> predicate
   -- Untouched for HasName's reason, one indirection along: the atom names an
   -- expansion, and the names it stands for are card names too.
   Filter.HasNameOriginallyPrintedIn _ -> predicate
@@ -3169,6 +3172,7 @@ bakeBound players predicate = case predicate of
   Filter.SharesColorWithSource -> predicate
   Filter.HasSubtype _ -> predicate
   Filter.HasName _ -> predicate
+  Filter.NameWordsAtLeast _ -> predicate
   Filter.HasNameOriginallyPrintedIn _ -> predicate
   Filter.HasKeyword _ -> predicate
   Filter.HasKeywordFamily _ -> predicate
@@ -3375,6 +3379,7 @@ manaValueThresholds predicate = case predicate of
   Filter.SharesColorWithSource -> []
   Filter.HasSubtype _ -> []
   Filter.HasName _ -> []
+  Filter.NameWordsAtLeast _ -> []
   Filter.HasNameOriginallyPrintedIn _ -> []
   Filter.HasKeyword _ -> []
   Filter.HasKeywordFamily _ -> []
@@ -3552,6 +3557,7 @@ statesAQuality predicate = case predicate of
   -- specific description a search can give -- so the searcher may decline to
   -- find one that is there, and CR 701.23d's "must find" does not apply.
   Filter.HasName _ -> True
+  Filter.NameWordsAtLeast _ -> True
   -- CR 701.23b for HasName's reason: "with a name originally printed in the
   -- Arabian Nights expansion" states a quality as squarely as one name does.
   Filter.HasNameOriginallyPrintedIn _ -> True
@@ -3718,6 +3724,7 @@ readsSourcePower predicate = case predicate of
   Filter.SharesColorWithSource -> False
   Filter.HasSubtype _ -> False
   Filter.HasName _ -> False
+  Filter.NameWordsAtLeast _ -> False
   Filter.HasNameOriginallyPrintedIn _ -> False
   -- A keyword's own Filter is compared, never matched (statesAQuality's
   -- HasKeyword arm), so nothing inside it reads the context.

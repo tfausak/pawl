@@ -686,3 +686,14 @@ spec s registry = Spec.describe s "Sticker" $ do
         (_, other, _) = entersNaming baaallerina (atBob (placingAt (Just bearsId) night 0)) g2
     Spec.assertEqWith s "CR 123.6d bob takes 1 for Otter's O" (S.lifeOf S.bob own) (Just 19)
     Spec.assertEqWith s "CR 123.3 a sticker on another permanent does not trigger it" (S.lifeOf S.bob other) (Just 20)
+  -- Trespasser, four tokens and one word, is the blank's negative.
+  Spec.it s "CR 123.6a Angelic Harold pumps Grizzly Otter Bears, three words, and not Trespasser, whose blanks are not words" $ do
+    sheets <- committedSheets
+    harold <- S.printingOf s registry "Angelic Harold"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    trespasser <- S.printingOf s registry "_____ _____ _____ Trespasser"
+    let (bearsId, g1) = S.addPermanent bears S.alice (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))
+        (tId, g2) = S.addPermanent trespasser S.alice g1
+        (_, after, _) = entersNaming harold (placingAt (Just bearsId) otter 1) g2
+    Spec.assertEqWith s "CR 123.6a Grizzly Otter Bears is a 3/3" (Projection.powerOf bearsId after) (Just 3)
+    Spec.assertEqWith s "CR 123.6a Trespasser, one word, is still a 2/1" (Projection.powerOf tId after) (Just 2)

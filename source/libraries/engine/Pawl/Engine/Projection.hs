@@ -3451,6 +3451,7 @@ filterReads f = case f of
   Filter.Type.HasSubtype _ -> Set.singleton Subtypes
   -- Reads no aspect: no Modification writes CR 201.1's names.
   Filter.Type.HasName _ -> Set.empty
+  Filter.Type.NameWordsAtLeast _ -> Set.empty
   -- HasName's answer, for HasName's reason: the rule's side of CR 206.3 is a
   -- constant, and the candidate's side is a name.
   Filter.Type.HasNameOriginallyPrintedIn _ -> Set.empty
@@ -3811,6 +3812,7 @@ filterReadsPeers f = case f of
   Filter.Type.SharesColorWithSource -> False
   Filter.Type.HasSubtype _ -> False
   Filter.Type.HasName _ -> False
+  Filter.Type.NameWordsAtLeast _ -> False
   Filter.Type.HasNameOriginallyPrintedIn _ -> False
   Filter.Type.HasKeyword _ -> False
   Filter.Type.HasKeywordFamily _ -> False

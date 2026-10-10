@@ -339,6 +339,7 @@ bakePerspective viewOf context gs candidate predicate =
         Filter.Type.SharesColorWithSource -> predicate
         Filter.Type.HasSubtype _ -> predicate
         Filter.Type.HasName _ -> predicate
+        Filter.Type.NameWordsAtLeast _ -> predicate
         Filter.Type.HasNameOriginallyPrintedIn _ -> predicate
         Filter.Type.HasKeyword _ -> predicate
         Filter.Type.HasKeywordFamily _ -> predicate

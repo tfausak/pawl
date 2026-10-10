@@ -4931,6 +4931,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.SharesColorWithSource -> []
   Filter.Type.HasSubtype _ -> []
   Filter.Type.HasName _ -> []
+  Filter.Type.NameWordsAtLeast _ -> []
   Filter.Type.HasNameOriginallyPrintedIn _ -> []
   -- The keyword's own Filter, left alone for the reason above.
   Filter.Type.HasKeyword _ -> []
