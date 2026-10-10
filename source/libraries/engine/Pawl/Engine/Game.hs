@@ -1188,9 +1188,27 @@ namesFor mObj card = case mObj of
 -- to the printed card: CR 707.2 leaves a copy with the copied object's values,
 -- so a Room that became a copy of a Blood Moon has stopped having doors.
 halvesCardOf :: Object.Object -> Card -> Maybe Card
-halvesCardOf obj card = case copyStampOf obj of
-  Just snapshot -> PC.halves snapshot
-  Nothing -> if Card.hasSharedTypeLine card then Just card else Nothing
+halvesCardOf = copiableOf PC.halves (\card -> if Card.hasSharedTypeLine card then Just card else Nothing)
+
+-- CR 707.2: an alternative characteristic this object has -- its copy stamp's
+-- (`fromStamp`) when it has one, its printed card's (`fromCard`) otherwise. A
+-- stamp lacking it ends the question rather than falling back to the printed
+-- card, since a copy has only the copied object's values. The one shape
+-- halvesCardOf above, prepareSpellOf and alternativeSpellOf below share.
+copiableOf :: (PC.ProjectedCharacteristics -> Maybe a) -> (Card -> Maybe a) -> Object.Object -> Card -> Maybe a
+copiableOf fromStamp fromCard obj card = maybe (fromCard card) fromStamp (copyStampOf obj)
+
+-- `value` for a caller that holds only the id, asked of the object as layer 1a
+-- leaves it (`lookupLayerOne`). FACE UP only, which is CR 708.2: a face-down
+-- object has only the characteristics its allower listed, so none of these
+-- however its card is printed; data/scenarios/room's "CR 708.2 a manifested Room
+-- has no doors to unlock" proves it.
+faceUpCopiable :: (Object.Object -> Card -> Maybe a) -> ObjectId -> GameState -> Maybe a
+faceUpCopiable value oid gs = do
+  obj <- lookupLayerOne oid gs
+  case Object.facing obj of
+    Facing.FaceDown _ -> Nothing
+    Facing.FaceUp -> cardOf oid gs >>= value obj
 
 -- CR 707.2: the copiable record stamped on this object -- a copy effect's
 -- (Binding.copyOf) over the values a conjured duplicate was minted with
@@ -1289,24 +1307,11 @@ copiedHalfOf obj = do
   stamp <- copyStampOf obj
   stampHalfNamed name stamp
 
--- CR 715.2b / 720.2b: the Adventure or Omen half this object has -- its copy
--- stamp's when it has one, its printed card's otherwise; prepareCardOf's shape.
-alternativeSpellCardOf :: Object.Object -> Card -> Maybe (Face Card)
-alternativeSpellCardOf obj card = case copyStampOf obj of
-  Just snapshot -> PC.alternativeSpell snapshot
-  Nothing -> Card.alternativeSpellFace card
-
--- alternativeSpellCardOf above for a caller that holds only the id, and the value
--- Pawl.Engine.Projection.View.baseCharacteristics seeds
--- ProjectedCharacteristics.alternativeSpell from. FACE UP only, halvesOf's fork.
+-- CR 715.2b / 720.2b: the Adventure or Omen half this object has, a copiable
+-- value -- and the value Pawl.Engine.Projection.View.baseCharacteristics seeds
+-- ProjectedCharacteristics.alternativeSpell from.
 alternativeSpellOf :: ObjectId -> GameState -> Maybe (Face Card)
-alternativeSpellOf oid gs = do
-  obj <- lookupLayerOne oid gs
-  case Object.facing obj of
-    Facing.FaceDown _ -> Nothing
-    Facing.FaceUp -> do
-      card <- cardOf oid gs
-      alternativeSpellCardOf obj card
+alternativeSpellOf = faceUpCopiable (copiableOf PC.alternativeSpell Card.alternativeSpellFace)
 
 -- CR 702.37e / 702.168d / 701.40b: faceUpFaceOf with the copy stamp's values
 -- laid over it (castingFaceOf), so a face-down card carrying copied values is
@@ -1327,8 +1332,8 @@ faceUpCastingFaceOf oid gs = do
   pure (castingFaceOf obj card (resolveFaceFor (Just obj) (Printing.card printing)))
 
 -- CR 722.2a / 722.2b: the PREPARE SPELL this object has -- the copy snapshot's
--- when the object is copying something, and its own printed card's otherwise.
--- halvesCardOf above's shape, and the rule states the same thing rule 709.5b
+-- when the object is copying something, and its own printed card's otherwise
+-- (copiableOf). The rule states the same thing rule 709.5b
 -- does: "the existence and values of these alternative characteristics are part
 -- of the object's copiable values". So having a prepare spell is a question about
 -- an object's COPIABLE values and not about the card printed underneath it, and a
@@ -1341,57 +1346,24 @@ faceUpCastingFaceOf oid gs = do
 -- is untouched by it, and Pawl.PreparationSpec's "CR 722.2b a Clone of the
 -- Aviator becomes prepared and mints a Jump copy" is what proves the difference.
 --
--- A snapshot with no prepare spell ends the question rather than falling back to
--- the printed card, halvesCardOf's reason: CR 707.2 leaves a copy with the copied
--- object's values, so a preparation card that became a copy of a Grizzly Bears
--- has stopped having an inset frame.
-prepareCardOf :: Object.Object -> Card -> Maybe (Face Card)
-prepareCardOf obj card = case copyStampOf obj of
-  Just snapshot -> PC.prepare snapshot
-  Nothing -> Card.prepareFace card
-
--- prepareCardOf above for a caller that holds only the id, and the value
--- Pawl.Engine.Projection.View.baseCharacteristics seeds
+-- The value Pawl.Engine.Projection.View.baseCharacteristics seeds
 -- ProjectedCharacteristics.prepare from -- so a copy of a copy of a preparation
--- card goes on carrying the inset frame.
---
--- FACE UP only, halvesOf's fork below and for its reason: CR 708.2 leaves a
--- face-down permanent only the characteristics its allower listed, so it has no
--- prepare spell however its card is printed.
---
--- Every zone, halvesOf's scope: CR 722.2a says "a card, spell, or permanent that
--- has a prepare spell", and CR 722.2b copies the alternative characteristics'
--- existence without naming a zone.
+-- card goes on carrying the inset frame. Every zone, halvesOf's scope: CR 722.2a
+-- says "a card, spell, or permanent that has a prepare spell", and CR 722.2b
+-- copies the alternative characteristics' existence without naming a zone.
 prepareSpellOf :: ObjectId -> GameState -> Maybe (Face Card)
-prepareSpellOf oid gs = do
-  obj <- lookupLayerOne oid gs
-  case Object.facing obj of
-    Facing.FaceDown _ -> Nothing
-    Facing.FaceUp -> do
-      card <- cardOf oid gs
-      prepareCardOf obj card
+prepareSpellOf = faceUpCopiable (copiableOf PC.prepare Card.prepareFace)
 
 -- halvesCardOf above for a caller that holds only the id, and the value
 -- Pawl.Engine.Projection.View.baseCharacteristics seeds
 -- ProjectedCharacteristics.halves from -- so a copy of a copy of a Room goes on
--- carrying the doors.
---
--- FACE UP only, which is CR 708.2's substitution read one field over: a
--- face-down permanent has only the characteristics its allower listed, so it has
--- no halves to unlock however its card is printed. faceOfObject below takes the
--- same fork.
+-- carrying the doors. faceOfObject below forks on CR 708.2 the same way.
 --
 -- Every zone, unlike resolveFaceFor's own gate: CR 709.5b makes the halves'
 -- existence copiable "even if that object is a spell on the stack", where CR
 -- 709.5c's designations belong to a permanent on the battlefield alone.
 halvesOf :: ObjectId -> GameState -> Maybe Card
-halvesOf oid gs = do
-  obj <- lookupLayerOne oid gs
-  case Object.facing obj of
-    Facing.FaceDown _ -> Nothing
-    Facing.FaceUp -> do
-      card <- cardOf oid gs
-      halvesCardOf obj card
+halvesOf = faceUpCopiable halvesCardOf
 
 -- The face of the card an object is showing. Nothing when the id is unknown or
 -- the object has no card behind it (an ability on the stack, CR 113.7a).
@@ -1937,10 +1909,10 @@ flipsOver oid gs = Set.member oid (GameState.battlefield gs) && hasFlipHalf oid 
 --
 -- HERE rather than beside its main caller
 -- (Pawl.Engine.Projection.View.stampedSnapshotOf) so that `hasFlipHalf` below
--- answers the same question the projection does. The readers of Binding.copyOf
--- that hold an Object and no GameState -- halvesCardOf, prepareCardOf,
--- alternativeSpellCardOf and resolveFaceFor's arms -- reach it through
--- `lookupLayerOne` below.
+-- answers the same question the projection does, both through
+-- `lookupLayerOne`. The readers of Binding.copyOf
+-- that hold an Object and no GameState -- copiableOf and resolveFaceFor's
+-- arms -- reach it through `lookupLayerOne` below.
 storedCopyOf :: ObjectId -> GameState -> Maybe PC.ProjectedCharacteristics
 storedCopyOf oid gs =
   fmap ActiveCopy.snapshot
@@ -1974,25 +1946,18 @@ supersedeStoredCopies oids gs =
 -- | CR 710.1b / 707.3: do this object's COPIABLE values include a flip card's
 -- alternative half? Its copy snapshot's answer when it has one -- the merge's
 -- flipped reading (CR 730.2h) or the copy's (PC.flipped) -- and its printed
--- card's otherwise, `halvesCardOf`'s posture. A copy of anything else has none
--- whatever card is printed underneath it. `storedCopyOf` above comes first, for
--- its own reason: a permanent under a stored copy effect is a copy.
+-- card's otherwise (faceUpCopiable). A copy of anything else has none whatever
+-- card is printed underneath it, and a stored copy effect's row replaces the
+-- merge's flipped reading as it does the merge's stamp (Binding.setCopy):
+-- Pawl.MutateSpec's "CR 707.3 Mirrorweave makes a flipped merged permanent a
+-- copy of a creature with no flip half" proves it.
 --
--- FACE UP only, halvesOf's fork: CR 708.2 leaves a face-down object only the
--- characteristics its allower listed. Every zone, since Pawl.Engine.Event's
--- copiedSnapshot asks it of a card a copy effect reads in a graveyard.
+-- Every zone, since Pawl.Engine.Event's copiedSnapshot asks it of a card a copy
+-- effect reads in a graveyard.
 hasFlipHalf :: ObjectId -> GameState -> Bool
-hasFlipHalf oid gs = case lookupObject oid gs of
-  Just obj
-    | Facing.FaceUp <- Object.facing obj ->
-        let bindings = Object.bindings obj
-            stamped = case storedCopyOf oid gs of
-              Just stored -> Just stored
-              Nothing -> copyStampOf obj
-         in case stamped of
-              Just snapshot -> Maybe.isJust (Binding.flippedCopyOf bindings) || Maybe.isJust (PC.flipped snapshot)
-              Nothing -> maybe False (Maybe.isJust . Card.flippedFace) (cardOf oid gs)
-  _ -> False
+hasFlipHalf oid gs = Maybe.isJust (faceUpCopiable flipHalf oid gs)
+  where
+    flipHalf obj = copiableOf (\stamp -> Monad.void (Binding.flippedCopyOf (Object.bindings obj) Applicative.<|> PC.flipped stamp)) (Monad.void . Card.flippedFace) obj
 
 -- CR 110.5: this board with `oid`'s flipped status set to `status`, and no other
 -- change. `flipPermanent`'s write, and the counterfactual board
