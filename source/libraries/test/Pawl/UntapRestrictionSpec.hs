@@ -282,7 +282,7 @@ prohibitionSpec s registry = Spec.describe s "Prohibition" $ do
 --
 -- Meekstone's own "creatures" conjunct is faithful to the printed word rather
 -- than discriminating: Affected.Matching is battlefield-gated, CR 208.3 gives a
--- noncreature permanent no power at all, and Filter.PowerAtLeast is vacuously
+-- noncreature permanent no power at all, and a power comparison is vacuously
 -- False without one, so no board can tell the conjunct from its absence.
 powerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 powerSpec s registry = Spec.describe s "Power" $ do

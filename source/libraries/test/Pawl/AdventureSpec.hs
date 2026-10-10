@@ -42,12 +42,16 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.CastRepetition as CastRepetition
+import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ManaSpending as ManaSpending
+import qualified Pawl.Types.Measure as Measure
+import qualified Pawl.Types.Measures as Measures
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Operand as Operand
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -399,7 +403,7 @@ spec s registry = Spec.describe s "Adventure" $ do
               CastOffer.withoutPayingManaCost = True,
               CastOffer.payingInstead = Nothing,
               CastOffer.spending = ManaSpending.AsProduced,
-              CastOffer.restriction = Just Filter.Type.ManaValueLessThanSource,
+              CastOffer.restriction = Just (Filter.Type.Measures (Measures.MkMeasures Measure.ManaValue Comparison.LessThan (Operand.OfSource Measure.ManaValue))),
               CastOffer.offeredBy = Nothing
             }
         context bound = (Filter.contextFor (Game.teams gs) (Just S.alice) Nothing) {Filter.sourceManaValue = Just bound}

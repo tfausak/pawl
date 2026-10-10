@@ -29,16 +29,20 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword.Type
+import qualified Pawl.Types.Measure as Measure
+import qualified Pawl.Types.Measures as Measures
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Operand as Operand
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -251,8 +255,8 @@ exaltedSpec s registry =
 -- CR 702.134a's mentor, which rule 702 states as a triggered ability
 -- and the FIRST whose ability TARGETS -- so this is the group that runs a
 -- keyword-minted TargetSlot through CR 601.2c's choosing, and with it
--- Filter.PowerLessThanSource, the one atom whose bound is the source's own power
--- rather than a literal.
+-- Filter.Measures' OfSource operand, whose bound is the source's own power rather
+-- than a literal.
 --
 -- Blade Instructor {2}{W} Creature -- Human Soldier 3/1 is the card: mentor and
 -- nothing else, so every number below is the keyword's. Its fellow attackers are
@@ -339,7 +343,7 @@ mentorSpec s registry =
               expectedSlot =
                 TargetSlot.required
                   Pool.Creatures
-                  (Just (Filter.Type.And [Filter.Type.IsAttacking, Filter.Type.PowerLessThanSource]))
+                  (Just (Filter.Type.And [Filter.Type.IsAttacking, Filter.Type.Measures (Measures.MkMeasures Measure.Power Comparison.LessThan (Operand.OfSource Measure.Power))]))
               slotsOf ability = concatMap (Map.elems . Mode.targetSlots) (Modal.modes (TriggeredAbility.modal ability))
           Spec.assertEqWith s "two abilities" (length abilities) 2
           Spec.assertEqWith
@@ -476,7 +480,7 @@ mentorsTriggerSpec s registry =
 
 -- CR 702.149a's training, which rule 702 states as a triggered
 -- ability -- and the first whose trigger CONDITION reads the rest of the
--- declaration, through Filter.PowerGreaterThanSource and the source power
+-- declaration, through a power comparison against the source power
 -- TriggerCondition.SelfAttacksWithAnother supplies.
 --
 -- Apprentice Sharpshooter {2}{G} Creature -- Human Archer 1/4 is the card: reach
@@ -496,7 +500,7 @@ trainingSpec s _ =
       let abilities = Keyword.abilitiesFor Keyword.Type.Training 2
           expected =
             TriggerCondition.SelfAttacksWithAnother
-              (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.PowerGreaterThanSource])
+              (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.Measures (Measures.MkMeasures Measure.Power Comparison.GreaterThan (Operand.OfSource Measure.Power))])
       Spec.assertEqWith s "two abilities" (length abilities) 2
       Spec.assertEqWith
         s

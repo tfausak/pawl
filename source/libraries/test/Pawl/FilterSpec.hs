@@ -7,9 +7,11 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.BoundMeasure as BoundMeasure
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Cycling as Cycling
@@ -21,7 +23,10 @@ import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.Measure as Measure
+import qualified Pawl.Types.Measures as Measures
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Operand as Operand
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProductionTag as ProductionTag
@@ -381,97 +386,81 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
       Spec.assertBool s (Filter.matches self (withKeyword swampwalk) (Filter.Type.HasKeywordFamily KeywordFamily.Landwalk)) "Staff of the Ages reaches swampwalk"
       Spec.assertBool s (Filter.matches self (withKeyword islandwalk) (Filter.Type.HasKeywordFamily KeywordFamily.Landwalk)) "and islandwalk too"
 
-  Spec.it s "PowerAtLeast compares projected power" $ do
-    Spec.assertBool s (not (Filter.matches self blackCreature (Filter.Type.PowerAtLeast 4))) "power 2 < 4"
-    Spec.assertBool s (Filter.matches self devoidBigCreature (Filter.Type.PowerAtLeast 4)) "power 5 >= 4"
-
-  Spec.it s "PowerAtLeast is False when power is Nothing" $ do
-    let noPower = blackCreature {Filter.power = Nothing}
-    Spec.assertBool s (not (Filter.matches self noPower (Filter.Type.PowerAtLeast 1))) "no power"
-
-  -- CR 208.1 read as a ceiling: Ezuri, Claw of Progress' "power 2 or less".
-  -- The bound is INCLUSIVE, which is the printed "or less", so the 2 that
-  -- PowerAtLeast 4 declines is admitted here and the 5 is not.
-  Spec.it s "PowerAtMost compares projected power" $ do
-    Spec.assertBool s (Filter.matches self blackCreature (Filter.Type.PowerAtMost 2)) "power 2 <= 2"
-    Spec.assertBool s (not (Filter.matches self devoidBigCreature (Filter.Type.PowerAtMost 2))) "power 5 > 2"
-
-  -- NOT the negation of PowerAtLeast, which is the whole reason it is a separate
-  -- atom: an object with no power answers False to both, where `Not (PowerAtLeast
-  -- 3)` would admit it.
-  Spec.it s "PowerAtMost is False when power is Nothing" $ do
-    let noPower = blackCreature {Filter.power = Nothing}
-    Spec.assertBool s (not (Filter.matches self noPower (Filter.Type.PowerAtMost 99))) "no power"
-    Spec.assertBool s (Filter.matches self noPower (Filter.Type.Not (Filter.Type.PowerAtLeast 99))) "where the negation of PowerAtLeast admits it"
-
-  Spec.it s "ToughnessGreaterThanPower compares both projected characteristics strictly" $ do
-    Spec.assertBool s (Filter.matches self (blackCreature {Filter.toughness = Just 3}) Filter.Type.ToughnessGreaterThanPower) "3 > 2"
-    Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.ToughnessGreaterThanPower)) "2 is not > 2"
-    Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.toughness = Nothing}) Filter.Type.ToughnessGreaterThanPower)) "no toughness"
-
-  -- CR 702.134a's comparison, whose bound is the Context's source power rather
-  -- than a literal the atom carries. blackCreature is power 2 and
-  -- devoidBigCreature power 5, so one source power between them tells the two
-  -- apart in both directions.
-  Spec.describe s "PowerLessThanSource" $ do
-    let sourced n = self {Filter.sourcePower = Just n}
-    Spec.it s "holds below the source's power and fails above it" $ do
-      Spec.assertBool s (Filter.matches (sourced 3) blackCreature Filter.Type.PowerLessThanSource) "2 < 3"
-      Spec.assertBool s (not (Filter.matches (sourced 3) devoidBigCreature Filter.Type.PowerLessThanSource)) "5 is not < 3"
-
-    -- STRICTLY less, which is what keeps a mentor from targeting itself: rule
-    -- 702.134a says "less than", not "no greater than".
-    Spec.it s "is False at equal power" $ do
-      Spec.assertBool s (not (Filter.matches (sourced 2) blackCreature Filter.Type.PowerLessThanSource)) "2 is not < 2"
-
-    -- The two vacuity postures, PowerAtMost's on the candidate side and
-    -- ControlledBy's on the context side.
-    Spec.it s "is False when either power is absent" $ do
-      let noPower = blackCreature {Filter.power = Nothing}
-      Spec.assertBool s (not (Filter.matches (sourced 3) noPower Filter.Type.PowerLessThanSource)) "no candidate power"
-      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.PowerLessThanSource)) "no source power"
-
-    Spec.it s "is False for a player" $ do
-      Spec.assertBool s (not (Filter.matches (sourced 3) aPlayer Filter.Type.PowerLessThanSource)) "player"
-
-  -- CR 702.149a's comparison, the same Context field read the other way -- and NOT
-  -- the negation of its sibling, which is why it is a separate atom: equal power
-  -- and an absent power both answer False here and True to `Not
-  -- PowerLessThanSource`.
-  Spec.describe s "PowerGreaterThanSource" $ do
-    let sourced n = self {Filter.sourcePower = Just n}
-    Spec.it s "holds above the source's power and fails below it" $ do
-      Spec.assertBool s (Filter.matches (sourced 3) devoidBigCreature Filter.Type.PowerGreaterThanSource) "5 > 3"
-      Spec.assertBool s (not (Filter.matches (sourced 3) blackCreature Filter.Type.PowerGreaterThanSource)) "2 is not > 3"
-
-    -- STRICTLY greater, which is what keeps a training creature from counting a
-    -- companion its own size: rule 702.149a says "greater", not "no less".
-    Spec.it s "is False at equal power, where the negation of its sibling is True" $ do
-      Spec.assertBool s (not (Filter.matches (sourced 2) blackCreature Filter.Type.PowerGreaterThanSource)) "2 is not > 2"
-      Spec.assertBool s (Filter.matches (sourced 2) blackCreature (Filter.Type.Not Filter.Type.PowerLessThanSource)) "where the negation admits it"
-
-    Spec.it s "is False when either power is absent" $ do
-      let noPower = blackCreature {Filter.power = Nothing}
-      Spec.assertBool s (not (Filter.matches (sourced 3) noPower Filter.Type.PowerGreaterThanSource)) "no candidate power"
-      Spec.assertBool s (not (Filter.matches self devoidBigCreature Filter.Type.PowerGreaterThanSource)) "no source power"
-
-    Spec.it s "is False for a player" $ do
-      Spec.assertBool s (not (Filter.matches (sourced 3) aPlayer Filter.Type.PowerGreaterThanSource)) "player"
-
-  -- Ironclaw Curse's comparison: the candidate's power against the source's
-  -- TOUGHNESS, inclusively. The source's power is set apart from its toughness
-  -- so a reading of the wrong field disagrees.
-  Spec.describe s "PowerAtLeastSourceToughness" $ do
-    let sourced t = self {Filter.sourcePower = Just 9, Filter.sourceToughness = Just t}
-    Spec.it s "holds at and above the source's toughness and fails below it" $ do
-      Spec.assertBool s (Filter.matches (sourced 2) blackCreature Filter.Type.PowerAtLeastSourceToughness) "2 >= 2"
-      Spec.assertBool s (Filter.matches (sourced 1) blackCreature Filter.Type.PowerAtLeastSourceToughness) "2 >= 1"
-      Spec.assertBool s (not (Filter.matches (sourced 3) blackCreature Filter.Type.PowerAtLeastSourceToughness)) "2 is not >= 3"
-
-    Spec.it s "is False when either number is absent" $ do
-      let noPower = blackCreature {Filter.power = Nothing}
-      Spec.assertBool s (not (Filter.matches (sourced 1) noPower Filter.Type.PowerAtLeastSourceToughness)) "no candidate power"
-      Spec.assertBool s (not (Filter.matches (self {Filter.sourcePower = Just 0}) blackCreature Filter.Type.PowerAtLeastSourceToughness)) "no source toughness"
+  -- CR 208.1 / 202.3: one comparison of a measure against an operand.
+  -- blackCreature is a 2/2 with mana value 3 and devoidBigCreature's power is 5,
+  -- so every reading below is told apart from its neighbours.
+  Spec.describe s "Measures" $ do
+    let measures measure comparison operand = Filter.Type.Measures (Measures.MkMeasures measure comparison operand)
+        power = measures Measure.Power
+        manaValue = measures Measure.ManaValue
+        noPower = blackCreature {Filter.power = Nothing}
+        noCost = blackCreature {Filter.manaValue = Nothing}
+    -- Each comparison at the boundary and on either side of it: AtMost is the
+    -- printed "or less" (Ezuri, Claw of Progress' "power 2 or less"), and the
+    -- strict pair is what keeps a mentor from targeting itself (CR 702.134a's
+    -- "less than") and a training creature from counting a companion its own size
+    -- (CR 702.149a's "greater").
+    Spec.it s "each comparison reads the candidate's projected power" $ do
+      let verdicts comparison = fmap (Filter.matches self blackCreature . power comparison . Operand.Literal) [1, 2, 3]
+      Spec.assertEqWith
+        s
+        "power 2 against 1, 2 and 3"
+        (fmap verdicts [minBound .. maxBound])
+        [[False, True, False], [True, True, False], [False, True, True], [False, False, True], [True, False, False]]
+    Spec.it s "the measure picks the characteristic" $ do
+      Spec.assertBool s (Filter.matches self devoidBigCreature (power Comparison.AtLeast (Operand.Literal 4))) "power 5 >= 4"
+      Spec.assertBool s (Filter.matches self blackCreature (manaValue Comparison.Exactly (Operand.Literal 3))) "mana value 3"
+      Spec.assertBool s (Filter.matches self (blackCreature {Filter.toughness = Just 3}) (measures Measure.Toughness Comparison.Exactly (Operand.Literal 3))) "toughness 3"
+    -- CR 202.3a: a mana value of 0 is a real answer, not a missing one.
+    Spec.it s "a mana value of 0 is compared" $
+      Spec.assertBool s (Filter.matches self (blackCreature {Filter.manaValue = Just 0}) (manaValue Comparison.AtMost (Operand.Literal 0))) "0 <= 0"
+    -- CR 208.3: an object with no power is not "a creature with power 2 or less",
+    -- so AtMost is NOT the negation of AtLeast: both answer False, where `Not`
+    -- would admit it.
+    Spec.it s "is False when the candidate has no such number" $ do
+      Spec.assertBool s (not (Filter.matches self noPower (power Comparison.AtMost (Operand.Literal 99)))) "no power"
+      Spec.assertBool s (not (Filter.matches self noPower (power Comparison.AtLeast (Operand.Literal 1)))) "no power either way"
+      Spec.assertBool s (Filter.matches self noPower (Filter.Type.Not (power Comparison.AtLeast (Operand.Literal 99)))) "where the negation admits it"
+      Spec.assertBool s (not (Filter.matches self noCost (manaValue Comparison.AtMost (Operand.Literal 99)))) "no mana value"
+      Spec.assertBool s (not (Filter.matches self aPlayer (manaValue Comparison.AtMost (Operand.Literal 99)))) "player"
+    Spec.it s "Own reads the candidate's other measure" $ do
+      let tougher = measures Measure.Toughness Comparison.GreaterThan (Operand.Own Measure.Power)
+      Spec.assertBool s (Filter.matches self (blackCreature {Filter.toughness = Just 3}) tougher) "3 > 2"
+      Spec.assertBool s (not (Filter.matches self blackCreature tougher)) "2 is not > 2"
+      Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.toughness = Nothing}) tougher)) "no toughness"
+    -- The source's power is set apart from its toughness and mana value, so a
+    -- reading of the wrong field disagrees.
+    Spec.it s "OfSource reads the Context's field for the operand's measure" $ do
+      let sourced = self {Filter.sourcePower = Just 9, Filter.sourceToughness = Just 2, Filter.sourceManaValue = Just 4}
+      Spec.assertBool s (Filter.matches sourced blackCreature (power Comparison.AtLeast (Operand.OfSource Measure.Toughness))) "2 >= the source's toughness 2"
+      Spec.assertBool s (Filter.matches sourced blackCreature (power Comparison.LessThan (Operand.OfSource Measure.Power))) "2 < the source's power 9"
+      Spec.assertBool s (Filter.matches sourced blackCreature (manaValue Comparison.LessThan (Operand.OfSource Measure.ManaValue))) "3 < the source's mana value 4"
+      Spec.assertBool s (not (Filter.matches sourced blackCreature (manaValue Comparison.Exactly (Operand.OfSource Measure.ManaValue)))) "3 is not 4"
+    Spec.it s "OfSource is False when either number is absent" $ do
+      let sourced = self {Filter.sourcePower = Just 3}
+      Spec.assertBool s (not (Filter.matches sourced noPower (power Comparison.LessThan (Operand.OfSource Measure.Power)))) "no candidate power"
+      Spec.assertBool s (not (Filter.matches self blackCreature (power Comparison.LessThan (Operand.OfSource Measure.Power)))) "no source power"
+      Spec.assertBool s (not (Filter.matches sourced aPlayer (power Comparison.LessThan (Operand.OfSource Measure.Power)))) "player"
+    -- CR 608.2c: the bound object's number, and the amount a clause stamped.
+    Spec.it s "OfBound and AmountInSlot read the slot's number" $ do
+      let slot = SlotName.MkSlotName (Text.pack "bound")
+          bound = self {Filter.slotMeasures = Map.singleton (slot, Measure.Toughness) 3, Filter.boundAmounts = Map.singleton slot 2}
+          ofBound = measures Measure.Toughness Comparison.LessThan (Operand.OfBound (BoundMeasure.MkBoundMeasure slot Measure.Toughness))
+      Spec.assertBool s (Filter.matches bound blackCreature ofBound) "toughness 2 < the bound object's 3"
+      Spec.assertBool s (not (Filter.matches self blackCreature ofBound)) "no bound object"
+      Spec.assertBool s (not (Filter.matches bound blackCreature (measures Measure.Toughness Comparison.LessThan (Operand.OfBound (BoundMeasure.MkBoundMeasure slot Measure.Power))))) "the bound object's power is not its toughness"
+      Spec.assertBool s (Filter.matches bound blackCreature (power Comparison.Exactly (Operand.AmountInSlot slot))) "power 2 is the amount 2"
+      Spec.assertBool s (not (Filter.matches self blackCreature (power Comparison.Exactly (Operand.AmountInSlot slot)))) "no amount"
+    -- CR 601.2b: the one operand whose absence can widen, and only while the
+    -- announcement that fixes it has not been made.
+    Spec.it s "EnclosingAmount narrows nothing until it is announced" $ do
+      let atMost = manaValue Comparison.AtMost Operand.EnclosingAmount
+      Spec.assertBool s (Filter.matches (self {Filter.slotAmount = Just 3}) blackCreature atMost) "3 <= 3"
+      Spec.assertBool s (not (Filter.matches (self {Filter.slotAmount = Just 2}) blackCreature atMost)) "3 > 2"
+      Spec.assertBool s (not (Filter.matches self blackCreature atMost)) "no amount stated"
+      Spec.assertBool s (Filter.matches (self {Filter.boundUnannounced = True}) blackCreature atMost) "an amount not yet announced"
+      Spec.assertBool s (not (Filter.matches (self {Filter.boundUnannounced = True}) noCost atMost)) "but never a candidate with no mana value"
+      Spec.assertBool s (not (Filter.matches (self {Filter.boundUnannounced = True}) blackCreature (power Comparison.AtMost (Operand.AmountInSlot (SlotName.MkSlotName (Text.pack "x")))))) "and no other operand widens"
   -- CR 702.39a's "defending player controls", whose player comes from the
   -- Context rather than from the perspective. blackCreature is controlled by
   -- player 0 and OWNED by player 1, so a reading that consulted the wrong field
@@ -568,71 +557,8 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
         s
         (Filter.matches self blackCreature (Filter.bakeBound bound (Filter.Type.ControlledByBound slot)))
         "so the baked filter matches where the unbaked one did not"
-  -- CR 202.3, a ceiling on a different characteristic: Ojutai's Command's
-  -- "mana value 2 or less".
-  Spec.it s "ManaValueAtMost compares the mana value" $ do
-    Spec.assertBool s (Filter.matches self blackCreature (Filter.Type.ManaValueAtMost 3)) "mana value 3 <= 3"
-    Spec.assertBool s (not (Filter.matches self blackCreature (Filter.Type.ManaValueAtMost 2))) "mana value 3 > 2"
-
-  -- CR 202.3a: a mana value of 0 is a real answer, not a missing one, so the
-  -- bound holds at zero rather than falling through to the Nothing arm below.
-  Spec.it s "ManaValueAtMost holds for a mana value of 0" $ do
-    let free = blackCreature {Filter.manaValue = Just 0}
-    Spec.assertBool s (Filter.matches self free (Filter.Type.ManaValueAtMost 0)) "0 <= 0"
-
-  Spec.it s "ManaValueAtMost is False when the mana value is Nothing" $ do
-    let noCost = blackCreature {Filter.manaValue = Nothing}
-    Spec.assertBool s (not (Filter.matches self noCost (Filter.Type.ManaValueAtMost 99))) "no mana value"
-
-  Spec.it s "ManaValueAtMost is False for a player" $ do
-    Spec.assertBool s (not (Filter.matches self aPlayer (Filter.Type.ManaValueAtMost 99))) "player"
-
-  -- CR 702.85a's comparison, PowerLessThanSource's shape one characteristic over:
-  -- the bound is the Context's source mana value rather than a literal the atom
-  -- carries. blackCreature's mana value is 3.
-  Spec.describe s "ManaValueLessThanSource" $ do
-    let sourced n = self {Filter.sourceManaValue = Just n}
-    Spec.it s "holds below the source's mana value and fails above it" $ do
-      Spec.assertBool s (Filter.matches (sourced 4) blackCreature Filter.Type.ManaValueLessThanSource) "3 < 4"
-      Spec.assertBool s (not (Filter.matches (sourced 4) (blackCreature {Filter.manaValue = Just 5}) Filter.Type.ManaValueLessThanSource)) "5 is not < 4"
-
-    -- STRICTLY less, rule 702.85a's own word: a cascade off a mana value of 3
-    -- does not reach another 3.
-    Spec.it s "is False at equal mana value" $
-      Spec.assertBool s (not (Filter.matches (sourced 3) blackCreature Filter.Type.ManaValueLessThanSource)) "3 is not < 3"
-
-    -- The two vacuity postures PowerLessThanSource takes, on the same two sides.
-    Spec.it s "is False when either mana value is absent" $ do
-      let noCost = blackCreature {Filter.manaValue = Nothing}
-      Spec.assertBool s (not (Filter.matches (sourced 4) noCost Filter.Type.ManaValueLessThanSource)) "no candidate mana value"
-      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.ManaValueLessThanSource)) "no source mana value"
-
-    Spec.it s "is False for a player" $
-      Spec.assertBool s (not (Filter.matches (sourced 4) aPlayer Filter.Type.ManaValueLessThanSource)) "player"
-
-  -- CR 702.53a's and CR 702.71a's "the same mana value", the atom above's
-  -- comparison at equality and off the same Context field. blackCreature's mana
-  -- value is 3.
-  Spec.describe s "ManaValueEqualToSource" $ do
-    let sourced n = self {Filter.sourceManaValue = Just n}
-    -- The boundary the atom above excludes is the only one this one admits, which
-    -- is the whole difference between the two rules' searches.
-    Spec.it s "holds at equal mana value and nowhere else" $ do
-      Spec.assertBool s (Filter.matches (sourced 3) blackCreature Filter.Type.ManaValueEqualToSource) "3 == 3"
-      Spec.assertBool s (not (Filter.matches (sourced 4) blackCreature Filter.Type.ManaValueEqualToSource)) "3 is not 4"
-      Spec.assertBool s (not (Filter.matches (sourced 2) blackCreature Filter.Type.ManaValueEqualToSource)) "3 is not 2"
-
-    -- ManaValueLessThanSource's two vacuity postures, on the same two sides.
-    Spec.it s "is False when either mana value is absent" $ do
-      let noCost = blackCreature {Filter.manaValue = Nothing}
-      Spec.assertBool s (not (Filter.matches (sourced 3) noCost Filter.Type.ManaValueEqualToSource)) "no candidate mana value"
-      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.ManaValueEqualToSource)) "no source mana value"
-
-    Spec.it s "is False for a player" $
-      Spec.assertBool s (not (Filter.matches (sourced 3) aPlayer Filter.Type.ManaValueEqualToSource)) "player"
-
-  -- CR 702.60a's "with the same name as this spell", the two arms above's shape
-  -- over a SET of NAMES: CR 201.2 makes the comparison an intersection, so an
+  -- CR 702.60a's "with the same name as this spell", the Measures atom's OfSource
+  -- shape over a SET of NAMES: CR 201.2 makes the comparison an intersection, so an
   -- object showing two names (CR 709.4a's split card) has the source's name if it
   -- shows either.
   Spec.describe s "SameNameAsSource" $ do
@@ -689,13 +615,20 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     Spec.assertEqWith
       s
       "both bounds, from inside an Or under a Not"
-      (Filter.manaValueThresholds (Filter.Type.Not (Filter.Type.Or [Filter.Type.ManaValueAtMost 5, Filter.Type.And [Filter.Type.ManaValueIsEven, Filter.Type.ManaValueAtMost 2]])))
+      (Filter.manaValueThresholds (Filter.Type.Not (Filter.Type.Or [Filter.Type.Measures (Measures.MkMeasures Measure.ManaValue Comparison.AtMost (Operand.Literal 5)), Filter.Type.And [Filter.Type.ManaValueIsEven, Filter.Type.Measures (Measures.MkMeasures Measure.ManaValue Comparison.AtMost (Operand.Literal 2))]])))
       [5, 2]
     Spec.assertEqWith
       s
       "and none from a criterion with no literal in it"
       (Filter.manaValueThresholds Filter.Type.ManaValueIsEven)
       []
+    -- Every comparison against a mana value literal bounds the search, and a
+    -- literal against power bounds nothing.
+    Spec.assertEqWith
+      s
+      "whatever the comparison, and only against the mana value"
+      (Filter.manaValueThresholds (Filter.Type.And [Filter.Type.Measures (Measures.MkMeasures Measure.ManaValue Comparison.GreaterThan (Operand.Literal 4)), Filter.Type.Measures (Measures.MkMeasures Measure.Power Comparison.AtMost (Operand.Literal 7))]))
+      [4]
 
   -- CR 110.2's board comparison is answered by Pawl.Engine.Count.bakePerspective,
   -- which holds the game state; this module holds none, so the atom is vacuously

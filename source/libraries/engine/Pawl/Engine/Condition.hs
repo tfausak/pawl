@@ -41,7 +41,6 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Types.Compares as Compares
-import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.DuringPhase as DuringPhase
 import Pawl.Types.GameState (GameState)
@@ -63,10 +62,7 @@ holds viewOf context gs oid condition =
         -- either side sweeps the same board. Only the Comparison is oriented.
         Condition.Type.Compares c ->
           case (evaluate (Compares.measured c), evaluate (Compares.threshold c)) of
-            (Just n, Just t) -> case Compares.comparison c of
-              Comparison.Exactly -> n == t
-              Comparison.AtLeast -> n >= t
-              Comparison.AtMost -> n <= t
+            (Just n, Just t) -> Filter.compares (Compares.comparison c) n t
             _ -> False
         -- Each disjunct collapses its own unanswerable quantities to False, so an
         -- empty list is False and a disjunct reading a slot nothing filled cannot

@@ -38,8 +38,19 @@
             "targetSlots": {
               "ability": {
                 "filter": {
-                  "type": "ManaValueAtMost",
-                  "value": 2
+                  "type": "Measures",
+                  "value": {
+                    "comparison": {
+                      "type": "AtMost"
+                    },
+                    "measure": {
+                      "type": "ManaValue"
+                    },
+                    "operand": {
+                      "type": "Literal",
+                      "value": 2
+                    }
+                  }
                 },
                 "pool": {
                   "type": "Abilities"

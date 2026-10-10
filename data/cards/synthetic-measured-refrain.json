@@ -84,7 +84,18 @@
                   }
                 },
                 "filter": {
-                  "type": "ManaValueAtMostAmount"
+                  "type": "Measures",
+                  "value": {
+                    "comparison": {
+                      "type": "AtMost"
+                    },
+                    "measure": {
+                      "type": "ManaValue"
+                    },
+                    "operand": {
+                      "type": "EnclosingAmount"
+                    }
+                  }
                 },
                 "pool": {
                   "type": "Creatures"

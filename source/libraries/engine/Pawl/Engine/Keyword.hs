@@ -133,6 +133,8 @@ import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.Measure as Measure
+import qualified Pawl.Types.Measures as Measures
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
@@ -146,6 +148,7 @@ import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.Onset as Onset
+import qualified Pawl.Types.Operand as Operand
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PayBranch as PayBranch
 import qualified Pawl.Types.PayGate as PayGate
@@ -958,8 +961,9 @@ reinforceTarget = SlotName.MkSlotName (Text.pack "reinforced")
 -- 702.29c's "when you cycle this card" must not see it.
 --
 -- THE FILTER is the one thing neither cycling nor reinforce needed -- "a card
--- with the same mana value as the discarded card". Filter.ManaValueEqualToSource
--- reads Pawl.Engine.Filter.Context's sourceManaValue, which
+-- with the same mana value as the discarded card". The mana value compared
+-- Exactly against the OfSource operand reads Pawl.Engine.Filter.Context's
+-- sourceManaValue, which
 -- Pawl.Engine.Resolve.Slots.effectContext fills through CR 608.2h's last-known
 -- reader: the cost has already put the card in a graveyard as a new object (CR
 -- 400.7), so the live board answers nothing and the discarded card's own mana
@@ -971,7 +975,7 @@ reinforceTarget = SlotName.MkSlotName (Text.pack "reinforced")
 -- say it does not do it. CR 113.8 makes the ability's controller the player who
 -- activated it, which is rule 702.53a's "your library" and "your hand" alike.
 transmute :: Cost Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
-transmute cost = searchForSameManaValue (cost {Cost.components = Cost.components cost <> [CostComponent.DiscardThis DiscardCause.Ordinary]}) Filter.ManaValueEqualToSource SearchDestination.RevealThenHand
+transmute cost = searchForSameManaValue (cost {Cost.components = Cost.components cost <> [CostComponent.DiscardThis DiscardCause.Ordinary]}) (Filter.Measures (Measures.MkMeasures Measure.ManaValue Comparison.Exactly (Operand.OfSource Measure.ManaValue))) SearchDestination.RevealThenHand
 
 -- CR 702.167a's whole ability: "[Cost], Exile this permanent, Exile [materials]
 -- from among permanents you control and\/or cards in your graveyard: Return this
@@ -1032,7 +1036,7 @@ craft spec =
 -- NO REVEAL in the destination, unlike transmute's: rule 702.71a states none,
 -- and CR 701.23e's reveal is only what a rule's own sentence asks for.
 transfigure :: Cost Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
-transfigure cost = searchForSameManaValue (cost {Cost.components = Cost.components cost <> [CostComponent.SacrificeThis]}) (Filter.And [Filter.HasCardType CardType.Creature, Filter.ManaValueEqualToSource]) SearchDestination.Battlefield
+transfigure cost = searchForSameManaValue (cost {Cost.components = Cost.components cost <> [CostComponent.SacrificeThis]}) (Filter.And [Filter.HasCardType CardType.Creature, Filter.Measures (Measures.MkMeasures Measure.ManaValue Comparison.Exactly (Operand.OfSource Measure.ManaValue))]) SearchDestination.Battlefield
 
 -- What CR 702.53a and CR 702.71a share once the cost, the quality and the
 -- destination are named: search your library for one card matching, then shuffle,
@@ -3613,7 +3617,7 @@ casualtyCost :: Natural -> Cost Keyword
 casualtyCost n =
   Cost.MkCost
     { Cost.mana = Just (ManaCost.MkManaCost []),
-      Cost.components = [CostComponent.Sacrifice (Sacrifice.MkSacrifice (CostAmount.Fixed 1) (Filter.And [Filter.HasCardType CardType.Creature, Filter.PowerAtLeast (toInteger n)]))]
+      Cost.components = [CostComponent.Sacrifice (Sacrifice.MkSacrifice (CostAmount.Fixed 1) (Filter.And [Filter.HasCardType CardType.Creature, Filter.Measures (Measures.MkMeasures Measure.Power Comparison.AtLeast (Operand.Literal (toInteger n)))]))]
     }
 
 -- CR 702.166a's additional cost: "you may sacrifice an artifact, enchantment, or
@@ -6510,9 +6514,9 @@ afflict n =
 -- CR 702.134a, the first minted ability that TARGETS. A REAL choice, since with
 -- two smaller attackers the rules leave which one open.
 --
--- Filter.PowerLessThanSource compares against the SOURCE, which is why that atom
--- carries no literal, and is strict, which is what excludes the BEARER with no
--- `Not IsSource`.
+-- The power comparison's operand is the SOURCE's power, which is why it
+-- carries no literal, and it is LessThan, strict, which is what excludes the
+-- BEARER with no `Not IsSource`.
 --
 -- Effect.Mentor and not Effect.PutCounters, for evolve's reason one rule over: CR
 -- 702.134c makes "a creature mentors another creature" a trigger event, so the
@@ -6520,7 +6524,7 @@ afflict n =
 -- still goes through Event.putCounters, so CR 122.6's funnel is unaffected.
 mentor :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 mentor =
-  let slot = TargetSlot.required Pool.Creatures (Just (Filter.And [Filter.IsAttacking, Filter.PowerLessThanSource]))
+  let slot = TargetSlot.required Pool.Creatures (Just (Filter.And [Filter.IsAttacking, Filter.Measures (Measures.MkMeasures Measure.Power Comparison.LessThan (Operand.OfSource Measure.Power))]))
       effect = Effect.Mentor mentorTarget
    in Mint.triggerOf
         (TriggerCondition.SelfAttacks TriggerFrequency.EveryTime)
@@ -6550,7 +6554,7 @@ training =
   let effect = Effect.CounterAndMark (PermanentActed.MkPermanentActed PermanentAction.Train Binding.triggerSource)
    in Mint.trigger
         ( TriggerCondition.SelfAttacksWithAnother
-            (Filter.And [Filter.HasCardType CardType.Creature, Filter.PowerGreaterThanSource])
+            (Filter.And [Filter.HasCardType CardType.Creature, Filter.Measures (Measures.MkMeasures Measure.Power Comparison.GreaterThan (Operand.OfSource Measure.Power))])
         )
         (Seq.singleton effect)
 
@@ -7605,7 +7609,7 @@ soulshift n =
   let slot =
         TargetSlot.required
           (Pool.CardsInGraveyard (ZoneScope.Scoped (PlayerScope.Related PlayerRelation.You)))
-          (Just (Filter.And [Filter.HasSubtype Subtype.Spirit, Filter.ManaValueAtMost (toInteger n)]))
+          (Just (Filter.And [Filter.HasSubtype Subtype.Spirit, Filter.Measures (Measures.MkMeasures Measure.ManaValue Comparison.AtMost (Operand.Literal (toInteger n)))]))
       back =
         Effect.MoveToZone
           ( MoveToZone.MkMoveToZone
@@ -8132,7 +8136,7 @@ demonstrateOpponent = SlotName.MkSlotName (Text.pack "demonstrated")
 -- comes of the second read -- the walk stops at the first match, so exactly one
 -- exiled card can satisfy it, and EachCardFromAmong asks nobody anything.
 --
--- Filter.ManaValueLessThanSource and not a literal, because CR 613.2a moves the
+-- An OfSource operand and not a literal, because CR 613.2a moves the
 -- spell's mana cost under layer 1: a cascade spell that is a copy of something
 -- else measures the copied cost, which no minter could have baked. So does an
 -- {X} spell granted cascade, whose mana value counts its announced X (CR
@@ -8152,7 +8156,7 @@ cascade :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 cascade =
   let plain =
         EntryRiders.defaultValue
-      match = Filter.And [Filter.Not (Filter.HasCardType CardType.Land), Filter.ManaValueLessThanSource]
+      match = Filter.And [Filter.Not (Filter.HasCardType CardType.Land), Filter.Measures (Measures.MkMeasures Measure.ManaValue Comparison.LessThan (Operand.OfSource Measure.ManaValue))]
       exile =
         Effect.MoveToZone
           ( MoveToZone.MkMoveToZone
@@ -8178,7 +8182,7 @@ cascade =
                     CastOffer.withoutPayingManaCost = True,
                     CastOffer.payingInstead = Nothing,
                     CastOffer.spending = ManaSpending.AsProduced,
-                    CastOffer.restriction = Just Filter.ManaValueLessThanSource,
+                    CastOffer.restriction = Just (Filter.Measures (Measures.MkMeasures Measure.ManaValue Comparison.LessThan (Operand.OfSource Measure.ManaValue))),
                     CastOffer.offeredBy = Nothing
                   },
               -- Rule 702.85a's "cast IT": one card, the one the walk stopped at.

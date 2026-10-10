@@ -13,10 +13,12 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.NameWords as NameWords
 import qualified Pawl.Types.Behold as Behold
+import qualified Pawl.Types.BoundMeasure as BoundMeasure
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -40,8 +42,11 @@ import qualified Pawl.Types.KeywordCount as KeywordCount
 import qualified Pawl.Types.KeywordTally as KeywordTally
 import qualified Pawl.Types.MadnessCost as MadnessCost
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.Measure as Measure
+import qualified Pawl.Types.Measures as Measures
 import qualified Pawl.Types.Morph as Morph
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Operand as Operand
 import qualified Pawl.Types.Pairing as Pairing
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -121,7 +126,7 @@ data View = MkView
     -- copiable mana cost is honoured -- a Clone reports what it copied. Off the
     -- battlefield it is the printed cost's, and unlike `power` it is NOT Nothing
     -- there -- a mana cost is printed on the card and rule 202.3 names no zone
-    -- -- which is what lets ManaValueAtMost filter a graveyard.
+    -- -- which is what lets a mana value comparison filter a graveyard.
     --
     -- Just for every OBJECT, an ability on the stack included: CR 109.1 makes
     -- one an object and CR 202.3a gives an object with no mana cost a 0
@@ -1008,29 +1013,28 @@ data Context = MkContext
     teams :: Teams.Teams,
     perspective :: Maybe PlayerId.PlayerId,
     source :: Maybe ObjectId.ObjectId,
-    -- CR 208.1: the SOURCE's power, for the two atoms that compare a candidate
-    -- against it (PowerLessThanSource, CR 702.134a; PowerGreaterThanSource, CR
-    -- 702.149a). Not derivable from `source` here -- this module holds no game
-    -- state and cannot project -- so Pawl.Engine.Projection.withCharacteristicsOf
-    -- fills it and the four fields below together, through last known
-    -- information (CR 608.2b's re-check, CR 608.2h's effects): in every context Pawl.Engine.Projection.sourceContext
+    -- CR 208.1: the SOURCE's power, for the Measures atom's OfSource operand
+    -- (CR 702.134a's mentor, CR 702.149a's training). Not derivable from
+    -- `source` here -- this module holds no game state and cannot project -- so
+    -- Pawl.Engine.Projection.withCharacteristicsOf fills it and the four fields
+    -- below together, through last known information (CR 608.2b's re-check,
+    -- CR 608.2h's effects): in every context Pawl.Engine.Projection.sourceContext
     -- frames, and in CR 509.1b's pairwise restrictions, which frame by the
     -- creature being compared (Projection.pairwiseContext, Spitfire Handler).
     --
     -- LAZY, and load-bearingly so: filling it costs a projection of the source,
-    -- and no filter that omits the atom ever forces it.
+    -- and no filter that omits the operand ever forces it.
     --
     -- Nothing in `contextFor` below and inside the CR 613 layer fold, whose
     -- contexts (Pawl.Engine.SourceContext) cannot project their own source; the
-    -- atom then matches nothing, and Pawl.FilterPositionLintSpec keeps a card
+    -- operand then matches nothing, and Pawl.FilterPositionLintSpec keeps a card
     -- out of those positions.
     sourcePower :: Maybe Integer,
-    -- CR 208.1: the SOURCE's toughness, for PowerAtLeastSourceToughness
-    -- (Ironclaw Curse). Filled with sourcePower.
+    -- CR 208.1: the SOURCE's toughness, for the same operand (Ironclaw Curse).
+    -- Filled with sourcePower.
     sourceToughness :: Maybe Integer,
-    -- CR 202.3: the SOURCE's mana value, for the atoms that compare a candidate
-    -- against it (ManaValueLessThanSource, CR 702.85a; ManaValueEqualToSource,
-    -- CR 702.53a and CR 702.71a; ManaValueGreaterThanSource, Kami of
+    -- CR 202.3: the SOURCE's mana value, for the same operand (CR 702.85a's
+    -- cascade, CR 702.53a's transmute, CR 702.71a's transfigure, Kami of
     -- Mourning). Filled with sourcePower.
     sourceManaValue :: Maybe Integer,
     -- CR 105.2: the SOURCE's colours, for SharesColorWithSource (CR 702.78a's
@@ -1042,12 +1046,12 @@ data Context = MkContext
     -- sourcePower, and a SET for sourceColors' reason (CR 708.2a's nameless
     -- object).
     sourceNames :: Set.Set CardName.CardName,
-    -- CR 202.3, the computed half: the number the TARGET SLOT being matched names
-    -- as its bound, for the three atoms that ask (ManaValueAtMostAmount,
-    -- ManaValueEqualToAmount, PowerAtMostAmount) -- Celestine, the Living
-    -- Saint's "where X is the amount of life you gained this turn". The slot carries the Quantity
-    -- (Pawl.Types.TargetSlot's `amount`); this is that Quantity already
-    -- evaluated, because this module holds no game state and cannot evaluate one.
+    -- CR 202.3, the computed half: the number the TARGET SLOT being matched
+    -- names as its bound, for the Measures atom's EnclosingAmount operand --
+    -- Celestine, the Living Saint's "where X is the amount of life you gained
+    -- this turn". The slot carries the Quantity (Pawl.Types.TargetSlot's
+    -- `amount`); this is that Quantity already evaluated, because this module
+    -- holds no game state and cannot evaluate one.
     --
     -- Pawl.Engine.Target.slotContext fills it for a target slot, and
     -- Pawl.Engine.Projection.View.referenceAdmits for a conjure's reference pick
@@ -1286,20 +1290,21 @@ data Context = MkContext
     -- SharesCreatureTypeWithBound outside a resolution's own positions or a
     -- target slot" keeps a card out of those.
     slotCreatureTypes :: Map.Map SlotName.SlotName (Set.Set Subtype.Subtype),
-    -- CR 208.1: the TOUGHNESS of the object a resolution's slot holds, for the one
-    -- atom that compares a candidate's against it (ToughnessLessThanBound --
-    -- Profaner of the Dead's "the exploited creature's toughness").
-    -- `slotCreatureTypes` above in every respect but one -- the same filler
-    -- (Pawl.Engine.Projection.framedBySlots), the same CR 608.2h last-known
-    -- reader so the sacrificed creature is still answerable, the same laziness, the
-    -- same vacuous False elsewhere, and Pawl.FilterPositionLintSpec's "CR 208.1 no
-    -- card asks ToughnessLessThanBound outside a resolution's own positions" to keep
-    -- a card to the position the pool exercises.
+    -- CR 608.2c: the MEASURES of the object a resolution's slot holds, for the
+    -- Measures atom's OfBound operand (Profaner of the Dead's "the exploited
+    -- creature's toughness"). `slotCreatureTypes` above in every respect but one
+    -- -- the same filler (Pawl.Engine.Projection.framedBySlots), the same CR
+    -- 608.2h last-known reader so the sacrificed creature is still answerable, the
+    -- same laziness, the same vacuous False elsewhere, and
+    -- Pawl.FilterPositionLintSpec's "CR 208.1 no card compares against a bound
+    -- object outside a resolution's own positions" to keep a card to the position
+    -- the pool exercises.
     --
-    -- ONE number per slot rather than a set, and a slot naming several objects has
-    -- no key at all: CR 115.10a's group binding is read by "those cards" payloads,
-    -- and no printed comparison asks a group for a single toughness.
-    slotToughnesses :: Map.Map SlotName.SlotName Integer,
+    -- ONE number per slot and measure rather than a set, and a slot naming
+    -- several objects has no key at all: CR 115.10a's group binding is read by
+    -- "those cards" payloads, and no printed comparison asks a group for a
+    -- single number.
+    slotMeasures :: Map.Map (SlotName.SlotName, Measure.Measure) Integer,
     -- CR 601.2c / 603.2: the PLAYERS the surrounding resolution's slots name --
     -- `slotObjects` above's player half (Pawl.Engine.Binding.playersBySlot),
     -- filled beside it by Pawl.Engine.Projection.framedBySlots.
@@ -1338,12 +1343,12 @@ data Context = MkContext
     -- announcement not yet stamped on an object: CR 603.3d chooses a trigger's
     -- targets before the ability object carries any binding at all, and CR 601.2c
     -- chooses a spell's before CR 601.2i stamps the X onto it. It is also what the
-    -- PowerIsAmountInSlot atom compares a candidate's power against, which is a
-    -- read `matches` makes directly.
+    -- Measures atom's AmountInSlot operand reads, which is a read `matches` makes
+    -- directly.
     --
     -- The other fillers: Pawl.Engine.Resolve.Slots.effectContext supplies the
-    -- resolving object's own stamped amounts, which is the position that atom is
-    -- written in, and CR 603.4's two intervening-"if" checks
+    -- resolving object's own stamped amounts, which is the position that operand
+    -- is written in, and CR 603.4's two intervening-"if" checks
     -- (Pawl.Engine.Event.Trigger.interveningHolds and CR 608.2a's re-check,
     -- Pawl.Engine.Stack.interveningStillHolds) supply CR 107.3m's announced X
     -- through Pawl.Engine.Condition.inheritedX -- an enters-the-battlefield
@@ -1535,11 +1540,12 @@ data Context = MkContext
 
 -- A Context for every match whose Filter cannot name a context-relative atom --
 -- that is, every match but a target slot's, CR 702.149a's trigger condition and
--- CR 509.1b's blocking gate. The source-power atoms reach a card only through
--- Pawl.Engine.Keyword's own mentor and training, through Pawl.Engine.Ring's
--- emblem and through a wish's filter (Pawl.Engine.Event.eligible fills the power
--- there), and CR 702.39a's defending-player atom only through
--- provoke; Pawl.CardSpec's lints keep all three out of card data, so no other
+-- CR 509.1b's blocking gate. The OfSource operand reaches a card only through
+-- Pawl.Engine.Keyword's own minted abilities, Pawl.Engine.Ring's emblem, a wish's
+-- filter (Pawl.Engine.Event.eligible fills the source there), a pairwise combat
+-- restriction and a triggered ability's own condition, and CR 702.39a's
+-- defending-player atom only through provoke; Pawl.FilterPositionLintSpec's
+-- lints keep both out of every other position in card data, so no other
 -- position can read the Nothings this leaves.
 --
 -- CR 303.4b's host atom is the second one a CARD may write (Ray of Frost,
@@ -1585,7 +1591,7 @@ data Context = MkContext
 -- here owes both halves of the same pair: which way its unfilled read answers,
 -- and what holds a card to the positions that fill it.
 contextFor :: Teams.Teams -> Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceToughness = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayers = [], recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, slotStickers = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, evaluated = Nothing, sourceEntrants = Set.empty, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColors = Set.empty, sourceChosenSubtype = Nothing, sourceLastExiled = Nothing}
+contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceToughness = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayers = [], recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotMeasures = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, slotStickers = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, evaluated = Nothing, sourceEntrants = Set.empty, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColors = Set.empty, sourceChosenSubtype = Nothing, sourceLastExiled = Nothing}
 
 -- The ONE object a slot names, for the readers that can take no more than one --
 -- Quantity.AgainstSlot's evaluation, Count's IsControllerOfBound. Nothing where
@@ -1602,6 +1608,38 @@ slotOneObject :: SlotName.SlotName -> Context -> Maybe ObjectId.ObjectId
 slotOneObject slot context = case Set.toList (Map.findWithDefault Set.empty slot (slotObjects context)) of
   [oid] -> Just oid
   _ -> Nothing
+
+-- CR 208.1 / 202.3: the number a Measure names on a view, Nothing where the
+-- object has none (CR 208.3's noncreature, a player).
+measureOf :: Measure.Measure -> View -> Maybe Integer
+measureOf measure = case measure of
+  Measure.Power -> power
+  Measure.Toughness -> toughness
+  Measure.ManaValue -> manaValue
+
+-- What a Measures atom's operand reads: a literal, the candidate's own view, or
+-- a number the Context carries, Nothing where the Context carries none.
+operandValue :: Context -> View -> Operand.Operand -> Maybe Integer
+operandValue context view operand = case operand of
+  Operand.Literal n -> Just n
+  Operand.Own measure -> measureOf measure view
+  Operand.OfSource measure -> case measure of
+    Measure.Power -> sourcePower context
+    Measure.Toughness -> sourceToughness context
+    Measure.ManaValue -> sourceManaValue context
+  Operand.OfBound bound -> Map.lookup (BoundMeasure.slot bound, BoundMeasure.measure bound) (slotMeasures context)
+  Operand.AmountInSlot slot -> toInteger <$> Map.lookup slot (boundAmounts context)
+  Operand.EnclosingAmount -> slotAmount context
+
+-- Does the measured number relate thus to the threshold? Pawl.Types.Comparison's
+-- one reader: this module's Measures atom and Pawl.Engine.Condition's Compares.
+compares :: Comparison.Comparison -> Integer -> Integer -> Bool
+compares comparison n t = case comparison of
+  Comparison.Exactly -> n == t
+  Comparison.AtLeast -> n >= t
+  Comparison.AtMost -> n <= t
+  Comparison.LessThan -> n < t
+  Comparison.GreaterThan -> n > t
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -1648,74 +1686,21 @@ matches context view predicate = case predicate of
   -- abilities, never the board.
   Filter.HasKeywordFamily f ->
     any ((== Just f) . Keyword.familyOf) (keywords view)
-  Filter.PowerAtLeast n -> case power view of
-    Nothing -> False
-    Just p -> p >= n
-  -- CR 208.1 again, and False for the same absent power PowerAtLeast declines:
-  -- an object with no power is not "a creature with power 2 or less", it is not
-  -- a creature at all.
-  Filter.PowerAtMost n -> case power view of
-    Nothing -> False
-    Just p -> p <= n
-  Filter.ToughnessGreaterThanPower -> case (toughness view, power view) of
-    (Just t, Just p) -> t > p
+  -- CR 208.1 / 202.3: one comparison, whatever is measured and whatever it is
+  -- measured against. False unless BOTH numbers are readable: an object with no
+  -- power (CR 208.3) is not "a creature with power 2 or less", and an operand
+  -- nothing supplied -- a source no context projected, a slot naming no amount
+  -- or no single object -- names no bound to compare with.
+  --
+  -- The one exception is an EnclosingAmount CR 601.2b has not announced yet,
+  -- which states nothing and so narrows nothing (boundUnannounced): the
+  -- permissive direction keeps the castability gate from refusing a spell the
+  -- announcement could still make legal. A candidate with no measure is still
+  -- excluded.
+  Filter.Measures m -> case (measureOf (Measures.measure m) view, operandValue context view (Measures.operand m)) of
+    (Just n, Just t) -> compares (Measures.comparison m) n t
+    (Just _, Nothing) | Measures.operand m == Operand.EnclosingAmount -> boundUnannounced context
     _ -> False
-  -- CR 702.134a's "power less than this creature's power", the one power
-  -- comparison whose bound is another object rather than a literal. False unless
-  -- BOTH powers are readable, which is PowerAtLeast and PowerAtMost joined: a
-  -- candidate with no power is no more "a creature with lesser power" than it is
-  -- one with power 2 or less, and a source whose power nothing supplied names no
-  -- bound to be less than.
-  Filter.PowerLessThanSource -> case (power view, sourcePower context) of
-    (Just p, Just s) -> p < s
-    _ -> False
-  -- CR 702.149a's "power greater than this creature's power", the same comparison
-  -- reversed, and False on an absent power at either end for the same reason.
-  Filter.PowerGreaterThanSource -> case (power view, sourcePower context) of
-    (Just p, Just s) -> p > s
-    _ -> False
-  -- Ironclaw Curse's "power equal to or greater than the enchanted creature's
-  -- toughness": the candidate's power against the SOURCE's toughness, False on
-  -- an absent number at either end for the two arms above's reason.
-  Filter.PowerAtLeastSourceToughness -> case (power view, sourceToughness context) of
-    (Just p, Just t) -> p >= t
-    _ -> False
-  -- CR 702.85a's "mana value that's less than this spell's mana value", the two
-  -- arms above's comparison one characteristic over, and False on an absent mana
-  -- value at either end for their reason: a context that supplied none names no
-  -- bound to be less than.
-  Filter.ManaValueLessThanSource -> case (manaValue view, sourceManaValue context) of
-    (Just v, Just s) -> v < s
-    _ -> False
-  Filter.ManaValueGreaterThanSource -> case (manaValue view, sourceManaValue context) of
-    (Just v, Just s) -> v > s
-    _ -> False
-  -- CR 702.53a's "a card with the same mana value as the discarded card" and CR
-  -- 702.71a's "the same mana value as this permanent", the arm above's
-  -- comparison at equality, and False on an absent mana value at either end for
-  -- its reason.
-  Filter.ManaValueEqualToSource -> case (manaValue view, sourceManaValue context) of
-    (Just v, Just s) -> v == s
-    _ -> False
-  -- CR 208.1 against a number an earlier clause of the resolution bound --
-  -- Localized Destruction's "power equal to the amount of {E} paid this way".
-  -- False unless both are readable, the two source-comparing arms above and for
-  -- their reason: a candidate with no power is not a creature with that power,
-  -- and a slot naming no amount names no power to equal.
-  Filter.PowerIsAmountInSlot slot -> case (power view, Map.lookup slot (boundAmounts context)) of
-    (Just p, Just n) -> p == toInteger n
-    _ -> False
-  -- The same pair of readings, compared the other way -- Valiant Endeavor's
-  -- "power greater than or equal to that result" -- and False on an absent
-  -- number at either end for the arm above's reason.
-  Filter.PowerAtLeastAmountInSlot slot -> case (power view, Map.lookup slot (boundAmounts context)) of
-    (Just p, Just n) -> p >= toInteger n
-    _ -> False
-  -- CR 202.3, and answerable in every zone -- see the View field's own note.
-  -- Vacuously False for a player, which has no mana value to compare.
-  Filter.ManaValueAtMost n -> case manaValue view of
-    Nothing -> False
-    Just mv -> mv <= n
   -- CR 202.3 again, read for parity. Void Winnower's reminder text is the
   -- boundary case in the rulebook's own words -- "(Zero is even.)" -- and `even
   -- 0` agrees, which is also CR 202.3a's answer for an object with no mana cost:
@@ -1725,36 +1710,6 @@ matches context view predicate = case predicate of
   -- above is: a player, or an event snapshot carrying none. An ability on the
   -- stack is NOT that case -- CR 202.3a's 0 is even, and it matches.
   Filter.ManaValueIsEven -> maybe False even (manaValue view)
-  -- CR 202.3 against the slot's computed bound. Vacuously False for a candidate
-  -- with no mana value at all, PowerLessThanSource's posture: it is not "a card
-  -- with mana value X or less". A slot naming NO amount has stated no bound for it
-  -- to be under, and is False for the same reason -- unless the bound is one CR
-  -- 601.2b has not announced yet, which boundUnannounced is.
-  Filter.ManaValueAtMostAmount -> case (manaValue view, slotAmount context) of
-    (Just mv, Just n) -> mv <= n
-    -- CR 601.2b: a bound the announcement has not yet fixed states nothing, so it
-    -- narrows nothing -- see boundUnannounced. A candidate with no mana value is
-    -- still excluded, PowerLessThanSource's posture above.
-    (Just _, Nothing) -> boundUnannounced context
-    _ -> False
-  -- The arm above at equality (Chthonian Nightmare's "with mana value X"), and
-  -- vacuously False on the same two absences for its reasons: "with mana value X"
-  -- is no more true of a candidate that has none than "X or less" is, and a slot
-  -- naming no amount has stated no number for the candidate's to equal.
-  Filter.ManaValueEqualToAmount -> case (manaValue view, slotAmount context) of
-    (Just mv, Just n) -> mv == n
-    -- CR 601.2b, the arm above's answer and for its reason: a bound the
-    -- announcement has not fixed states nothing, and the permissive direction is
-    -- what keeps the castability gate from refusing a spell the announcement could
-    -- still make legal.
-    (Just _, Nothing) -> boundUnannounced context
-    _ -> False
-  -- CR 208.1 against the slot's computed bound, ManaValueAtMostAmount's arm with
-  -- power in place of mana value and False on the same absences for its reasons.
-  Filter.PowerAtMostAmount -> case (power view, slotAmount context) of
-    (Just p, Just n) -> p <= n
-    (Just _, Nothing) -> boundUnannounced context
-    _ -> False
   -- PlayerRelation.holds is what each arm MEANS, and its haddock carries the
   -- argument: an Opponent is CR 102.3's player not on your team, which is every
   -- other player in a free-for-all (CR 806.1) and at two seats (CR 102.2), and
@@ -1774,7 +1729,7 @@ matches context view predicate = case predicate of
   -- the Context supplies because it is a fact about the combat record rather than
   -- about the candidate -- or, for a source with no attack, IS ONE of the
   -- defending players (CR 802.2a, Yare). False with no controller or no defending
-  -- player, the posture PowerLessThanSource takes.
+  -- player, the posture the Measures atom takes.
   Filter.ControlledByDefendingPlayer -> case controller view of
     Just c -> List.elem c (defendingPlayers context)
     Nothing -> False
@@ -1928,12 +1883,6 @@ matches context view predicate = case predicate of
   Filter.SharesCreatureTypeWithBound slot -> case Map.lookup slot (slotCreatureTypes context) of
     Nothing -> True
     Just types -> not (Set.disjoint (subtypes view) types)
-  -- CR 208.1 against the toughness the context read off the bound object, the
-  -- atom above's shape one characteristic over. STRICT, and vacuously False if
-  -- either side is absent -- PowerLessThanSource's pair of postures.
-  Filter.ToughnessLessThanBound slot -> case (toughness view, Map.lookup slot (slotToughnesses context)) of
-    (Just t, Just n) -> t < n
-    _ -> False
   -- CR 201.4 at both ends, the arm above's INTERSECTION for CR 201.4g's reason as
   -- much as CR 709.4a's: choosing one of a set of interchangeable names chooses
   -- each of them, so a candidate showing either matches. A source that has chosen
@@ -2339,28 +2288,10 @@ rewrite pairs predicate = case predicate of
   -- "creature with landwalk" still reads landwalk afterwards, and CR 702.14a's
   -- generic term is not itself a land type to swap.
   Filter.HasKeywordFamily _ -> predicate
-  Filter.PowerAtLeast _ -> predicate
-  Filter.PowerAtMost _ -> predicate
-  Filter.ToughnessGreaterThanPower -> predicate
-  -- Untouched for the power atoms' reason above: the atom names a comparison,
-  -- and CR 612.1 finds no word in it to swap.
-  Filter.PowerLessThanSource -> predicate
-  Filter.PowerGreaterThanSource -> predicate
-  Filter.PowerAtLeastSourceToughness -> predicate
-  -- Untouched for the two above's reason: a slot name is not a word CR 612.1's
-  -- swap can find in the text.
-  Filter.PowerIsAmountInSlot _ -> predicate
-  Filter.PowerAtLeastAmountInSlot _ -> predicate
-  Filter.ManaValueAtMost _ -> predicate
-  -- Untouched for the source-power atoms' reason above: the atom names a
-  -- comparison, and CR 612.1 finds no word in it to swap.
-  Filter.ManaValueLessThanSource -> predicate
-  Filter.ManaValueGreaterThanSource -> predicate
-  Filter.ManaValueEqualToSource -> predicate
+  -- Untouched: the atom names a comparison, and CR 612.1 finds no word in it to
+  -- swap -- nor in a slot name it may carry.
+  Filter.Measures _ -> predicate
   Filter.ManaValueIsEven -> predicate
-  Filter.ManaValueAtMostAmount -> predicate
-  Filter.ManaValueEqualToAmount -> predicate
-  Filter.PowerAtMostAmount -> predicate
   Filter.ControlledBy _ -> predicate
   -- Untouched for ControlledBy's reason.
   Filter.ControlledByDefendingPlayer -> predicate
@@ -2395,7 +2326,6 @@ rewrite pairs predicate = case predicate of
   Filter.SameControllerAsBound _ -> predicate
   Filter.SameControllerAsHostOfBound _ -> predicate
   Filter.SharesCreatureTypeWithBound _ -> predicate
-  Filter.ToughnessLessThanBound _ -> predicate
   Filter.HasChosenName -> predicate
   Filter.HasChosenColor -> predicate
   Filter.HasChosenSubtype -> predicate
@@ -3110,28 +3040,12 @@ bakeBound players predicate = case predicate of
   Filter.HasNameOriginallyPrintedIn _ -> predicate
   Filter.HasKeyword _ -> predicate
   Filter.HasKeywordFamily _ -> predicate
-  Filter.PowerAtLeast _ -> predicate
-  Filter.PowerAtMost _ -> predicate
-  Filter.ToughnessGreaterThanPower -> predicate
-  Filter.PowerLessThanSource -> predicate
-  Filter.PowerGreaterThanSource -> predicate
-  Filter.PowerAtLeastSourceToughness -> predicate
-  -- Untouched: CR 603.2's map holds PLAYERS, and this atom's slot names a
-  -- number. It stays answerable where it is written, boundAmounts carrying the
-  -- number into the match rather than a substitution making it.
-  Filter.PowerIsAmountInSlot _ -> predicate
-  Filter.PowerAtLeastAmountInSlot _ -> predicate
-  Filter.ManaValueAtMost _ -> predicate
-  -- Untouched for the source-power atoms' reason: CR 603.2's map holds PLAYERS,
-  -- and this atom names no slot at all -- the source's mana value rides the
-  -- Context.
-  Filter.ManaValueLessThanSource -> predicate
-  Filter.ManaValueGreaterThanSource -> predicate
-  Filter.ManaValueEqualToSource -> predicate
+  -- Untouched: CR 603.2's map holds PLAYERS, and a slot this atom's operand
+  -- names holds a number or an object. It stays answerable where it is written,
+  -- the Context carrying the number into the match rather than a substitution
+  -- making it.
+  Filter.Measures _ -> predicate
   Filter.ManaValueIsEven -> predicate
-  Filter.ManaValueAtMostAmount -> predicate
-  Filter.ManaValueEqualToAmount -> predicate
-  Filter.PowerAtMostAmount -> predicate
   Filter.ControlledBy _ -> predicate
   Filter.ControlledByDefendingPlayer -> predicate
   Filter.OwnedBy _ -> predicate
@@ -3160,7 +3074,6 @@ bakeBound players predicate = case predicate of
   Filter.SameControllerAsBound _ -> predicate
   Filter.SameControllerAsHostOfBound _ -> predicate
   Filter.SharesCreatureTypeWithBound _ -> predicate
-  Filter.ToughnessLessThanBound _ -> predicate
   Filter.HasChosenName -> predicate
   Filter.HasChosenColor -> predicate
   Filter.HasChosenSubtype -> predicate
@@ -3244,19 +3157,19 @@ bakeBound players predicate = case predicate of
   Filter.TagWasSpent _ -> predicate
   Filter.Kicked -> predicate
 
--- The mana-value LITERALS a Filter compares against: every `n` in a
--- ManaValueAtMost atom inside it, at any depth.
+-- The mana-value LITERALS a Filter compares against: every `n` a Measures atom
+-- compares the candidate's mana value with, at any depth.
 --
 -- CR 601.3a's lookahead is the one caller (Pawl.Engine.PlayerEffect
 -- prohibitsCasting). Asking whether some choice of X could take a spell out of a
 -- prohibition means asking one Filter at more than one mana value, and this is
--- what BOUNDS that search: ManaValueAtMost and ManaValueIsEven are the whole of
--- the mana-value vocabulary a filter in this POSITION may use, so above every
--- literal returned here the only distinction a Filter can still draw is parity,
--- and a sample running two past the greatest literal has already seen every
--- verdict the Filter can give. ManaValueAtMostAmount and ManaValueEqualToAmount
--- are the third and fourth atoms that read a mana value, and the position is why
--- neither widens the sample -- see their arms below.
+-- what BOUNDS that search: a literal comparison and ManaValueIsEven are the
+-- whole of the mana-value vocabulary a filter in this POSITION may use, so above
+-- every literal returned here the only distinction a Filter can still draw is
+-- parity, and a sample running two past the greatest literal has already seen
+-- every verdict the Filter can give. A comparison against any other operand reads
+-- a mana value too, and the position is why none widens the sample -- see the
+-- Measures arm below.
 --
 -- Exhaustive rather than a catch-all, bakeBound's posture and for a sharper
 -- reason: an atom reading the mana value some other way -- a multiple-of-three
@@ -3266,7 +3179,28 @@ bakeBound players predicate = case predicate of
 -- Polymorphic in the keyword, since no arm reads one.
 manaValueThresholds :: Filter.Filter keyword -> [Integer]
 manaValueThresholds predicate = case predicate of
-  Filter.ManaValueAtMost n -> [n]
+  -- A literal against the candidate's mana value, whichever way it compares:
+  -- above every such literal the comparison's answer is constant, so the sample
+  -- has already seen it.
+  Filter.Measures m -> case Measures.operand m of
+    Operand.Literal n -> case Measures.measure m of
+      Measure.ManaValue -> [n]
+      -- Reads power or toughness against the literal, so it bounds nothing.
+      Measure.Power -> []
+      Measure.Toughness -> []
+    -- No literal to report, whatever the measure -- and an Own ManaValue
+    -- operand reads the candidate's mana value from the other side. Position is
+    -- what keeps the caller's argument whole: CR 601.3a's lookahead reads a
+    -- player ability's prohibition filter
+    -- (Pawl.Engine.PlayerEffect.prohibitsCasting), and
+    -- Pawl.FilterPositionLintSpec's "CR 601.3a no player effect compares a mana
+    -- value against anything but a literal" keeps every read of the candidate's
+    -- mana value through any other operand, on either side, out of that position.
+    Operand.OfSource _ -> []
+    Operand.Own _ -> []
+    Operand.OfBound _ -> []
+    Operand.AmountInSlot _ -> []
+    Operand.EnclosingAmount -> []
   Filter.And fs -> concatMap manaValueThresholds fs
   Filter.Or fs -> concatMap manaValueThresholds fs
   Filter.Not f -> manaValueThresholds f
@@ -3279,34 +3213,6 @@ manaValueThresholds predicate = case predicate of
   -- Reads the mana value and compares it against NO literal, so it bounds
   -- nothing: parity is what the sample's two-past-the-greatest tail is for.
   Filter.ManaValueIsEven -> []
-  -- Reads the mana value and compares it against a bound that is another
-  -- OBJECT's, so there is no literal to report, and position is what keeps the
-  -- caller's argument whole -- the arm below's reasoning: CR 601.3a's lookahead
-  -- reads a player ability's prohibition filter, while this atom is written only
-  -- into a resolution's own references (Pawl.Engine.Resolve.Slots.effectContext
-  -- fills Context's sourceManaValue there), and
-  -- Pawl.FilterPositionLintSpec is what keeps a card from writing it anywhere.
-  Filter.ManaValueLessThanSource -> []
-  -- The arm above's comparison one operator over, empty for its reason.
-  Filter.ManaValueGreaterThanSource -> []
-  -- The arm above's comparison at equality (CR 702.53a, CR 702.71a), and empty
-  -- for its reason: it names no literal, and its position is the same one.
-  Filter.ManaValueEqualToSource -> []
-  -- Reads the mana value and compares it against a bound this function cannot
-  -- see -- the number is on the SLOT, and is a board reading rather than a
-  -- literal -- so there is no threshold to report and reporting none is not the
-  -- vacuous answer it is for the atom above. What keeps the caller's argument
-  -- whole is position: CR 601.3a's lookahead reads a PLAYER ability's
-  -- prohibition filter (Pawl.Engine.PlayerEffect.prohibitsCasting), the atom
-  -- lives only in a target slot, and Pawl.CardSpec's position lint is what keeps
-  -- it there. An atom bounding the mana value in any position this function's
-  -- callers reach would have to break this build instead.
-  Filter.ManaValueAtMostAmount -> []
-  -- The arm above's comparison at equality, and empty for its reason: it names no
-  -- literal either, and its position is the same target slot.
-  Filter.ManaValueEqualToAmount -> []
-  -- Reads power, not mana value, so it bounds nothing here.
-  Filter.PowerAtMostAmount -> []
   Filter.HasCardType _ -> []
   Filter.HasSupertype _ -> []
   Filter.HasColor _ -> []
@@ -3318,14 +3224,6 @@ manaValueThresholds predicate = case predicate of
   Filter.HasNameOriginallyPrintedIn _ -> []
   Filter.HasKeyword _ -> []
   Filter.HasKeywordFamily _ -> []
-  Filter.PowerAtLeast _ -> []
-  Filter.PowerAtMost _ -> []
-  Filter.ToughnessGreaterThanPower -> []
-  Filter.PowerLessThanSource -> []
-  Filter.PowerGreaterThanSource -> []
-  Filter.PowerAtLeastSourceToughness -> []
-  Filter.PowerIsAmountInSlot _ -> []
-  Filter.PowerAtLeastAmountInSlot _ -> []
   Filter.ControlledBy _ -> []
   Filter.ControlledByDefendingPlayer -> []
   Filter.ControlledByBound _ -> []
@@ -3351,7 +3249,6 @@ manaValueThresholds predicate = case predicate of
   Filter.SameControllerAsBound _ -> []
   Filter.SameControllerAsHostOfBound _ -> []
   Filter.SharesCreatureTypeWithBound _ -> []
-  Filter.ToughnessLessThanBound _ -> []
   Filter.HasChosenName -> []
   Filter.HasChosenColor -> []
   Filter.HasChosenSubtype -> []
@@ -3466,23 +3363,11 @@ statesAQuality predicate = case predicate of
   -- whose predicate is this one is looking for cards with a stated quality, so CR
   -- 701.23b applies and no descent could change that.
   Filter.ControlsMoreThanYou _ _ -> True
-  Filter.ManaValueAtMost _ -> True
-  -- A quality like the literal bound's, the source-power atoms' answer: "a
-  -- nonland card with mana value less than this spell's" describes the card.
-  Filter.ManaValueLessThanSource -> True
-  Filter.ManaValueGreaterThanSource -> True
-  -- A quality for the arm above's reason: "a card with the same mana value as
-  -- the discarded card" (CR 702.53a) describes the card.
-  Filter.ManaValueEqualToSource -> True
+  -- A quality whatever the operand: "with mana value X or less" describes the
+  -- card as much when X is computed, or is another object's, as when it is
+  -- printed.
+  Filter.Measures _ -> True
   Filter.ManaValueIsEven -> True
-  -- A quality like the literal bound's, one atom over: "with mana value X or
-  -- less" describes the card as much when X is computed as when it is printed.
-  Filter.ManaValueAtMostAmount -> True
-  -- A quality for the arm above's reason: "with mana value X" describes the card
-  -- as much at equality as "X or less" does under order.
-  Filter.ManaValueEqualToAmount -> True
-  -- A quality for the arm above's reason: "with power X or less" describes the card.
-  Filter.PowerAtMostAmount -> True
   Filter.HasCardType _ -> True
   Filter.HasSupertype _ -> True
   Filter.HasColor _ -> True
@@ -3499,14 +3384,6 @@ statesAQuality predicate = case predicate of
   Filter.HasNameOriginallyPrintedIn _ -> True
   Filter.HasKeyword _ -> True
   Filter.HasKeywordFamily _ -> True
-  Filter.PowerAtLeast _ -> True
-  Filter.PowerAtMost _ -> True
-  Filter.ToughnessGreaterThanPower -> True
-  Filter.PowerLessThanSource -> True
-  Filter.PowerGreaterThanSource -> True
-  Filter.PowerAtLeastSourceToughness -> True
-  Filter.PowerIsAmountInSlot _ -> True
-  Filter.PowerAtLeastAmountInSlot _ -> True
   Filter.ControlledBy _ -> True
   Filter.ControlledByDefendingPlayer -> True
   Filter.ControlledByBound _ -> True
@@ -3532,7 +3409,6 @@ statesAQuality predicate = case predicate of
   Filter.SameControllerAsBound _ -> True
   Filter.SameControllerAsHostOfBound _ -> True
   Filter.SharesCreatureTypeWithBound _ -> True
-  Filter.ToughnessLessThanBound _ -> True
   -- CR 701.23b's "stated quality" for HasName's reason, one indirection along: the
   -- description is a card name whichever way the name was arrived at, so a search
   -- whose filter is this one may decline to find what it can see.
@@ -3650,14 +3526,14 @@ readsSourceValues predicate = case predicate of
   Filter.Or fs -> any readsSourceValues fs
   Filter.Not f -> readsSourceValues f
   Filter.ControlsMoreThanYou _ f -> readsSourceValues f
-  Filter.ManaValueAtMost _ -> False
-  Filter.ManaValueLessThanSource -> True
-  Filter.ManaValueGreaterThanSource -> True
-  Filter.ManaValueEqualToSource -> True
+  Filter.Measures m -> case Measures.operand m of
+    Operand.OfSource _ -> True
+    Operand.Literal _ -> False
+    Operand.Own _ -> False
+    Operand.OfBound _ -> False
+    Operand.AmountInSlot _ -> False
+    Operand.EnclosingAmount -> False
   Filter.ManaValueIsEven -> False
-  Filter.ManaValueAtMostAmount -> False
-  Filter.ManaValueEqualToAmount -> False
-  Filter.PowerAtMostAmount -> False
   Filter.HasCardType _ -> False
   Filter.HasSupertype _ -> False
   Filter.HasColor _ -> False
@@ -3671,15 +3547,6 @@ readsSourceValues predicate = case predicate of
   -- HasKeyword arm), so nothing inside it reads the context.
   Filter.HasKeyword _ -> False
   Filter.HasKeywordFamily _ -> False
-  Filter.PowerAtLeast _ -> False
-  Filter.PowerAtMost _ -> False
-  Filter.ToughnessGreaterThanPower -> False
-  Filter.PowerLessThanSource -> True
-  Filter.PowerGreaterThanSource -> True
-  -- Reads the source's TOUGHNESS, never its power.
-  Filter.PowerAtLeastSourceToughness -> True
-  Filter.PowerIsAmountInSlot _ -> False
-  Filter.PowerAtLeastAmountInSlot _ -> False
   Filter.ControlledBy _ -> False
   Filter.ControlledByDefendingPlayer -> False
   Filter.ControlledByBound _ -> False
@@ -3703,7 +3570,6 @@ readsSourceValues predicate = case predicate of
   Filter.SameControllerAsBound _ -> False
   Filter.SameControllerAsHostOfBound _ -> False
   Filter.SharesCreatureTypeWithBound _ -> False
-  Filter.ToughnessLessThanBound _ -> False
   Filter.HasChosenName -> True
   Filter.HasChosenColor -> True
   Filter.HasChosenSubtype -> True
@@ -3814,23 +3680,19 @@ overBoundSlotsWith f predicate = case predicate of
   -- The keyword's own Filter, left alone for the reason above.
   Filter.HasKeyword _ -> pure predicate
   Filter.HasKeywordFamily _ -> pure predicate
-  Filter.PowerAtLeast _ -> pure predicate
-  Filter.PowerAtMost _ -> pure predicate
-  Filter.ToughnessGreaterThanPower -> pure predicate
-  Filter.PowerLessThanSource -> pure predicate
-  Filter.PowerGreaterThanSource -> pure predicate
-  Filter.PowerAtLeastSourceToughness -> pure predicate
-  -- The slot holds an AMOUNT (Context's boundAmounts), never a recipient.
-  Filter.PowerIsAmountInSlot slot -> fmap Filter.PowerIsAmountInSlot (f SlotArity.Amount slot)
-  Filter.PowerAtLeastAmountInSlot slot -> fmap Filter.PowerAtLeastAmountInSlot (f SlotArity.Amount slot)
-  Filter.ManaValueAtMost _ -> pure predicate
-  Filter.ManaValueLessThanSource -> pure predicate
-  Filter.ManaValueGreaterThanSource -> pure predicate
-  Filter.ManaValueEqualToSource -> pure predicate
+  Filter.Measures m ->
+    let rebuild x = Filter.Measures m {Measures.operand = x}
+     in case Measures.operand m of
+          -- The slot holds an AMOUNT (Context's boundAmounts), never a recipient.
+          Operand.AmountInSlot slot -> rebuild . Operand.AmountInSlot <$> f SlotArity.Amount slot
+          -- CR 208.1's comparison wants ONE object's number, and
+          -- Pawl.Engine.Projection.framedBySlots declines a slot that names several.
+          Operand.OfBound bound -> (\slot -> rebuild (Operand.OfBound bound {BoundMeasure.slot = slot})) <$> f SlotArity.One (BoundMeasure.slot bound)
+          Operand.Literal _ -> pure predicate
+          Operand.OfSource _ -> pure predicate
+          Operand.Own _ -> pure predicate
+          Operand.EnclosingAmount -> pure predicate
   Filter.ManaValueIsEven -> pure predicate
-  Filter.ManaValueAtMostAmount -> pure predicate
-  Filter.ManaValueEqualToAmount -> pure predicate
-  Filter.PowerAtMostAmount -> pure predicate
   Filter.ControlledBy _ -> pure predicate
   Filter.ControlledByDefendingPlayer -> pure predicate
   -- A PLAYER slot, read singly all the same: `matches` answers it off a slot
@@ -3868,9 +3730,6 @@ overBoundSlotsWith f predicate = case predicate of
   Filter.SameControllerAsHostOfBound slot -> fmap Filter.SameControllerAsHostOfBound (f SlotArity.Many slot)
   -- Reads the whole set too, off its own field.
   Filter.SharesCreatureTypeWithBound slot -> fmap Filter.SharesCreatureTypeWithBound (f SlotArity.Many slot)
-  -- CR 208.1's comparison wants ONE toughness, and
-  -- Pawl.Engine.Projection.framedBySlots declines a slot that names several.
-  Filter.ToughnessLessThanBound slot -> fmap Filter.ToughnessLessThanBound (f SlotArity.One slot)
   Filter.HasChosenName -> pure predicate
   -- Reads no slot either: CR 105.2's colour arrives on Filter.Context.
   Filter.HasChosenColor -> pure predicate

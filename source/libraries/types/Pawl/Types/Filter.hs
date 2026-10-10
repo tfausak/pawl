@@ -8,6 +8,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Expansion as Expansion
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
+import qualified Pawl.Types.Measures as Measures
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -38,7 +39,7 @@ data Filter keyword
   | IsMonocolored -- CR 105.2a: the object is exactly one of the five colours.
   | -- | CR 105.2 asked of TWO objects: the candidate's colours intersect the
     -- colours of the object the evaluation comes from (CR 702.78a's conspire).
-    -- PowerLessThanSource's shape one characteristic over -- read off
+    -- The Measures atom's OfSource shape one characteristic over -- read off
     -- Pawl.Engine.Filter.Context's sourceColors -- and vacuously False where
     -- either side is colourless, which CR 105.2's set reading already makes the
     -- answer for a colourless source.
@@ -73,79 +74,14 @@ data Filter keyword
     -- HasKeyword above rather than a widening of it, and answered off the
     -- projection for that atom's reason.
     HasKeywordFamily KeywordFamily.KeywordFamily
-  | PowerAtLeast Integer -- CR 208.1: the object's power is >= this literal.
-  | -- | CR 208.1 in the other direction: the object's power is <= this literal.
-    -- Not PowerAtLeast's negation -- both arms answer False for an absent power,
-    -- so neither is reachable from the other, and Pawl.FilterSpec pins that pair
-    -- apart. Answered off the projection, in every zone.
-    PowerAtMost Integer
-  | -- | CR 208.1: the object's toughness is strictly greater than its power.
-    ToughnessGreaterThanPower
-  | -- | CR 208.1 compared against the SOURCE rather than a literal: the object's
-    -- power is strictly less than the power of the object the evaluation comes
-    -- from (CR 702.134a's mentor). Read off Pawl.Engine.Filter.Context's
-    -- sourcePower, and vacuously False where either power is absent.
-    PowerLessThanSource
-  | -- | CR 208.1 compared against the SOURCE the other way: the object's power is
-    -- strictly greater than the source's (CR 702.149a's training). Not
-    -- PowerLessThanSource's negation, which admits equal and absent power alike.
-    PowerGreaterThanSource
-  | -- | CR 208.1 against the SOURCE's toughness: the object's power is >= the
-    -- toughness of the object the evaluation comes from (Ironclaw Curse, a CR
-    -- 509.1b pairwise restriction). Read off Pawl.Engine.Filter.Context's
-    -- sourceToughness, and vacuously False where either number is absent.
-    PowerAtLeastSourceToughness
-  | -- | CR 208.1 compared against a number an earlier clause of the same
-    -- resolution BOUND at this slot -- Localized Destruction's "power equal to
-    -- the amount of {E} paid this way". Exact equality, and vacuously False where
-    -- either number is absent.
-    PowerIsAmountInSlot SlotName.SlotName
-  | -- | CR 208.1 against the same kind of bound number, one comparison over:
-    -- the object's power is >= the amount an earlier clause of the resolution
-    -- bound at this slot -- Valiant Endeavor's "power greater than or equal to
-    -- that result". PowerAtLeast's comparison with PowerIsAmountInSlot's right
-    -- operand, and vacuously False where either number is absent.
-    PowerAtLeastAmountInSlot SlotName.SlotName
-  | -- | CR 202.3: the object's mana value is <= this literal. Answerable off the
-    -- battlefield, rule 202.3 reading the printed mana cost.
-    ManaValueAtMost Integer
-  | -- | CR 202.3 compared against the SOURCE rather than a literal: the object's
-    -- mana value is strictly less than the mana value of the object the
-    -- evaluation comes from (CR 702.85a's cascade). PowerLessThanSource's
-    -- reading one characteristic over -- read off Pawl.Engine.Filter.Context's
-    -- sourceManaValue, and vacuously False where either mana value is absent.
-    ManaValueLessThanSource
-  | -- | CR 202.3: the object's mana value is strictly greater than the source's
-    -- -- Kami of Mourning's "a creature you control with greater mana value than
-    -- this card"; vacuously False where either mana value is absent.
-    ManaValueGreaterThanSource
-  | -- | CR 202.3 compared against the SOURCE for EQUALITY rather than order: the
-    -- object's mana value is the same as the mana value of the object the
-    -- evaluation comes from (CR 702.53a's transmute, CR 702.71a's transfigure).
-    -- ManaValueLessThanSource's comparison one operator over -- read off
-    -- Pawl.Engine.Filter.Context's sourceManaValue, and vacuously False where
-    -- either mana value is absent.
-    ManaValueEqualToSource
+  | -- | CR 208.1 / 202.3: the candidate's measure relates thus to the operand;
+    -- see Pawl.Engine.Filter.matches for an absent number.
+    Measures Measures.Measures
   | -- | CR 202.3 read for its PARITY rather than against a bound -- Void
     -- Winnower's "spells with even mana values", whose reminder text settles the
     -- boundary case: "(Zero is even.)" CR 202.3e is what makes it interesting off
     -- the stack, where an {X} in a cost counts as zero.
     ManaValueIsEven
-  | -- | CR 202.3 compared against a COMPUTED bound: the object's mana value is <=
-    -- the amount the enclosing target slot names (Pawl.Types.TargetSlot's
-    -- @amount@), read again at CR 608.2b rather than frozen at announcement.
-    -- Vacuously False where either number is absent.
-    ManaValueAtMostAmount
-  | -- | The atom above at EQUALITY rather than order (CR 202.3): the object's mana
-    -- value IS the amount the enclosing target slot names -- Chthonian Nightmare's
-    -- "target creature card with mana value X" -- or the enclosing conjure's
-    -- reference pick (Pawl.Types.FromReference's @amount@). Vacuously False where
-    -- either number is absent.
-    ManaValueEqualToAmount
-  | -- | CR 208.1 against the same computed bound: the object's power is <= the
-    -- amount the enclosing target slot names -- Spawnbroker's "power less than or
-    -- equal to that creature's power". Vacuously False where either is absent.
-    PowerAtMostAmount
   | ControlledBy PlayerRelation.PlayerRelation -- CR 109.5 / 102.2: controller relates thus to the perspective.
   | -- | CR 508.5: the candidate's controller is the DEFENDING PLAYER for the
     -- object the evaluation comes from (CR 702.39a's provoke), or, for a source
@@ -243,7 +179,7 @@ data Filter keyword
   | -- | CR 201.2 / 709.4a asked of the candidate and the SOURCE rather than a
     -- slot: the candidate shares a name with the object the evaluation comes
     -- from (CR 702.60a's "with the same name as this spell"). SameNameAsBound's
-    -- comparison with ManaValueLessThanSource's other operand -- read off
+    -- comparison with the OfSource operand's other end -- read off
     -- Pawl.Engine.Filter.Context's sourceNames, and vacuously False where the
     -- source has no name (CR 708.2a) or none was supplied.
     --
@@ -289,14 +225,6 @@ data Filter keyword
     SameControllerAsHostOfBound SlotName.SlotName
   | -- | CR 205.3m: the candidate shares a creature type with the object this slot holds.
     SharesCreatureTypeWithBound SlotName.SlotName
-  | -- | CR 208.1 compared against a BOUND OBJECT rather than the source or a
-    -- literal: the candidate's toughness is strictly less than the toughness of
-    -- the object this slot holds -- Profaner of the Dead's "toughness less than
-    -- the exploited creature's toughness". PowerLessThanSource's comparison
-    -- aimed at a slot, read off Pawl.Engine.Filter.Context's slotToughnesses and
-    -- vacuously False where either toughness is absent or the slot names more
-    -- than one object.
-    ToughnessLessThanBound SlotName.SlotName
   | -- | CR 201.4: the candidate has a name the SOURCE has chosen earlier in the
     -- same resolution (CR 608.2c) -- Ancient Vendetta's "cards with that name".
     -- Set intersection, for CR 201.4g's interchangeable names as much as CR

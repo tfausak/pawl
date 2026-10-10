@@ -1296,7 +1296,7 @@ announcing x recipient p = case p of
 -- what fires. Resolve.chooseNewTargetsFor also seeds those bindings into
 -- Filter.boundAmounts, which is the CR-correct channel and the one every other
 -- slot atom reads, but for the X it is dead code: neutralizing the seed leaves
--- this group green. Widening Filter's ManaValueAtMostAmount arm reddens the
+-- this group green. Widening Filter's EnclosingAmount operand reddens the
 -- case below, which is what makes this a proof of the BOUND rather than of
 -- either road.
 stirCopySpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()

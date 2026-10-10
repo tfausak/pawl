@@ -179,7 +179,7 @@ data CombatRestriction
     -- all three counts.
     --
     -- The Filter's context is the ATTACKER's, which is what makes the comparison
-    -- expressible: Filter.PowerGreaterThanSource reads
+    -- expressible: Filter.Measures' OfSource operand reads
     -- Pawl.Engine.Filter.Context's sourcePower, and the power CR 701.54c compares
     -- against is the blocked creature's, not the emblem's -- CR 114.3 leaves an
     -- emblem no power at all. See Pawl.Engine.CombatRestriction.cantBeBlockedBy.

@@ -6,12 +6,16 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.Measure as Measure
+import qualified Pawl.Types.Measures as Measures
+import qualified Pawl.Types.Operand as Operand
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.CastOffer" $ do
@@ -66,8 +70,8 @@ spec s = Spec.describe s "Pawl.Codec.CastOffer" $ do
     Common.assertCodec
       s
       CastOffer.codec
-      CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing, CastOffer.spending = ManaSpending.AsProduced, CastOffer.restriction = Just Filter.ManaValueLessThanSource, CastOffer.offeredBy = Nothing}
-      " {\"withoutPayingManaCost\":true,\"restriction\":{\"type\":\"ManaValueLessThanSource\"}} "
+      CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing, CastOffer.spending = ManaSpending.AsProduced, CastOffer.restriction = Just (Filter.Measures (Measures.MkMeasures Measure.ManaValue Comparison.LessThan (Operand.OfSource Measure.ManaValue))), CastOffer.offeredBy = Nothing}
+      " {\"withoutPayingManaCost\":true,\"restriction\":{\"type\":\"Measures\",\"value\":{\"measure\":{\"type\":\"ManaValue\"},\"comparison\":{\"type\":\"LessThan\"},\"operand\":{\"type\":\"OfSource\",\"value\":{\"type\":\"ManaValue\"}}}}} "
   Spec.describe s "defaultValue" $ do
     Spec.it s "carries no rider" $
       Spec.assertEq s CastOffer.defaultValue CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = False, CastOffer.payingInstead = Nothing, CastOffer.spending = ManaSpending.AsProduced, CastOffer.restriction = Nothing, CastOffer.offeredBy = Nothing}

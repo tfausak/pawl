@@ -40,6 +40,7 @@ import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.DamageEvent as DamageEvent
@@ -54,9 +55,12 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Measure as Measure
+import qualified Pawl.Types.Measures as Measures
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Operand as Operand
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerEffect as PlayerEffect.Type
@@ -1206,7 +1210,7 @@ voidWinnowerSpec s registry =
       bolt <- S.printingOf s registry "Lightning Bolt"
       disaster <- S.printingOf s registry "Molten Disaster"
       let (_, bobsPiker, _, bobsDisaster, board) = voidWinnowerBoard mountain piker bolt disaster []
-          cheap = Filter.Type.ManaValueAtMost 5
+          cheap = Filter.Type.Measures (Measures.MkMeasures Measure.ManaValue Comparison.AtMost (Operand.Literal 5))
       Spec.assertBool s (PlayerEffect.matchesObjectFrom (PlayerEffect.liveSource Nothing) cheap bobsDisaster board) "the {X} spell is inside the class as it sits in hand"
       Spec.assertBool s (PlayerEffect.choiceCouldEscape S.bob (PlayerEffect.liveSource Nothing) cheap bobsDisaster VariableChoice.Announced board) "and a large enough X takes it out"
       Spec.assertBool s (not (PlayerEffect.choiceCouldEscape S.bob (PlayerEffect.liveSource Nothing) cheap bobsPiker VariableChoice.Announced board)) "while the fixed spell beside it has no choice to make"

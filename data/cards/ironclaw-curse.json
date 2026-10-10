@@ -26,7 +26,21 @@
               }
             },
             "attackers": {
-              "type": "PowerAtLeastSourceToughness"
+              "type": "Measures",
+              "value": {
+                "comparison": {
+                  "type": "AtLeast"
+                },
+                "measure": {
+                  "type": "Power"
+                },
+                "operand": {
+                  "type": "OfSource",
+                  "value": {
+                    "type": "Toughness"
+                  }
+                }
+              }
             }
           }
         }

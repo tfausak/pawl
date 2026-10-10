@@ -153,8 +153,19 @@
                                     }
                                   },
                                   {
-                                    "type": "ManaValueAtMost",
-                                    "value": 5
+                                    "type": "Measures",
+                                    "value": {
+                                      "comparison": {
+                                        "type": "AtMost"
+                                      },
+                                      "measure": {
+                                        "type": "ManaValue"
+                                      },
+                                      "operand": {
+                                        "type": "Literal",
+                                        "value": 5
+                                      }
+                                    }
                                   }
                                 ]
                               },
@@ -181,8 +192,19 @@
                         "value": {
                           "offer": {
                             "restriction": {
-                              "type": "ManaValueAtMost",
-                              "value": 5
+                              "type": "Measures",
+                              "value": {
+                                "comparison": {
+                                  "type": "AtMost"
+                                },
+                                "measure": {
+                                  "type": "ManaValue"
+                                },
+                                "operand": {
+                                  "type": "Literal",
+                                  "value": 5
+                                }
+                              }
                             },
                             "withoutPayingManaCost": true
                           },
@@ -202,8 +224,19 @@
                                     }
                                   },
                                   {
-                                    "type": "ManaValueAtMost",
-                                    "value": 5
+                                    "type": "Measures",
+                                    "value": {
+                                      "comparison": {
+                                        "type": "AtMost"
+                                      },
+                                      "measure": {
+                                        "type": "ManaValue"
+                                      },
+                                      "operand": {
+                                        "type": "Literal",
+                                        "value": 5
+                                      }
+                                    }
                                   }
                                 ]
                               },
@@ -235,8 +268,19 @@
                                     }
                                   },
                                   {
-                                    "type": "ManaValueAtMost",
-                                    "value": 5
+                                    "type": "Measures",
+                                    "value": {
+                                      "comparison": {
+                                        "type": "AtMost"
+                                      },
+                                      "measure": {
+                                        "type": "ManaValue"
+                                      },
+                                      "operand": {
+                                        "type": "Literal",
+                                        "value": 5
+                                      }
+                                    }
                                   }
                                 ]
                               },

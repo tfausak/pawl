@@ -152,6 +152,7 @@ import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.CoinFlipped as CoinFlipped
 import qualified Pawl.Types.CoinReading as CoinReading
+import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.ConjureCards as ConjureCards
 import qualified Pawl.Types.ConjureDestination as ConjureDestination
@@ -263,6 +264,8 @@ import qualified Pawl.Types.ManaAddedCause as ManaAddedCause
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaUnit as ManaUnit
+import qualified Pawl.Types.Measure as Measure
+import qualified Pawl.Types.Measures as Measures
 import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Mill as Mill
@@ -285,6 +288,7 @@ import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.ObjectRef (ObjectRef)
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
+import qualified Pawl.Types.Operand as Operand
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.OutsideDestination as OutsideDestination
 import qualified Pawl.Types.PayBranch as PayBranch
@@ -1348,7 +1352,7 @@ offerCast runSubgame context evaluate named caster optionality verb retake repet
     CastRepetition.WithinTotalManaValue quantity -> again (Just (Maybe.fromMaybe 0 (evaluate quantity))) subjects
   where
     again budget remaining = do
-      let capped total = offer {CastOffer.restriction = Just (maybe (Filter.Type.ManaValueAtMost total) (\r -> Filter.Type.And [r, Filter.Type.ManaValueAtMost total]) (CastOffer.restriction offer))}
+      let capped total = offer {CastOffer.restriction = Just (maybe (Filter.Type.Measures (Measures.MkMeasures Measure.ManaValue Comparison.AtMost (Operand.Literal total))) (\r -> Filter.Type.And [r, Filter.Type.Measures (Measures.MkMeasures Measure.ManaValue Comparison.AtMost (Operand.Literal total))]) (CastOffer.restriction offer))}
       taken <- offerCastOnce runSubgame context remaining caster optionality verb retake (maybe offer capped budget)
       case taken of
         Nothing -> pure []

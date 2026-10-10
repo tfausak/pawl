@@ -47,10 +47,9 @@ data TargetSlot = MkTargetSlot
     -- | CR 202.3 / 601.2c: the COMPUTED number this slot's Filter compares a
     -- candidate's mana value against -- Celestine, the Living Saint's "creature
     -- card with mana value X or less ... where X is the amount of life you gained
-    -- this turn". Filter.ManaValueAtMostAmount and Filter.ManaValueEqualToAmount
-    -- are the atoms that read it -- the second at equality, Chthonian Nightmare's
-    -- "with mana value X" -- and Filter.PowerAtMostAmount compares a candidate's
-    -- POWER against it instead (Spawnbroker).
+    -- this turn". Filter.Measures' EnclosingAmount operand is what reads it --
+    -- at equality too, Chthonian Nightmare's "with mana value X" -- and against a
+    -- candidate's POWER as well (Spawnbroker).
     -- Pawl.Engine.Target.slotContext is where it is evaluated and handed over.
     --
     -- HERE rather than in the Filter arm, which is where it belongs on the face of
@@ -65,15 +64,15 @@ data TargetSlot = MkTargetSlot
     -- parameter on Keyword too, and on KeywordFamily behind it. A field on the
     -- slot costs one record field and reaches every bound the pool prints.
     --
-    -- ON THE SLOT rather than one nullary atom per printed bound (a
-    -- PowerLessThanSource-shaped ManaValueAtMostLifeGained), because Betor,
+    -- ON THE SLOT rather than one nullary operand per printed bound (an
+    -- OfSource-shaped LifeGainedThisTurn), because Betor,
     -- Ancestor's Voice prints the bound against life LOST this turn beside the
-    -- gained one: the atom-per-bound shape owes a new atom, a new
+    -- gained one: the operand-per-bound shape owes a new operand, a new
     -- Pawl.Engine.Filter.Context field and a new position lint for each, where a
     -- slot naming its own Quantity owes nothing.
     --
     -- Nothing on every slot but the ones that print such a bound, which is all but
-    -- a handful: the atom is vacuously False against a Nothing here, and
+    -- a handful: the operand is vacuously False against a Nothing here, and
     -- Pawl.CardSpec's position lint is what keeps a card from writing one into a
     -- slot that names no amount.
     --

@@ -54,6 +54,7 @@ import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Arithmetic as Arithmetic
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachAll as AttachAll
+import qualified Pawl.Types.BoundMeasure as BoundMeasure
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Chooser as Chooser
@@ -82,6 +83,8 @@ import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.Measure as Measure
+import qualified Pawl.Types.Measures as Measures
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
@@ -92,6 +95,7 @@ import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.MovedKinds as MovedKinds
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Onset as Onset
+import qualified Pawl.Types.Operand as Operand
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PayBranch as PayBranch
 import qualified Pawl.Types.PayGate as PayGate
@@ -947,7 +951,7 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
         bounded amount =
           Mode.MkMode
             (Seq.singleton (Mint.mandatory (Seq.singleton (Effect.Tap (ObjectRef.InSlot target)))))
-            (Map.singleton target (TargetSlot.withAmount amount (TargetSlot.required Pool.Permanents (Just Filter.Type.ManaValueAtMostAmount))))
+            (Map.singleton target (TargetSlot.withAmount amount (TargetSlot.required Pool.Permanents (Just (Filter.Type.Measures (Measures.MkMeasures Measure.ManaValue Comparison.AtMost Operand.EnclosingAmount))))))
         thatPlayer = Quantity.Type.LifeGainedThisTurn (PlayerRef.InSlot Binding.triggerPlayer)
         you = Quantity.Type.LifeGainedThisTurn (PlayerRef.Relative PlayerRelation.You)
     Spec.assertBool
@@ -1243,7 +1247,7 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
       "nor does a one-target slot read as one object"
     -- An effect's own FILTER over the same two-target slot, the pair differing
     -- in the atom alone: IsBound takes the whole set the slot names
-    -- (Binding.objectsBySlot), CR 208.1's ToughnessLessThanBound wants one
+    -- (Binding.objectsBySlot), CR 208.1's OfBound operand wants one
     -- toughness and answers nothing for two (Filter.singularSlots).
     Spec.assertBool
       s
@@ -1251,7 +1255,7 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
       "a two-target slot read whole by a filter does not offend"
     Spec.assertBool
       s
-      (modalCountsOffend (modeWith two (Effect.AttachAll (AttachAll.MkAttachAll (ObjectRef.InSlot slot) (Filter.Type.ToughnessLessThanBound slot)))))
+      (modalCountsOffend (modeWith two (Effect.AttachAll (AttachAll.MkAttachAll (ObjectRef.InSlot slot) (Filter.Type.Measures (Measures.MkMeasures Measure.Toughness Comparison.LessThan (Operand.OfBound (BoundMeasure.MkBoundMeasure slot Measure.Toughness))))))))
       "but one a filter reads as one object does"
     -- CR 601.2c's "any number of target ...", which states no maximum to compare
     -- against: an unbounded slot is plural, so the same one-object reader offends.

@@ -66,7 +66,21 @@
               }
             },
             "attackers": {
-              "type": "PowerGreaterThanSource"
+              "type": "Measures",
+              "value": {
+                "comparison": {
+                  "type": "GreaterThan"
+                },
+                "measure": {
+                  "type": "Power"
+                },
+                "operand": {
+                  "type": "OfSource",
+                  "value": {
+                    "type": "Power"
+                  }
+                }
+              }
             }
           }
         }
