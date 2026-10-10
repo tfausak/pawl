@@ -11278,7 +11278,7 @@ activateWhileRolling runSubgame pid oid ability = do
 
 -- CR 123.6b: the object's CONTROLLER, or its owner for a card with none (CR
 -- 108.4a), chooses where the word goes: the start, or after any number of the
--- words now in its name, the longest name's where it has several (#4901). An
+-- words now in its name, the longest name's where it has several (gap #4901). An
 -- object whose names hold no word has one position and is not asked.
 namePosition :: ObjectId -> Game Natural
 namePosition oid = do

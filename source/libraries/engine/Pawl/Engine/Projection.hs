@@ -633,7 +633,7 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
         -- CR 612.8: the object loses its names and has only this one.
         Modification.SetName named -> pc {PC.names = Set.singleton named}
         -- CR 123.6b-c / 612.9: the sticker's word after the first @k@ words of
-        -- each name the fold has reached (#4901), or the name of an object with
+        -- each name the fold has reached (gap #4901), or the name of an object with
         -- none.
         Modification.InsertNameWords (NameInsertion.MkNameInsertion ws k) ->
           pc {PC.names = if Set.null (PC.names pc) then Set.singleton (CardName.MkCardName ws) else Set.map (NameWords.insertAfter k ws) (PC.names pc)}
@@ -3449,7 +3449,9 @@ filterReads f = case f of
   Filter.Type.IsMonocolored -> Set.singleton Colors
   Filter.Type.SharesColorWithSource -> Set.singleton Colors
   Filter.Type.HasSubtype _ -> Set.singleton Subtypes
-  -- Reads no aspect: no Modification writes CR 201.1's names.
+  -- Reads no aspect: CR 201.1's names have no Aspect, so CR 613.8a's dependency
+  -- cannot turn on the layer-3 writes of them (AddNamesMatching, SetName,
+  -- InsertNameWords).
   Filter.Type.HasName _ -> Set.empty
   Filter.Type.NameWordsAtLeast _ -> Set.empty
   -- HasName's answer, for HasName's reason: the rule's side of CR 206.3 is a
@@ -3498,7 +3500,7 @@ filterReads f = case f of
   -- Reads an IDENTITY, which CR 109.3 does not count as a characteristic.
   Filter.Type.IsBound _ -> Set.empty
   Filter.Type.IsTarget -> Set.empty
-  -- Reads NAMES at both ends, which no Modification writes.
+  -- Reads NAMES at both ends, which have no Aspect, HasName's reason.
   Filter.Type.SameNameAsBound _ -> Set.empty
   -- Reads NAMES at both ends too, the source's arriving on the Context.
   Filter.Type.SameNameAsSource -> Set.empty
@@ -3517,7 +3519,7 @@ filterReads f = case f of
   -- over; the bound object's toughness arrives on the Context, already projected.
   Filter.Type.ToughnessLessThanBound _ -> Set.singleton PowerA
   -- Reads NAMES at both ends too, HasName's answer one indirection along: the
-  -- chosen half is not a projection at all, and no Modification writes the other.
+  -- chosen half is not a projection at all, and the other has no Aspect.
   Filter.Type.HasChosenName -> Set.empty
   -- Reads the candidate's COLOURS, HasColor's answer above: the chosen half is no
   -- projection at all, and CR 613.1e's layer writes the other, so an effect that
