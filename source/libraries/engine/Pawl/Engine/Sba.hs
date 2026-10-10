@@ -560,14 +560,13 @@ legendGroups pcs gs =
 -- A plain put-into-graveyard, not a destruction, so the caller consults neither
 -- indestructible (CR 702.12b) nor a regeneration shield.
 --
--- FILTERED, NOT TRUSTED: an answer naming a permanent outside the group would
--- otherwise bury the whole group, so it falls back to the head.
+-- Asked through Game.chooseAmong, FILTERED, NOT TRUSTED: an answer naming a
+-- permanent outside the group would otherwise bury the whole group. A group
+-- always holds two or more (legendGroups), so one is always kept.
 chooseLegendVictims :: (PlayerId, NonEmpty.NonEmpty ObjectId) -> Game [ObjectId]
 chooseLegendVictims (controller, candidates) = do
-  gs <- State.get
-  answer <- Game.choose (Prompt.ChooseLegend (Decide.deciderFor controller gs) controller candidates)
-  let kept = if List.elem answer (NonEmpty.toList candidates) then answer else NonEmpty.head candidates
-  pure (filter (/= kept) (NonEmpty.toList candidates))
+  kept <- Game.chooseAmong Prompt.ChooseLegend controller (NonEmpty.toList candidates)
+  pure (filter ((/= kept) . Just) (NonEmpty.toList candidates))
 
 -- CR 704.5k: with two or more world permanents, all but the one that has been
 -- world for the shortest time are put into their owners' graveyards, and on a tie

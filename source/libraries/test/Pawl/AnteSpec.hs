@@ -109,6 +109,26 @@ spec s registry = Spec.describe s "Ante" $ do
         (anted, asked) = startedWith anteGame matchup
     Spec.assertEqWith s "CR 407.2 each seat's own card is in the ante" (fmap (\pid -> length (anteOf pid anted)) [S.alice, S.bob, S.carol]) [1, 1, 1]
     Spec.assertEqWith s "drawn from each seat's own library, in turn order" (fmap length asked) [10, 11, 12]
+  -- Two different cards, so WHICH one the draw landed on is readable by printing.
+  -- The answer is the last candidate offered: a draw that ignored it and took
+  -- the offered set's front antes the other card.
+  Spec.it s "CR 407.2 the card the random draw lands on is the one anted" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    let bare = Setup.emptyGame S.bothPlayers
+        (_, g1) = S.addLibraryCard mountain S.alice bare {GameState.settings = anteGame}
+        (_, before) = S.addLibraryCard forest S.alice g1
+        drawingLast :: Prompt.Prompt r -> r
+        drawingLast p = case p of
+          Prompt.RandomObject candidates -> NonEmpty.last candidates
+          _ -> S.identityAnswer p
+        printingsIn zone gs = fmap (`Game.printingOfObject` gs) (Game.zoneMembers zone S.alice gs)
+        after = S.runPure drawingLast before (Setup.anteFromLibraries [S.alice])
+    case reverse (printingsIn Zone.Library before) of
+      drawn : kept -> do
+        Spec.assertEqWith s "CR 407.2 the drawn card is in the ante" (printingsIn Zone.Ante after) [drawn]
+        Spec.assertEqWith s "and the other stayed in her library" (printingsIn Zone.Library after) kept
+      [] -> Spec.assertFailure s "alice's library is empty"
   -- CR 727.2 rebuilds every card, the anted ones among them, so the restart's
   -- own CR 407.2 step must not see the old ante. Twenty cards a deck: the old
   -- ante card is rebuilt below the eight the restart antes and draws, so a stale

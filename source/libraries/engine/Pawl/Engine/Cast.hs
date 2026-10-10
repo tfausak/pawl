@@ -4,7 +4,6 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
-import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -2622,19 +2621,12 @@ withPermissionCosts :: [CostComponent.CostComponent Keyword] -> Cost Keyword -> 
 withPermissionCosts extra cost = cost {Cost.Type.components = Cost.Type.components cost <> extra}
 
 -- CR 601.3 / 305.1: which of `options` (PlayerEffect.castPermissionOptions,
--- PlayerEffect.landPermissionOptions) the play of `oid` is made under. Asked
--- only where there are two: those already differ in the budget spent or the
--- rider given. FILTERED, NOT TRUSTED, the ChooseRingBearer posture: an answer
--- naming something never offered falls back to the first, since a play is
--- always made under something.
+-- PlayerEffect.landPermissionOptions) the play of `oid` is made under, asked
+-- through Game.chooseAmong: two already differ in the budget spent or the
+-- rider given, and a play is always made under something.
 choosePlayPermission :: PlayerId -> ObjectId -> [Maybe (ObjectId, CastFromZone.CastFromZone)] -> Game (Maybe (ObjectId, CastFromZone.CastFromZone))
-choosePlayPermission pid oid options = case options of
-  [] -> pure Nothing
-  [only] -> pure only
-  first : more -> do
-    gs <- State.get
-    answer <- Game.choose (Prompt.ChoosePlayPermission (Decide.deciderFor pid gs) pid oid (first NonEmpty.:| more))
-    pure (if elem answer options then answer else first)
+choosePlayPermission pid oid options =
+  Monad.join <$> Game.chooseAmong (\decider asked -> Prompt.ChoosePlayPermission decider asked oid) pid options
 
 -- CR 400.7h: "if an effect allows a nonland card to be cast, other parts of that
 -- effect can find the new object that card becomes after it moves to the stack as
