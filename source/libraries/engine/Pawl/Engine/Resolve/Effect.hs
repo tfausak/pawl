@@ -10646,8 +10646,7 @@ enteredBeside oid gs = case Trigger.entryGroup oid gs of
       [ ZoneChange.object zc
       | logged <- Foldable.toList (GameState.events gs),
         LoggedEvent.group logged == group,
-        Just zc <- [Trigger.movedOf (LoggedEvent.event logged)],
-        ZoneChange.to zc == Zone.Battlefield
+        Just zc <- [Game.enteredBattlefieldChange (LoggedEvent.event logged)]
       ]
 
 -- CR 614.1a: run the effects a DamageRewrite.RunEffects rewrite put in a damage
