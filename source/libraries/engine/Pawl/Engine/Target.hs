@@ -29,7 +29,6 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.QuantitySlot as QuantitySlot
 import qualified Pawl.Engine.SourceContext as SourceContext
-import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
@@ -322,7 +321,27 @@ slotContext pcs perspective unannounced bindings source amount gs =
       -- environment, which is what the two slot-reading atoms below want; the
       -- amounts beside them go to boundAmounts instead.
       targets = Binding.targetsOf bindings
-      base =
+      -- Every slot-derived field through Projection.framedBySlots, the filler a
+      -- resolution's context goes through too, off the announcement's whole
+      -- binding environment: CR 603.2's own bindings for a triggered ability
+      -- (Harness the Storm's cast spell), whatever sibling slots the first
+      -- pass answered, and any group a reflexive ability captured (CR 603.7c,
+      -- Nihiloor's tapped creature, which its scenario "steals from each
+      -- opponent" proves).
+      --
+      -- Sibling slots are how "another target creature" is written (Fall of
+      -- the Hammer's Not (IsBound "dealer")): CR 601.2c makes sharing a target
+      -- the default, so the restriction is a Filter the card writes. WIDENING
+      -- at CR 601.2c is still the offer: legalSetsGiven's first pass hands
+      -- every slot the seed alone, so a slot not answered yet has no key, and
+      -- selectionLegal is where an announcement naming one creature twice is
+      -- rejected.
+      --
+      -- Not implemented: CR 608.2b's last sentence blanking a departed
+      -- sibling TARGET's names, controller and creature types here, as
+      -- slotAmount's bound below does (#4865).
+      base = Projection.framedBySlots gs (Binding.objectsBySlot targets bindings) (Binding.playersBySlot targets) framed
+      framed =
         (SourceContext.sourceContext gs perspective source)
           { Filter.sourcePower = Projection.powerWithLastKnownGiven pcs source gs,
             Filter.sourceToughness = Nothing,
@@ -364,98 +383,15 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- lives in an effect's QUANTITY, which is evaluated later and
             -- elsewhere.
             Filter.recipient = Nothing,
-            -- Off `bindings`, exactly as slotNames below is and for CR 601.2c's
-            -- other sibling-slot reading: "another target creature" is a slot
-            -- forbidding what a SIBLING slot holds (Fall of the Hammer's
-            -- Not (IsBound "dealer")), and rule 601.2c makes sharing the default,
-            -- so the restriction has to be a Filter the card writes rather than
-            -- machinery. What a caller supplies no bindings for stays vacuously
-            -- False -- IsBound's own call rather than a posture this record takes
-            -- for every field: slotControllers below is read by an atom that
-            -- WIDENS on the same absence (CR 110.2's SameControllerAsBound).
-            --
-            -- WIDENING at CR 601.2c is still the offer: legalSetsGiven's first
-            -- pass hands every slot the seed alone, so the union is what a
-            -- dependent slot is offered, and selectionLegal is where an
-            -- announcement naming one creature twice is rejected.
-            --
-            -- A GROUP binding joins the targets here, Binding.slotObjects' union:
-            -- a reflexive ability's captured environment (CR 603.7c) can hold
-            -- one, and Nihiloor's "the tapped creature's power" aims its slot's
-            -- computed bound at the creature its own ChoosePermanents bound.
-            -- Nihiloor's scenario "steals from each opponent" proves it.
-            Filter.slotObjects = Map.unionWith Set.union (fmap (Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList) targets) (Binding.withGroups Map.empty (Binding.groupsOf bindings)),
             -- EMPTY: CR 702.122d's prohibition is read where rule 702.122a's
             -- cost picks its candidates (Pawl.Engine.Cost.tapCandidates) and no
             -- target slot's Filter carries the atom, crew naming its Vehicle
             -- rather than targeting it (CR 115.10a).
             Filter.cantCrewVehicles = Set.empty,
-            -- THE one site that fills it, alongside sourcePower and
-            -- defendingPlayer above and for the same reason: SameNameAsBound
-            -- lives in a target slot's Filter, and this is where one is matched.
-            --
-            -- Off `bindings`, which is what the announcement already holds --
-            -- CR 603.2's own bindings for a triggered ability (Harness the Storm's
-            -- cast spell) plus whatever sibling slots the first pass answered.
-            -- A slot holding several recipients contributes all of their names,
-            -- which is CR 709.4a's membership read once more: the candidate has
-            -- "the same name as" the slot if it shares a name with any of them.
-            --
-            -- Through CR 608.2h's last-known reader rather than a live
-            -- projection, because the bound object is NOT the target and the two
-            -- rules differ: CR 608.2b blanks a departed TARGET, while "that
-            -- spell" is a reference the ability already made and rule 608.2h
-            -- keeps answerable. Harness the Storm whose spell was countered in
-            -- response still knows the name it named.
-            --
-            -- Not implemented: CR 608.2b's last sentence blanking a departed
-            -- sibling TARGET's name here, as slotAmount's bound below does (#4865).
-            --
-            -- A THUNK, like the two above: one projection per bound object, paid
-            -- for only by a filter that names the atom.
-            Filter.slotNames = fmap (foldMap (foldMap (foldMap Filter.names . Projection.viewWithLastKnownAnywhere gs) . Recipient.objectOf)) targets,
-            -- CR 110.2's other read of the same objects, alongside slotNames above
-            -- and filled the same way: SameControllerAsBound lives in a target
-            -- slot's Filter, this is where one is matched, and the CR 608.2h
-            -- reader is what keeps a bound target that has since left the
-            -- battlefield answerable rather than silently changing the sibling
-            -- slot's legality at CR 608.2b.
-            --
-            -- Not implemented: CR 608.2b's last sentence blanking a departed
-            -- sibling TARGET's controller here, as slotAmount's bound below does
-            -- (#4865).
-            --
-            -- A KEY PER BOUND SLOT and no more, which is the distinction that
-            -- atom's vacuous direction rests on: `fmap` leaves a slot the
-            -- announcement has not answered yet out of the map entirely, where a
-            -- slot naming an object with no controller (CR 108.4) gets an empty
-            -- set. The first widens and the second refuses.
-            --
-            -- A THUNK, like its siblings: one projection per bound object, paid
-            -- for only by a filter that names the atom.
-            Filter.slotControllers = fmap (foldMap (foldMap (foldMap (maybe Set.empty Set.singleton . Filter.controller) . Projection.viewWithLastKnownAnywhere gs) . Recipient.objectOf)) targets,
-            -- Empty for slotCreatureTypes' reason below, and one of the two the
-            -- lints have to be read together for: this atom is a silent False
-            -- here where slotControllers' is a silent True, so a card writing it
-            -- in a target slot admits nothing rather than everything.
-            Filter.slotHostControllers = Map.empty,
-            -- Empty for the field above's reason, one characteristic over: CR
-            -- 205.2a's read of the subject's host is Pawl.Engine.Attach.hostsFor's
-            -- to fill, and an announcement has no attach subject at all.
+            -- Empty: CR 205.2a's read of the subject's host is
+            -- Pawl.Engine.Attach.hostsFor's to fill, and an announcement has no
+            -- attach subject at all.
             Filter.subjectHostCardTypes = Set.empty,
-            -- CR 205.3m's creature types off the same objects and the same
-            -- CR 608.2h reader as slotControllers above, keyed per bound slot so
-            -- the atom widens for an unanswered one. The last-known read is the
-            -- rulings' (Unbury, Secret Tunnel): a target that has left still
-            -- lends its types to the one that stayed.
-            Filter.slotCreatureTypes = fmap (foldMap (foldMap (foldMap (Set.filter Subtype.isCreatureType . Filter.subtypes) . Projection.viewWithLastKnownAnywhere gs) . Recipient.objectOf)) targets,
-            Filter.slotToughnesses = Map.empty,
-            -- CR 601.2c's PLAYERS out of the same environment, slotObjects' half
-            -- one recipient kind over. Filled here for the symmetry rather than
-            -- for a reader in this module: no Filter atom asks it, and the one
-            -- function that does (Pawl.Engine.Count.playersFor) is reached from
-            -- this context only through a slot's CR 202.3 computed bound.
-            Filter.slotPlayers = fmap (Set.fromList . Maybe.mapMaybe Recipient.playerOf . Set.toList) targets,
             -- CR 603.2's NUMBERS out of the same environment: "that much", the
             -- amount the trigger's own event stamped, which the bound below reads
             -- through Quantity.InSlot. Not an atom's input -- no Filter arm reads
@@ -1579,9 +1515,8 @@ zoneScopeSlot scope = case scope of
 -- `seed` is the announcement's own bindings, so a count can read what the
 -- object already carries before any target is chosen: Miasma Demon's reflexive
 -- "up to that many target creatures" (CR 603.12) counts the cards its arming
--- resolution discarded. Its GROUP bindings join the target half here, since a
--- slot an effect filled ("the cards discarded this way") is no target and
--- slotContext's slotObjects holds targets alone. Proved by Miasma Demon's
+-- resolution discarded -- a GROUP binding, which slotContext's slot map holds
+-- beside the targets (Binding.objectsBySlot). Proved by Miasma Demon's
 -- scenario, "CR 603.12 whole card".
 --
 -- A number the board cannot supply reads zero, SlotCount.at's posture: an "up to"
@@ -1597,11 +1532,9 @@ zoneScopeSlot scope = case scope of
 -- (Resolve.Effect.chooseNewTargetsFor) rather than asking a count again.
 countingByGiven :: Map ObjectId PC.ProjectedCharacteristics -> Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> GameState -> Quantity -> Natural
 countingByGiven pcs perspective seed source gs =
-  let context = slotContext pcs perspective False seed source Nothing gs
-      withGroups = context {Filter.slotObjects = Map.unionWith Set.union (Filter.slotObjects context) (Binding.slotObjects seed)}
-   in Integer.toNaturalSaturating
-        . Maybe.fromMaybe 0
-        . Quantity.evaluate (Projection.fullView gs) withGroups gs source
+  Integer.toNaturalSaturating
+    . Maybe.fromMaybe 0
+    . Quantity.evaluate (Projection.fullView gs) (slotContext pcs perspective False seed source Nothing gs) gs source
 
 -- CR 601.2c: the number of targets a slot's own text fixes ("in some cases, the
 -- number of targets will be defined by the spell's text"), for a slot that
