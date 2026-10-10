@@ -40,9 +40,14 @@
       "triggeredAbilities": [
         {
           "condition": {
-            "type": "PlayerCompletesDungeon",
+            "type": "PlayerActs",
             "value": {
-              "type": "You"
+              "action": {
+                "type": "CompleteDungeon"
+              },
+              "player": {
+                "type": "You"
+              }
             }
           },
           "modal": {

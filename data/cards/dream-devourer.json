@@ -88,9 +88,14 @@
       "triggeredAbilities": [
         {
           "condition": {
-            "type": "PlayerForetells",
+            "type": "PlayerActs",
             "value": {
-              "type": "You"
+              "action": {
+                "type": "Foretell"
+              },
+              "player": {
+                "type": "You"
+              }
             }
           },
           "modal": {

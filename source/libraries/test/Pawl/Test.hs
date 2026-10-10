@@ -462,6 +462,7 @@ import qualified Pawl.Codec.PlacementSpec
 import qualified Pawl.Codec.PlanarDieFaceSpec
 import qualified Pawl.Codec.PlanarDieRolledSpec
 import qualified Pawl.Codec.PlayPermissionOriginSpec
+import qualified Pawl.Codec.PlayerActionSpec
 import qualified Pawl.Codec.PlayerAttacksPlayerSpec
 import qualified Pawl.Codec.PlayerAttacksWithSpec
 import qualified Pawl.Codec.PlayerControlSpec
@@ -1327,6 +1328,7 @@ spec s registry = do
   Pawl.Codec.PlayerCounterKindSpec.spec s
   Pawl.Codec.StickerKindSpec.spec s
   Pawl.Codec.StickerSheetSpec.spec s
+  Pawl.Codec.PlayerActionSpec.spec s
   Pawl.Codec.PlayerAttacksPlayerSpec.spec s
   Pawl.Codec.PlayerAttacksWithSpec.spec s
   Pawl.Codec.PlayerCounterTallySpec.spec s

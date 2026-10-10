@@ -141,6 +141,8 @@ import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.PermissionCost as PermissionCost
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerActed as PlayerActed
+import qualified Pawl.Types.PlayerAction as PlayerAction
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerEffect as PlayerEffect.Type
 import Pawl.Types.PlayerId (PlayerId)
@@ -6895,14 +6897,14 @@ payPayable moment slots pid oid component = case component of
   -- Binds the amount under Binding.waterbendCost for the same reason: it is
   -- what "if this spell's additional cost was paid" reads (Quantity.WasBound).
   CostComponent.Waterbend amount -> paidAnnounced amount $ \n -> do
-    State.modify' (Event.recordEvent (GameEvent.Waterbent pid))
+    State.modify' (Event.recordEvent (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.Waterbend pid)))
     pure (Payment.Paid (Map.singleton Binding.waterbendCost (Binding.toAmount n)))
   -- CR 701.67c's event, Waterbend's reason, and NO record: this waterbend is
   -- CR 118.9's alternative cost, so "if this spell's additional cost was paid"
   -- must not read it. Pawl.CostSpec's "CR 118.8b Spirit Water Revival cast
   -- through Hama without its {6} draws two" is the proof.
   CostComponent.WaterbendInstead _ -> do
-    State.modify' (Event.recordEvent (GameEvent.Waterbent pid))
+    State.modify' (Event.recordEvent (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.Waterbend pid)))
     pure bindsNothing
   -- CR 406.2's move, through the Event.changeZone funnel, so the card gets a CR
   -- 400.7 incarnation and anything watching a graveyard-to-exile move sees it.
@@ -7009,7 +7011,7 @@ payPayable moment slots pid oid component = case component of
       then do
         Monad.void (Event.changeZonesTogether (fmap (\c -> (c, Zone.Exile)) (Set.toAscList chosen)))
         -- CR 701.59a's "whenever you collect evidence" reads this.
-        State.modify' (Event.recordEvent (GameEvent.CollectedEvidence pid))
+        State.modify' (Event.recordEvent (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.CollectEvidence pid)))
         pure (Payment.Paid (Binding.paidObjects Binding.collectedEvidence (Set.map Recipient.ToObject chosen)))
       else pure Payment.Unpaid
   -- The arm above at the amount these slots fix (fixComputed). A REGRESSION

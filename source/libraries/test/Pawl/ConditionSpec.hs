@@ -56,6 +56,8 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerActed as PlayerActed
+import qualified Pawl.Types.PlayerAction as PlayerAction
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -735,7 +737,7 @@ enterFromHand oid gs =
 
 -- How many times a player has scried this turn (CR 701.22b's scry event).
 scriesBy :: PlayerId.PlayerId -> GameState.GameState -> Int
-scriesBy pid gs = length [() | GameEvent.Scried p <- fmap LoggedEvent.event (Foldable.toList (GameState.events gs)), p == pid]
+scriesBy pid gs = length [() | GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.Scry p) <- fmap LoggedEvent.event (Foldable.toList (GameState.events gs)), p == pid]
 
 -- CR 404.1 read from inside a CONDITION: Scope.TopOfGraveyard, which names ONE
 -- position in a graveyard so that a Filter over it TESTS that card rather than

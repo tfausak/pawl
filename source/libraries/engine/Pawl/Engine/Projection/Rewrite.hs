@@ -2032,32 +2032,16 @@ rewriteTriggerCondition pairs condition = case condition of
   -- reason above, so no CR 612.1 swap reaches it either.
   TriggerCondition.BoundDies _ -> condition
   TriggerCondition.RoomEntered _ -> condition
-  TriggerCondition.PlayerScries _ -> condition
+  TriggerCondition.PlayerActs _ -> condition
   TriggerCondition.PlayerLosesGame _ -> condition
-  TriggerCondition.RingTemptsPlayer _ -> condition
-  TriggerCondition.PlayerBlights _ -> condition
-  TriggerCondition.PlayerForages _ -> condition
-  TriggerCondition.PlayerForetells _ -> condition
-  TriggerCondition.PlayerCollectsEvidence _ -> condition
-  TriggerCondition.PlayerGivesGift _ -> condition
-  TriggerCondition.PlayerEarthbends _ -> condition
-  TriggerCondition.PlayerWaterbends _ -> condition
-  TriggerCondition.PlayerAirbends _ -> condition
-  TriggerCondition.PlayerFirebends _ -> condition
   TriggerCondition.PlacesSticker p -> TriggerCondition.PlacesSticker p {PlacesSticker.object = Filter.rewrite pairs (PlacesSticker.object p)}
-  TriggerCondition.PlayerCompletesDungeon _ -> condition
-  TriggerCondition.PlayerSurveils _ -> condition
   TriggerCondition.PlayerPlaysLand payload -> TriggerCondition.PlayerPlaysLand payload {PlaysLand.filter = Filter.rewrite pairs (PlaysLand.filter payload)}
-  TriggerCondition.PlayerProliferates _ -> condition
   TriggerCondition.PlayerManifestsDread _ -> condition
-  TriggerCondition.PlayerRollsDice _ -> condition
   TriggerCondition.PlayerRollsResult _ -> condition
   TriggerCondition.Visit -> condition
   TriggerCondition.ChaosEnsues -> condition
   TriggerCondition.PlayerRollsPlaneswalker _ -> condition
   TriggerCondition.SetInMotion -> condition
-  TriggerCondition.PlayerOpensAttraction _ -> condition
-  TriggerCondition.PlayerClaimsPrize _ -> condition
   TriggerCondition.PlayerWinsCoinFlip _ -> condition
   TriggerCondition.PlayerLosesCoinFlip _ -> condition
   TriggerCondition.SelfBecomesPlotted -> condition

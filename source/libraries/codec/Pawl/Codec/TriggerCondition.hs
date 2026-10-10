@@ -22,6 +22,7 @@ import qualified Pawl.Codec.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Codec.PermanentsBecomeTargeted as PermanentsBecomeTargeted
 import qualified Pawl.Codec.PermanentsDealCombatDamageToPlayer as PermanentsDealCombatDamageToPlayer
 import qualified Pawl.Codec.PlacesSticker as PlacesSticker
+import qualified Pawl.Codec.PlayerActed as PlayerActed
 import qualified Pawl.Codec.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Codec.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Codec.PlayerDrawsNthCard as PlayerDrawsNthCard
@@ -172,22 +173,15 @@ codec =
           Arm.payload "BoundDiesOrIsExiled" SlotName.codec TriggerCondition.BoundDiesOrIsExiled (\x -> case x of TriggerCondition.BoundDiesOrIsExiled y -> Just y; _ -> Nothing),
           Arm.payload "BoundDies" SlotName.codec TriggerCondition.BoundDies (\x -> case x of TriggerCondition.BoundDies y -> Just y; _ -> Nothing),
           Arm.payload "RoomEntered" RoomIndex.codec TriggerCondition.RoomEntered (\x -> case x of TriggerCondition.RoomEntered y -> Just y; _ -> Nothing),
-          Arm.payload "PlayerScries" PlayerRelation.codec TriggerCondition.PlayerScries (\x -> case x of TriggerCondition.PlayerScries y -> Just y; _ -> Nothing),
-          -- CR 309.7's "whenever you complete a dungeon", PlayerScries' shape above.
-          Arm.payload "PlayerCompletesDungeon" PlayerRelation.codec TriggerCondition.PlayerCompletesDungeon (\x -> case x of TriggerCondition.PlayerCompletesDungeon y -> Just y; _ -> Nothing),
+          Arm.payload "PlayerActs" (PlayerActed.codec PlayerRelation.codec) TriggerCondition.PlayerActs (\x -> case x of TriggerCondition.PlayerActs y -> Just y; _ -> Nothing),
           Arm.payload "PlayerLosesGame" PlayerRelation.codec TriggerCondition.PlayerLosesGame (\x -> case x of TriggerCondition.PlayerLosesGame y -> Just y; _ -> Nothing),
-          Arm.payload "PlayerSurveils" PlayerRelation.codec TriggerCondition.PlayerSurveils (\x -> case x of TriggerCondition.PlayerSurveils y -> Just y; _ -> Nothing),
           Arm.payload "PlayerPlaysLand" PlaysLand.codec TriggerCondition.PlayerPlaysLand (\x -> case x of TriggerCondition.PlayerPlaysLand y -> Just y; _ -> Nothing),
-          Arm.payload "PlayerProliferates" PlayerRelation.codec TriggerCondition.PlayerProliferates (\x -> case x of TriggerCondition.PlayerProliferates y -> Just y; _ -> Nothing),
           Arm.payload "PlayerManifestsDread" PlayerRelation.codec TriggerCondition.PlayerManifestsDread (\x -> case x of TriggerCondition.PlayerManifestsDread y -> Just y; _ -> Nothing),
-          Arm.payload "PlayerRollsDice" PlayerRelation.codec TriggerCondition.PlayerRollsDice (\x -> case x of TriggerCondition.PlayerRollsDice y -> Just y; _ -> Nothing),
           Arm.payload "PlayerRollsResult" (DieResult.codec PlayerRelation.codec) TriggerCondition.PlayerRollsResult (\x -> case x of TriggerCondition.PlayerRollsResult y -> Just y; _ -> Nothing),
           Arm.nullary "Visit" TriggerCondition.Visit,
           Arm.nullary "ChaosEnsues" TriggerCondition.ChaosEnsues,
           Arm.payload "PlayerRollsPlaneswalker" PlayerRelation.codec TriggerCondition.PlayerRollsPlaneswalker (\x -> case x of TriggerCondition.PlayerRollsPlaneswalker y -> Just y; _ -> Nothing),
           Arm.nullary "SetInMotion" TriggerCondition.SetInMotion,
-          Arm.payload "PlayerOpensAttraction" PlayerRelation.codec TriggerCondition.PlayerOpensAttraction (\x -> case x of TriggerCondition.PlayerOpensAttraction y -> Just y; _ -> Nothing),
-          Arm.payload "PlayerClaimsPrize" PlayerRelation.codec TriggerCondition.PlayerClaimsPrize (\x -> case x of TriggerCondition.PlayerClaimsPrize y -> Just y; _ -> Nothing),
           Arm.payload "PlayerWinsCoinFlip" PlayerRelation.codec TriggerCondition.PlayerWinsCoinFlip (\x -> case x of TriggerCondition.PlayerWinsCoinFlip y -> Just y; _ -> Nothing),
           Arm.payload "PlayerLosesCoinFlip" PlayerRelation.codec TriggerCondition.PlayerLosesCoinFlip (\x -> case x of TriggerCondition.PlayerLosesCoinFlip y -> Just y; _ -> Nothing),
           Arm.nullary "SelfBecomesPlotted" TriggerCondition.SelfBecomesPlotted,
@@ -200,22 +194,9 @@ codec =
           -- shape as the arm above with the Filter over the HOST instead.
           Arm.payload "SelfBecomesAttachedTo" filterCodec TriggerCondition.SelfBecomesAttachedTo (\x -> case x of TriggerCondition.SelfBecomesAttachedTo y -> Just y; _ -> Nothing),
           Arm.payload "SelfBecomesUnattachedFrom" filterCodec TriggerCondition.SelfBecomesUnattachedFrom (\x -> case x of TriggerCondition.SelfBecomesUnattachedFrom y -> Just y; _ -> Nothing),
-          -- CR 701.54d's "whenever the Ring tempts you", PlayerScries' shape above.
-          Arm.payload "RingTemptsPlayer" PlayerRelation.codec TriggerCondition.RingTemptsPlayer (\x -> case x of TriggerCondition.RingTemptsPlayer y -> Just y; _ -> Nothing),
           -- CR 509.3d from the attacking side's bystander, SelfBecomesBlockedBy's
           -- shape above with the Filter over the attacker instead.
           Arm.payload "PermanentBecomesBlockedBy" filterCodec TriggerCondition.PermanentBecomesBlockedBy (\x -> case x of TriggerCondition.PermanentBecomesBlockedBy y -> Just y; _ -> Nothing),
-          -- CR 701.68d's "whenever a player blights", RingTemptsPlayer's shape above.
-          Arm.payload "PlayerBlights" PlayerRelation.codec TriggerCondition.PlayerBlights (\x -> case x of TriggerCondition.PlayerBlights y -> Just y; _ -> Nothing),
-          -- CR 701.61a's "whenever you forage", the arm above's shape.
-          Arm.payload "PlayerForages" PlayerRelation.codec TriggerCondition.PlayerForages (\x -> case x of TriggerCondition.PlayerForages y -> Just y; _ -> Nothing),
-          Arm.payload "PlayerForetells" PlayerRelation.codec TriggerCondition.PlayerForetells (\x -> case x of TriggerCondition.PlayerForetells y -> Just y; _ -> Nothing),
-          Arm.payload "PlayerCollectsEvidence" PlayerRelation.codec TriggerCondition.PlayerCollectsEvidence (\x -> case x of TriggerCondition.PlayerCollectsEvidence y -> Just y; _ -> Nothing),
-          Arm.payload "PlayerGivesGift" PlayerRelation.codec TriggerCondition.PlayerGivesGift (\x -> case x of TriggerCondition.PlayerGivesGift y -> Just y; _ -> Nothing),
-          Arm.payload "PlayerEarthbends" PlayerRelation.codec TriggerCondition.PlayerEarthbends (\x -> case x of TriggerCondition.PlayerEarthbends y -> Just y; _ -> Nothing),
-          Arm.payload "PlayerWaterbends" PlayerRelation.codec TriggerCondition.PlayerWaterbends (\x -> case x of TriggerCondition.PlayerWaterbends y -> Just y; _ -> Nothing),
-          Arm.payload "PlayerAirbends" PlayerRelation.codec TriggerCondition.PlayerAirbends (\x -> case x of TriggerCondition.PlayerAirbends y -> Just y; _ -> Nothing),
-          Arm.payload "PlayerFirebends" PlayerRelation.codec TriggerCondition.PlayerFirebends (\x -> case x of TriggerCondition.PlayerFirebends y -> Just y; _ -> Nothing),
           Arm.payload "PlacesSticker" PlacesSticker.codec TriggerCondition.PlacesSticker (\x -> case x of TriggerCondition.PlacesSticker y -> Just y; _ -> Nothing)
         ]
 
@@ -341,21 +322,15 @@ tagOf x = case x of
   TriggerCondition.BoundDiesOrIsExiled {} -> "BoundDiesOrIsExiled"
   TriggerCondition.BoundDies {} -> "BoundDies"
   TriggerCondition.RoomEntered {} -> "RoomEntered"
-  TriggerCondition.PlayerScries {} -> "PlayerScries"
-  TriggerCondition.PlayerCompletesDungeon {} -> "PlayerCompletesDungeon"
+  TriggerCondition.PlayerActs {} -> "PlayerActs"
   TriggerCondition.PlayerLosesGame {} -> "PlayerLosesGame"
-  TriggerCondition.PlayerSurveils {} -> "PlayerSurveils"
   TriggerCondition.PlayerPlaysLand {} -> "PlayerPlaysLand"
-  TriggerCondition.PlayerProliferates {} -> "PlayerProliferates"
   TriggerCondition.PlayerManifestsDread {} -> "PlayerManifestsDread"
-  TriggerCondition.PlayerRollsDice {} -> "PlayerRollsDice"
   TriggerCondition.PlayerRollsResult {} -> "PlayerRollsResult"
   TriggerCondition.Visit {} -> "Visit"
   TriggerCondition.ChaosEnsues {} -> "ChaosEnsues"
   TriggerCondition.PlayerRollsPlaneswalker {} -> "PlayerRollsPlaneswalker"
   TriggerCondition.SetInMotion {} -> "SetInMotion"
-  TriggerCondition.PlayerOpensAttraction {} -> "PlayerOpensAttraction"
-  TriggerCondition.PlayerClaimsPrize {} -> "PlayerClaimsPrize"
   TriggerCondition.PlayerWinsCoinFlip {} -> "PlayerWinsCoinFlip"
   TriggerCondition.PlayerLosesCoinFlip {} -> "PlayerLosesCoinFlip"
   TriggerCondition.SelfBecomesPlotted {} -> "SelfBecomesPlotted"
@@ -366,15 +341,5 @@ tagOf x = case x of
   TriggerCondition.SelfBecomesAttachedBy {} -> "SelfBecomesAttachedBy"
   TriggerCondition.SelfBecomesAttachedTo {} -> "SelfBecomesAttachedTo"
   TriggerCondition.SelfBecomesUnattachedFrom {} -> "SelfBecomesUnattachedFrom"
-  TriggerCondition.RingTemptsPlayer {} -> "RingTemptsPlayer"
   TriggerCondition.PermanentBecomesBlockedBy {} -> "PermanentBecomesBlockedBy"
-  TriggerCondition.PlayerBlights {} -> "PlayerBlights"
-  TriggerCondition.PlayerForages {} -> "PlayerForages"
-  TriggerCondition.PlayerForetells {} -> "PlayerForetells"
-  TriggerCondition.PlayerCollectsEvidence {} -> "PlayerCollectsEvidence"
-  TriggerCondition.PlayerGivesGift {} -> "PlayerGivesGift"
-  TriggerCondition.PlayerEarthbends {} -> "PlayerEarthbends"
-  TriggerCondition.PlayerWaterbends {} -> "PlayerWaterbends"
-  TriggerCondition.PlayerAirbends {} -> "PlayerAirbends"
-  TriggerCondition.PlayerFirebends {} -> "PlayerFirebends"
   TriggerCondition.PlacesSticker {} -> "PlacesSticker"

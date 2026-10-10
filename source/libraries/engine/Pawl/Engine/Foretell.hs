@@ -48,6 +48,8 @@ import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
+import qualified Pawl.Types.PlayerActed as PlayerActed
+import qualified Pawl.Types.PlayerAction as PlayerAction
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Zone as Zone
 
@@ -157,7 +159,7 @@ foretell perform pid oid = do
       exiled <- Event.changeZoneEntering oid Zone.Exile LibraryPosition.defaultValue riders Nothing
       Monad.forM_ exiled (State.modify' . becomeForetold (Maybe.listToMaybe (Maybe.mapMaybe reductionOf (foretellCostsOf oid before))))
       -- CR 702.143c: "foretelling a card" is this special action.
-      Monad.unless (null exiled) (State.modify' (Event.recordEvent (GameEvent.Foretold pid)))
+      Monad.unless (null exiled) (State.modify' (Event.recordEvent (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.Foretell pid))))
 
 -- A granted foretell stops applying once the card leaves the hand, yet the card
 -- keeps the cost it was given (Dream Devourer's ruling): so a reduction off the
@@ -209,7 +211,7 @@ riders =
 --
 -- No GameEvent rides along, where Plot.becomePlotted records one: CR 702.143c's
 -- "foretelling a card" is the special action alone, so `foretell` above records
--- GameEvent.Foretold and CR 702.143d's route records nothing.
+-- GameEvent.PlayerActed and CR 702.143d's route records nothing.
 becomeForetold :: Maybe ManaCost.ManaCost -> ObjectId -> GameState -> GameState
 becomeForetold reduction newId gs =
   gs

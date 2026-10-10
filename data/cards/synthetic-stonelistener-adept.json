@@ -28,9 +28,14 @@
       "triggeredAbilities": [
         {
           "condition": {
-            "type": "PlayerEarthbends",
+            "type": "PlayerActs",
             "value": {
-              "type": "AnyPlayer"
+              "action": {
+                "type": "Earthbend"
+              },
+              "player": {
+                "type": "AnyPlayer"
+              }
             }
           },
           "modal": {

@@ -74,9 +74,14 @@
         },
         {
           "condition": {
-            "type": "PlayerOpensAttraction",
+            "type": "PlayerActs",
             "value": {
-              "type": "You"
+              "action": {
+                "type": "OpenAttraction"
+              },
+              "player": {
+                "type": "You"
+              }
             }
           },
           "modal": {
@@ -110,9 +115,14 @@
         },
         {
           "condition": {
-            "type": "PlayerClaimsPrize",
+            "type": "PlayerActs",
             "value": {
-              "type": "You"
+              "action": {
+                "type": "ClaimPrize"
+              },
+              "player": {
+                "type": "You"
+              }
             }
           },
           "modal": {

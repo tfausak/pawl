@@ -27,6 +27,8 @@ import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.PlayerActed as PlayerActed
+import qualified Pawl.Types.PlayerAction as PlayerAction
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Prompt as Prompt
 
@@ -113,5 +115,5 @@ blight cause resolving n = do
       -- HERE and not at a caller, because this is the one place all three
       -- provenances meet (the module haddock above): a blight paid as a cost and
       -- one an effect instructs are both a player blighting.
-      State.modify' (Event.recordEvent (GameEvent.Blighted pid))
+      State.modify' (Event.recordEvent (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.Blight pid)))
       pure (Just blighted)

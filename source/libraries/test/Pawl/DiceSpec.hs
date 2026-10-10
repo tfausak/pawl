@@ -65,7 +65,7 @@
 -- interned from six different printings. Every scry prompt is answered by
 -- bottoming the whole look, so scry N moves exactly N cards off the top and the
 -- top card names N: card 2 for scry 1, card 3 for scry 2, card 4 for scry 3, and
--- card 1 for a table that fired nothing at all. GameEvent.Scried carries a
+-- card 1 for a table that fired nothing at all. GameEvent.PlayerActed carries a
 -- PlayerId and no count, so library order is the only gameplay-level quantity
 -- that can tell the striations apart.
 --
@@ -120,6 +120,8 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerActed as PlayerActed
+import qualified Pawl.Types.PlayerAction as PlayerAction
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
@@ -647,7 +649,7 @@ costedRerollSpec s registry = Spec.describe s "Costed reroll" $ do
     (spell, _, _, board) <- endeavorBoard s registry
     wall <- S.printingOf s registry "Wall of Fortune"
     let (_, withWall) = S.addPermanent wall S.bob board
-        rolls p after = length (filter (== GameEvent.DiceRolled p) (S.eventsOf after))
+        rolls p after = length (filter (== GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.RollDice p)) (S.eventsOf after))
     -- Pippa, Duchess of Dice's ruling makes a reroll trigger "whenever you roll
     -- a die". Bob's Wall has ALICE reroll, so alice has rolled twice -- the
     -- instruction's roll and the reroll -- and bob not at all. The paired run
@@ -746,7 +748,7 @@ activatedRerollSpec s registry = Spec.describe s "Activated reroll" $ do
     Spec.assertEqWith
       s
       "a reroll of alice's die is bob's roll"
-      (length (filter (== GameEvent.DiceRolled S.bob) (S.eventsOf after)))
+      (length (filter (== GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.RollDice S.bob)) (S.eventsOf after)))
       1
     -- The paired run: the same board with the offer declined.
     Spec.assertEqWith

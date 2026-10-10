@@ -102,6 +102,7 @@ import qualified Pawl.Types.PlacesSticker as PlacesSticker
 import qualified Pawl.Types.PlanarDieFace as PlanarDieFace
 import qualified Pawl.Types.PlanarDieRolled as PlanarDieRolled
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerActed as PlayerActed
 import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
@@ -271,14 +272,10 @@ countersRemovedFrom bearer wanted event = case event of
   GameEvent.BecameUnattached {} -> Nothing
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Milled {} -> Nothing
-  GameEvent.Scried _ -> Nothing
+  GameEvent.PlayerActed _ -> Nothing
   GameEvent.LandPlayed {} -> Nothing
   GameEvent.LostTheGame _ -> Nothing
-  GameEvent.DungeonCompleted _ -> Nothing
-  GameEvent.Surveiled _ -> Nothing
-  GameEvent.Proliferated _ -> Nothing
   GameEvent.ManifestedDread {} -> Nothing
-  GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
   GameEvent.PlanarDieRolled _ -> Nothing
@@ -296,18 +293,6 @@ countersRemovedFrom bearer wanted event = case event of
   GameEvent.ManaAdded _ -> Nothing
   GameEvent.ManaAbilityResolved _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
-  GameEvent.RingTempted _ -> Nothing
-  GameEvent.Blighted _ -> Nothing
-  GameEvent.Foraged _ -> Nothing
-  GameEvent.Foretold _ -> Nothing
-  GameEvent.CollectedEvidence _ -> Nothing
-  GameEvent.GaveGift _ -> Nothing
-  GameEvent.AttractionOpened _ -> Nothing
-  GameEvent.PrizeClaimed _ -> Nothing
-  GameEvent.Earthbent _ -> Nothing
-  GameEvent.Waterbent _ -> Nothing
-  GameEvent.Airbent _ -> Nothing
-  GameEvent.Firebent _ -> Nothing
   GameEvent.StickerPut _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.TriggeredAbilityResolved _ -> Nothing
@@ -415,14 +400,10 @@ boundDeparts bindings destinations slot event = case event of
   GameEvent.BecameUnattached {} -> False
   GameEvent.LeftTheGame _ -> False
   GameEvent.Milled {} -> False
-  GameEvent.Scried _ -> False
+  GameEvent.PlayerActed _ -> False
   GameEvent.LandPlayed {} -> False
   GameEvent.LostTheGame _ -> False
-  GameEvent.DungeonCompleted _ -> False
-  GameEvent.Surveiled _ -> False
-  GameEvent.Proliferated _ -> False
   GameEvent.ManifestedDread {} -> False
-  GameEvent.DiceRolled _ -> False
   GameEvent.DieResultSettled _ -> False
   GameEvent.RolledToVisit _ -> False
   GameEvent.PlanarDieRolled _ -> False
@@ -440,18 +421,6 @@ boundDeparts bindings destinations slot event = case event of
   GameEvent.ManaAdded _ -> False
   GameEvent.ManaAbilityResolved _ -> False
   GameEvent.CoinFlipped {} -> False
-  GameEvent.RingTempted _ -> False
-  GameEvent.Blighted _ -> False
-  GameEvent.Foraged _ -> False
-  GameEvent.Foretold _ -> False
-  GameEvent.CollectedEvidence _ -> False
-  GameEvent.GaveGift _ -> False
-  GameEvent.AttractionOpened _ -> False
-  GameEvent.PrizeClaimed _ -> False
-  GameEvent.Earthbent _ -> False
-  GameEvent.Waterbent _ -> False
-  GameEvent.Airbent _ -> False
-  GameEvent.Firebent _ -> False
   GameEvent.StickerPut _ -> False
   GameEvent.ActivatedAbilityResolved _ -> False
   GameEvent.TriggeredAbilityResolved _ -> False
@@ -543,14 +512,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -568,18 +533,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -648,14 +601,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -673,18 +622,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -743,14 +680,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -768,18 +701,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -836,14 +757,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -861,18 +778,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -937,14 +842,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -962,18 +863,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -1039,14 +928,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -1064,18 +949,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -1130,14 +1003,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -1155,18 +1024,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -1230,14 +1087,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -1255,18 +1108,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -1340,14 +1181,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -1365,18 +1202,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -1430,14 +1255,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -1455,18 +1276,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -1521,14 +1330,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -1546,18 +1351,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -1611,14 +1404,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -1636,18 +1425,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -1701,14 +1478,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -1726,18 +1499,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -1805,14 +1566,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -1830,18 +1587,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -1918,14 +1663,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -1943,18 +1684,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -2016,14 +1745,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -2041,18 +1766,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -2113,14 +1826,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -2138,18 +1847,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -2219,14 +1916,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -2244,18 +1937,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -2326,14 +2007,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -2351,18 +2028,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -2429,14 +2094,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -2454,18 +2115,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -2531,14 +2180,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -2556,18 +2201,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -2634,14 +2267,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -2659,18 +2288,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -2749,14 +2366,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -2774,18 +2387,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -2862,14 +2463,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -2887,18 +2484,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -2967,14 +2552,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -2992,18 +2573,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -3070,14 +2639,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -3095,18 +2660,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -3168,14 +2721,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -3193,18 +2742,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -3248,18 +2785,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -3310,14 +2836,9 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -3372,18 +2893,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -3434,14 +2944,9 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -3518,14 +3023,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -3542,18 +3043,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -3622,14 +3111,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -3646,18 +3131,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -3751,14 +3224,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -3775,18 +3244,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -3859,14 +3316,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -3884,18 +3337,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -3979,14 +3420,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -4004,18 +3441,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -4069,14 +3494,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -4094,18 +3515,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -4163,14 +3572,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -4188,18 +3593,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -4281,14 +3674,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -4306,18 +3695,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -4377,14 +3754,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -4402,18 +3775,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -4490,14 +3851,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -4515,18 +3872,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -4590,14 +3935,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -4615,18 +3956,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -4701,14 +4030,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -4726,18 +4051,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -4807,14 +4120,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -4832,18 +4141,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -4974,14 +4271,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.BecameUnattached {} -> False
           GameEvent.LeftTheGame _ -> False
           GameEvent.Milled {} -> False
-          GameEvent.Scried _ -> False
+          GameEvent.PlayerActed _ -> False
           GameEvent.LandPlayed {} -> False
           GameEvent.LostTheGame _ -> False
-          GameEvent.DungeonCompleted _ -> False
-          GameEvent.Surveiled _ -> False
-          GameEvent.Proliferated _ -> False
           GameEvent.ManifestedDread {} -> False
-          GameEvent.DiceRolled _ -> False
           GameEvent.DieResultSettled _ -> False
           GameEvent.RolledToVisit _ -> False
           GameEvent.PlanarDieRolled _ -> False
@@ -4999,18 +4292,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.ManaAdded _ -> False
           GameEvent.ManaAbilityResolved _ -> False
           GameEvent.CoinFlipped {} -> False
-          GameEvent.RingTempted _ -> False
-          GameEvent.Blighted _ -> False
-          GameEvent.Foraged _ -> False
-          GameEvent.Foretold _ -> False
-          GameEvent.CollectedEvidence _ -> False
-          GameEvent.GaveGift _ -> False
-          GameEvent.AttractionOpened _ -> False
-          GameEvent.PrizeClaimed _ -> False
-          GameEvent.Earthbent _ -> False
-          GameEvent.Waterbent _ -> False
-          GameEvent.Airbent _ -> False
-          GameEvent.Firebent _ -> False
           GameEvent.StickerPut _ -> False
           GameEvent.ActivatedAbilityResolved _ -> False
           GameEvent.TriggeredAbilityResolved _ -> False
@@ -5144,14 +4425,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.BecameUnattached {} -> False
           GameEvent.LeftTheGame _ -> False
           GameEvent.Milled {} -> False
-          GameEvent.Scried _ -> False
+          GameEvent.PlayerActed _ -> False
           GameEvent.LandPlayed {} -> False
           GameEvent.LostTheGame _ -> False
-          GameEvent.DungeonCompleted _ -> False
-          GameEvent.Surveiled _ -> False
-          GameEvent.Proliferated _ -> False
           GameEvent.ManifestedDread {} -> False
-          GameEvent.DiceRolled _ -> False
           GameEvent.DieResultSettled _ -> False
           GameEvent.RolledToVisit _ -> False
           GameEvent.PlanarDieRolled _ -> False
@@ -5169,18 +4446,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.ManaAdded _ -> False
           GameEvent.ManaAbilityResolved _ -> False
           GameEvent.CoinFlipped {} -> False
-          GameEvent.RingTempted _ -> False
-          GameEvent.Blighted _ -> False
-          GameEvent.Foraged _ -> False
-          GameEvent.Foretold _ -> False
-          GameEvent.CollectedEvidence _ -> False
-          GameEvent.GaveGift _ -> False
-          GameEvent.AttractionOpened _ -> False
-          GameEvent.PrizeClaimed _ -> False
-          GameEvent.Earthbent _ -> False
-          GameEvent.Waterbent _ -> False
-          GameEvent.Airbent _ -> False
-          GameEvent.Firebent _ -> False
           GameEvent.StickerPut _ -> False
           GameEvent.ActivatedAbilityResolved _ -> False
           GameEvent.TriggeredAbilityResolved _ -> False
@@ -5242,14 +4507,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -5267,18 +4528,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -5340,14 +4589,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -5365,18 +4610,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -5439,14 +4672,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -5464,18 +4693,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -5543,14 +4760,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -5568,18 +4781,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -5655,14 +4856,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -5680,18 +4877,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -5795,14 +4980,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.BecameUnattached {} -> False
           GameEvent.LeftTheGame _ -> False
           GameEvent.Milled {} -> False
-          GameEvent.Scried _ -> False
+          GameEvent.PlayerActed _ -> False
           GameEvent.LandPlayed {} -> False
           GameEvent.LostTheGame _ -> False
-          GameEvent.DungeonCompleted _ -> False
-          GameEvent.Surveiled _ -> False
-          GameEvent.Proliferated _ -> False
           GameEvent.ManifestedDread {} -> False
-          GameEvent.DiceRolled _ -> False
           GameEvent.DieResultSettled _ -> False
           GameEvent.RolledToVisit _ -> False
           GameEvent.PlanarDieRolled _ -> False
@@ -5820,18 +5001,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.ManaAdded _ -> False
           GameEvent.ManaAbilityResolved _ -> False
           GameEvent.CoinFlipped {} -> False
-          GameEvent.RingTempted _ -> False
-          GameEvent.Blighted _ -> False
-          GameEvent.Foraged _ -> False
-          GameEvent.Foretold _ -> False
-          GameEvent.CollectedEvidence _ -> False
-          GameEvent.GaveGift _ -> False
-          GameEvent.AttractionOpened _ -> False
-          GameEvent.PrizeClaimed _ -> False
-          GameEvent.Earthbent _ -> False
-          GameEvent.Waterbent _ -> False
-          GameEvent.Airbent _ -> False
-          GameEvent.Firebent _ -> False
           GameEvent.StickerPut _ -> False
           GameEvent.ActivatedAbilityResolved _ -> False
           GameEvent.TriggeredAbilityResolved _ -> False
@@ -6028,14 +5197,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -6048,18 +5213,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -6121,14 +5274,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -6141,18 +5290,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -6198,14 +5335,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -6221,18 +5354,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -6317,14 +5438,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -6337,18 +5454,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -6435,14 +5540,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -6455,18 +5556,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -6532,14 +5621,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -6552,18 +5637,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -6632,14 +5705,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -6652,18 +5721,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -6695,14 +5752,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
         && ZoneChange.to zc /= Zone.Battlefield
     GameEvent.LeftTheGame l -> LeftTheGame.object l == bearer && LeftTheGame.from l == Zone.Battlefield
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -6720,18 +5773,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -6794,14 +5835,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
         && maybe False (PlayerRelation.holds (Game.teams gs) (OwnedZone.owner destination) you) (Game.ownerWithLastKnown (ZoneChange.departed zc) gs)
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -6819,18 +5856,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -6899,14 +5924,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.Moved {} -> False
           GameEvent.LeftTheGame l -> LeftTheGame.from l == Zone.Battlefield && admits (LeftTheGame.object l)
           GameEvent.Milled {} -> False
-          GameEvent.Scried _ -> False
+          GameEvent.PlayerActed _ -> False
           GameEvent.LandPlayed {} -> False
           GameEvent.LostTheGame _ -> False
-          GameEvent.DungeonCompleted _ -> False
-          GameEvent.Surveiled _ -> False
-          GameEvent.Proliferated _ -> False
           GameEvent.ManifestedDread {} -> False
-          GameEvent.DiceRolled _ -> False
           GameEvent.DieResultSettled _ -> False
           GameEvent.RolledToVisit _ -> False
           GameEvent.PlanarDieRolled _ -> False
@@ -6924,18 +5945,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.ManaAdded _ -> False
           GameEvent.ManaAbilityResolved _ -> False
           GameEvent.CoinFlipped {} -> False
-          GameEvent.RingTempted _ -> False
-          GameEvent.Blighted _ -> False
-          GameEvent.Foraged _ -> False
-          GameEvent.Foretold _ -> False
-          GameEvent.CollectedEvidence _ -> False
-          GameEvent.GaveGift _ -> False
-          GameEvent.AttractionOpened _ -> False
-          GameEvent.PrizeClaimed _ -> False
-          GameEvent.Earthbent _ -> False
-          GameEvent.Waterbent _ -> False
-          GameEvent.Airbent _ -> False
-          GameEvent.Firebent _ -> False
           GameEvent.StickerPut _ -> False
           GameEvent.ActivatedAbilityResolved _ -> False
           GameEvent.TriggeredAbilityResolved _ -> False
@@ -7014,14 +6023,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.Moved {} -> False
           GameEvent.LeftTheGame _ -> False
           GameEvent.Milled {} -> False
-          GameEvent.Scried _ -> False
+          GameEvent.PlayerActed _ -> False
           GameEvent.LandPlayed {} -> False
           GameEvent.LostTheGame _ -> False
-          GameEvent.DungeonCompleted _ -> False
-          GameEvent.Surveiled _ -> False
-          GameEvent.Proliferated _ -> False
           GameEvent.ManifestedDread {} -> False
-          GameEvent.DiceRolled _ -> False
           GameEvent.DieResultSettled _ -> False
           GameEvent.RolledToVisit _ -> False
           GameEvent.PlanarDieRolled _ -> False
@@ -7039,18 +6044,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.ManaAdded _ -> False
           GameEvent.ManaAbilityResolved _ -> False
           GameEvent.CoinFlipped {} -> False
-          GameEvent.RingTempted _ -> False
-          GameEvent.Blighted _ -> False
-          GameEvent.Foraged _ -> False
-          GameEvent.Foretold _ -> False
-          GameEvent.CollectedEvidence _ -> False
-          GameEvent.GaveGift _ -> False
-          GameEvent.AttractionOpened _ -> False
-          GameEvent.PrizeClaimed _ -> False
-          GameEvent.Earthbent _ -> False
-          GameEvent.Waterbent _ -> False
-          GameEvent.Airbent _ -> False
-          GameEvent.Firebent _ -> False
           GameEvent.StickerPut _ -> False
           GameEvent.ActivatedAbilityResolved _ -> False
           GameEvent.TriggeredAbilityResolved _ -> False
@@ -7150,14 +6143,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
                   && admitsDeparture gs bearer you p (LeftTheGame.object l)
           GameEvent.LeftTheGame _ -> False
           GameEvent.Milled {} -> False
-          GameEvent.Scried _ -> False
+          GameEvent.PlayerActed _ -> False
           GameEvent.LandPlayed {} -> False
           GameEvent.LostTheGame _ -> False
-          GameEvent.DungeonCompleted _ -> False
-          GameEvent.Surveiled _ -> False
-          GameEvent.Proliferated _ -> False
           GameEvent.ManifestedDread {} -> False
-          GameEvent.DiceRolled _ -> False
           GameEvent.DieResultSettled _ -> False
           GameEvent.RolledToVisit _ -> False
           GameEvent.PlanarDieRolled _ -> False
@@ -7175,18 +6164,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.ManaAdded _ -> False
           GameEvent.ManaAbilityResolved _ -> False
           GameEvent.CoinFlipped {} -> False
-          GameEvent.RingTempted _ -> False
-          GameEvent.Blighted _ -> False
-          GameEvent.Foraged _ -> False
-          GameEvent.Foretold _ -> False
-          GameEvent.CollectedEvidence _ -> False
-          GameEvent.GaveGift _ -> False
-          GameEvent.AttractionOpened _ -> False
-          GameEvent.PrizeClaimed _ -> False
-          GameEvent.Earthbent _ -> False
-          GameEvent.Waterbent _ -> False
-          GameEvent.Airbent _ -> False
-          GameEvent.Firebent _ -> False
           GameEvent.StickerPut _ -> False
           GameEvent.ActivatedAbilityResolved _ -> False
           GameEvent.TriggeredAbilityResolved _ -> False
@@ -7317,14 +6294,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.BecameUnattached {} -> False
           GameEvent.LeftTheGame _ -> False
           GameEvent.Milled {} -> False
-          GameEvent.Scried _ -> False
+          GameEvent.PlayerActed _ -> False
           GameEvent.LandPlayed {} -> False
           GameEvent.LostTheGame _ -> False
-          GameEvent.DungeonCompleted _ -> False
-          GameEvent.Surveiled _ -> False
-          GameEvent.Proliferated _ -> False
           GameEvent.ManifestedDread {} -> False
-          GameEvent.DiceRolled _ -> False
           GameEvent.DieResultSettled _ -> False
           GameEvent.RolledToVisit _ -> False
           GameEvent.PlanarDieRolled _ -> False
@@ -7342,18 +6315,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.ManaAdded _ -> False
           GameEvent.ManaAbilityResolved _ -> False
           GameEvent.CoinFlipped {} -> False
-          GameEvent.RingTempted _ -> False
-          GameEvent.Blighted _ -> False
-          GameEvent.Foraged _ -> False
-          GameEvent.Foretold _ -> False
-          GameEvent.CollectedEvidence _ -> False
-          GameEvent.GaveGift _ -> False
-          GameEvent.AttractionOpened _ -> False
-          GameEvent.PrizeClaimed _ -> False
-          GameEvent.Earthbent _ -> False
-          GameEvent.Waterbent _ -> False
-          GameEvent.Airbent _ -> False
-          GameEvent.Firebent _ -> False
           GameEvent.StickerPut _ -> False
           GameEvent.ActivatedAbilityResolved _ -> False
           GameEvent.TriggeredAbilityResolved _ -> False
@@ -7419,14 +6380,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -7444,18 +6401,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -7520,14 +6465,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -7545,18 +6486,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -7643,14 +6572,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -7668,18 +6593,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -7758,14 +6671,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -7783,18 +6692,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -7869,14 +6766,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -7894,18 +6787,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -7980,14 +6861,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -8005,18 +6882,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -8058,14 +6923,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -8083,18 +6944,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -8167,14 +7016,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -8191,18 +7036,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -8308,14 +7141,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -8333,18 +7162,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -8475,14 +7292,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.BecameUnattached {} -> False
           GameEvent.LeftTheGame _ -> False
           GameEvent.Milled {} -> False
-          GameEvent.Scried _ -> False
+          GameEvent.PlayerActed _ -> False
           GameEvent.LandPlayed {} -> False
           GameEvent.LostTheGame _ -> False
-          GameEvent.DungeonCompleted _ -> False
-          GameEvent.Surveiled _ -> False
-          GameEvent.Proliferated _ -> False
           GameEvent.ManifestedDread {} -> False
-          GameEvent.DiceRolled _ -> False
           GameEvent.DieResultSettled _ -> False
           GameEvent.RolledToVisit _ -> False
           GameEvent.PlanarDieRolled _ -> False
@@ -8500,18 +7313,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.ManaAdded _ -> False
           GameEvent.ManaAbilityResolved _ -> False
           GameEvent.CoinFlipped {} -> False
-          GameEvent.RingTempted _ -> False
-          GameEvent.Blighted _ -> False
-          GameEvent.Foraged _ -> False
-          GameEvent.Foretold _ -> False
-          GameEvent.CollectedEvidence _ -> False
-          GameEvent.GaveGift _ -> False
-          GameEvent.AttractionOpened _ -> False
-          GameEvent.PrizeClaimed _ -> False
-          GameEvent.Earthbent _ -> False
-          GameEvent.Waterbent _ -> False
-          GameEvent.Airbent _ -> False
-          GameEvent.Firebent _ -> False
           GameEvent.StickerPut _ -> False
           GameEvent.ActivatedAbilityResolved _ -> False
           GameEvent.TriggeredAbilityResolved _ -> False
@@ -8595,14 +7396,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -8620,18 +7417,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -8656,14 +7441,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -8681,18 +7462,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -8764,14 +7533,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -8789,18 +7554,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -8882,14 +7635,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -8907,18 +7656,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -9002,14 +7739,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -9027,18 +7760,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -9103,14 +7824,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -9128,18 +7845,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -9206,14 +7911,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -9231,18 +7932,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -9343,14 +8032,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -9368,18 +8053,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -9462,14 +8135,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -9487,18 +8156,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -9555,14 +8212,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -9580,18 +8233,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -9645,14 +8286,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -9670,18 +8307,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -9742,14 +8367,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -9767,18 +8388,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -9834,14 +8443,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -9859,18 +8464,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -9937,14 +8530,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -9962,18 +8551,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -10028,14 +8605,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -10053,18 +8626,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -10125,14 +8686,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -10150,18 +8707,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -10230,14 +8775,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -10255,18 +8796,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -10330,14 +8859,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -10355,18 +8880,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -10426,14 +8939,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -10451,18 +8960,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -10520,14 +9017,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -10545,18 +9038,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -10628,14 +9109,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -10653,18 +9130,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -10743,14 +9208,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -10768,18 +9229,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -10883,14 +9332,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -10908,18 +9353,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -10974,14 +9407,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -10999,18 +9428,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -11067,14 +9484,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -11092,18 +9505,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -11148,23 +9549,23 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
     GameEvent.LifeGained {} -> False
-  -- CR 701.22d: this player scried. The relation reads the scryer against CR
-  -- 109.5's "you", the ability's controller (CR 603.3a) --
-  -- PlayerBecomesMonarch's shape, and Matoya, Archon Elder is the You form.
-  --
-  -- The EVENT and nothing else: how many cards moved, and whether any could,
-  -- is CR 701.22a's business and CR 701.22d says explicitly that neither
-  -- narrows this. Pawl.Engine.Resolve.Effect's Scry arm records the event for
-  -- every scryer, decideScry's prompt guard or not, for that sentence.
-  TriggerCondition.PlayerScries relation -> case event of
-    GameEvent.Moved {} -> False
+  -- CR 603.2: this player performed the watched action, the relation reading
+  -- the actor against CR 109.5's "you", the ability's controller (CR 603.3a).
+  -- The EVENT and nothing else: each keyword action's own rule places the
+  -- moment it is recorded (Pawl.Types.PlayerAction), and several of them --
+  -- CR 701.22d, 701.25d, 701.54d, 701.68d -- say it fires even where some or
+  -- all of the action was impossible.
+  TriggerCondition.PlayerActs watched -> case event of
+    GameEvent.PlayerActed acted ->
+      PlayerActed.action acted == PlayerActed.action watched
+        && PlayerRelation.holds (Game.teams gs) (PlayerActed.player watched) you (PlayerActed.player acted)
+    GameEvent.TookInitiative _ -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
     GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
-    GameEvent.TookInitiative _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
@@ -11203,14 +9604,9 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried scryer -> PlayerRelation.holds (Game.teams gs) relation you scryer
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -11228,215 +9624,13 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
-  -- CR 701.54d: "whenever the Ring tempts you" (Nazgul). PlayerScries' shape
-  -- above, and Nazgul is the You form.
-  --
-  -- The EVENT and nothing else: rule 701.54d says a player is tempted whenever
-  -- they complete CR 701.54a's actions "even if some or all of those actions
-  -- were impossible", so a temptation that designated nobody matches this.
-  -- Pawl.Engine.Ring.tempt records the event outside the branch that
-  -- designates, for that sentence.
-  TriggerCondition.RingTemptsPlayer relation -> case event of
     GameEvent.Moved {} -> False
-    GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan {} -> False
-    GameEvent.SpellCast {} -> False
-    GameEvent.SpellCopied _ -> False
-    GameEvent.DamagePrevented {} -> False
-    GameEvent.BecameMonarch _ -> False
-    GameEvent.TookInitiative _ -> False
-    GameEvent.Discarded {} -> False
-    GameEvent.Drew {} -> False
-    GameEvent.Revealed {} -> False
-    GameEvent.AttackerDeclared {} -> False
-    GameEvent.BecameBlocking {} -> False
-    GameEvent.BlocksDeclared {} -> False
-    GameEvent.AttackerBlocked {} -> False
-    GameEvent.AttackerUnblocked _ -> False
-    GameEvent.SpellCountered _ -> False
-    GameEvent.AbilityCountered _ -> False
-    GameEvent.HalfUnlocked {} -> False
-    GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
-    GameEvent.Transformed {} -> False
-    GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
-    GameEvent.Mentored {} -> False
-    GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
-    GameEvent.BecameCrewed _ -> False
-    GameEvent.Convoked _ -> False
-    GameEvent.Saddled _ -> False
-    GameEvent.Crewed _ -> False
-    GameEvent.PermanentSacrificed {} -> False
-    GameEvent.AbilityTriggered {} -> False
-    GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost {} -> False
-    GameEvent.LifeGained {} -> False
-    GameEvent.CountersPut {} -> False
-    GameEvent.CountersRemoved {} -> False
-    GameEvent.ControlChanged {} -> False
-    GameEvent.VentureMarkerEntered {} -> False
-    GameEvent.BecameTarget {} -> False
-    GameEvent.BecameAttached {} -> False
-    GameEvent.BecameUnattached {} -> False
-    GameEvent.LeftTheGame _ -> False
-    GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
-    GameEvent.LandPlayed {} -> False
-    GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
-    GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
-    GameEvent.DieResultSettled _ -> False
-    GameEvent.RolledToVisit _ -> False
-    GameEvent.PlanarDieRolled _ -> False
-    GameEvent.SchemeSetInMotion _ -> False
-    GameEvent.ClassLevelSet _ -> False
-    GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
-    GameEvent.BecameAttacked _ -> False
-    GameEvent.AttackersDeclared _ -> False
-    GameEvent.BecameTapped _ -> False
-    GameEvent.BecameUntapped _ -> False
-    GameEvent.TappedForMana _ -> False
-    GameEvent.ManaAdded _ -> False
-    GameEvent.ManaAbilityResolved _ -> False
-    GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted tempted -> PlayerRelation.holds (Game.teams gs) relation you tempted
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
-    GameEvent.StickerPut _ -> False
-    GameEvent.ActivatedAbilityResolved _ -> False
-    GameEvent.TriggeredAbilityResolved _ -> False
-    GameEvent.CardArrived _ -> False
-  -- CR 309.7: this player completed a dungeon. The relation reads the
-  -- completing player against CR 109.5's "you", the ability's controller (CR
-  -- 603.3a) -- PlayerScries' shape above, and Dungeon Crawler is the You form.
-  --
-  -- CR 309.6 makes the completing player the dungeon card's OWNER, which is
-  -- what Pawl.Engine.Dungeon.remove records; a controller reading is not
-  -- available to differ from it, since a dungeon card has no controller.
-  TriggerCondition.PlayerCompletesDungeon relation -> case event of
-    GameEvent.Moved {} -> False
-    GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan {} -> False
-    GameEvent.SpellCast {} -> False
-    GameEvent.SpellCopied _ -> False
-    GameEvent.DamagePrevented {} -> False
-    GameEvent.BecameMonarch _ -> False
-    GameEvent.TookInitiative _ -> False
-    GameEvent.Discarded {} -> False
-    GameEvent.Drew {} -> False
-    GameEvent.Revealed {} -> False
-    GameEvent.AttackerDeclared {} -> False
-    GameEvent.BecameBlocking {} -> False
-    GameEvent.BlocksDeclared {} -> False
-    GameEvent.AttackerBlocked {} -> False
-    GameEvent.AttackerUnblocked _ -> False
-    GameEvent.SpellCountered _ -> False
-    GameEvent.AbilityCountered _ -> False
-    GameEvent.HalfUnlocked {} -> False
-    GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
-    GameEvent.Transformed {} -> False
-    GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
-    GameEvent.Mentored {} -> False
-    GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
-    GameEvent.BecameCrewed _ -> False
-    GameEvent.Convoked _ -> False
-    GameEvent.Saddled _ -> False
-    GameEvent.Crewed _ -> False
-    GameEvent.PermanentSacrificed {} -> False
-    GameEvent.AbilityTriggered {} -> False
-    GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost {} -> False
-    GameEvent.LifeGained {} -> False
-    GameEvent.CountersPut {} -> False
-    GameEvent.CountersRemoved {} -> False
-    GameEvent.ControlChanged {} -> False
-    GameEvent.VentureMarkerEntered {} -> False
-    GameEvent.BecameTarget {} -> False
-    GameEvent.BecameAttached {} -> False
-    GameEvent.BecameUnattached {} -> False
-    GameEvent.LeftTheGame _ -> False
-    GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
-    GameEvent.LandPlayed {} -> False
-    GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted completer -> PlayerRelation.holds (Game.teams gs) relation you completer
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
-    GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
-    GameEvent.DieResultSettled _ -> False
-    GameEvent.RolledToVisit _ -> False
-    GameEvent.PlanarDieRolled _ -> False
-    GameEvent.SchemeSetInMotion _ -> False
-    GameEvent.ClassLevelSet _ -> False
-    GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
-    GameEvent.BecameAttacked _ -> False
-    GameEvent.AttackersDeclared _ -> False
-    GameEvent.BecameTapped _ -> False
-    GameEvent.BecameUntapped _ -> False
-    GameEvent.TappedForMana _ -> False
-    GameEvent.ManaAdded _ -> False
-    GameEvent.ManaAbilityResolved _ -> False
-    GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
-    GameEvent.StickerPut _ -> False
-    GameEvent.ActivatedAbilityResolved _ -> False
-    GameEvent.TriggeredAbilityResolved _ -> False
-    GameEvent.CardArrived _ -> False
   -- CR 603.9: a player lost the game. The relation reads the loser against CR
-  -- 109.5's "you", the ability's controller -- PlayerScries' shape. Game.teams
+  -- 109.5's "you", the ability's controller -- PlayerActs' shape. Game.teams
   -- is read off the settings (CR 800.2), so a loser who has already left is
   -- still judged against the team they played on.
   TriggerCondition.PlayerLosesGame relation -> case event of
@@ -11486,14 +9680,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame loser -> PlayerRelation.holds (Game.teams gs) relation you loser
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -11511,109 +9701,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
-    GameEvent.StickerPut _ -> False
-    GameEvent.ActivatedAbilityResolved _ -> False
-    GameEvent.TriggeredAbilityResolved _ -> False
-    GameEvent.CardArrived _ -> False
-  -- CR 701.25d, the arm above's twin and Matoya, Archon Elder's other branch.
-  -- A surveil that put nothing into a graveyard matches, which is what a
-  -- condition built on CR 701.25a's zone changes could not do.
-  TriggerCondition.PlayerSurveils relation -> case event of
-    GameEvent.Moved {} -> False
-    GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan {} -> False
-    GameEvent.SpellCast {} -> False
-    GameEvent.SpellCopied _ -> False
-    GameEvent.DamagePrevented {} -> False
-    GameEvent.BecameMonarch _ -> False
-    GameEvent.TookInitiative _ -> False
-    GameEvent.Discarded {} -> False
-    GameEvent.Drew {} -> False
-    GameEvent.Revealed {} -> False
-    GameEvent.AttackerDeclared {} -> False
-    GameEvent.BecameBlocking {} -> False
-    GameEvent.BlocksDeclared {} -> False
-    GameEvent.AttackerBlocked {} -> False
-    GameEvent.AttackerUnblocked _ -> False
-    GameEvent.SpellCountered _ -> False
-    GameEvent.AbilityCountered _ -> False
-    GameEvent.HalfUnlocked {} -> False
-    GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
-    GameEvent.Transformed {} -> False
-    GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
-    GameEvent.Mentored {} -> False
-    GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
-    GameEvent.BecameCrewed _ -> False
-    GameEvent.Convoked _ -> False
-    GameEvent.Saddled _ -> False
-    GameEvent.Crewed _ -> False
-    GameEvent.PermanentSacrificed {} -> False
-    GameEvent.AbilityTriggered {} -> False
-    GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost {} -> False
-    GameEvent.LifeGained {} -> False
-    GameEvent.CountersPut {} -> False
-    GameEvent.CountersRemoved {} -> False
-    GameEvent.ControlChanged {} -> False
-    GameEvent.VentureMarkerEntered {} -> False
-    GameEvent.BecameTarget {} -> False
-    GameEvent.BecameAttached {} -> False
-    GameEvent.BecameUnattached {} -> False
-    GameEvent.LeftTheGame _ -> False
-    GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
-    GameEvent.LandPlayed {} -> False
-    GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled surveiller -> PlayerRelation.holds (Game.teams gs) relation you surveiller
-    GameEvent.Proliferated _ -> False
-    GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
-    GameEvent.DieResultSettled _ -> False
-    GameEvent.RolledToVisit _ -> False
-    GameEvent.PlanarDieRolled _ -> False
-    GameEvent.SchemeSetInMotion _ -> False
-    GameEvent.ClassLevelSet _ -> False
-    GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
-    GameEvent.BecameAttacked _ -> False
-    GameEvent.AttackersDeclared _ -> False
-    GameEvent.BecameTapped _ -> False
-    GameEvent.BecameUntapped _ -> False
-    GameEvent.TappedForMana _ -> False
-    GameEvent.ManaAdded _ -> False
-    GameEvent.ManaAbilityResolved _ -> False
-    GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -11668,7 +9755,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed played ->
       PlayerRelation.holds (Game.teams gs) (PlaysLand.player p) you (LandPlayed.player played)
         && LandPlayed.from played == PlaysLand.from p
@@ -11677,11 +9764,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
         -- permanent Cast.playLand's follow moved the binding onto.
         && maybe False (\view -> Filter.matches bearerContext view (PlaysLand.filter p)) (postEventView board gs (LandPlayed.land played))
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -11699,108 +9782,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
-    GameEvent.StickerPut _ -> False
-    GameEvent.ActivatedAbilityResolved _ -> False
-    GameEvent.TriggeredAbilityResolved _ -> False
-    GameEvent.CardArrived _ -> False
-  -- CR 701.34a: "whenever you proliferate" (Scheming Aspirant). One match per
-  -- proliferate, including one that chose nothing.
-  TriggerCondition.PlayerProliferates relation -> case event of
-    GameEvent.Moved {} -> False
-    GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan {} -> False
-    GameEvent.SpellCast {} -> False
-    GameEvent.SpellCopied _ -> False
-    GameEvent.DamagePrevented {} -> False
-    GameEvent.BecameMonarch _ -> False
-    GameEvent.TookInitiative _ -> False
-    GameEvent.Discarded {} -> False
-    GameEvent.Drew {} -> False
-    GameEvent.Revealed {} -> False
-    GameEvent.AttackerDeclared {} -> False
-    GameEvent.BecameBlocking {} -> False
-    GameEvent.BlocksDeclared {} -> False
-    GameEvent.AttackerBlocked {} -> False
-    GameEvent.AttackerUnblocked _ -> False
-    GameEvent.SpellCountered _ -> False
-    GameEvent.AbilityCountered _ -> False
-    GameEvent.HalfUnlocked {} -> False
-    GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
-    GameEvent.Transformed {} -> False
-    GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
-    GameEvent.Mentored {} -> False
-    GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
-    GameEvent.BecameCrewed _ -> False
-    GameEvent.Convoked _ -> False
-    GameEvent.Saddled _ -> False
-    GameEvent.Crewed _ -> False
-    GameEvent.PermanentSacrificed {} -> False
-    GameEvent.AbilityTriggered {} -> False
-    GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost {} -> False
-    GameEvent.LifeGained {} -> False
-    GameEvent.CountersPut {} -> False
-    GameEvent.CountersRemoved {} -> False
-    GameEvent.ControlChanged {} -> False
-    GameEvent.VentureMarkerEntered {} -> False
-    GameEvent.BecameTarget {} -> False
-    GameEvent.BecameAttached {} -> False
-    GameEvent.BecameUnattached {} -> False
-    GameEvent.LeftTheGame _ -> False
-    GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
-    GameEvent.LandPlayed {} -> False
-    GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated proliferator -> PlayerRelation.holds (Game.teams gs) relation you proliferator
-    GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
-    GameEvent.DieResultSettled _ -> False
-    GameEvent.RolledToVisit _ -> False
-    GameEvent.PlanarDieRolled _ -> False
-    GameEvent.SchemeSetInMotion _ -> False
-    GameEvent.ClassLevelSet _ -> False
-    GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
-    GameEvent.BecameAttacked _ -> False
-    GameEvent.AttackersDeclared _ -> False
-    GameEvent.BecameTapped _ -> False
-    GameEvent.BecameUntapped _ -> False
-    GameEvent.TappedForMana _ -> False
-    GameEvent.ManaAdded _ -> False
-    GameEvent.ManaAbilityResolved _ -> False
-    GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -11855,14 +9836,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread ev -> PlayerRelation.holds (Game.teams gs) relation you (ManifestedDread.player ev)
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -11880,127 +9857,12 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
-    GameEvent.StickerPut _ -> False
-    GameEvent.ActivatedAbilityResolved _ -> False
-    GameEvent.TriggeredAbilityResolved _ -> False
-    GameEvent.CardArrived _ -> False
-  -- CR 706.1: this player rolled a die, the relation reading the roller against
-  -- CR 109.5's "you" as PlayerScries above does. Feywild Trickster is the You
-  -- form.
-  --
-  -- The EVENT alone. What the die SHOWED is deliberately not a bar here: CR
-  -- 706.7 has the planar die firing this very condition while every effect
-  -- reading a numerical result ignores it, so a condition gated on the result
-  -- would be the wrong shape rather than a stricter one. CR 901.9d is the same
-  -- rule stated of the planar die, which records a DiceRolled of its own.
-  --
-  -- CR 706.6's ignored roll is nothing this must skip, although Pixie Guide puts
-  -- one in the pool: GameEvent.DiceRolled is recorded once per INSTRUCTION, and
-  -- the instruction that had a roll ignored still rolled one or more dice. The
-  -- rule's "no abilities trigger because of the ignored roll" bars a condition
-  -- reading THAT roll, and this one reads none.
-  TriggerCondition.PlayerRollsDice relation -> case event of
-    GameEvent.Moved {} -> False
-    GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan {} -> False
-    GameEvent.SpellCast {} -> False
-    GameEvent.SpellCopied _ -> False
-    GameEvent.DamagePrevented {} -> False
-    GameEvent.BecameMonarch _ -> False
-    GameEvent.TookInitiative _ -> False
-    GameEvent.Discarded {} -> False
-    GameEvent.Drew {} -> False
-    GameEvent.Revealed {} -> False
-    GameEvent.AttackerDeclared {} -> False
-    GameEvent.BecameBlocking {} -> False
-    GameEvent.BlocksDeclared {} -> False
-    GameEvent.AttackerBlocked {} -> False
-    GameEvent.AttackerUnblocked _ -> False
-    GameEvent.SpellCountered _ -> False
-    GameEvent.AbilityCountered _ -> False
-    GameEvent.HalfUnlocked {} -> False
-    GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
-    GameEvent.Transformed {} -> False
-    GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
-    GameEvent.Mentored {} -> False
-    GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
-    GameEvent.BecameCrewed _ -> False
-    GameEvent.Convoked _ -> False
-    GameEvent.Saddled _ -> False
-    GameEvent.Crewed _ -> False
-    GameEvent.PermanentSacrificed {} -> False
-    GameEvent.AbilityTriggered {} -> False
-    GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost {} -> False
-    GameEvent.LifeGained {} -> False
-    GameEvent.CountersPut {} -> False
-    GameEvent.CountersRemoved {} -> False
-    GameEvent.ControlChanged {} -> False
-    GameEvent.VentureMarkerEntered {} -> False
-    GameEvent.BecameTarget {} -> False
-    GameEvent.BecameAttached {} -> False
-    GameEvent.BecameUnattached {} -> False
-    GameEvent.LeftTheGame _ -> False
-    GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
-    GameEvent.LandPlayed {} -> False
-    GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
-    GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled roller -> PlayerRelation.holds (Game.teams gs) relation you roller
-    GameEvent.DieResultSettled _ -> False
-    GameEvent.RolledToVisit _ -> False
-    GameEvent.PlanarDieRolled _ -> False
-    GameEvent.SchemeSetInMotion _ -> False
-    GameEvent.ClassLevelSet _ -> False
-    GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
-    GameEvent.BecameAttacked _ -> False
-    GameEvent.AttackersDeclared _ -> False
-    GameEvent.BecameTapped _ -> False
-    GameEvent.BecameUntapped _ -> False
-    GameEvent.TappedForMana _ -> False
-    GameEvent.ManaAdded _ -> False
-    GameEvent.ManaAbilityResolved _ -> False
-    GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 706.2: one die's RESULT, after every modifier, was the stated number,
-  -- the roller read against CR 109.5's "you" as PlayerRollsDice above does.
+  -- the roller read against CR 109.5's "you" as PlayerActs does.
   -- Per die rather than per instruction, since each die is its own roll.
   TriggerCondition.PlayerRollsResult watched -> case event of
     GameEvent.Moved {} -> False
@@ -12049,14 +9911,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled settled ->
       DieResult.result settled == DieResult.result watched
         && PlayerRelation.holds (Game.teams gs) (DieResult.roller watched) you (DieResult.roller settled)
@@ -12076,18 +9934,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -12143,14 +9989,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit rolled ->
       DieResult.roller rolled == you
@@ -12171,18 +10013,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -12236,14 +10066,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit {} -> False
     GameEvent.PlanarDieRolled rolled -> PlanarDieRolled.face rolled == PlanarDieFace.Chaos
@@ -12261,24 +10087,12 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 901.8 / 901.9c: the roller, read against CR 109.5's "you" as
-  -- PlayerRollsDice does, rolled the Planeswalker symbol.
+  -- PlayerActs does, rolled the Planeswalker symbol.
   TriggerCondition.PlayerRollsPlaneswalker relation -> case event of
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
@@ -12326,14 +10140,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit {} -> False
     GameEvent.PlanarDieRolled rolled -> PlanarDieRolled.face rolled == PlanarDieFace.Planeswalker && PlayerRelation.holds (Game.teams gs) relation you (PlanarDieRolled.roller rolled)
@@ -12351,18 +10161,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -12416,14 +10214,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit {} -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -12441,27 +10235,15 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 705.2: this player WON a coin flip, the relation reading the flipper
-  -- against CR 109.5's "you" as PlayerRollsDice above does. Tavern Scoundrel is
+  -- against CR 109.5's "you" as PlayerActs does. Tavern Scoundrel is
   -- the You form.
   --
-  -- The OUTCOME is a bar here, where the roll above deliberately has none: CR
+  -- The OUTCOME is a bar here, where PlayerAction.RollDice deliberately has none: CR
   -- 705.2 names the win itself, so a lost flip is a recorded event this must not
   -- match. CR 705.2's last sentence is why one seat answers -- "no other players
   -- are involved" -- so the losing side of a won flip is nobody.
@@ -12512,14 +10294,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -12539,18 +10317,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     -- A flip with NO outcome (CR 705.2's first sentence) is not a won one, so
     -- Nothing answers False exactly as Just False does.
     GameEvent.CoinFlipped flipped -> CoinFlipped.won flipped == Just True && PlayerRelation.holds (Game.teams gs) relation you (CoinFlipped.flipper flipped)
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -12608,14 +10374,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -12636,18 +10398,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     -- either: Nothing is the flip nobody called, where Just False is the call that
     -- missed.
     GameEvent.CoinFlipped flipped -> CoinFlipped.won flipped == Just False && PlayerRelation.holds (Game.teams gs) relation you (CoinFlipped.flipper flipped)
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -12704,14 +10454,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -12729,18 +10475,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -12804,14 +10538,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -12831,18 +10561,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -12902,14 +10620,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -12929,18 +10643,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -12997,14 +10699,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -13022,18 +10720,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -13106,14 +10792,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -13131,18 +10813,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -13214,14 +10884,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -13239,18 +10905,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -13317,14 +10971,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
            )
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -13342,1033 +10992,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
-    GameEvent.StickerPut _ -> False
-    GameEvent.ActivatedAbilityResolved _ -> False
-    GameEvent.TriggeredAbilityResolved _ -> False
-    GameEvent.CardArrived _ -> False
-  -- CR 701.68d: this player blighted. The relation reads the blighting
-  -- player against CR 109.5's "you", the ability's controller (CR 603.3a) --
-  -- RingTemptsPlayer's shape above, and Synthetic Blight Chronicler is the
-  -- AnyPlayer form.
-  --
-  -- The EVENT and nothing else: rule 701.68d says the trigger fires once rule
-  -- 701.68a's process is complete "regardless of what events actually
-  -- occurred", so a blight that put no counters matches this and the
-  -- GameEvent.CountersPut arm above cannot stand in for it.
-  TriggerCondition.PlayerBlights relation -> case event of
-    GameEvent.Moved {} -> False
-    GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan {} -> False
-    GameEvent.SpellCast {} -> False
-    GameEvent.SpellCopied _ -> False
-    GameEvent.DamagePrevented {} -> False
-    GameEvent.BecameMonarch _ -> False
-    GameEvent.TookInitiative _ -> False
-    GameEvent.Discarded {} -> False
-    GameEvent.Drew {} -> False
-    GameEvent.Revealed {} -> False
-    GameEvent.AttackerDeclared {} -> False
-    GameEvent.BecameBlocking {} -> False
-    GameEvent.BlocksDeclared {} -> False
-    GameEvent.AttackerBlocked {} -> False
-    GameEvent.AttackerUnblocked _ -> False
-    GameEvent.SpellCountered _ -> False
-    GameEvent.AbilityCountered _ -> False
-    GameEvent.HalfUnlocked {} -> False
-    GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
-    GameEvent.Transformed {} -> False
-    GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
-    GameEvent.Mentored {} -> False
-    GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
-    GameEvent.BecameCrewed _ -> False
-    GameEvent.Convoked _ -> False
-    GameEvent.Saddled _ -> False
-    GameEvent.Crewed _ -> False
-    GameEvent.PermanentSacrificed {} -> False
-    GameEvent.AbilityTriggered {} -> False
-    GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost {} -> False
-    GameEvent.LifeGained {} -> False
-    GameEvent.CountersPut {} -> False
-    GameEvent.CountersRemoved {} -> False
-    GameEvent.ControlChanged {} -> False
-    GameEvent.VentureMarkerEntered {} -> False
-    GameEvent.BecameTarget {} -> False
-    GameEvent.BecameAttached {} -> False
-    GameEvent.BecameUnattached {} -> False
-    GameEvent.LeftTheGame _ -> False
-    GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
-    GameEvent.LandPlayed {} -> False
-    GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
-    GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
-    GameEvent.DieResultSettled _ -> False
-    GameEvent.RolledToVisit _ -> False
-    GameEvent.PlanarDieRolled _ -> False
-    GameEvent.SchemeSetInMotion _ -> False
-    GameEvent.ClassLevelSet _ -> False
-    GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
-    GameEvent.BecameAttacked _ -> False
-    GameEvent.AttackersDeclared _ -> False
-    GameEvent.BecameTapped _ -> False
-    GameEvent.BecameUntapped _ -> False
-    GameEvent.TappedForMana _ -> False
-    GameEvent.ManaAdded _ -> False
-    GameEvent.ManaAbilityResolved _ -> False
-    GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted blighter -> PlayerRelation.holds (Game.teams gs) relation you blighter
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
-    GameEvent.StickerPut _ -> False
-    GameEvent.ActivatedAbilityResolved _ -> False
-    GameEvent.TriggeredAbilityResolved _ -> False
-    GameEvent.CardArrived _ -> False
-  -- CR 701.61a: this player foraged. The relation reads the foraging player
-  -- against CR 109.5's "you", the ability's controller (CR 603.3a) --
-  -- PlayerBlights' shape above, and Corpseberry Cultivator is the You form.
-  --
-  -- The EVENT and nothing else, which is what makes rule 701.61a's two halves
-  -- one condition: a forage that exiled three cards and one that sacrificed a
-  -- Food both match here, where the GameEvent.Moved arms above see only the
-  -- first and CR 701.21a's sacrifice only the second.
-  TriggerCondition.PlayerForages relation -> case event of
-    GameEvent.Moved {} -> False
-    GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan {} -> False
-    GameEvent.SpellCast {} -> False
-    GameEvent.SpellCopied _ -> False
-    GameEvent.DamagePrevented {} -> False
-    GameEvent.BecameMonarch _ -> False
-    GameEvent.TookInitiative _ -> False
-    GameEvent.Discarded {} -> False
-    GameEvent.Drew {} -> False
-    GameEvent.Revealed {} -> False
-    GameEvent.AttackerDeclared {} -> False
-    GameEvent.BecameBlocking {} -> False
-    GameEvent.BlocksDeclared {} -> False
-    GameEvent.AttackerBlocked {} -> False
-    GameEvent.AttackerUnblocked _ -> False
-    GameEvent.SpellCountered _ -> False
-    GameEvent.AbilityCountered _ -> False
-    GameEvent.HalfUnlocked {} -> False
-    GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
-    GameEvent.Transformed {} -> False
-    GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
-    GameEvent.Mentored {} -> False
-    GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
-    GameEvent.BecameCrewed _ -> False
-    GameEvent.Convoked _ -> False
-    GameEvent.Saddled _ -> False
-    GameEvent.Crewed _ -> False
-    GameEvent.PermanentSacrificed {} -> False
-    GameEvent.AbilityTriggered {} -> False
-    GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost {} -> False
-    GameEvent.LifeGained {} -> False
-    GameEvent.CountersPut {} -> False
-    GameEvent.CountersRemoved {} -> False
-    GameEvent.ControlChanged {} -> False
-    GameEvent.VentureMarkerEntered {} -> False
-    GameEvent.BecameTarget {} -> False
-    GameEvent.BecameAttached {} -> False
-    GameEvent.BecameUnattached {} -> False
-    GameEvent.LeftTheGame _ -> False
-    GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
-    GameEvent.LandPlayed {} -> False
-    GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
-    GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
-    GameEvent.DieResultSettled _ -> False
-    GameEvent.RolledToVisit _ -> False
-    GameEvent.PlanarDieRolled _ -> False
-    GameEvent.SchemeSetInMotion _ -> False
-    GameEvent.ClassLevelSet _ -> False
-    GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
-    GameEvent.BecameAttacked _ -> False
-    GameEvent.AttackersDeclared _ -> False
-    GameEvent.BecameTapped _ -> False
-    GameEvent.BecameUntapped _ -> False
-    GameEvent.TappedForMana _ -> False
-    GameEvent.ManaAdded _ -> False
-    GameEvent.ManaAbilityResolved _ -> False
-    GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged forager -> PlayerRelation.holds (Game.teams gs) relation you forager
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
-    GameEvent.StickerPut _ -> False
-    GameEvent.ActivatedAbilityResolved _ -> False
-    GameEvent.TriggeredAbilityResolved _ -> False
-    GameEvent.CardArrived _ -> False
-  -- CR 702.143c: this player foretold a card, read against CR 109.5's "you",
-  -- PlayerForages' shape above. The event is the special action's alone, so a
-  -- card CR 702.143d's effect made foretold does not reach it.
-  TriggerCondition.PlayerForetells relation -> case event of
-    GameEvent.Moved {} -> False
-    GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan {} -> False
-    GameEvent.SpellCast {} -> False
-    GameEvent.SpellCopied _ -> False
-    GameEvent.DamagePrevented {} -> False
-    GameEvent.BecameMonarch _ -> False
-    GameEvent.TookInitiative _ -> False
-    GameEvent.Discarded {} -> False
-    GameEvent.Drew {} -> False
-    GameEvent.Revealed {} -> False
-    GameEvent.AttackerDeclared {} -> False
-    GameEvent.BecameBlocking {} -> False
-    GameEvent.BlocksDeclared {} -> False
-    GameEvent.AttackerBlocked {} -> False
-    GameEvent.AttackerUnblocked _ -> False
-    GameEvent.SpellCountered _ -> False
-    GameEvent.AbilityCountered _ -> False
-    GameEvent.HalfUnlocked {} -> False
-    GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
-    GameEvent.Transformed {} -> False
-    GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
-    GameEvent.Mentored {} -> False
-    GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
-    GameEvent.BecameCrewed _ -> False
-    GameEvent.Convoked _ -> False
-    GameEvent.Saddled _ -> False
-    GameEvent.Crewed _ -> False
-    GameEvent.PermanentSacrificed {} -> False
-    GameEvent.AbilityTriggered {} -> False
-    GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost {} -> False
-    GameEvent.LifeGained {} -> False
-    GameEvent.CountersPut {} -> False
-    GameEvent.CountersRemoved {} -> False
-    GameEvent.ControlChanged {} -> False
-    GameEvent.VentureMarkerEntered {} -> False
-    GameEvent.BecameTarget {} -> False
-    GameEvent.BecameAttached {} -> False
-    GameEvent.BecameUnattached {} -> False
-    GameEvent.LeftTheGame _ -> False
-    GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
-    GameEvent.LandPlayed {} -> False
-    GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
-    GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
-    GameEvent.DieResultSettled _ -> False
-    GameEvent.RolledToVisit _ -> False
-    GameEvent.PlanarDieRolled _ -> False
-    GameEvent.SchemeSetInMotion _ -> False
-    GameEvent.ClassLevelSet _ -> False
-    GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
-    GameEvent.BecameAttacked _ -> False
-    GameEvent.AttackersDeclared _ -> False
-    GameEvent.BecameTapped _ -> False
-    GameEvent.BecameUntapped _ -> False
-    GameEvent.TappedForMana _ -> False
-    GameEvent.ManaAdded _ -> False
-    GameEvent.ManaAbilityResolved _ -> False
-    GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold foreteller -> PlayerRelation.holds (Game.teams gs) relation you foreteller
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
-    GameEvent.StickerPut _ -> False
-    GameEvent.ActivatedAbilityResolved _ -> False
-    GameEvent.TriggeredAbilityResolved _ -> False
-    GameEvent.CardArrived _ -> False
-  -- CR 701.59a: this player collected evidence, read against CR 109.5's "you",
-  -- PlayerForetells' shape above.
-  TriggerCondition.PlayerCollectsEvidence relation -> case event of
-    GameEvent.Moved {} -> False
-    GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan {} -> False
-    GameEvent.SpellCast {} -> False
-    GameEvent.SpellCopied _ -> False
-    GameEvent.DamagePrevented {} -> False
-    GameEvent.BecameMonarch _ -> False
-    GameEvent.TookInitiative _ -> False
-    GameEvent.Discarded {} -> False
-    GameEvent.Drew {} -> False
-    GameEvent.Revealed {} -> False
-    GameEvent.AttackerDeclared {} -> False
-    GameEvent.BecameBlocking {} -> False
-    GameEvent.BlocksDeclared {} -> False
-    GameEvent.AttackerBlocked {} -> False
-    GameEvent.AttackerUnblocked _ -> False
-    GameEvent.SpellCountered _ -> False
-    GameEvent.AbilityCountered _ -> False
-    GameEvent.HalfUnlocked {} -> False
-    GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
-    GameEvent.Transformed {} -> False
-    GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
-    GameEvent.Mentored {} -> False
-    GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
-    GameEvent.BecameCrewed _ -> False
-    GameEvent.Convoked _ -> False
-    GameEvent.Saddled _ -> False
-    GameEvent.Crewed _ -> False
-    GameEvent.PermanentSacrificed {} -> False
-    GameEvent.AbilityTriggered {} -> False
-    GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost {} -> False
-    GameEvent.LifeGained {} -> False
-    GameEvent.CountersPut {} -> False
-    GameEvent.CountersRemoved {} -> False
-    GameEvent.ControlChanged {} -> False
-    GameEvent.VentureMarkerEntered {} -> False
-    GameEvent.BecameTarget {} -> False
-    GameEvent.BecameAttached {} -> False
-    GameEvent.BecameUnattached {} -> False
-    GameEvent.LeftTheGame _ -> False
-    GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
-    GameEvent.LandPlayed {} -> False
-    GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
-    GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
-    GameEvent.DieResultSettled _ -> False
-    GameEvent.RolledToVisit _ -> False
-    GameEvent.PlanarDieRolled _ -> False
-    GameEvent.SchemeSetInMotion _ -> False
-    GameEvent.ClassLevelSet _ -> False
-    GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
-    GameEvent.BecameAttacked _ -> False
-    GameEvent.AttackersDeclared _ -> False
-    GameEvent.BecameTapped _ -> False
-    GameEvent.BecameUntapped _ -> False
-    GameEvent.TappedForMana _ -> False
-    GameEvent.ManaAdded _ -> False
-    GameEvent.ManaAbilityResolved _ -> False
-    GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence collector -> PlayerRelation.holds (Game.teams gs) relation you collector
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
-    GameEvent.StickerPut _ -> False
-    GameEvent.ActivatedAbilityResolved _ -> False
-    GameEvent.TriggeredAbilityResolved _ -> False
-    GameEvent.CardArrived _ -> False
-  -- CR 702.174c: this player gave a gift, read against CR 109.5's "you",
-  -- PlayerForetells' shape above.
-  TriggerCondition.PlayerGivesGift relation -> case event of
-    GameEvent.Moved {} -> False
-    GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan {} -> False
-    GameEvent.SpellCast {} -> False
-    GameEvent.SpellCopied _ -> False
-    GameEvent.DamagePrevented {} -> False
-    GameEvent.BecameMonarch _ -> False
-    GameEvent.TookInitiative _ -> False
-    GameEvent.Discarded {} -> False
-    GameEvent.Drew {} -> False
-    GameEvent.Revealed {} -> False
-    GameEvent.AttackerDeclared {} -> False
-    GameEvent.BecameBlocking {} -> False
-    GameEvent.BlocksDeclared {} -> False
-    GameEvent.AttackerBlocked {} -> False
-    GameEvent.AttackerUnblocked _ -> False
-    GameEvent.SpellCountered _ -> False
-    GameEvent.AbilityCountered _ -> False
-    GameEvent.HalfUnlocked {} -> False
-    GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
-    GameEvent.Transformed {} -> False
-    GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
-    GameEvent.Mentored {} -> False
-    GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
-    GameEvent.BecameCrewed _ -> False
-    GameEvent.Convoked _ -> False
-    GameEvent.Saddled _ -> False
-    GameEvent.Crewed _ -> False
-    GameEvent.PermanentSacrificed {} -> False
-    GameEvent.AbilityTriggered {} -> False
-    GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost {} -> False
-    GameEvent.LifeGained {} -> False
-    GameEvent.CountersPut {} -> False
-    GameEvent.CountersRemoved {} -> False
-    GameEvent.ControlChanged {} -> False
-    GameEvent.VentureMarkerEntered {} -> False
-    GameEvent.BecameTarget {} -> False
-    GameEvent.BecameAttached {} -> False
-    GameEvent.BecameUnattached {} -> False
-    GameEvent.LeftTheGame _ -> False
-    GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
-    GameEvent.LandPlayed {} -> False
-    GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
-    GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
-    GameEvent.DieResultSettled _ -> False
-    GameEvent.RolledToVisit _ -> False
-    GameEvent.PlanarDieRolled _ -> False
-    GameEvent.SchemeSetInMotion _ -> False
-    GameEvent.ClassLevelSet _ -> False
-    GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
-    GameEvent.BecameAttacked _ -> False
-    GameEvent.AttackersDeclared _ -> False
-    GameEvent.BecameTapped _ -> False
-    GameEvent.BecameUntapped _ -> False
-    GameEvent.TappedForMana _ -> False
-    GameEvent.ManaAdded _ -> False
-    GameEvent.ManaAbilityResolved _ -> False
-    GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift giver -> PlayerRelation.holds (Game.teams gs) relation you giver
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
-    GameEvent.StickerPut _ -> False
-    GameEvent.ActivatedAbilityResolved _ -> False
-    GameEvent.TriggeredAbilityResolved _ -> False
-    GameEvent.CardArrived _ -> False
-  -- CR 701.51c: this player opened an Attraction. The relation reads the
-  -- opener against CR 109.5's "you", PlayerForages' shape above.
-  TriggerCondition.PlayerOpensAttraction relation -> case event of
-    GameEvent.Moved {} -> False
-    GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan {} -> False
-    GameEvent.SpellCast {} -> False
-    GameEvent.SpellCopied _ -> False
-    GameEvent.DamagePrevented {} -> False
-    GameEvent.BecameMonarch _ -> False
-    GameEvent.TookInitiative _ -> False
-    GameEvent.Discarded {} -> False
-    GameEvent.Drew {} -> False
-    GameEvent.Revealed {} -> False
-    GameEvent.AttackerDeclared {} -> False
-    GameEvent.BecameBlocking {} -> False
-    GameEvent.BlocksDeclared {} -> False
-    GameEvent.AttackerBlocked {} -> False
-    GameEvent.AttackerUnblocked _ -> False
-    GameEvent.SpellCountered _ -> False
-    GameEvent.AbilityCountered _ -> False
-    GameEvent.HalfUnlocked {} -> False
-    GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
-    GameEvent.Transformed {} -> False
-    GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
-    GameEvent.Mentored {} -> False
-    GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
-    GameEvent.BecameCrewed _ -> False
-    GameEvent.Convoked _ -> False
-    GameEvent.Saddled _ -> False
-    GameEvent.Crewed _ -> False
-    GameEvent.PermanentSacrificed {} -> False
-    GameEvent.AbilityTriggered {} -> False
-    GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost {} -> False
-    GameEvent.LifeGained {} -> False
-    GameEvent.CountersPut {} -> False
-    GameEvent.CountersRemoved {} -> False
-    GameEvent.ControlChanged {} -> False
-    GameEvent.VentureMarkerEntered {} -> False
-    GameEvent.BecameTarget {} -> False
-    GameEvent.BecameAttached {} -> False
-    GameEvent.BecameUnattached {} -> False
-    GameEvent.LeftTheGame _ -> False
-    GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
-    GameEvent.LandPlayed {} -> False
-    GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
-    GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
-    GameEvent.DieResultSettled _ -> False
-    GameEvent.RolledToVisit _ -> False
-    GameEvent.PlanarDieRolled _ -> False
-    GameEvent.SchemeSetInMotion _ -> False
-    GameEvent.ClassLevelSet _ -> False
-    GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
-    GameEvent.BecameAttacked _ -> False
-    GameEvent.AttackersDeclared _ -> False
-    GameEvent.BecameTapped _ -> False
-    GameEvent.BecameUntapped _ -> False
-    GameEvent.TappedForMana _ -> False
-    GameEvent.ManaAdded _ -> False
-    GameEvent.ManaAbilityResolved _ -> False
-    GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened opener -> PlayerRelation.holds (Game.teams gs) relation you opener
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
-    GameEvent.StickerPut _ -> False
-    GameEvent.ActivatedAbilityResolved _ -> False
-    GameEvent.TriggeredAbilityResolved _ -> False
-    GameEvent.CardArrived _ -> False
-  -- CR 702.159b: this player claimed an Attraction's prize, PlayerForages'
-  -- shape above.
-  TriggerCondition.PlayerClaimsPrize relation -> case event of
-    GameEvent.Moved {} -> False
-    GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan {} -> False
-    GameEvent.SpellCast {} -> False
-    GameEvent.SpellCopied _ -> False
-    GameEvent.DamagePrevented {} -> False
-    GameEvent.BecameMonarch _ -> False
-    GameEvent.TookInitiative _ -> False
-    GameEvent.Discarded {} -> False
-    GameEvent.Drew {} -> False
-    GameEvent.Revealed {} -> False
-    GameEvent.AttackerDeclared {} -> False
-    GameEvent.BecameBlocking {} -> False
-    GameEvent.BlocksDeclared {} -> False
-    GameEvent.AttackerBlocked {} -> False
-    GameEvent.AttackerUnblocked _ -> False
-    GameEvent.SpellCountered _ -> False
-    GameEvent.AbilityCountered _ -> False
-    GameEvent.HalfUnlocked {} -> False
-    GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
-    GameEvent.Transformed {} -> False
-    GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
-    GameEvent.Mentored {} -> False
-    GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
-    GameEvent.BecameCrewed _ -> False
-    GameEvent.Convoked _ -> False
-    GameEvent.Saddled _ -> False
-    GameEvent.Crewed _ -> False
-    GameEvent.PermanentSacrificed {} -> False
-    GameEvent.AbilityTriggered {} -> False
-    GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost {} -> False
-    GameEvent.LifeGained {} -> False
-    GameEvent.CountersPut {} -> False
-    GameEvent.CountersRemoved {} -> False
-    GameEvent.ControlChanged {} -> False
-    GameEvent.VentureMarkerEntered {} -> False
-    GameEvent.BecameTarget {} -> False
-    GameEvent.BecameAttached {} -> False
-    GameEvent.BecameUnattached {} -> False
-    GameEvent.LeftTheGame _ -> False
-    GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
-    GameEvent.LandPlayed {} -> False
-    GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
-    GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
-    GameEvent.DieResultSettled _ -> False
-    GameEvent.RolledToVisit _ -> False
-    GameEvent.PlanarDieRolled _ -> False
-    GameEvent.SchemeSetInMotion _ -> False
-    GameEvent.ClassLevelSet _ -> False
-    GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
-    GameEvent.BecameAttacked _ -> False
-    GameEvent.AttackersDeclared _ -> False
-    GameEvent.BecameTapped _ -> False
-    GameEvent.BecameUntapped _ -> False
-    GameEvent.TappedForMana _ -> False
-    GameEvent.ManaAdded _ -> False
-    GameEvent.ManaAbilityResolved _ -> False
-    GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed claimant -> PlayerRelation.holds (Game.teams gs) relation you claimant
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
-    GameEvent.StickerPut _ -> False
-    GameEvent.ActivatedAbilityResolved _ -> False
-    GameEvent.TriggeredAbilityResolved _ -> False
-    GameEvent.CardArrived _ -> False
-  -- CR 701.66b: this player earthbent. The relation reads the earthbending
-  -- player against CR 109.5's "you", the ability's controller (CR 603.3a) --
-  -- PlayerBlights' shape above.
-  --
-  -- The EVENT and nothing else, which is what puts the moment where rule
-  -- 701.66b puts it: GameEvent.Earthbent is written as rule 701.66a's delayed
-  -- triggered ability is created, so the GameEvent.Moved and GameEvent.Drew
-  -- arms above -- and the delayed ability's own return, which arrives as a
-  -- GameEvent.Moved much later -- cannot stand in for it.
-  TriggerCondition.PlayerEarthbends relation -> case event of
-    GameEvent.Moved {} -> False
-    GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan {} -> False
-    GameEvent.SpellCast {} -> False
-    GameEvent.SpellCopied _ -> False
-    GameEvent.DamagePrevented {} -> False
-    GameEvent.BecameMonarch _ -> False
-    GameEvent.TookInitiative _ -> False
-    GameEvent.Discarded {} -> False
-    GameEvent.Drew {} -> False
-    GameEvent.Revealed {} -> False
-    GameEvent.AttackerDeclared {} -> False
-    GameEvent.BecameBlocking {} -> False
-    GameEvent.BlocksDeclared {} -> False
-    GameEvent.AttackerBlocked {} -> False
-    GameEvent.AttackerUnblocked _ -> False
-    GameEvent.SpellCountered _ -> False
-    GameEvent.AbilityCountered _ -> False
-    GameEvent.HalfUnlocked {} -> False
-    GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
-    GameEvent.Transformed {} -> False
-    GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
-    GameEvent.Mentored {} -> False
-    GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
-    GameEvent.BecameCrewed _ -> False
-    GameEvent.Convoked _ -> False
-    GameEvent.Saddled _ -> False
-    GameEvent.Crewed _ -> False
-    GameEvent.PermanentSacrificed {} -> False
-    GameEvent.AbilityTriggered {} -> False
-    GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost {} -> False
-    GameEvent.LifeGained {} -> False
-    GameEvent.CountersPut {} -> False
-    GameEvent.CountersRemoved {} -> False
-    GameEvent.ControlChanged {} -> False
-    GameEvent.VentureMarkerEntered {} -> False
-    GameEvent.BecameTarget {} -> False
-    GameEvent.BecameAttached {} -> False
-    GameEvent.BecameUnattached {} -> False
-    GameEvent.LeftTheGame _ -> False
-    GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
-    GameEvent.LandPlayed {} -> False
-    GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
-    GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
-    GameEvent.DieResultSettled _ -> False
-    GameEvent.RolledToVisit _ -> False
-    GameEvent.PlanarDieRolled _ -> False
-    GameEvent.SchemeSetInMotion _ -> False
-    GameEvent.ClassLevelSet _ -> False
-    GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
-    GameEvent.BecameAttacked _ -> False
-    GameEvent.AttackersDeclared _ -> False
-    GameEvent.BecameTapped _ -> False
-    GameEvent.BecameUntapped _ -> False
-    GameEvent.TappedForMana _ -> False
-    GameEvent.ManaAdded _ -> False
-    GameEvent.ManaAbilityResolved _ -> False
-    GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent bender -> PlayerRelation.holds (Game.teams gs) relation you bender
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
-    GameEvent.StickerPut _ -> False
-    GameEvent.ActivatedAbilityResolved _ -> False
-    GameEvent.TriggeredAbilityResolved _ -> False
-    GameEvent.CardArrived _ -> False
-  -- CR 701.67c: this player paid a waterbend cost. The relation reads the
-  -- paying player against CR 109.5's "you", PlayerEarthbends' shape above.
-  --
-  -- The EVENT and nothing else, which is rule 701.67c's "regardless of how
-  -- they paid that cost": the GameEvent.BecameTapped arm above cannot stand in
-  -- for it either way, since a cost paid in mana taps lands for it and rule
-  -- 701.67a's substitution taps creatures and artifacts that pay nothing.
-  TriggerCondition.PlayerWaterbends relation -> case event of
-    GameEvent.Moved {} -> False
-    GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan {} -> False
-    GameEvent.SpellCast {} -> False
-    GameEvent.SpellCopied _ -> False
-    GameEvent.DamagePrevented {} -> False
-    GameEvent.BecameMonarch _ -> False
-    GameEvent.TookInitiative _ -> False
-    GameEvent.Discarded {} -> False
-    GameEvent.Drew {} -> False
-    GameEvent.Revealed {} -> False
-    GameEvent.AttackerDeclared {} -> False
-    GameEvent.BecameBlocking {} -> False
-    GameEvent.BlocksDeclared {} -> False
-    GameEvent.AttackerBlocked {} -> False
-    GameEvent.AttackerUnblocked _ -> False
-    GameEvent.SpellCountered _ -> False
-    GameEvent.AbilityCountered _ -> False
-    GameEvent.HalfUnlocked {} -> False
-    GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
-    GameEvent.Transformed {} -> False
-    GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
-    GameEvent.Mentored {} -> False
-    GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
-    GameEvent.BecameCrewed _ -> False
-    GameEvent.Convoked _ -> False
-    GameEvent.Saddled _ -> False
-    GameEvent.Crewed _ -> False
-    GameEvent.PermanentSacrificed {} -> False
-    GameEvent.AbilityTriggered {} -> False
-    GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost {} -> False
-    GameEvent.LifeGained {} -> False
-    GameEvent.CountersPut {} -> False
-    GameEvent.CountersRemoved {} -> False
-    GameEvent.ControlChanged {} -> False
-    GameEvent.VentureMarkerEntered {} -> False
-    GameEvent.BecameTarget {} -> False
-    GameEvent.BecameAttached {} -> False
-    GameEvent.BecameUnattached {} -> False
-    GameEvent.LeftTheGame _ -> False
-    GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
-    GameEvent.LandPlayed {} -> False
-    GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
-    GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
-    GameEvent.DieResultSettled _ -> False
-    GameEvent.RolledToVisit _ -> False
-    GameEvent.PlanarDieRolled _ -> False
-    GameEvent.SchemeSetInMotion _ -> False
-    GameEvent.ClassLevelSet _ -> False
-    GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
-    GameEvent.BecameAttacked _ -> False
-    GameEvent.AttackersDeclared _ -> False
-    GameEvent.BecameTapped _ -> False
-    GameEvent.BecameUntapped _ -> False
-    GameEvent.TappedForMana _ -> False
-    GameEvent.ManaAdded _ -> False
-    GameEvent.ManaAbilityResolved _ -> False
-    GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent bender -> PlayerRelation.holds (Game.teams gs) relation you bender
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
-    GameEvent.StickerPut _ -> False
-    GameEvent.ActivatedAbilityResolved _ -> False
-    GameEvent.TriggeredAbilityResolved _ -> False
-    GameEvent.CardArrived _ -> False
-  -- CR 701.65b: this player airbent, PlayerWaterbends' shape above.
-  TriggerCondition.PlayerAirbends relation -> case event of
-    GameEvent.Moved {} -> False
-    GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan {} -> False
-    GameEvent.SpellCast {} -> False
-    GameEvent.SpellCopied _ -> False
-    GameEvent.DamagePrevented {} -> False
-    GameEvent.BecameMonarch _ -> False
-    GameEvent.TookInitiative _ -> False
-    GameEvent.Discarded {} -> False
-    GameEvent.Drew {} -> False
-    GameEvent.Revealed {} -> False
-    GameEvent.AttackerDeclared {} -> False
-    GameEvent.BecameBlocking {} -> False
-    GameEvent.BlocksDeclared {} -> False
-    GameEvent.AttackerBlocked {} -> False
-    GameEvent.AttackerUnblocked _ -> False
-    GameEvent.SpellCountered _ -> False
-    GameEvent.AbilityCountered _ -> False
-    GameEvent.HalfUnlocked {} -> False
-    GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
-    GameEvent.Transformed {} -> False
-    GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
-    GameEvent.Mentored {} -> False
-    GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
-    GameEvent.BecameCrewed _ -> False
-    GameEvent.Convoked _ -> False
-    GameEvent.Saddled _ -> False
-    GameEvent.Crewed _ -> False
-    GameEvent.PermanentSacrificed {} -> False
-    GameEvent.AbilityTriggered {} -> False
-    GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost {} -> False
-    GameEvent.LifeGained {} -> False
-    GameEvent.CountersPut {} -> False
-    GameEvent.CountersRemoved {} -> False
-    GameEvent.ControlChanged {} -> False
-    GameEvent.VentureMarkerEntered {} -> False
-    GameEvent.BecameTarget {} -> False
-    GameEvent.BecameAttached {} -> False
-    GameEvent.BecameUnattached {} -> False
-    GameEvent.LeftTheGame _ -> False
-    GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
-    GameEvent.LandPlayed {} -> False
-    GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
-    GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
-    GameEvent.DieResultSettled _ -> False
-    GameEvent.RolledToVisit _ -> False
-    GameEvent.PlanarDieRolled _ -> False
-    GameEvent.SchemeSetInMotion _ -> False
-    GameEvent.ClassLevelSet _ -> False
-    GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
-    GameEvent.BecameAttacked _ -> False
-    GameEvent.AttackersDeclared _ -> False
-    GameEvent.BecameTapped _ -> False
-    GameEvent.BecameUntapped _ -> False
-    GameEvent.TappedForMana _ -> False
-    GameEvent.ManaAdded _ -> False
-    GameEvent.ManaAbilityResolved _ -> False
-    GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent bender -> PlayerRelation.holds (Game.teams gs) relation you bender
-    GameEvent.Firebent _ -> False
-    GameEvent.StickerPut _ -> False
-    GameEvent.ActivatedAbilityResolved _ -> False
-    GameEvent.TriggeredAbilityResolved _ -> False
-    GameEvent.CardArrived _ -> False
-  -- CR 702.189b: a firebending ability this player controls resolved,
-  -- PlayerWaterbends' shape above.
-  TriggerCondition.PlayerFirebends relation -> case event of
-    GameEvent.Moved {} -> False
-    GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan {} -> False
-    GameEvent.SpellCast {} -> False
-    GameEvent.SpellCopied _ -> False
-    GameEvent.DamagePrevented {} -> False
-    GameEvent.BecameMonarch _ -> False
-    GameEvent.TookInitiative _ -> False
-    GameEvent.Discarded {} -> False
-    GameEvent.Drew {} -> False
-    GameEvent.Revealed {} -> False
-    GameEvent.AttackerDeclared {} -> False
-    GameEvent.BecameBlocking {} -> False
-    GameEvent.BlocksDeclared {} -> False
-    GameEvent.AttackerBlocked {} -> False
-    GameEvent.AttackerUnblocked _ -> False
-    GameEvent.SpellCountered _ -> False
-    GameEvent.AbilityCountered _ -> False
-    GameEvent.HalfUnlocked {} -> False
-    GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
-    GameEvent.Transformed {} -> False
-    GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
-    GameEvent.Mentored {} -> False
-    GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
-    GameEvent.BecameCrewed _ -> False
-    GameEvent.Convoked _ -> False
-    GameEvent.Saddled _ -> False
-    GameEvent.Crewed _ -> False
-    GameEvent.PermanentSacrificed {} -> False
-    GameEvent.AbilityTriggered {} -> False
-    GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost {} -> False
-    GameEvent.LifeGained {} -> False
-    GameEvent.CountersPut {} -> False
-    GameEvent.CountersRemoved {} -> False
-    GameEvent.ControlChanged {} -> False
-    GameEvent.VentureMarkerEntered {} -> False
-    GameEvent.BecameTarget {} -> False
-    GameEvent.BecameAttached {} -> False
-    GameEvent.BecameUnattached {} -> False
-    GameEvent.LeftTheGame _ -> False
-    GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
-    GameEvent.LandPlayed {} -> False
-    GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
-    GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
-    GameEvent.DieResultSettled _ -> False
-    GameEvent.RolledToVisit _ -> False
-    GameEvent.PlanarDieRolled _ -> False
-    GameEvent.SchemeSetInMotion _ -> False
-    GameEvent.ClassLevelSet _ -> False
-    GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
-    GameEvent.BecameAttacked _ -> False
-    GameEvent.AttackersDeclared _ -> False
-    GameEvent.BecameTapped _ -> False
-    GameEvent.BecameUntapped _ -> False
-    GameEvent.TappedForMana _ -> False
-    GameEvent.ManaAdded _ -> False
-    GameEvent.ManaAbilityResolved _ -> False
-    GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent bender -> PlayerRelation.holds (Game.teams gs) relation you bender
     GameEvent.StickerPut _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
@@ -14422,14 +11045,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
+    GameEvent.PlayerActed _ -> False
     GameEvent.LandPlayed {} -> False
     GameEvent.LostTheGame _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Proliferated _ -> False
     GameEvent.ManifestedDread {} -> False
-    GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
     GameEvent.PlanarDieRolled _ -> False
@@ -14447,18 +11066,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False
     GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.Foretold _ -> False
-    GameEvent.CollectedEvidence _ -> False
-    GameEvent.GaveGift _ -> False
-    GameEvent.AttractionOpened _ -> False
-    GameEvent.PrizeClaimed _ -> False
-    GameEvent.Earthbent _ -> False
-    GameEvent.Waterbent _ -> False
-    GameEvent.Airbent _ -> False
-    GameEvent.Firebent _ -> False
     GameEvent.StickerPut put ->
       PlayerRelation.holds (Game.teams gs) relation you (StickerPut.placer put)
         && Set.member (StickerPut.kind put) kinds

@@ -71,6 +71,8 @@ import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Placement as Placement
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerActed as PlayerActed
+import qualified Pawl.Types.PlayerAction as PlayerAction
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
@@ -1518,7 +1520,7 @@ rayOfCommandSpec s registry = Spec.describe s "RayOfCommand" $ do
 
 -- Matoya, Archon Elder {2}{U} Legendary Creature -- Human Warlock 1/4, "Whenever
 -- you scry or surveil, draw a card" -- CR 603.1b's AnyOf over
--- TriggerCondition.PlayerScries and TriggerCondition.PlayerSurveils, so one card
+-- TriggerCondition.PlayerActs under PlayerAction.Scry and PlayerAction.Surveil, so one card
 -- proves both of CR 701.22d and CR 701.25d.
 --
 -- The two firing sources are DIFFERENT cards already in the pool -- Crystal
@@ -1578,7 +1580,7 @@ matoyaTriggerSpec s registry =
           (bareBall, bare) <- scryBoardFor False 1
           let after = runBall S.alice ballId board
               baseline = runBall S.alice bareBall bare
-          Spec.assertBool s (elem (GameEvent.Scried S.alice) (S.eventsOf after)) "CR 701.22d the scry is still an event"
+          Spec.assertBool s (elem (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.Scry S.alice)) (S.eventsOf after)) "CR 701.22d the scry is still an event"
           Spec.assertEqWith s "Matoya drew the lone card" (S.handSize S.alice after) 1
           Spec.assertEqWith s "so alice's library is empty" (length (Game.zoneMembers Zone.Library S.alice after)) 0
           Spec.assertEqWith s "and without Matoya nothing was drawn" (S.handSize S.alice baseline) 0
@@ -1586,7 +1588,7 @@ matoyaTriggerSpec s registry =
 
 -- Feywild Trickster {2}{U} Creature -- Gnome Warlock 2/2, "Whenever you roll one
 -- or more dice, create a 1/1 blue Faerie Dragon creature token with flying" --
--- the pool's producer for TriggerCondition.PlayerRollsDice (CR 706.1).
+-- the pool's producer for PlayerAction.RollDice (CR 706.1).
 --
 -- THE ROLLER is Djinni Windseer ("Flying / When this creature enters, roll a
 -- d20. / 1-9 | Scry 1. / 10-19 | Scry 2. / 20 | Scry 3."), already in the pool
@@ -1650,7 +1652,7 @@ feywildTricksterSpec s registry =
                 else drain (n - 1) (S.runPure rollAnswerer g Stack.resolveTop)
             cycleOnce g = drain 8 (S.runPure rollAnswerer g Engine.placePendingTriggers)
          in cycleOnce (cycleOnce gs)
-   in Spec.describe s "PlayerRollsDice" $ do
+   in Spec.describe s "PlayerActs RollDice" $ do
         -- CR 706.1: alice's own Windseer rolls, alice's Trickster fires. The
         -- paired board differs in the Trickster and in nothing else, so the
         -- token is the trigger rather than anything the Windseer did.
@@ -1669,7 +1671,7 @@ feywildTricksterSpec s registry =
             "and without the Trickster the same roll mints nothing"
             (S.countOnBattlefieldByName faerieDragon S.alice baseline)
             0
-          Spec.assertBool s (elem (GameEvent.DiceRolled S.alice) (S.eventsOf after)) "CR 706.1 the roll recorded its event under the roller"
+          Spec.assertBool s (elem (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.RollDice S.alice)) (S.eventsOf after)) "CR 706.1 the roll recorded its event under the roller"
           Spec.assertEqWith s "the stack is empty, so the trigger really resolved" (GameState.stack after) []
         -- CR 109.5 / 603.3a: the relation is read against the ABILITY'S
         -- CONTROLLER. The same board one seat over -- bob's Windseer, alice's
@@ -1689,8 +1691,8 @@ feywildTricksterSpec s registry =
             "and bob, who rolled, has none either -- he controls no Trickster"
             (S.countOnBattlefieldByName faerieDragon S.bob after)
             0
-          Spec.assertBool s (elem (GameEvent.DiceRolled S.bob) (S.eventsOf after)) "bob really rolled, so there was an event to match"
-          Spec.assertBool s (notElem (GameEvent.DiceRolled S.alice) (S.eventsOf after)) "and the event names the roller, not the watcher"
+          Spec.assertBool s (elem (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.RollDice S.bob)) (S.eventsOf after)) "bob really rolled, so there was an event to match"
+          Spec.assertBool s (notElem (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.RollDice S.alice)) (S.eventsOf after)) "and the event names the roller, not the watcher"
         -- Both seats hold a Trickster and bob rolls, so the two readings of
         -- "you" -- the ability's controller and the roller -- fall on different
         -- seats with the same event on the log. Only bob's fires.

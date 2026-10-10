@@ -28,6 +28,8 @@ import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.PlayerActed as PlayerActed
+import qualified Pawl.Types.PlayerAction as PlayerAction
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Subtype as Subtype
@@ -131,5 +133,5 @@ forage pid resolving = do
   -- 701.54d's "even if some or all of those actions were impossible", so the
   -- board CR 608.2d refuses writes nothing -- and neither half's own Moved event
   -- could stand in for this one, a forage being one action however it was taken.
-  Monad.when did (State.modify' (Event.recordEvent (GameEvent.Foraged pid)))
+  Monad.when did (State.modify' (Event.recordEvent (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.Forage pid))))
   pure did

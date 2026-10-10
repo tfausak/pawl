@@ -19,7 +19,7 @@
 -- card's OWNER -- whom no slot holds -- and fixes the {2} itself; no card states
 -- either, so no opcode field carries them and 'permission' mints them here.
 --
--- CR 701.65b's "whenever a player airbends" is GameEvent.Airbent, which the
+-- CR 701.65b's "whenever a player airbends" is GameEvent.PlayerActed, which the
 -- Effect.Airbend arm writes once the exile has run.
 module Pawl.Engine.Airbend where
 
