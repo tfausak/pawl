@@ -45,6 +45,7 @@ import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.Object as Object
@@ -715,3 +716,25 @@ spec s registry = Spec.describe s "Sticker" $ do
         revealed = S.runPure (namingTarget trackerId) (g3 {GameState.priority = Just S.bob}) (S.cast S.bob breakId >> Stack.resolveTop)
     Spec.assertEqWith s "CR 613.7k face up, the restamped sticker follows the Aura: Night Legitimate Businessperson" (nameTexts trackerId revealed) [Text.pack "Night Legitimate Businessperson"]
     Spec.assertEqWith s "CR 613.7 face down, the later Aura hides the word" (nameTexts trackerId enchanted) [Text.pack "Legitimate Businessperson"]
+  Spec.it s "CR 123.6e Otter has two unique vowels: _____ Bird Gets the Worm gains alice 2 life" $ do
+    sheets <- committedSheets
+    bird <- S.printingOf s registry "_____ Bird Gets the Worm"
+    let (_, after, _) = entersNaming bird (placingAt Nothing otter 0) (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))
+    Spec.assertEqWith s "CR 123.6e alice gains 2" (S.lifeOf S.alice after) (Just 22)
+  Spec.it s "CR 123.6e Slimy has two unique vowels: _____ Goblin adds two red mana" $ do
+    sheets <- committedSheets
+    goblin <- S.printingOf s registry "_____ Goblin"
+    let (_, after, _) = entersNaming goblin (placingAt Nothing slimy 0) (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))
+    Spec.assertEqWith s "CR 123.6e alice's pool holds two mana" (maybe 0 (length . Mana.unwrap) (Map.lookup S.alice (GameState.manaPool after))) 2
+  -- Brushwagg has one u, so one of bob's two Pikers is tapped.
+  Spec.it s "CR 123.6d Brushwagg's one u: Make a _____ Splash taps one of bob's two Pikers" $ do
+    sheets <- committedSheets
+    splash <- S.printingOf s registry "Make a _____ Splash"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (p1, g1) = S.addPermanent piker S.bob (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))
+        (p2, g2) = S.addPermanent piker S.bob g1
+        bobs r = case Recipient.objectOf r of
+          Just oid -> List.elem oid [p1, p2]
+          Nothing -> False
+        (_, after, _) = entersNaming splash ((placingAt Nothing (nameSticker 0 1) 0) {namingPrefers = bobs}) g2
+    Spec.assertEqWith s "CR 123.6d one Piker is tapped" (S.tappedCount S.bob after) 1
