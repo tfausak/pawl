@@ -18,6 +18,7 @@ import qualified Pawl.Engine.Plot as Plot
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Room as Room
+import qualified Pawl.Engine.Snapshot as Snapshot
 import qualified Pawl.Engine.Suspend as Suspend
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
@@ -321,10 +322,10 @@ legalActions pid gs =
       -- (Target.Pools), so building one per slot per ability walked the
       -- battlefield once per permanent. Lazy per pool, so an enumeration that
       -- targets only creatures pays for the creature walk alone (#1073).
-      pools = Target.poolsGiven pcs gs
+      pools = Target.poolsOf (Snapshot.MkSnapshot pcs grants) gs
       activations =
         let forObject oid =
-              fmap (Action.Activate oid) (filter (\ab -> Activatable.activatableGiven grants pcs pools supplySources pid oid ab gs) (Activatable.abilitiesForGiven pcs oid gs))
+              fmap (Action.Activate oid) (filter (\ab -> Activatable.activatableGiven pools supplySources pid oid ab gs) (Activatable.abilitiesForGiven pcs oid gs))
          in concatMap forObject (Activatable.activationSourcesGiven grants pcs pid gs)
       -- CR 605.3a's first window -- "a player may activate an activated mana
       -- ability whenever they have priority" -- which the activation list above

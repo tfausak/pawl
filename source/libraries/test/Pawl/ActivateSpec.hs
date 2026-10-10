@@ -34,6 +34,7 @@ import qualified Pawl.Engine.Mint as Mint
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Snapshot as Snapshot
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
@@ -3887,9 +3888,8 @@ hoistMixedBoard printings n =
 -- pile of arguments.
 threadedGate :: PlayerId.PlayerId -> ObjectId.ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> GameState.GameState -> Bool
 threadedGate pid oid ability gs =
-  let grants = Projection.controlGrants gs
-      pcs = Projection.projectAll gs
-   in Activatable.activatableGiven grants pcs (Target.poolsGiven pcs gs) (Cost.supplyManaSourcesGiven grants pcs pid gs) pid oid ability gs
+  let board = Snapshot.whole gs
+   in Activatable.activatableGiven (Target.poolsOf board gs) (Cost.supplyManaSourcesGiven (Snapshot.grants board) (Snapshot.projected board) pid gs) pid oid ability gs
 
 -- Action.legalActions' two ACTIVATION lists rebuilt out of the plain per-call
 -- wrappers, which hoist nothing: Activatable.activatable projects each object for
@@ -3943,7 +3943,7 @@ activationsIn =
 -- while these measure what it ANSWERS and are ordinary rules assertions.
 hoistDifferentialSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 hoistDifferentialSpec s registry = do
-  -- Activatable.activatable passes Map.empty for the projected board, so the plain
+  -- Activatable.activatable passes Snapshot.onDemand, so the plain
   -- side really does project each object for itself through
   -- Projection.projectGiven's per-object fallback while the threaded side reads
   -- the pre-projected board. It is still a REGRESSION FENCE and not a proof,
