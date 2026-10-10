@@ -1,0 +1,102 @@
+{
+  "description": "CR 801.5a a Siege's protector is chosen only from opponents within range (control)",
+  "note": "Four seats, every range 1: carol sits two seats from alice. Alice casts Invasion of Dominaria; CR 310.9a with CR 801.5a offers bob and dave as its protector and not carol, so naming carol is refused and bob is taken. Control: at an unlimited range carol is offered and protects it.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-2",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-3",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Invasion of Dominaria",
+            "label": "invasion"
+          }
+        ],
+        "library": [
+          {
+            "card": "Plains"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol"
+      },
+      {
+        "name": "dave"
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseProtector",
+          "with": "carol"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$invasion",
+          "mana": [
+            "$plains",
+            "$plains-2",
+            "$plains-3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Protector",
+          "object": "Invasion of Dominaria",
+          "is": "carol"
+        }
+      }
+    }
+  ]
+}

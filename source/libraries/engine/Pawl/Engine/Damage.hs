@@ -4,7 +4,6 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
-import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -518,12 +517,15 @@ attackerAssignment gs contested (attacker, target) = case Projection.combatDamag
 --
 -- CR 805.9: under the shared team turns option "the active player" is one
 -- active player, chosen by the banding ability's controller -- the controller
--- of the banding creature among them. Asked only with two or more active
--- players still playing; the answer is filtered, not trusted. Banding creatures
--- with different controllers leave that choice to the team, and CR 805.2 gives
--- a team's unsettled choice to its primary player. Pawl.TeamSpec's "CR 805.9
--- the banding creature's controller names the active player who divides"
--- proves both.
+-- of the banding creature among them, asked through Game.chooseAmong among the
+-- active players still playing and within the chooser's range (CR 801.5a).
+-- Banding creatures with different controllers leave that choice to the team,
+-- and CR 805.2 gives a team's unsettled choice to its primary player. The team
+-- scenario "CR 805.9 the banding creature's controller names the active player
+-- who divides" proves both, its "a departed teammate is not offered" sibling
+-- the still-playing cut (CR 800.4a), and the range-of-influence scenario "CR
+-- 801.5a / 805.9 the banding creature's controller names an active player
+-- within range" the range cut.
 blockerChooser :: GameState -> [ObjectId] -> PlayerId -> Game PlayerId
 blockerChooser gs attackers controller =
   case (banding, ListUtils.nubOrd (Maybe.mapMaybe (`Projection.controllerOf` gs) banding)) of
@@ -532,13 +534,8 @@ blockerChooser gs attackers controller =
       let chooser = case controllers of
             [one] -> one
             _ -> Game.primaryOf gs (GameState.activePlayer gs)
-          live = filter (`List.elem` Game.stillPlaying gs) (Turn.activePlayers gs)
-       in case live of
-            [] -> pure (GameState.activePlayer gs)
-            [one] -> pure one
-            first : rest -> do
-              answer <- Game.choose (Prompt.ChoosePlayer (Decide.deciderFor chooser gs) chooser source (first NonEmpty.:| rest))
-              pure (if List.elem answer live then answer else first)
+          live = filter (\pid -> List.elem pid (Game.stillPlaying gs) && Game.inRangeOf chooser pid gs) (Turn.activePlayers gs)
+       in fmap (Maybe.fromMaybe (GameState.activePlayer gs)) (Game.chooseAmong (\decider asked -> Prompt.ChoosePlayer decider asked source) chooser live)
   where
     banding = filter (\attacker -> Projection.hasKeyword Keyword.Banding attacker gs) attackers
 
