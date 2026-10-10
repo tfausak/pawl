@@ -14,7 +14,9 @@ data PlayerAction
     Proliferate
   | -- | CR 706.1, once per instruction however many dice it rolls; CR 901.9d's
     -- planar die too. A reroll (CR 706.2b) is a roll of its own, under the player
-    -- who throws it; Pawl.DiceSpec's Goblin Bookie group proves it.
+    -- who throws it; Pawl.DiceSpec's Goblin Bookie group proves it. No result
+    -- bar (CR 706.7's planar die fires it), and a CR 706.6 ignored die (Pixie
+    -- Guide) still leaves its instruction a roll of one or more dice.
     RollDice
   | -- | CR 701.51c.
     OpenAttraction

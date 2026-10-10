@@ -95,6 +95,13 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       codec
       Modification.LoseAllAbilities
       " {\"type\":\"LoseAllAbilities\"} "
+  -- layer 6, CR 123.7a (Pin Collection).
+  Spec.it s "GainAbilitiesOfStickers" $
+    Common.assertCodec
+      s
+      codec
+      Modification.GainAbilitiesOfStickers
+      " {\"type\":\"GainAbilitiesOfStickers\"} "
   -- layer 6, CR 613.1f: the removal that names ONE ability (Gliding Licid).
   Spec.it s "LoseNamedAbility carries the name" $
     Common.assertCodec

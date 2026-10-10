@@ -890,6 +890,14 @@ placeBorne srcId pending = do
         TriggerCondition.SelfEnters -> Projection.announcedXOf srcId gs
         TriggerCondition.SelfTurnedFaceUp -> Maybe.fromMaybe 0 (Binding.amountOf Binding.variableX bound)
         _ -> 0
+      -- CR 107.3m: an enters-the-battlefield triggered ability's effects read
+      -- the X announced for the spell that became its source, as its target
+      -- count does (inheritedX), and 0 where no cast X stands behind the
+      -- permanent. Nothing for every other trigger, so a delayed ability's
+      -- captured X (CR 107.3n) is not overwritten.
+      enteredX = case TriggeredAbility.condition ability of
+        TriggerCondition.SelfEnters -> Just inheritedX
+        _ -> Nothing
       legal = Target.fillableModes (Just controller) bound srcId Map.empty modal gs
       selection = Modal.Type.selection modal
       obj =
@@ -1010,7 +1018,7 @@ placeBorne srcId pending = do
           -- Inserted over the captured environment, whose thisAbility names the
           -- ability that armed a delayed trigger rather than the trigger itself.
           let placedSource = maybe (Projection.copiableCharacteristics srcId gs) LastKnown.copiable (Game.lastKnownOf srcId gs)
-          State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setThisAbility abilId (Binding.setPlacedSourceCopy placedSource (Binding.setYou controller (Binding.setTriggerSource srcId (Map.unionWith Binding.mergeBinding (Target.stampDefendingPlayers srcId chosen g (Binding.fromChoices chosen Nothing chosenModes)) (PendingTrigger.bindings pending)))))}) abilId (GameState.objects g)})
+          State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setThisAbility abilId (Binding.setPlacedSourceCopy placedSource (Binding.setYou controller (Binding.setTriggerSource srcId (Map.unionWith Binding.mergeBinding (Target.stampDefendingPlayers srcId chosen g (Binding.fromChoices chosen enteredX chosenModes)) (PendingTrigger.bindings pending)))))}) abilId (GameState.objects g)})
           -- CR 601.2c through CR 603.3d: each chosen object became a target, which
           -- is what CR 702.21a's ward watches. Raised only on an announcement the
           -- joint check accepted, so a re-asked answer never made anything a

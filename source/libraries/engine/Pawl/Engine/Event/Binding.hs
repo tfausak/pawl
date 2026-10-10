@@ -66,6 +66,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.SpellWasCopied as SpellWasCopied
 import qualified Pawl.Types.StepBegan as StepBegan
+import qualified Pawl.Types.StickerPut as StickerPut
 import qualified Pawl.Types.TappedForMana as TappedForMana
 import Pawl.Types.TriggerCondition (TriggerCondition)
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -489,6 +490,11 @@ eventBindingsOver board gs bearerBecame becameInGraveyard bearer you cond event 
   -- one slot cannot name them all.
   (TriggerCondition.PermanentGetsCounters _, GameEvent.CountersPut change) ->
     Binding.setBecame (CounterChange.object change) Map.empty
+  -- CR 123.3's "that creature": the object the sticker went on, which the event
+  -- carries (Tusk and Whiskers). No zone change, so CR 400.7e's slot is the
+  -- printed word, PermanentGetsCounters' reason.
+  (TriggerCondition.PlacesSticker _, GameEvent.StickerPut put) ->
+    Binding.setBecame (StickerPut.object put) Map.empty
   -- "That player": the discarder, which CR 701.9a makes one player and the event
   -- carries directly. The same reserved slot CR 702.70a's poisonous uses, for the
   -- same reason -- a player the EVENT names, which CR 109.5's `you` cannot stand
@@ -1328,11 +1334,12 @@ eventBindingSlots cond = case cond of
   TriggerCondition.PlayerActs _ -> Set.empty
   -- Nothing: Withengar Unbound's payload points at no one -- it grows itself.
   TriggerCondition.PlayerLosesGame _ -> Set.empty
+  -- Nothing: CR 305.1's land play binds nothing.
+  TriggerCondition.PlayerPlaysLand _ -> Set.empty
   -- Nothing, for these keyword actions. CR 702.170a and CR 701.44b name an
   -- object, but no printed payload points at it: Aloe Alchemist targets a
   -- creature of its controller's choosing and Wildgrowth Walker grows itself. A
   -- card printing "that creature" is what would earn a slot.
-  TriggerCondition.PlayerPlaysLand _ -> Set.empty
   TriggerCondition.SelfBecomesPlotted -> Set.empty
   TriggerCondition.PermanentExplores _ -> Set.empty
   TriggerCondition.PermanentConnives _ -> Set.empty
@@ -1340,7 +1347,8 @@ eventBindingSlots cond = case cond of
   -- the graveyard, which binds nothing. The `became` it binds otherwise is
   -- eventBindingSlotsSometimes'.
   TriggerCondition.PlayerManifestsDread _ -> Set.empty
-  TriggerCondition.PlacesSticker _ -> Set.empty
+  -- The object the sticker went on, for Tusk and Whiskers' "that creature".
+  TriggerCondition.PlacesSticker _ -> Set.singleton Binding.became
   TriggerCondition.PlayerRollsResult _ -> Set.empty
   TriggerCondition.Visit -> Set.empty
   TriggerCondition.ChaosEnsues -> Set.empty

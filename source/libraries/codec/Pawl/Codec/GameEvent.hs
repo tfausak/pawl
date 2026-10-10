@@ -121,8 +121,6 @@ codec =
       Arm.payload "LostTheGame" PlayerId.codec GameEvent.LostTheGame (\x -> case x of GameEvent.LostTheGame y -> Just y; _ -> Nothing),
       Arm.payload "PlayerActed" (PlayerActed.codec PlayerId.codec) GameEvent.PlayerActed (\x -> case x of GameEvent.PlayerActed y -> Just y; _ -> Nothing),
       Arm.payload "LandPlayed" LandPlayed.codec GameEvent.LandPlayed (\x -> case x of GameEvent.LandPlayed y -> Just y; _ -> Nothing),
-      -- CR 309.7's completion, with only the completing player on the wire: the
-      -- rule names no card, so there is nothing else to carry.
       Arm.payload "ManifestedDread" ManifestedDread.codec GameEvent.ManifestedDread (\x -> case x of GameEvent.ManifestedDread y -> Just y; _ -> Nothing),
       Arm.payload "DieResultSettled" (DieResult.codec PlayerId.codec) GameEvent.DieResultSettled (\x -> case x of GameEvent.DieResultSettled y -> Just y; _ -> Nothing),
       Arm.payload "RolledToVisit" (DieResult.codec PlayerId.codec) GameEvent.RolledToVisit (\x -> case x of GameEvent.RolledToVisit y -> Just y; _ -> Nothing),

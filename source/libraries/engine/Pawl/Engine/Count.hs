@@ -1250,9 +1250,10 @@ viewOfSnapshot deploy mController mOwner isToken counters snapshot =
       -- (Pawl.CountSpec) is what reads it.
       Filter.counters = counters,
       -- Not implemented: CR 608.2h's record of a departed object's stickers,
-      -- kinds and words (#4890).
+      -- kinds, words and P/T (#4890).
       Filter.stickerKinds = Seq.empty,
       Filter.nameStickers = Seq.empty,
+      Filter.stickerPowerToughness = Seq.empty,
       -- CR 701.54b: a designation, which a ProjectedCharacteristics does not carry
       -- and never could -- CR 109.3's characteristic list has no room for one. So a
       -- past event records none, and no CR 608.2h record holds one for the arm to

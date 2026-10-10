@@ -2619,13 +2619,12 @@ zonesTriggeredFrom cond =
         -- by Pawl.DungeonSpec's "CR 309.7 completing a dungeon triggers Dungeon
         -- Crawler out of the graveyard".
         TriggerCondition.PlayerActs _ -> battlefield
-        -- CR 113.6's default for the ones whose watcher is an ordinary permanent:
-        -- Wildgrowth Walker is a creature, and an explore is no condition that
-        -- cannot trigger from the battlefield.
         TriggerCondition.PlayerPlaysLand _ -> battlefield
         TriggerCondition.PlayerManifestsDread _ -> battlefield
         -- CR 113.6's default: Withengar Unbound is a creature.
         TriggerCondition.PlayerLosesGame _ -> battlefield
+        -- CR 113.6's default: Wildgrowth Walker is a creature, and an explore is
+        -- no condition that cannot trigger from the battlefield.
         TriggerCondition.PermanentExplores _ -> battlefield
         TriggerCondition.PermanentConnives _ -> battlefield
         TriggerCondition.PlacesSticker _ -> battlefield

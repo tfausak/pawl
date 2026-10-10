@@ -8904,9 +8904,9 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.PlayerActs _ -> False
   -- CR 104.3 names no turn either.
   TriggerCondition.PlayerLosesGame _ -> False
+  TriggerCondition.PlayerPlaysLand _ -> False
   -- None of these keyword-action conditions names a turn either: CR 701.62,
   -- CR 702.170, CR 701.44 and CR 701.50 each state when their event happens.
-  TriggerCondition.PlayerPlaysLand _ -> False
   TriggerCondition.PlayerManifestsDread _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
   TriggerCondition.PermanentExplores _ -> False

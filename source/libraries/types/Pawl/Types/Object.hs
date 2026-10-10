@@ -702,9 +702,10 @@ data Object = MkObject
     -- Pawl.Engine.Quantity.substituteAnnouncedX, and a CR 614.1c "as [this]
     -- enters" row's effects (Neverwinter Hydra), bound only while
     -- Pawl.Engine.Resolve.Effect.runEntryEffect runs them; the trigger's is CR 601.2c's
-    -- target count (Lost in the Maze), through Pawl.Engine.Engine.placeBorne, and
+    -- target count (Lost in the Maze), through Pawl.Engine.Engine.placeBorne,
     -- CR 603.4's intervening "if" on that same ability (Jacked Rabbit), through
-    -- Pawl.Engine.Condition.inheritedX.
+    -- Pawl.Engine.Condition.inheritedX, and its effects (Pin Collection's cap),
+    -- through placeBorne's enteredX.
     --
     -- A SNAPSHOT copied across the move by Pawl.Engine.Event.changeZoneAttaching
     -- off the departing spell's own `bindings`, never a live read, CR 601.2b

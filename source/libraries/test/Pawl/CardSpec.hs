@@ -690,7 +690,7 @@ objectRefPositions =
         ("unsuspect", Effect.Unsuspect (plantedRef "us"), [plantedRef "us"]),
         ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary Nothing (NonEmpty.singleton (plantedRef "sl"))), [plantedRef "sl"]),
         ("ante", Effect.Ante (Ante.MkAnte (PlayerRef.Relative PlayerRelation.You) (plantedRef "an") Nothing), [plantedRef "an"]),
-        ("put-sticker", Effect.PutSticker (PutSticker.MkPutSticker (PlayerRef.Relative PlayerRelation.You) (plantedRef "ps") (Set.singleton StickerKind.Art) Nothing), [plantedRef "ps"]),
+        ("put-sticker", Effect.PutSticker (PutSticker.MkPutSticker (PlayerRef.Relative PlayerRelation.You) (plantedRef "ps") (Set.singleton StickerKind.Art) Nothing False Nothing), [plantedRef "ps"]),
         ("set-owner", Effect.SetOwner (SetOwner.MkSetOwner (PlayerRef.Relative PlayerRelation.You) (plantedRef "so")), [plantedRef "so"]),
         ("exchange-ownership", Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership (plantedRef "eo") (plantedRef "ep")), [plantedRef "eo", plantedRef "ep"]),
         ("exchange-top", Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary (plantedRef "et") (PlayerRef.Relative PlayerRelation.You)), [plantedRef "et"]),
@@ -750,7 +750,7 @@ playerRefPositions =
         ("take-extra-turn", Effect.TakeExtraTurn TakeExtraTurn.MkTakeExtraTurn {TakeExtraTurn.player = plantedPlayer "te", TakeExtraTurn.skips = Set.empty, TakeExtraTurn.count = Quantity.Type.Literal 1}, [plantedPlayer "te"]),
         ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary (Just (plantedPlayer "si")) (NonEmpty.singleton (plantedRef "si"))), [plantedPlayer "si"]),
         ("ante", Effect.Ante (Ante.MkAnte (plantedPlayer "ap") (plantedRef "ap") Nothing), [plantedPlayer "ap"]),
-        ("put-sticker", Effect.PutSticker (PutSticker.MkPutSticker (plantedPlayer "pp") (plantedRef "pp") (Set.singleton StickerKind.Art) Nothing), [plantedPlayer "pp"]),
+        ("put-sticker", Effect.PutSticker (PutSticker.MkPutSticker (plantedPlayer "pp") (plantedRef "pp") (Set.singleton StickerKind.Art) Nothing False Nothing), [plantedPlayer "pp"]),
         ("set-owner", Effect.SetOwner (SetOwner.MkSetOwner (plantedPlayer "sp") (plantedRef "sp")), [plantedPlayer "sp"]),
         ("exchange-top", Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary (plantedRef "ep") (plantedPlayer "ep")), [plantedPlayer "ep"]),
         ("shuffle", Effect.Shuffle (plantedPlayer "sh"), [plantedPlayer "sh"]),
@@ -947,6 +947,7 @@ modificationCounts modification = case modification of
   Modification.GainAbilitiesOfSource _ -> []
   -- The rider's CR 602.5 conditions; the abilities are the linked cards'.
   Modification.GainCraftMaterialAbilities extra -> concatMap conditionCounts (concatMap restrictionConditions extra)
+  Modification.GainAbilitiesOfStickers -> []
   Modification.LoseAllAbilities -> []
   -- Carries a name, which reaches no Count.
   Modification.LoseNamedAbility _ -> []
@@ -1159,8 +1160,6 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PlayerActs _ -> []
   -- CR 603.9's too.
   TriggerCondition.PlayerLosesGame _ -> []
-  -- CR 702.170a carries nothing at all, so holds no Count. CR 701.44b holds a
-  -- Filter, and a Filter holds no Count for PermanentEnters' reason above.
   TriggerCondition.PlayerPlaysLand _ -> []
   TriggerCondition.PlayerManifestsDread _ -> []
   TriggerCondition.PlayerRollsResult _ -> []
@@ -1170,6 +1169,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SetInMotion -> []
   TriggerCondition.PlayerWinsCoinFlip _ -> []
   TriggerCondition.PlayerLosesCoinFlip _ -> []
+  -- CR 702.170a carries nothing at all, so holds no Count. CR 701.44b holds a
+  -- Filter, and a Filter holds no Count for PermanentEnters' reason above.
   TriggerCondition.SelfBecomesPlotted -> []
   TriggerCondition.PermanentExplores _ -> []
   TriggerCondition.PermanentConnives _ -> []
@@ -1455,7 +1456,7 @@ ownCounts effect = case effect of
   Effect.TakeExtraTurn takeExtraTurn -> quantityCounts (TakeExtraTurn.count takeExtraTurn)
   Effect.ShuffleIntoLibrary {} -> []
   Effect.Ante {} -> []
-  Effect.PutSticker {} -> []
+  Effect.PutSticker putSticker -> foldMap quantityCounts (PutSticker.ticketCap putSticker)
   Effect.SetOwner {} -> []
   Effect.ExchangeOwnership {} -> []
   Effect.ExchangeWithTopOfLibrary {} -> []
@@ -4181,6 +4182,8 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.ObjectCountersOfAnyKind -> []
   Quantity.Type.LettersOnNameStickers _ -> []
   Quantity.Type.NameStickers -> []
+  Quantity.Type.PowerOfStickers -> []
+  Quantity.Type.ToughnessOfStickers -> []
   Quantity.Type.OpponentsAttacked _ -> []
   Quantity.Type.AttackersDeclaredThisTurn _ -> []
   Quantity.Type.AttackersDeclaredThisCombat -> []
@@ -4294,6 +4297,7 @@ modificationFilters modification = case modification of
   Modification.GainAbilitiesOfSource _ -> []
   -- The rider's CR 602.5 conditions, as a printed ability's are swept.
   Modification.GainCraftMaterialAbilities extra -> frame Unframed (concatMap conditionFilters (concatMap restrictionConditions extra))
+  Modification.GainAbilitiesOfStickers -> []
   Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> foldMap quantityFilters p <> foldMap quantityFilters t
   Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> quantityFilters p <> quantityFilters t
   Modification.Intensify n -> quantityFilters n
@@ -6062,7 +6066,7 @@ effectFilters effect = case effect of
   Effect.TakeExtraTurn takeExtraTurn -> frame Unframed (quantityFilters (TakeExtraTurn.count takeExtraTurn))
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ refs) -> frame SourceHostFramed (foldMap objectRefFilters refs)
   Effect.Ante (Ante.MkAnte _ ref _) -> frame SourceHostFramed (objectRefFilters ref)
-  Effect.PutSticker (PutSticker.MkPutSticker _ ref _ _) -> frame SourceHostFramed (objectRefFilters ref)
+  Effect.PutSticker (PutSticker.MkPutSticker _ ref _ cap _ _) -> frame SourceHostFramed (objectRefFilters ref) <> frame Unframed (foldMap quantityFilters cap)
   Effect.SetOwner (SetOwner.MkSetOwner _ ref) -> frame SourceHostFramed (objectRefFilters ref)
   Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership one other) -> frame SourceHostFramed (objectRefFilters one <> objectRefFilters other)
   Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary ref _) -> frame SourceHostFramed (objectRefFilters ref)
@@ -7260,12 +7264,12 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- replacement effects above: Lost in the Maze's "tap X target creatures"
         -- names its count at the announcement made for the spell that became the
         -- enchantment, so the {X} that face declares is what makes the count
-        -- answerable. Only this condition, CR 107.3m's own, and only through the
-        -- slot -- an effect of the same ability reading X is already
-        -- Resolve.readsX's.
+        -- answerable. Only this condition, CR 107.3m's own, through the slot or
+        -- through an effect (Pin Collection's "ticket cost X or less", bound by
+        -- Engine.placeBorne's enteredX).
         entersTriggerReadsX c =
           any
-            (\ability -> TriggeredAbility.condition ability == TriggerCondition.SelfEnters && modalReadsAnnouncedX (TriggeredAbility.modal ability))
+            (\ability -> TriggeredAbility.condition ability == TriggerCondition.SelfEnters && (modalReadsAnnouncedX (TriggeredAbility.modal ability) || Resolve.readsX (Modal.allEffects (TriggeredAbility.modal ability))))
             (Face.triggeredAbilities c)
         -- CR 107.3m's reader that no card writes: a KEYWORD whose minted CR 614.1c
         -- row carries the announcement (ravenous, CR 702.156a, on Jacked Rabbit).

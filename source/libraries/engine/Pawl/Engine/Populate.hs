@@ -11,7 +11,7 @@
 --
 -- Rule 701.36 has no "whenever a player populates", so there is no GameEvent
 -- here and no trigger condition to hang one on -- Pawl.Engine.Forage writes
--- PlayerAction.Forage only because CR 701.61b's counterpart exists. Scryfall
+-- PlayerAction.Forage only because Corpseberry Cultivator watches it. Scryfall
 -- @o:"populates"@, 2026-09-18, returns no card; a printing worded that way is
 -- what would need one.
 module Pawl.Engine.Populate where

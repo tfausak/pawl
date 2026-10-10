@@ -1,0 +1,247 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "TapThis"
+              }
+            ],
+            "mana": [
+              {
+                "type": "Generic",
+                "value": 2
+              },
+              {
+                "type": "OfType",
+                "value": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Green"
+                  }
+                }
+              },
+              {
+                "type": "OfType",
+                "value": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "White"
+                  }
+                }
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "GainPlayerCounters",
+                        "value": {
+                          "kind": {
+                            "type": "Ticket"
+                          },
+                          "player": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "effects": [
+                      {
+                        "type": "PutSticker",
+                        "value": {
+                          "kinds": [
+                            {
+                              "type": "Name"
+                            },
+                            {
+                              "type": "Ability"
+                            },
+                            {
+                              "type": "PowerToughness"
+                            },
+                            {
+                              "type": "Art"
+                            }
+                          ],
+                          "player": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          "ref": {
+                            "type": "ChosenPermanent",
+                            "value": {
+                              "filter": {
+                                "type": "And",
+                                "value": [
+                                  {
+                                    "type": "Not",
+                                    "value": {
+                                      "type": "HasCardType",
+                                      "value": {
+                                        "type": "Land"
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "type": "OwnedBy",
+                                    "value": {
+                                      "type": "You"
+                                    }
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ],
+                    "optionality": {
+                      "type": "Optional"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Tusk and Whiskers",
+      "oracleText": "Whenever you put an ability sticker on a creature, put a +1/+1 counter on that creature.\n{2}{G}{W}, {T}: You get {TK}. You may put a sticker on a nonland permanent you own.",
+      "power": {
+        "type": "Literal",
+        "value": 4
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 4
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "PlacesSticker",
+            "value": {
+              "kinds": [
+                {
+                  "type": "Ability"
+                }
+              ],
+              "object": {
+                "type": "And",
+                "value": [
+                  {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Creature"
+                    }
+                  },
+                  {
+                    "type": "IsInZone",
+                    "value": {
+                      "type": "Battlefield"
+                    }
+                  }
+                ]
+              },
+              "placer": {
+                "type": "You"
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "PutCounters",
+                        "value": {
+                          "kind": {
+                            "type": "PlusOnePlusOne"
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "became"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Elephant"
+          },
+          {
+            "type": "Mouse"
+          },
+          {
+            "type": "Performer"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}
