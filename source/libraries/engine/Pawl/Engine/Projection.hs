@@ -1175,14 +1175,18 @@ viewWithLastKnownAnywhere gs oid =
 -- controller is the projected one, not its owner" in data/scenarios/aura
 -- proves.
 --
--- A key per slot the map names, so SameControllerAsBound's widening on an
--- absent key is CR 601.2c's slot nobody has answered yet. Toughness only for a
--- slot naming exactly ONE object: no printed comparison asks a group for one.
--- All thunks: a filter naming none of the atoms forces no projection.
+-- A key for every slot either map names -- `players` keys every target slot
+-- (Binding.playersBySlot) -- so a slot holding only a player, or one CR 608.2b
+-- emptied, answers an EMPTY set and SameControllerAsBound and
+-- SharesCreatureTypeWithBound refuse there; only a slot nobody has answered yet
+-- (CR 601.2c) is absent, where they widen. Toughness only for a slot naming
+-- exactly ONE object: no printed comparison asks a group for one. All thunks: a
+-- filter naming none of the atoms forces no projection.
 framedBySlots :: GameState -> Map SlotName (Set ObjectId) -> Map SlotName (Set PlayerId.PlayerId) -> Filter.Context -> Filter.Context
 framedBySlots gs objects players context =
   let lastKnown = viewWithLastKnownAnywhere gs
-      over read_ = fmap (foldMap (foldMap read_ . lastKnown)) objects
+      keyed = Map.union objects (Set.empty <$ players)
+      over read_ = fmap (foldMap (foldMap read_ . lastKnown)) keyed
       hostController oid = case Game.hostOf oid gs of
         Just host | Set.member host (GameState.battlefield gs) -> maybe Set.empty Set.singleton (controllerOf host gs)
         _ -> Set.empty
@@ -1196,8 +1200,16 @@ framedBySlots gs objects players context =
           Filter.slotControllers = over (maybe Set.empty Set.singleton . Filter.controller),
           Filter.slotCreatureTypes = over (Set.filter Subtype.isCreatureType . Filter.subtypes),
           Filter.slotToughnesses = Map.mapMaybe oneToughness objects,
-          Filter.slotHostControllers = fmap (foldMap hostController) objects
+          Filter.slotHostControllers = fmap (foldMap hostController) keyed
         }
+
+-- Filter.contextFor with a slot map of OBJECTS framed in through framedBySlots,
+-- for a caller that holds the objects and no players: a cost's candidate pools
+-- (Pawl.Engine.Cost, off the announcement CR 601.2c made before CR 601.2h
+-- pays) and a sacrifice criterion (Pawl.Engine.Replacement.matchesPermanent).
+contextWithSlots :: GameState -> Maybe PlayerId.PlayerId -> Maybe ObjectId -> Map SlotName (Set ObjectId) -> Filter.Context
+contextWithSlots gs perspective source slots =
+  framedBySlots gs slots Map.empty (Filter.contextFor (Game.teams gs) perspective source)
 
 -- framedBySlots off a whole binding environment as announced
 -- (Binding.slotObjects): CR 603.4's intervening "if", which Event.Trigger checks

@@ -51,6 +51,7 @@ import qualified Pawl.Types.ActivationProhibition as ActivationProhibition
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
+import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Chooser as Chooser
@@ -1234,6 +1235,18 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
       s
       (not (modalCountsOffend (modeWith (TargetSlot.required Pool.Creatures Nothing) (Effect.TurnFaceUp slot))))
       "nor does a one-target slot read as one object"
+    -- An effect's own FILTER over the same two-target slot, the pair differing
+    -- in the atom alone: IsBound takes the whole set the slot names
+    -- (Binding.objectsBySlot), CR 208.1's ToughnessLessThanBound wants one
+    -- toughness and answers nothing for two (Filter.singularSlots).
+    Spec.assertBool
+      s
+      (not (modalCountsOffend (modeWith two (Effect.AttachAll (AttachAll.MkAttachAll (ObjectRef.InSlot slot) (Filter.Type.IsBound slot))))))
+      "a two-target slot read whole by a filter does not offend"
+    Spec.assertBool
+      s
+      (modalCountsOffend (modeWith two (Effect.AttachAll (AttachAll.MkAttachAll (ObjectRef.InSlot slot) (Filter.Type.ToughnessLessThanBound slot)))))
+      "but one a filter reads as one object does"
     -- CR 601.2c's "any number of target ...", which states no maximum to compare
     -- against: an unbounded slot is plural, so the same one-object reader offends.
     -- No card in the corpus makes this mistake, so this is the only observer the

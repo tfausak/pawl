@@ -85,8 +85,10 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -519,6 +521,23 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   unburySpec s registry
   pentarchPaladinSpec s registry
   fromTheRubbleSpec s registry
+  -- CR 110.2 / 601.2c: SameControllerAsBound against a sibling slot. A slot
+  -- answered with a PLAYER names no object and so no controller, and the atom
+  -- refuses; only a slot nobody has answered yet is absent, where it widens.
+  -- Projection.framedBySlots keys every target slot to tell the two apart. No
+  -- card in data/cards/ aims the atom at a slot that can hold a player, so this
+  -- reads the target-slot context directly.
+  Spec.it s "CR 110.2 SameControllerAsBound refuses a slot answered with a player and widens on an unanswered one" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (pikerId, gs) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
+        slot = SlotName.MkSlotName (Text.pack "who")
+        context bindings = Target.slotContext (Projection.projectAll gs) (Just S.alice) False bindings S.noSource Nothing gs
+        admits bindings = Filter.matches (context bindings) (Projection.viewOfObject pikerId gs) (Filter.Type.SameControllerAsBound slot)
+    Spec.assertEqWith
+      s
+      "a slot holding bob refuses bob's Piker, and an unanswered slot admits it"
+      (admits (Map.singleton slot (Binding.toPlayer S.bob)), admits Map.empty)
+      (False, True)
   -- CR 702.18a: "Shroud is a static ability. 'Shroud' means 'This permanent or
   -- player can't be the target of spells or abilities.'" Doom Blade is "target
   -- nonblack creature" and the Mongoose is green, so its Filter admits the

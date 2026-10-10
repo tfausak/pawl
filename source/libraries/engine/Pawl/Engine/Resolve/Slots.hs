@@ -289,17 +289,16 @@ insertOne slot = joinTwo (oneSlot slot)
 --     under a fold is judged against the resolving object's bindings --
 --     Filter.matches' IsBound arm, against the Context's slotObjects -- exactly as
 --     one on an effect's own field is, and the pool writes the shape (Caldera
---     Breaker, Into the Wilds, Wild Evocation). Reported at SlotArity.Many, never
---     One: that arm reads the whole GROUP a slot names, and WHICH filter atom is
---     damaged by a plural slot is Pawl.EffectLintSpec's framedSlotsReadSingly,
---     which reaches these same filters through Pawl.CardSpec's effectFilters.
+--     Breaker, Into the Wilds, Wild Evocation). Classified by filterSlotsOf, as
+--     an effect's own Filter is: that arm reads the whole GROUP a slot names,
+--     and the atoms that read one thing are Filter.singularSlots'.
 quantitySlots :: Quantity.Type.Quantity -> Map.Map SlotName SlotArity
 quantitySlots quantity =
   joinSlots
     ( Map.union
         (Map.fromSet (const SlotArity.One) (Quantity.objectSlots quantity))
         (Map.fromSet (const SlotArity.Amount) (QuantitySlot.slots quantity))
-        : fmap (Map.fromSet (const SlotArity.Many) . Filter.boundSlots . Count.Type.filter) (QuantitySlot.nestedCounts quantity)
+        : fmap (filterSlotsOf . Count.Type.filter) (QuantitySlot.nestedCounts quantity)
           <> fmap (either playerRefSlots (`Map.singleton` SlotArity.Many)) (Set.toList (QuantitySlot.nestedRefs quantity))
     )
 
@@ -1981,10 +1980,17 @@ damageRewriteFilters rewrite = case rewrite of
   -- the rewrite's own.
   DamageRewrite.RunEffects _ -> []
 
--- One Filter's slot reads, at arity One -- the same shape modeSlots folds over a
+-- One Filter's slot reads, each at the arity its atom reads it with: One for
+-- Filter.singularSlots' atoms, which answer nothing for a slot naming several,
+-- and Many for every other slot Filter.boundSlots reports, whose atom takes
+-- the whole set -- since Binding.objectsBySlot, a multi-target slot is the set
+-- of its targets at resolution too. The same shape modeSlots folds over a
 -- mode's target-slot Filters.
 filterSlotsOf :: Filter.Type.Filter Keyword.Type.Keyword -> Map.Map SlotName SlotArity
-filterSlotsOf = Map.fromSet (const SlotArity.One) . Filter.boundSlots
+filterSlotsOf predicate =
+  Map.union
+    (Map.fromSet (const SlotArity.One) (Filter.singularSlots predicate))
+    (Map.fromSet (const SlotArity.Many) (Filter.boundSlots predicate))
 
 -- A CR 615.5 rider's slot reads, less the reserved amount and source slots that
 -- Pawl.Engine.Resolve.Effect.runPreventionRider binds as the rider runs.

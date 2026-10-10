@@ -2408,7 +2408,7 @@ countersOn kind oid gs =
 -- something else under Maskwood Nexus (Pawl.CostSpec's Putrid Raptor pair).
 discardCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 discardCandidates slots pid oid criterion gs =
-  let context = SourceContext.framedBy oid gs (Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots)
+  let context = SourceContext.framedBy oid gs (Projection.contextWithSlots gs (Just pid) Nothing slots)
       viewOf = Projection.viewsOf gs
       matches candidate = Filter.matches context (viewOf candidate) criterion
    in filter (\candidate -> candidate /= oid && not (Game.beingCast gs candidate) && matches candidate) (Game.zoneMembers Zone.Hand pid gs)
@@ -2464,7 +2464,7 @@ revealFromHandCandidates = discardCandidates
 -- the battlefield half cannot read the criterion differently.
 beholdCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 beholdCandidates slots pid oid criterion gs =
-  let context = SourceContext.framedBy oid gs (Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots)
+  let context = SourceContext.framedBy oid gs (Projection.contextWithSlots gs (Just pid) Nothing slots)
       viewOf = Projection.viewsOf gs
       matches candidate = Filter.matches context (viewOf candidate) criterion
    in revealFromHandCandidates slots pid oid criterion gs
@@ -2523,7 +2523,7 @@ beholdObjects slots pid oid n criterion = do
 -- escape cost can exile.
 exileCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 exileCandidates slots pid oid criterion gs =
-  let context = SourceContext.framedBy oid gs (Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots)
+  let context = SourceContext.framedBy oid gs (Projection.contextWithSlots gs (Just pid) Nothing slots)
       viewOf = Projection.viewsOf gs
       matches candidate = Filter.matches context (viewOf candidate) criterion
    in filter (\candidate -> not (Game.beingCast gs candidate) && matches candidate) (Game.zoneMembers Zone.Graveyard pid gs)
@@ -2544,7 +2544,7 @@ exileCandidates slots pid oid criterion gs =
 -- leave the ExileThis component nothing to exile.
 materialCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 materialCandidates slots pid oid criterion gs =
-  let context = SourceContext.framedBy oid gs (Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots)
+  let context = SourceContext.framedBy oid gs (Projection.contextWithSlots gs (Just pid) Nothing slots)
       viewOf = Projection.viewsOf gs
       matches candidate = candidate /= oid && Filter.matches context (viewOf candidate) criterion
    in filter matches (List.sort (Projection.controls pid gs))
@@ -2609,8 +2609,9 @@ tapCandidates slots pid oid criterion gs =
         SourceContext.framedBy
           oid
           gs
-          (Filter.contextCrewing (Game.teams gs) (Just pid) (Just oid) slots (CrewRestriction.cantCrew (Set.toList (GameState.battlefield gs)) gs))
-            { Filter.sourceColors = maybe Set.empty Filter.colors (Projection.viewWithLastKnownAnywhere gs oid)
+          (Projection.contextWithSlots gs (Just pid) (Just oid) slots)
+            { Filter.cantCrewVehicles = CrewRestriction.cantCrew (Set.toList (GameState.battlefield gs)) gs,
+              Filter.sourceColors = maybe Set.empty Filter.colors (Projection.viewWithLastKnownAnywhere gs oid)
             }
       viewOf = Projection.viewsOf gs
       matches candidate =

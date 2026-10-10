@@ -907,7 +907,7 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
   -- slot naming 6 and 8 is the negative built off the same board.
   Spec.describe s "IsBound" $ do
     let slot = SlotName.MkSlotName (Text.pack "milled")
-        bound oids = Filter.contextWithSlots Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 7)) (Map.singleton slot (Set.fromList (fmap ObjectId.MkObjectId oids)))
+        bound oids = (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 7))) {Filter.slotObjects = Map.singleton slot (Set.fromList (fmap ObjectId.MkObjectId oids))}
     Spec.it s "matches the one object the slot names" $ do
       Spec.assertBool s (Filter.matches (bound [7]) blackCreature (Filter.Type.IsBound slot)) "the bound object"
 

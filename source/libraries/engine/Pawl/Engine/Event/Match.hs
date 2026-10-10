@@ -15016,9 +15016,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     -- of Mourning grant returns the card when a greater creature dies" proves
     -- it.
     bearerContext =
-      (SourceContext.sourceContext gs (Just you) bearer)
-        { Filter.slotObjects = Binding.slotObjects bindings,
-          Filter.sourceManaValue = Filter.manaValue =<< Projection.viewWithLastKnown bearer gs bearer
+      (Projection.framedByBindings gs bindings (SourceContext.sourceContext gs (Just you) bearer))
+        { Filter.sourceManaValue = Filter.manaValue =<< Projection.viewWithLastKnown bearer gs bearer
         }
 
 -- CR 106.12a's second half: did an activation that produced @produced@ produce

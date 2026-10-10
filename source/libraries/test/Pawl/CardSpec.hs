@@ -33,6 +33,7 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as KeywordEngine
 import qualified Pawl.Engine.Modal as Modal
@@ -4882,191 +4883,23 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   -- condition itself admits no event and names nothing.
   TriggerCondition.Reflexive -> []
 
--- Every SlotName a Filter reads SINGLY -- today exactly the IsControllerOfBound
--- atoms in it. Pawl.Engine.Count answers that one through
--- Pawl.Engine.Filter.slotOneObject, which declines a slot naming several objects
--- rather than picking one of them (Pawl.Engine.Binding.onlyOne's doctrine), so
--- the atom is False for every candidate and the count is zero, in silence.
+-- Every SlotName a Filter reads SINGLY: Pawl.Engine.Filter.singularSlots, the
+-- classification the engine's arity lint reads too. Pawl.Engine.Count answers
+-- IsControllerOfBound through Pawl.Engine.Filter.slotOneObject, which declines
+-- a slot naming several objects rather than picking one of them, so the atom
+-- is False for every candidate and the count is zero, in silence.
 --
--- Exhaustive with no fallthrough, triggerConditionSlots' shape and for its
--- reason. Pawl.Engine.Filter.boundSlots is deliberately NOT reused: it ends in a
--- catch-all, so a new atom naming a slot would be absorbed there, and it reports
--- IsBound and SameNameAsBound beside the atom wanted -- both of which read the
--- whole bound set through Filter.Context and so tolerate a group.
---
--- ControlledByBound is not one either, though it names a slot:
--- Pawl.Engine.Filter.bakeBound answers it off a map of PLAYER slots, a namespace
--- disjoint from the object slots a binder mints.
---
--- Reported wherever the atom sits, not only where it is ANSWERED -- which is a
--- Scope.OverPlayers count's filter and nothing else, Pawl.Types.Filter's own
--- haddock says, every other position leaving it vacuously False. Within one
+-- Reported wherever the atom sits, not only where it is ANSWERED. Within one
 -- card's own text that is the conservative direction, an atom in one of those
 -- other positions naming no slot at all. It says nothing about a position in
 -- ANOTHER object's text, which is read for real in a resolution of its own --
 -- see clashesIn, which is where that boundary is kept (#2735).
 --
--- NOT descended into: the Filter a Keyword carries (CR 702.29e) and the one a
--- CounterKind hides under a keyword (CR 122.1b). Sound rather than elided --
--- keywordFilters tags both KeywordFramed, a position whose evaluator supplies no
--- slots at all, so nothing there reads a slot singly or plurally and there is no
--- clash to report. That covers the payload as it is READ under Filter.HasKeyword;
--- the one payload rule 702 transplants into a slot instead, CR 702.6c's equip
--- quality, keywordFilters hands out as its own MintedTargetSlot pair, which IS
--- swept. sweptForSingularSlots below is that argument, and every reader
--- reaches this walk through framedSlotsReadSingly beside it, so a keyword's
--- Filter arriving as a TOP-LEVEL tagged pair is dropped exactly as this
--- non-descent drops it nested (#2741).
+-- A keyword's own Filter is not descended into; sweptForSingularSlots below is
+-- the argument for that, and every reader reaches this walk through
+-- framedSlotsReadSingly beside it (#2741).
 filterSlotsReadSingly :: Filter.Type.Filter Keyword.Keyword -> [SlotName.SlotName]
-filterSlotsReadSingly predicate = case predicate of
-  Filter.Type.HasCardType _ -> []
-  Filter.Type.HasSupertype _ -> []
-  Filter.Type.HasColor _ -> []
-  Filter.Type.IsMonocolored -> []
-  Filter.Type.SharesColorWithSource -> []
-  Filter.Type.HasSubtype _ -> []
-  Filter.Type.HasName _ -> []
-  Filter.Type.HasNameOriginallyPrintedIn _ -> []
-  -- The keyword's own Filter, left alone for the reason above.
-  Filter.Type.HasKeyword _ -> []
-  Filter.Type.HasKeywordFamily _ -> []
-  Filter.Type.PowerAtLeast _ -> []
-  Filter.Type.PowerAtMost _ -> []
-  Filter.Type.ToughnessGreaterThanPower -> []
-  Filter.Type.PowerLessThanSource -> []
-  Filter.Type.PowerGreaterThanSource -> []
-  Filter.Type.PowerAtLeastSourceToughness -> []
-  -- Not one either, though it names a slot: the slot holds an AMOUNT
-  -- (Pawl.Engine.Filter.Context's boundAmounts), a namespace disjoint from the
-  -- object slots a binder mints, which is ControlledByBound's position above.
-  Filter.Type.PowerIsAmountInSlot _ -> []
-  Filter.Type.PowerAtLeastAmountInSlot _ -> []
-  Filter.Type.ManaValueAtMost _ -> []
-  Filter.Type.ManaValueLessThanSource -> []
-  Filter.Type.ManaValueGreaterThanSource -> []
-  Filter.Type.ManaValueEqualToSource -> []
-  Filter.Type.ManaValueIsEven -> []
-  Filter.Type.ManaValueAtMostAmount -> []
-  Filter.Type.ManaValueEqualToAmount -> []
-  Filter.Type.PowerAtMostAmount -> []
-  Filter.Type.ControlledBy _ -> []
-  Filter.Type.ControlledByDefendingPlayer -> []
-  -- A PLAYER slot, not an object one -- the disjoint namespace above.
-  Filter.Type.ControlledByBound _ -> []
-  Filter.Type.ControlledByPlayer _ -> []
-  Filter.Type.ControlledByRecipient -> []
-  Filter.Type.OwnedBy _ -> []
-  Filter.Type.OwnedByRecipient -> []
-  Filter.Type.IsSource -> []
-  Filter.Type.IsObject _ -> []
-  Filter.Type.TargetsSource -> []
-  Filter.Type.TargetsOnlySource -> []
-  Filter.Type.HasSingleTarget -> []
-  -- DESCENT, for AttachedTo's reason below: CR 115.1's atom carries the one
-  -- target's description, which a card author writes like any other filter.
-  Filter.Type.TargetsOnlyOne f -> filterSlotsReadSingly f
-  Filter.Type.TargetsMatching f -> filterSlotsReadSingly f
-  Filter.Type.TargetsPlayer _ -> []
-  -- Reads the whole bound set off Filter.Context, so a group is every one of its
-  -- members rather than nothing -- the atom this lint must NOT report.
-  Filter.Type.IsBound _ -> []
-  Filter.Type.IsTarget -> []
-  -- Reads the whole set too, one field over.
-  Filter.Type.SameNameAsBound _ -> []
-  -- Names no slot at all: CR 702.60a's comparison is against the SOURCE, whose
-  -- names arrive on Filter.Context.
-  Filter.Type.SameNameAsSource -> []
-  Filter.Type.SameOwnerAsSource -> []
-  -- Reads the whole set too, one field further over.
-  Filter.Type.SameControllerAsBound _ -> []
-  -- Reads the whole set too, off its own field: a slot naming a group answers
-  -- with every member's host's controller.
-  Filter.Type.SameControllerAsHostOfBound _ -> []
-  -- Reads the whole set too, off its own field.
-  Filter.Type.SharesCreatureTypeWithBound _ -> []
-  -- The second arm with an answer, IsControllerOfBound's below: CR 208.1's
-  -- comparison wants ONE toughness, and Pawl.Engine.Projection.framedBySlots
-  -- declines a slot that names several.
-  Filter.Type.ToughnessLessThanBound slot -> [slot]
-  Filter.Type.HasChosenName -> []
-  -- Reads no slot either: CR 105.2's colour arrives on Filter.Context.
-  Filter.Type.HasChosenColor -> []
-  -- Reads no slot either: CR 205.3's subtype arrives on Filter.Context.
-  Filter.Type.HasChosenSubtype -> []
-  Filter.Type.IsLastExiledWithSource -> []
-  -- Reads no slot at all: rule 702.16k's player arrives on Filter.Context.
-  Filter.Type.OfChosenPlayer -> []
-  Filter.Type.OfRelatedPlayer _ -> []
-  Filter.Type.IsPlayer _ -> []
-  -- The one arm with an answer: the candidate is the controller of the object
-  -- the slot names (CR 608.2h), read through slotOneObject.
-  Filter.Type.IsControllerOfBound slot -> [slot]
-  -- DESCENT: the nest is card text like any other, and an atom written into it
-  -- is read exactly as one written at the top level.
-  Filter.Type.ControlsMoreThanYou _ f -> filterSlotsReadSingly f
-  Filter.Type.CardsInGraveyardAtLeast _ -> []
-  Filter.Type.IsAttacking -> []
-  Filter.Type.IsAttackingPlayer _ -> []
-  Filter.Type.IsAttackingPlaneswalker _ -> []
-  Filter.Type.IsAttackingBattle _ -> []
-  Filter.Type.DeclaredAttackedThisCombat -> []
-  Filter.Type.IsBlocking -> []
-  Filter.Type.IsBlocked -> []
-  Filter.Type.DeclaredAttackerThisCombat -> []
-  Filter.Type.DeclaredBlockerThisCombat -> []
-  Filter.Type.AttackedThisTurn -> []
-  Filter.Type.MilledThisTurn -> []
-  Filter.Type.CantCrewVehicles -> []
-  Filter.Type.DealtDamageThisTurn -> []
-  Filter.Type.EnteredThisTurn -> []
-  Filter.Type.CrewedSourceThisTurn -> []
-  Filter.Type.ConvokedSourceThisTurn -> []
-  Filter.Type.SaddledSourceThisTurn -> []
-  Filter.Type.ControlledSinceTurnBegan -> []
-  -- DESCENT, for ControlsMoreThanYou's reason.
-  Filter.Type.AttachedTo f -> filterSlotsReadSingly f
-  -- DESCENT, for the atom above's reason.
-  Filter.Type.HasAttached f -> filterSlotsReadSingly f
-  Filter.Type.IsAttachedToSource -> []
-  Filter.Type.IsAttachedToEvaluated -> []
-  Filter.Type.IsHostOfSource -> []
-  Filter.Type.EnteredWithSource -> []
-  Filter.Type.AttachedNoLaterThanSource -> []
-  Filter.Type.CanHostSubject -> []
-  Filter.Type.CanAttachToSubject -> []
-  Filter.Type.HostOfSubjectHasCardType _ -> []
-  Filter.Type.IsCommander -> []
-  Filter.Type.IsToken -> []
-  Filter.Type.IsActivatedAbility -> []
-  Filter.Type.IsAbility -> []
-  Filter.Type.IsEmblem -> []
-  -- DESCENT, for RepresentedByCard's reason below.
-  Filter.Type.FromSource f -> filterSlotsReadSingly f
-  Filter.Type.IsTapped -> []
-  Filter.Type.IsFaceDown -> []
-  -- DESCENT, for the atom above's reason.
-  Filter.Type.RepresentedByCard f -> filterSlotsReadSingly f
-  Filter.Type.IsExiledFaceDown -> []
-  Filter.Type.Transformed -> []
-  Filter.Type.IsRingBearer -> []
-  Filter.Type.IsPaired -> []
-  Filter.Type.IsPairedWithSource -> []
-  Filter.Type.IsBlockedBySource -> []
-  Filter.Type.HasDesignation _ -> []
-  -- The kind may be a whole Keyword hiding a Filter, left alone for the reason
-  -- the keyword atom above is.
-  Filter.Type.HasCounters _ -> []
-  Filter.Type.HasCountersOfAnyKind -> []
-  Filter.Type.HasSticker _ -> []
-  Filter.Type.Stickered -> []
-  Filter.Type.HasNonManaActivatedAbility -> []
-  Filter.Type.HasActivatedAbility -> []
-  Filter.Type.IsInZone _ -> []
-  Filter.Type.WasCastFrom _ -> []
-  Filter.Type.TagWasSpent _ -> []
-  Filter.Type.And fs -> concatMap filterSlotsReadSingly fs
-  Filter.Type.Or fs -> concatMap filterSlotsReadSingly fs
-  Filter.Type.Not f -> filterSlotsReadSingly f
+filterSlotsReadSingly = Set.toList . Filter.singularSlots
 
 -- The Filters a DamagePattern carries -- its source half and its printed
 -- recipient half, the two axes of that type that ARE predicates over an object.
@@ -5802,9 +5635,8 @@ data Framing
 -- keyword's payload Filter supplies SLOT OBJECTS, so Filter.IsControllerOfBound
 -- reads nothing at any of them. That is the test to put a new evaluator to,
 -- rather than a list of today's: the question is what the EVALUATING context
--- holds, not how many builders there are -- Pawl.Engine.Filter.contextWithSlots
--- has callers across the engine and Pawl.Engine.Target.slotContext writes a
--- slot-carrying Context out by hand. None reaches a keyword's payload: CR
+-- holds, not how many builders there are -- Pawl.Engine.Projection.framedBySlots
+-- has callers across the engine. None reaches a keyword's payload: CR
 -- 702.11d and CR 702.16b (Pawl.Engine.Target.targetable), CR 702.14c
 -- (Pawl.Engine.Combat), CR 702.16c/d (Pawl.Engine.AttachRestriction), CR
 -- 702.16f (Pawl.Engine.CombatRestriction) and the CR 702.29e cycling mint's
@@ -5837,7 +5669,7 @@ sweptForSingularSlots framing = case framing of
   SourceHostFramed -> True
   -- SWEPT, as these positions were under SourceHostFramed before #3320 split them
   -- off: CR 603.4's clause really does read the trigger's slots
-  -- (Filter.contextWithSlots), and where the other two read none the sweep can
+  -- (Projection.framedByBindings), and where the other two read none the sweep can
   -- only reject more, SlotlessCostFramed's argument.
   StandingHostFramed -> True
   -- SWEPT, as both were before they were split off: the split is about CR
