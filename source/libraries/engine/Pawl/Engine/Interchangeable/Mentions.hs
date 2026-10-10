@@ -164,6 +164,7 @@ import qualified Pawl.Types.EntryAttack as EntryAttack
 import qualified Pawl.Types.EntryBlock as EntryBlock
 import qualified Pawl.Types.EntryFlip as EntryFlip
 import qualified Pawl.Types.EntryOption as EntryOption
+import qualified Pawl.Types.EntryPrice as EntryPrice
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRestriction as EntryRestriction
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
@@ -1410,6 +1411,11 @@ entryOptionNames :: Asking -> EntryOption.EntryOption -> Bool
 entryOptionNames asking x = case x of
   EntryOption.MkEntryOption _power _toughness keywords -> any (keywordNames asking) keywords
 
+entryPriceNames :: Asking -> EntryPrice.EntryPrice -> Bool
+entryPriceNames asking x = case x of
+  EntryPrice.PayLife _natural -> False
+  EntryPrice.Reveal filter_ -> filterNames asking filter_
+
 entryRNames :: Asking -> (ability -> Bool) -> (effect -> Bool) -> EntryR.EntryR ability effect -> Bool
 entryRNames asking onAbility onEffect x = case x of
   EntryR.MkEntryR matching rewrite -> filterNames asking matching || entryRewriteNames asking onAbility onEffect rewrite
@@ -1446,8 +1452,7 @@ entryRewriteNames asking onAbility onEffect x = case x of
   EntryRewrite.Tribute _natural -> False
   EntryRewrite.Compleated _natural -> False
   EntryRewrite.Tapped -> False
-  EntryRewrite.PayLifeOrTapped _natural -> False
-  EntryRewrite.RevealOrTapped filter_ -> filterNames asking filter_
+  EntryRewrite.OrTapped entryPrice -> entryPriceNames asking entryPrice
   EntryRewrite.EntersTransformed -> False
   EntryRewrite.RunEffects seq_ -> any onEffect seq_
 

@@ -271,6 +271,7 @@ import qualified Pawl.Codec.EntryAttackSpec
 import qualified Pawl.Codec.EntryBlockSpec
 import qualified Pawl.Codec.EntryFlipSpec
 import qualified Pawl.Codec.EntryOptionSpec
+import qualified Pawl.Codec.EntryPriceSpec
 import qualified Pawl.Codec.EntryRSpec
 import qualified Pawl.Codec.EntryRestrictionSpec
 import qualified Pawl.Codec.EntryRewriteSpec
@@ -1113,6 +1114,7 @@ spec s registry = do
   Pawl.Codec.AttackPermissionSpec.spec s
   Pawl.Codec.EnteringTogetherSpec.spec s
   Pawl.Codec.EntryRestrictionSpec.spec s
+  Pawl.Codec.EntryPriceSpec.spec s
   Pawl.Codec.EntryRewriteSpec.spec s
   Pawl.Codec.EntryRidersSpec.spec s
   Pawl.Codec.EquipSpec.spec s

@@ -179,6 +179,7 @@ import qualified Pawl.Types.Emerge as Emerge
 import qualified Pawl.Types.EntersWith as EntersWith
 import qualified Pawl.Types.EntryFlip as EntryFlip
 import qualified Pawl.Types.EntryOption as EntryOption
+import qualified Pawl.Types.EntryPrice as EntryPrice
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRestriction as EntryRestriction
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
@@ -5060,7 +5061,7 @@ entryRewriteFilters :: EntryRewrite.EntryRewrite (GrantedAbility.GrantedAbility 
 entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.ChooseCardNames f -> unframed [f]
   EntryRewrite.ChooseCardName f -> unframed [f]
-  EntryRewrite.RevealOrTapped f -> unframed [f]
+  EntryRewrite.OrTapped (EntryPrice.Reveal f) -> unframed [f]
   -- CR 614.1c's as-enters exile carries a criterion over a CARD IN A GRAVEYARD
   -- (Living Lore's "an instant or sorcery card"), the reveal's axis one zone over
   -- and unframed with it.
@@ -5119,7 +5120,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.Tribute _ -> []
   EntryRewrite.Compleated _ -> []
   EntryRewrite.Tapped -> []
-  EntryRewrite.PayLifeOrTapped _ -> []
+  EntryRewrite.OrTapped (EntryPrice.PayLife _) -> []
   EntryRewrite.EntersTransformed -> []
   -- ALL THREE fields: the permanents the sacrifice may take, CR 122.1b's kind
   -- the entering permanent takes one of per sacrifice, which may be a whole

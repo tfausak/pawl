@@ -591,6 +591,8 @@ library codec
     Pawl.Codec.EntryFlipSpec
     Pawl.Codec.EntryOption
     Pawl.Codec.EntryOptionSpec
+    Pawl.Codec.EntryPrice
+    Pawl.Codec.EntryPriceSpec
     Pawl.Codec.EntryR
     Pawl.Codec.EntryRestriction
     Pawl.Codec.EntryRestrictionSpec
@@ -2266,6 +2268,7 @@ library types
     Pawl.Types.EntryBlock
     Pawl.Types.EntryFlip
     Pawl.Types.EntryOption
+    Pawl.Types.EntryPrice
     Pawl.Types.EntryR
     Pawl.Types.EntryRefusal
     Pawl.Types.EntryRestriction

@@ -108,6 +108,7 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntersWith as EntersWith
 import qualified Pawl.Types.EntryAttack as EntryAttack
 import qualified Pawl.Types.EntryBlock as EntryBlock
+import qualified Pawl.Types.EntryPrice as EntryPrice
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
@@ -1759,8 +1760,8 @@ entryRewriteReads rewrite = case rewrite of
   EntryRewrite.Tribute _ -> ([], [])
   EntryRewrite.Compleated _ -> ([], [])
   EntryRewrite.Tapped -> ([], [])
-  EntryRewrite.PayLifeOrTapped _ -> ([], [])
-  EntryRewrite.RevealOrTapped filter_ -> ([filter_], [])
+  EntryRewrite.OrTapped (EntryPrice.PayLife _) -> ([], [])
+  EntryRewrite.OrTapped (EntryPrice.Reveal filter_) -> ([filter_], [])
   EntryRewrite.EntersTransformed -> ([], [])
   -- The nested effects' reads are replacementRowEffects' answer rather than this
   -- one's, for the reason replacementRowReads' header gives.
@@ -1935,8 +1936,7 @@ entryRewriteEffects rewrite = case rewrite of
   EntryRewrite.Tribute _ -> []
   EntryRewrite.Compleated _ -> []
   EntryRewrite.Tapped -> []
-  EntryRewrite.PayLifeOrTapped _ -> []
-  EntryRewrite.RevealOrTapped _ -> []
+  EntryRewrite.OrTapped _ -> []
   EntryRewrite.EntersTransformed -> []
 
 -- The program a DAMAGE rewrite runs. entryRewriteEffects' twin, and its

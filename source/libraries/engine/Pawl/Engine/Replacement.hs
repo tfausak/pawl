@@ -1215,8 +1215,7 @@ admitsEntry gs oid rewrite = case rewrite of
   -- enters, and both of the questions it asks are players'.
   EntryRewrite.Tribute _ -> True
   EntryRewrite.Tapped -> True
-  EntryRewrite.PayLifeOrTapped _ -> True
-  EntryRewrite.RevealOrTapped _ -> True
+  EntryRewrite.OrTapped _ -> True
   -- CR 614.1c's "as [this permanent] enters, [do something]". No condition here
   -- and Bloodthirst above is the contrast: rule 702.54a's condition is a RULE's,
   -- so it has nowhere else to live, while Monstrous War-Leech's "if it was
@@ -1294,8 +1293,7 @@ entryCostOf rewrite = case rewrite of
   EntryRewrite.Tribute _ -> Nothing
   EntryRewrite.Compleated _ -> Nothing
   EntryRewrite.Tapped -> Nothing
-  EntryRewrite.PayLifeOrTapped _ -> Nothing
-  EntryRewrite.RevealOrTapped _ -> Nothing
+  EntryRewrite.OrTapped _ -> Nothing
   EntryRewrite.EntersTransformed -> Nothing
   EntryRewrite.RunEffects _ -> Nothing
 
@@ -1875,14 +1873,11 @@ bucketOfEffect re = case re of
   -- STATUS the permanent enters with (CR 110.5b), never whose it is, what it
   -- copies or which face is up. So CR 616.1e.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.Tapped) -> ReplacementBucket.Other
-  -- CR 614.1c's paid variant of the same rewrite is none of CR 616.1a-d either,
-  -- and paying life does not make it one: what the rewrite changes is still the
-  -- STATUS the permanent enters with (CR 110.5b). So CR 616.1e.
-  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.PayLifeOrTapped _)) -> ReplacementBucket.Other
-  -- CR 614.1c's revealed variant, PayLifeOrTapped's answer for its reason: what
-  -- the rewrite changes is the STATUS the permanent enters with (CR 110.5b), and
-  -- CR 701.20b makes the reveal itself change nothing at all. So CR 616.1e.
-  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.RevealOrTapped _)) -> ReplacementBucket.Other
+  -- CR 614.1c's priced variant of the same rewrite is none of CR 616.1a-d
+  -- either, and the price does not make it one: what the rewrite changes is still
+  -- the STATUS the permanent enters with (CR 110.5b), and CR 701.20b makes a
+  -- reveal change nothing at all. So CR 616.1e.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.OrTapped _)) -> ReplacementBucket.Other
   -- CR 616.1b: a control-on-entry rewrite is one step ABOVE the copy bucket, and
   -- Gather Specimens racing an entering Clone is the board where the two orders
   -- disagree: taking the control rewrite first hands Clone's own CR 109.5 copy
@@ -2076,16 +2071,9 @@ readsApplier re = case re of
   -- The payer is the ENTERING object's controller -- "you" in an "as this
   -- permanent enters" ability the permanent prints about itself -- read live off
   -- the board at CR 614.12a's moment rather than off the candidate, and the
-  -- amount rides the effect. Two such rows are always on the same object and
+  -- price rides the effect. Two such rows are always on the same object and
   -- would offer that object's controller the same price.
-  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.PayLifeOrTapped _)) -> False
-  -- CR 614.1c: NO, and PayLifeOrTapped's reasoning holds word for word. The
-  -- revealer is the ENTERING object's controller -- "your hand" in an ability the
-  -- permanent prints about itself -- read live off the board at CR 614.12a's
-  -- moment rather than off the candidate, and the criterion rides the effect. Two
-  -- such rows are always on the same object and would offer that object's
-  -- controller the same cards.
-  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.RevealOrTapped _)) -> False
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.OrTapped _)) -> False
   -- THE ONE ARM THAT ANSWERS YES. CR 616.1b / 110.2 / 109.5: the rewrite hands
   -- the permanent to the candidate's own `controller`, baked when the row was
   -- installed. Two Gather Specimens are one card, so their `effect` values are

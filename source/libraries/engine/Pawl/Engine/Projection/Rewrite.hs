@@ -114,6 +114,7 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntersWith as EntersWith
 import qualified Pawl.Types.EntryFlip as EntryFlip
 import qualified Pawl.Types.EntryOption as EntryOption
+import qualified Pawl.Types.EntryPrice as EntryPrice
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRestriction as EntryRestriction
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
@@ -1731,7 +1732,7 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
           SacrificeAnyNumber.kind = fmap (Filter.rewriteCounterKind pairs) (SacrificeAnyNumber.kind s)
         }
   -- CR 614.1c's "exile a [matching] card from your graveyard": Living Lore's says
-  -- instant or sorcery, card types CR 612.1 reaches. Latent for RevealOrTapped's
+  -- instant or sorcery, card types CR 612.1 reaches. Latent for OrTapped's
   -- reason -- that EntryR matches Filter.IsSource, and CR 400.7 forbids carrying a
   -- text change onto the permanent before it entered.
   EntryRewrite.ExileFromGraveyard f -> EntryRewrite.ExileFromGraveyard (Filter.rewrite pairs f)
@@ -1763,15 +1764,15 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
   -- announced payment rather than card text, so there is no word here for CR
   -- 612.1 either.
   EntryRewrite.Compleated _ -> rewrite
-  -- CR 614.1d's bare "enters tapped", and the life total CR 614.1c's alternative
-  -- to it asks for: a tap status and a number.
+  -- CR 614.1d's bare "enters tapped": a tap status.
   EntryRewrite.Tapped -> rewrite
-  EntryRewrite.PayLifeOrTapped _ -> rewrite
-  -- CR 614.1c's "reveal a [matching] card": Rustic Clachan's says Kithkin, a
-  -- creature type word CR 612.2 licenses. Latent all the same: that EntryR
-  -- matches Filter.IsSource, so a text change would have to be on the permanent
-  -- before it entered, and CR 400.7 is what forbids carrying one there.
-  EntryRewrite.RevealOrTapped f -> EntryRewrite.RevealOrTapped (Filter.rewrite pairs f)
+  -- CR 614.1c's life price is a number. Its "reveal a [matching] card": Rustic
+  -- Clachan's says Kithkin, a creature type word CR 612.2 licenses. Latent all
+  -- the same: that EntryR matches Filter.IsSource, so a text change would have
+  -- to be on the permanent before it entered, and CR 400.7 is what forbids
+  -- carrying one there.
+  EntryRewrite.OrTapped (EntryPrice.PayLife _) -> rewrite
+  EntryRewrite.OrTapped (EntryPrice.Reveal f) -> EntryRewrite.OrTapped (EntryPrice.Reveal (Filter.rewrite pairs f))
   EntryRewrite.EntersTransformed -> rewrite
   -- CR 614.1c's "as this enters, [do something]", the payload shared with an
   -- ability's clauses.
