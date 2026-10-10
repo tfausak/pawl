@@ -76,7 +76,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Recruit as Recruit
 import qualified Pawl.Engine.Replacement as Replacement
-import Pawl.Engine.Resolve.Slots (battlefieldMatching, boundSlots, conditionSlots, effectContext, effectContextNaming, effectObjectRefs, effectPlayerRefs, effectViewOf, graveyardCardsOf, handCardsOf, legalMany, legalOne, libraryCardsOf, matchingFromAmong, objectRefObjects, overRelations, playerRefPlayers, replacementRowSlots, resolutionReads, slotBindings, slotGroup)
+import Pawl.Engine.Resolve.Slots (battlefieldMatching, boundSlots, conditionSlots, effectContext, effectContextNaming, effectObjectRefs, effectPlayerRefs, effectViewOf, graveyardCardsOf, handCardsOf, legalMany, legalOne, libraryCardsOf, matchingFromAmong, objectRefObjects, overRelations, playerRefPlayers, playerRefSlots, replacementRowSlots, resolutionReads, slotBindings, slotGroup)
 import qualified Pawl.Engine.Restamp as Restamp
 import qualified Pawl.Engine.Ring as Ring
 import qualified Pawl.Engine.Room as Room
@@ -3173,7 +3173,10 @@ conjuredName card = Face.name (NonEmpty.head (Card.Type.faces card))
 -- Lion's "you may reveal a planeswalker card from among them and put it into
 -- your hand" moves nothing when the reveal found nothing. Pawl.MassEffectSpec's
 -- "CR 608.2d Carth the Lion's reveal is not offered without a planeswalker among
--- them" proves it.
+-- them" proves it. A PlayerRef naming no slot ("you") is no such read and
+-- leaves the instruction dependent; one naming a slot is a read of its own, so
+-- the instruction is weighed. Pawl.MassEffectSpec's "CR 608.2d a GainControl to
+-- you of a slot the reveal defines is dependent on it" proves the first half.
 --
 -- An EMPTY clause is not impossible, for the reason clauseIsInert gives.
 clauseIsImpossible :: ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> GameState -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
@@ -3186,7 +3189,7 @@ clauseIsImpossible resolving source controller legal gs clause =
         _ -> False
       dependent defined effect =
         let refs = effectObjectRefs effect
-         in not (null refs) && null (effectPlayerRefs effect) && all (readsOnly defined) refs
+         in not (null refs) && all (Map.null . playerRefSlots) (effectPlayerRefs effect) && all (readsOnly defined) refs
       independent = [effect | (defined, effect) <- zip definedBefore effects, not (dependent defined effect)]
    in not (null independent) && all (effectIsImpossible resolving source controller legal gs) independent
 

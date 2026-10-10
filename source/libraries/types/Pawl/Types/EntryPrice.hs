@@ -9,7 +9,6 @@ import qualified Pawl.Types.Keyword as Keyword
 data EntryPrice
   = -- | CR 119.4: pay N life (Razorgrass Field).
     PayLife Natural.Natural
-  | -- | CR 701.20a: reveal a matching card from your hand (Rustic Clachan). Not a
-    -- cost, since a reveal changes no zone.
+  | -- | CR 701.20a: reveal a matching card from your hand (Rustic Clachan).
     Reveal (Filter.Filter Keyword.Keyword)
   deriving (Eq, Ord, Show)
