@@ -1,0 +1,189 @@
+{
+  "faces": [
+    {
+      "characteristicPT": {
+        "type": "Count",
+        "value": {
+          "aggregation": {
+            "type": "DistinctCardTypes"
+          },
+          "filter": {
+            "type": "And",
+            "value": []
+          },
+          "scope": {
+            "type": "InZone",
+            "value": {
+              "player": {
+                "type": "Relative",
+                "value": {
+                  "type": "You"
+                }
+              },
+              "zone": {
+                "type": "Graveyard"
+              }
+            }
+          }
+        }
+      },
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Consuming Blob",
+      "oracleText": "Consuming Blob's power is equal to the number of card types among cards in your graveyard and its toughness is equal to that number plus 1.\nAt the beginning of your end step, create a green Ooze creature token with \"This token's power is equal to the number of card types among cards in your graveyard and its toughness is equal to that number plus 1.\"",
+      "power": {
+        "type": "Star"
+      },
+      "toughness": {
+        "type": "Plus",
+        "value": {
+          "left": {
+            "type": "Star"
+          },
+          "right": {
+            "type": "Literal",
+            "value": 1
+          }
+        }
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "StepBegins",
+            "value": {
+              "phase": {
+                "type": "Ending",
+                "value": {
+                  "type": "EndStep"
+                }
+              },
+              "scope": {
+                "type": "ControllersTurn"
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Create",
+                        "value": {
+                          "card": {
+                            "faces": [
+                              {
+                                "characteristicPT": {
+                                  "type": "Count",
+                                  "value": {
+                                    "aggregation": {
+                                      "type": "DistinctCardTypes"
+                                    },
+                                    "filter": {
+                                      "type": "And",
+                                      "value": []
+                                    },
+                                    "scope": {
+                                      "type": "InZone",
+                                      "value": {
+                                        "player": {
+                                          "type": "Relative",
+                                          "value": {
+                                            "type": "You"
+                                          }
+                                        },
+                                        "zone": {
+                                          "type": "Graveyard"
+                                        }
+                                      }
+                                    }
+                                  }
+                                },
+                                "colorIndicator": [
+                                  {
+                                    "type": "Green"
+                                  }
+                                ],
+                                "name": "Ooze Token",
+                                "power": {
+                                  "type": "Star"
+                                },
+                                "toughness": {
+                                  "type": "Plus",
+                                  "value": {
+                                    "left": {
+                                      "type": "Star"
+                                    },
+                                    "right": {
+                                      "type": "Literal",
+                                      "value": 1
+                                    }
+                                  }
+                                },
+                                "typeLine": {
+                                  "subtypes": [
+                                    {
+                                      "type": "Ooze"
+                                    }
+                                  ],
+                                  "types": [
+                                    {
+                                      "type": "Creature"
+                                    }
+                                  ]
+                                }
+                              }
+                            ]
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Ooze"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

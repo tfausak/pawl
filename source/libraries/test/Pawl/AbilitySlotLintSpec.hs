@@ -51,6 +51,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationProhibition as ActivationProhibition
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.Arithmetic as Arithmetic
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.Card as Card.Type
@@ -1220,10 +1221,12 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
         -- an inner number aimed at the object the slot names.
         bothReader =
           Effect.Bolster
-            ( Quantity.Type.Plus
-                ( Plus.MkPlus
-                    (Quantity.Type.InSlot slot)
-                    (Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot slot (Quantity.Type.Literal 1)))
+            ( Quantity.Type.Arithmetic
+                ( Arithmetic.Plus
+                    ( Plus.MkPlus
+                        (Quantity.Type.InSlot slot)
+                        (Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot slot (Quantity.Type.Literal 1)))
+                    )
                 )
             )
     Spec.assertBool

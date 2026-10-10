@@ -1,0 +1,26 @@
+{
+  "description": "CR 111.3 / 208.2 Consuming Blob's Ooze token keeps its printed *+1 box for its characteristic-defining ability, so it is a 3/4 off alice's three card types",
+  "note": "The token's toughness box is a Plus over the star, which bakeTokenCharacteristics must leave standing (Star.containsStar). Bob's sorcery and artifact are two more card types, which an all-graveyards count would read.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Consuming Blob", "label": "blob" }],
+        "graveyard": [{ "card": "Grizzly Bears" }, { "card": "Lightning Bolt" }, { "card": "Forest" }],
+        "library": [{ "card": "Grizzly Bears" }, { "card": "Grizzly Bears" }]
+      },
+      {
+        "name": "bob",
+        "graveyard": [{ "card": "Divination" }, { "card": "Ornithopter" }],
+        "library": [{ "card": "Grizzly Bears" }, { "card": "Grizzly Bears" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PostcombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "EndStep", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "PowerToughness": { "object": "Ooze Token", "power": 3, "toughness": 4 } } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "PowerToughness": { "object": "$blob", "power": 3, "toughness": 4 } } }
+  ]
+}

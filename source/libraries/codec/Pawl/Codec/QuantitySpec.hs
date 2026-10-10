@@ -8,6 +8,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AgainstLastCardExiledWith as AgainstLastCardExiledWith
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.Arithmetic as Arithmetic
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastFrom as CastFrom
@@ -89,7 +90,7 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
     Common.assertCodec
       s
       Quantity.codec
-      (Quantity.Plus (Plus.MkPlus (Quantity.Literal 1) (Quantity.InSlot slot)))
+      (Quantity.Arithmetic (Arithmetic.Plus (Plus.MkPlus (Quantity.Literal 1) (Quantity.InSlot slot))))
       " {\"type\":\"Plus\",\"value\":{\"left\":{\"type\":\"Literal\",\"value\":1},\"right\":{\"type\":\"InSlot\",\"value\":\"destroyed\"}}} "
   -- CR 701.4b's yes-or-no over the same slot name, whose wire shape is InSlot's
   -- and whose reading is not: this one asks whether the slot is bound at all.
@@ -146,7 +147,7 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
     Common.assertCodec
       s
       Quantity.codec
-      (Quantity.Plus (Plus.MkPlus (Quantity.Literal 1) Quantity.Star))
+      (Quantity.Arithmetic (Arithmetic.Plus (Plus.MkPlus (Quantity.Literal 1) Quantity.Star)))
       " {\"type\":\"Plus\",\"value\":{\"left\":{\"type\":\"Literal\",\"value\":1},\"right\":{\"type\":\"Star\"}}} "
   -- Toxic Deluge's -X on the wire: one whole Quantity under the tag, not a pair.
   -- The second case nests a NEGATIVE Literal under it -- the other way this type
@@ -157,12 +158,12 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
     Common.assertCodec
       s
       Quantity.codec
-      (Quantity.Negate (Quantity.InSlot slot))
+      (Quantity.Arithmetic (Arithmetic.Negate (Quantity.InSlot slot)))
       " {\"type\":\"Negate\",\"value\":{\"type\":\"InSlot\",\"value\":\"X\"}} "
     Common.assertCodec
       s
       Quantity.codec
-      (Quantity.Negate (Quantity.Literal (-2)))
+      (Quantity.Arithmetic (Arithmetic.Negate (Quantity.Literal (-2))))
       " {\"type\":\"Negate\",\"value\":{\"type\":\"Literal\",\"value\":-2}} "
   -- Quantity.Count's arm is tagged here and nowhere else: Pawl.Codec.Count
   -- writes a bare object, so a Count payload can never be double-tagged.
@@ -773,7 +774,7 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
     Common.assertCodec
       s
       Quantity.codec
-      (Quantity.Plus (Plus.MkPlus (Quantity.Literal 1) (Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot (Quantity.ObjectCounters CounterKind.PlusOnePlusOne)))))
+      (Quantity.Arithmetic (Arithmetic.Plus (Plus.MkPlus (Quantity.Literal 1) (Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot (Quantity.ObjectCounters CounterKind.PlusOnePlusOne))))))
       " {\"type\":\"Plus\",\"value\":{\"left\":{\"type\":\"Literal\",\"value\":1},\"right\":{\"type\":\"AgainstSlot\",\"value\":{\"slot\":\"creature\",\"quantity\":{\"type\":\"ObjectCounters\",\"value\":{\"type\":\"PlusOnePlusOne\"}}}}}} "
   -- No slot to carry, so the payload IS the wire value. Nested once for
   -- AgainstSlot's reason -- a recursive decoder is where a payload gets lost --
@@ -788,7 +789,7 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
     Common.assertCodec
       s
       Quantity.codec
-      (Quantity.Plus (Plus.MkPlus (Quantity.Literal 1) (Quantity.AgainstCardsExiledWith Quantity.Toughness)))
+      (Quantity.Arithmetic (Arithmetic.Plus (Plus.MkPlus (Quantity.Literal 1) (Quantity.AgainstCardsExiledWith Quantity.Toughness))))
       " {\"type\":\"Plus\",\"value\":{\"left\":{\"type\":\"Literal\",\"value\":1},\"right\":{\"type\":\"AgainstCardsExiledWith\",\"value\":{\"type\":\"Toughness\"}}}} "
   -- CR 607.2a / 613.7d (Duplicant): the filter picking the card, then what to
   -- read off it.
@@ -812,12 +813,12 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
     Common.assertCodec
       s
       Quantity.codec
-      (Quantity.Halved (Halved.MkHalved Rounding.Down (Quantity.Literal 5)))
+      (Quantity.Arithmetic (Arithmetic.Halved (Halved.MkHalved Rounding.Down (Quantity.Literal 5))))
       " {\"type\":\"Halved\",\"value\":{\"rounding\":{\"type\":\"Down\"},\"quantity\":{\"type\":\"Literal\",\"value\":5}}} "
     Common.assertCodec
       s
       Quantity.codec
-      (Quantity.Halved (Halved.MkHalved Rounding.Up (Quantity.LifeTotal PlayerRef.Candidate)))
+      (Quantity.Arithmetic (Arithmetic.Halved (Halved.MkHalved Rounding.Up (Quantity.LifeTotal PlayerRef.Candidate))))
       " {\"type\":\"Halved\",\"value\":{\"rounding\":{\"type\":\"Up\"},\"quantity\":{\"type\":\"LifeTotal\",\"value\":{\"type\":\"Candidate\"}}}} "
   -- CR 107.1's factor and the value it multiplies, over the Count that Blessed
   -- Reversal prints -- Halved's reason for nesting, one arm over.
@@ -825,7 +826,7 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
     Common.assertCodec
       s
       Quantity.codec
-      (Quantity.Times (Times.MkTimes 3 (Quantity.LifeTotal PlayerRef.Candidate)))
+      (Quantity.Arithmetic (Arithmetic.Times (Times.MkTimes 3 (Quantity.LifeTotal PlayerRef.Candidate))))
       " {\"type\":\"Times\",\"value\":{\"factor\":3,\"quantity\":{\"type\":\"LifeTotal\",\"value\":{\"type\":\"Candidate\"}}}} "
   -- Forcing the schema is what proves the RECURSIVE definition terminates, and
   -- it proves more of that now than it used to: Negate names `codec` itself

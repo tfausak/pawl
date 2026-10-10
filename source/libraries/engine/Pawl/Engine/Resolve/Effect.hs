@@ -447,10 +447,9 @@ bindMinted resolving mSlot minted = case (mSlot, minted) of
 -- would instead be a board-reading box on a permanent, which is not a thing CR
 -- 208 allows a token to have.
 --
--- The star half is a REGRESSION FENCE, not a proven behaviour: no card in
--- data/cards mints a token whose printed box holds a Star (grepped 2026-08-24),
--- so making containsStar answer False everywhere leaves the suite green. It is
--- kept because CR 208.2 states it.
+-- The star half is proved by the scenario
+-- consuming-blob-ooze-token-keeps-its-star-plus-one-box: Consuming Blob's Ooze
+-- token prints a *+1 toughness, and settling that box makes it a 3/1.
 bakeTokenCharacteristics :: (Quantity.Type.Quantity -> Maybe Integer) -> Card.Type.Card -> Card.Type.Card
 bakeTokenCharacteristics eval card =
   let bake quantity =
