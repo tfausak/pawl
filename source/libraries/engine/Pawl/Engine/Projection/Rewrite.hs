@@ -14,6 +14,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Types.AbilityAddsMana as AbilityAddsMana
+import qualified Pawl.Types.ActingPermanent as ActingPermanent
 import qualified Pawl.Types.ActivateManaAbilities as ActivateManaAbilities
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationProhibition as ActivationProhibition
@@ -29,6 +30,7 @@ import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.Ante as Ante
 import qualified Pawl.Types.AnyNumberDiscard as AnyNumberDiscard
 import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
+import qualified Pawl.Types.Arithmetic as Arithmetic
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttachAll as AttachAll
@@ -141,7 +143,6 @@ import qualified Pawl.Types.GainControl as GainControl
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
-import qualified Pawl.Types.Halved as Halved
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LifeLoss as LifeLoss
@@ -166,6 +167,7 @@ import qualified Pawl.Types.MovedKinds as MovedKinds
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.PayGate as PayGate
+import qualified Pawl.Types.PermanentActed as PermanentActed
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentDealsCombatDamageToPlayer as PermanentDealsCombatDamageToPlayer
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
@@ -230,7 +232,6 @@ import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TheseDiscard as TheseDiscard
-import qualified Pawl.Types.Times as Times
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
@@ -1797,7 +1798,7 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
 -- Modification.ChangeSubtypeWord arm above guards the same hazard the same way,
 -- over a permanent's projected keywords instead of an entry row.
 --
--- The combiner is Quantity.Plus, CR 208.2's composition: it needs no Num instance
+-- The combiner is Arithmetic.Plus, CR 208.2's composition: it needs no Num instance
 -- (Pawl.Types.Quantity has none, deliberately), and it leaves the two amounts
 -- unevaluated exactly as the rewrite found them, so a Count that must be read
 -- against a board is still read against the board the entry happens on.
@@ -1808,7 +1809,7 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
 rewriteWithCounters :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> WithCounters.WithCounters -> WithCounters.WithCounters
 rewriteWithCounters pairs w =
   WithCounters.MkWithCounters
-    . Map.mapKeysWith (\greater lesser -> Quantity.Type.Plus (Plus.MkPlus lesser greater)) (Filter.rewriteCounterKind pairs)
+    . Map.mapKeysWith (\greater lesser -> Quantity.Type.Arithmetic (Arithmetic.Plus (Plus.MkPlus lesser greater))) (Filter.rewriteCounterKind pairs)
     . fmap (rewriteQuantity pairs)
     $ WithCounters.counters w
 
@@ -2001,11 +2002,15 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfTransformedInto _ -> condition
   TriggerCondition.PermanentTransforms f -> TriggerCondition.PermanentTransforms (Filter.rewrite pairs f)
   TriggerCondition.PermanentTurnedFaceUp f -> TriggerCondition.PermanentTurnedFaceUp (Filter.rewrite pairs f)
-  TriggerCondition.PermanentTurnedFaceDown f -> TriggerCondition.PermanentTurnedFaceDown (Filter.rewrite pairs f)
   TriggerCondition.FaceDownPermanentLeavesRevealed -> condition
   TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated d f) -> TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated d (Filter.rewrite pairs f))
-  TriggerCondition.SelfEvolves -> condition
-  TriggerCondition.SelfMutates -> condition
+  TriggerCondition.PermanentActs acts ->
+    TriggerCondition.PermanentActs
+      acts
+        { PermanentActed.permanent = case PermanentActed.permanent acts of
+            ActingPermanent.Self -> ActingPermanent.Self
+            ActingPermanent.Matching f -> ActingPermanent.Matching (Filter.rewrite pairs f)
+        }
   TriggerCondition.AttachedCreatureMentors -> condition
   TriggerCondition.AttachedCreatureDies -> condition
   TriggerCondition.AttachedCreatureBecomesTapped -> condition
@@ -2015,7 +2020,6 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PermanentTappedForMana payload -> TriggerCondition.PermanentTappedForMana payload {PermanentTappedForMana.filter = Filter.rewrite pairs (PermanentTappedForMana.filter payload)}
   TriggerCondition.AbilityAddsMana payload -> TriggerCondition.AbilityAddsMana payload {AbilityAddsMana.source = Filter.rewrite pairs (AbilityAddsMana.source payload)}
   TriggerCondition.SelfManaAbilityResolves -> condition
-  TriggerCondition.SelfTrains -> condition
   TriggerCondition.SelfExploits -> condition
   TriggerCondition.CreatureExploits (CreatureExploits.MkCreatureExploits exploiter exploited) -> TriggerCondition.CreatureExploits (CreatureExploits.MkCreatureExploits (Filter.rewrite pairs exploiter) (Filter.rewrite pairs exploited))
   TriggerCondition.SelfBecomesCrewed {} -> condition
@@ -2045,9 +2049,6 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PlayerWinsCoinFlip _ -> condition
   TriggerCondition.PlayerLosesCoinFlip _ -> condition
   TriggerCondition.SelfBecomesPlotted -> condition
-  TriggerCondition.PermanentExplores f -> TriggerCondition.PermanentExplores (Filter.rewrite pairs f)
-  TriggerCondition.PermanentConnives f -> TriggerCondition.PermanentConnives (Filter.rewrite pairs f)
-  TriggerCondition.SelfExerted -> condition
   TriggerCondition.SelfBecomesAttachedBy f -> TriggerCondition.SelfBecomesAttachedBy (Filter.rewrite pairs f)
   TriggerCondition.SelfBecomesAttachedTo f -> TriggerCondition.SelfBecomesAttachedTo (Filter.rewrite pairs f)
   TriggerCondition.SelfBecomesUnattachedFrom f -> TriggerCondition.SelfBecomesUnattachedFrom (Filter.rewrite pairs f)
@@ -2169,10 +2170,7 @@ rewriteQuantity pairs quantity = case quantity of
         { Count.Type.filter = Filter.rewrite pairs (Count.Type.filter c),
           Count.Type.aggregation = rewriteAggregation pairs (Count.Type.aggregation c)
         }
-  Quantity.Type.Plus (Plus.MkPlus x y) -> Quantity.Type.Plus (Plus.MkPlus (rewriteQuantity pairs x) (rewriteQuantity pairs y))
-  Quantity.Type.Halved (Halved.MkHalved rounding inner) -> Quantity.Type.Halved (Halved.MkHalved rounding (rewriteQuantity pairs inner))
-  Quantity.Type.Times (Times.MkTimes factor inner) -> Quantity.Type.Times (Times.MkTimes factor (rewriteQuantity pairs inner))
-  Quantity.Type.Negate x -> Quantity.Type.Negate (rewriteQuantity pairs x)
+  Quantity.Type.Arithmetic arithmetic -> Quantity.Type.Arithmetic (fmap (rewriteQuantity pairs) arithmetic)
   Quantity.Type.Literal _ -> quantity
   Quantity.Type.ManaValue -> quantity
   Quantity.Type.Power -> quantity
@@ -2288,7 +2286,7 @@ rewriteEntryRiders :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> EntryRid
 rewriteEntryRiders pairs riders =
   riders
     { EntryRiders.counters =
-        Map.mapKeysWith (\greater lesser -> Quantity.Type.Plus (Plus.MkPlus lesser greater)) (Filter.rewriteCounterKind pairs)
+        Map.mapKeysWith (\greater lesser -> Quantity.Type.Arithmetic (Arithmetic.Plus (Plus.MkPlus lesser greater))) (Filter.rewriteCounterKind pairs)
           . fmap (rewriteQuantity pairs)
           $ EntryRiders.counters riders,
       EntryRiders.faceDown = fmap (\state -> state {FaceDownState.listed = rewriteListing pairs (FaceDownState.listed state)}) (EntryRiders.faceDown riders),

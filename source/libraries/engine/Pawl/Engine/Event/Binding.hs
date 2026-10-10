@@ -1092,7 +1092,7 @@ eventBindingsOver board gs bearerBecame becameInGraveyard bearer you cond event 
   -- The CR 701/702 keyword-action conditions reach this fallthrough and
   -- stamp nothing, deliberately: no card in the pool reads the scrying player,
   -- the plotted card, the explorer or the forager, and
-  -- SelfExerted's "it" is the bearer, which CR 113.7a's source slot already
+  -- a self-scoped PermanentActs' "it" is the bearer, which CR 113.7a's source slot already
   -- names. eventBindingSlots claims nothing for any of them; see that function's
   -- arms.
   --
@@ -1336,13 +1336,17 @@ eventBindingSlots cond = case cond of
   TriggerCondition.PlayerLosesGame _ -> Set.empty
   -- Nothing: CR 305.1's land play binds nothing.
   TriggerCondition.PlayerPlaysLand _ -> Set.empty
-  -- Nothing, for these keyword actions. CR 702.170a and CR 701.44b name an
-  -- object, but no printed payload points at it: Aloe Alchemist targets a
-  -- creature of its controller's choosing and Wildgrowth Walker grows itself. A
-  -- card printing "that creature" is what would earn a slot.
+  -- Nothing: CR 702.170a names an object, but Aloe Alchemist targets a creature
+  -- of its controller's choosing rather than pointing at it.
   TriggerCondition.SelfBecomesPlotted -> Set.empty
-  TriggerCondition.PermanentExplores _ -> Set.empty
-  TriggerCondition.PermanentConnives _ -> Set.empty
+  -- Nothing: the event names the acting permanent, and no printed payload points
+  -- at it as anything but the bearer. Under Self the actor IS the bearer, which
+  -- CR 113.7a's source slot already names -- Renegade Krasis' and Savior of
+  -- Ollenbock's "this creature", and Glory-Bound Initiate's linked "it" (CR
+  -- 701.43d), read as Filter.IsSource. Under a Filter, Wildgrowth Walker grows
+  -- itself and Synthetic Veiled Witness draws. A card printing "that creature"
+  -- would earn CR 400.7e's slot, as PermanentTurnedFaceUp does.
+  TriggerCondition.PermanentActs _ -> Set.empty
   -- Empty as a floor: CR 701.62b fires on a manifest dread that put nothing into
   -- the graveyard, which binds nothing. The `became` it binds otherwise is
   -- eventBindingSlotsSometimes'.
@@ -1356,11 +1360,6 @@ eventBindingSlots cond = case cond of
   TriggerCondition.SetInMotion -> Set.empty
   TriggerCondition.PlayerWinsCoinFlip _ -> Set.empty
   TriggerCondition.PlayerLosesCoinFlip _ -> Set.empty
-  -- Empty for the same reason, and CR 701.43d is what settles it: the linked
-  -- trigger's "it" is the exerted permanent, which is already CR 113.7a's source
-  -- slot, so a binding here would be a second name for one object. Glory-Bound
-  -- Initiate reads it as Filter.IsSource.
-  TriggerCondition.SelfExerted -> Set.empty
   -- Empty DELIBERATELY. CR 701.3a's event names two objects, and the bearer is
   -- one of them -- CR 113.7a's source slot already names the host. The other,
   -- the attachment, has no printed reader: Bramble Elemental says "create two
@@ -1844,21 +1843,13 @@ eventBindingSlots cond = case cond of
   -- unlike CR 400.7e's hidden-destination case (eventBindingSlotsSometimes)
   -- there is no shape of this event that withholds it.
   TriggerCondition.PermanentTurnedFaceUp _ -> Set.singleton Binding.became
-  -- A deliberate empty: Synthetic Veiled Witness draws and names no "it". A
-  -- card that did would take CR 400.7e's slot, as PermanentTurnedFaceUp does.
-  TriggerCondition.PermanentTurnedFaceDown _ -> Set.empty
   TriggerCondition.FaceDownPermanentLeavesRevealed -> Set.empty
   -- A deliberate empty: Valeron Wardens draws a card and names no "it", so there
   -- is no subject to claim a slot for. The arm above is the worked example of what
   -- a card reading the designated permanent would take -- CR 400.7e's slot, since
   -- the event names one object and CR 113.7a's source names the watcher.
   TriggerCondition.PermanentBecomesDesignated {} -> Set.empty
-  -- Empty too: rule 702.100b's event names the creature that evolved, and that is
-  -- the bearer -- Renegade Krasis says "this creature", so there is no "it" to
-  -- bind that Binding.triggerSource does not already answer.
-  TriggerCondition.SelfEvolves -> Set.empty
-  TriggerCondition.SelfMutates -> Set.empty
-  -- NOT empty, unlike SelfEvolves above, and the pair CR 702.134c names is why:
+  -- NOT empty, unlike PermanentActs above, and the pair CR 702.134c names is why:
   -- neither the mentor nor the mentored creature is the bearer, so Aegis of the
   -- Legion's "that creature" has no other name to be read under. Guaranteed given a
   -- match, as this classification has to be: every Mentored event carries both ids.
@@ -1920,11 +1911,7 @@ eventBindingSlots cond = case cond of
   -- The amount the resolving mana ability produced, which the arm above stamps
   -- for every match. No manaSource beside it: the permanent is the bearer.
   TriggerCondition.SelfManaAbilityResolves -> Set.singleton Binding.eventAmount
-  -- Empty for SelfEvolves' reason and not for AttachedCreatureMentors' -- rule
-  -- 702.149a's counter goes on the bearer, so Savior of Ollenbock's "this creature"
-  -- is Binding.triggerSource and the event names nobody else.
-  TriggerCondition.SelfTrains -> Set.empty
-  -- NOT empty, for AttachedCreatureMentors' reason and not SelfTrains': rule
+  -- NOT empty, for AttachedCreatureMentors' reason and not PermanentActs': rule
   -- 702.110b's event names the exploiter, which Binding.triggerSource already
   -- answers, and a SECOND creature besides -- Profaner of the Dead's "the
   -- exploited creature's toughness". Guaranteed given a match, every
@@ -1932,7 +1919,7 @@ eventBindingSlots cond = case cond of
   TriggerCondition.SelfExploits -> Set.singleton Binding.exploitedCreature
   -- The same slot, guaranteed for the same reason.
   TriggerCondition.CreatureExploits {} -> Set.singleton Binding.exploitedCreature
-  -- NOT empty, unlike SelfEvolves above: rule 702.122e's event names the Vehicle,
+  -- NOT empty, unlike PermanentActs above: rule 702.122e's event names the Vehicle,
   -- which Binding.triggerSource already answers, but its rider makes the CREWERS
   -- a subject of their own -- Mighty Servant of Leuk-o's "if it was crewed by
   -- exactly two creatures". Guaranteed given a match, every

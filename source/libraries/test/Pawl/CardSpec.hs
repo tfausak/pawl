@@ -56,6 +56,7 @@ import qualified Pawl.Slug as Slug
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilityAddsMana as AbilityAddsMana
+import qualified Pawl.Types.ActingPermanent as ActingPermanent
 import qualified Pawl.Types.ActivateManaAbilities as ActivateManaAbilities
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationProhibition as ActivationProhibition
@@ -215,7 +216,6 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
-import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.HandAction as HandAction
 import qualified Pawl.Types.Impending as Impending
 import qualified Pawl.Types.InZone as InZone
@@ -263,6 +263,7 @@ import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.OrElse as OrElse
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PerCreature as PerCreature
+import qualified Pawl.Types.PermanentActed as PermanentActed
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentDealsCombatDamageToPlayer as PermanentDealsCombatDamageToPlayer
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
@@ -286,7 +287,6 @@ import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.PlaysLand as PlaysLand
 import qualified Pawl.Types.PlotFromZone as PlotFromZone
-import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
@@ -354,7 +354,6 @@ import qualified Pawl.Types.TapPermanents as TapPermanents
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TheseDiscard as TheseDiscard
-import qualified Pawl.Types.Times as Times
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
@@ -1023,12 +1022,12 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- Its watcher-scoped sibling carries a Filter, and a Filter holds no Count for
   -- PermanentEnters' reason.
   TriggerCondition.PermanentTurnedFaceUp _ -> []
-  TriggerCondition.PermanentTurnedFaceDown _ -> []
+  -- PermanentActs carries an action and, for a bystander, a Filter -- which
+  -- holds no Count for PermanentEnters' reason.
+  TriggerCondition.PermanentActs _ -> []
   TriggerCondition.FaceDownPermanentLeavesRevealed -> []
   -- CR 702.112b's condition carries a Filter for the same reason, and no Count.
   TriggerCondition.PermanentBecomesDesignated {} -> []
-  TriggerCondition.SelfEvolves -> []
-  TriggerCondition.SelfMutates -> []
   -- CR 702.134c's is nullary too, so it holds no Quantity.
   TriggerCondition.AttachedCreatureMentors -> []
   -- CR 700.4's is nullary as well, for the same reason.
@@ -1042,8 +1041,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PermanentTappedForMana {} -> []
   TriggerCondition.AbilityAddsMana {} -> []
   TriggerCondition.SelfManaAbilityResolves -> []
-  -- Nor does CR 702.149c's, for the same reason.
-  TriggerCondition.SelfTrains -> []
+  -- Nor does CR 702.110b's, for the same reason.
   TriggerCondition.SelfExploits -> []
   TriggerCondition.CreatureExploits {} -> []
   -- Nor does CR 702.122e's: its payload is a TriggerFrequency, SelfAttacks' above.
@@ -1169,14 +1167,9 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SetInMotion -> []
   TriggerCondition.PlayerWinsCoinFlip _ -> []
   TriggerCondition.PlayerLosesCoinFlip _ -> []
-  -- CR 702.170a carries nothing at all, so holds no Count. CR 701.44b holds a
-  -- Filter, and a Filter holds no Count for PermanentEnters' reason above.
+  -- CR 702.170a carries nothing at all, so holds no Count.
   TriggerCondition.SelfBecomesPlotted -> []
-  TriggerCondition.PermanentExplores _ -> []
-  TriggerCondition.PermanentConnives _ -> []
   TriggerCondition.PlacesSticker _ -> []
-  -- CR 701.43d carries nothing at all, so no Count either.
-  TriggerCondition.SelfExerted -> []
   -- CR 701.3a's carries a Filter, and a Filter holds no Count for
   -- PermanentTurnedFaceUp's reason.
   TriggerCondition.SelfBecomesAttachedBy _ -> []
@@ -4129,10 +4122,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.BoundCount _ -> []
   Quantity.Type.UniqueVowelsOnSticker _ -> []
   Quantity.Type.Star -> []
-  Quantity.Type.Plus (Plus.MkPlus a b) -> quantityKindFilters a <> quantityKindFilters b
-  Quantity.Type.Halved (Halved.MkHalved _ inner) -> quantityKindFilters inner
-  Quantity.Type.Times (Times.MkTimes _ inner) -> quantityKindFilters inner
-  Quantity.Type.Negate a -> quantityKindFilters a
+  Quantity.Type.Arithmetic arithmetic -> foldMap quantityKindFilters arithmetic
   -- The Count's own Filter is countFilters' half above; what this half adds is
   -- the CounterKind a Greatest's per-member Quantity may hide, which is
   -- QuantitySlot.nestedCounts' descent.
@@ -4385,12 +4375,15 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- Its watcher-scoped sibling carries one, and Aven Farseer's is the trivial
   -- `And []` -- which this sweep must still see, an empty Filter being a Filter.
   TriggerCondition.PermanentTurnedFaceUp f -> unframed [f]
-  TriggerCondition.PermanentTurnedFaceDown f -> unframed [f]
   TriggerCondition.FaceDownPermanentLeavesRevealed -> []
   -- CR 702.112b's carries one too -- Valeron Wardens' "a creature you control".
   TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated _ f) -> unframed [f]
-  TriggerCondition.SelfEvolves -> []
-  TriggerCondition.SelfMutates -> []
+  -- A bystander's PermanentActs DOES carry one, a predicate over the actor --
+  -- Wildgrowth Walker's "a creature you control" -- which the card lint must
+  -- sweep. The self-scoped reading carries nothing.
+  TriggerCondition.PermanentActs acts -> case PermanentActed.permanent acts of
+    ActingPermanent.Self -> []
+    ActingPermanent.Matching f -> unframed [f]
   -- CR 702.134c's carries none either: "equipped creature" is CR 301.5f's one
   -- permanent rather than a class of them, and "a creature" narrows by nothing.
   TriggerCondition.AttachedCreatureMentors -> []
@@ -4403,9 +4396,6 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PermanentsBecomeTapped f -> unframed [f]
   TriggerCondition.SelfBecomesUntapped -> []
   TriggerCondition.AttachedPermanentTappedForMana -> []
-  -- CR 702.149c's carries none either: it names "this creature" and nothing about
-  -- it to narrow by.
-  TriggerCondition.SelfTrains -> []
   TriggerCondition.SelfExploits -> []
   -- Skull Skaab's two, both card text.
   TriggerCondition.CreatureExploits (CreatureExploits.MkCreatureExploits exploiter exploited) -> unframed [exploiter, exploited]
@@ -4571,12 +4561,6 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PlayerLosesCoinFlip _ -> []
   TriggerCondition.SelfBecomesPlotted -> []
   TriggerCondition.PlacesSticker placesSticker -> unframed [PlacesSticker.object placesSticker]
-  -- CR 701.44b DOES carry one, a predicate over the explorer -- Wildgrowth
-  -- Walker's "a creature you control" -- which the card lint must sweep.
-  TriggerCondition.PermanentExplores f -> unframed [f]
-  TriggerCondition.PermanentConnives f -> unframed [f]
-  -- CR 701.43d carries nothing, so no Filter either.
-  TriggerCondition.SelfExerted -> []
   -- CR 701.3a's carries one over the ATTACHMENT -- Bramble Elemental's "an
   -- Aura" -- which this sweep must see for PermanentTurnedFaceUp's reason.
   TriggerCondition.SelfBecomesAttachedBy f -> unframed [f]
@@ -4598,7 +4582,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.DamageToPlayerPrevented _ -> []
   -- Rule 615.13's other reading DOES carry one, a predicate over the damage's
   -- source -- Samite Ministration's "black or red" -- which this sweep must see
-  -- for PermanentExplores' reason.
+  -- for PermanentActs' reason.
   TriggerCondition.SelfPreventsDamage f -> unframed [f]
   TriggerCondition.PlayerGainsLife _ -> []
   TriggerCondition.PlayersGainLife _ -> []
@@ -4764,13 +4748,10 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.SelfTransformedInto _ -> []
   TriggerCondition.PermanentTransforms _ -> []
   TriggerCondition.PermanentTurnedFaceUp _ -> []
-  TriggerCondition.PermanentTurnedFaceDown _ -> []
+  TriggerCondition.PermanentActs _ -> []
   TriggerCondition.FaceDownPermanentLeavesRevealed -> []
   TriggerCondition.PermanentBecomesDesignated _ -> []
-  TriggerCondition.SelfEvolves -> []
-  TriggerCondition.SelfMutates -> []
   TriggerCondition.AttachedCreatureMentors -> []
-  TriggerCondition.SelfTrains -> []
   TriggerCondition.SelfExploits -> []
   TriggerCondition.CreatureExploits {} -> []
   TriggerCondition.SelfBecomesCrewed {} -> []
@@ -4804,9 +4785,6 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.PlayerWinsCoinFlip _ -> []
   TriggerCondition.PlayerLosesCoinFlip _ -> []
   TriggerCondition.SelfBecomesPlotted -> []
-  TriggerCondition.PermanentExplores _ -> []
-  TriggerCondition.PermanentConnives _ -> []
-  TriggerCondition.SelfExerted -> []
   TriggerCondition.SelfBecomesAttachedBy _ -> []
   -- Neither attachment-scoped condition names a slot OUTRIGHT either: each binds
   -- one (Pawl.Engine.Event.Binding.eventBindingSlots) rather than reading one.

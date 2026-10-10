@@ -20,6 +20,7 @@ module Pawl.Engine.Interchangeable.Mentions where
 import qualified Data.Map.Strict as Map
 import qualified Pawl.Engine.Binding as Binding.Engine
 import qualified Pawl.Types.AbilityAddsMana as AbilityAddsMana
+import qualified Pawl.Types.ActingPermanent as ActingPermanent
 import qualified Pawl.Types.ActivateManaAbilities as ActivateManaAbilities
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationCriteria as ActivationCriteria
@@ -42,6 +43,7 @@ import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.Ante as Ante
 import qualified Pawl.Types.AnyNumberDiscard as AnyNumberDiscard
 import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
+import qualified Pawl.Types.Arithmetic as Arithmetic
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttachAll as AttachAll
@@ -251,6 +253,7 @@ import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PendingDamageEffect as PendingDamageEffect
 import qualified Pawl.Types.PendingEntryEffect as PendingEntryEffect
 import qualified Pawl.Types.PerCreature as PerCreature
+import qualified Pawl.Types.PermanentActed as PermanentActed
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentCandidate as PermanentCandidate
 import qualified Pawl.Types.PermanentDealsCombatDamageToPlayer as PermanentDealsCombatDamageToPlayer
@@ -646,6 +649,13 @@ anyNumberDiscardNames asking x = case x of
 anyNumberMatchingNames :: Asking -> AnyNumberMatching.AnyNumberMatching -> Bool
 anyNumberMatchingNames asking x = case x of
   AnyNumberMatching.MkAnyNumberMatching filter_ atMost -> filterNames asking filter_ || any (quantityNames asking) atMost
+
+arithmeticNames :: Asking -> (quantity -> Bool) -> Arithmetic.Arithmetic quantity -> Bool
+arithmeticNames asking onQuantity x = case x of
+  Arithmetic.Plus plus -> plusNames asking onQuantity plus
+  Arithmetic.Halved halved -> halvedNames asking onQuantity halved
+  Arithmetic.Times times -> timesNames asking onQuantity times
+  Arithmetic.Negate quantity -> onQuantity quantity
 
 armDelayedTriggerNames :: Asking -> (ability -> Bool) -> ArmDelayedTrigger.ArmDelayedTrigger ability -> Bool
 armDelayedTriggerNames asking onAbility x = case x of
@@ -1128,6 +1138,15 @@ devotionNames asking x = case x of
 devourNames :: Asking -> Devour.Devour keyword -> Bool
 devourNames asking x = case x of
   Devour.MkDevour quality _count -> any (filterNames asking) quality
+
+permanentActedNames :: Asking -> (permanent -> Bool) -> PermanentActed.PermanentActed permanent -> Bool
+permanentActedNames _asking onPermanent x = case x of
+  PermanentActed.MkPermanentActed _action permanent -> onPermanent permanent
+
+actingPermanentNames :: Asking -> ActingPermanent.ActingPermanent -> Bool
+actingPermanentNames asking x = case x of
+  ActingPermanent.Self -> False
+  ActingPermanent.Matching filter_ -> filterNames asking filter_
 
 dieResultNames :: Asking -> (player -> Bool) -> DieResult.DieResult player -> Bool
 dieResultNames _asking onPlayer x = case x of
@@ -2318,10 +2337,7 @@ quantityNames asking x = case x of
   Quantity.BoundCount slotName -> slotNames asking slotName
   Quantity.UniqueVowelsOnSticker slotName -> slotNames asking slotName
   Quantity.Star -> False
-  Quantity.Plus plus -> plusNames asking (quantityNames asking) plus
-  Quantity.Halved halved -> halvedNames asking (quantityNames asking) halved
-  Quantity.Times times -> timesNames asking (quantityNames asking) times
-  Quantity.Negate quantity -> quantityNames asking quantity
+  Quantity.Arithmetic arithmetic -> arithmeticNames asking (quantityNames asking) arithmetic
   Quantity.Count count -> countNames asking (quantityNames asking) count
   Quantity.ManaCount manaCount -> manaCountNames asking manaCount
   Quantity.LifeTotal playerRef -> playerRefNames asking playerRef
@@ -2770,13 +2786,10 @@ triggerConditionNames asking x = case x of
   TriggerCondition.SelfTransformedInto _cardName -> False
   TriggerCondition.PermanentTransforms filter_ -> filterNames asking filter_
   TriggerCondition.PermanentTurnedFaceUp filter_ -> filterNames asking filter_
-  TriggerCondition.PermanentTurnedFaceDown filter_ -> filterNames asking filter_
   TriggerCondition.FaceDownPermanentLeavesRevealed -> False
   TriggerCondition.PermanentBecomesDesignated permanentBecomesDesignated -> permanentBecomesDesignatedNames asking permanentBecomesDesignated
-  TriggerCondition.SelfEvolves -> False
-  TriggerCondition.SelfMutates -> False
+  TriggerCondition.PermanentActs permanentActs -> permanentActedNames asking (actingPermanentNames asking) permanentActs
   TriggerCondition.AttachedCreatureMentors -> False
-  TriggerCondition.SelfTrains -> False
   TriggerCondition.SelfExploits -> False
   TriggerCondition.CreatureExploits creatureExploits -> creatureExploitsNames asking creatureExploits
   TriggerCondition.SelfBecomesCrewed _triggerFrequency -> False
@@ -2800,9 +2813,6 @@ triggerConditionNames asking x = case x of
   TriggerCondition.PlayerWinsCoinFlip _playerRelation -> False
   TriggerCondition.PlayerLosesCoinFlip _playerRelation -> False
   TriggerCondition.SelfBecomesPlotted -> False
-  TriggerCondition.PermanentExplores filter_ -> filterNames asking filter_
-  TriggerCondition.PermanentConnives filter_ -> filterNames asking filter_
-  TriggerCondition.SelfExerted -> False
   TriggerCondition.SelfBecomesAttachedBy filter_ -> filterNames asking filter_
   TriggerCondition.SelfBecomesAttachedTo filter_ -> filterNames asking filter_
   TriggerCondition.SelfBecomesUnattachedFrom filter_ -> filterNames asking filter_

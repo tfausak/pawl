@@ -1296,8 +1296,8 @@ castingWindowSpec s registry = Spec.describe s "CastingWindow" $ do
 -- Glory-Bound Initiate {1}{W} Creature -- Human Warrior 3/1, "You may exert this
 -- creature as it attacks. When you do, it gets +1\/+3 and gains lifelink until
 -- end of turn." The pool's producer for Keyword.Exert, and so for CR 508.1g's
--- optional-cost step, for GameEvent.Exerted and for
--- TriggerCondition.SelfExerted's CR 607.2h linked trigger.
+-- optional-cost step, for PermanentAction.Exert and for the CR 607.2h linked
+-- trigger TriggerCondition.PermanentActs reads it with.
 --
 -- Every case runs a PAIR of boards differing in exactly one thing -- the answer
 -- to Prompt.ChooseExert -- so no assertion can pass because the board could not

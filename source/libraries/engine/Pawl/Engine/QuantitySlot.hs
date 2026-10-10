@@ -27,18 +27,15 @@ import qualified Pawl.Types.CastFrom as CastFrom
 import qualified Pawl.Types.CompletedDungeon as CompletedDungeon
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.Devotion as Devotion
-import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.ManaCount as ManaCount.Type
 import qualified Pawl.Types.PlayerCounterTally as PlayerCounterTally
 import qualified Pawl.Types.PlayerDesignationTally as PlayerDesignationTally
 import qualified Pawl.Types.PlayerRef as PlayerRef
-import qualified Pawl.Types.Plus as Plus
 import Pawl.Types.Quantity (Quantity)
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Scope as Scope
 import Pawl.Types.SlotName (SlotName)
-import qualified Pawl.Types.Times as Times
 
 -- The per-member quantity of a count, VISITED -- the one walk the four functions
 -- below are each an instance of, so a new Aggregation arm carrying a quantity
@@ -104,19 +101,9 @@ overSlots f quantity =
         Quantity.BoundCount slot -> fmap Quantity.BoundCount (f slot)
         Quantity.UniqueVowelsOnSticker slot -> fmap Quantity.UniqueVowelsOnSticker (f slot)
         Quantity.Star -> pure quantity
-        Quantity.Plus (Plus.MkPlus a b) -> fmap Quantity.Plus (Plus.MkPlus <$> recur a <*> recur b)
-        -- Composition, as Plus is: the rounding names no slot and the payload may name
-        -- any.
-        Quantity.Halved (Halved.MkHalved rounding inner) -> fmap (Quantity.Halved . Halved.MkHalved rounding) (recur inner)
-        -- Halved's answer: the factor names no slot and the payload may name any.
-        Quantity.Times (Times.MkTimes factor inner) -> fmap (Quantity.Times . Times.MkTimes factor) (recur inner)
-        -- Whatever the payload names, since a minus sign changes no slot: Toxic
-        -- Deluge's -X is a Negate over the InSlot that names X. A REGRESSION FENCE
-        -- rather than proven behaviour -- emptying this arm leaves the suite green,
-        -- because the consumer that could tell (CR 603.3b's orderInert, through
-        -- Resolve.modeSlots) is reached only by a TRIGGERED ability, and no card in
-        -- the pool negates a slot read inside one.
-        Quantity.Negate a -> fmap Quantity.Negate (recur a)
+        -- Whatever the operands name: a calculation's own payload (a rounding, a
+        -- factor) names no slot.
+        Quantity.Arithmetic arithmetic -> fmap Quantity.Arithmetic (traverse recur arithmetic)
         -- Terminating for the reason evaluate's Count arm is: a Greatest's payload is
         -- a strictly smaller subterm.
         Quantity.Count c -> fmap Quantity.Count (overCount recur c)
@@ -326,12 +313,9 @@ nestedRefs quantity = case quantity of
   Quantity.BoundCount _ -> Set.empty
   Quantity.UniqueVowelsOnSticker _ -> Set.empty
   Quantity.Star -> Set.empty
-  Quantity.Plus (Plus.MkPlus a b) -> Set.union (nestedRefs a) (nestedRefs b)
-  -- Plus' answer: the rounding hides no reference, so what the payload hides is
-  -- the whole question.
-  Quantity.Halved (Halved.MkHalved _ inner) -> nestedRefs inner
-  Quantity.Times (Times.MkTimes _ inner) -> nestedRefs inner
-  Quantity.Negate a -> nestedRefs a
+  -- What the operands hide is the whole question: a rounding or a factor hides
+  -- no reference.
+  Quantity.Arithmetic arithmetic -> foldMap nestedRefs arithmetic
   -- Both halves `slots` skips: the Scope's own read, and the per-member quantity
   -- of a Greatest, which may hide a reference of its own.
   Quantity.Count c -> Set.union (scopeRefs (Count.Type.scope c)) (foldCount nestedRefs c)
@@ -446,15 +430,9 @@ nestedCounts quantity = case quantity of
   Quantity.BoundCount _ -> []
   Quantity.UniqueVowelsOnSticker _ -> []
   Quantity.Star -> []
-  Quantity.Plus (Plus.MkPlus a b) -> nestedCounts a <> nestedCounts b
-  -- Plus' descent: CR 107.1a's rounding holds no Count, and the payload it halves
-  -- may be one -- Malignus halves a fold over players.
-  Quantity.Halved (Halved.MkHalved _ inner) -> nestedCounts inner
-  -- Halved's descent: the factor holds no Count and what it multiplies may be one
-  -- -- Blessed Reversal multiplies a fold over the battlefield.
-  Quantity.Times (Times.MkTimes _ inner) -> nestedCounts inner
-  -- Not a leaf: a minus sign hides nothing -- Toxic Deluge's -X.
-  Quantity.Negate a -> nestedCounts a
+  -- An operand may be a Count -- Malignus halves a fold over players, Blessed
+  -- Reversal multiplies one over the battlefield.
+  Quantity.Arithmetic arithmetic -> foldMap nestedCounts arithmetic
   -- The leaf itself, and DESCENT into a Greatest's per-member number, which may
   -- be a Count of its own.
   Quantity.Count c -> c : foldCount nestedCounts c
@@ -687,10 +665,7 @@ mapPlayerRefs f intoCount quantity =
               }
         Quantity.ManaCount c -> Quantity.ManaCount c {ManaCount.Type.player = f (ManaCount.Type.player c)}
         Quantity.Count c -> Quantity.Count (intoCount c)
-        Quantity.Plus (Plus.MkPlus a b) -> Quantity.Plus (Plus.MkPlus (recur a) (recur b))
-        Quantity.Halved (Halved.MkHalved rounding inner) -> Quantity.Halved (Halved.MkHalved rounding (recur inner))
-        Quantity.Times (Times.MkTimes factor inner) -> Quantity.Times (Times.MkTimes factor (recur inner))
-        Quantity.Negate a -> Quantity.Negate (recur a)
+        Quantity.Arithmetic arithmetic -> Quantity.Arithmetic (fmap recur arithmetic)
         Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot inner) -> Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot (recur inner))
         Quantity.AgainstCardsExiledWith inner -> Quantity.AgainstCardsExiledWith (recur inner)
         Quantity.AgainstLastCardExiledWith l -> Quantity.AgainstLastCardExiledWith l {AgainstLastCardExiledWith.quantity = recur (AgainstLastCardExiledWith.quantity l)}

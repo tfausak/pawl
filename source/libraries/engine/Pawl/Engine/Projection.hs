@@ -75,7 +75,6 @@ import qualified Pawl.Types.FullText as FullText
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
-import qualified Pawl.Types.Halved as Halved
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
@@ -93,7 +92,6 @@ import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
-import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.PowerToughnessSticker as PowerToughnessSticker
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
@@ -114,7 +112,6 @@ import qualified Pawl.Types.StickerPlacement as StickerPlacement
 import qualified Pawl.Types.Subtype as Subtype.Type
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TargetSlot as TargetSlot
-import qualified Pawl.Types.Times as Times
 import Pawl.Types.Timestamp (Timestamp (MkTimestamp))
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -567,7 +564,7 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
         --
         -- rewriteWithCounters below guards the same hazard on an ENTRY ROW's
         -- counter kinds, where the values are Quantities and the combiner is
-        -- Quantity.Plus rather than (+).
+        -- Arithmetic.Plus rather than (+).
         --
         -- The static, player and rule-ability lists, gathered off the copiable
         -- values rather than read off the fold (exchangeTextBoxFrom), are
@@ -4302,10 +4299,7 @@ quantityReads q = case q of
   -- Reads whichever of the two the substitution picks, so it reads PowerA
   -- exactly as Power and Toughness do above.
   Quantity.Type.StationMeasure -> Set.singleton PowerA
-  Quantity.Type.Plus (Plus.MkPlus a b) -> quantityReads a <> quantityReads b
-  Quantity.Type.Halved (Halved.MkHalved _ a) -> quantityReads a
-  Quantity.Type.Times (Times.MkTimes _ a) -> quantityReads a
-  Quantity.Type.Negate a -> quantityReads a
+  Quantity.Type.Arithmetic arithmetic -> foldMap quantityReads arithmetic
   Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot _ a) -> quantityReads a
   -- AgainstSlot's answer: the payload is what reads an aspect, off CR 607.2a's
   -- linked cards rather than off a slot. Over-declaring is the safe direction

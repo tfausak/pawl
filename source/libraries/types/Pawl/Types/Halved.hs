@@ -2,7 +2,7 @@ module Pawl.Types.Halved where
 
 import qualified Pawl.Types.Rounding as Rounding
 
--- | The payload of Pawl.Types.Quantity's Halved arm (#1305): CR 107.1a's half,
+-- | The payload of Pawl.Types.Arithmetic's Halved arm (#1305): CR 107.1a's half,
 -- rounded the way the card prints.
 --
 -- PARAMETRIC in the quantity for Pawl.Types.Plus's reason: the inner value is a

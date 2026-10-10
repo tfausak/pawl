@@ -1077,9 +1077,9 @@ krasisSpec s registry =
           let (raptor, withRaptor) = S.addPermanent raptorPrinting S.alice gs
               (_, entered) = S.entersWithTrigger pikerPrinting S.alice withRaptor
               after = resolveAll (settle entered)
+          Spec.assertEqWith s "the Krasis' trigger paid out nothing" (plusOnes mine after) 1
           Spec.assertEqWith s "the Raptor did evolve" (plusOnes raptor after) 1
           Spec.assertEqWith s "the Krasis did not" (plusOnes krasis after) 0
-          Spec.assertEqWith s "so its trigger paid out nothing" (plusOnes mine after) 1
 
 -- CR 702.116a's myriad: an attack trigger whose loop mints a token copy per
 -- opponent OTHER than the defending player, each entering tapped and attacking

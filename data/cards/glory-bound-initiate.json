@@ -34,7 +34,15 @@
       "triggeredAbilities": [
         {
           "condition": {
-            "type": "SelfExerted"
+            "type": "PermanentActs",
+            "value": {
+              "action": {
+                "type": "Exert"
+              },
+              "permanent": {
+                "type": "Self"
+              }
+            }
           },
           "modal": {
             "modes": [
