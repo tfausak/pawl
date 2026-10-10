@@ -1628,7 +1628,7 @@ leavesBattlefieldSpec s registry =
       -- Every slot stamped on every object currently on the stack, which for
       -- these boards is the one placed trigger.
       stackSlots gs =
-        concatMap (Map.toList . Map.mapMaybe Binding.onlyOne . Binding.targetsOf . maybe Map.empty Object.bindings . flip Game.lookupObject gs) (GameState.stack gs)
+        concatMap (Map.toList . Binding.oneBySlot . Binding.targetsOf . maybe Map.empty Object.bindings . flip Game.lookupObject gs) (GameState.stack gs)
    in Spec.describe s "LeavesTheBattlefield" $ do
         -- CR 400.7e's proviso, which is the new plumbing this condition needed:
         -- "can find the new object that it became in the zone it moved to when

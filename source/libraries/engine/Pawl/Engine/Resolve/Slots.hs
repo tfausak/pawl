@@ -2772,10 +2772,11 @@ boundSlots effect = case effect of
 
 -- CR 608.2b: the ONE recipient still legal in `slot`, for a reader that can take
 -- only one -- nothing when the slot named none, its target became illegal, or it
--- names SEVERAL. Pawl.CardSpec's plural-slot lint keeps a card from aiming one of
--- those at such a reader.
+-- names SEVERAL (Binding.oneBySlot). Pawl.AbilitySlotLintSpec's "no
+-- multi-target slot is read one at a time" keeps a card from aiming one of those
+-- at such a reader.
 legalOne :: SlotName -> Map.Map SlotName (Set Recipient) -> Maybe Recipient
-legalOne slot legal = Binding.onlyOne (Map.findWithDefault Set.empty slot legal)
+legalOne slot legal = Map.lookup slot (Binding.oneBySlot legal)
 
 -- The same read for a reader that takes them ALL, CR 608.2b's illegal ones
 -- already dropped.
