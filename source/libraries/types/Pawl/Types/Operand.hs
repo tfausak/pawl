@@ -5,9 +5,9 @@ import qualified Pawl.Types.Measure as Measure
 import qualified Pawl.Types.SlotName as SlotName
 
 -- | What a Pawl.Types.Measures comparison compares the candidate's measure
--- against. Every arm but Literal is answered off Pawl.Engine.Filter.Context, so
--- where each may be written is a position question
--- (Pawl.FilterPositionLintSpec).
+-- against. Literal and Own need nothing beyond the candidate; every other arm is
+-- answered off Pawl.Engine.Filter.Context, so where it may be written is a
+-- position question (Pawl.FilterPositionLintSpec).
 data Operand
   = -- | A printed number.
     Literal Integer
@@ -19,7 +19,8 @@ data Operand
     OfBound BoundMeasure.BoundMeasure
   | -- | CR 608.2c: a number an earlier clause bound at a slot.
     AmountInSlot SlotName.SlotName
-  | -- | CR 601.2b: the amount the enclosing target slot or conjure reference
-    -- names (Pawl.Types.TargetSlot's and Pawl.Types.FromReference's @amount@).
+  | -- | CR 202.3 / 601.2c: the amount the enclosing target slot or conjure
+    -- reference names (Pawl.Types.TargetSlot's and Pawl.Types.FromReference's
+    -- @amount@).
     EnclosingAmount
   deriving (Eq, Ord, Show)

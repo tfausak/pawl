@@ -244,6 +244,7 @@ library codec
     Pawl.Codec.Board
     Pawl.Codec.BoardSpec
     Pawl.Codec.BoundMeasure
+    Pawl.Codec.BoundMeasureSpec
     Pawl.Codec.CandidateId
     Pawl.Codec.CandidateIdSpec
     Pawl.Codec.CantAttackPlayer

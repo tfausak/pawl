@@ -1014,10 +1014,11 @@ data Context = MkContext
     perspective :: Maybe PlayerId.PlayerId,
     source :: Maybe ObjectId.ObjectId,
     -- CR 208.1: the SOURCE's power, for the Measures atom's OfSource operand
-    -- (CR 702.134a's mentor, CR 702.149a's training). Not derivable from `source` here -- this module holds no game
-    -- state and cannot project -- so Pawl.Engine.Projection.withCharacteristicsOf
-    -- fills it and the four fields below together, through last known
-    -- information (CR 608.2b's re-check, CR 608.2h's effects): in every context Pawl.Engine.Projection.sourceContext
+    -- (CR 702.134a's mentor, CR 702.149a's training). Not derivable from
+    -- `source` here -- this module holds no game state and cannot project -- so
+    -- Pawl.Engine.Projection.withCharacteristicsOf fills it and the four fields
+    -- below together, through last known information (CR 608.2b's re-check,
+    -- CR 608.2h's effects): in every context Pawl.Engine.Projection.sourceContext
     -- frames, and in CR 509.1b's pairwise restrictions, which frame by the
     -- creature being compared (Projection.pairwiseContext, Spitfire Handler).
     --
@@ -1045,11 +1046,12 @@ data Context = MkContext
     -- sourcePower, and a SET for sourceColors' reason (CR 708.2a's nameless
     -- object).
     sourceNames :: Set.Set CardName.CardName,
-    -- CR 202.3, the computed half: the number the TARGET SLOT being matched names
-    -- as its bound, for the Measures atom's EnclosingAmount operand --
-    -- Celestine, the Living Saint's "where X is the amount of life you gained this turn". The slot carries the Quantity
-    -- (Pawl.Types.TargetSlot's `amount`); this is that Quantity already
-    -- evaluated, because this module holds no game state and cannot evaluate one.
+    -- CR 202.3, the computed half: the number the TARGET SLOT being matched
+    -- names as its bound, for the Measures atom's EnclosingAmount operand --
+    -- Celestine, the Living Saint's "where X is the amount of life you gained
+    -- this turn". The slot carries the Quantity (Pawl.Types.TargetSlot's
+    -- `amount`); this is that Quantity already evaluated, because this module
+    -- holds no game state and cannot evaluate one.
     --
     -- Pawl.Engine.Target.slotContext fills it for a target slot, and
     -- Pawl.Engine.Projection.View.referenceAdmits for a conjure's reference pick
@@ -1298,9 +1300,10 @@ data Context = MkContext
     -- object outside a resolution's own positions" to keep a card to the position
     -- the pool exercises.
     --
-    -- ONE number per slot and measure rather than a set, and a slot naming several
-    -- objects has no key at all: CR 115.10a's group binding is read by "those cards" payloads,
-    -- and no printed comparison asks a group for a single number.
+    -- ONE number per slot and measure rather than a set, and a slot naming
+    -- several objects has no key at all: CR 115.10a's group binding is read by
+    -- "those cards" payloads, and no printed comparison asks a group for a
+    -- single number.
     slotMeasures :: Map.Map (SlotName.SlotName, Measure.Measure) Integer,
     -- CR 601.2c / 603.2: the PLAYERS the surrounding resolution's slots name --
     -- `slotObjects` above's player half (Pawl.Engine.Binding.playersBySlot),
@@ -3179,23 +3182,25 @@ manaValueThresholds predicate = case predicate of
   -- A literal against the candidate's mana value, whichever way it compares:
   -- above every such literal the comparison's answer is constant, so the sample
   -- has already seen it.
-  Filter.Measures m -> case (Measures.measure m, Measures.operand m) of
-    (Measure.ManaValue, Operand.Literal n) -> [n]
-    -- Reads power or toughness, so it bounds nothing here.
-    (Measure.Power, _) -> []
-    (Measure.Toughness, _) -> []
-    -- Reads the mana value against a bound that is no literal -- the source's,
-    -- a bound object's, a slot's amount -- so there is nothing to report, and
-    -- position is what keeps the caller's argument whole: CR 601.3a's lookahead
-    -- reads a player ability's prohibition filter
-    -- (Pawl.Engine.PlayerEffect.prohibitsCasting), and Pawl.FilterPositionLintSpec's
-    -- "CR 601.3a no player effect compares a mana value against anything but a
-    -- literal" keeps every other operand out of that position.
-    (Measure.ManaValue, Operand.OfSource _) -> []
-    (Measure.ManaValue, Operand.Own _) -> []
-    (Measure.ManaValue, Operand.OfBound _) -> []
-    (Measure.ManaValue, Operand.AmountInSlot _) -> []
-    (Measure.ManaValue, Operand.EnclosingAmount) -> []
+  Filter.Measures m -> case Measures.operand m of
+    Operand.Literal n -> case Measures.measure m of
+      Measure.ManaValue -> [n]
+      -- Reads power or toughness against the literal, so it bounds nothing.
+      Measure.Power -> []
+      Measure.Toughness -> []
+    -- No literal to report, whatever the measure -- and an Own ManaValue
+    -- operand reads the candidate's mana value from the other side. Position is
+    -- what keeps the caller's argument whole: CR 601.3a's lookahead reads a
+    -- player ability's prohibition filter
+    -- (Pawl.Engine.PlayerEffect.prohibitsCasting), and
+    -- Pawl.FilterPositionLintSpec's "CR 601.3a no player effect compares a mana
+    -- value against anything but a literal" keeps every read of the candidate's
+    -- mana value through any other operand, on either side, out of that position.
+    Operand.OfSource _ -> []
+    Operand.Own _ -> []
+    Operand.OfBound _ -> []
+    Operand.AmountInSlot _ -> []
+    Operand.EnclosingAmount -> []
   Filter.And fs -> concatMap manaValueThresholds fs
   Filter.Or fs -> concatMap manaValueThresholds fs
   Filter.Not f -> manaValueThresholds f

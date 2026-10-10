@@ -74,8 +74,8 @@ data Filter keyword
     -- HasKeyword above rather than a widening of it, and answered off the
     -- projection for that atom's reason.
     HasKeywordFamily KeywordFamily.KeywordFamily
-  | -- | CR 208.1 / 202.3: the candidate's measure relates thus to the operand,
-    -- and False where either number is absent (CR 208.3).
+  | -- | CR 208.1 / 202.3: the candidate's measure relates thus to the operand;
+    -- see Pawl.Engine.Filter.matches for an absent number.
     Measures Measures.Measures
   | -- | CR 202.3 read for its PARITY rather than against a bound -- Void
     -- Winnower's "spells with even mana values", whose reminder text settles the

@@ -1586,9 +1586,10 @@ rewriteDamageRewrite pairs rewrite = case rewrite of
 --
 -- NO BOARD OBSERVES IT, rewriteDamageRewrite's position above: the pool's
 -- draw-replacing wishes are Ring of Ma'rûf's @And []@ and Synthetic Wishful
--- Djinn's comparison against the source's power, which name no subtype for CR 612.1 to swap, so
--- neutralising the Filter.rewrite here leaves the suite green. The arm is the rule rather than a proven behaviour -- a card
--- replacing a draw with "a Goblin card you own from outside the game", under a
+-- Djinn's comparison against the source's power, which name no subtype for
+-- CR 612.1 to swap, so neutralising the Filter.rewrite here leaves the suite
+-- green. The arm is the rule rather than a proven behaviour -- a card replacing
+-- a draw with "a Goblin card you own from outside the game", under a
 -- text-changing effect, would be what proves it. Exhaustive rather than a
 -- wildcard, rewriteReplacementEffect's posture.
 rewriteDrawRewrite :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> DrawRewrite.DrawRewrite -> DrawRewrite.DrawRewrite

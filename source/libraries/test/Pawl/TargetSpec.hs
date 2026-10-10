@@ -2768,10 +2768,11 @@ stirTheGraveSpec s registry =
 -- judged (Target.jointlyJudged, because its pool is CR 400.1's graveyard scoped
 -- to whatever the player slot names) AND its CR 202.3 computed bound reads CR
 -- 601.2b's announced X. The offer is computed against the seed carrying that X;
--- the joint check re-derives the same slot, and it is handed the same seed. Given
--- the chosen targets alone the bound reads no number, the EnclosingAmount
--- comparison is vacuously False, the card the caster was OFFERED is not in the re-derived
--- set, and CR 601.2e reverses a casting rule 601.2c allows; see #2676.
+-- the joint check re-derives the same slot, and it is handed the same seed.
+-- Given the chosen targets alone the bound reads no number, the EnclosingAmount
+-- comparison is vacuously False, the card the caster was OFFERED is not in the
+-- re-derived set, and CR 601.2e reverses a casting rule 601.2c allows; see
+-- #2676.
 --
 -- THREE SEATS for Dwell on the Past's reason: with alice and bob alone, "bob's
 -- graveyard" and "not the caster's graveyard" pick out the same cards.

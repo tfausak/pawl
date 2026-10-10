@@ -1277,11 +1277,11 @@ framedWith choices source gs = withCharacteristicsOf source gs . SourceContext.f
 -- `context` with `object`'s projected power, toughness, mana value, colours and
 -- names as the source's (CR 613), through its last known information once it
 -- has left (viewWithLastKnownAnywhere): CR 608.2b's re-check and CR 608.2h's
--- effects alike: the fields the
--- source-comparison atoms read (Filter.Measures' OfSource operand,
--- Filter.SharesColorWithSource, Filter.SameNameAsSource and their siblings). Leaves every other field alone,
--- so CR 509.1b's pairwise restrictions, framed by the creature being compared
--- rather than by an ability's source, take these and not its choices.
+-- effects alike: the fields the source-comparison atoms read (Filter.Measures'
+-- OfSource operand, Filter.SharesColorWithSource, Filter.SameNameAsSource and
+-- their siblings). Leaves every other field alone, so CR 509.1b's pairwise
+-- restrictions, framed by the creature being compared rather than by an
+-- ability's source, take these and not its choices.
 --
 -- All thunks over one view: a filter naming none of the atoms projects
 -- nothing. pairwiseContext is the CR 509.1b framing.

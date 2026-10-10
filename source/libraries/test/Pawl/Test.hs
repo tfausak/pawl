@@ -101,6 +101,7 @@ import qualified Pawl.Codec.BlockRequirementSpec
 import qualified Pawl.Codec.BlockersAreSpec
 import qualified Pawl.Codec.BlocksDeclaredSpec
 import qualified Pawl.Codec.BoardSpec
+import qualified Pawl.Codec.BoundMeasureSpec
 import qualified Pawl.Codec.CandidateIdSpec
 import qualified Pawl.Codec.CantAttackPlayerSpec
 import qualified Pawl.Codec.CantBeBlockedBySpec
@@ -1001,6 +1002,7 @@ spec s registry = do
   Pawl.Codec.CombatStepSpec.spec s
   Pawl.Codec.ComparesSpec.spec s
   Pawl.Codec.ComparisonSpec.spec s
+  Pawl.Codec.BoundMeasureSpec.spec s
   Pawl.Codec.MeasureSpec.spec s
   Pawl.Codec.MeasuresSpec.spec s
   Pawl.Codec.OperandSpec.spec s

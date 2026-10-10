@@ -502,8 +502,9 @@ isTargetOffends = (/= 0) . isTargetStrays . Codec.encode (Face.Codec.codec Card.
 enclosingAmountTag :: Text.Text
 enclosingAmountTag = Text.pack "EnclosingAmount"
 
--- How many comparisons of the candidate's MANA VALUE one encoded Filter holds
--- whose operand's tag `wanted` accepts, at any depth.
+-- How many comparisons reading the candidate's MANA VALUE one encoded Filter
+-- holds whose operand's tag `wanted` accepts, at any depth: a mana value measure,
+-- or an Own ManaValue operand reading it from the other side.
 manaValueComparisons :: (Text.Text -> Bool) -> Value.Value -> Int
 manaValueComparisons wanted value = case value of
   Value.Object o ->
@@ -512,9 +513,13 @@ manaValueComparisons wanted value = case value of
         tagOf v = case v of
           Value.Object x -> [t | p <- Object.unwrap x, String.unwrap (Pair.name p) == Text.pack "type", Value.String t <- [Pair.value p]]
           _ -> []
-        isManaValue = any (\v -> fmap String.unwrap (tagOf v) == [Text.pack "ManaValue"]) (named "measure")
-        operandWanted = any (any (wanted . String.unwrap) . tagOf) (named "operand")
-        here = if isManaValue && operandWanted then 1 else 0 :: Int
+        isManaValue v = fmap String.unwrap (tagOf v) == [Text.pack "ManaValue"]
+        operandTags = concatMap (fmap String.unwrap . tagOf) (named "operand")
+        ownManaValue = case named "operand" of
+          [Value.Object x] -> Text.pack "Own" `elem` operandTags && any isManaValue [Pair.value p | p <- Object.unwrap x, String.unwrap (Pair.name p) == Text.pack "value"]
+          _ -> False
+        measured = any isManaValue (named "measure") || ownManaValue
+        here = if measured && any wanted operandTags then 1 else 0 :: Int
      in here + sum (fmap (manaValueComparisons wanted . Pair.value) pairs)
   Value.Array a -> sum (fmap (manaValueComparisons wanted) (Array.unwrap a))
   Value.String _ -> 0
@@ -1723,6 +1728,10 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     -- counter sees a non-literal one buried under a combinator.
     Spec.assertBool s (sum (fmap (sum . fmap (inPlayerEffects (== Text.pack "Literal")) . Card.Type.faces . Printing.card) ps) /= 0) "the pool's player effects compare mana values against literals"
     Spec.assertEqWith s "a planted comparison against the candidate's own power is counted" (manaValueComparisons nonLiteral (encode (Filter.Type.Not (Filter.Type.Measures (Measures.MkMeasures Measure.ManaValue Comparison.AtMost (Operand.Own Measure.Power)))))) 1
+    -- And the same read from the other side: power against the candidate's own
+    -- mana value varies with X exactly as the measure would.
+    Spec.assertEqWith s "so is one reading the mana value through the operand" (manaValueComparisons nonLiteral (encode (Filter.Type.Measures (Measures.MkMeasures Measure.Power Comparison.GreaterThan (Operand.Own Measure.ManaValue))))) 1
+    Spec.assertEqWith s "and a power literal is not" (manaValueComparisons nonLiteral (encode (Filter.Type.Measures (Measures.MkMeasures Measure.Power Comparison.AtLeast (Operand.Literal 4))))) 0
   -- CR 202.3's computed bound is CR 709.4a's atom one axis over once more, and the
   -- axis is the SLOT rather than the Framing: Pawl.Engine.Target.slotContext fills
   -- Filter.Context.slotAmount off the target slot's own Quantity, so an
