@@ -1277,7 +1277,7 @@ derivesFromCopiedHalves oid gs = case stampedSnapshotOf oid gs of
 -- Binding.copyOf, or a conjured duplicate carries (Game.copyStampOf), before
 -- rule 709.5's question is asked of it. The projection's ONE read of that
 -- binding, and only copiableSnapshotOf and derivesFromCopiedHalves
--- above call it; Pawl.Engine.Game.halvesCardOf makes the other read in the
+-- above call it; Pawl.Engine.Game.copiableOf makes the other read in the
 -- engine, off the object it already holds.
 --
 -- LAYER 1a IS NOT THE BINDING ALONE. A copy effect that stated a duration is

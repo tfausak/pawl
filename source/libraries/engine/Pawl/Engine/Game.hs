@@ -1355,7 +1355,7 @@ prepareSpellOf = faceUpCopiable (copiableOf PC.prepare Card.prepareFace)
 -- halvesCardOf above for a caller that holds only the id, and the value
 -- Pawl.Engine.Projection.View.baseCharacteristics seeds
 -- ProjectedCharacteristics.halves from -- so a copy of a copy of a Room goes on
--- carrying the doors. faceOfObject below takes faceUpCopiable's CR 708.2 fork.
+-- carrying the doors. faceOfObject below forks on CR 708.2 the same way.
 --
 -- Every zone, unlike resolveFaceFor's own gate: CR 709.5b makes the halves'
 -- existence copiable "even if that object is a spell on the stack", where CR

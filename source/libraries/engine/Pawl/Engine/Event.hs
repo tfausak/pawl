@@ -8221,7 +8221,8 @@ meldable victims gs = do
 --
 -- CR 730.2h's flip components are stamped as a SECOND reading of the same merge,
 -- both sides read again through Projection.copiableCharacteristicsFlipped, and
--- Projection.stampedSnapshotOf spends it once the merged permanent is flipped.
+-- Projection.stampedSnapshotOf spends it once the merged permanent is flipped --
+-- off a rewoven stored copy row's PC.flipped while one covers the permanent.
 -- Two readings rather than one because CR 110.5a keeps status out of the
 -- characteristics: flipping is no CR 613 layer to fold in later, and CR 730.2a
 -- fixes this stamp's timestamp at the merge, so what the flip may reach is
@@ -8276,8 +8277,18 @@ merge sid target side = do
             -- expiry and timestamp and carries the merge read over it.
             -- Pawl.MutateSpec's "CR 730.2a/613.7 a merge outranks Mirrorweave's
             -- copy at once and is recomputed when it ends" proves both.
+            --
+            -- The row carries CR 730.2h's flipped reading of the merge as its
+            -- PC.flipped, the stamp's own slot for it, since a row has no
+            -- Binding.flippedCopyOf beside it. Pawl.MutateSpec's "CR 730.2h a
+            -- merge over Mirrorweave's copy of a flip card flips with the
+            -- abilities from under" proves it.
             alone row = row {ActiveCopy.objects = Set.singleton target}
-            rewoven row = (alone row) {ActiveCopy.snapshot = reading Projection.copiableCharacteristicsFaceUp unrowed {GameState.copyEffects = alone row : GameState.copyEffects unrowed}}
+            rewoven row =
+              let board = unrowed {GameState.copyEffects = alone row : GameState.copyEffects unrowed}
+                  faceUp = reading Projection.copiableCharacteristicsFaceUp board
+                  flipped = reading Projection.copiableCharacteristicsFlipped board
+               in (alone row) {ActiveCopy.snapshot = if flipped == faceUp then faceUp else faceUp {PC.flipped = Just flipped}}
             rows = fmap rewoven (filter (Set.member target . ActiveCopy.objects) (GameState.copyEffects gs))
         State.modify' (`forgetObject` sid)
         State.modify'
