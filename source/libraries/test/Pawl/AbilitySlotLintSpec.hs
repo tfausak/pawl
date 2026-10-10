@@ -137,7 +137,7 @@ isSharedZone zone = case zone of
   Zone.Command -> True
   Zone.Ante -> True
 
--- A Count over a shared zone paired with anything but EachPlayer names a
+-- A Count over a shared zone paired with anything but Relative AnyPlayer names a
 -- per-player fold over a zone no player individually owns -- permitted by the
 -- type, not by the rules. Pawl.Codec.InZone.undividedShared is what ENFORCES
 -- this, at the decoder, so a card file carrying the pairing never reaches a
@@ -145,7 +145,7 @@ isSharedZone zone = case zone of
 -- that predicate, so the two have to agree independently, see #161.
 scopeOffends :: Scope.Scope -> Bool
 scopeOffends scope = case scope of
-  Scope.InZone (InZone.MkInZone zone ref) -> isSharedZone zone && ref /= PlayerRef.EachPlayer
+  Scope.InZone (InZone.MkInZone zone ref) -> isSharedZone zone && ref /= PlayerRef.Relative PlayerRelation.AnyPlayer
   Scope.InHistory _ -> False
   -- No zone at all, shared or otherwise: this scope folds the players a
   -- PlayerRef names rather than a copy of a zone each of them owns, so the
@@ -1457,19 +1457,19 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (not (activatedAbilityOffends (modalActivated inSlot))) "a slot read only by a chosen graveyard card's scope is accepted"
     Spec.assertBool s (activatedAbilityOffends (modalActivated scoped)) "and the same effect over a scope naming no slot leaves that slot unread"
   -- CR 400.1: every InZone Count over a shared zone (battlefield, stack,
-  -- exile, command) must pair with PlayerRef.EachPlayer -- the type
-  -- permits any PlayerRef there, but only EachPlayer is meaningful for a
+  -- exile, command) must pair with PlayerRef.Relative AnyPlayer -- the type
+  -- permits any PlayerRef there, but only Relative AnyPlayer is meaningful for a
   -- zone no player owns individually, see #161. A REGRESSION FENCE rather than
   -- the guard: the decoder refuses such a file, so an offender would abort the
   -- whole corpus load before this sweep ran. Pawl.RegistrySpec's "CR 400.1 a
   -- corpus dividing a shared zone between players" is where that is proved.
-  Spec.it s "every InZone Count over a shared zone pairs with EachPlayer" $ do
+  Spec.it s "every InZone Count over a shared zone pairs with Relative AnyPlayer" $ do
     ps <- S.allPrintings s
     let offenders =
           filter
             (anyFace cardOffendsSharedZoneScope . Printing.card)
             ps
-    Spec.assertEqWith s "no shared-zone scope with a non-EachPlayer ref" (fmap (S.nameOf . Printing.card) offenders) []
+    Spec.assertEqWith s "no shared-zone scope with a ref other than Relative AnyPlayer" (fmap (S.nameOf . Printing.card) offenders) []
     -- The sweep above is vacuous on any Count position the traversal forgets, so
     -- the newest one is asserted positively: Sphere of Safety's CR 508.1h share
     -- counts "enchantments you control", the only Count a cost to attack can
@@ -1479,7 +1479,7 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
       s
       "a cost to attack's counted share is in the sweep"
       (fmap Count.Type.scope (cardCounts (S.combinedFace sphere)))
-      [Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)]
+      [Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer))]
     -- And the newest position of all, planted rather than read off a card: CR
     -- 122.5's GIVER became an ObjectRef when the first side was widened to a
     -- group, so a library walk's depth there is a Count position this traversal

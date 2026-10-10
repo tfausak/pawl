@@ -12,8 +12,8 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 -- per-player zone the last two are one question, and CR 400.1's shared zones
 -- have no per-player copy for either to name. The printed clauses constrain the
 -- two halves independently and in opposite directions: Breathless Knight's "you
--- cast it from a graveyard" is @Relative You@ over @EachPlayer@'s graveyards,
--- Fblthp, the Lost's "was cast from your library" is @EachPlayer@ over your own.
+-- cast it from a graveyard" is @Relative You@ over @Relative AnyPlayer@'s graveyards,
+-- Fblthp, the Lost's "was cast from your library" is @Relative AnyPlayer@ over your own.
 data CastFrom = MkCastFrom
   { caster :: PlayerRef.PlayerRef,
     from :: InZone.InZone

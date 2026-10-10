@@ -462,7 +462,7 @@ waxWaneJson = do
 
 -- The committed Nightmare file: "Nightmare's power and toughness are each equal
 -- to the number of Swamps you control", written as CR 400.1's shared
--- battlefield paired with PlayerRef.EachPlayer and a Filter.ControlledBy
+-- battlefield paired with PlayerRef.Relative AnyPlayer and a Filter.ControlledBy
 -- conjunct. Read for the same reason the two above are, and used where a case
 -- needs a card whose scope it can divide by hand.
 nightmareJson :: IO Text.Text
@@ -734,7 +734,7 @@ youControlSource =
     ( Compares.MkCompares
         ( Quantity.Type.Count
             ( Count.Type.MkCount
-                (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
+                (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer)))
                 (Filter.Type.And [Filter.Type.IsSource, Filter.Type.ControlledBy PlayerRelation.You])
                 Aggregation.Members
             )
@@ -754,7 +754,7 @@ youControlNoSwamps =
     ( Compares.MkCompares
         ( Quantity.Type.Count
             ( Count.Type.MkCount
-                (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
+                (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer)))
                 (Filter.Type.And [Filter.Type.HasSubtype Subtype.Swamp, Filter.Type.ControlledBy PlayerRelation.You])
                 Aggregation.Members
             )

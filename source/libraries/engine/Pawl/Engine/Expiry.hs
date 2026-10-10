@@ -36,9 +36,8 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Condition as Condition
-import qualified Pawl.Engine.Count as Count
-import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Players as Players
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as View
 import qualified Pawl.Engine.SourceContext as SourceContext
@@ -130,7 +129,7 @@ arm targets controller source duration gs = case duration of
   Duration.UntilEndOfNextTurnOf ref ->
     fmap
       (\pid -> Expiry.AtEndOfTurnOf (AfterTurn.MkAfterTurn pid (GameState.turnNumber gs)))
-      (seatOf targets controller source gs ref)
+      (seatOf targets controller gs ref)
   -- CR 611.2a: the same seat and the same turn number as the arm above, under an
   -- arm that also states a BEGINNING. Sampled through seatOf for that arm's
   -- reasons, and Nothing where the reference names nobody for that arm's reason
@@ -148,7 +147,7 @@ arm targets controller source duration gs = case duration of
     _ ->
       fmap
         (\pid -> Expiry.DuringTurnOf (AfterTurn.MkAfterTurn pid (GameState.turnNumber gs)))
-        (seatOf targets controller source gs ref)
+        (seatOf targets controller gs ref)
   -- CR 611.2a: the arm above's window with the seat taken from CR 109.5's "you",
   -- as UntilYourNextTurn takes it. Never Nothing -- a controller is always a
   -- seat, so this window always begins.
@@ -206,47 +205,23 @@ arm targets controller source duration gs = case duration of
 -- (Scryfall o:"each opponent's next turn", o:"opponents' next turns",
 -- 2026-09-25, no hit).
 --
--- InSlot is CR 601.2c's targeted player, through Binding.onlyOne. ControllerOfBound
--- is CR 108.4a's substitute read through the projection: Suspend Aggression's
--- "its owner" is asked of a card already in exile, which CR 108.4 leaves with no
--- controller, and that rule then answers with the owner. Every other arm is
--- Pawl.Engine.Count.playersFor's, over the resolution's slots and a CR 608.2h
--- last-known view -- not Pawl.Engine.Resolve.Slots.playerRefPlayers, which sits
--- above this module and which the callers with no resolution behind them
--- (Pawl.Engine.Stack, Pawl.Engine.Event, Pawl.Engine.ManaRider) cannot reach.
+-- Pawl.Engine.Players' reading over the resolution's slots, CR 608.2h's last
+-- known information answering a controller or owner: Suspend Aggression's "its
+-- owner" is asked of a card already in exile, which CR 108.4 leaves with no
+-- controller, and CR 108.4a then answers with the owner.
+--
+-- Not cut to the controller's range: a window names a turn and affects nobody,
+-- which is what CR 801.10 cuts.
 --
 -- Candidate names nobody here: it is the member a per-player fold has reached,
 -- and the one fold that states such a window substitutes the member as Specific
 -- before arming (perSeat).
-seatOf :: Map.Map SlotName (Set.Set Recipient) -> PlayerId -> ObjectId -> GameState -> PlayerRef.PlayerRef -> Maybe PlayerId
-seatOf targets controller source gs ref = case ref of
-  PlayerRef.InSlot slot -> Map.lookup slot (Binding.playersIn targets)
-  PlayerRef.ControllerOfBound slot ->
-    Map.lookup slot targets
-      >>= Binding.onlyOne
-      >>= Recipient.objectOf
-      >>= \oid -> Projection.controllerWithLastKnown oid gs
-  PlayerRef.Candidate -> Nothing
-  PlayerRef.EachPlayer -> counted
-  PlayerRef.EachPlayerExcept _ -> counted
-  PlayerRef.EachOpponentExcept _ -> counted
-  PlayerRef.Relative _ -> counted
-  PlayerRef.EachInSlot _ -> counted
-  PlayerRef.Specific _ -> counted
-  PlayerRef.OwnerOfBound _ -> counted
-  PlayerRef.ControllerOfObject _ -> counted
-  PlayerRef.OwnerOfObject _ -> counted
-  PlayerRef.ChosenPlayerOfBound _ -> counted
-  PlayerRef.Attacking _ -> counted
-  where
-    counted = case Count.playersFor (Projection.viewWithLastKnownAnywhere gs) context gs ref of
-      Just [pid] -> Just pid
-      _ -> Nothing
-    slotsOf pick = fmap (Set.fromList . Maybe.mapMaybe pick . Set.toList) targets
-    context =
-      ((SourceContext.sourceContext gs (Just controller) source) {Filter.slotObjects = slotsOf Recipient.objectOf})
-        { Filter.slotPlayers = slotsOf Recipient.playerOf
-        }
+seatOf :: Map.Map SlotName (Set.Set Recipient) -> PlayerId -> GameState -> PlayerRef.PlayerRef -> Maybe PlayerId
+seatOf targets controller gs ref =
+  let given = Players.resolution (`Projection.controllerWithLastKnown` gs) (`Projection.ownerWithLastKnown` gs) targets controller gs
+   in case Players.named given {Players.reaches = const True} gs ref of
+        Just [pid] -> Just pid
+        _ -> Nothing
 
 -- CR 611.2a: "each opponent can't cast instant or sorcery spells during THAT
 -- PLAYER's next turn" (Sphinx's Decree) -- a window whose seat is the member a

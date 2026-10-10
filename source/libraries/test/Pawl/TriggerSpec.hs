@@ -2504,7 +2504,7 @@ chaptersOnStackFrom oid gs =
 -- The observable is the LIFE TRIPLE, and it separates three implementations:
 -- EachInSlot gives (16, 20, 16); InSlot's singular read gives (20, 20, 20),
 -- since Binding.onlyOne answers Nothing for the two seats in the slot; a naive
--- EachPlayer gives (16, 16, 16), sweeping up the seat that paid. Nothing else
+-- Relative AnyPlayer gives (16, 16, 16), sweeping up the seat that paid. Nothing else
 -- on the board changes a life total, and no seat drops near zero, so no
 -- state-based action moves the reading between the resolution and the read.
 maulerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()

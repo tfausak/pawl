@@ -58,7 +58,10 @@
                             "type": "Poison"
                           },
                           "player": {
-                            "type": "EachPlayer"
+                            "type": "Relative",
+                            "value": {
+                              "type": "AnyPlayer"
+                            }
                           },
                           "quantity": {
                             "type": "Literal",

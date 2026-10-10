@@ -28,7 +28,6 @@ import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeInstance as ModeInstance
 import qualified Pawl.Types.ModeSelection as ModeSelection
-import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.SlotCount as SlotCount
@@ -38,16 +37,6 @@ import Pawl.Types.TargetSlot (TargetSlot)
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.ZoneScope as ZoneScope
 import qualified Text.Read as Read
-
--- | One mode, selected outright, of one mandatory clause holding these effects
--- in order (CR 608.2c): the whole text of a triggered ability the rulebook
--- writes out and that chooses nothing -- CR 725.2's, 726.2's, 702.179d's,
--- 728.1's, 901.8's.
-single :: Seq.Seq (Effect card ability) -> Modal.Modal card ability
-single effects =
-  Modal.MkModal
-    (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing effects)) Map.empty))
-    (ModeSelection.ChooseExactly 1)
 
 -- Each mode's effects, in printed (mode, then written) order (CR 608.2c) -- one
 -- inner list per mode, kept apart. The shape a caller wants when the MODE is

@@ -465,7 +465,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     Spec.assertEqWith s "no draw outran a library" (GameState.drewFromEmpty after) Set.empty
     Spec.assertEqWith s "both opponents drew, and the controller did not" (drawersOf after) [S.bob, S.carol]
   -- CR 102.1: "A player is one of the people in the game", so once CR 800.4a
-  -- takes carol out, `EachPlayer` stops naming her (#279). It needs three
+  -- takes carol out, `Relative AnyPlayer` stops naming her (#279). It needs three
   -- seats twice over: CR 800.4 says only a multiplayer game -- CR 800.1's,
   -- one that BEGAN with more than two players -- continues after a
   -- departure, and a two-seat game would already have ended under CR 104.2a

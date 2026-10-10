@@ -1476,7 +1476,7 @@ jaradDrainSpec s registry =
           resolved = S.runPure S.identityAnswer activated Stack.resolveTop
       Spec.assertEqWith s "bob lost the Piker's 2 power" (S.lifeOf S.bob resolved) (Just 18)
       -- CR 109.5: "each opponent" must not reach the controller. Without this a
-      -- fix that spelled the recipient EachPlayer would pass the assertion above.
+      -- fix that spelled the recipient Relative AnyPlayer would pass the assertion above.
       Spec.assertEqWith s "alice, who is not an opponent of herself, lost nothing" (S.lifeOf S.alice resolved) (Just 20)
       Spec.assertEqWith s "the Piker really was sacrificed, and as a COST" (Game.lookupObject preyId activated) Nothing
       Spec.assertEqWith s "so the ability was on the stack with the Piker already gone" (length (GameState.stack activated)) 1

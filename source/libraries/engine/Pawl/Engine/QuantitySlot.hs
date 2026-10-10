@@ -605,7 +605,6 @@ overPlayerRefSlots f ref = case ref of
   PlayerRef.Attacking attacking -> fmap (\slot -> PlayerRef.Attacking attacking {AttackingPlayers.attacked = slot}) (f (AttackingPlayers.attacked attacking))
   -- The ones that name no slot at all: the table, CR 109.5's relation, a baked
   -- seat or object, and the candidate whichever fold is running supplies.
-  PlayerRef.EachPlayer -> pure ref
   PlayerRef.Relative _ -> pure ref
   PlayerRef.Specific _ -> pure ref
   PlayerRef.ControllerOfObject _ -> pure ref

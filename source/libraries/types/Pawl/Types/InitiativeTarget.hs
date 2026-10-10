@@ -5,9 +5,8 @@ module Pawl.Types.InitiativeTarget where
 -- it.
 --
 -- Its own sum rather than a Pawl.Types.PlayerRef, for
--- Pawl.Types.MonarchTarget's reason: CR 726.2's ControllerOfSource has no
--- PlayerRef spelling, and PlayerRef.EachPlayer is meaningless for a designation
--- CR 726.3 gives to exactly one player at a time.
+-- Pawl.Types.MonarchTarget's reason: CR 726.3 gives the designation to exactly
+-- one player at a time.
 --
 -- No InSlot arm, where MonarchTarget has one: Scryfall o:"takes the
 -- initiative", 2026-09-03, returns only Undercity // The Initiative, whose

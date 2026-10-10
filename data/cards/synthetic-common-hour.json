@@ -36,7 +36,10 @@
                     "type": "TakeExtraTurn",
                     "value": {
                       "player": {
-                        "type": "EachPlayer"
+                        "type": "Relative",
+                        "value": {
+                          "type": "AnyPlayer"
+                        }
                       },
                       "skips": []
                     }

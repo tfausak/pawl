@@ -108,7 +108,7 @@ triggerSource = SlotName.MkSlotName (Text.pack "self")
 -- ability, this is the controller of the object when the ability triggered"
 -- covers the other two: Pawl.Engine.Activate.activateAbility answers the first,
 -- Pawl.Engine.Engine.placeBorne the second. CR 725.2's monarch pair is the fourth
--- stamp site (Pawl.Engine.Monarch.placeInherent): those abilities have no object
+-- stamp site (Pawl.Engine.Engine.placeSourceless): those abilities have no object
 -- for CR 109.5's triggered-ability sentence to name a controller of, and CR 725.2
 -- supplies one itself -- "controlled by the player who was the monarch at the
 -- time the abilities triggered".

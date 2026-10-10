@@ -106,7 +106,10 @@
                               "scope": {
                                 "type": "OverPlayers",
                                 "value": {
-                                  "type": "EachPlayer"
+                                  "type": "Relative",
+                                  "value": {
+                                    "type": "AnyPlayer"
+                                  }
                                 }
                               }
                             }

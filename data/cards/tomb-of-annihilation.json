@@ -14,7 +14,10 @@
                         "type": "LoseLife",
                         "value": {
                           "player": {
-                            "type": "EachPlayer"
+                            "type": "Relative",
+                            "value": {
+                              "type": "AnyPlayer"
+                            }
                           },
                           "quantity": {
                             "type": "Literal",
@@ -75,7 +78,10 @@
                         "mana": []
                       },
                       "payer": {
-                        "type": "EachPlayer"
+                        "type": "Relative",
+                        "value": {
+                          "type": "AnyPlayer"
+                        }
                       }
                     }
                   }
@@ -148,7 +154,10 @@
                         "mana": []
                       },
                       "payer": {
-                        "type": "EachPlayer"
+                        "type": "Relative",
+                        "value": {
+                          "type": "AnyPlayer"
+                        }
                       }
                     }
                   }

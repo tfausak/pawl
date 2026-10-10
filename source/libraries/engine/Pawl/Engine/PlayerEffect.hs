@@ -43,6 +43,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.IgnoredAbility as IgnoredAbility
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.ManaFilter as ManaFilter
+import qualified Pawl.Engine.Players as Players
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
@@ -187,13 +188,10 @@ permanentLeader gs =
 
 -- The same scope as a SET rather than as a membership test -- CR 400.1's
 -- per-player zones asked in the direction a zone fold needs it
--- (Pawl.Engine.Target.graveyardRecipients). Built ON inScope rather than beside
--- it, so there is exactly one reading of what a PlayerScope names.
---
--- CR 102.1: a player who has left keeps their row in GameState.players
--- (Player.status turns Departed, the key stays), so the fold is over
--- Game.stillPlaying rather than the map's keys, and no scope names a departed
--- seat.
+-- (Pawl.Engine.Target.graveyardRecipients), and the offer a resolving "choose
+-- a player" makes (CR 608.2d). A relation is Pawl.Engine.Players.related's: the
+-- players still in the game (CR 102.1) within the perspective's range (CR
+-- 801.5a / 801.10), so no scope names a departed seat or one out of reach.
 --
 -- Nothing is an ABSENT perspective, which is CR 109.5's "you" with nobody to be
 -- -- the vacuous posture every player-referencing Filter atom takes. AnyPlayer
@@ -202,14 +200,9 @@ permanentLeader gs =
 -- ControllingMostPermanents is answerable for that same reason, one arm further
 -- on: its membership is a fact about the board.
 playersInScope :: Maybe PlayerId -> GameState -> PlayerScope -> Maybe [PlayerId]
-playersInScope perspective gs scope =
-  let everyone = Game.stillPlaying gs
-      relative = fmap (\you -> filter (\pid -> inScope pid you gs scope) everyone) perspective
-   in case scope of
-        PlayerScope.Related relation
-          | PlayerRelation.perspectiveFree relation -> Just everyone
-          | otherwise -> relative
-        PlayerScope.ControllingMostPermanents -> Just (Maybe.maybeToList (permanentLeader gs))
+playersInScope perspective gs scope = case scope of
+  PlayerScope.Related relation -> Players.related perspective gs relation
+  PlayerScope.ControllingMostPermanents -> Just (filter (`elem` Players.table perspective gs) (Maybe.maybeToList (permanentLeader gs)))
 
 -- CR 707.2a: the player abilities this permanent's copiable rules text gives it
 -- -- its copy snapshot's when it has one, its printed face's otherwise. The
@@ -2160,40 +2153,29 @@ mayCastAsThoughItHadFlashAt pid oid manaValue gs =
 -- for whoever the permission reached: Yawgmoth's Will affects its controller
 -- alone, and a grant to the whole table would mean each player's own pile.
 --
--- Exhaustive over PlayerRef, since a new arm has to say what a zone scope makes
--- of it. Three arms answer, and the rest name NOBODY: the slot-reading ones
--- (InSlot, EachInSlot, ControllerOfBound, OwnerOfBound, ChosenPlayerOfBound,
--- Attacking) read the RESOLUTION's
--- bindings, which are gone by the time a stored row is read and which
--- Pawl.Engine.Resolve bakes to Specific while they are still there, and Candidate
--- names whichever player a fold is aimed at with no fold running here. A
--- permission naming nobody opens nothing, which is the honest answer rather than
--- a silent fallback to the caster.
---
--- The two excluding arms are the ones that could have gone either way, and they
--- name nobody here rather than taking their own stated reading (an unfilled slot
--- excludes nobody, so the set is the table). A permission is the direction where
--- widening on an unanswerable reference reads WEAKER than printed, and no card
--- writes this arm in this position; the count in a Scope is where the type's
--- reading belongs.
+-- Pawl.Engine.Players.named's reading over no bindings, judged from the
+-- permitted player over every player still in the game. The slot-reading arms name nobody, their bindings being gone by the time a
+-- stored row is read (Pawl.Engine.Resolve bakes them while they are still
+-- there), and so do the excluding arms -- a permission is the direction where
+-- widening on an unanswerable reference reads WEAKER than printed. Candidate
+-- names nobody, no fold running here. A permission naming nobody opens
+-- nothing.
 zoneOwners :: PlayerId -> PlayerRef.PlayerRef -> GameState -> [PlayerId]
-zoneOwners pid ref gs = case ref of
-  PlayerRef.EachPlayer -> Game.stillPlaying gs
-  PlayerRef.Relative relation -> filter (PlayerRelation.holds (Game.teams gs) relation pid) (Game.stillPlaying gs)
-  PlayerRef.Specific other -> [other]
-  PlayerRef.InSlot _ -> []
-  PlayerRef.EachInSlot _ -> []
-  PlayerRef.EachPlayerExcept _ -> []
-  -- The arm above's answer, for its reason.
-  PlayerRef.EachOpponentExcept _ -> []
-  PlayerRef.Candidate -> []
-  PlayerRef.ControllerOfBound _ -> []
-  PlayerRef.OwnerOfBound _ -> []
-  -- The two arms above, baked, and read the same way.
-  PlayerRef.ControllerOfObject _ -> []
-  PlayerRef.OwnerOfObject _ -> []
-  PlayerRef.ChosenPlayerOfBound _ -> []
-  PlayerRef.Attacking _ -> []
+zoneOwners pid ref gs =
+  Maybe.fromMaybe [] $
+    Players.named
+      Players.MkReads
+        { Players.perspective = Just pid,
+          Players.bound = False,
+          Players.slotPlayers = const Nothing,
+          Players.slotObject = const Nothing,
+          Players.controllerOf = (`Projection.controllerOf` gs),
+          Players.ownerOf = fmap Object.owner . (`Game.lookupObject` gs),
+          Players.roster = Game.stillPlaying gs,
+          Players.reaches = const True
+        }
+      gs
+      ref
 
 -- Does this permission's zone reference name the zone `oid` lies in, and the
 -- player whose copy of it that is?

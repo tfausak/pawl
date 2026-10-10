@@ -2213,7 +2213,6 @@ playerQuantityNames asking x = case x of
 
 playerRefNames :: Asking -> PlayerRef.PlayerRef -> Bool
 playerRefNames asking x = case x of
-  PlayerRef.EachPlayer -> False
   PlayerRef.EachPlayerExcept slotName -> slotNames asking slotName
   PlayerRef.EachOpponentExcept slotName -> slotNames asking slotName
   PlayerRef.Relative _playerRelation -> False
@@ -2808,6 +2807,7 @@ triggerConditionNames asking x = case x of
   TriggerCondition.PlayerManifestsDread _playerRelation -> False
   TriggerCondition.PlayerRollsDice _playerRelation -> False
   TriggerCondition.ChaosEnsues -> False
+  TriggerCondition.PlayerRollsPlaneswalker _playerRelation -> False
   TriggerCondition.SetInMotion -> False
   TriggerCondition.PlayerRollsResult dieResult -> dieResultNames asking (const False) dieResult
   TriggerCondition.Visit -> False

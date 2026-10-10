@@ -23,13 +23,13 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.ManaAbility as ManaAbility
+import qualified Pawl.Engine.Players as Players
 import qualified Pawl.Engine.Projection.Rewrite as Rewrite
 import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
-import qualified Pawl.Types.AttackingPlayers as AttackingPlayers
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardArrivedIn as CardArrivedIn
 import qualified Pawl.Types.Combat as Combat
@@ -56,7 +56,6 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerRef as PlayerRef
-import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Revealed as Revealed
@@ -586,186 +585,32 @@ aggregate quantityOf aggregation members = case aggregation of
 
 -- CR 400.1: whose copy of the zone -- and, for Pawl.Engine.ManaCount, whose
 -- mana pool, which CR 106.4 attaches to a player the same way. Nothing when the
--- reference cannot be resolved: a Relative with no perspective, or a slot the
+-- reference cannot be resolved: a relation with no perspective, or a slot the
 -- arm reading it can make no player of.
 --
--- Takes the same ViewOf `evaluate` does, and for the reason that function's
--- haddock gives: CR 613.1b makes control a layer-2 question, so the arm reading
--- an object's controller needs the caller's projection rather than the bindings
--- alone. Every caller already held one.
---
--- CR 102.1: a departed player keeps their row in GameState.players (only
--- Player.status changes), so `everyone` is Game.stillPlaying rather than the
--- map's keys, and neither EachPlayer nor Opponent names a departed seat.
+-- Pawl.Engine.Players.named's reading, the one every "which players" question
+-- shares; what is this position's own is how it reads a slot (slotPlayers
+-- below, and Filter.slotOneObject) and a controller or owner -- off the
+-- caller's view, since CR 613.1b makes control a layer-2 question.
 --
 -- Observable through Scope.OverPlayers, which folds the players this returns
 -- rather than their objects, and Pawl.CountSpec's Tyranid Invasion group is
--- what proves it. Through Scope.InZone it still is not: CR 800.4a already
--- emptied every zone a departing player owned, so naming a departed seat there
--- folds nothing either way.
+-- what proves CR 102.1's departed seat stays out. Through Scope.InZone it still
+-- is not: CR 800.4a already emptied every zone a departing player owned.
 playersFor :: ViewOf -> Filter.Context -> GameState -> PlayerRef.PlayerRef -> Maybe [PlayerId]
-playersFor viewOf context gs ref =
-  let -- CR 801.11: information from within the perspective's range only. An
-      -- unframed evaluation has no controller to measure from, and cuts nothing.
-      everyone = maybe (Game.stillPlaying gs) (`Game.reachableBy` gs) (Filter.perspective context)
-      -- CR 702.26b: a baked object that is phased out names nothing.
-      unlessPhasedOut oid = if Map.member oid (GameState.phasedOut gs) then Nothing else Just oid
-   in case ref of
-        PlayerRef.EachPlayer -> Just everyone
-        -- EachPlayer minus every player the slot names (CR 104.2c's winning team
-        -- is several), read through slotPlayers below -- Resolve.Slots'
-        -- playerRefPlayers' reading, kept in step with it; no count in
-        -- data/cards/ reads a slot naming several. DEFINED rather than Nothing where
-        -- that read comes up empty -- a slot naming nobody excludes nobody, which
-        -- is the type's stated reading and the opposite of InSlot's collapse. A
-        -- reference with no source at all is still unanswerable, since without one
-        -- there are no bindings to have excluded anybody. A source that EXISTED and
-        -- then ceased, which CR 729.5 leaves a resumed resolution holding, is not
-        -- looked up: the resolution's context carries the slot, read through
-        -- Pawl.Engine.Resolve.liveBindings. Pawl.OutsideTheGameSpec's Synthetic
-        -- Subgame Tithe case proves it.
-        PlayerRef.EachPlayerExcept name ->
-          case Filter.source context of
-            Nothing -> Nothing
-            Just _ ->
-              let excluded = Maybe.fromMaybe [] (slotPlayers context gs name)
-               in Just (filter (`notElem` excluded) everyone)
-        -- CR 702.116a's "each opponent other than defending player": the arm
-        -- above narrowed by CR 102.2 / 102.3, which needs the perspective, so an
-        -- unframed evaluation is unanswerable here as it is under Relative.
-        PlayerRef.EachOpponentExcept name ->
-          case Filter.source context of
-            Nothing -> Nothing
-            Just _ -> do
-              you <- Filter.perspective context
-              let excluded = Maybe.fromMaybe [] (slotPlayers context gs name)
-              Just (filter (\pid -> notElem pid excluded && PlayerRelation.holds (Game.teams gs) PlayerRelation.Opponent you pid) everyone)
-        PlayerRef.Relative relation -> do
-          you <- Filter.perspective context
-          case relation of
-            PlayerRelation.You -> Just [you]
-            -- CR 102.3's every player not on your team, which in a free-for-all
-            -- (CR 806.1) and at two seats (CR 102.2) is every other player.
-            -- PlayerRelation.holds is the predicate, so the two arms and every
-            -- reader elsewhere agree on what the relation means.
-            PlayerRelation.Opponent -> Just (filter (PlayerRelation.holds (Game.teams gs) relation you) everyone)
-            -- CR 102.3's other players on your team, the same predicate.
-            PlayerRelation.Teammate -> Just (filter (PlayerRelation.holds (Game.teams gs) relation you) everyone)
-            -- CR 102.4's you and your teammates, the same predicate.
-            PlayerRelation.YourTeam -> Just (filter (PlayerRelation.holds (Game.teams gs) relation you) everyone)
-            -- CR 102.1's whole table, the perspective included -- which is
-            -- EachPlayer above, arrived at from the other side. Answered off
-            -- `everyone` rather than by consing `you` onto the Opponent set, so a
-            -- departed seat stays out for the same reason it does there. Still a
-            -- perspective-dependent reference for the purposes of this function:
-            -- the do-block's read of it is what makes an unframed evaluation
-            -- unanswerable, and widening that for one arm would let a reference
-            -- resolve where its siblings cannot.
-            PlayerRelation.AnyPlayer -> Just everyone
-        -- ONE player or none: a count reads a slot that names one player, and
-        -- declining a slot that names several is CR 601.2c's own answer, the one
-        -- Binding.onlyOne gives every other such reader.
-        PlayerRef.InSlot name -> case slotPlayers context gs name of
-          Just [pid] -> Just [pid]
-          _ -> Nothing
-        -- InSlot's plural, off the same read: EVERY player the slot names, rather
-        -- than collapsing the whole answer the way the arm above does. An UNBOUND
-        -- slot is still unanswerable, which is that arm's posture -- nothing named
-        -- nobody, and a fold over the empty set would be a different claim.
-        PlayerRef.EachInSlot name -> slotPlayers context gs name
-        -- InSlot's baked half, and answered exactly as the arm above answers a
-        -- slot that names one player: the seat, with no roster test. Per the CR
-        -- 102.1 note above a departed player keeps their row, so this can name one
-        -- -- and the answer is defined rather than absent. What a departed seat
-        -- can still be TRUE of is the reader's question: CR 725.4 takes the crown
-        -- off a player as they leave, so Quantity.IsMonarch reads 0 for one and
-        -- Garland's duration ends.
-        PlayerRef.Specific pid -> Just [pid]
-        -- The fold's own candidate, which this function cannot answer: it holds
-        -- no view, and the candidate is a fact about the member being read
-        -- rather than about the board. Pawl.Engine.Quantity answers it where the
-        -- view is, and Quantity.forCandidate substitutes it in a SCOPE before the
-        -- fold runs, for the recipient a per-player instruction has reached
-        -- (Nature's Resurgence). So what reaches here is a reference in a position
-        -- with no candidate of either kind -- a scope outside such an instruction,
-        -- or a ManaCount -- and Nothing is the honest answer for those.
-        PlayerRef.Candidate -> Nothing
-        -- CR 613.1b / CR 608.2h: the controller of the OBJECT a slot names,
-        -- projected off the injected view -- layer 2 decides who controls a
-        -- permanent, so no read of the bindings alone could answer it. The
-        -- caller's view is what carries CR 608.2h in: a caller that has already
-        -- moved the object supplies a last-known-aware one, and the controller
-        -- still answers. Flunk's "that creature's controller's hand" is what
-        -- proves the Scope road (Pawl.CountSpec).
-        --
-        -- The SAME expression Pawl.Engine.Count.bakePerspective's
-        -- IsControllerOfBound arm makes, so the two cannot come apart about who
-        -- controls the object.
-        --
-        -- Nothing when the slot names no object, names several, or names one the
-        -- view cannot describe -- Candidate's posture above: the count is
-        -- unanswered rather than answered off some other seat.
-        PlayerRef.ControllerOfBound slot ->
-          fmap pure (Filter.slotOneObject slot context >>= viewOf >>= Filter.controller)
-        -- CR 108.3's owner, ControllerOfBound's arm one field over: the OWNER
-        -- of the object a slot names, off the same injected view. The Deck of
-        -- Many Things' 20 band is the producer (Pawl.CardSpec) -- reanimating
-        -- an opponent's creature and having that opponent lose the game is
-        -- exactly the case where owner and controller come apart.
-        --
-        -- Nothing for the same reasons the arm above is: no object, several,
-        -- or one the view cannot describe.
-        PlayerRef.OwnerOfBound slot ->
-          fmap pure (Filter.slotOneObject slot context >>= viewOf >>= Filter.owner)
-        -- CR 611.2b: the two arms above, BAKED -- the object named outright, so
-        -- a stored duration asks who controls or owns it NOW, off the same view.
-        -- Unanswered once the view cannot describe it, and while the object is
-        -- phased out, which CR 702.26b treats as not existing -- so CR 702.26f's
-        -- duration tracking it ends. Not a battlefield test: the object may be
-        -- a card in exile. Proved by
-        -- data/scenarios/cr-611-2b-a-stored-duration-reads-its-target-s-controller-and-owner-after-resolution.json
-        -- and, for phasing,
-        -- data/scenarios/phasing/cr-702-26f-a-duration-reading-its-permanent-s-controller-ends-when-it-phases-out.json.
-        PlayerRef.ControllerOfObject oid -> fmap pure (unlessPhasedOut oid >>= viewOf >>= Filter.controller)
-        PlayerRef.OwnerOfObject oid -> fmap pure (unlessPhasedOut oid >>= viewOf >>= Filter.owner)
-        -- CR 614.1c / CR 702.174b: the player the object a slot names chose, read
-        -- off Object.chosenPlayer rather than off the view -- a choice is a
-        -- record, not a characteristic (CR 707.2), so no projection answers it.
-        --
-        -- Unanswered where the slot names no object or names several,
-        -- ControllerOfBound's posture above; one that has left answers through
-        -- CR 608.2h's last known information. That look-back is a regression
-        -- fence: no card in data/cards/ counts over this reference, so reverting
-        -- it to the live read leaves the suite green.
-        PlayerRef.ChosenPlayerOfBound slot ->
-          fmap pure (Filter.slotOneObject slot context >>= (`Game.chosenPlayerWithLastKnown` gs))
-        -- CR 508.6's set: the players controlling a creature attacking the player
-        -- a slot names, narrowed by the relation the card printed. The SAME fold
-        -- Pawl.Engine.Resolve.Slots.playerRefPlayers makes for the reference in an
-        -- effect's own recipient position, so the two cannot come apart about who
-        -- is attacking whom -- AttackTarget.OfPlayer alone (CR 508.1b lists player,
-        -- planeswalker and battle separately), read LIVE off GameState.combat
-        -- because the sentence is present tense and CR 506.4's removal takes a
-        -- controller back out, and filtered out of `everyone` so the roster order
-        -- and CR 102.1's departed seat are the ones every arm above gives.
-        --
-        -- The controller comes off the injected view rather than a projection of
-        -- this module's own, ControllerOfBound's road above and for CR 613.1b's
-        -- reason. Unanswered where the slot names no one player: the relation is
-        -- about a third seat and there is nothing to be attacking.
-        --
-        -- Synthetic Toll of the Siege is the producer (Pawl.CountSpec); no
-        -- printing counts attacking players (Scryfall o:"for each player
-        -- attacking", o:"each player attacking", o:"players attacking",
-        -- 2026-09-04, no hit).
-        PlayerRef.Attacking (AttackingPlayers.MkAttackingPlayers relation slot) -> do
-          you <- Filter.perspective context
-          attacked <- case slotPlayers context gs slot of
-            Just [pid] -> Just pid
-            _ -> Nothing
-          let sentAt = Map.keys (Map.filter (== AttackTarget.OfPlayer attacked) (Combat.attackers (GameState.combat gs)))
-              attackers = Maybe.mapMaybe (viewOf Monad.>=> Filter.controller) sentAt
-          Just (filter (\pid -> PlayerRelation.holds (Game.teams gs) relation you pid && pid `elem` attackers) everyone)
+playersFor viewOf context gs =
+  Players.named
+    Players.MkReads
+      { Players.perspective = Filter.perspective context,
+        Players.bound = Maybe.isJust (Filter.source context),
+        Players.slotPlayers = slotPlayers context gs,
+        Players.slotObject = (`Filter.slotOneObject` context),
+        Players.controllerOf = viewOf Monad.>=> Filter.controller,
+        Players.ownerOf = viewOf Monad.>=> Filter.owner,
+        Players.roster = Players.table (Filter.perspective context) gs,
+        Players.reaches = const True
+      }
+    gs
 
 -- CR 601.2c: the players one slot names at this position, or Nothing where no
 -- slot of that name is bound here -- which every arm above reads as

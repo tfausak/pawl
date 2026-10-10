@@ -2888,7 +2888,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                 { Face.staticAbilities =
                     [ boostedBy
                         ( Quantity.Type.Count
-                            (Count.Type.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) buried Aggregation.Members)
+                            (Count.Type.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer))) buried Aggregation.Members)
                         )
                     ]
                 }
@@ -2938,7 +2938,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                         (Affected.Matching (Filter.Type.HasCardType CardType.Creature))
                         ( PerCreature.Counted
                             ( Quantity.Type.Count
-                                (Count.Type.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) buried Aggregation.Members)
+                                (Count.Type.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer))) buried Aggregation.Members)
                             )
                         )
                         AttackCostScope.Controller
@@ -2958,7 +2958,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                         (Affected.Matching (Filter.Type.HasCardType CardType.Creature))
                         ( PerCreature.Counted
                             ( Quantity.Type.Count
-                                (Count.Type.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) buried Aggregation.Members)
+                                (Count.Type.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer))) buried Aggregation.Members)
                             )
                         )
                         Nothing
@@ -2984,7 +2984,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                             ( Condition.Type.Compares
                                 ( Compares.MkCompares
                                     ( Quantity.Type.Count
-                                        (Count.Type.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) buried Aggregation.Members)
+                                        (Count.Type.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer))) buried Aggregation.Members)
                                     )
                                     Comparison.AtLeast
                                     (Quantity.Type.Literal 1)
@@ -3126,7 +3126,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                 { Face.staticAbilities =
                     [ boostedBy
                         ( Quantity.Type.Count
-                            (Count.Type.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) buried Aggregation.Members)
+                            (Count.Type.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer))) buried Aggregation.Members)
                         )
                     ]
                 }
@@ -3301,7 +3301,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                             ( Condition.Type.Compares
                                 ( Compares.MkCompares
                                     ( Quantity.Type.Count
-                                        (Count.Type.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) buried Aggregation.Members)
+                                        (Count.Type.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer))) buried Aggregation.Members)
                                     )
                                     Comparison.AtLeast
                                     (Quantity.Type.Literal 1)

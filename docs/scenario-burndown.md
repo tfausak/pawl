@@ -536,7 +536,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 110.2 a seat TIED with alice controls no more lands than she does | `check:events`
 - CR 601.2a the second, cast from the LIBRARY, does not win | `board:library-order`
 - CR 800.4a a player who has conceded is not one of alice's opponents | `board:player-status`
-- CR 800.4a neither EachPlayer nor Opponent names a player who has left the game | `check:other-Count.playersFor` `check:other-Filter.contextFor` `check:other-S.countOf` `check:other-S.stubView` `check:other-Teams.none`
+- CR 800.4a neither AnyPlayer nor Opponent names a player who has left the game | `check:other-Count.playersFor` `check:other-Filter.contextFor` `check:other-S.countOf` `check:other-S.stubView` `check:other-Teams.none`
 
 ### `CounterKeywordTriggerSpec`
 

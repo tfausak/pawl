@@ -3938,7 +3938,7 @@ recipientsSpec s registry = Spec.describe s "recipientsOf" $ do
     Spec.assertEqWith s "CR 605.3b the excluding reference resolves to no recipient at all" (Mana.recipientsOf S.alice Map.empty board excepting) []
     -- Behind the assertion above, and the guard against it passing because the
     -- board has no players to name: the slotless sibling names all three.
-    Spec.assertEqWith s "CR 102.1 while the slotless EachPlayer beside it names the whole table" (Mana.recipientsOf S.alice Map.empty board PlayerRef.EachPlayer) [S.alice, S.bob, S.carol]
+    Spec.assertEqWith s "CR 102.1 while the slotless Relative AnyPlayer beside it names the whole table" (Mana.recipientsOf S.alice Map.empty board (PlayerRef.Relative PlayerRelation.AnyPlayer)) [S.alice, S.bob, S.carol]
 
 -- Valleymaker ({5}{R/G} Creature -- Giant Shaman 5/5, Shadowmoor; Oracle text
 -- checked against Scryfall 2026-10-01): "{T}, Sacrifice a Forest: Choose a

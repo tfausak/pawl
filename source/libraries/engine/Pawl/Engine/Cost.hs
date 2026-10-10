@@ -51,6 +51,7 @@ import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.ManaRider as ManaRider
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
+import qualified Pawl.Engine.Players as Players
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
@@ -4230,7 +4231,7 @@ canPayComponent slots pid oid component gs = case component of
   -- with none left, or none in range (CR 801.5a), cannot pay it -- the payment
   -- arm's own offer. Nothing about `oid`: the choice is about the table, not
   -- about the object the cost is on.
-  CostComponent.ChooseOpponent -> not (null (Game.opponentsInReach pid gs))
+  CostComponent.ChooseOpponent -> not (null (Players.offer pid gs PlayerRelation.Opponent))
   -- CR 601.2b: the component BEFORE X is announced, so there is no
   -- ceiling for rule 701.67b to scope -- BlightX's arm below, verbatim.
   -- Unreachable from the activation path, which substitutes before it
@@ -7063,8 +7064,7 @@ payPayable moment slots pid oid component = case component of
     _ <- Event.flipWinLoseCoin pid statements
     pure bindsNothing
   -- CR 702.174a's first ability, paid by naming the opponent the gift is
-  -- promised to. The answer is FILTERED rather than trusted and falls back to the
-  -- head, Pawl.Engine.Event's as-enters chooser's posture.
+  -- promised to, through Players.chooseOne.
   --
   -- Written to Object.chosenPlayer rather than bound as a slot: CR 702.174b's
   -- payoff is a triggered ability of the PERMANENT the spell becomes, and CR
@@ -7076,19 +7076,13 @@ payPayable moment slots pid oid component = case component of
   -- opponent, and naming one spends nothing that could run out.
   CostComponent.ChooseOpponent -> do
     gs <- State.get
-    case Game.opponentsInReach pid gs of
+    chosen <- Players.chooseOne pid oid (Players.offer pid gs PlayerRelation.Opponent)
+    case chosen of
       -- Unreachable behind `payComponent`'s guard, which reads the same offer;
       -- defensive, as CR 118.3 would have it.
-      [] -> pure Payment.Unpaid
-      -- CR 102.2: a two-player game leaves exactly one opponent, and one option
-      -- is not a choice.
-      [sole] -> do
-        stampChosenPlayer oid sole
-        pure bindsNothing
-      first : second : rest -> do
-        let offered = first NonEmpty.:| (second : rest)
-        answer <- Game.choose (Prompt.ChooseOpponent (Decide.deciderFor pid gs) pid oid offered)
-        stampChosenPlayer oid (if List.elem answer (NonEmpty.toList offered) then answer else first)
+      Nothing -> pure Payment.Unpaid
+      Just opponent -> do
+        stampChosenPlayer oid opponent
         pure bindsNothing
   -- Unpayable, `canPayComponent`'s answer and for its reason -- BlightX's
   -- arm above, verbatim.

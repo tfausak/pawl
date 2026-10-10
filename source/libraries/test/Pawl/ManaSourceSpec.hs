@@ -90,6 +90,7 @@ import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.Prompt as Prompt
@@ -2074,7 +2075,7 @@ onBattlefield :: Filter.Filter Keyword.Keyword -> Condition.Condition
 onBattlefield criterion =
   Condition.Compares
     ( Compares.MkCompares
-        (Quantity.Count (Count.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) criterion Aggregation.Members))
+        (Quantity.Count (Count.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer))) criterion Aggregation.Members))
         Comparison.AtLeast
         (Quantity.Literal 1)
     )

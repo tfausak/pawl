@@ -473,7 +473,7 @@ increaseSpec s registry = Spec.describe s "Increase" $ do
     Spec.assertEqWith s "alice is the active player" (GameState.activePlayer logged) S.alice
     Spec.assertEqWith s "CR 702.179d alice's speed rose once" (speedOf S.alice after) (Just (Just 2))
     Spec.assertEqWith s "one sourceless trigger was spent" (inherentTriggersSpent after) [S.alice]
-    Spec.assertEqWith s "the gather fired once per group, not once per loss" (fmap PendingTrigger.controller (Trigger.inherentTriggers (Speed.abilities logged) (Event.unscannedGrouped logged) logged)) [S.alice, S.alice]
+    Spec.assertEqWith s "the gather fired once per group, not once per loss" (fmap PendingTrigger.controller (Trigger.inherentTriggers (fmap (\(pid, ability) -> (TriggerSource.Sourceless, pid, ability)) (Speed.abilities logged)) (Event.unscannedGrouped logged) logged)) [S.alice, S.alice]
   -- CR 702.179d's intervening "if your speed is less than 4", at CR 603.4's
   -- gather-time check: a player already at max speed does not trigger, so speed
   -- stops at 4 rather than climbing past it. CR 702.179e is why 4 is the number.

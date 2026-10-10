@@ -19,6 +19,7 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
+import qualified Pawl.Engine.Players as Players
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
@@ -41,7 +42,6 @@ import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachBound as AttachBound
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttachedToBound as AttachedToBound
-import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackTargetRef as AttackTargetRef
 import qualified Pawl.Types.AttackingPlayers as AttackingPlayers
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
@@ -63,7 +63,6 @@ import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Types.ChosenPermanent as ChosenPermanent
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.CoinFlipR as CoinFlipR
-import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Conjure as Conjure
@@ -179,7 +178,6 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import Pawl.Types.PlayerRef (PlayerRef)
 import qualified Pawl.Types.PlayerRef as PlayerRef
-import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
@@ -394,7 +392,6 @@ riderSlots riders =
 -- the arms below carry the reason for each arity that is not self-evident.
 playerRefSlots :: PlayerRef -> Map.Map SlotName SlotArity
 playerRefSlots ref = case ref of
-  PlayerRef.EachPlayer -> Map.empty
   -- Every player the slot names is excluded -- CR 104.2c's winning team is
   -- several.
   PlayerRef.EachPlayerExcept slot -> Map.singleton slot SlotArity.Many
@@ -2788,117 +2785,20 @@ legalMany :: SlotName -> Map.Map SlotName (Set Recipient) -> [Recipient]
 legalMany slot legal = Set.toList (Map.findWithDefault Set.empty slot legal)
 
 -- The players a PlayerRef names DURING a resolution, read from the slots this
--- resolution filled rather than the source's bindings. A slot naming SEVERAL
--- names nobody (`legalOne`).
---
--- CR 102.1: a departed player keeps their row in GameState.players, so `everyone`
--- is Game.stillPlaying rather than the map's keys; a question about a departed
--- player's actions reads the record holding them instead (CR 800.4i,
--- Game.attackersInTheirLastTurn). In PlayerId
--- order, a PlayerRef naming an unordered SET, so a caller with an ordering rule
--- imposes it.
+-- resolution filled rather than the source's bindings -- Pawl.Engine.Players'
+-- one reading of every arm, with CR 608.2h's last known information answering
+-- who controlled or owned an object the clause has already moved. Nobody where
+-- that reading is unanswerable: an unfilled or illegal slot is a no-op (CR
+-- 608.2b). In PlayerId order; a caller with an ordering rule imposes it.
 playerRefPlayers :: Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> PlayerRef -> [PlayerId]
-playerRefPlayers legal controller gs ref =
-  let -- CR 801.10: the table the controller's spell or ability reaches. The arms
-      -- reading a slot are cut already, CR 801.4 having kept a target in range.
-      everyone = Game.reachableBy controller gs
-   in case ref of
-        PlayerRef.InSlot slot -> case legalOne slot legal of
-          Just (Recipient.ToPlayer pid) -> [pid]
-          _ -> [] -- an unfilled, illegal, or non-player slot: no-op
-          -- Every player the slot names, InSlot's read without Binding.onlyOne's
-          -- collapse -- Binding.mayPlayers, the seats a CR 603.5 "may" selected.
-          -- Non-player recipients are dropped, as the arm above drops them.
-          --
-          -- Binding.gatePlayers is the same shape one question over, and Bellowing
-          -- Mauler's "each player loses 4 life unless they sacrifice a nontoken
-          -- creature of their choice" reads THAT slot plurally through the arm below.
-        PlayerRef.EachInSlot slot -> Maybe.mapMaybe Recipient.playerOf (legalMany slot legal)
-        PlayerRef.Relative PlayerRelation.You -> [controller]
-        PlayerRef.Relative PlayerRelation.Opponent -> filter (PlayerRelation.holds (Game.teams gs) PlayerRelation.Opponent controller) everyone
-        PlayerRef.Relative PlayerRelation.Teammate -> filter (PlayerRelation.holds (Game.teams gs) PlayerRelation.Teammate controller) everyone
-        PlayerRef.Relative PlayerRelation.YourTeam -> filter (PlayerRelation.holds (Game.teams gs) PlayerRelation.YourTeam controller) everyone
-        -- CR 102.1's whole table, off the roster rather than by consing the controller
-        -- onto the Opponent set, so a departed seat stays out.
-        PlayerRef.Relative PlayerRelation.AnyPlayer -> everyone
-        PlayerRef.EachPlayer -> everyone
-        -- EachPlayer minus every player the slot names -- CR 104.2c's winning
-        -- team is several. A slot that is unfilled, illegal, or names only
-        -- objects excludes NOBODY.
-        PlayerRef.EachPlayerExcept slot ->
-          let excluded = Maybe.mapMaybe Recipient.playerOf (legalMany slot legal)
-           in filter (`notElem` excluded) everyone
-        -- CR 702.116a's "each opponent other than defending player": the arm above
-        -- narrowed by CR 102.2 / 102.3, off the same read.
-        PlayerRef.EachOpponentExcept slot ->
-          let excluded = Maybe.mapMaybe Recipient.playerOf (legalMany slot legal)
-           in filter (\pid -> notElem pid excluded && PlayerRelation.holds (Game.teams gs) PlayerRelation.Opponent controller pid) everyone
-        -- The baked seat, unreachable from card data. Not filtered against the roster:
-        -- it names one specific player who arrived from elsewhere.
-        PlayerRef.Specific pid -> [pid]
-        -- NOBODY, and not a hole: the reference names whichever player a fold has
-        -- reached, and this function is handed no fold. The two positions that DO
-        -- answer it never route through here -- Pawl.Engine.Quantity's playersOf reads
-        -- it off the view a Count's fold supplies, and the Effect.Search arm's
-        -- ownersFor substitutes the searcher for a search whose owner is its own
-        -- searcher -- so what reaches this arm is a reference in a position with no
-        -- candidate at all, and the opcode is a no-op.
-        PlayerRef.Candidate -> []
-        -- CR 608.2h: the controller of the object the slot names, through last known
-        -- information -- the clause naming the player generally MOVED it first, and CR
-        -- 108.4 leaves a card in a hand with no controller at all. Pawl.ResolveSpec's
-        -- "bob, who controlled the bounced creature, went 20 -> 19" (Vapor Snag) is
-        -- what proves the last-known road rather than merely fencing it.
-        PlayerRef.ControllerOfBound slot -> case legalOne slot legal of
-          Just recipient -> case Recipient.objectOf recipient of
-            Just oid -> Maybe.maybeToList (Projection.controllerWithLastKnown oid gs)
-            Nothing -> []
-          Nothing -> []
-        -- CR 108.3: the OWNER of the object the slot names, ControllerOfBound's
-        -- arm one word over -- The Deck of Many Things' 20 band, "its owner
-        -- loses the game", read off the reanimated creature's slot. No
-        -- projection moves an owner (CR 110.2), but the object CR 400.7 replaced
-        -- still has to answer, so this takes the same CR 608.2h last-known road.
-        PlayerRef.OwnerOfBound slot -> case legalOne slot legal of
-          Just recipient -> case Recipient.objectOf recipient of
-            Just oid -> Maybe.maybeToList (Projection.ownerWithLastKnown oid gs)
-            Nothing -> []
-          Nothing -> []
-        -- The two arms above, baked: the same last-known reads, off the object
-        -- named outright.
-        PlayerRef.ControllerOfObject oid -> Maybe.maybeToList (Projection.controllerWithLastKnown oid gs)
-        PlayerRef.OwnerOfObject oid -> Maybe.maybeToList (Projection.ownerWithLastKnown oid gs)
-        -- CR 614.1c / CR 702.174b: the player that object CHOSE -- "the chosen
-        -- player" of the gift ability Pawl.Engine.Keyword mints, read off CR
-        -- 113.7a's source slot. The arm above's read one record over, through
-        -- the same CR 608.2h look-back: Pawl.CastSpec's Scrapshooter killed in
-        -- response still has the promised opponent draw.
-        PlayerRef.ChosenPlayerOfBound slot -> case legalOne slot legal >>= Recipient.objectOf of
-          Just oid -> Maybe.maybeToList (Game.chosenPlayerWithLastKnown oid gs)
-          Nothing -> []
-        -- CR 508.6: the players controlling a creature that is attacking the player the
-        -- slot names, narrowed by the relation the card printed -- Curse of Vitality's
-        -- "each opponent attacking that player".
-        --
-        -- The LIVE combat record, read as this effect applies (CR 608.2c): the sentence
-        -- is present tense, so a creature removed from combat (CR 506.4) since the
-        -- declaration has taken its controller out of the set. Not the event log, which
-        -- is Pawl.Engine.Turn.attackedThisStep's historical reading of the same rule.
-        --
-        -- AttackTarget.OfPlayer alone, CR 508.1b listing player, planeswalker and
-        -- battle separately: a creature attacking a planeswalker that player controls
-        -- is not attacking that player.
-        --
-        -- Filtered out of `everyone` rather than collected from the record, so the
-        -- roster order and the CR 102.1 exclusion of a departed seat are the ones every
-        -- other arm gives.
-        PlayerRef.Attacking (AttackingPlayers.MkAttackingPlayers relation slot) ->
-          case legalOne slot legal >>= Recipient.playerOf of
-            Nothing -> []
-            Just attacked ->
-              let sentAt = Map.keys (Map.filter (== AttackTarget.OfPlayer attacked) (Combat.attackers (GameState.combat gs)))
-                  attackers = Maybe.mapMaybe (\oid -> Projection.controllerOf oid gs) sentAt
-               in filter (\pid -> PlayerRelation.holds (Game.teams gs) relation controller pid && pid `elem` attackers) everyone
+playerRefPlayers legal controller gs =
+  Maybe.fromMaybe [] . Players.named (resolutionReads legal controller gs) gs
+
+-- What a resolution reads (Players.resolution), off CR 608.2h's last known
+-- controller and owner.
+resolutionReads :: Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> Players.Reads
+resolutionReads legal controller gs =
+  Players.resolution (`Projection.controllerWithLastKnown` gs) (`Projection.ownerWithLastKnown` gs) legal controller gs
 
 -- CR 109.2's battlefield, narrowed by an effect-borne Filter and sorted into CR
 -- 608.2f's APNAP order. ObjectRef.EachMatching's whole answer, and the

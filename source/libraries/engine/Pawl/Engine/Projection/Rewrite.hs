@@ -2060,6 +2060,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PlayerRollsResult _ -> condition
   TriggerCondition.Visit -> condition
   TriggerCondition.ChaosEnsues -> condition
+  TriggerCondition.PlayerRollsPlaneswalker _ -> condition
   TriggerCondition.SetInMotion -> condition
   TriggerCondition.PlayerOpensAttraction _ -> condition
   TriggerCondition.PlayerClaimsPrize _ -> condition

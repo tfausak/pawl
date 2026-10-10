@@ -13,7 +13,7 @@ import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 
 -- | CR 603.3: an ability that has TRIGGERED but is not yet on the stack. Gathered
--- by Pawl.Engine.Event (the sourceless ones by
+-- by Pawl.Engine.Event (the rulebook-written ones by
 -- Pawl.Engine.Event.Trigger.inherentTriggers) at the CR 117.5 boundary, ordered
 -- and placed by Pawl.Engine.Engine.
 --

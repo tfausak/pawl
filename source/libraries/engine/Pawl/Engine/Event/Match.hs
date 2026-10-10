@@ -11596,17 +11596,14 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
     GameEvent.LifeGained {} -> False
-  -- CR 309.4c: "when you move your venture marker into THIS room", so the
-  -- dungeon card the marker is on must be the bearer and the room must be this
-  -- ability's own. Not reached from here: eventTriggers' command-zone source is
-  -- CR 114.4's and takes emblems alone, so a dungeon card is never offered and
-  -- Pawl.Engine.Dungeon.roomPending is what gathers a room ability. A regression
-  -- fence, written to agree with that gatherer rather than to differ. The two
-  -- cannot disagree on any dungeon card: CR 309.4c gives every room ability the
-  -- same trigger condition, which the rulebook supplies and the card does not
-  -- print, so only the effect varies and neither collector reads it.
+  -- CR 309.4c: "when YOU move your venture marker into THIS room", so the
+  -- mover must be the ability's controller, the dungeon card the marker is on
+  -- must be the bearer, and the room must be this ability's own.
+  -- Event.Trigger.inherentTriggers reaches it, with Dungeon.abilities' rooms.
+  -- The mover test is a regression fence: CR 309.4 puts a player's marker only
+  -- on a dungeon card they own, so the mover is always the controller.
   TriggerCondition.RoomEntered room -> case event of
-    GameEvent.VentureMarkerEntered (VentureMarkerEntered.MkVentureMarkerEntered _ oid entered) -> oid == bearer && entered == room
+    GameEvent.VentureMarkerEntered (VentureMarkerEntered.MkVentureMarkerEntered mover oid entered) -> mover == you && oid == bearer && entered == room
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
     GameEvent.BecameUnattached {} -> False
@@ -12792,6 +12789,96 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit {} -> False
     GameEvent.PlanarDieRolled rolled -> PlanarDieRolled.face rolled == PlanarDieFace.Chaos
+    GameEvent.SchemeSetInMotion _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+    GameEvent.BecameUntapped _ -> False
+    GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
+    GameEvent.ManaAbilityResolved _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.RingTempted _ -> False
+    GameEvent.Blighted _ -> False
+    GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
+    GameEvent.CollectedEvidence _ -> False
+    GameEvent.GaveGift _ -> False
+    GameEvent.AttractionOpened _ -> False
+    GameEvent.PrizeClaimed _ -> False
+    GameEvent.Earthbent _ -> False
+    GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
+    GameEvent.StickerPut _ -> False
+    GameEvent.ActivatedAbilityResolved _ -> False
+    GameEvent.TriggeredAbilityResolved _ -> False
+    GameEvent.CardArrived _ -> False
+  -- CR 901.8 / 901.9c: the roller, read against CR 109.5's "you" as
+  -- PlayerRollsDice does, rolled the Planeswalker symbol.
+  TriggerCondition.PlayerRollsPlaneswalker relation -> case event of
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.TookInitiative _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mutated _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Exploited {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.BecameCrewed _ -> False
+    GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
+    GameEvent.Crewed _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.LandPlayed {} -> False
+    GameEvent.LostTheGame _ -> False
+    GameEvent.DungeonCompleted _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.Proliferated _ -> False
+    GameEvent.ManifestedDread {} -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
+    GameEvent.RolledToVisit {} -> False
+    GameEvent.PlanarDieRolled rolled -> PlanarDieRolled.face rolled == PlanarDieFace.Planeswalker && PlayerRelation.holds (Game.teams gs) relation you (PlanarDieRolled.roller rolled)
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False

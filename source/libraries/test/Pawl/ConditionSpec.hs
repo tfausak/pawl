@@ -74,7 +74,7 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 everyPermanent :: Count.Type.Count Quantity.Type.Quantity
 everyPermanent =
   Count.Type.MkCount
-    (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
+    (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer)))
     (Filter.Type.And [])
     Aggregation.Members
 
@@ -245,7 +245,7 @@ stealing wanted p = case p of
 -- TWO READERS ON ONE BOARD, answering opposite ways off that one cast:
 --
 --   * Breathless Knight's "you cast it from A graveyard" is caster You over
---     PlayerRef.EachPlayer's graveyards, and it holds -- the Knight takes its
+--     PlayerRef.Relative AnyPlayer's graveyards, and it holds -- the Knight takes its
 --     +1/+1 counter.
 --   * The Vessel's own "you cast it from YOUR graveyard" is caster You over your
 --     own graveyard, and it does not -- no Demon token.

@@ -306,6 +306,28 @@ spec s registry = Spec.describe s "Pawl.Engine.Dungeon" $ do
     Spec.assertEqWith s "bottoming it moved it to the bottom" (take 1 (reverse (libraryOf bottomed))) [marker]
     Spec.assertBool s (take 1 (libraryOf bottomed) /= [marker]) "so it is no longer on top"
     Spec.assertEqWith s "and keeping it left it on top" (take 1 (libraryOf kept)) [marker]
+  -- CR 309.4c: "each room ability is controlled by the player who owns the
+  -- dungeon card", whoever's turn it is. alice's venture resolves on bob's turn,
+  -- so a room ability handed to the active player would scry bob's library, or
+  -- -- not being moved by its controller -- not trigger at all.
+  Spec.it s "CR 309.4c a room ability is the dungeon owner's on another player's turn" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    door <- S.printingOf s registry "Secret Door"
+    lostMine <- S.printingOf s registry "Lost Mine of Phandelver"
+    let (doorId, base) = dungeonBoard island door [lostMine] 5
+        (marker, gs) = S.addLibraryCard mountain S.alice base
+        answering :: Prompt.Prompt r -> r
+        answering p = case p of
+          Prompt.ChooseScry {} -> ([marker], [])
+          _ -> paying p
+        activated = S.runPure answering gs (Activate.activateAbility S.alice doorId (ventureAbility door))
+        onBobsTurn = activated {GameState.activePlayer = S.bob}
+        resolved = resolveAll answering (S.runPure answering onBobsTurn Engine.settleForPriority)
+        libraryOf = Game.zoneMembers Zone.Library S.alice
+    Spec.assertEqWith s "bob is the active player" (GameState.activePlayer resolved) S.bob
+    Spec.assertEqWith s "alice scried her Mountain to the bottom" (take 1 (reverse (libraryOf resolved))) [marker]
+
   -- CR 309.5a: "if there are multiple arrows pointing away from the room the
   -- player's venture marker is on, THEY CHOOSE one of them to follow."
   --
@@ -474,7 +496,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Dungeon" $ do
     Spec.assertEqWith s "and only one of them, either way" (length (dungeonsOf S.alice headDungeon), length (dungeonsOf S.alice lastDungeon)) (1, 1)
   -- CR 118.12a down the ROOM-ABILITY path, which no card had reached before Tomb
   -- of Annihilation: Veils of Fear is "each player loses 2 life unless they
-  -- discard a card", and Dungeon.roomPending mints that ability rather than
+  -- discard a card", and Dungeon.abilities mints that ability rather than
   -- reading it off a permanent's face. A gate that found no payers there would
   -- lose nobody any life and look exactly like a rule that did not apply.
   --

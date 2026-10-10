@@ -47,7 +47,7 @@ cardsInYourHand =
 cardTypesInAllGraveyards :: Count.Type.Count Quantity.Type.Quantity
 cardTypesInAllGraveyards =
   Count.Type.MkCount
-    (Scope.InZone (InZone.MkInZone Zone.Graveyard PlayerRef.EachPlayer))
+    (Scope.InZone (InZone.MkInZone Zone.Graveyard (PlayerRef.Relative PlayerRelation.AnyPlayer)))
     (Filter.Type.And [])
     Aggregation.DistinctCardTypes
 

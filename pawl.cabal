@@ -1479,6 +1479,7 @@ library engine
     Pawl.Engine.ManaFilter
     Pawl.Engine.ManaRider
     Pawl.Engine.ManifestDread
+    Pawl.Engine.Mint
     Pawl.Engine.Modal
     Pawl.Engine.Monarch
     Pawl.Engine.MoveDuration
@@ -1489,6 +1490,7 @@ library engine
     Pawl.Engine.Planechase
     Pawl.Engine.PlayerDesignation
     Pawl.Engine.PlayerEffect
+    Pawl.Engine.Players
     Pawl.Engine.Plot
     Pawl.Engine.Populate
     Pawl.Engine.Prepare

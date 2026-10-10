@@ -38,7 +38,10 @@
                     "type": "Ante",
                     "value": {
                       "player": {
-                        "type": "EachPlayer"
+                        "type": "Relative",
+                        "value": {
+                          "type": "AnyPlayer"
+                        }
                       },
                       "ref": {
                         "type": "TopOfLibrary",
@@ -48,7 +51,10 @@
                             "value": 1
                           },
                           "player": {
-                            "type": "EachPlayer"
+                            "type": "Relative",
+                            "value": {
+                              "type": "AnyPlayer"
+                            }
                           }
                         }
                       }
