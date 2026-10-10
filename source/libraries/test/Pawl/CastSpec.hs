@@ -65,7 +65,6 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.Label as Label
-import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSpending as ManaSpending
@@ -480,68 +479,8 @@ handInPlay printing board =
       (oid, g1) = Game.freshObjectId boardP
       (ts, g2) = Game.freshTimestamp g1
       obj =
-        Object.MkObject
-          { Object.owner = S.alice,
-            Object.identity = Just (Game.mintIdentity oid S.alice),
-            Object.enteredUnder = Nothing,
-            Object.source = Source.OfCard printingId,
-            Object.zone = Zone.Hand,
-            Object.tapped = TapState.Untapped,
-            Object.facing = Facing.FaceUp,
-            Object.flipped = False,
-            Object.exiledFaceDown = False,
-            Object.exileLookers = Set.empty,
-            Object.damage = 0,
-            Object.sickness = Sickness.Settled S.alice,
-            Object.controlClock = Map.empty,
-            Object.bindings = Map.empty,
-            Object.counters = Map.empty,
-            Object.counterTimestamps = Map.empty,
-            Object.attachedTo = Nothing,
-            Object.chosenColors = Set.empty,
-            Object.chosenSubtype = Nothing,
-            Object.chosenNames = Set.empty,
-            Object.chosenPlayer = Nothing,
-            Object.timestamp = ts,
-            Object.face = Nothing,
-            Object.turnedOverAt = Nothing,
-            Object.worldSince = Nothing,
-            Object.playableFromExile = Nothing,
-            Object.plotted = Nothing,
-            Object.foretold = Nothing,
-            Object.foretellCostReduction = Nothing,
-            Object.warped = Nothing,
-            Object.preparedCopyOf = Nothing,
-            Object.ringBearerFor = Nothing,
-            Object.stickers = Seq.empty,
-            Object.duplicate = Nothing,
-            Object.paired = Nothing,
-            Object.protector = Nothing,
-            Object.ventureRoom = Nothing,
-            Object.classLevel = Nothing,
-            Object.unlockedHalves = Set.empty,
-            Object.designations = Set.empty,
-            Object.designationValues = Map.empty,
-            Object.storedResults = Map.empty,
-            Object.paidCosts = Map.empty,
-            Object.tributePaid = False,
-            Object.bestowed = False,
-            Object.mutating = False,
-            Object.prototyped = False,
-            Object.boughtBack = False,
-            Object.unannounced = False,
-            Object.spliced = Seq.empty,
-            Object.phyrexianLifePaid = 0,
-            Object.manaSpent = Mana.MkMana [],
-            Object.announcedX = Nothing,
-            Object.castFrom = Nothing,
-            Object.castUsing = Nothing,
-            Object.castGrant = Nothing,
-            Object.detainedUntil = Set.empty,
-            Object.goadedBy = Set.empty,
-            Object.doesNotUntapFor = 0,
-            Object.exertedBy = Set.empty,
-            Object.activatedOnce = Map.empty
+        (Game.cardObject oid S.alice printingId Zone.Hand ts)
+          { Object.sickness = Sickness.Settled S.alice
           }
    in ( g2
           { GameState.objects = Map.insert oid obj (GameState.objects g2),

@@ -30,13 +30,11 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.DungeonRoom as DungeonRoom
 import qualified Pawl.Types.Face as Face
-import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
-import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Player as Player
@@ -47,7 +45,6 @@ import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
-import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggerSource as TriggerSource
@@ -233,70 +230,12 @@ enter pid quality = do
       let (oid, gs1) = Game.freshObjectId gs
           (ts, gs2) = Game.freshTimestamp gs1
           obj =
-            Object.MkObject
-              { Object.owner = pid,
-                Object.identity = Just (Game.mintIdentity oid pid),
-                Object.enteredUnder = Nothing,
-                Object.source = Source.OfCard printingId,
-                Object.zone = Zone.Command,
-                Object.tapped = TapState.Untapped,
-                Object.facing = Facing.FaceUp,
-                Object.flipped = False,
-                Object.exiledFaceDown = False,
-                Object.exileLookers = Set.empty,
-                Object.damage = 0,
+            (Object.new pid (Source.OfCard printingId) Zone.Command ts)
+              { Object.identity = Just (Game.mintIdentity oid pid),
                 Object.sickness = Sickness.Settled pid,
-                Object.controlClock = Map.empty,
-                Object.bindings = Map.empty,
-                Object.counters = Map.empty,
-                Object.counterTimestamps = Map.empty,
-                Object.attachedTo = Nothing,
-                Object.chosenColors = Set.empty,
-                Object.chosenSubtype = Nothing,
-                Object.chosenNames = Set.empty,
-                Object.chosenPlayer = Nothing,
-                Object.timestamp = ts,
-                Object.face = Nothing,
-                Object.turnedOverAt = Nothing,
-                Object.worldSince = Nothing,
-                Object.playableFromExile = Nothing,
-                Object.plotted = Nothing,
-                Object.foretold = Nothing,
-                Object.foretellCostReduction = Nothing,
-                Object.warped = Nothing,
-                Object.preparedCopyOf = Nothing,
-                Object.ringBearerFor = Nothing,
-                Object.stickers = Seq.empty,
-                Object.duplicate = Nothing,
-                Object.paired = Nothing,
-                Object.protector = Nothing,
-                Object.classLevel = Nothing,
                 -- CR 309.4a: "as a player puts a dungeon they own into the command
                 -- zone, they put their venture marker on the topmost room".
-                Object.ventureRoom = Just RoomIndex.topmost,
-                Object.unlockedHalves = Set.empty,
-                Object.designations = Set.empty,
-                Object.designationValues = Map.empty,
-                Object.storedResults = Map.empty,
-                Object.paidCosts = Map.empty,
-                Object.tributePaid = False,
-                Object.bestowed = False,
-                Object.mutating = False,
-                Object.prototyped = False,
-                Object.boughtBack = False,
-                Object.unannounced = False,
-                Object.spliced = Seq.empty,
-                Object.phyrexianLifePaid = 0,
-                Object.manaSpent = Mana.MkMana [],
-                Object.announcedX = Nothing,
-                Object.castFrom = Nothing,
-                Object.castUsing = Nothing,
-                Object.castGrant = Nothing,
-                Object.detainedUntil = Set.empty,
-                Object.goadedBy = Set.empty,
-                Object.doesNotUntapFor = 0,
-                Object.exertedBy = Set.empty,
-                Object.activatedOnce = Map.empty
+                Object.ventureRoom = Just RoomIndex.topmost
               }
           gs3 =
             Game.insertIntoZone

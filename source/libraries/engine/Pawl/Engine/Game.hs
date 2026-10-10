@@ -678,6 +678,12 @@ pileHolderIn hint oid piles = case hint of
 mintIdentity :: ObjectId -> PlayerId -> CardIdentity.CardIdentity
 mintIdentity oid pid = CardIdentity.MkCardIdentity {CardIdentity.serial = ObjectId.unwrap oid, CardIdentity.startingOwner = pid}
 
+-- | A card's object as it first exists under `oid`, owned by `pid`, before
+-- anything has happened to it: Object.new with the card's identity minted.
+cardObject :: ObjectId -> PlayerId -> PrintingId.PrintingId -> Zone -> Timestamp.Timestamp -> Object.Object
+cardObject oid pid printingId zone ts =
+  (Object.new pid (Source.OfCard printingId) zone ts) {Object.identity = Just (mintIdentity oid pid)}
+
 -- CR 108.3 / 407.3: this player now owns the object. A write on the object as
 -- it stands and not a zone change, so CR 400.7 mints nothing; CR 400.3 reads
 -- the new owner at its next move. Unknown ids are left alone.

@@ -84,7 +84,6 @@ import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
-import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaProduction as ManaProduction
@@ -605,73 +604,14 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (boilPrintingId, g2b) = Game.intern boil g2
         (boilId, g3) = Game.freshObjectId g2b
         boilObj =
-          Object.MkObject
-            { Object.owner = S.alice,
-              Object.identity = Just (Game.mintIdentity boilId S.alice),
-              Object.enteredUnder = Nothing,
-              Object.source = Source.OfCard boilPrintingId,
-              Object.zone = Zone.Stack,
-              Object.tapped = TapState.Untapped,
-              Object.facing = Facing.FaceUp,
-              Object.flipped = False,
-              Object.exiledFaceDown = False,
-              Object.exileLookers = Set.empty,
-              Object.damage = 0,
-              Object.sickness = Sickness.Settled S.alice,
-              Object.controlClock = Map.empty,
+          (Game.cardObject boilId S.alice boilPrintingId Zone.Stack (Timestamp.MkTimestamp 0))
+            { Object.sickness = Sickness.Settled S.alice,
               -- CR 700.2: Boil has one mode, and a directly-built stack object
               -- (bypassing Cast.castSpell) must stamp it chosen (mode 0), or
               -- Resolve.modesOf and Resolve.targetSlotsOf -- both scoped to the
               -- CHOSEN modes through Binding.modesOf -- would see no effects and
               -- no target slots at all.
-              Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0)),
-              Object.counters = Map.empty,
-              Object.counterTimestamps = Map.empty,
-              Object.attachedTo = Nothing,
-              Object.chosenColors = Set.empty,
-              Object.chosenSubtype = Nothing,
-              Object.chosenNames = Set.empty,
-              Object.chosenPlayer = Nothing,
-              Object.timestamp = Timestamp.MkTimestamp 0,
-              Object.face = Nothing,
-              Object.turnedOverAt = Nothing,
-              Object.worldSince = Nothing,
-              Object.playableFromExile = Nothing,
-              Object.plotted = Nothing,
-              Object.foretold = Nothing,
-              Object.foretellCostReduction = Nothing,
-              Object.warped = Nothing,
-              Object.preparedCopyOf = Nothing,
-              Object.ringBearerFor = Nothing,
-              Object.stickers = Seq.empty,
-              Object.duplicate = Nothing,
-              Object.paired = Nothing,
-              Object.protector = Nothing,
-              Object.ventureRoom = Nothing,
-              Object.classLevel = Nothing,
-              Object.unlockedHalves = Set.empty,
-              Object.designations = Set.empty,
-              Object.designationValues = Map.empty,
-              Object.storedResults = Map.empty,
-              Object.paidCosts = Map.empty,
-              Object.tributePaid = False,
-              Object.bestowed = False,
-              Object.mutating = False,
-              Object.prototyped = False,
-              Object.boughtBack = False,
-              Object.unannounced = False,
-              Object.spliced = Seq.empty,
-              Object.phyrexianLifePaid = 0,
-              Object.manaSpent = Mana.MkMana [],
-              Object.announcedX = Nothing,
-              Object.castFrom = Nothing,
-              Object.castUsing = Nothing,
-              Object.castGrant = Nothing,
-              Object.detainedUntil = Set.empty,
-              Object.goadedBy = Set.empty,
-              Object.doesNotUntapFor = 0,
-              Object.exertedBy = Set.empty,
-              Object.activatedOnce = Map.empty
+              Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
             }
         g4 =
           g3
@@ -696,68 +636,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (bloodMoonPrintingId, g1b) = Game.intern bloodMoon g1
         (bloodMoonSpellId, g2) = Game.freshObjectId g1b
         bmObj =
-          Object.MkObject
-            { Object.owner = S.alice,
-              Object.identity = Just (Game.mintIdentity bloodMoonSpellId S.alice),
-              Object.enteredUnder = Nothing,
-              Object.source = Source.OfCard bloodMoonPrintingId,
-              Object.zone = Zone.Stack,
-              Object.tapped = TapState.Untapped,
-              Object.facing = Facing.FaceUp,
-              Object.flipped = False,
-              Object.exiledFaceDown = False,
-              Object.exileLookers = Set.empty,
-              Object.damage = 0,
-              Object.sickness = Sickness.Settled S.alice,
-              Object.controlClock = Map.empty,
-              Object.bindings = Map.empty,
-              Object.counters = Map.empty,
-              Object.counterTimestamps = Map.empty,
-              Object.attachedTo = Nothing,
-              Object.chosenColors = Set.empty,
-              Object.chosenSubtype = Nothing,
-              Object.chosenNames = Set.empty,
-              Object.chosenPlayer = Nothing,
-              Object.timestamp = Timestamp.MkTimestamp 0,
-              Object.face = Nothing,
-              Object.turnedOverAt = Nothing,
-              Object.worldSince = Nothing,
-              Object.playableFromExile = Nothing,
-              Object.plotted = Nothing,
-              Object.foretold = Nothing,
-              Object.foretellCostReduction = Nothing,
-              Object.warped = Nothing,
-              Object.preparedCopyOf = Nothing,
-              Object.ringBearerFor = Nothing,
-              Object.stickers = Seq.empty,
-              Object.duplicate = Nothing,
-              Object.paired = Nothing,
-              Object.protector = Nothing,
-              Object.ventureRoom = Nothing,
-              Object.classLevel = Nothing,
-              Object.unlockedHalves = Set.empty,
-              Object.designations = Set.empty,
-              Object.designationValues = Map.empty,
-              Object.storedResults = Map.empty,
-              Object.paidCosts = Map.empty,
-              Object.tributePaid = False,
-              Object.bestowed = False,
-              Object.mutating = False,
-              Object.prototyped = False,
-              Object.boughtBack = False,
-              Object.unannounced = False,
-              Object.spliced = Seq.empty,
-              Object.phyrexianLifePaid = 0,
-              Object.manaSpent = Mana.MkMana [],
-              Object.announcedX = Nothing,
-              Object.castFrom = Nothing,
-              Object.castUsing = Nothing,
-              Object.castGrant = Nothing,
-              Object.detainedUntil = Set.empty,
-              Object.goadedBy = Set.empty,
-              Object.doesNotUntapFor = 0,
-              Object.exertedBy = Set.empty,
-              Object.activatedOnce = Map.empty
+          (Game.cardObject bloodMoonSpellId S.alice bloodMoonPrintingId Zone.Stack (Timestamp.MkTimestamp 0))
+            { Object.sickness = Sickness.Settled S.alice
             }
         g3 =
           g2
@@ -784,74 +664,20 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (ts, g2) = Game.freshTimestamp g1
         slot = SlotName.MkSlotName (Text.pack "target")
         abilObj =
-          Object.MkObject
-            { Object.owner = S.alice,
-              Object.identity = Nothing,
-              Object.enteredUnder = Nothing,
-              Object.source =
-                Source.OfAbility
+          ( Object.new
+              S.alice
+              ( Source.OfAbility
                   ActivatedAbilitySource.MkActivatedAbilitySource
                     { ActivatedAbilitySource.source = srcId,
                       ActivatedAbilitySource.ability = ability,
                       ActivatedAbilitySource.delayed = Map.empty
-                    },
-              Object.zone = Zone.Stack,
-              Object.tapped = TapState.Untapped,
-              Object.facing = Facing.FaceUp,
-              Object.flipped = False,
-              Object.exiledFaceDown = False,
-              Object.exileLookers = Set.empty,
-              Object.damage = 0,
-              Object.sickness = Sickness.Settled S.alice,
-              Object.controlClock = Map.empty,
-              Object.bindings = Binding.fromChoices (Map.singleton slot (Set.singleton (Recipient.ToPlayer S.bob))) Nothing (Seq.singleton (ModeIndex.MkModeIndex 0)),
-              Object.counters = Map.empty,
-              Object.counterTimestamps = Map.empty,
-              Object.attachedTo = Nothing,
-              Object.chosenColors = Set.empty,
-              Object.chosenSubtype = Nothing,
-              Object.chosenNames = Set.empty,
-              Object.chosenPlayer = Nothing,
-              Object.timestamp = ts,
-              Object.face = Nothing,
-              Object.turnedOverAt = Nothing,
-              Object.worldSince = Nothing,
-              Object.playableFromExile = Nothing,
-              Object.plotted = Nothing,
-              Object.foretold = Nothing,
-              Object.foretellCostReduction = Nothing,
-              Object.warped = Nothing,
-              Object.preparedCopyOf = Nothing,
-              Object.ringBearerFor = Nothing,
-              Object.stickers = Seq.empty,
-              Object.duplicate = Nothing,
-              Object.paired = Nothing,
-              Object.protector = Nothing,
-              Object.ventureRoom = Nothing,
-              Object.classLevel = Nothing,
-              Object.unlockedHalves = Set.empty,
-              Object.designations = Set.empty,
-              Object.designationValues = Map.empty,
-              Object.storedResults = Map.empty,
-              Object.paidCosts = Map.empty,
-              Object.tributePaid = False,
-              Object.bestowed = False,
-              Object.mutating = False,
-              Object.prototyped = False,
-              Object.boughtBack = False,
-              Object.unannounced = False,
-              Object.spliced = Seq.empty,
-              Object.phyrexianLifePaid = 0,
-              Object.manaSpent = Mana.MkMana [],
-              Object.announcedX = Nothing,
-              Object.castFrom = Nothing,
-              Object.castUsing = Nothing,
-              Object.castGrant = Nothing,
-              Object.detainedUntil = Set.empty,
-              Object.goadedBy = Set.empty,
-              Object.doesNotUntapFor = 0,
-              Object.exertedBy = Set.empty,
-              Object.activatedOnce = Map.empty
+                    }
+              )
+              Zone.Stack
+              ts
+          )
+            { Object.sickness = Sickness.Settled S.alice,
+              Object.bindings = Binding.fromChoices (Map.singleton slot (Set.singleton (Recipient.ToPlayer S.bob))) Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
             }
         g3 =
           g2
@@ -882,7 +708,10 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          Object.MkObject S.alice Nothing Nothing (Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = ObjectId.MkObjectId 0, ActivatedAbilitySource.ability = ability, ActivatedAbilitySource.delayed = Map.empty}) Zone.Stack TapState.Untapped Facing.FaceUp False False Set.empty 0 (Sickness.Settled S.alice) Map.empty (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Map.empty Nothing Set.empty Nothing Set.empty Nothing ts Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty Map.empty Map.empty Map.empty False False False False False False Seq.empty 0 (Mana.MkMana []) Nothing Nothing Nothing Nothing Set.empty Set.empty 0 Set.empty Map.empty Nothing Nothing Seq.empty
+          (Object.new S.alice (Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = ObjectId.MkObjectId 0, ActivatedAbilitySource.ability = ability, ActivatedAbilitySource.delayed = Map.empty}) Zone.Stack ts)
+            { Object.sickness = Sickness.Settled S.alice,
+              Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
+            }
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findFirst g4 Stack.resolveTop)
     Spec.assertEqWith s "one permanent on the battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice resolved)) 1
@@ -895,7 +724,11 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] 0 (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.outsideTheGame = False, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped, Search.subject = Nothing, Search.slot = Nothing, Search.differentIn = Set.empty, Search.exactly = False}]))) Map.empty)) (ModeSelection.ChooseExactly 1)) [] Activator.Controller Nothing Nothing Nothing
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
-        abilObj = Object.MkObject S.alice Nothing Nothing (Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = ObjectId.MkObjectId 0, ActivatedAbilitySource.ability = ability, ActivatedAbilitySource.delayed = Map.empty}) Zone.Stack TapState.Untapped Facing.FaceUp False False Set.empty 0 (Sickness.Settled S.alice) Map.empty (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Map.empty Nothing Set.empty Nothing Set.empty Nothing ts Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty Map.empty Map.empty Map.empty False False False False False False Seq.empty 0 (Mana.MkMana []) Nothing Nothing Nothing Nothing Set.empty Set.empty 0 Set.empty Map.empty Nothing Nothing Seq.empty
+        abilObj =
+          (Object.new S.alice (Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = ObjectId.MkObjectId 0, ActivatedAbilitySource.ability = ability, ActivatedAbilitySource.delayed = Map.empty}) Zone.Stack ts)
+            { Object.sickness = Sickness.Settled S.alice,
+              Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
+            }
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findNothing g4 Stack.resolveTop)
     Spec.assertEqWith s "nothing entered the battlefield" (GameState.battlefield resolved) Set.empty
@@ -928,7 +761,10 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          Object.MkObject S.alice Nothing Nothing (Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = ObjectId.MkObjectId 0, ActivatedAbilitySource.ability = ability, ActivatedAbilitySource.delayed = Map.empty}) Zone.Stack TapState.Untapped Facing.FaceUp False False Set.empty 0 (Sickness.Settled S.alice) Map.empty (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Map.empty Nothing Set.empty Nothing Set.empty Nothing ts Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty Map.empty Map.empty Map.empty False False False False False False Seq.empty 0 (Mana.MkMana []) Nothing Nothing Nothing Nothing Set.empty Set.empty 0 Set.empty Map.empty Nothing Nothing Seq.empty
+          (Object.new S.alice (Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = ObjectId.MkObjectId 0, ActivatedAbilitySource.ability = ability, ActivatedAbilitySource.delayed = Map.empty}) Zone.Stack ts)
+            { Object.sickness = Sickness.Settled S.alice,
+              Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
+            }
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findFirst g4 Stack.resolveTop)
     Spec.assertEqWith s "the basic land is offered and fetched to the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Mountain") S.alice resolved) 1
@@ -957,7 +793,10 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          Object.MkObject S.alice Nothing Nothing (Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = ObjectId.MkObjectId 0, ActivatedAbilitySource.ability = ability, ActivatedAbilitySource.delayed = Map.empty}) Zone.Stack TapState.Untapped Facing.FaceUp False False Set.empty 0 (Sickness.Settled S.alice) Map.empty (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Map.empty Nothing Set.empty Nothing Set.empty Nothing ts Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty Map.empty Map.empty Map.empty False False False False False False Seq.empty 0 (Mana.MkMana []) Nothing Nothing Nothing Nothing Set.empty Set.empty 0 Set.empty Map.empty Nothing Nothing Seq.empty
+          (Object.new S.alice (Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = ObjectId.MkObjectId 0, ActivatedAbilitySource.ability = ability, ActivatedAbilitySource.delayed = Map.empty}) Zone.Stack ts)
+            { Object.sickness = Sickness.Settled S.alice,
+              Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
+            }
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure (findForbidden pikerId) g4 Stack.resolveTop)
     Spec.assertEqWith s "the Piker was NOT fetched to the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice resolved) 0
@@ -1427,75 +1266,21 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g4) = Game.freshObjectId g3
         (ts, g5) = Game.freshTimestamp g4
         abilObj =
-          Object.MkObject
-            { Object.owner = S.alice,
-              Object.identity = Nothing,
-              Object.enteredUnder = Nothing,
-              Object.source =
-                Source.OfTrigger
+          ( Object.new
+              S.alice
+              ( Source.OfTrigger
                   TriggeredAbilitySource.MkTriggeredAbilitySource
                     { TriggeredAbilitySource.source = ripId,
                       TriggeredAbilitySource.ability = ability,
                       TriggeredAbilitySource.createdAt = Nothing,
                       TriggeredAbilitySource.delayed = Map.empty
-                    },
-              Object.zone = Zone.Stack,
-              Object.tapped = TapState.Untapped,
-              Object.facing = Facing.FaceUp,
-              Object.flipped = False,
-              Object.exiledFaceDown = False,
-              Object.exileLookers = Set.empty,
-              Object.damage = 0,
-              Object.sickness = Sickness.Settled S.alice,
-              Object.controlClock = Map.empty,
-              Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0)),
-              Object.counters = Map.empty,
-              Object.counterTimestamps = Map.empty,
-              Object.attachedTo = Nothing,
-              Object.chosenColors = Set.empty,
-              Object.chosenSubtype = Nothing,
-              Object.chosenNames = Set.empty,
-              Object.chosenPlayer = Nothing,
-              Object.timestamp = ts,
-              Object.face = Nothing,
-              Object.turnedOverAt = Nothing,
-              Object.worldSince = Nothing,
-              Object.playableFromExile = Nothing,
-              Object.plotted = Nothing,
-              Object.foretold = Nothing,
-              Object.foretellCostReduction = Nothing,
-              Object.warped = Nothing,
-              Object.preparedCopyOf = Nothing,
-              Object.ringBearerFor = Nothing,
-              Object.stickers = Seq.empty,
-              Object.duplicate = Nothing,
-              Object.paired = Nothing,
-              Object.protector = Nothing,
-              Object.ventureRoom = Nothing,
-              Object.classLevel = Nothing,
-              Object.unlockedHalves = Set.empty,
-              Object.designations = Set.empty,
-              Object.designationValues = Map.empty,
-              Object.storedResults = Map.empty,
-              Object.paidCosts = Map.empty,
-              Object.tributePaid = False,
-              Object.bestowed = False,
-              Object.mutating = False,
-              Object.prototyped = False,
-              Object.boughtBack = False,
-              Object.unannounced = False,
-              Object.spliced = Seq.empty,
-              Object.phyrexianLifePaid = 0,
-              Object.manaSpent = Mana.MkMana [],
-              Object.announcedX = Nothing,
-              Object.castFrom = Nothing,
-              Object.castUsing = Nothing,
-              Object.castGrant = Nothing,
-              Object.detainedUntil = Set.empty,
-              Object.goadedBy = Set.empty,
-              Object.doesNotUntapFor = 0,
-              Object.exertedBy = Set.empty,
-              Object.activatedOnce = Map.empty
+                    }
+              )
+              Zone.Stack
+              ts
+          )
+            { Object.sickness = Sickness.Settled S.alice,
+              Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
             }
         g6 = g5 {GameState.objects = Map.insert abilId abilObj (GameState.objects g5), GameState.stack = abilId : GameState.stack g5}
         resolved = snd (Engine.runGamePure S.identityAnswer g6 Stack.resolveTop)
@@ -1541,74 +1326,20 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          Object.MkObject
-            { Object.owner = S.alice,
-              Object.identity = Nothing,
-              Object.enteredUnder = Nothing,
-              Object.source =
-                Source.OfAbility
+          ( Object.new
+              S.alice
+              ( Source.OfAbility
                   ActivatedAbilitySource.MkActivatedAbilitySource
                     { ActivatedAbilitySource.source = srcId,
                       ActivatedAbilitySource.ability = ability,
                       ActivatedAbilitySource.delayed = Map.empty
-                    },
-              Object.zone = Zone.Stack,
-              Object.tapped = TapState.Untapped,
-              Object.facing = Facing.FaceUp,
-              Object.flipped = False,
-              Object.exiledFaceDown = False,
-              Object.exileLookers = Set.empty,
-              Object.damage = 0,
-              Object.sickness = Sickness.Settled S.alice,
-              Object.controlClock = Map.empty,
-              Object.bindings = Binding.fromChoices (Map.singleton slot (Set.singleton (Recipient.ToPlayer S.bob))) Nothing (Seq.singleton (ModeIndex.MkModeIndex 0)),
-              Object.counters = Map.empty,
-              Object.counterTimestamps = Map.empty,
-              Object.attachedTo = Nothing,
-              Object.chosenColors = Set.empty,
-              Object.chosenSubtype = Nothing,
-              Object.chosenNames = Set.empty,
-              Object.chosenPlayer = Nothing,
-              Object.timestamp = ts,
-              Object.face = Nothing,
-              Object.turnedOverAt = Nothing,
-              Object.worldSince = Nothing,
-              Object.playableFromExile = Nothing,
-              Object.plotted = Nothing,
-              Object.foretold = Nothing,
-              Object.foretellCostReduction = Nothing,
-              Object.warped = Nothing,
-              Object.preparedCopyOf = Nothing,
-              Object.ringBearerFor = Nothing,
-              Object.stickers = Seq.empty,
-              Object.duplicate = Nothing,
-              Object.paired = Nothing,
-              Object.protector = Nothing,
-              Object.ventureRoom = Nothing,
-              Object.classLevel = Nothing,
-              Object.unlockedHalves = Set.empty,
-              Object.designations = Set.empty,
-              Object.designationValues = Map.empty,
-              Object.storedResults = Map.empty,
-              Object.paidCosts = Map.empty,
-              Object.tributePaid = False,
-              Object.bestowed = False,
-              Object.mutating = False,
-              Object.prototyped = False,
-              Object.boughtBack = False,
-              Object.unannounced = False,
-              Object.spliced = Seq.empty,
-              Object.phyrexianLifePaid = 0,
-              Object.manaSpent = Mana.MkMana [],
-              Object.announcedX = Nothing,
-              Object.castFrom = Nothing,
-              Object.castUsing = Nothing,
-              Object.castGrant = Nothing,
-              Object.detainedUntil = Set.empty,
-              Object.goadedBy = Set.empty,
-              Object.doesNotUntapFor = 0,
-              Object.exertedBy = Set.empty,
-              Object.activatedOnce = Map.empty
+                    }
+              )
+              Zone.Stack
+              ts
+          )
+            { Object.sickness = Sickness.Settled S.alice,
+              Object.bindings = Binding.fromChoices (Map.singleton slot (Set.singleton (Recipient.ToPlayer S.bob))) Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
             }
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = abilId : GameState.stack g3}
         resolved = snd (Engine.runGamePure S.identityAnswer g4 Stack.resolveTop)
@@ -1665,74 +1396,20 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               ActivatedAbility.keyword = Nothing
             }
         abilObj =
-          Object.MkObject
-            { Object.owner = S.bob,
-              Object.identity = Nothing,
-              Object.enteredUnder = Nothing,
-              Object.source =
-                Source.OfAbility
+          ( Object.new
+              S.bob
+              ( Source.OfAbility
                   ActivatedAbilitySource.MkActivatedAbilitySource
                     { ActivatedAbilitySource.source = aliceId,
                       ActivatedAbilitySource.ability = ability,
                       ActivatedAbilitySource.delayed = Map.empty
-                    },
-              Object.zone = Zone.Stack,
-              Object.tapped = TapState.Untapped,
-              Object.facing = Facing.FaceUp,
-              Object.flipped = False,
-              Object.exiledFaceDown = False,
-              Object.exileLookers = Set.empty,
-              Object.damage = 0,
-              Object.sickness = Sickness.Settled S.bob,
-              Object.controlClock = Map.empty,
-              Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0)),
-              Object.counters = Map.empty,
-              Object.counterTimestamps = Map.empty,
-              Object.attachedTo = Nothing,
-              Object.chosenColors = Set.empty,
-              Object.chosenSubtype = Nothing,
-              Object.chosenNames = Set.empty,
-              Object.chosenPlayer = Nothing,
-              Object.timestamp = ts,
-              Object.face = Nothing,
-              Object.turnedOverAt = Nothing,
-              Object.worldSince = Nothing,
-              Object.playableFromExile = Nothing,
-              Object.plotted = Nothing,
-              Object.foretold = Nothing,
-              Object.foretellCostReduction = Nothing,
-              Object.warped = Nothing,
-              Object.preparedCopyOf = Nothing,
-              Object.ringBearerFor = Nothing,
-              Object.stickers = Seq.empty,
-              Object.duplicate = Nothing,
-              Object.paired = Nothing,
-              Object.protector = Nothing,
-              Object.ventureRoom = Nothing,
-              Object.classLevel = Nothing,
-              Object.unlockedHalves = Set.empty,
-              Object.designations = Set.empty,
-              Object.designationValues = Map.empty,
-              Object.storedResults = Map.empty,
-              Object.paidCosts = Map.empty,
-              Object.tributePaid = False,
-              Object.bestowed = False,
-              Object.mutating = False,
-              Object.prototyped = False,
-              Object.boughtBack = False,
-              Object.unannounced = False,
-              Object.spliced = Seq.empty,
-              Object.phyrexianLifePaid = 0,
-              Object.manaSpent = Mana.MkMana [],
-              Object.announcedX = Nothing,
-              Object.castFrom = Nothing,
-              Object.castUsing = Nothing,
-              Object.castGrant = Nothing,
-              Object.detainedUntil = Set.empty,
-              Object.goadedBy = Set.empty,
-              Object.doesNotUntapFor = 0,
-              Object.exertedBy = Set.empty,
-              Object.activatedOnce = Map.empty
+                    }
+              )
+              Zone.Stack
+              ts
+          )
+            { Object.sickness = Sickness.Settled S.bob,
+              Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
             }
         g6 = g5 {GameState.objects = Map.insert abilId abilObj (GameState.objects g5), GameState.stack = abilId : GameState.stack g5}
         after = snd (Engine.runGamePure S.identityAnswer g6 Stack.resolveTop)
@@ -1946,74 +1623,20 @@ installControlBy mindslaver controller target gs0 =
       (abilId, gs2) = Game.freshObjectId gs1
       (ts, gs3) = Game.freshTimestamp gs2
       abilObj =
-        Object.MkObject
-          { Object.owner = controller,
-            Object.identity = Nothing,
-            Object.enteredUnder = Nothing,
-            Object.source =
-              Source.OfAbility
+        ( Object.new
+            controller
+            ( Source.OfAbility
                 ActivatedAbilitySource.MkActivatedAbilitySource
                   { ActivatedAbilitySource.source = srcId,
                     ActivatedAbilitySource.ability = ability,
                     ActivatedAbilitySource.delayed = Map.empty
-                  },
-            Object.zone = Zone.Stack,
-            Object.tapped = TapState.Untapped,
-            Object.facing = Facing.FaceUp,
-            Object.flipped = False,
-            Object.exiledFaceDown = False,
-            Object.exileLookers = Set.empty,
-            Object.damage = 0,
-            Object.sickness = Sickness.Settled controller,
-            Object.controlClock = Map.empty,
-            Object.bindings = Binding.fromChoices (Map.singleton slot (Set.singleton (Recipient.ToPlayer target))) Nothing (Seq.singleton (ModeIndex.MkModeIndex 0)),
-            Object.counters = Map.empty,
-            Object.counterTimestamps = Map.empty,
-            Object.attachedTo = Nothing,
-            Object.chosenColors = Set.empty,
-            Object.chosenSubtype = Nothing,
-            Object.chosenNames = Set.empty,
-            Object.chosenPlayer = Nothing,
-            Object.timestamp = ts,
-            Object.face = Nothing,
-            Object.turnedOverAt = Nothing,
-            Object.worldSince = Nothing,
-            Object.playableFromExile = Nothing,
-            Object.plotted = Nothing,
-            Object.foretold = Nothing,
-            Object.foretellCostReduction = Nothing,
-            Object.warped = Nothing,
-            Object.preparedCopyOf = Nothing,
-            Object.ringBearerFor = Nothing,
-            Object.stickers = Seq.empty,
-            Object.duplicate = Nothing,
-            Object.paired = Nothing,
-            Object.protector = Nothing,
-            Object.ventureRoom = Nothing,
-            Object.classLevel = Nothing,
-            Object.unlockedHalves = Set.empty,
-            Object.designations = Set.empty,
-            Object.designationValues = Map.empty,
-            Object.storedResults = Map.empty,
-            Object.paidCosts = Map.empty,
-            Object.tributePaid = False,
-            Object.bestowed = False,
-            Object.mutating = False,
-            Object.prototyped = False,
-            Object.boughtBack = False,
-            Object.unannounced = False,
-            Object.spliced = Seq.empty,
-            Object.phyrexianLifePaid = 0,
-            Object.manaSpent = Mana.MkMana [],
-            Object.announcedX = Nothing,
-            Object.castFrom = Nothing,
-            Object.castUsing = Nothing,
-            Object.castGrant = Nothing,
-            Object.detainedUntil = Set.empty,
-            Object.goadedBy = Set.empty,
-            Object.doesNotUntapFor = 0,
-            Object.exertedBy = Set.empty,
-            Object.activatedOnce = Map.empty
+                  }
+            )
+            Zone.Stack
+            ts
+        )
+          { Object.sickness = Sickness.Settled controller,
+            Object.bindings = Binding.fromChoices (Map.singleton slot (Set.singleton (Recipient.ToPlayer target))) Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
           }
       gs4 = gs3 {GameState.objects = Map.insert abilId abilObj (GameState.objects gs3), GameState.stack = abilId : GameState.stack gs3}
    in snd (Engine.runGamePure S.identityAnswer gs4 Stack.resolveTop)
@@ -2696,68 +2319,9 @@ subgameSpellOn borrowed name effects gs0 =
             Face.counterability = Counterability.Counterable
           }
       spellObj =
-        Object.MkObject
-          { Object.owner = S.alice,
-            Object.identity = Nothing,
-            Object.enteredUnder = Nothing,
-            Object.source = Source.OfToken spellPrintingId,
-            Object.zone = Zone.Stack,
-            Object.tapped = TapState.Untapped,
-            Object.facing = Facing.FaceUp,
-            Object.flipped = False,
-            Object.exiledFaceDown = False,
-            Object.exileLookers = Set.empty,
-            Object.damage = 0,
-            Object.sickness = Sickness.Settled S.alice,
-            Object.controlClock = Map.empty,
-            Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0)),
-            Object.counters = Map.empty,
-            Object.counterTimestamps = Map.empty,
-            Object.attachedTo = Nothing,
-            Object.chosenColors = Set.empty,
-            Object.chosenSubtype = Nothing,
-            Object.chosenNames = Set.empty,
-            Object.chosenPlayer = Nothing,
-            Object.timestamp = ts,
-            Object.face = Nothing,
-            Object.turnedOverAt = Nothing,
-            Object.worldSince = Nothing,
-            Object.playableFromExile = Nothing,
-            Object.plotted = Nothing,
-            Object.foretold = Nothing,
-            Object.foretellCostReduction = Nothing,
-            Object.warped = Nothing,
-            Object.preparedCopyOf = Nothing,
-            Object.ringBearerFor = Nothing,
-            Object.stickers = Seq.empty,
-            Object.duplicate = Nothing,
-            Object.paired = Nothing,
-            Object.protector = Nothing,
-            Object.ventureRoom = Nothing,
-            Object.classLevel = Nothing,
-            Object.unlockedHalves = Set.empty,
-            Object.designations = Set.empty,
-            Object.designationValues = Map.empty,
-            Object.storedResults = Map.empty,
-            Object.paidCosts = Map.empty,
-            Object.tributePaid = False,
-            Object.bestowed = False,
-            Object.mutating = False,
-            Object.prototyped = False,
-            Object.boughtBack = False,
-            Object.unannounced = False,
-            Object.spliced = Seq.empty,
-            Object.phyrexianLifePaid = 0,
-            Object.manaSpent = Mana.MkMana [],
-            Object.announcedX = Nothing,
-            Object.castFrom = Nothing,
-            Object.castUsing = Nothing,
-            Object.castGrant = Nothing,
-            Object.detainedUntil = Set.empty,
-            Object.goadedBy = Set.empty,
-            Object.doesNotUntapFor = 0,
-            Object.exertedBy = Set.empty,
-            Object.activatedOnce = Map.empty
+        (Object.new S.alice (Source.OfToken spellPrintingId) Zone.Stack ts)
+          { Object.sickness = Sickness.Settled S.alice,
+            Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
           }
    in (spellId, gs2 {GameState.objects = Map.insert spellId spellObj (GameState.objects gs2), GameState.stack = spellId : GameState.stack gs2})
 

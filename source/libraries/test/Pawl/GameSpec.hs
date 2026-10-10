@@ -61,14 +61,12 @@ import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.ExileLink as ExileLink
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.Face as Face
-import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.MeldSource as MeldSource
 import qualified Pawl.Types.Modal as Modal
@@ -177,72 +175,12 @@ gameSpec s registry = Spec.describe s "Game" $ do
       "moved"
       (Game.lookupObject (ObjectId.MkObjectId 1) (afterMountainMoved mountain))
       ( Just
-          Object.MkObject
-            { Object.owner = S.alice,
-              Object.identity = Just (Game.mintIdentity (ObjectId.MkObjectId 0) S.alice),
-              Object.enteredUnder = Nothing,
-              Object.source = Source.OfCard S.oneMountainPrintingId,
-              Object.zone = Zone.Battlefield,
-              Object.tapped = TapState.Untapped,
-              Object.facing = Facing.FaceUp,
-              Object.flipped = False,
-              Object.exiledFaceDown = False,
-              Object.exileLookers = Set.empty,
-              Object.damage = 0,
-              Object.sickness = Sickness.Sick,
-              Object.controlClock = Map.empty,
-              Object.bindings = Map.empty,
-              Object.counters = Map.empty,
-              Object.counterTimestamps = Map.empty,
-              Object.attachedTo = Nothing,
-              Object.chosenColors = Set.empty,
-              Object.chosenSubtype = Nothing,
-              Object.chosenNames = Set.empty,
-              Object.chosenPlayer = Nothing,
-              -- changeZone draws a fresh timestamp; oneMountainState's
-              -- nextTimestamp starts at 1 (object 0 already holds 0).
-              Object.timestamp = Timestamp.MkTimestamp 1,
-              -- CR 400.7: changeZone clears any singled-out face along with
+          -- changeZone draws a fresh timestamp; oneMountainState's
+          -- nextTimestamp starts at 1 (object 0 already holds 0).
+          (Game.cardObject (ObjectId.MkObjectId 0) S.alice S.oneMountainPrintingId Zone.Battlefield (Timestamp.MkTimestamp 1))
+            { -- CR 400.7: changeZone clears any singled-out face along with
               -- every other per-incarnation field.
-              Object.face = Nothing,
-              Object.turnedOverAt = Nothing,
-              Object.worldSince = Nothing,
-              Object.playableFromExile = Nothing,
-              Object.plotted = Nothing,
-              Object.foretold = Nothing,
-              Object.foretellCostReduction = Nothing,
-              Object.warped = Nothing,
-              Object.preparedCopyOf = Nothing,
-              Object.ringBearerFor = Nothing,
-              Object.stickers = Seq.empty,
-              Object.duplicate = Nothing,
-              Object.paired = Nothing,
-              Object.protector = Nothing,
-              Object.ventureRoom = Nothing,
-              Object.classLevel = Nothing,
-              Object.unlockedHalves = Set.empty,
-              Object.designations = Set.empty,
-              Object.designationValues = Map.empty,
-              Object.storedResults = Map.empty,
-              Object.paidCosts = Map.empty,
-              Object.tributePaid = False,
-              Object.bestowed = False,
-              Object.mutating = False,
-              Object.prototyped = False,
-              Object.boughtBack = False,
-              Object.unannounced = False,
-              Object.spliced = Seq.empty,
-              Object.phyrexianLifePaid = 0,
-              Object.manaSpent = Mana.MkMana [],
-              Object.announcedX = Nothing,
-              Object.castFrom = Nothing,
-              Object.castUsing = Nothing,
-              Object.castGrant = Nothing,
-              Object.detainedUntil = Set.empty,
-              Object.goadedBy = Set.empty,
-              Object.doesNotUntapFor = 0,
-              Object.exertedBy = Set.empty,
-              Object.activatedOnce = Map.empty
+              Object.face = Nothing
             }
       )
 
@@ -2123,68 +2061,8 @@ handBobBolt lightningBolt gs =
       (oid, gs1) = Game.freshObjectId gsP
       (ts, gs2) = Game.freshTimestamp gs1
       obj =
-        Object.MkObject
-          { Object.owner = S.bob,
-            Object.identity = Just (Game.mintIdentity oid S.bob),
-            Object.enteredUnder = Nothing,
-            Object.source = Source.OfCard printingId,
-            Object.zone = Zone.Hand,
-            Object.tapped = TapState.Untapped,
-            Object.facing = Facing.FaceUp,
-            Object.flipped = False,
-            Object.exiledFaceDown = False,
-            Object.exileLookers = Set.empty,
-            Object.damage = 0,
-            Object.sickness = Sickness.Settled S.bob,
-            Object.controlClock = Map.empty,
-            Object.bindings = Map.empty,
-            Object.counters = Map.empty,
-            Object.counterTimestamps = Map.empty,
-            Object.attachedTo = Nothing,
-            Object.chosenColors = Set.empty,
-            Object.chosenSubtype = Nothing,
-            Object.chosenNames = Set.empty,
-            Object.chosenPlayer = Nothing,
-            Object.timestamp = ts,
-            Object.face = Nothing,
-            Object.turnedOverAt = Nothing,
-            Object.worldSince = Nothing,
-            Object.playableFromExile = Nothing,
-            Object.plotted = Nothing,
-            Object.foretold = Nothing,
-            Object.foretellCostReduction = Nothing,
-            Object.warped = Nothing,
-            Object.preparedCopyOf = Nothing,
-            Object.ringBearerFor = Nothing,
-            Object.stickers = Seq.empty,
-            Object.duplicate = Nothing,
-            Object.paired = Nothing,
-            Object.protector = Nothing,
-            Object.ventureRoom = Nothing,
-            Object.classLevel = Nothing,
-            Object.unlockedHalves = Set.empty,
-            Object.designations = Set.empty,
-            Object.designationValues = Map.empty,
-            Object.storedResults = Map.empty,
-            Object.paidCosts = Map.empty,
-            Object.tributePaid = False,
-            Object.bestowed = False,
-            Object.mutating = False,
-            Object.prototyped = False,
-            Object.boughtBack = False,
-            Object.unannounced = False,
-            Object.spliced = Seq.empty,
-            Object.phyrexianLifePaid = 0,
-            Object.manaSpent = Mana.MkMana [],
-            Object.announcedX = Nothing,
-            Object.castFrom = Nothing,
-            Object.castUsing = Nothing,
-            Object.castGrant = Nothing,
-            Object.detainedUntil = Set.empty,
-            Object.goadedBy = Set.empty,
-            Object.doesNotUntapFor = 0,
-            Object.exertedBy = Set.empty,
-            Object.activatedOnce = Map.empty
+        (Game.cardObject oid S.bob printingId Zone.Hand ts)
+          { Object.sickness = Sickness.Settled S.bob
           }
    in (oid, gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2), GameState.hand = Map.insert S.bob (Seq.singleton oid) (GameState.hand gs2)})
 
@@ -2595,74 +2473,20 @@ restartOnStack mountain =
             ActivatedAbility.keyword = Nothing
           }
       abilObj =
-        Object.MkObject
-          { Object.owner = S.bob,
-            Object.identity = Nothing,
-            Object.enteredUnder = Nothing,
-            Object.source =
-              Source.OfAbility
+        ( Object.new
+            S.bob
+            ( Source.OfAbility
                 ActivatedAbilitySource.MkActivatedAbilitySource
                   { ActivatedAbilitySource.source = ObjectId.MkObjectId 0,
                     ActivatedAbilitySource.ability = ability,
                     ActivatedAbilitySource.delayed = Map.empty
-                  },
-            Object.zone = Zone.Stack,
-            Object.tapped = TapState.Untapped,
-            Object.facing = Facing.FaceUp,
-            Object.flipped = False,
-            Object.exiledFaceDown = False,
-            Object.exileLookers = Set.empty,
-            Object.damage = 0,
-            Object.sickness = Sickness.Settled S.bob,
-            Object.controlClock = Map.empty,
-            Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0)),
-            Object.counters = Map.empty,
-            Object.counterTimestamps = Map.empty,
-            Object.attachedTo = Nothing,
-            Object.chosenColors = Set.empty,
-            Object.chosenSubtype = Nothing,
-            Object.chosenNames = Set.empty,
-            Object.chosenPlayer = Nothing,
-            Object.timestamp = ts,
-            Object.face = Nothing,
-            Object.turnedOverAt = Nothing,
-            Object.worldSince = Nothing,
-            Object.playableFromExile = Nothing,
-            Object.plotted = Nothing,
-            Object.foretold = Nothing,
-            Object.foretellCostReduction = Nothing,
-            Object.warped = Nothing,
-            Object.preparedCopyOf = Nothing,
-            Object.ringBearerFor = Nothing,
-            Object.stickers = Seq.empty,
-            Object.duplicate = Nothing,
-            Object.paired = Nothing,
-            Object.protector = Nothing,
-            Object.ventureRoom = Nothing,
-            Object.classLevel = Nothing,
-            Object.unlockedHalves = Set.empty,
-            Object.designations = Set.empty,
-            Object.designationValues = Map.empty,
-            Object.storedResults = Map.empty,
-            Object.paidCosts = Map.empty,
-            Object.tributePaid = False,
-            Object.bestowed = False,
-            Object.mutating = False,
-            Object.prototyped = False,
-            Object.boughtBack = False,
-            Object.unannounced = False,
-            Object.spliced = Seq.empty,
-            Object.phyrexianLifePaid = 0,
-            Object.manaSpent = Mana.MkMana [],
-            Object.announcedX = Nothing,
-            Object.castFrom = Nothing,
-            Object.castUsing = Nothing,
-            Object.castGrant = Nothing,
-            Object.detainedUntil = Set.empty,
-            Object.goadedBy = Set.empty,
-            Object.doesNotUntapFor = 0,
-            Object.exertedBy = Set.empty,
-            Object.activatedOnce = Map.empty
+                  }
+            )
+            Zone.Stack
+            ts
+        )
+          { Object.sickness = Sickness.Settled S.bob,
+            Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))
           }
    in g4
         { GameState.objects = Map.insert abilId abilObj (GameState.objects g4),

@@ -87,7 +87,6 @@ import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
-import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameSettings as GameSettings
@@ -97,7 +96,6 @@ import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LoopTrail as LoopTrail
-import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.Modal as Modal.Type
 import qualified Pawl.Types.Mode as Mode
@@ -123,7 +121,6 @@ import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Supertype as Supertype
-import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
@@ -810,73 +807,19 @@ placeSourceless pending = do
       allModes = Seq.fromList (fmap ModeIndex.MkModeIndex (take modeCount [0 ..]))
       bindings = Binding.setYou controller (Map.union provided (Binding.fromChoices Map.empty Nothing allModes))
       obj =
-        Object.MkObject
-          { Object.owner = controller,
-            Object.identity = Nothing,
-            Object.enteredUnder = Nothing,
-            Object.source =
-              Source.OfInherentTrigger
+        ( Object.new
+            controller
+            ( Source.OfInherentTrigger
                 InherentTriggerSource.MkInherentTriggerSource
                   { InherentTriggerSource.controller = controller,
                     InherentTriggerSource.ability = ability
-                  },
-            Object.zone = Zone.Stack,
-            Object.tapped = TapState.Untapped,
-            Object.facing = Facing.FaceUp,
-            Object.flipped = False,
-            Object.exiledFaceDown = False,
-            Object.exileLookers = Set.empty,
-            Object.damage = 0,
-            Object.sickness = Sickness.Settled controller,
-            Object.controlClock = Map.empty,
-            Object.bindings = bindings,
-            Object.counters = Map.empty,
-            Object.counterTimestamps = Map.empty,
-            Object.attachedTo = Nothing,
-            Object.chosenColors = Set.empty,
-            Object.chosenSubtype = Nothing,
-            Object.chosenNames = Set.empty,
-            Object.chosenPlayer = Nothing,
-            Object.timestamp = ts,
-            Object.face = Nothing,
-            Object.turnedOverAt = Nothing,
-            Object.worldSince = Nothing,
-            Object.playableFromExile = Nothing,
-            Object.plotted = Nothing,
-            Object.foretold = Nothing,
-            Object.foretellCostReduction = Nothing,
-            Object.warped = Nothing,
-            Object.preparedCopyOf = Nothing,
-            Object.ringBearerFor = Nothing,
-            Object.stickers = Seq.empty,
-            Object.duplicate = Nothing,
-            Object.paired = Nothing,
-            Object.protector = Nothing,
-            Object.ventureRoom = Nothing,
-            Object.classLevel = Nothing,
-            Object.unlockedHalves = Set.empty,
-            Object.designations = Set.empty,
-            Object.designationValues = Map.empty,
-            Object.storedResults = Map.empty,
-            Object.paidCosts = Map.empty,
-            Object.tributePaid = False,
-            Object.bestowed = False,
-            Object.mutating = False,
-            Object.prototyped = False,
-            Object.boughtBack = False,
-            Object.unannounced = False,
-            Object.spliced = Seq.empty,
-            Object.phyrexianLifePaid = 0,
-            Object.manaSpent = Mana.MkMana [],
-            Object.announcedX = Nothing,
-            Object.castFrom = Nothing,
-            Object.castUsing = Nothing,
-            Object.castGrant = Nothing,
-            Object.detainedUntil = Set.empty,
-            Object.goadedBy = Set.empty,
-            Object.doesNotUntapFor = 0,
-            Object.exertedBy = Set.empty,
-            Object.activatedOnce = Map.empty
+                  }
+            )
+            Zone.Stack
+            ts
+        )
+          { Object.sickness = Sickness.Settled controller,
+            Object.bindings = bindings
           }
   State.put (Game.putOnStack abilId gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2)})
 
@@ -950,12 +893,9 @@ placeBorne srcId pending = do
       legal = Target.fillableModes (Just controller) bound srcId Map.empty modal gs
       selection = Modal.Type.selection modal
       obj =
-        Object.MkObject
-          { Object.owner = controller,
-            Object.identity = Nothing,
-            Object.enteredUnder = Nothing,
-            Object.source =
-              Source.OfTrigger
+        ( Object.new
+            controller
+            ( Source.OfTrigger
                 TriggeredAbilitySource.MkTriggeredAbilitySource
                   { TriggeredAbilitySource.source = srcId,
                     TriggeredAbilitySource.ability = ability,
@@ -968,64 +908,12 @@ placeBorne srcId pending = do
                     -- placement, so a copy effect applied in between changes them
                     -- (#4846).
                     TriggeredAbilitySource.delayed = Projection.delayedSnapshotOf srcId gs
-                  },
-            Object.zone = Zone.Stack,
-            Object.tapped = TapState.Untapped,
-            Object.facing = Facing.FaceUp,
-            Object.flipped = False,
-            Object.exiledFaceDown = False,
-            Object.exileLookers = Set.empty,
-            Object.damage = 0,
-            Object.sickness = Sickness.Settled controller,
-            Object.controlClock = Map.empty,
-            Object.bindings = Map.empty,
-            Object.counters = Map.empty,
-            Object.counterTimestamps = Map.empty,
-            Object.attachedTo = Nothing,
-            Object.chosenColors = Set.empty,
-            Object.chosenSubtype = Nothing,
-            Object.chosenNames = Set.empty,
-            Object.chosenPlayer = Nothing,
-            Object.timestamp = ts,
-            Object.face = Nothing,
-            Object.turnedOverAt = Nothing,
-            Object.worldSince = Nothing,
-            Object.playableFromExile = Nothing,
-            Object.plotted = Nothing,
-            Object.foretold = Nothing,
-            Object.foretellCostReduction = Nothing,
-            Object.warped = Nothing,
-            Object.preparedCopyOf = Nothing,
-            Object.ringBearerFor = Nothing,
-            Object.stickers = Seq.empty,
-            Object.duplicate = Nothing,
-            Object.paired = Nothing,
-            Object.protector = Nothing,
-            Object.ventureRoom = Nothing,
-            Object.classLevel = Nothing,
-            Object.unlockedHalves = Set.empty,
-            Object.designations = Set.empty,
-            Object.designationValues = Map.empty,
-            Object.storedResults = Map.empty,
-            Object.paidCosts = Map.empty,
-            Object.tributePaid = False,
-            Object.bestowed = False,
-            Object.mutating = False,
-            Object.prototyped = False,
-            Object.boughtBack = False,
-            Object.unannounced = False,
-            Object.spliced = Seq.empty,
-            Object.phyrexianLifePaid = 0,
-            Object.manaSpent = Mana.MkMana [],
-            Object.announcedX = Nothing,
-            Object.castFrom = Nothing,
-            Object.castUsing = Nothing,
-            Object.castGrant = Nothing,
-            Object.detainedUntil = Set.empty,
-            Object.goadedBy = Set.empty,
-            Object.doesNotUntapFor = 0,
-            Object.exertedBy = Set.empty,
-            Object.activatedOnce = Map.empty
+                  }
+            )
+            Zone.Stack
+            ts
+        )
+          { Object.sickness = Sickness.Settled controller
           }
   State.put (Game.putOnStack abilId gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2)})
   if not (Modal.selectionPossible legal selection)

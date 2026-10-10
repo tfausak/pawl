@@ -887,21 +887,21 @@ data Object = MkObject
   }
   deriving (Eq, Ord, Show)
 
--- | CR 400.7: "an object that moves from one zone to another becomes a new
--- object with no memory of, or relation to, its previous existence" -- the
--- forgetting, as one function. Every field above documented as per-incarnation
--- goes back to its no-memory value here, and nothing else is touched, so a field
--- added to Object is reset everywhere exactly when it is added HERE.
---
--- Leaves `owner`, `identity`, `source` and `duplicate` alone, which are not
--- per-incarnation at all (CR 108.3), and `zone` and `timestamp`, which the
--- caller is DECIDING rather than forgetting. A caller overrides the rest the same way -- CR
--- 110.5b's "enters tapped", CR 708.4's face-down status and CR 701.3's
--- attach-on-entry are choices the move makes about the new object.
-newIncarnation :: Object -> Object
-newIncarnation object =
-  object
-    { tapped = TapState.Untapped,
+-- | CR 400.7: a new object with "no memory of, or relation to, its previous
+-- existence", owned by the given player (CR 108.3), made from the given source,
+-- and in the given zone since the given timestamp. Every other field holds its
+-- no-memory value, so a site that builds an object writes only what it means, and
+-- a field added to Object gets its neutral value here and nowhere else.
+new :: PlayerId.PlayerId -> Source.Source -> Zone.Zone -> Timestamp.Timestamp -> Object
+new o s z t =
+  MkObject
+    { owner = o,
+      identity = Nothing,
+      source = s,
+      zone = z,
+      timestamp = t,
+      duplicate = Nothing,
+      tapped = TapState.Untapped,
       -- CR 110.5b for a battlefield entry, CR 708.9 for a departure from one;
       -- Event.changeZoneFaceDown is the "otherwise".
       facing = Facing.FaceUp,
@@ -1013,4 +1013,20 @@ newIncarnation object =
       -- CR 123.5's exception is written back by
       -- Pawl.Engine.Event.changeZoneWithCause's mkObj, for a public destination.
       stickers = Seq.empty
+    }
+
+-- | CR 400.7: "an object that moves from one zone to another becomes a new
+-- object with no memory of, or relation to, its previous existence" -- the
+-- forgetting, as one function: 'new', keeping `owner`, `identity`, `source` and
+-- `duplicate`, which are not per-incarnation at all (CR 108.3), and `zone` and
+-- `timestamp`, which the caller is DECIDING rather than forgetting. A field
+-- added to Object is therefore reset here by default; one that survives the move
+-- must be carried across below. A caller overrides the rest the same way -- CR
+-- 110.5b's "enters tapped", CR 708.4's face-down status and CR 701.3's
+-- attach-on-entry are choices the move makes about the new object.
+newIncarnation :: Object -> Object
+newIncarnation object =
+  (new (owner object) (source object) (zone object) (timestamp object))
+    { identity = identity object,
+      duplicate = duplicate object
     }

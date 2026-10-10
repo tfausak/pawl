@@ -971,9 +971,8 @@ placeObject pid mkObj dest position = do
 -- Two roads reach it and they are not the same rule. CR 400.11c's wish brings in
 -- a card the player already owned outside the game, which rule 400.11 says is
 -- not a zone; Alchemy's conjure creates a card that was in nobody's deck, which
--- no rule of the CR covers at all. Both end at Object.MkObject's field list, and
--- sharing it is what keeps the two from drifting -- a field added to Object is
--- answered once here rather than twice.
+-- no rule of the CR covers at all. Both end here, and sharing
+-- this function is what keeps the two from drifting.
 --
 -- Not routed through Event.changeZone for that shared reason: a zone change
 -- would announce a departure from a zone the card was never in.
@@ -1005,7 +1004,7 @@ mintCard :: PlayerId -> Maybe PlayerId -> PrintingId.PrintingId -> Zone -> Libra
 mintCard pid under printingId dest position tapped gs =
   let (oid, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
-      obj = cardObject oid pid under printingId dest tapped ts
+      obj = (Game.cardObject oid pid printingId dest ts) {Object.enteredUnder = under, Object.tapped = tapped}
    in ( oid,
         Game.insertIntoZone
           dest
@@ -1024,81 +1023,13 @@ mintOutside :: PlayerId -> PrintingId.PrintingId -> GameState.GameState -> (Obje
 mintOutside pid printingId gs =
   let (oid, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
-      obj = (cardObject oid pid Nothing printingId Zone.Graveyard TapState.Untapped ts) {Object.source = Source.OfCardCopy printingId, Object.identity = Nothing}
+      obj = Object.new pid (Source.OfCardCopy printingId) Zone.Graveyard ts
    in ( oid,
         gs2
           { GameState.objects = Map.insert oid obj (GameState.objects gs2),
             GameState.outsideCopies = Set.insert oid (GameState.outsideCopies gs2)
           }
       )
-
--- The card object `mintCard` and `mintOutside` place, with every per-incarnation
--- field at its no-memory value.
-cardObject :: ObjectId -> PlayerId -> Maybe PlayerId -> PrintingId.PrintingId -> Zone -> TapState.TapState -> Timestamp.Timestamp -> Object.Object
-cardObject oid pid under printingId dest tapped ts =
-  Object.MkObject
-    { Object.owner = pid,
-      Object.identity = Just (Game.mintIdentity oid pid),
-      Object.enteredUnder = under,
-      Object.source = Source.OfCard printingId,
-      Object.zone = dest,
-      Object.tapped = tapped,
-      Object.facing = Facing.FaceUp,
-      Object.flipped = False,
-      Object.exiledFaceDown = False,
-      Object.exileLookers = Set.empty,
-      Object.damage = 0,
-      Object.sickness = Sickness.Sick,
-      Object.controlClock = Map.empty,
-      Object.bindings = Map.empty,
-      Object.counters = Map.empty,
-      Object.counterTimestamps = Map.empty,
-      Object.attachedTo = Nothing,
-      Object.chosenColors = Set.empty,
-      Object.chosenSubtype = Nothing,
-      Object.chosenNames = Set.empty,
-      Object.chosenPlayer = Nothing,
-      Object.timestamp = ts,
-      Object.face = Nothing,
-      Object.turnedOverAt = Nothing,
-      Object.worldSince = Nothing,
-      Object.playableFromExile = Nothing,
-      Object.plotted = Nothing,
-      Object.foretold = Nothing,
-      Object.foretellCostReduction = Nothing,
-      Object.warped = Nothing,
-      Object.preparedCopyOf = Nothing,
-      Object.ringBearerFor = Nothing,
-      Object.stickers = Seq.empty,
-      Object.duplicate = Nothing,
-      Object.paired = Nothing,
-      Object.protector = Nothing,
-      Object.ventureRoom = Nothing,
-      Object.classLevel = Nothing,
-      Object.unlockedHalves = Set.empty,
-      Object.designations = Set.empty,
-      Object.designationValues = Map.empty,
-      Object.storedResults = Map.empty,
-      Object.paidCosts = Map.empty,
-      Object.tributePaid = False,
-      Object.bestowed = False,
-      Object.mutating = False,
-      Object.prototyped = False,
-      Object.boughtBack = False,
-      Object.unannounced = False,
-      Object.spliced = Seq.empty,
-      Object.phyrexianLifePaid = 0,
-      Object.manaSpent = Mana.MkMana [],
-      Object.announcedX = Nothing,
-      Object.castFrom = Nothing,
-      Object.castUsing = Nothing,
-      Object.castGrant = Nothing,
-      Object.detainedUntil = Set.empty,
-      Object.goadedBy = Set.empty,
-      Object.doesNotUntapFor = 0,
-      Object.exertedBy = Set.empty,
-      Object.activatedOnce = Map.empty
-    }
 
 -- Alchemy's conjure keyword action: create the given card out of nothing and put
 -- it into the conjuring player's zone.
@@ -1270,68 +1201,8 @@ createEmblem pid card = do
       -- a card (CR 114.5).
       emblemId <- State.state (Game.intern (Printing.ofCard card))
       let mkObj ts =
-            Object.MkObject
-              { Object.owner = pid,
-                Object.identity = Nothing,
-                Object.enteredUnder = Nothing,
-                Object.source = Source.OfEmblem emblemId,
-                Object.zone = Zone.Command,
-                Object.tapped = TapState.Untapped,
-                Object.facing = Facing.FaceUp,
-                Object.flipped = False,
-                Object.exiledFaceDown = False,
-                Object.exileLookers = Set.empty,
-                Object.damage = 0,
-                Object.sickness = Sickness.Settled pid,
-                Object.controlClock = Map.empty,
-                Object.bindings = Map.empty,
-                Object.counters = Map.empty,
-                Object.counterTimestamps = Map.empty,
-                Object.attachedTo = Nothing,
-                Object.chosenColors = Set.empty,
-                Object.chosenSubtype = Nothing,
-                Object.chosenNames = Set.empty,
-                Object.chosenPlayer = Nothing,
-                Object.timestamp = ts,
-                Object.face = Nothing,
-                Object.turnedOverAt = Nothing,
-                Object.worldSince = Nothing,
-                Object.playableFromExile = Nothing,
-                Object.plotted = Nothing,
-                Object.foretold = Nothing,
-                Object.foretellCostReduction = Nothing,
-                Object.warped = Nothing,
-                Object.preparedCopyOf = Nothing,
-                Object.ringBearerFor = Nothing,
-                Object.stickers = Seq.empty,
-                Object.duplicate = Nothing,
-                Object.paired = Nothing,
-                Object.protector = Nothing,
-                Object.ventureRoom = Nothing,
-                Object.classLevel = Nothing,
-                Object.unlockedHalves = Set.empty,
-                Object.designations = Set.empty,
-                Object.designationValues = Map.empty,
-                Object.storedResults = Map.empty,
-                Object.paidCosts = Map.empty,
-                Object.tributePaid = False,
-                Object.bestowed = False,
-                Object.mutating = False,
-                Object.prototyped = False,
-                Object.boughtBack = False,
-                Object.unannounced = False,
-                Object.spliced = Seq.empty,
-                Object.phyrexianLifePaid = 0,
-                Object.manaSpent = Mana.MkMana [],
-                Object.announcedX = Nothing,
-                Object.castFrom = Nothing,
-                Object.castUsing = Nothing,
-                Object.castGrant = Nothing,
-                Object.detainedUntil = Set.empty,
-                Object.goadedBy = Set.empty,
-                Object.doesNotUntapFor = 0,
-                Object.exertedBy = Set.empty,
-                Object.activatedOnce = Map.empty
+            (Object.new pid (Source.OfEmblem emblemId) Zone.Command ts)
+              { Object.sickness = Sickness.Settled pid
               }
       Just <$> placeObject pid mkObj Zone.Command LibraryPosition.defaultValue
 
@@ -7969,25 +7840,14 @@ createTokens controller card copy n tapped entering attached = do
             -- they name one entry.
             tokenId <- State.state (Game.intern (Printing.ofCard (TokenLot.card lot)))
             let mkObj ts =
-                  Object.MkObject
-                    { Object.owner = owner,
-                      Object.identity = Nothing,
-                      Object.enteredUnder = Nothing,
-                      Object.source = Source.OfToken tokenId,
-                      Object.zone = Zone.Battlefield,
-                      -- CR 110.5b: untapped unless an effect says otherwise, which
+                  (Object.new owner (Source.OfToken tokenId) Zone.Battlefield ts)
+                    { -- CR 110.5b: untapped unless an effect says otherwise, which
                       -- is why the caller supplies this rather than the default
                       -- being taken and the token tapped after.
                       Object.tapped = tapped,
                       -- CR 110.5b: face up, for the same rule's reason. No effect
                       -- in the pool creates a token face down.
                       Object.facing = Facing.FaceUp,
-                      Object.flipped = False,
-                      Object.exiledFaceDown = False,
-                      Object.exileLookers = Set.empty,
-                      Object.damage = 0,
-                      Object.sickness = Sickness.Sick,
-                      Object.controlClock = Map.empty,
                       -- CR 707.2 / 111.3: a token copy's copiable values are the
                       -- copied permanent's, stamped into the layer-1 snapshot the
                       -- projection starts from -- the same binding the CR 614.1c
@@ -7997,54 +7857,7 @@ createTokens controller card copy n tapped entering attached = do
                       -- 614.12 asks for the characteristics the permanent would
                       -- have on the battlefield, and for this token those are the
                       -- copy's from the instant it exists.
-                      Object.bindings = maybe Map.empty (\pc -> Binding.setCopy pc Map.empty) (TokenLot.copy lot),
-                      Object.counters = Map.empty,
-                      Object.counterTimestamps = Map.empty,
-                      Object.attachedTo = Nothing,
-                      Object.chosenColors = Set.empty,
-                      Object.chosenSubtype = Nothing,
-                      Object.chosenNames = Set.empty,
-                      Object.chosenPlayer = Nothing,
-                      Object.timestamp = ts,
-                      Object.face = Nothing,
-                      Object.turnedOverAt = Nothing,
-                      Object.worldSince = Nothing,
-                      Object.playableFromExile = Nothing,
-                      Object.plotted = Nothing,
-                      Object.foretold = Nothing,
-                      Object.foretellCostReduction = Nothing,
-                      Object.warped = Nothing,
-                      Object.preparedCopyOf = Nothing,
-                      Object.ringBearerFor = Nothing,
-                      Object.stickers = Seq.empty,
-                      Object.duplicate = Nothing,
-                      Object.paired = Nothing,
-                      Object.protector = Nothing,
-                      Object.ventureRoom = Nothing,
-                      Object.classLevel = Nothing,
-                      Object.unlockedHalves = Set.empty,
-                      Object.designations = Set.empty,
-                      Object.designationValues = Map.empty,
-                      Object.storedResults = Map.empty,
-                      Object.paidCosts = Map.empty,
-                      Object.tributePaid = False,
-                      Object.bestowed = False,
-                      Object.mutating = False,
-                      Object.prototyped = False,
-                      Object.boughtBack = False,
-                      Object.unannounced = False,
-                      Object.spliced = Seq.empty,
-                      Object.phyrexianLifePaid = 0,
-                      Object.manaSpent = Mana.MkMana [],
-                      Object.announcedX = Nothing,
-                      Object.castFrom = Nothing,
-                      Object.castUsing = Nothing,
-                      Object.castGrant = Nothing,
-                      Object.detainedUntil = Set.empty,
-                      Object.goadedBy = Set.empty,
-                      Object.doesNotUntapFor = 0,
-                      Object.exertedBy = Set.empty,
-                      Object.activatedOnce = Map.empty
+                      Object.bindings = maybe Map.empty (\pc -> Binding.setCopy pc Map.empty) (TokenLot.copy lot)
                     }
             Monad.replicateM (Natural.toIntSaturating (TokenLot.count lot)) (placeObject owner mkObj Zone.Battlefield LibraryPosition.defaultValue)
           minted <- State.get
@@ -8248,13 +8061,12 @@ meld controller victims resultCard = do
       -- would want a single pre-removal board for all of them.
       State.modify' (\g -> Foldable.foldl' forgetObject g (fmap fst melding))
       let mkObj ts =
-            Object.MkObject
-              { -- CR 110.2, sentence 1: a permanent's owner is the owner of the
-                -- card that represents it, which for a melded permanent is the
-                -- one owner all of them share -- `meldable` checked that, since
-                -- CR 701.42b's pair has no other reading of "its owner".
-                Object.owner = owner,
-                -- CR 108.3: the first card's identity, read off the board before
+            -- CR 110.2, sentence 1: a permanent's owner is the owner of the
+            -- card that represents it, which for a melded permanent is the
+            -- one owner all of them share -- `meldable` checked that, since
+            -- CR 701.42b's pair has no other reading of "its owner".
+            (Object.new owner (Source.OfMeld (MeldSource.MkMeldSource {MeldSource.result = resultId, MeldSource.components = fmap snd melding})) Zone.Battlefield ts)
+              { -- CR 108.3: the first card's identity, read off the board before
                 -- forgetObject above. Not implemented: the melded permanent's
                 -- second card keeping its own identity (#4848).
                 Object.identity = Game.lookupObject (fst (NonEmpty.head melding)) gs >>= Object.identity,
@@ -8265,70 +8077,16 @@ meld controller victims resultCard = do
                 -- pool's meld pairs, whose abilities require their controller
                 -- to own and control both halves.
                 Object.enteredUnder = Just controller,
-                Object.source = Source.OfMeld (MeldSource.MkMeldSource {MeldSource.result = resultId, MeldSource.components = fmap snd melding}),
-                Object.zone = Zone.Battlefield,
                 -- CR 110.5b: nothing in rule 701.42 says otherwise.
                 Object.tapped = TapState.Untapped,
                 -- CR 712.14c's "back faces up", which for the interned combined
                 -- face is its only face; Object.face = Nothing is that face.
                 Object.facing = Facing.FaceUp,
-                Object.flipped = False,
-                Object.exiledFaceDown = False,
-                Object.exileLookers = Set.empty,
-                Object.damage = 0,
                 -- CR 302.6 through CR 400.7: a permanent that has just entered is
                 -- a new object nobody has controlled for any time.
                 Object.sickness = Sickness.Sick,
-                Object.controlClock = Map.empty,
-                Object.bindings = Map.empty,
-                Object.counters = Map.empty,
-                Object.counterTimestamps = Map.empty,
-                Object.attachedTo = Nothing,
-                Object.chosenColors = Set.empty,
-                Object.chosenSubtype = Nothing,
-                Object.chosenNames = Set.empty,
-                Object.chosenPlayer = Nothing,
-                Object.timestamp = ts,
-                Object.face = Nothing,
-                Object.turnedOverAt = Nothing,
-                Object.worldSince = Nothing,
-                Object.playableFromExile = Nothing,
-                Object.plotted = Nothing,
-                Object.foretold = Nothing,
-                Object.foretellCostReduction = Nothing,
-                Object.warped = Nothing,
-                Object.preparedCopyOf = Nothing,
-                Object.ringBearerFor = Nothing,
                 -- Not implemented: CR 123.5a's stickers on a melded permanent (#872).
-                Object.stickers = Seq.empty,
-                Object.duplicate = Nothing,
-                Object.paired = Nothing,
-                Object.protector = Nothing,
-                Object.ventureRoom = Nothing,
-                Object.classLevel = Nothing,
-                Object.unlockedHalves = Set.empty,
-                Object.designations = Set.empty,
-                Object.designationValues = Map.empty,
-                Object.storedResults = Map.empty,
-                Object.paidCosts = Map.empty,
-                Object.tributePaid = False,
-                Object.bestowed = False,
-                Object.mutating = False,
-                Object.prototyped = False,
-                Object.boughtBack = False,
-                Object.unannounced = False,
-                Object.spliced = Seq.empty,
-                Object.phyrexianLifePaid = 0,
-                Object.manaSpent = Mana.MkMana [],
-                Object.announcedX = Nothing,
-                Object.castFrom = Nothing,
-                Object.castUsing = Nothing,
-                Object.castGrant = Nothing,
-                Object.detainedUntil = Set.empty,
-                Object.goadedBy = Set.empty,
-                Object.doesNotUntapFor = 0,
-                Object.exertedBy = Set.empty,
-                Object.activatedOnce = Map.empty
+                Object.stickers = Seq.empty
               }
       newId <- placeObject owner mkObj Zone.Battlefield LibraryPosition.defaultValue
       -- Alchemy's "perpetually", the ARRIVAL direction of what perpetuate does at
