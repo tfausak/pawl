@@ -37,6 +37,8 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerActed as PlayerActed
+import qualified Pawl.Types.PlayerAction as PlayerAction
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Source as Source
@@ -92,7 +94,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Planechase" $ do
         (_, withForest) = S.addPermanent forest S.alice rolledOnce
     Spec.assertBool s (elem Action.Type.RollPlanarDie (Action.legalActions S.alice main)) "CR 116.2i the active player may roll"
     Spec.assertBool s (notElem Action.Type.RollPlanarDie (Action.legalActions S.bob (main {GameState.priority = Just S.bob}))) "and a player whose turn it isn't may not"
-    Spec.assertBool s (elem (GameEvent.DiceRolled S.alice) (S.eventsOf rolledOnce)) "CR 901.9d the roll is a die roll"
+    Spec.assertBool s (elem (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.RollDice S.alice)) (S.eventsOf rolledOnce)) "CR 901.9d the roll is a die roll"
     Spec.assertBool s (notElem Action.Type.RollPlanarDie (Action.legalActions S.alice rolledOnce)) "CR 901.9 with no mana the second roll is not offered"
     Spec.assertBool s (elem Action.Type.RollPlanarDie (Action.legalActions S.alice withForest)) "and with a Forest to pay {1} it is"
 

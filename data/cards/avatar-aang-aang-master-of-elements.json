@@ -67,27 +67,47 @@
             "type": "AnyOf",
             "value": [
               {
-                "type": "PlayerWaterbends",
+                "type": "PlayerActs",
                 "value": {
-                  "type": "You"
+                  "action": {
+                    "type": "Waterbend"
+                  },
+                  "player": {
+                    "type": "You"
+                  }
                 }
               },
               {
-                "type": "PlayerEarthbends",
+                "type": "PlayerActs",
                 "value": {
-                  "type": "You"
+                  "action": {
+                    "type": "Earthbend"
+                  },
+                  "player": {
+                    "type": "You"
+                  }
                 }
               },
               {
-                "type": "PlayerFirebends",
+                "type": "PlayerActs",
                 "value": {
-                  "type": "You"
+                  "action": {
+                    "type": "Firebend"
+                  },
+                  "player": {
+                    "type": "You"
+                  }
                 }
               },
               {
-                "type": "PlayerAirbends",
+                "type": "PlayerActs",
                 "value": {
-                  "type": "You"
+                  "action": {
+                    "type": "Airbend"
+                  },
+                  "player": {
+                    "type": "You"
+                  }
                 }
               }
             ]

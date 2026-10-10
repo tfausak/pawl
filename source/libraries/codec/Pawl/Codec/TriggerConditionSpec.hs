@@ -37,6 +37,8 @@ import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
 import qualified Pawl.Types.PermanentsDealCombatDamageToPlayer as PermanentsDealCombatDamageToPlayer
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlacesSticker as PlacesSticker
+import qualified Pawl.Types.PlayerActed as PlayerActed
+import qualified Pawl.Types.PlayerAction as PlayerAction
 import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
@@ -1184,21 +1186,21 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.RoomEntered (RoomIndex.MkRoomIndex 3))
       " {\"type\":\"RoomEntered\",\"value\":3} "
-  -- CR 701.22d and CR 701.25d. Two TAGS rather than one carrying which keyword
-  -- action it was: Matoya, Archon Elder's "whenever you scry or surveil" is an
-  -- AnyOf of the two, and a codec that folded them would fire the card twice on
-  -- one scry. Both relations, for PlayerBecomesMonarch's reason.
-  Spec.it s "PlayerScries round-trips both relations" $ do
+  -- CR 603.2: both fields ride on the wire, so a codec that dropped the action
+  -- would fold Matoya, Archon Elder's AnyOf of a scry and a surveil into one
+  -- condition that fires twice on a scry. Two relations, for
+  -- PlayerBecomesMonarch's reason.
+  Spec.it s "PlayerActs round-trips the action and the relation" $ do
     Common.assertCodec
       s
       TriggerCondition.codec
-      (TriggerCondition.PlayerScries PlayerRelation.You)
-      " {\"type\":\"PlayerScries\",\"value\":{\"type\":\"You\"}} "
+      (TriggerCondition.PlayerActs (PlayerActed.MkPlayerActed PlayerAction.Scry PlayerRelation.You))
+      " {\"type\":\"PlayerActs\",\"value\":{\"action\":{\"type\":\"Scry\"},\"player\":{\"type\":\"You\"}}} "
     Common.assertCodec
       s
       TriggerCondition.codec
-      (TriggerCondition.PlayerScries PlayerRelation.Opponent)
-      " {\"type\":\"PlayerScries\",\"value\":{\"type\":\"Opponent\"}} "
+      (TriggerCondition.PlayerActs (PlayerActed.MkPlayerActed PlayerAction.Firebend PlayerRelation.AnyPlayer))
+      " {\"type\":\"PlayerActs\",\"value\":{\"action\":{\"type\":\"Firebend\"},\"player\":{\"type\":\"AnyPlayer\"}}} "
   -- CR 305.1: Urianger Augurelt's "whenever you play a land from exile".
   Spec.it s "PlayerPlaysLand" $
     Common.assertCodec
@@ -1206,18 +1208,6 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PlayerPlaysLand (PlaysLand.MkPlaysLand PlayerRelation.You Zone.Exile (Filter.And [])))
       " {\"type\":\"PlayerPlaysLand\",\"value\":{\"player\":{\"type\":\"You\"},\"from\":{\"type\":\"Exile\"},\"filter\":{\"type\":\"And\",\"value\":[]}}} "
-  -- CR 309.7. Both relations, for PlayerScries' reason above.
-  Spec.it s "PlayerCompletesDungeon round-trips both relations" $ do
-    Common.assertCodec
-      s
-      TriggerCondition.codec
-      (TriggerCondition.PlayerCompletesDungeon PlayerRelation.You)
-      " {\"type\":\"PlayerCompletesDungeon\",\"value\":{\"type\":\"You\"}} "
-    Common.assertCodec
-      s
-      TriggerCondition.codec
-      (TriggerCondition.PlayerCompletesDungeon PlayerRelation.Opponent)
-      " {\"type\":\"PlayerCompletesDungeon\",\"value\":{\"type\":\"Opponent\"}} "
   -- CR 603.9. Withengar Unbound's "a player" and Share the Spoils' "an
   -- opponent".
   Spec.it s "PlayerLosesGame round-trips both relations" $ do
@@ -1231,42 +1221,12 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PlayerLosesGame PlayerRelation.Opponent)
       " {\"type\":\"PlayerLosesGame\",\"value\":{\"type\":\"Opponent\"}} "
-  Spec.it s "PlayerSurveils round-trips both relations" $ do
-    Common.assertCodec
-      s
-      TriggerCondition.codec
-      (TriggerCondition.PlayerSurveils PlayerRelation.You)
-      " {\"type\":\"PlayerSurveils\",\"value\":{\"type\":\"You\"}} "
-    Common.assertCodec
-      s
-      TriggerCondition.codec
-      (TriggerCondition.PlayerSurveils PlayerRelation.Opponent)
-      " {\"type\":\"PlayerSurveils\",\"value\":{\"type\":\"Opponent\"}} "
-  Spec.it s "PlayerProliferates" $
-    Common.assertCodec
-      s
-      TriggerCondition.codec
-      (TriggerCondition.PlayerProliferates PlayerRelation.You)
-      " {\"type\":\"PlayerProliferates\",\"value\":{\"type\":\"You\"}} "
   Spec.it s "PlayerManifestsDread" $
     Common.assertCodec
       s
       TriggerCondition.codec
       (TriggerCondition.PlayerManifestsDread PlayerRelation.You)
       " {\"type\":\"PlayerManifestsDread\",\"value\":{\"type\":\"You\"}} "
-  -- CR 706.1. Both relations, for the reason above: Feywild Trickster is the
-  -- You form, and CR 109.5 is what an Opponent printing would be read against.
-  Spec.it s "PlayerRollsDice round-trips both relations" $ do
-    Common.assertCodec
-      s
-      TriggerCondition.codec
-      (TriggerCondition.PlayerRollsDice PlayerRelation.You)
-      " {\"type\":\"PlayerRollsDice\",\"value\":{\"type\":\"You\"}} "
-    Common.assertCodec
-      s
-      TriggerCondition.codec
-      (TriggerCondition.PlayerRollsDice PlayerRelation.Opponent)
-      " {\"type\":\"PlayerRollsDice\",\"value\":{\"type\":\"Opponent\"}} "
   -- CR 706.2: Night Shift of the Living Dead's "whenever you roll a 6".
   Spec.it s "PlayerRollsResult" $
     Common.assertCodec
@@ -1295,27 +1255,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.ChaosEnsues
       " {\"type\":\"ChaosEnsues\"} "
-  -- CR 901.8: the planeswalking ability's condition, PlayerRollsDice's shape.
+  -- CR 901.8: the planeswalking ability's condition, PlayerBecomesMonarch's shape.
   Spec.it s "PlayerRollsPlaneswalker round-trips" $
     Common.assertCodec
       s
       TriggerCondition.codec
       (TriggerCondition.PlayerRollsPlaneswalker PlayerRelation.You)
       " {\"type\":\"PlayerRollsPlaneswalker\",\"value\":{\"type\":\"You\"}} "
-  -- CR 701.51c and CR 702.159b, PlayerForages' shape.
-  Spec.it s "PlayerOpensAttraction round-trips" $
-    Common.assertCodec
-      s
-      TriggerCondition.codec
-      (TriggerCondition.PlayerOpensAttraction PlayerRelation.You)
-      " {\"type\":\"PlayerOpensAttraction\",\"value\":{\"type\":\"You\"}} "
-  Spec.it s "PlayerClaimsPrize round-trips" $
-    Common.assertCodec
-      s
-      TriggerCondition.codec
-      (TriggerCondition.PlayerClaimsPrize PlayerRelation.Opponent)
-      " {\"type\":\"PlayerClaimsPrize\",\"value\":{\"type\":\"Opponent\"}} "
-  -- CR 705.2. Both relations, PlayerRollsDice's shape: Tavern Scoundrel is the
+  -- CR 705.2. Both relations, PlayerBecomesMonarch's shape: Tavern Scoundrel is the
   -- You form.
   Spec.it s "PlayerWinsCoinFlip round-trips both relations" $ do
     Common.assertCodec
@@ -1409,88 +1356,6 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.SelfBecomesUnattachedFrom (Filter.And []))
       " {\"type\":\"SelfBecomesUnattachedFrom\",\"value\":{\"type\":\"And\",\"value\":[]}} "
-  -- CR 701.54d. Both relations, for PlayerScries' reason above.
-  Spec.it s "RingTemptsPlayer round-trips both relations" $ do
-    Common.assertCodec
-      s
-      TriggerCondition.codec
-      (TriggerCondition.RingTemptsPlayer PlayerRelation.You)
-      " {\"type\":\"RingTemptsPlayer\",\"value\":{\"type\":\"You\"}} "
-    Common.assertCodec
-      s
-      TriggerCondition.codec
-      (TriggerCondition.RingTemptsPlayer PlayerRelation.Opponent)
-      " {\"type\":\"RingTemptsPlayer\",\"value\":{\"type\":\"Opponent\"}} "
-  -- CR 701.68d. AnyPlayer, which is what Synthetic Blight Chronicler prints,
-  -- beside You:
-  -- the two are observably different readings of the same wire shape.
-  Spec.it s "PlayerBlights round-trips both relations" $ do
-    Common.assertCodec
-      s
-      TriggerCondition.codec
-      (TriggerCondition.PlayerBlights PlayerRelation.AnyPlayer)
-      " {\"type\":\"PlayerBlights\",\"value\":{\"type\":\"AnyPlayer\"}} "
-    Common.assertCodec
-      s
-      TriggerCondition.codec
-      (TriggerCondition.PlayerBlights PlayerRelation.You)
-      " {\"type\":\"PlayerBlights\",\"value\":{\"type\":\"You\"}} "
-  Spec.it s "PlayerForages round-trips both relations" $ do
-    Common.assertCodec
-      s
-      TriggerCondition.codec
-      (TriggerCondition.PlayerForages PlayerRelation.AnyPlayer)
-      " {\"type\":\"PlayerForages\",\"value\":{\"type\":\"AnyPlayer\"}} "
-    Common.assertCodec
-      s
-      TriggerCondition.codec
-      (TriggerCondition.PlayerForages PlayerRelation.You)
-      " {\"type\":\"PlayerForages\",\"value\":{\"type\":\"You\"}} "
-  Spec.it s "PlayerForetells round-trips" $
-    Common.assertCodec
-      s
-      TriggerCondition.codec
-      (TriggerCondition.PlayerForetells PlayerRelation.You)
-      " {\"type\":\"PlayerForetells\",\"value\":{\"type\":\"You\"}} "
-  Spec.it s "PlayerCollectsEvidence round-trips" $
-    Common.assertCodec
-      s
-      TriggerCondition.codec
-      (TriggerCondition.PlayerCollectsEvidence PlayerRelation.You)
-      " {\"type\":\"PlayerCollectsEvidence\",\"value\":{\"type\":\"You\"}} "
-  Spec.it s "PlayerGivesGift round-trips" $
-    Common.assertCodec
-      s
-      TriggerCondition.codec
-      (TriggerCondition.PlayerGivesGift PlayerRelation.You)
-      " {\"type\":\"PlayerGivesGift\",\"value\":{\"type\":\"You\"}} "
-  -- CR 701.66b and CR 701.67c, PlayerBlights' shape above. Both spelled, since a
-  -- tag with no arm of its own encodes as an empty object and still compiles.
-  Spec.it s "PlayerEarthbends round-trips" $
-    Common.assertCodec
-      s
-      TriggerCondition.codec
-      (TriggerCondition.PlayerEarthbends PlayerRelation.AnyPlayer)
-      " {\"type\":\"PlayerEarthbends\",\"value\":{\"type\":\"AnyPlayer\"}} "
-  Spec.it s "PlayerWaterbends round-trips" $
-    Common.assertCodec
-      s
-      TriggerCondition.codec
-      (TriggerCondition.PlayerWaterbends PlayerRelation.Opponent)
-      " {\"type\":\"PlayerWaterbends\",\"value\":{\"type\":\"Opponent\"}} "
-  -- CR 701.65b and CR 702.189b, the same shape again.
-  Spec.it s "PlayerAirbends round-trips" $
-    Common.assertCodec
-      s
-      TriggerCondition.codec
-      (TriggerCondition.PlayerAirbends PlayerRelation.You)
-      " {\"type\":\"PlayerAirbends\",\"value\":{\"type\":\"You\"}} "
-  Spec.it s "PlayerFirebends round-trips" $
-    Common.assertCodec
-      s
-      TriggerCondition.codec
-      (TriggerCondition.PlayerFirebends PlayerRelation.AnyPlayer)
-      " {\"type\":\"PlayerFirebends\",\"value\":{\"type\":\"AnyPlayer\"}} "
   Spec.it s "PlacesSticker round-trips" $
     Common.assertCodec
       s

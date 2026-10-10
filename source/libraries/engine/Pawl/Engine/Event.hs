@@ -782,14 +782,10 @@ damageOf event = case event of
   GameEvent.BecameUnattached {} -> Nothing
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Milled {} -> Nothing
-  GameEvent.Scried _ -> Nothing
+  GameEvent.PlayerActed _ -> Nothing
   GameEvent.LandPlayed {} -> Nothing
   GameEvent.LostTheGame _ -> Nothing
-  GameEvent.DungeonCompleted _ -> Nothing
-  GameEvent.Surveiled _ -> Nothing
-  GameEvent.Proliferated _ -> Nothing
   GameEvent.ManifestedDread {} -> Nothing
-  GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
   GameEvent.PlanarDieRolled _ -> Nothing
@@ -807,18 +803,6 @@ damageOf event = case event of
   GameEvent.ManaAdded _ -> Nothing
   GameEvent.ManaAbilityResolved _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
-  GameEvent.RingTempted _ -> Nothing
-  GameEvent.Blighted _ -> Nothing
-  GameEvent.Foraged _ -> Nothing
-  GameEvent.Foretold _ -> Nothing
-  GameEvent.CollectedEvidence _ -> Nothing
-  GameEvent.GaveGift _ -> Nothing
-  GameEvent.AttractionOpened _ -> Nothing
-  GameEvent.PrizeClaimed _ -> Nothing
-  GameEvent.Earthbent _ -> Nothing
-  GameEvent.Waterbent _ -> Nothing
-  GameEvent.Airbent _ -> Nothing
-  GameEvent.Firebent _ -> Nothing
   GameEvent.StickerPut _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.TriggeredAbilityResolved _ -> Nothing
@@ -873,14 +857,10 @@ revealOf event = case event of
   GameEvent.BecameUnattached {} -> Nothing
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Milled {} -> Nothing
-  GameEvent.Scried _ -> Nothing
+  GameEvent.PlayerActed _ -> Nothing
   GameEvent.LandPlayed {} -> Nothing
   GameEvent.LostTheGame _ -> Nothing
-  GameEvent.DungeonCompleted _ -> Nothing
-  GameEvent.Surveiled _ -> Nothing
-  GameEvent.Proliferated _ -> Nothing
   GameEvent.ManifestedDread {} -> Nothing
-  GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
   GameEvent.PlanarDieRolled _ -> Nothing
@@ -898,18 +878,6 @@ revealOf event = case event of
   GameEvent.ManaAdded _ -> Nothing
   GameEvent.ManaAbilityResolved _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
-  GameEvent.RingTempted _ -> Nothing
-  GameEvent.Blighted _ -> Nothing
-  GameEvent.Foraged _ -> Nothing
-  GameEvent.Foretold _ -> Nothing
-  GameEvent.CollectedEvidence _ -> Nothing
-  GameEvent.GaveGift _ -> Nothing
-  GameEvent.AttractionOpened _ -> Nothing
-  GameEvent.PrizeClaimed _ -> Nothing
-  GameEvent.Earthbent _ -> Nothing
-  GameEvent.Waterbent _ -> Nothing
-  GameEvent.Airbent _ -> Nothing
-  GameEvent.Firebent _ -> Nothing
   GameEvent.StickerPut _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.TriggeredAbilityResolved _ -> Nothing
@@ -8917,42 +8885,25 @@ controllerTurnScoped :: TriggerCondition -> Bool
 controllerTurnScoped cond = case cond of
   -- CR 309.4c names no turn at all.
   TriggerCondition.RoomEntered _ -> False
-  -- CR 309.7 names no turn either.
-  TriggerCondition.PlayerCompletesDungeon _ -> False
+  -- No PlayerAction's rule names a turn: each states when the act happens and
+  -- says nothing about whose turn it is.
+  TriggerCondition.PlayerActs _ -> False
   -- CR 104.3 names no turn either.
   TriggerCondition.PlayerLosesGame _ -> False
-  -- None of the four keyword-action conditions names a turn: CR 701.22,
-  -- CR 701.25, CR 702.170 and CR 701.44 each state when their event happens
-  -- and say nothing about whose turn it is.
-  TriggerCondition.PlayerScries _ -> False
-  TriggerCondition.RingTemptsPlayer _ -> False
-  TriggerCondition.PlayerSurveils _ -> False
+  -- None of these keyword-action conditions names a turn either: CR 701.62,
+  -- CR 702.170, CR 701.44 and CR 701.50 each state when their event happens.
   TriggerCondition.PlayerPlaysLand _ -> False
-  TriggerCondition.PlayerProliferates _ -> False
   TriggerCondition.PlayerManifestsDread _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
   TriggerCondition.PermanentExplores _ -> False
   TriggerCondition.PermanentConnives _ -> False
-  -- CR 701.68 names no turn either.
-  TriggerCondition.PlayerBlights _ -> False
-  TriggerCondition.PlayerForages _ -> False
-  TriggerCondition.PlayerForetells _ -> False
-  TriggerCondition.PlayerCollectsEvidence _ -> False
-  TriggerCondition.PlayerGivesGift _ -> False
-  TriggerCondition.PlayerEarthbends _ -> False
-  TriggerCondition.PlayerWaterbends _ -> False
-  TriggerCondition.PlayerAirbends _ -> False
-  TriggerCondition.PlayerFirebends _ -> False
   TriggerCondition.PlacesSticker _ -> False
-  -- CR 706.1 names no turn either.
-  TriggerCondition.PlayerRollsDice _ -> False
+  -- CR 706.2 names no turn either.
   TriggerCondition.PlayerRollsResult _ -> False
   TriggerCondition.Visit -> False
   TriggerCondition.ChaosEnsues -> False
   TriggerCondition.PlayerRollsPlaneswalker _ -> False
   TriggerCondition.SetInMotion -> False
-  TriggerCondition.PlayerOpensAttraction _ -> False
-  TriggerCondition.PlayerClaimsPrize _ -> False
   TriggerCondition.PlayerWinsCoinFlip _ -> False
   TriggerCondition.PlayerLosesCoinFlip _ -> False
   -- False for the SelfAttacks arm's reason below, which is exactly this case one
@@ -9523,14 +9474,10 @@ abilityTriggeredOf event = case event of
   GameEvent.BecameUnattached {} -> Nothing
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Milled {} -> Nothing
-  GameEvent.Scried _ -> Nothing
+  GameEvent.PlayerActed _ -> Nothing
   GameEvent.LandPlayed {} -> Nothing
   GameEvent.LostTheGame _ -> Nothing
-  GameEvent.DungeonCompleted _ -> Nothing
-  GameEvent.Surveiled _ -> Nothing
-  GameEvent.Proliferated _ -> Nothing
   GameEvent.ManifestedDread {} -> Nothing
-  GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
   GameEvent.PlanarDieRolled _ -> Nothing
@@ -9548,18 +9495,6 @@ abilityTriggeredOf event = case event of
   GameEvent.ManaAdded _ -> Nothing
   GameEvent.ManaAbilityResolved _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
-  GameEvent.RingTempted _ -> Nothing
-  GameEvent.Blighted _ -> Nothing
-  GameEvent.Foraged _ -> Nothing
-  GameEvent.Foretold _ -> Nothing
-  GameEvent.CollectedEvidence _ -> Nothing
-  GameEvent.GaveGift _ -> Nothing
-  GameEvent.AttractionOpened _ -> Nothing
-  GameEvent.PrizeClaimed _ -> Nothing
-  GameEvent.Earthbent _ -> Nothing
-  GameEvent.Waterbent _ -> Nothing
-  GameEvent.Airbent _ -> Nothing
-  GameEvent.Firebent _ -> Nothing
   GameEvent.StickerPut _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.TriggeredAbilityResolved _ -> Nothing

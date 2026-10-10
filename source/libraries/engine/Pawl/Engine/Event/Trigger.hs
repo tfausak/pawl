@@ -96,6 +96,7 @@ import Pawl.Types.PendingTrigger (PendingTrigger)
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
 import qualified Pawl.Types.PlanarDieRolled as PlanarDieRolled
+import qualified Pawl.Types.PlayerActed as PlayerActed
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
@@ -252,14 +253,10 @@ movedOf event = case event of
   GameEvent.BecameUnattached {} -> Nothing
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Milled {} -> Nothing
-  GameEvent.Scried _ -> Nothing
+  GameEvent.PlayerActed _ -> Nothing
   GameEvent.LandPlayed {} -> Nothing
   GameEvent.LostTheGame _ -> Nothing
-  GameEvent.DungeonCompleted _ -> Nothing
-  GameEvent.Surveiled _ -> Nothing
-  GameEvent.Proliferated _ -> Nothing
   GameEvent.ManifestedDread {} -> Nothing
-  GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
   GameEvent.PlanarDieRolled _ -> Nothing
@@ -277,18 +274,6 @@ movedOf event = case event of
   GameEvent.ManaAdded _ -> Nothing
   GameEvent.ManaAbilityResolved _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
-  GameEvent.RingTempted _ -> Nothing
-  GameEvent.Blighted _ -> Nothing
-  GameEvent.Foraged _ -> Nothing
-  GameEvent.Foretold _ -> Nothing
-  GameEvent.CollectedEvidence _ -> Nothing
-  GameEvent.GaveGift _ -> Nothing
-  GameEvent.AttractionOpened _ -> Nothing
-  GameEvent.PrizeClaimed _ -> Nothing
-  GameEvent.Earthbent _ -> Nothing
-  GameEvent.Waterbent _ -> Nothing
-  GameEvent.Airbent _ -> Nothing
-  GameEvent.Firebent _ -> Nothing
   GameEvent.StickerPut _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.TriggeredAbilityResolved _ -> Nothing
@@ -413,14 +398,10 @@ participants event =
         GameEvent.BecameAttached a -> ([BecameAttached.attachment a], []) <> recipient (BecameAttached.host a)
         GameEvent.BecameUnattached a -> ([BecameUnattached.attachment a], []) <> recipient (BecameUnattached.host a)
         GameEvent.LeftTheGame l -> one (LeftTheGame.object l)
-        GameEvent.Scried pid -> player pid
+        GameEvent.PlayerActed acted -> player (PlayerActed.player acted)
         GameEvent.LandPlayed l -> ([LandPlayed.land l], [LandPlayed.player l])
         GameEvent.LostTheGame pid -> player pid
-        GameEvent.DungeonCompleted pid -> player pid
-        GameEvent.Surveiled pid -> player pid
-        GameEvent.Proliferated pid -> player pid
         GameEvent.ManifestedDread d -> (Foldable.toList (ManifestedDread.cards d), [ManifestedDread.player d])
-        GameEvent.DiceRolled pid -> player pid
         GameEvent.DieResultSettled r -> player (DieResult.roller r)
         GameEvent.RolledToVisit r -> player (DieResult.roller r)
         GameEvent.PlanarDieRolled r -> player (PlanarDieRolled.roller r)
@@ -436,18 +417,6 @@ participants event =
         GameEvent.ManaAdded m -> ([ManaAdded.source m], [ManaAdded.player m])
         GameEvent.ManaAbilityResolved m -> one (ManaAbilityResolved.permanent m)
         GameEvent.CoinFlipped c -> player (CoinFlipped.flipper c)
-        GameEvent.RingTempted pid -> player pid
-        GameEvent.Blighted pid -> player pid
-        GameEvent.Foraged pid -> player pid
-        GameEvent.Foretold pid -> player pid
-        GameEvent.CollectedEvidence pid -> player pid
-        GameEvent.GaveGift pid -> player pid
-        GameEvent.AttractionOpened pid -> player pid
-        GameEvent.PrizeClaimed pid -> player pid
-        GameEvent.Earthbent pid -> player pid
-        GameEvent.Waterbent pid -> player pid
-        GameEvent.Airbent pid -> player pid
-        GameEvent.Firebent pid -> player pid
         GameEvent.StickerPut put -> ([StickerPut.object put], [StickerPut.placer put])
         GameEvent.ActivatedAbilityResolved a -> one (ActivatedAbilitySource.source a)
         GameEvent.TriggeredAbilityResolved t -> one (TriggeredAbilitySource.source t)
@@ -480,45 +449,28 @@ looksBack condition = case condition of
   -- CR 603.10a is about a bearer that left the battlefield, and CR 309.2c keeps a
   -- dungeon card in the command zone until it leaves the game.
   TriggerCondition.RoomEntered _ -> False
-  -- Not on CR 603.10a's list either, and CR 309.2c takes the dungeon card out of
-  -- the GAME rather than to a zone, so CR 603.10's first sentence governs.
-  TriggerCondition.PlayerCompletesDungeon _ -> False
-  -- None of the four is on CR 603.10a's list, and none is a zone change at
-  -- all: CR 701.22a moves cards within one library, CR 701.25a and CR 701.44a
-  -- do move cards but their events say the keyword action COMPLETED rather
-  -- than that anything left a zone, and CR 702.170b's exile is a card leaving
-  -- a HAND. So CR 603.10's first sentence governs all four.
-  TriggerCondition.PlayerScries _ -> False
-  TriggerCondition.RingTemptsPlayer _ -> False
-  TriggerCondition.PlayerSurveils _ -> False
+  -- Not on CR 603.10a's list either: the event says a player ACTED rather than
+  -- that anything left a zone, whatever cards the act moved -- and CR 309.2c
+  -- takes a completed dungeon card out of the GAME rather than to a zone. So CR
+  -- 603.10's first sentence governs.
+  TriggerCondition.PlayerActs _ -> False
+  -- None of these is on CR 603.10a's list, and none is a zone change at all:
+  -- CR 701.44a does move cards but its event says the keyword action COMPLETED
+  -- rather than that anything left a zone, and CR 702.170b's exile is a card
+  -- leaving a HAND. So CR 603.10's first sentence governs.
   TriggerCondition.PlayerPlaysLand _ -> False
-  TriggerCondition.PlayerProliferates _ -> False
   TriggerCondition.PlayerManifestsDread _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
   TriggerCondition.PermanentExplores _ -> False
   TriggerCondition.PermanentConnives _ -> False
-  -- Not on CR 603.10a's list either, and no zone change at all: CR 701.68a
-  -- puts counters on a permanent that stays where it is.
-  TriggerCondition.PlayerBlights _ -> False
-  TriggerCondition.PlayerForages _ -> False
-  TriggerCondition.PlayerForetells _ -> False
-  TriggerCondition.PlayerCollectsEvidence _ -> False
-  TriggerCondition.PlayerGivesGift _ -> False
-  TriggerCondition.PlayerEarthbends _ -> False
-  TriggerCondition.PlayerWaterbends _ -> False
-  TriggerCondition.PlayerAirbends _ -> False
-  TriggerCondition.PlayerFirebends _ -> False
   TriggerCondition.PlacesSticker _ -> False
   -- Not on CR 603.10a's list, and CR 706.1's roll is no zone change: it moves
   -- no object at all, so CR 603.10's first sentence governs.
-  TriggerCondition.PlayerRollsDice _ -> False
   TriggerCondition.PlayerRollsResult _ -> False
   TriggerCondition.Visit -> False
   TriggerCondition.ChaosEnsues -> False
   TriggerCondition.PlayerRollsPlaneswalker _ -> False
   TriggerCondition.SetInMotion -> False
-  TriggerCondition.PlayerOpensAttraction _ -> False
-  TriggerCondition.PlayerClaimsPrize _ -> False
   TriggerCondition.PlayerWinsCoinFlip _ -> False
   TriggerCondition.PlayerLosesCoinFlip _ -> False
   -- The same answer once more, and the most plainly: CR 701.43c can only exert a
@@ -817,41 +769,24 @@ looksBack condition = case condition of
 batchScoped :: TriggerCondition -> Bool
 batchScoped condition = case condition of
   TriggerCondition.RoomEntered _ -> False
-  TriggerCondition.PlayerScries _ -> False
+  -- Per-occurrence, and for PlayerAction.RollDice indistinguishable from the
+  -- batch reading of Feywild Trickster's "one or more dice": one Effect.RollDie's
+  -- throw records exactly one roll however many dice CR 706.1's count threw. A
+  -- reroll (CR 706.2b) records another, but it is a separate, later roll, so a
+  -- batch reading would fire for it too.
+  TriggerCondition.PlayerActs _ -> False
   TriggerCondition.PlayerLosesGame _ -> False
-  TriggerCondition.RingTemptsPlayer _ -> False
-  TriggerCondition.PlayerBlights _ -> False
-  TriggerCondition.PlayerForages _ -> False
-  TriggerCondition.PlayerForetells _ -> False
-  TriggerCondition.PlayerCollectsEvidence _ -> False
-  TriggerCondition.PlayerGivesGift _ -> False
-  TriggerCondition.PlayerEarthbends _ -> False
-  TriggerCondition.PlayerWaterbends _ -> False
-  TriggerCondition.PlayerAirbends _ -> False
-  TriggerCondition.PlayerFirebends _ -> False
   TriggerCondition.PlacesSticker _ -> False
-  TriggerCondition.PlayerCompletesDungeon _ -> False
-  TriggerCondition.PlayerSurveils _ -> False
   TriggerCondition.PlayerPlaysLand _ -> False
-  TriggerCondition.PlayerProliferates _ -> False
   TriggerCondition.PlayerManifestsDread _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
   TriggerCondition.PermanentExplores _ -> False
   TriggerCondition.PermanentConnives _ -> False
-  -- Per-occurrence, and indistinguishable from the batch reading of Feywild
-  -- Trickster's "one or more dice": one Effect.RollDie's throw records exactly
-  -- one GameEvent.DiceRolled however many dice CR 706.1's count threw. A reroll
-  -- (CR 706.2b) records another, but it is a separate, later roll, so a batch
-  -- reading would fire for it too. What would make the two readings differ is
-  -- an event per DIE, which the printed words do not ask for.
-  TriggerCondition.PlayerRollsDice _ -> False
   TriggerCondition.PlayerRollsResult _ -> False
   TriggerCondition.Visit -> False
   TriggerCondition.ChaosEnsues -> False
   TriggerCondition.PlayerRollsPlaneswalker _ -> False
   TriggerCondition.SetInMotion -> False
-  TriggerCondition.PlayerOpensAttraction _ -> False
-  TriggerCondition.PlayerClaimsPrize _ -> False
   TriggerCondition.PlayerWinsCoinFlip _ -> False
   TriggerCondition.PlayerLosesCoinFlip _ -> False
   TriggerCondition.SelfExerted -> False
@@ -1377,14 +1312,10 @@ eventTriggers events gs =
               Just lk -> Map.singleton oid (LastKnown.controller lk, battlefieldAbilitiesOf oid (LastKnown.characteristics lk))
           | otherwise -> Map.empty
         GameEvent.Milled {} -> Map.empty
-        GameEvent.Scried _ -> Map.empty
+        GameEvent.PlayerActed _ -> Map.empty
         GameEvent.LandPlayed {} -> Map.empty
         GameEvent.LostTheGame _ -> Map.empty
-        GameEvent.DungeonCompleted _ -> Map.empty
-        GameEvent.Surveiled _ -> Map.empty
-        GameEvent.Proliferated _ -> Map.empty
         GameEvent.ManifestedDread {} -> Map.empty
-        GameEvent.DiceRolled _ -> Map.empty
         GameEvent.DieResultSettled _ -> Map.empty
         GameEvent.RolledToVisit _ -> Map.empty
         GameEvent.PlanarDieRolled _ -> Map.empty
@@ -1402,18 +1333,6 @@ eventTriggers events gs =
         GameEvent.ManaAdded _ -> Map.empty
         GameEvent.ManaAbilityResolved _ -> Map.empty
         GameEvent.CoinFlipped {} -> Map.empty
-        GameEvent.RingTempted _ -> Map.empty
-        GameEvent.Blighted _ -> Map.empty
-        GameEvent.Foraged _ -> Map.empty
-        GameEvent.Foretold _ -> Map.empty
-        GameEvent.CollectedEvidence _ -> Map.empty
-        GameEvent.GaveGift _ -> Map.empty
-        GameEvent.AttractionOpened _ -> Map.empty
-        GameEvent.PrizeClaimed _ -> Map.empty
-        GameEvent.Earthbent _ -> Map.empty
-        GameEvent.Waterbent _ -> Map.empty
-        GameEvent.Airbent _ -> Map.empty
-        GameEvent.Firebent _ -> Map.empty
         GameEvent.StickerPut _ -> Map.empty
         GameEvent.ActivatedAbilityResolved _ -> Map.empty
         GameEvent.TriggeredAbilityResolved _ -> Map.empty
@@ -1755,14 +1674,10 @@ eventTriggers events gs =
         GameEvent.BecameUnattached {} -> Map.empty
         GameEvent.LeftTheGame _ -> Map.empty
         GameEvent.Milled {} -> Map.empty
-        GameEvent.Scried _ -> Map.empty
+        GameEvent.PlayerActed _ -> Map.empty
         GameEvent.LandPlayed {} -> Map.empty
         GameEvent.LostTheGame _ -> Map.empty
-        GameEvent.DungeonCompleted _ -> Map.empty
-        GameEvent.Surveiled _ -> Map.empty
-        GameEvent.Proliferated _ -> Map.empty
         GameEvent.ManifestedDread {} -> Map.empty
-        GameEvent.DiceRolled _ -> Map.empty
         GameEvent.DieResultSettled _ -> Map.empty
         GameEvent.RolledToVisit _ -> Map.empty
         GameEvent.PlanarDieRolled _ -> Map.empty
@@ -1780,18 +1695,6 @@ eventTriggers events gs =
         GameEvent.ManaAdded _ -> Map.empty
         GameEvent.ManaAbilityResolved _ -> Map.empty
         GameEvent.CoinFlipped {} -> Map.empty
-        GameEvent.RingTempted _ -> Map.empty
-        GameEvent.Blighted _ -> Map.empty
-        GameEvent.Foraged _ -> Map.empty
-        GameEvent.Foretold _ -> Map.empty
-        GameEvent.CollectedEvidence _ -> Map.empty
-        GameEvent.GaveGift _ -> Map.empty
-        GameEvent.AttractionOpened _ -> Map.empty
-        GameEvent.PrizeClaimed _ -> Map.empty
-        GameEvent.Earthbent _ -> Map.empty
-        GameEvent.Waterbent _ -> Map.empty
-        GameEvent.Airbent _ -> Map.empty
-        GameEvent.Firebent _ -> Map.empty
         GameEvent.StickerPut _ -> Map.empty
         GameEvent.ActivatedAbilityResolved _ -> Map.empty
         GameEvent.TriggeredAbilityResolved _ -> Map.empty
@@ -2087,14 +1990,10 @@ eventTriggers events gs =
         GameEvent.BecameUnattached {} -> Map.empty
         GameEvent.LeftTheGame _ -> Map.empty
         GameEvent.Milled {} -> Map.empty
-        GameEvent.Scried _ -> Map.empty
+        GameEvent.PlayerActed _ -> Map.empty
         GameEvent.LandPlayed {} -> Map.empty
         GameEvent.LostTheGame _ -> Map.empty
-        GameEvent.DungeonCompleted _ -> Map.empty
-        GameEvent.Surveiled _ -> Map.empty
-        GameEvent.Proliferated _ -> Map.empty
         GameEvent.ManifestedDread {} -> Map.empty
-        GameEvent.DiceRolled _ -> Map.empty
         GameEvent.DieResultSettled _ -> Map.empty
         GameEvent.RolledToVisit _ -> Map.empty
         GameEvent.PlanarDieRolled _ -> Map.empty
@@ -2112,18 +2011,6 @@ eventTriggers events gs =
         GameEvent.ManaAdded _ -> Map.empty
         GameEvent.ManaAbilityResolved _ -> Map.empty
         GameEvent.CoinFlipped {} -> Map.empty
-        GameEvent.RingTempted _ -> Map.empty
-        GameEvent.Blighted _ -> Map.empty
-        GameEvent.Foraged _ -> Map.empty
-        GameEvent.Foretold _ -> Map.empty
-        GameEvent.CollectedEvidence _ -> Map.empty
-        GameEvent.GaveGift _ -> Map.empty
-        GameEvent.AttractionOpened _ -> Map.empty
-        GameEvent.PrizeClaimed _ -> Map.empty
-        GameEvent.Earthbent _ -> Map.empty
-        GameEvent.Waterbent _ -> Map.empty
-        GameEvent.Airbent _ -> Map.empty
-        GameEvent.Firebent _ -> Map.empty
         GameEvent.StickerPut _ -> Map.empty
         GameEvent.ActivatedAbilityResolved _ -> Map.empty
         GameEvent.TriggeredAbilityResolved _ -> Map.empty
@@ -2265,14 +2152,10 @@ eventTriggers events gs =
         GameEvent.BecameUnattached {} -> Map.empty
         GameEvent.LeftTheGame _ -> Map.empty
         GameEvent.Milled {} -> Map.empty
-        GameEvent.Scried _ -> Map.empty
+        GameEvent.PlayerActed _ -> Map.empty
         GameEvent.LandPlayed {} -> Map.empty
         GameEvent.LostTheGame _ -> Map.empty
-        GameEvent.DungeonCompleted _ -> Map.empty
-        GameEvent.Surveiled _ -> Map.empty
-        GameEvent.Proliferated _ -> Map.empty
         GameEvent.ManifestedDread {} -> Map.empty
-        GameEvent.DiceRolled _ -> Map.empty
         GameEvent.DieResultSettled _ -> Map.empty
         GameEvent.RolledToVisit _ -> Map.empty
         GameEvent.PlanarDieRolled _ -> Map.empty
@@ -2290,18 +2173,6 @@ eventTriggers events gs =
         GameEvent.ManaAdded _ -> Map.empty
         GameEvent.ManaAbilityResolved _ -> Map.empty
         GameEvent.CoinFlipped {} -> Map.empty
-        GameEvent.RingTempted _ -> Map.empty
-        GameEvent.Blighted _ -> Map.empty
-        GameEvent.Foraged _ -> Map.empty
-        GameEvent.Foretold _ -> Map.empty
-        GameEvent.CollectedEvidence _ -> Map.empty
-        GameEvent.GaveGift _ -> Map.empty
-        GameEvent.AttractionOpened _ -> Map.empty
-        GameEvent.PrizeClaimed _ -> Map.empty
-        GameEvent.Earthbent _ -> Map.empty
-        GameEvent.Waterbent _ -> Map.empty
-        GameEvent.Airbent _ -> Map.empty
-        GameEvent.Firebent _ -> Map.empty
         GameEvent.StickerPut _ -> Map.empty
         GameEvent.ActivatedAbilityResolved _ -> Map.empty
         GameEvent.TriggeredAbilityResolved _ -> Map.empty
@@ -2740,46 +2611,26 @@ zonesTriggeredFrom cond =
         -- is CR 114.4's and takes emblems alone, so nothing consults this arm --
         -- inherentTriggers gathers a room ability off Dungeon.abilities.
         TriggerCondition.RoomEntered _ -> Set.singleton Zone.Command
-        -- CR 113.6's default for the three whose watcher is an ordinary permanent:
-        -- Matoya, Archon Elder and Wildgrowth Walker are creatures, and neither the
-        -- scry, the surveil nor the explore is a condition that cannot trigger from
-        -- the battlefield, so CR 113.6k's exception does not apply.
-        TriggerCondition.PlayerScries _ -> battlefield
-        TriggerCondition.RingTemptsPlayer _ -> battlefield
-        TriggerCondition.PlayerSurveils _ -> battlefield
+        -- CR 113.6's default: no player's act is a condition that cannot trigger
+        -- from the battlefield, so CR 113.6k's exception does not apply. NOT the
+        -- graveyard, though Dungeon Crawler watches a completed dungeon from
+        -- there: what puts its ability in the graveyard is CR 113.6m, read off its
+        -- effect by `zonesFunctionedIn` above -- Squee, Goblin Nabob's road, proved
+        -- by Pawl.DungeonSpec's "CR 309.7 completing a dungeon triggers Dungeon
+        -- Crawler out of the graveyard".
+        TriggerCondition.PlayerActs _ -> battlefield
+        -- CR 113.6's default for the ones whose watcher is an ordinary permanent:
+        -- Wildgrowth Walker is a creature, and an explore is no condition that
+        -- cannot trigger from the battlefield.
         TriggerCondition.PlayerPlaysLand _ -> battlefield
-        TriggerCondition.PlayerProliferates _ -> battlefield
         TriggerCondition.PlayerManifestsDread _ -> battlefield
         -- CR 113.6's default: Withengar Unbound is a creature.
         TriggerCondition.PlayerLosesGame _ -> battlefield
         TriggerCondition.PermanentExplores _ -> battlefield
         TriggerCondition.PermanentConnives _ -> battlefield
-        -- CR 113.6's default again: Synthetic Blight Chronicler is an ordinary
-        -- creature, and a
-        -- blight is a condition a battlefield permanent can watch, so CR 113.6k's
-        -- exception does not apply.
-        TriggerCondition.PlayerBlights _ -> battlefield
-        TriggerCondition.PlayerForages _ -> battlefield
-        TriggerCondition.PlayerForetells _ -> battlefield
-        TriggerCondition.PlayerCollectsEvidence _ -> battlefield
-        TriggerCondition.PlayerGivesGift _ -> battlefield
-        TriggerCondition.PlayerEarthbends _ -> battlefield
-        TriggerCondition.PlayerWaterbends _ -> battlefield
-        TriggerCondition.PlayerAirbends _ -> battlefield
-        TriggerCondition.PlayerFirebends _ -> battlefield
         TriggerCondition.PlacesSticker _ -> battlefield
-        -- CR 113.6's default again, and NOT the graveyard, though Dungeon Crawler
-        -- watches from there: completing a dungeon is a condition a battlefield
-        -- permanent could watch perfectly well, so CR 113.6k's exception does not
-        -- apply. What puts Dungeon Crawler's ability in the graveyard is CR 113.6m,
-        -- read off its effect by `zonesFunctionedIn` above -- Squee, Goblin Nabob's
-        -- road, proved by Pawl.DungeonSpec's "CR 309.7 completing a dungeon triggers
-        -- Dungeon Crawler out of the graveyard".
-        TriggerCondition.PlayerCompletesDungeon _ -> battlefield
-        -- CR 113.6's default again: Feywild Trickster is a creature, and nothing
-        -- about rolling a die is a condition that cannot trigger from the
-        -- battlefield.
-        TriggerCondition.PlayerRollsDice _ -> battlefield
+        -- CR 113.6's default again: nothing about rolling a die is a condition
+        -- that cannot trigger from the battlefield.
         TriggerCondition.PlayerRollsPlaneswalker _ -> battlefield
         TriggerCondition.PlayerRollsResult _ -> battlefield
         -- CR 311.7 / 901.7: a chaos ability triggers from the face-up plane.
@@ -2788,8 +2639,6 @@ zonesTriggeredFrom cond =
         -- scheme face up in the command zone.
         TriggerCondition.SetInMotion -> Set.singleton Zone.Command
         TriggerCondition.Visit -> battlefield
-        TriggerCondition.PlayerOpensAttraction _ -> battlefield
-        TriggerCondition.PlayerClaimsPrize _ -> battlefield
         TriggerCondition.PlayerWinsCoinFlip _ -> battlefield
         TriggerCondition.PlayerLosesCoinFlip _ -> battlefield
         -- CR 113.6's default, and CR 701.43c makes it the only possible answer rather
@@ -3242,46 +3091,28 @@ stateTriggers gs
             -- CR 309.4c is an EVENT trigger too: the marker MOVING into the room
             -- is what fires it, not the marker sitting there.
             TriggerCondition.RoomEntered _ -> False
-            -- CR 603.2 again: CR 309.7's completion is the dungeon card's
-            -- removal happening, not a state that could be true standing still.
-            TriggerCondition.PlayerCompletesDungeon _ -> False
+            -- CR 603.2 again: a player's act is something that HAPPENS, with
+            -- its own log entry, not a state that could be true standing still.
+            TriggerCondition.PlayerActs _ -> False
             -- CR 104.3: losing the game happens; it is not a CR 603.8 state.
             TriggerCondition.PlayerLosesGame _ -> False
-            -- CR 603.2 event triggers, all four: a scry, a surveil, a card
-            -- becoming plotted and an explore are things that HAPPEN, each with
-            -- its own log entry, and none of them is a CR 603.8 state that could
-            -- be true standing still.
-            TriggerCondition.PlayerScries _ -> False
-            TriggerCondition.RingTemptsPlayer _ -> False
-            TriggerCondition.PlayerSurveils _ -> False
+            -- CR 603.2 event triggers: a land play, a manifest dread, a card
+            -- becoming plotted, an explore and a connive are things that HAPPEN,
+            -- each with its own log entry, and none of them is a CR 603.8 state
+            -- that could be true standing still.
             TriggerCondition.PlayerPlaysLand _ -> False
-            TriggerCondition.PlayerProliferates _ -> False
             TriggerCondition.PlayerManifestsDread _ -> False
             TriggerCondition.SelfBecomesPlotted -> False
             TriggerCondition.PermanentExplores _ -> False
             TriggerCondition.PermanentConnives _ -> False
-            -- CR 603.2 once more: a blight is something that HAPPENS, with
-            -- its own log entry, never a CR 603.8 state standing still.
-            TriggerCondition.PlayerBlights _ -> False
-            TriggerCondition.PlayerForages _ -> False
-            TriggerCondition.PlayerForetells _ -> False
-            TriggerCondition.PlayerCollectsEvidence _ -> False
-            TriggerCondition.PlayerGivesGift _ -> False
-            TriggerCondition.PlayerEarthbends _ -> False
-            TriggerCondition.PlayerWaterbends _ -> False
-            TriggerCondition.PlayerAirbends _ -> False
-            TriggerCondition.PlayerFirebends _ -> False
             TriggerCondition.PlacesSticker _ -> False
             -- CR 603.2 once more: a die roll is something that HAPPENS, with its own log
             -- entry, never a CR 603.8 state that could be true standing still.
-            TriggerCondition.PlayerRollsDice _ -> False
             TriggerCondition.PlayerRollsResult _ -> False
             TriggerCondition.Visit -> False
             TriggerCondition.ChaosEnsues -> False
             TriggerCondition.PlayerRollsPlaneswalker _ -> False
             TriggerCondition.SetInMotion -> False
-            TriggerCondition.PlayerOpensAttraction _ -> False
-            TriggerCondition.PlayerClaimsPrize _ -> False
             TriggerCondition.PlayerWinsCoinFlip _ -> False
             TriggerCondition.PlayerLosesCoinFlip _ -> False
             -- CR 603.2 again: being exerted is something that happens, with its
@@ -4062,14 +3893,10 @@ resnapshot gs without event =
         GameEvent.BecameAttached {} -> Just event
         GameEvent.BecameUnattached {} -> Just event
         GameEvent.LeftTheGame {} -> Just event
-        GameEvent.Scried {} -> Just event
+        GameEvent.PlayerActed {} -> Just event
         GameEvent.LandPlayed {} -> Just event
         GameEvent.LostTheGame {} -> Just event
-        GameEvent.DungeonCompleted {} -> Just event
-        GameEvent.Surveiled {} -> Just event
-        GameEvent.Proliferated {} -> Just event
         GameEvent.ManifestedDread {} -> Just event
-        GameEvent.DiceRolled {} -> Just event
         GameEvent.DieResultSettled {} -> Just event
         GameEvent.RolledToVisit {} -> Just event
         GameEvent.PlanarDieRolled {} -> Just event
@@ -4085,18 +3912,6 @@ resnapshot gs without event =
         GameEvent.ManaAdded {} -> Just event
         GameEvent.ManaAbilityResolved {} -> Just event
         GameEvent.CoinFlipped {} -> Just event
-        GameEvent.RingTempted {} -> Just event
-        GameEvent.Blighted {} -> Just event
-        GameEvent.Foraged {} -> Just event
-        GameEvent.Foretold {} -> Just event
-        GameEvent.CollectedEvidence {} -> Just event
-        GameEvent.GaveGift {} -> Just event
-        GameEvent.AttractionOpened {} -> Just event
-        GameEvent.PrizeClaimed {} -> Just event
-        GameEvent.Earthbent {} -> Just event
-        GameEvent.Waterbent {} -> Just event
-        GameEvent.Airbent {} -> Just event
-        GameEvent.Firebent {} -> Just event
         GameEvent.StickerPut {} -> Just event
         GameEvent.ActivatedAbilityResolved {} -> Just event
         GameEvent.TriggeredAbilityResolved {} -> Just event

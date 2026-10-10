@@ -69,6 +69,8 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerActed as PlayerActed
+import qualified Pawl.Types.PlayerAction as PlayerAction
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
@@ -2710,14 +2712,10 @@ castOf event = case event of
   GameEvent.BecameUnattached {} -> Nothing
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Milled {} -> Nothing
-  GameEvent.Scried _ -> Nothing
+  GameEvent.PlayerActed _ -> Nothing
   GameEvent.LandPlayed {} -> Nothing
   GameEvent.LostTheGame _ -> Nothing
-  GameEvent.DungeonCompleted _ -> Nothing
-  GameEvent.Surveiled _ -> Nothing
-  GameEvent.Proliferated _ -> Nothing
   GameEvent.ManifestedDread {} -> Nothing
-  GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
   GameEvent.PlanarDieRolled _ -> Nothing
@@ -2735,18 +2733,6 @@ castOf event = case event of
   GameEvent.ManaAdded _ -> Nothing
   GameEvent.ManaAbilityResolved _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
-  GameEvent.RingTempted _ -> Nothing
-  GameEvent.Blighted _ -> Nothing
-  GameEvent.Foraged _ -> Nothing
-  GameEvent.Foretold _ -> Nothing
-  GameEvent.CollectedEvidence _ -> Nothing
-  GameEvent.GaveGift _ -> Nothing
-  GameEvent.AttractionOpened _ -> Nothing
-  GameEvent.PrizeClaimed _ -> Nothing
-  GameEvent.Earthbent _ -> Nothing
-  GameEvent.Waterbent _ -> Nothing
-  GameEvent.Airbent _ -> Nothing
-  GameEvent.Firebent _ -> Nothing
   GameEvent.StickerPut _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.TriggeredAbilityResolved _ -> Nothing
@@ -2837,14 +2823,10 @@ abilityResolved event = case event of
   GameEvent.BecameUnattached {} -> Nothing
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Milled {} -> Nothing
-  GameEvent.Scried _ -> Nothing
+  GameEvent.PlayerActed _ -> Nothing
   GameEvent.LandPlayed {} -> Nothing
   GameEvent.LostTheGame _ -> Nothing
-  GameEvent.DungeonCompleted _ -> Nothing
-  GameEvent.Surveiled _ -> Nothing
-  GameEvent.Proliferated _ -> Nothing
   GameEvent.ManifestedDread {} -> Nothing
-  GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
   GameEvent.PlanarDieRolled _ -> Nothing
@@ -2862,18 +2844,6 @@ abilityResolved event = case event of
   GameEvent.ManaAdded _ -> Nothing
   GameEvent.ManaAbilityResolved _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
-  GameEvent.RingTempted _ -> Nothing
-  GameEvent.Blighted _ -> Nothing
-  GameEvent.Foraged _ -> Nothing
-  GameEvent.Foretold _ -> Nothing
-  GameEvent.CollectedEvidence _ -> Nothing
-  GameEvent.GaveGift _ -> Nothing
-  GameEvent.AttractionOpened _ -> Nothing
-  GameEvent.PrizeClaimed _ -> Nothing
-  GameEvent.Earthbent _ -> Nothing
-  GameEvent.Waterbent _ -> Nothing
-  GameEvent.Airbent _ -> Nothing
-  GameEvent.Firebent _ -> Nothing
   GameEvent.StickerPut _ -> Nothing
   GameEvent.ActivatedAbilityResolved activated -> Just (Source.OfAbility activated)
   GameEvent.TriggeredAbilityResolved triggered -> Just (Source.OfTrigger triggered)
@@ -2942,14 +2912,10 @@ discardOf event = case event of
   GameEvent.BecameUnattached {} -> Nothing
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Milled {} -> Nothing
-  GameEvent.Scried _ -> Nothing
+  GameEvent.PlayerActed _ -> Nothing
   GameEvent.LandPlayed {} -> Nothing
   GameEvent.LostTheGame _ -> Nothing
-  GameEvent.DungeonCompleted _ -> Nothing
-  GameEvent.Surveiled _ -> Nothing
-  GameEvent.Proliferated _ -> Nothing
   GameEvent.ManifestedDread {} -> Nothing
-  GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
   GameEvent.PlanarDieRolled _ -> Nothing
@@ -2967,18 +2933,6 @@ discardOf event = case event of
   GameEvent.ManaAdded _ -> Nothing
   GameEvent.ManaAbilityResolved _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
-  GameEvent.RingTempted _ -> Nothing
-  GameEvent.Blighted _ -> Nothing
-  GameEvent.Foraged _ -> Nothing
-  GameEvent.Foretold _ -> Nothing
-  GameEvent.CollectedEvidence _ -> Nothing
-  GameEvent.GaveGift _ -> Nothing
-  GameEvent.AttractionOpened _ -> Nothing
-  GameEvent.PrizeClaimed _ -> Nothing
-  GameEvent.Earthbent _ -> Nothing
-  GameEvent.Waterbent _ -> Nothing
-  GameEvent.Airbent _ -> Nothing
-  GameEvent.Firebent _ -> Nothing
   GameEvent.StickerPut _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.TriggeredAbilityResolved _ -> Nothing
@@ -3108,14 +3062,10 @@ movedChange event = case event of
   GameEvent.BecameUnattached {} -> Nothing
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Milled {} -> Nothing
-  GameEvent.Scried _ -> Nothing
+  GameEvent.PlayerActed _ -> Nothing
   GameEvent.LandPlayed {} -> Nothing
   GameEvent.LostTheGame _ -> Nothing
-  GameEvent.DungeonCompleted _ -> Nothing
-  GameEvent.Surveiled _ -> Nothing
-  GameEvent.Proliferated _ -> Nothing
   GameEvent.ManifestedDread {} -> Nothing
-  GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
   GameEvent.PlanarDieRolled _ -> Nothing
@@ -3133,18 +3083,6 @@ movedChange event = case event of
   GameEvent.ManaAdded _ -> Nothing
   GameEvent.ManaAbilityResolved _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
-  GameEvent.RingTempted _ -> Nothing
-  GameEvent.Blighted _ -> Nothing
-  GameEvent.Foraged _ -> Nothing
-  GameEvent.Foretold _ -> Nothing
-  GameEvent.CollectedEvidence _ -> Nothing
-  GameEvent.GaveGift _ -> Nothing
-  GameEvent.AttractionOpened _ -> Nothing
-  GameEvent.PrizeClaimed _ -> Nothing
-  GameEvent.Earthbent _ -> Nothing
-  GameEvent.Waterbent _ -> Nothing
-  GameEvent.Airbent _ -> Nothing
-  GameEvent.Firebent _ -> Nothing
   GameEvent.StickerPut _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.TriggeredAbilityResolved _ -> Nothing
@@ -3232,14 +3170,10 @@ damageDealt event = case event of
   GameEvent.BecameUnattached {} -> Nothing
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Milled {} -> Nothing
-  GameEvent.Scried _ -> Nothing
+  GameEvent.PlayerActed _ -> Nothing
   GameEvent.LandPlayed {} -> Nothing
   GameEvent.LostTheGame _ -> Nothing
-  GameEvent.DungeonCompleted _ -> Nothing
-  GameEvent.Surveiled _ -> Nothing
-  GameEvent.Proliferated _ -> Nothing
   GameEvent.ManifestedDread {} -> Nothing
-  GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
   GameEvent.PlanarDieRolled _ -> Nothing
@@ -3257,18 +3191,6 @@ damageDealt event = case event of
   GameEvent.ManaAdded _ -> Nothing
   GameEvent.ManaAbilityResolved _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
-  GameEvent.RingTempted _ -> Nothing
-  GameEvent.Blighted _ -> Nothing
-  GameEvent.Foraged _ -> Nothing
-  GameEvent.Foretold _ -> Nothing
-  GameEvent.CollectedEvidence _ -> Nothing
-  GameEvent.GaveGift _ -> Nothing
-  GameEvent.AttractionOpened _ -> Nothing
-  GameEvent.PrizeClaimed _ -> Nothing
-  GameEvent.Earthbent _ -> Nothing
-  GameEvent.Waterbent _ -> Nothing
-  GameEvent.Airbent _ -> Nothing
-  GameEvent.Firebent _ -> Nothing
   GameEvent.StickerPut _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.TriggeredAbilityResolved _ -> Nothing
@@ -3521,14 +3443,10 @@ lifeGainOf event = case event of
   GameEvent.BecameUnattached {} -> Nothing
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Milled {} -> Nothing
-  GameEvent.Scried _ -> Nothing
+  GameEvent.PlayerActed _ -> Nothing
   GameEvent.LandPlayed {} -> Nothing
   GameEvent.LostTheGame _ -> Nothing
-  GameEvent.DungeonCompleted _ -> Nothing
-  GameEvent.Surveiled _ -> Nothing
-  GameEvent.Proliferated _ -> Nothing
   GameEvent.ManifestedDread {} -> Nothing
-  GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
   GameEvent.PlanarDieRolled _ -> Nothing
@@ -3546,18 +3464,6 @@ lifeGainOf event = case event of
   GameEvent.ManaAdded _ -> Nothing
   GameEvent.ManaAbilityResolved _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
-  GameEvent.RingTempted _ -> Nothing
-  GameEvent.Blighted _ -> Nothing
-  GameEvent.Foraged _ -> Nothing
-  GameEvent.Foretold _ -> Nothing
-  GameEvent.CollectedEvidence _ -> Nothing
-  GameEvent.GaveGift _ -> Nothing
-  GameEvent.AttractionOpened _ -> Nothing
-  GameEvent.PrizeClaimed _ -> Nothing
-  GameEvent.Earthbent _ -> Nothing
-  GameEvent.Waterbent _ -> Nothing
-  GameEvent.Airbent _ -> Nothing
-  GameEvent.Firebent _ -> Nothing
   GameEvent.StickerPut _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.TriggeredAbilityResolved _ -> Nothing
@@ -3576,12 +3482,18 @@ lifeGainedThisTurn gs pid =
 
 -- CR 603.1b: how many DISTINCT bending verbs this player has done this turn --
 -- CR 701.65b's airbend, CR 701.66b's earthbend, CR 702.189b's firebend and CR
--- 701.67c's waterbend. lifeGainedThisTurn's footing. Each event names only its
--- player, so the distinct events for one player are the distinct verbs.
+-- 701.67c's waterbend. lifeGainedThisTurn's footing.
 bendingsThisTurn :: GameState -> PlayerId -> Int
 bendingsThisTurn gs pid =
-  let bends = Set.fromList [GameEvent.Airbent pid, GameEvent.Earthbent pid, GameEvent.Firebent pid, GameEvent.Waterbent pid]
-   in Set.size (Set.intersection bends (Set.fromList (fmap LoggedEvent.event (Foldable.toList (GameState.events gs)))))
+  let actionOf event = case event of
+        GameEvent.PlayerActed acted | PlayerActed.player acted == pid -> Just (PlayerActed.action acted)
+        _ -> Nothing
+   in Set.size (Set.intersection bendingActions (Set.fromList (Maybe.mapMaybe (actionOf . LoggedEvent.event) (Foldable.toList (GameState.events gs)))))
+
+-- The four bending keyword actions bendingsThisTurn counts: CR 701.65b, CR
+-- 701.66b, CR 702.189b and CR 701.67c.
+bendingActions :: Set.Set PlayerAction.PlayerAction
+bendingActions = Set.fromList [PlayerAction.Airbend, PlayerAction.Earthbend, PlayerAction.Firebend, PlayerAction.Waterbend]
 
 -- CR 508.1a / 608.2i: how many creatures this player declared as attackers this
 -- turn. lifeGainedThisTurn's footing -- a fold over GameState.events, whose

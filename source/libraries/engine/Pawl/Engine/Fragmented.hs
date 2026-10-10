@@ -40,6 +40,7 @@ import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerActed as PlayerActed
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.PrintingId as PrintingId
@@ -288,10 +289,7 @@ dealtDamage event = case event of
 
 bent :: GameEvent -> Bool
 bent event = case event of
-  GameEvent.Airbent {} -> True
-  GameEvent.Earthbent {} -> True
-  GameEvent.Firebent {} -> True
-  GameEvent.Waterbent {} -> True
+  GameEvent.PlayerActed acted -> Set.member (PlayerActed.action acted) Game.bendingActions
   _ -> False
 
 milled :: GameEvent -> Bool

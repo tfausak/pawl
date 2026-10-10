@@ -18,6 +18,8 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.PlayerActed as PlayerActed
+import qualified Pawl.Types.PlayerAction as PlayerAction
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
@@ -34,7 +36,7 @@ controlsAttraction pid gs = any (\oid -> Set.member Subtype.Attraction (Projecti
 -- | CR 701.51b: move the top card of this player's Attraction deck onto the
 -- battlefield under their control. Through Event.changeZoneEntering, so an
 -- entry replacement or prohibition applies as to any other entry (CR 701.51c).
--- An empty deck opens nothing (CR 609.3). GameEvent.AttractionOpened is
+-- An empty deck opens nothing (CR 609.3). GameEvent.PlayerActed is
 -- recorded only when the card reached the battlefield, since an entry prevented
 -- or replaced opens nothing that triggers (CR 701.51c).
 open :: PlayerId -> Game ()
@@ -46,7 +48,7 @@ open pid = do
       entered <- Event.changeZoneEntering top Zone.Battlefield LibraryPosition.defaultValue riders (Just pid)
       after <- State.get
       Monad.when (any (`Set.member` GameState.battlefield after) entered) $
-        State.modify' (Event.recordEvent (GameEvent.AttractionOpened pid))
+        State.modify' (Event.recordEvent (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.OpenAttraction pid)))
 
 -- CR 701.51b states no riders: the Attraction enters untapped, face up and
 -- with no counters.

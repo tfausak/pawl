@@ -67,6 +67,8 @@ import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlanarDieFace as PlanarDieFace
 import qualified Pawl.Types.PlanarDieRolled as PlanarDieRolled
+import qualified Pawl.Types.PlayerActed as PlayerActed
+import qualified Pawl.Types.PlayerAction as PlayerAction
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RevealCause as RevealCause
@@ -518,7 +520,7 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.LeftTheGame (LeftTheGame.MkLeftTheGame (ObjectId.MkObjectId 7) Zone.Battlefield))
       " {\"type\":\"LeftTheGame\",\"value\":{\"object\":7,\"from\":{\"type\":\"Battlefield\"}}} "
-  -- CR 603.9. One player id, Scried's payload: the player who lost.
+  -- CR 603.9. One player id: the player who lost.
   Spec.it s "LostTheGame" $
     Common.assertCodec
       s
@@ -532,14 +534,14 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.Milled (Milled.MkMilled (PlayerId.MkPlayerId 1) (Seq.fromList [ObjectId.MkObjectId 3, ObjectId.MkObjectId 4])))
       " {\"type\":\"Milled\",\"value\":{\"player\":1,\"cards\":[3,4]}} "
-  -- CR 701.22d. One player id, BecameMonarch's payload: a scry names the player
-  -- who scried and nothing else, the cards never leaving their library.
-  Spec.it s "Scried" $
+  -- CR 603.2. The action and the acting player, and nothing else: each action's
+  -- own rule names the player and no object.
+  Spec.it s "PlayerActed" $
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.Scried (PlayerId.MkPlayerId 1))
-      " {\"type\":\"Scried\",\"value\":1} "
+      (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.CompleteDungeon (PlayerId.MkPlayerId 5)))
+      " {\"type\":\"PlayerActed\",\"value\":{\"action\":{\"type\":\"CompleteDungeon\"},\"player\":5}} "
   -- CR 305.1. The player, the land as it arrived, and the zone it was played
   -- from, which is what Urianger Augurelt's condition reads.
   Spec.it s "LandPlayed" $
@@ -548,28 +550,6 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.LandPlayed (LandPlayed.MkLandPlayed (PlayerId.MkPlayerId 1) (ObjectId.MkObjectId 7) Zone.Exile))
       " {\"type\":\"LandPlayed\",\"value\":{\"player\":1,\"land\":7,\"from\":{\"type\":\"Exile\"}}} "
-  -- CR 309.7. One player id, Scried's payload: the rule names the completion
-  -- and not the dungeon.
-  Spec.it s "DungeonCompleted" $
-    Common.assertCodec
-      s
-      GameEvent.codec
-      (GameEvent.DungeonCompleted (PlayerId.MkPlayerId 5))
-      " {\"type\":\"DungeonCompleted\",\"value\":5} "
-  -- CR 701.25d, Scried's twin. A DISTINCT tag, since CR 701.25a's graveyard half
-  -- is what a card telling the two apart reads about.
-  Spec.it s "Surveiled" $
-    Common.assertCodec
-      s
-      GameEvent.codec
-      (GameEvent.Surveiled (PlayerId.MkPlayerId 2))
-      " {\"type\":\"Surveiled\",\"value\":2} "
-  Spec.it s "Proliferated" $
-    Common.assertCodec
-      s
-      GameEvent.codec
-      (GameEvent.Proliferated (PlayerId.MkPlayerId 3))
-      " {\"type\":\"Proliferated\",\"value\":3} "
   -- CR 701.62b. The cards the process put into the graveyard ride along, the
   -- "this way" a trigger on it reads back.
   Spec.it s "ManifestedDread" $
@@ -578,15 +558,6 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.ManifestedDread (ManifestedDread.MkManifestedDread (PlayerId.MkPlayerId 1) (Seq.fromList [ObjectId.MkObjectId 5])))
       " {\"type\":\"ManifestedDread\",\"value\":{\"player\":1,\"cards\":[5]}} "
-  -- CR 706.1. One player id and no result: CR 706.7's planar die fires the
-  -- trigger while every reader of a numerical result ignores it, so the number
-  -- is not part of this entry.
-  Spec.it s "DiceRolled" $
-    Common.assertCodec
-      s
-      GameEvent.codec
-      (GameEvent.DiceRolled (PlayerId.MkPlayerId 3))
-      " {\"type\":\"DiceRolled\",\"value\":3} "
   -- CR 706.2. The roller and one die's result, distinct numbers so a codec that
   -- swapped them would not round-trip.
   Spec.it s "DieResultSettled" $
@@ -616,20 +587,6 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.PlanarDieRolled (PlanarDieRolled.MkPlanarDieRolled (PlayerId.MkPlayerId 2) PlanarDieFace.Chaos))
       " {\"type\":\"PlanarDieRolled\",\"value\":{\"roller\":2,\"face\":{\"type\":\"Chaos\"}}} "
-  -- CR 701.51c.
-  Spec.it s "AttractionOpened" $
-    Common.assertCodec
-      s
-      GameEvent.codec
-      (GameEvent.AttractionOpened (PlayerId.MkPlayerId 4))
-      " {\"type\":\"AttractionOpened\",\"value\":4} "
-  -- CR 702.159b.
-  Spec.it s "PrizeClaimed" $
-    Common.assertCodec
-      s
-      GameEvent.codec
-      (GameEvent.PrizeClaimed (PlayerId.MkPlayerId 6))
-      " {\"type\":\"PrizeClaimed\",\"value\":6} "
   -- CR 716.2a. The object then the level BEFORE then the level AFTER, and the two
   -- levels deliberately differ by more than one: a level bar can only step N-1 to
   -- N, so a fixture crossing one threshold would round-trip a codec that dropped
@@ -782,74 +739,6 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.CoinFlipped CoinFlipped.MkCoinFlipped {CoinFlipped.flipper = PlayerId.MkPlayerId 5, CoinFlipped.won = Just False})
       " {\"type\":\"CoinFlipped\",\"value\":{\"flipper\":5,\"won\":false}} "
-  -- CR 701.54d. One player id, Scried's payload: rule 701.54d names the tempted
-  -- player, and the emblem and the designation are state rather than log.
-  Spec.it s "RingTempted" $
-    Common.assertCodec
-      s
-      GameEvent.codec
-      (GameEvent.RingTempted (PlayerId.MkPlayerId 7))
-      " {\"type\":\"RingTempted\",\"value\":7} "
-  -- CR 701.68d. One player id, the arm above's payload: rule 701.68d names the
-  -- blighting player, and the -1/-1 counters are their own log entry.
-  Spec.it s "Blighted" $
-    Common.assertCodec
-      s
-      GameEvent.codec
-      (GameEvent.Blighted (PlayerId.MkPlayerId 4))
-      " {\"type\":\"Blighted\",\"value\":4} "
-  Spec.it s "Foraged" $
-    Common.assertCodec
-      s
-      GameEvent.codec
-      (GameEvent.Foraged (PlayerId.MkPlayerId 5))
-      " {\"type\":\"Foraged\",\"value\":5} "
-  Spec.it s "Foretold" $
-    Common.assertCodec
-      s
-      GameEvent.codec
-      (GameEvent.Foretold (PlayerId.MkPlayerId 6))
-      " {\"type\":\"Foretold\",\"value\":6} "
-  Spec.it s "CollectedEvidence" $
-    Common.assertCodec
-      s
-      GameEvent.codec
-      (GameEvent.CollectedEvidence (PlayerId.MkPlayerId 7))
-      " {\"type\":\"CollectedEvidence\",\"value\":7} "
-  Spec.it s "GaveGift" $
-    Common.assertCodec
-      s
-      GameEvent.codec
-      (GameEvent.GaveGift (PlayerId.MkPlayerId 8))
-      " {\"type\":\"GaveGift\",\"value\":8} "
-  -- CR 701.66b and CR 701.67c. One player id each, Blighted's payload above: the
-  -- rules name the bending player and nothing else. DISTINCT tags, since the two
-  -- are different acts at different moments -- a shared one would let an
-  -- earthbend fire a waterbend's watcher.
-  Spec.it s "Earthbent" $
-    Common.assertCodec
-      s
-      GameEvent.codec
-      (GameEvent.Earthbent (PlayerId.MkPlayerId 6))
-      " {\"type\":\"Earthbent\",\"value\":6} "
-  Spec.it s "Waterbent" $
-    Common.assertCodec
-      s
-      GameEvent.codec
-      (GameEvent.Waterbent (PlayerId.MkPlayerId 7))
-      " {\"type\":\"Waterbent\",\"value\":7} "
-  Spec.it s "Airbent" $
-    Common.assertCodec
-      s
-      GameEvent.codec
-      (GameEvent.Airbent (PlayerId.MkPlayerId 8))
-      " {\"type\":\"Airbent\",\"value\":8} "
-  Spec.it s "Firebent" $
-    Common.assertCodec
-      s
-      GameEvent.codec
-      (GameEvent.Firebent (PlayerId.MkPlayerId 9))
-      " {\"type\":\"Firebent\",\"value\":9} "
   Spec.it s "StickerPut" $
     Common.assertCodec
       s

@@ -37,6 +37,7 @@ import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
 import qualified Pawl.Types.PlanarDieRolled as PlanarDieRolled
+import qualified Pawl.Types.PlayerActed as PlayerActed
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Saddling as Saddling
@@ -388,13 +389,6 @@ data GameEvent
     -- within one, CR 701.49a putting the marker on the topmost room. The dungeon
     -- rides beside the room because the index alone names nothing.
     VentureMarkerEntered VentureMarkerEntered.VentureMarkerEntered
-  | -- | CR 309.7: a player completed a dungeon, as the dungeon card they own was
-    -- removed from the game -- CR 309.6's owner, recorded by
-    -- Pawl.Engine.Dungeon.remove. No dungeon on the payload: rule 309.7 states
-    -- the fact and names no card, and Scryfall o:"completed" (2026-08-31) returns
-    -- one printing naming a dungeon, Acererak the Archlich, which reads
-    -- Pawl.Types.Player.completedDungeonNames rather than the moment.
-    DungeonCompleted PlayerId.PlayerId
   | -- | CR 601.2c: an object or player BECAME A TARGET of a spell or ability, the
     -- payload's `targeted` being a Recipient since CR 115.1 makes a player a
     -- target in its own right. One event per targeted recipient, as the targets
@@ -435,57 +429,25 @@ data GameEvent
   | -- | CR 104.3 / 603.9: a player lost the game, or left it other than by a
     -- draw. Recorded by Pawl.Engine.Departure.leaveTogether.
     LostTheGame PlayerId.PlayerId
-  | -- | CR 701.22d: a player completed CR 701.22a's scry. Recorded after the
-    -- reorder and even where nothing could move, that rule covering the actions
-    -- that were impossible; CR 701.22b's zero is no scry at all. Nothing else in
-    -- the log says a scry happened, the reorder crossing no zone boundary.
-    Scried PlayerId.PlayerId
   | -- | CR 305.1: a player played a land, recorded by Pawl.Engine.Cast.playLand
     -- beside the Moved event the land's arrival records.
     LandPlayed LandPlayed.LandPlayed
-  | -- | CR 701.25d, Scried's twin, with CR 701.25c as its own non-event. Distinct
-    -- from the Moved entries the graveyard half of CR 701.25a records and from
-    -- Milled above, a surveil binning a card without milling it -- a reader
-    -- folding either would miss a surveil that binned nothing.
-    Surveiled PlayerId.PlayerId
-  | -- | CR 701.34a: a player proliferated, once per proliferate and whether or
-    -- not anything was chosen.
-    Proliferated PlayerId.PlayerId
   | -- | CR 701.62b: a player manifested dread, once per CR 701.62a process and
     -- whether or not any of it was possible.
     ManifestedDread ManifestedDread.ManifestedDread
-  | -- | CR 706.1: a player rolled a die -- the resolving ability's controller or
-    -- the player rolling to visit, recorded by Pawl.Engine.Resolve.Effect's
-    -- recordRoll after CR 706.2's result is settled. No result and no die kind: a reader wanting
-    -- the number takes it from Pawl.Types.RollDie's own slot or DieResultSettled
-    -- below, CR 706.7's planar die being ignored by every effect reading a
-    -- numerical result while still firing this trigger (CR 901.9d).
-    --
-    -- ONE ENTRY PER INSTRUCTION and not per die, however many CR 706.1's count
-    -- threw, where CoinFlipped records one per coin: the condition reading this
-    -- event is worded "one or more dice", which scopes it to the instruction.
-    -- A reroll (CR 706.2b) is a roll of its own, recorded under the player who
-    -- throws it; Pawl.DiceSpec's Goblin Bookie group proves it.
-    DiceRolled PlayerId.PlayerId
   | -- | CR 706.2: one die's result, after every modifier, recorded per die the
     -- instruction left unignored (CR 706.6) -- what "whenever you roll a 6"
-    -- reads, where DiceRolled above is one entry per instruction.
+    -- reads, where PlayerAction.RollDice is one entry per instruction.
     DieResultSettled (DieResult.DieResult PlayerId.PlayerId)
   | -- | CR 701.52a: a player rolled to visit their Attractions, with the result
     -- the Visit triggers read (CR 702.159a).
     RolledToVisit (DieResult.DieResult PlayerId.PlayerId)
-  | -- | CR 901.9: a player rolled the planar die. DiceRolled above is recorded
+  | -- | CR 901.9: a player rolled the planar die. PlayerAction.RollDice is recorded
     -- beside it (CR 901.9d); DieResultSettled is not, since the planar die has
     -- no numerical result.
     PlanarDieRolled PlanarDieRolled.PlanarDieRolled
   | -- | CR 701.32 / 904.9: the archenemy set a scheme in motion.
     SchemeSetInMotion SchemeSetInMotion.SchemeSetInMotion
-  | -- | CR 701.51c: this player opened an Attraction, recorded by
-    -- Pawl.Engine.Attraction.open only when the card reached the battlefield.
-    AttractionOpened PlayerId.PlayerId
-  | -- | CR 702.159b: this player claimed an Attraction's prize, recorded by
-    -- Effect.ClaimPrize.
-    PrizeClaimed PlayerId.PlayerId
   | -- | CR 716.2a: a permanent's class level BECAME something -- the level BEFORE
     -- and the level AFTER, CountersPut's shape and for CR 714.2b's reason, since
     -- "becomes level N" is a threshold crossing. Recorded by Pawl.Engine.Resolve's
@@ -578,65 +540,6 @@ data GameEvent
     -- outcome is CR 705.3's. Pawl.Types.CoinFlipped says why the outcome is an
     -- optional field rather than a second constructor.
     CoinFlipped CoinFlipped.CoinFlipped
-  | -- | CR 701.54d: the Ring tempted this player. Recorded by
-    -- Pawl.Engine.Ring.tempt after CR 701.54a's actions, "even if some or all of
-    -- those actions were impossible", so a player with no creature to choose
-    -- writes one just the same. The player alone: the emblem and the Ring-bearer
-    -- designation are state a reader can look at, and nothing else in the log
-    -- says a temptation happened.
-    RingTempted PlayerId.PlayerId
-  | -- | CR 701.68d: this player blighted. Recorded by Pawl.Engine.Blight.blight
-    -- once rule 701.68a's process is complete, "regardless of what events
-    -- actually occurred", so a blight of zero and one whose counters a
-    -- replacement kept off write one just the same -- which is why the
-    -- CountersPut above cannot stand in for it. NOT written on rule 701.68b's
-    -- board, where that process never runs: rule 701.68d has no counterpart to
-    -- rule 701.54d's "even if some or all of those actions were impossible".
-    --
-    -- CR 701.68c's blighted creature is no payload here: it is a resolution-time
-    -- binding of the INSTRUCTING effect, under the name Pawl.Types.Blight's slot
-    -- gives it.
-    Blighted PlayerId.PlayerId
-  | -- | CR 701.61a: this player foraged. Recorded by Pawl.Engine.Forage.forage
-    -- once rule 701.61a's action is carried out, and ONLY then: rule 701.61
-    -- states no counterpart to rule 701.54d's "even if some or all of those
-    -- actions were impossible", so a player CR 608.2d refused the forage writes
-    -- none. The Blighted arm above draws the same line for its own rule.
-    --
-    -- The player alone, and neither the cards exiled nor the Food sacrificed:
-    -- both halves of rule 701.61a already write their own Moved events, and no
-    -- printing reads which half a forage took.
-    Foraged PlayerId.PlayerId
-  | -- | CR 702.143c: this player foretold a card -- CR 116.2h's special action,
-    -- recorded by Pawl.Engine.Foretell.foretell and NOT by CR 702.143d's
-    -- Effect.MakeForetold, whose card becomes foretold without anyone foretelling
-    -- it.
-    Foretold PlayerId.PlayerId
-  | -- | CR 701.59a: this player collected evidence -- recorded by
-    -- Pawl.Engine.Cost's CollectEvidence payment once the cards are exiled, and
-    -- by nothing else, since collecting evidence is only ever a cost.
-    CollectedEvidence PlayerId.PlayerId
-  | -- | CR 702.174c: this player gave a gift -- a promised gift instant or sorcery
-    -- they controlled resolved, or a permanent's gift triggered ability did.
-    -- Written by Effect.GiveGift alone.
-    GaveGift PlayerId.PlayerId
-  | -- | CR 701.66b: this player earthbent, written as rule 701.66a's delayed
-    -- triggered ability is CREATED rather than when it later returns the land.
-    -- Pawl.EventTriggerSpec's "CR 701.66b the Adept fires as rule 701.66a's
-    -- delayed ability is created, not when it returns the land" proves the two
-    -- moments apart.
-    Earthbent PlayerId.PlayerId
-  | -- | CR 701.67c: this player paid a waterbend cost, whichever way rule
-    -- 701.67a let them pay it. Pawl.EventTriggerSpec's "CR 701.67c and the same
-    -- cost paid entirely in mana fires it just the same" is the half a
-    -- tap-reading condition would miss.
-    Waterbent PlayerId.PlayerId
-  | -- | CR 701.65b: this player airbent, written only when rule 701.65a's exile
-    -- actually moved one or more objects.
-    Airbent PlayerId.PlayerId
-  | -- | CR 702.189b: a firebending ability this player controls resolved,
-    -- written by Effect.Firebend.
-    Firebent PlayerId.PlayerId
   | -- | CR 608.2n: an ACTIVATED ability RESOLVED -- the source object and the
     -- ability, which is the pair CR 707.10b's third sentence counts by. Appended
     -- by Pawl.Engine.Resolve.resolveModesWith, the one loop every ability's
@@ -661,6 +564,8 @@ data GameEvent
     -- above is. Two firings of one CR 603.7 delayed ability share the entry's
     -- createdAt, so they are one key too.
     TriggeredAbilityResolved TriggeredAbilitySource.TriggeredAbilitySource
+  | -- | CR 603.2: a player performed a Pawl.Types.PlayerAction.
+    PlayerActed (PlayerActed.PlayerActed PlayerId.PlayerId)
   | -- | CR 123.3.
     StickerPut StickerPut.StickerPut
   deriving (Eq, Ord, Show)

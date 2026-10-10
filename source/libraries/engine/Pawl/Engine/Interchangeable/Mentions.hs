@@ -2783,21 +2783,15 @@ triggerConditionNames asking x = case x of
   TriggerCondition.BoundDiesOrIsExiled slotName -> slotNames asking slotName
   TriggerCondition.BoundDies slotName -> slotNames asking slotName
   TriggerCondition.RoomEntered _roomIndex -> False
-  TriggerCondition.PlayerCompletesDungeon _playerRelation -> False
+  TriggerCondition.PlayerActs _playerActs -> False
   TriggerCondition.PlayerLosesGame _playerRelation -> False
-  TriggerCondition.PlayerScries _playerRelation -> False
-  TriggerCondition.PlayerSurveils _playerRelation -> False
   TriggerCondition.PlayerPlaysLand playsLand -> playsLandNames asking playsLand
-  TriggerCondition.PlayerProliferates _playerRelation -> False
   TriggerCondition.PlayerManifestsDread _playerRelation -> False
-  TriggerCondition.PlayerRollsDice _playerRelation -> False
   TriggerCondition.ChaosEnsues -> False
   TriggerCondition.PlayerRollsPlaneswalker _playerRelation -> False
   TriggerCondition.SetInMotion -> False
   TriggerCondition.PlayerRollsResult dieResult -> dieResultNames asking (const False) dieResult
   TriggerCondition.Visit -> False
-  TriggerCondition.PlayerOpensAttraction _playerRelation -> False
-  TriggerCondition.PlayerClaimsPrize _playerRelation -> False
   TriggerCondition.PlayerWinsCoinFlip _playerRelation -> False
   TriggerCondition.PlayerLosesCoinFlip _playerRelation -> False
   TriggerCondition.SelfBecomesPlotted -> False
@@ -2808,17 +2802,7 @@ triggerConditionNames asking x = case x of
   TriggerCondition.SelfBecomesAttachedTo filter_ -> filterNames asking filter_
   TriggerCondition.SelfBecomesUnattachedFrom filter_ -> filterNames asking filter_
   TriggerCondition.Reflexive -> False
-  TriggerCondition.RingTemptsPlayer _playerRelation -> False
   TriggerCondition.PermanentBecomesBlockedBy filter_ -> filterNames asking filter_
-  TriggerCondition.PlayerBlights _playerRelation -> False
-  TriggerCondition.PlayerForages _playerRelation -> False
-  TriggerCondition.PlayerForetells _playerRelation -> False
-  TriggerCondition.PlayerCollectsEvidence _playerRelation -> False
-  TriggerCondition.PlayerGivesGift _playerRelation -> False
-  TriggerCondition.PlayerEarthbends _playerRelation -> False
-  TriggerCondition.PlayerWaterbends _playerRelation -> False
-  TriggerCondition.PlayerAirbends _playerRelation -> False
-  TriggerCondition.PlayerFirebends _playerRelation -> False
   TriggerCondition.PlacesSticker placesSticker -> filterNames asking (PlacesSticker.object placesSticker)
 
 triggeredAbilityNames :: Asking -> (card -> Bool) -> (ability -> Bool) -> TriggeredAbility.TriggeredAbility card ability -> Bool

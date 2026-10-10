@@ -28,9 +28,14 @@
       "triggeredAbilities": [
         {
           "condition": {
-            "type": "PlayerWaterbends",
+            "type": "PlayerActs",
             "value": {
-              "type": "AnyPlayer"
+              "action": {
+                "type": "Waterbend"
+              },
+              "player": {
+                "type": "AnyPlayer"
+              }
             }
           },
           "modal": {

@@ -23,6 +23,7 @@ import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
 import qualified Pawl.Types.PermanentsDealCombatDamageToPlayer as PermanentsDealCombatDamageToPlayer
 import qualified Pawl.Types.PlacesSticker as PlacesSticker
+import qualified Pawl.Types.PlayerActed as PlayerActed
 import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
@@ -560,36 +561,15 @@ data TriggerCondition
     -- Self-scoped through the bearer and the room index; minted by
     -- Pawl.Engine.Dungeon rather than written by card data.
     RoomEntered RoomIndex.RoomIndex
-  | -- | CR 309.7: "whenever you complete a dungeon" (Dungeon Crawler), against
-    -- GameEvent.DungeonCompleted.
-    PlayerCompletesDungeon PlayerRelation.PlayerRelation
   | -- | CR 603.9: "whenever a player loses the game" (Withengar Unbound),
     -- against GameEvent.LostTheGame.
     PlayerLosesGame PlayerRelation.PlayerRelation
-  | -- | CR 701.22d: "whenever you scry" (Matoya, Archon Elder). Counts scries
-    -- rather than cards; CR 701.22b's scry 0 records no event.
-    PlayerScries PlayerRelation.PlayerRelation
-  | -- | CR 701.25d, PlayerScries' twin: a surveil that put nothing into a
-    -- graveyard fires it just the same, and CR 701.25c's surveil 0 fires nothing.
-    PlayerSurveils PlayerRelation.PlayerRelation
   | -- | CR 305.1: "whenever you play a land from exile" (Urianger Augurelt),
     -- against GameEvent.LandPlayed.
     PlayerPlaysLand PlaysLand.PlaysLand
-  | -- | CR 701.34a: "whenever you proliferate" (Scheming Aspirant), against
-    -- GameEvent.Proliferated.
-    PlayerProliferates PlayerRelation.PlayerRelation
   | -- | CR 701.62b: "whenever you manifest dread" (Paranormal Analyst), against
     -- GameEvent.ManifestedDread.
     PlayerManifestsDread PlayerRelation.PlayerRelation
-  | -- | CR 706.1: "whenever you roll one or more dice" (Feywild Trickster). The
-    -- event and not the result, which is what lets CR 706.7's planar die fire it.
-    --
-    -- The printed "one or more" is the whole of one instruction's throw:
-    -- Pawl.Engine.Resolve records one GameEvent.DiceRolled per throw, however
-    -- many dice it named, and a reroll is a separate later throw, so the batch
-    -- and per-occurrence readings coincide. The planar die records one too
-    -- (CR 901.9d).
-    PlayerRollsDice PlayerRelation.PlayerRelation
   | -- | CR 311.7: "whenever chaos ensues", a plane's chaos ability, against a
     -- GameEvent.PlanarDieRolled showing the chaos symbol (CR 901.9b).
     ChaosEnsues
@@ -604,14 +584,8 @@ data TriggerCondition
   | -- | CR 702.159a: Visit -- its controller rolled to visit their Attractions
     -- and the result is lit up on this one.
     Visit
-  | -- | CR 701.51c: "whenever you open an Attraction" (The Most Dangerous
-    -- Gamer), against GameEvent.AttractionOpened.
-    PlayerOpensAttraction PlayerRelation.PlayerRelation
-  | -- | CR 702.159b: "whenever you claim the prize of an Attraction" (The Most
-    -- Dangerous Gamer), against GameEvent.PrizeClaimed.
-    PlayerClaimsPrize PlayerRelation.PlayerRelation
   | -- | CR 705.2: "whenever you win a coin flip" (Tavern Scoundrel), reading the
-    -- event's win where PlayerRollsDice ignores what the die showed.
+    -- event's win where PlayerAction.RollDice ignores what the die showed.
     --
     -- No third, outcome-blind arm: Scryfall o:"whenever you flip a coin" with
     -- include_extras, 2026-09-16, returns nothing, so no printing watches the flip
@@ -663,10 +637,6 @@ data TriggerCondition
     -- this way") reaches -- that event is no payment and can occur several times
     -- in one resolution, where this fires once (#2121).
     Reflexive
-  | -- | CR 701.54d: "whenever the Ring tempts you" (Nazgul), against
-    -- GameEvent.RingTempted. Fires on the temptation itself, so one whose
-    -- CR 701.54a actions were all impossible fires it too.
-    RingTemptsPlayer PlayerRelation.PlayerRelation
   | -- | CR 509.3d read by a bystander: "whenever [a creature] becomes blocked by
     -- a creature", the Filter over the ATTACKER and the blocker bound under
     -- Pawl.Engine.Binding.blockingCreature (CR 701.54c's three-temptation tier).
@@ -674,50 +644,9 @@ data TriggerCondition
     -- Rule 509.3d's remaining producer, an effect that causes a creature to
     -- block (General Jarkeld), reaches it through the same arm as the other two.
     PermanentBecomesBlockedBy (Filter.Filter Keyword.Keyword)
-  | -- | CR 701.68d: "whenever a player blights"
-    -- (data\/cards\/synthetic-blight-chronicler.json), against
-    -- GameEvent.Blighted. Fires on the blight itself, so one that put no
-    -- counters -- rule 701.68a's N of zero, or a replacement that kept them off
-    -- -- fires it too.
-    PlayerBlights PlayerRelation.PlayerRelation
-  | -- | CR 701.61a: "whenever you forage" (Corpseberry Cultivator), against
-    -- GameEvent.Foraged. Fires on the forage itself, so which half of rule
-    -- 701.61a the forager took does not separate two forages here.
-    PlayerForages PlayerRelation.PlayerRelation
-  | -- | CR 702.143c: "whenever you foretell a card" (Dream Devourer), against
-    -- GameEvent.Foretold.
-    PlayerForetells PlayerRelation.PlayerRelation
-  | -- | CR 701.59a: "whenever you collect evidence" (Surveillance Monitor),
-    -- against GameEvent.CollectedEvidence.
-    PlayerCollectsEvidence PlayerRelation.PlayerRelation
-  | -- | CR 702.174c: "whenever you give a gift" (Jolly Gerbils), against
-    -- GameEvent.GaveGift.
-    PlayerGivesGift PlayerRelation.PlayerRelation
-  | -- | CR 701.66b: "whenever a player earthbends"
-    -- (data\/cards\/synthetic-stonelistener-adept.json), against
-    -- GameEvent.Earthbent. Rule 701.66b puts the moment at the CREATION of rule
-    -- 701.66a's delayed triggered ability, so this fires while the earthbend is
-    -- still resolving and NOT when the land later dies and comes back.
-    --
-    -- One arm per bending keyword action, PlayerBlights' and PlayerForages'
-    -- shape, rather than one arm carrying which act was done: CR 701.65b, CR
-    -- 701.66b, CR 701.67c and CR 702.189b put the moment in four different
-    -- places, and a printing watching several of them (Avatar Aang) writes CR
-    -- 603.1b's AnyOf over these arms.
-    PlayerEarthbends PlayerRelation.PlayerRelation
-  | -- | CR 701.67c: "whenever a player waterbends"
-    -- (data\/cards\/synthetic-tidecaller-scribe.json), against
-    -- GameEvent.Waterbent. Fires on the PAYMENT, "regardless of how they paid
-    -- that cost", so a waterbend cost paid entirely in mana fires it exactly as
-    -- one paid by rule 701.67a's taps does.
-    PlayerWaterbends PlayerRelation.PlayerRelation
-  | -- | CR 701.65b: "whenever you airbend" (Avatar Aang), against
-    -- GameEvent.Airbent.
-    PlayerAirbends PlayerRelation.PlayerRelation
-  | -- | CR 702.189b: "whenever you firebend" (Avatar Aang), against
-    -- GameEvent.Firebent -- a firebending ability resolving, not the attack
-    -- that triggered it.
-    PlayerFirebends PlayerRelation.PlayerRelation
+  | -- | CR 603.2: "whenever [a player] <acts>", the actor read against CR
+    -- 109.5's "you" (Matoya, Archon Elder; Synthetic Blight Chronicler).
+    PlayerActs (PlayerActed.PlayerActed PlayerRelation.PlayerRelation)
   | -- | CR 123.3: Wee Champion's "whenever you place a sticker".
     PlacesSticker PlacesSticker.PlacesSticker
   deriving (Eq, Ord, Show)

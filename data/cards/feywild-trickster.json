@@ -29,9 +29,14 @@
       "triggeredAbilities": [
         {
           "condition": {
-            "type": "PlayerRollsDice",
+            "type": "PlayerActs",
             "value": {
-              "type": "You"
+              "action": {
+                "type": "RollDice"
+              },
+              "player": {
+                "type": "You"
+              }
             }
           },
           "modal": {

@@ -19,8 +19,8 @@
 -- CR 701.66b's "whenever a player earthbends" is written from
 -- Pawl.Engine.Resolve.Effect's Effect.Earthbend arm rather than from here, since
 -- rule 701.66b puts the moment at the CREATION of the delayed ability 'arm'
--- mints and this module only describes it. GameEvent.Earthbent is the entry and
--- TriggerCondition.PlayerEarthbends reads it.
+-- mints and this module only describes it. GameEvent.PlayerActed is the entry and
+-- TriggerCondition.PlayerActs reads it.
 module Pawl.Engine.Earthbend where
 
 import qualified Data.Sequence as Seq
