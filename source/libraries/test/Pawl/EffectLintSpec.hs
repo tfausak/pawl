@@ -427,7 +427,7 @@ ownQuantities effect = case effect of
   Effect.TakeExtraTurn takeExtraTurn -> [TakeExtraTurn.count takeExtraTurn]
   Effect.ShuffleIntoLibrary {} -> []
   Effect.Ante {} -> []
-  Effect.PutSticker {} -> []
+  Effect.PutSticker putSticker -> Maybe.maybeToList (PutSticker.ticketCap putSticker)
   Effect.SetOwner {} -> []
   Effect.ExchangeOwnership {} -> []
   Effect.ExchangeWithTopOfLibrary {} -> []
@@ -1590,7 +1590,7 @@ effectObjectRefs effect =
         Effect.TakeExtraTurn {} -> []
         Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ refs) -> read_ (NonEmpty.toList refs)
         Effect.Ante (Ante.MkAnte _ ref _) -> read_ [ref]
-        Effect.PutSticker (PutSticker.MkPutSticker _ ref _ _) -> [(AsksChosenPermanent, ref)]
+        Effect.PutSticker (PutSticker.MkPutSticker _ ref _ _ _ _) -> [(AsksChosenPermanent, ref)]
         Effect.SetOwner (SetOwner.MkSetOwner _ ref) -> read_ [ref]
         Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership one other) -> read_ [one, other]
         Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary ref _) -> read_ [ref]

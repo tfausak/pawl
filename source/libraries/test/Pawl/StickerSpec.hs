@@ -37,6 +37,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.StickerSheets as StickerSheets
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilitySticker as AbilitySticker
+import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Deck as Deck
@@ -62,6 +63,7 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.StickerKind as StickerKind
 import qualified Pawl.Types.StickerPlacement as StickerPlacement
 import qualified Pawl.Types.StickerRef as StickerRef
@@ -902,3 +904,41 @@ spec s registry = Spec.describe s "Sticker" $ do
         shape oid = (Projection.powerOf oid cloned, Projection.toughnessOf oid cloned, Projection.hasKeyword Keyword.Flying oid cloned)
     Spec.assertEqWith s "CR 707.2 the Clone is a 2/2 without flying" (fmap shape clones) [(Just 2, Just 2, False)]
     Spec.assertEqWith s "and the Bears it copied is a 5/1 that flies" (shape bearsId) (Just 5, Just 1, True)
+  -- Review Focus 3, and Review Focus 1 through the card. Alice has no tickets
+  -- until Lineprancers gives her two.
+  Spec.it s "CR 123.3c Lineprancers offers only the four P/T stickers its two tickets pay for, and spends both" $ do
+    sheets <- committedSheets
+    lineprancers <- S.printingOf s registry "Lineprancers"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    let (bearsId, g1) = S.addPermanent bears S.alice (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers))
+        (_, entered) = S.entersWithTrigger lineprancers S.alice (S.addCounter CounterKind.PlusOnePlusOne 1 bearsId g1)
+        ((_, after), offers) = State.runState (Engine.runGame (placingRef 0 (Just bearsId) otterFiveOne) entered drain) (MkOffers [] [] 0)
+    Spec.assertEqWith s "CR 613.4b-c the Bears is a 6/2" (Projection.powerOf bearsId after, Projection.toughnessOf bearsId after) (Just 6, Just 2)
+    Spec.assertEqWith s "CR 123.3c alice spent both tickets" (S.playerCounterOf PlayerCounterKind.Ticket S.alice after) 0
+    Spec.assertEqWith s "CR 123.3c only the 2-ticket P/T stickers are offered" (concat (take 1 (stickers offers))) [nightTwoThree, slimyTwoFour, otterFiveOne, minotaurOneFour]
+  -- Lineprancers carries a sticker too, and Hill Giant none: only the Bears is
+  -- an attacker the ability can name.
+  Spec.it s "CR 509.1c Lineprancers makes bob's Piker block alice's P/T-stickered Bears, never Lineprancers itself" $ do
+    sheets <- committedSheets
+    lineprancers <- S.printingOf s registry "Lineprancers"
+    bears <- S.printingOf s registry "Grizzly Bears"
+    giant <- S.printingOf s registry "Hill Giant"
+    piker <- S.printingOf s registry "Goblin Piker"
+    forest <- S.printingOf s registry "Forest"
+    let base = mainPhaseForAlice (S.landsFor forest S.alice 4 (withSheets sheets (Setup.gameWith GameSettings.plain S.bothPlayers)))
+        (lineId, g1) = S.addPermanent lineprancers S.alice base
+        (bearsId, g2) = S.addPermanent bears S.alice g1
+        (_, g3) = S.addPermanent giant S.alice g2
+        (pikerId, g4) = S.addPermanent piker S.bob g3
+        board = Sticker.put S.alice lineId slimyTwoFour Nothing (Sticker.put S.alice bearsId otterFiveOne Nothing g4)
+        recording :: Prompt.Prompt r -> State.State (Map.Map SlotName.SlotName [ObjectId.ObjectId]) r
+        recording p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> do
+            State.put (fmap (Maybe.mapMaybe Recipient.objectOf . Set.toList . snd) sets)
+            pure (S.preferring (const False) sets)
+          _ -> pure (S.identityAnswer p)
+        ((_, after), offered) = case Activatable.abilitiesFor lineId board of
+          [ability] -> State.runState (Engine.runGame recording board (Activate.activateAbility S.alice lineId ability >> Stack.resolveTop)) Map.empty
+          _ -> (((), board), Map.empty)
+    Spec.assertEqWith s "CR 509.1c bob's Piker must block the Bears" (fmap (\r -> (ActiveBlockRequirement.blocker r, ActiveBlockRequirement.attacker r)) (GameState.blockRequirements after)) [(pikerId, bearsId)]
+    Spec.assertEqWith s "CR 115.1 the attacker slot offers only the Bears" (Map.lookup (SlotName.MkSlotName (Text.pack "attacker")) offered) (Just [bearsId])

@@ -19,6 +19,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PowerToughnessSticker as PowerToughnessSticker
 import qualified Pawl.Types.StickerKind as StickerKind
@@ -46,14 +47,14 @@ available pid kinds gs = case Map.lookup pid (GameState.players gs) of
   Nothing -> []
   Just player ->
     let used = Set.fromList [StickerPlacement.sticker p | obj <- Map.elems (GameState.objects gs), Object.owner obj == pid, p <- Foldable.toList (Object.stickers obj)]
-        offered =
+        printed =
           [ ref
           | (slot, sheet) <- zip [0 :: Natural ..] (Foldable.toList (Player.stickerSheets player)),
             Set.member slot (Player.chosenStickerSheets player),
             ref <- refsOn pid slot sheet,
             Set.member (StickerRef.kind ref) kinds
           ]
-     in filter (\ref -> Set.notMember ref used) offered
+     in filter (\ref -> Set.notMember ref used) printed
 
 -- | CR 123.3c / 107.17a: a sticker's ticket cost, printed on its sheet; a name
 -- or art sticker has none.
@@ -63,6 +64,28 @@ ticketCost ref gs = case StickerRef.kind ref of
   StickerKind.PowerToughness -> maybe 0 PowerToughnessSticker.tickets (Game.powerToughnessStickerOf ref gs)
   StickerKind.Name -> 0
   StickerKind.Art -> 0
+
+-- | CR 123.3 / 123.3c: the stickers `pid` may put on `oid`: `available`, less
+-- each whose ticket cost is above `cap` and, unless the placement is free,
+-- above the ticket counters of `oid`'s owner.
+offered :: PlayerId -> ObjectId -> Set.Set StickerKind.StickerKind -> Maybe Natural -> Bool -> GameState -> [StickerRef.StickerRef]
+offered pid oid kinds cap free gs =
+  let owner = fmap Object.owner (Game.lookupObject oid gs)
+      tickets = maybe 0 (Map.findWithDefault 0 PlayerCounterKind.Ticket . Player.counters) (owner >>= \o -> Map.lookup o (GameState.players gs))
+      fits ref =
+        let cost = ticketCost ref gs
+         in maybe True (cost <=) cap && (free || cost <= tickets)
+   in filter fits (available pid kinds gs)
+
+-- | CR 123.3c / 107.17a: the owner of `oid` removes the sticker's ticket cost,
+-- RemovePlayerCounters' road (Game.counterSharers).
+payTickets :: ObjectId -> StickerRef.StickerRef -> GameState -> GameState
+payTickets oid ref gs = case fmap Object.owner (Game.lookupObject oid gs) of
+  Nothing -> gs
+  Just owner ->
+    let cost = ticketCost ref gs
+        lose p = p {Player.counters = Map.adjust (\had -> had - min had cost) PlayerCounterKind.Ticket (Player.counters p)}
+     in gs {GameState.players = List.foldl' (flip (Map.adjust lose)) (GameState.players gs) (Game.counterSharers PlayerCounterKind.Ticket owner gs)}
 
 -- | CR 123.3 / 613.7k: put the sticker on the object, stamped now, and record
 -- the placement for "whenever you place a sticker". CR 123.6b: @position@ is a

@@ -1200,8 +1200,16 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.PutSticker (PutSticker.MkPutSticker (PlayerRef.Relative PlayerRelation.You) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))) (Set.singleton StickerKind.Art) (Just (SlotName.MkSlotName (Text.pack "placed")))))
+      (Effect.PutSticker (PutSticker.MkPutSticker (PlayerRef.Relative PlayerRelation.You) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))) (Set.singleton StickerKind.Art) Nothing False (Just (SlotName.MkSlotName (Text.pack "placed")))))
       " {\"type\":\"PutSticker\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"ref\":{\"type\":\"InSlot\",\"value\":\"self\"},\"kinds\":[{\"type\":\"Art\"}],\"bound\":\"placed\"}} "
+  -- CR 123.3c: Pin Collection's cap and waiver.
+  Spec.it s "PutSticker with a ticket cap, free" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.PutSticker (PutSticker.MkPutSticker (PlayerRef.Relative PlayerRelation.You) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))) (Set.singleton StickerKind.Ability) (Just (Quantity.InSlot (SlotName.MkSlotName (Text.pack "X")))) True Nothing))
+      " {\"type\":\"PutSticker\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"ref\":{\"type\":\"InSlot\",\"value\":\"self\"},\"kinds\":[{\"type\":\"Ability\"}],\"ticketCap\":{\"type\":\"InSlot\",\"value\":\"X\"},\"free\":true}} "
   -- CR 407.4: the anteing player, the objects, and the slot binding them.
   Spec.it s "Ante" $
     Common.assertJsonCodec

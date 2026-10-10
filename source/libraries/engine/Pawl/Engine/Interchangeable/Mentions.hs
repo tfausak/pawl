@@ -2576,7 +2576,7 @@ anteNames asking x = case x of
 
 putStickerNames :: Asking -> PutSticker.PutSticker -> Bool
 putStickerNames asking x = case x of
-  PutSticker.MkPutSticker player ref _kinds bound -> playerRefNames asking player || objectRefNames asking ref || any (slotNames asking) bound
+  PutSticker.MkPutSticker player ref _kinds cap _free bound -> playerRefNames asking player || objectRefNames asking ref || any (quantityNames asking) cap || any (slotNames asking) bound
 
 shuffleIntoLibraryNames :: Asking -> ShuffleIntoLibrary.ShuffleIntoLibrary -> Bool
 shuffleIntoLibraryNames asking x = case x of
