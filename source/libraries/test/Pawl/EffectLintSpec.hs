@@ -53,6 +53,7 @@ import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.Ante as Ante
 import qualified Pawl.Types.AnyNumberDiscard as AnyNumberDiscard
 import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
+import qualified Pawl.Types.Arithmetic as Arithmetic
 import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachBound as AttachBound
 import qualified Pawl.Types.AttachTarget as AttachTarget
@@ -453,7 +454,11 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.Star -> True
   -- CR 208.2's composite box. Recursive on both sides, so 1+* is accepted and
   -- 1 + "the number of creatures you control" is not.
-  Quantity.Type.Plus (Plus.MkPlus left right) -> printedBoxQuantity left && printedBoxQuantity right
+  Quantity.Type.Arithmetic arithmetic -> case arithmetic of
+    Arithmetic.Plus (Plus.MkPlus left right) -> printedBoxQuantity left && printedBoxQuantity right
+    Arithmetic.Halved {} -> False
+    Arithmetic.Times {} -> False
+    Arithmetic.Negate {} -> False
   Quantity.Type.ManaValue -> False
   Quantity.Type.Power -> False
   Quantity.Type.Toughness -> False
@@ -462,9 +467,6 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.WasBound _ -> False
   Quantity.Type.BoundCount _ -> False
   Quantity.Type.UniqueVowelsOnSticker _ -> False
-  Quantity.Type.Halved {} -> False
-  Quantity.Type.Times {} -> False
-  Quantity.Type.Negate {} -> False
   Quantity.Type.Count {} -> False
   Quantity.Type.ManaCount {} -> False
   Quantity.Type.LifeTotal {} -> False
@@ -2461,7 +2463,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     -- The same atom under a NEST, which is the half a top-level number cannot
     -- prove: a QuantitySlot.slots answering the empty set for Negate would pass
     -- both assertions above.
-    Spec.assertBool s (clashes [destruction, counting (Quantity.Type.Negate (against destroyedSlot))]) "a singular read nested inside a number is caught"
+    Spec.assertBool s (clashes [destruction, counting (Quantity.Type.Arithmetic (Arithmetic.Negate (against destroyedSlot)))]) "a singular read nested inside a number is caught"
     -- The OTHER slot-naming arm of a number, on the same board: Quantity.InSlot
     -- reads Binding.amount through Pawl.Engine.Binding.amountOf and reaches
     -- slotOneObject nowhere, so the group a plural binder wrote at that same
@@ -2474,7 +2476,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     -- prove: a walk that dropped the whole quantity on seeing an amount read
     -- would pass both of them and silently stop catching the object read beside
     -- it.
-    Spec.assertBool s (clashes [destruction, counting (Quantity.Type.Plus (Plus.MkPlus (Quantity.Type.InSlot destroyedSlot) (against destroyedSlot)))]) "an object read beside an amount read of the same slot is still caught"
+    Spec.assertBool s (clashes [destruction, counting (Quantity.Type.Arithmetic (Arithmetic.Plus (Plus.MkPlus (Quantity.Type.InSlot destroyedSlot) (against destroyedSlot))))]) "an object read beside an amount read of the same slot is still caught"
     -- And the guard that keeps the leg from being silently inert: the pool reads
     -- a slot inside a number -- Rabid Bite's damage is its dealer's power, aimed
     -- at the dealer's own slot.

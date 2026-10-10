@@ -25,6 +25,7 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.Arithmetic as Arithmetic
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachRestriction as AttachRestriction
 import qualified Pawl.Types.AttackTargetRef as AttackTargetRef
@@ -6148,7 +6149,7 @@ evolve =
           ( Compares.MkCompares
               (Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot Binding.became quantity))
               Comparison.AtLeast
-              (Quantity.Plus (Plus.MkPlus quantity (Quantity.Literal 1)))
+              (Quantity.Arithmetic (Arithmetic.Plus (Plus.MkPlus quantity (Quantity.Literal 1))))
           )
    in Mint.triggerIf
         ( TriggerCondition.PermanentEnters
@@ -6250,7 +6251,7 @@ increment =
           ( Compares.MkCompares
               (Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot Binding.castSpell Quantity.ManaSpent))
               Comparison.AtLeast
-              (Quantity.Plus (Plus.MkPlus quantity (Quantity.Literal 1)))
+              (Quantity.Arithmetic (Arithmetic.Plus (Plus.MkPlus quantity (Quantity.Literal 1))))
           )
       -- "If this permanent is a creature", echo's spelling of a question about the
       -- bearer: a count of one over the battlefield, which answers 0 for a
@@ -6295,14 +6296,14 @@ melee =
 -- blocker. Rule 702.23a's bonus already counts the blockers itself, so a
 -- per-blocker trigger would count them twice.
 --
--- The BONUS is Quantity.Times of N and Quantity.BlockersBeyondFirst (CR 107.1);
+-- The BONUS is Arithmetic.Times of N and Quantity.BlockersBeyondFirst (CR 107.1);
 -- a factor of 0 is legal, so rampage 0 reads 0 rather than failing.
 --
 -- CR 702.23b's "calculated only once per combat" is CR 611.2d's freeze and needs
 -- nothing of its own.
 rampage :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 rampage n =
-  let bonus = Quantity.Times (Times.MkTimes n Quantity.BlockersBeyondFirst)
+  let bonus = Quantity.Arithmetic (Arithmetic.Times (Times.MkTimes n Quantity.BlockersBeyondFirst))
       effect =
         Effect.ModifyTarget
           ( ModifyTarget.MkModifyTarget

@@ -1596,7 +1596,7 @@ setLifeTotalSpec s registry =
 -- action: the player "gains or loses an amount of life such that their new life
 -- total is twice its current value". So it needs no opcode of its own, CR
 -- 701.10b's reason in Pawl.PowerToughnessSpec's Unleash Fury group. It is CR
--- 119.5's set -- setLifeTotalSpec above -- over Quantity.Times of 2 and the
+-- 119.5's set -- setLifeTotalSpec above -- over Arithmetic.Times of 2 and the
 -- TARGET's own Quantity.LifeTotal, and the gain or loss falls out of that set.
 --
 -- Three seats at 4, 27 and 13: distinct, and no seat's double (8, 54, 26) is any

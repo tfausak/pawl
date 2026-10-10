@@ -2036,6 +2036,7 @@ library types
     Pawl.Types.AnyNumberDiscard
     Pawl.Types.AnyNumberMatching
     Pawl.Types.AppliedReduction
+    Pawl.Types.Arithmetic
     Pawl.Types.ArmDelayedTrigger
     Pawl.Types.Arrival
     Pawl.Types.ArrivalEnd

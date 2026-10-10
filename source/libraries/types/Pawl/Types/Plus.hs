@@ -1,6 +1,6 @@
 module Pawl.Types.Plus where
 
--- | The payload of Pawl.Types.Quantity's Plus arm (#1305): CR 208.2's
+-- | The payload of Pawl.Types.Arithmetic's Plus arm (#1305): CR 208.2's
 -- composition, so a printed 1+* needs no constructor of its own.
 --
 -- PARAMETRIC in the quantity, and that is what keeps this out of a module cycle

@@ -10,28 +10,18 @@
 -- reads a board and so sits above Game.
 module Pawl.Engine.Star where
 
-import qualified Pawl.Types.Halved as Halved
-import qualified Pawl.Types.Plus as Plus
 import Pawl.Types.Quantity (Quantity)
 import qualified Pawl.Types.Quantity as Quantity
-import qualified Pawl.Types.Times as Times
 
 -- CR 208.2: resolve a printed star to the quantity a characteristic-defining
--- ability supplies, recursing through Plus so 1+* becomes 1+<the count>.
+-- ability supplies, recursing through a calculation so 1+* becomes 1+<the count>.
 substituteStar :: Quantity -> Quantity -> Quantity
 substituteStar star quantity = case quantity of
   Quantity.Star -> star
-  Quantity.Plus (Plus.MkPlus a b) -> Quantity.Plus (Plus.MkPlus (substituteStar star a) (substituteStar star b))
-  -- The same descent Plus takes, for CR 208.2's reason: a printed star inside a
-  -- halving is still the value the CDA supplies. No card prints one there --
-  -- Malignus' star is the whole P/T box and its CDA carries the halving.
-  Quantity.Halved (Halved.MkHalved rounding inner) -> Quantity.Halved (Halved.MkHalved rounding (substituteStar star inner))
-  -- Halved's descent, for CR 208.2's reason: a printed star inside a product is
-  -- still the value the characteristic-defining ability supplies.
-  Quantity.Times (Times.MkTimes factor inner) -> Quantity.Times (Times.MkTimes factor (substituteStar star inner))
-  -- Plus's descent, for Plus's reason: a star under a minus sign is still the
-  -- star the characteristic-defining ability defines.
-  Quantity.Negate a -> Quantity.Negate (substituteStar star a)
+  -- A printed star inside a calculation is still the value the CDA supplies.
+  -- No card prints one under anything but a Plus -- Malignus' star is the whole
+  -- P/T box and its CDA carries the halving.
+  Quantity.Arithmetic arithmetic -> Quantity.Arithmetic (fmap (substituteStar star) arithmetic)
   Quantity.Literal _ -> quantity
   Quantity.ManaValue -> quantity
   Quantity.Power -> quantity
@@ -121,9 +111,10 @@ substituteStar star quantity = case quantity of
   -- CR 702.167c: AgainstCardsExiledWith's answer, over the craft link alone.
   Quantity.AgainstCraftMaterials {} -> quantity
 
--- Does a printed box hold CR 208.2's star anywhere inside it? The three
--- calculations descend for substituteStar's reason: 1+* is a star box, and the
--- star is what a characteristic-defining ability fills in later.
+-- Does a printed box hold CR 208.2's star anywhere inside it? A calculation
+-- descends for substituteStar's reason: *+1 is a star box, and the star is what
+-- a characteristic-defining ability fills in later -- proved by the scenario
+-- consuming-blob-ooze-token-keeps-its-star-plus-one-box.
 --
 -- Asked by Pawl.Engine.Resolve.Effect.bakeTokenCharacteristics, which must tell a star
 -- (keep it -- CR 208.2's value arrives at layer 7a, so there is nothing to settle
@@ -134,10 +125,7 @@ substituteStar star quantity = case quantity of
 containsStar :: Quantity -> Bool
 containsStar quantity = case quantity of
   Quantity.Star -> True
-  Quantity.Plus (Plus.MkPlus a b) -> containsStar a || containsStar b
-  Quantity.Halved (Halved.MkHalved _ inner) -> containsStar inner
-  Quantity.Times (Times.MkTimes _ inner) -> containsStar inner
-  Quantity.Negate a -> containsStar a
+  Quantity.Arithmetic arithmetic -> any containsStar arithmetic
   -- No descent into a Count, nor into AgainstSlot or AgainstCardsExiledWith:
   -- CR 208.2a's star is a printed box's own symbol, and each of those three
   -- reads its payload against ANOTHER object, where a star would be that

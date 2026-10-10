@@ -215,7 +215,6 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
-import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.HandAction as HandAction
 import qualified Pawl.Types.Impending as Impending
 import qualified Pawl.Types.InZone as InZone
@@ -286,7 +285,6 @@ import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.PlaysLand as PlaysLand
 import qualified Pawl.Types.PlotFromZone as PlotFromZone
-import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
@@ -354,7 +352,6 @@ import qualified Pawl.Types.TapPermanents as TapPermanents
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TheseDiscard as TheseDiscard
-import qualified Pawl.Types.Times as Times
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
@@ -4128,10 +4125,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.BoundCount _ -> []
   Quantity.Type.UniqueVowelsOnSticker _ -> []
   Quantity.Type.Star -> []
-  Quantity.Type.Plus (Plus.MkPlus a b) -> quantityKindFilters a <> quantityKindFilters b
-  Quantity.Type.Halved (Halved.MkHalved _ inner) -> quantityKindFilters inner
-  Quantity.Type.Times (Times.MkTimes _ inner) -> quantityKindFilters inner
-  Quantity.Type.Negate a -> quantityKindFilters a
+  Quantity.Type.Arithmetic arithmetic -> foldMap quantityKindFilters arithmetic
   -- The Count's own Filter is countFilters' half above; what this half adds is
   -- the CounterKind a Greatest's per-member Quantity may hide, which is
   -- QuantitySlot.nestedCounts' descent.

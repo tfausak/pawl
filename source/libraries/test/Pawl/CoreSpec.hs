@@ -19,6 +19,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.Arithmetic as Arithmetic
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
@@ -143,7 +144,7 @@ quantitySpec s registry = Spec.describe s "Pawl.Engine.Quantity" $ do
           noContext
           (Setup.emptyGame S.bothPlayers)
           (ObjectId.MkObjectId 0)
-          (Quantity.Type.Plus (Plus.MkPlus (Quantity.Type.Literal 1) (Quantity.Type.Literal 2)))
+          (Quantity.Type.Arithmetic (Arithmetic.Plus (Plus.MkPlus (Quantity.Type.Literal 1) (Quantity.Type.Literal 2))))
       )
       $ Just 3
 
@@ -155,7 +156,7 @@ quantitySpec s registry = Spec.describe s "Pawl.Engine.Quantity" $ do
           noContext
           (Setup.emptyGame S.bothPlayers)
           (ObjectId.MkObjectId 0)
-          (Quantity.Type.Plus (Plus.MkPlus (Quantity.Type.Literal 1) Quantity.Type.Star))
+          (Quantity.Type.Arithmetic (Arithmetic.Plus (Plus.MkPlus (Quantity.Type.Literal 1) Quantity.Type.Star)))
       )
       Nothing
 
@@ -187,7 +188,7 @@ quantitySpec s registry = Spec.describe s "Pawl.Engine.Quantity" $ do
           noContext
           (Setup.emptyGame S.bothPlayers)
           (ObjectId.MkObjectId 0)
-          (Quantity.Type.Plus (Plus.MkPlus (Quantity.Type.Literal 1) Quantity.Type.Star))
+          (Quantity.Type.Arithmetic (Arithmetic.Plus (Plus.MkPlus (Quantity.Type.Literal 1) Quantity.Type.Star)))
       )
       1
 
@@ -199,7 +200,7 @@ quantitySpec s registry = Spec.describe s "Pawl.Engine.Quantity" $ do
           noContext
           (Setup.emptyGame S.bothPlayers)
           (ObjectId.MkObjectId 0)
-          (Quantity.Type.Plus (Plus.MkPlus (Quantity.Type.Literal 1) (Quantity.Type.Literal 2)))
+          (Quantity.Type.Arithmetic (Arithmetic.Plus (Plus.MkPlus (Quantity.Type.Literal 1) (Quantity.Type.Literal 2))))
       )
       3
 
@@ -208,9 +209,9 @@ quantitySpec s registry = Spec.describe s "Pawl.Engine.Quantity" $ do
       s
       ( Star.substituteStar
           (Quantity.Type.Literal 7)
-          (Quantity.Type.Plus (Plus.MkPlus (Quantity.Type.Literal 1) Quantity.Type.Star))
+          (Quantity.Type.Arithmetic (Arithmetic.Plus (Plus.MkPlus (Quantity.Type.Literal 1) Quantity.Type.Star)))
       )
-      $ Quantity.Type.Plus (Plus.MkPlus (Quantity.Type.Literal 1) (Quantity.Type.Literal 7))
+      $ Quantity.Type.Arithmetic (Arithmetic.Plus (Plus.MkPlus (Quantity.Type.Literal 1) (Quantity.Type.Literal 7)))
 
   Spec.it s "Count CardsInYourHand is Nothing with no 'you'" $ do
     let gs = Setup.emptyGame S.bothPlayers

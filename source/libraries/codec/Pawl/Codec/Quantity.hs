@@ -23,6 +23,7 @@ import qualified Pawl.Codec.Times as Times
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
+import qualified Pawl.Types.Arithmetic as Arithmetic
 import qualified Pawl.Types.Quantity as Quantity
 
 -- | Quantity.Count's arm is tagged HERE, like every other arm. Pawl.Codec.Count
@@ -58,15 +59,15 @@ codec =
       Arm.nullary "ToughnessOfStickers" Quantity.ToughnessOfStickers,
       Arm.payload "UniqueVowelsOnSticker" SlotName.codec Quantity.UniqueVowelsOnSticker (\x -> case x of Quantity.UniqueVowelsOnSticker y -> Just y; _ -> Nothing),
       Arm.nullary "Star" Quantity.Star,
-      Arm.payload "Plus" (Plus.codec codec) Quantity.Plus (\x -> case x of Quantity.Plus y -> Just y; _ -> Nothing),
+      Arm.payload "Plus" (Plus.codec codec) (Quantity.Arithmetic . Arithmetic.Plus) (\x -> case x of Quantity.Arithmetic (Arithmetic.Plus y) -> Just y; _ -> Nothing),
       -- CR 107.1a's rounding first, then what is halved: the direction is the
       -- card's word and the payload is the value it applies to.
-      Arm.payload "Halved" (Halved.codec codec) Quantity.Halved (\x -> case x of Quantity.Halved y -> Just y; _ -> Nothing),
+      Arm.payload "Halved" (Halved.codec codec) (Quantity.Arithmetic . Arithmetic.Halved) (\x -> case x of Quantity.Arithmetic (Arithmetic.Halved y) -> Just y; _ -> Nothing),
       -- CR 107.1: the factor first, then what it multiplies.
-      Arm.payload "Times" (Times.codec codec) Quantity.Times (\x -> case x of Quantity.Times y -> Just y; _ -> Nothing),
+      Arm.payload "Times" (Times.codec codec) (Quantity.Arithmetic . Arithmetic.Times) (\x -> case x of Quantity.Arithmetic (Arithmetic.Times y) -> Just y; _ -> Nothing),
       -- CR 107.1b's negative game value: one whole Quantity on the wire, since a
       -- minus sign carries nothing of its own.
-      Arm.payload "Negate" codec Quantity.Negate (\x -> case x of Quantity.Negate y -> Just y; _ -> Nothing),
+      Arm.payload "Negate" codec (Quantity.Arithmetic . Arithmetic.Negate) (\x -> case x of Quantity.Arithmetic (Arithmetic.Negate y) -> Just y; _ -> Nothing),
       Arm.payload "Count" (Count.codec codec) Quantity.Count (\x -> case x of Quantity.Count y -> Just y; _ -> Nothing),
       Arm.payload "ManaCount" ManaCount.codec Quantity.ManaCount (\x -> case x of Quantity.ManaCount y -> Just y; _ -> Nothing),
       Arm.payload "LifeTotal" PlayerRef.codec Quantity.LifeTotal (\x -> case x of Quantity.LifeTotal y -> Just y; _ -> Nothing),
@@ -245,10 +246,11 @@ tagOf x = case x of
   Quantity.PowerOfStickers {} -> "PowerOfStickers"
   Quantity.ToughnessOfStickers {} -> "ToughnessOfStickers"
   Quantity.Star {} -> "Star"
-  Quantity.Plus {} -> "Plus"
-  Quantity.Halved {} -> "Halved"
-  Quantity.Times {} -> "Times"
-  Quantity.Negate {} -> "Negate"
+  Quantity.Arithmetic a -> case a of
+    Arithmetic.Plus {} -> "Plus"
+    Arithmetic.Halved {} -> "Halved"
+    Arithmetic.Times {} -> "Times"
+    Arithmetic.Negate {} -> "Negate"
   Quantity.Count {} -> "Count"
   Quantity.ManaCount {} -> "ManaCount"
   Quantity.LifeTotal {} -> "LifeTotal"

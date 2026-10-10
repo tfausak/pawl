@@ -52,6 +52,7 @@ import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.Arithmetic as Arithmetic
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.Choices as Choices
@@ -114,7 +115,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
       s
       "the CDA pair"
       (PC.characteristicPT (Projection.baseCharacteristics goyfId gs))
-      (Just (CharacteristicPT.MkCharacteristicPT count (Quantity.Type.Plus (Plus.MkPlus (Quantity.Type.Literal 1) count))))
+      (Just (CharacteristicPT.MkCharacteristicPT count (Quantity.Type.Arithmetic (Arithmetic.Plus (Plus.MkPlus (Quantity.Type.Literal 1) count)))))
   Spec.it s "CR 613.4a no P/T value exists before layer 7a applies one" $ do
     -- The seed evaluates the printed Star, which is deliberately Nothing.
     tarmogoyf <- S.printingOf s registry "Tarmogoyf"
@@ -1188,14 +1189,16 @@ malignusSpec s registry = Spec.describe s "Malignus" $ do
     malignus <- S.printingOf s registry "Malignus"
     let (malignusId, gs) = malignusBoard malignus
         halfTheHighest =
-          Quantity.Type.Halved
-            ( Halved.MkHalved
-                Rounding.Up
-                ( Quantity.Type.Count
-                    ( Count.Type.MkCount
-                        (Scope.OverPlayers (PlayerRef.Relative PlayerRelation.Opponent))
-                        (Filter.Type.And [])
-                        (Aggregation.Greatest (Quantity.Type.LifeTotal PlayerRef.Candidate))
+          Quantity.Type.Arithmetic
+            ( Arithmetic.Halved
+                ( Halved.MkHalved
+                    Rounding.Up
+                    ( Quantity.Type.Count
+                        ( Count.Type.MkCount
+                            (Scope.OverPlayers (PlayerRef.Relative PlayerRelation.Opponent))
+                            (Filter.Type.And [])
+                            (Aggregation.Greatest (Quantity.Type.LifeTotal PlayerRef.Candidate))
+                        )
                     )
                 )
             )
