@@ -57,6 +57,12 @@
                     "value": {
                       "type": "You"
                     }
+                  },
+                  {
+                    "type": "IsInZone",
+                    "value": {
+                      "type": "Battlefield"
+                    }
                   }
                 ]
               }
@@ -95,6 +101,12 @@
                     "type": "ControlledBy",
                     "value": {
                       "type": "You"
+                    }
+                  },
+                  {
+                    "type": "IsInZone",
+                    "value": {
+                      "type": "Battlefield"
                     }
                   }
                 ]

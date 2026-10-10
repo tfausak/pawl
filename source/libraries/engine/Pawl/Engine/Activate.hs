@@ -313,12 +313,12 @@ activateAbilityWith runSubgame pid srcId ability = Event.announcing $ do
           -- TARGET-BLIND, unlike the gate above, and deliberately: that gate
           -- asks whether SOME aiming pays and may look ahead, while this is a
           -- CHOICE the player makes against one definite cost, and CR 601.2c's
-          -- targets are not announced until below. What that costs is nothing
-          -- here -- CR 118.13a's announcement is a choice of halves, every
-          -- activation-cost reducer in the pool reduces by GENERIC mana, and a
-          -- target-aware reduction therefore cannot change which nonhybrid
-          -- equivalent or Phyrexian half a player would announce. The reductions
-          -- themselves are gathered again below, once the targets exist.
+          -- targets are not announced until below. So no target-aware
+          -- adjustment is in view -- Dwarven Mauler's reduction, nor Kopala,
+          -- Warden of Waves' increase, which makes the targeted total DEARER
+          -- than this one -- and that is CR 601.2b's own order: the halves are
+          -- announced before the targets exist. Both are gathered again below,
+          -- once they do.
           let gathered = Cost.activationAdjustments Set.empty stamp AbilityKind.NonManaAbility (Cost.loyaltyKindOf (ActivatedAbility.cost ability)) pid srcId gs
           -- The Phyrexian life record is DISCARDED here: CR 702.150a reads what
           -- the player who CAST a spell announced, and no rule asks the same of

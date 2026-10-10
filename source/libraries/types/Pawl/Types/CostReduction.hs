@@ -67,7 +67,8 @@ data CostReduction = MkCostReduction
     -- Apart from 'condition' because the gates that measure a cost before CR
     -- 601.2c (Pawl.Engine.Cast.payableCostAt) have to search the aimings for a
     -- sentence reading the targets, and this field is how they know one does.
-    -- Pawl.Types.CostModifier's @whichTargets@ is the activation twin.
+    -- Pawl.Types.CostModifier's @whichTargets@ is the same question asked by
+    -- another permanent's effect, of a spell or an activation.
     whichTargets :: Maybe (Filter.Filter Keyword.Keyword),
     -- | Whether 'amount' comes off the total or goes onto it -- Dragon's Prey's
     -- "costs {2} more". A More amount is generic mana, the only kind CR 601.2f's

@@ -91,6 +91,7 @@ import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ManaUnit as ManaUnit
+import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.Move as Move
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -2628,6 +2629,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   morcantSpec s registry
   unerringSlingSpec s registry
   kopalaSpec s registry
+  battlefieldThaumaturgeSpec s registry
   melokuSpec s registry
   barkhideTrollSpec s registry
   zameckGuildmageCostSpec s registry
@@ -6228,3 +6230,46 @@ kopalaSpec s registry = Spec.describe s "Kopala, Warden of Waves" $ do
         (fiveId, five) = boardWith 5
     Spec.assertBool s (not (S.castable S.bob fourId four)) "CR 601.2f on four Plains both legal targets are taxed: not castable"
     Spec.assertBool s (S.castable S.bob fiveId five) "on five Plains it is"
+  -- CR 109.2: "a Merfolk you control" names no zone, so it is a PERMANENT. A
+  -- Coral Merfolk spell alice is casting is a Merfolk she controls on the
+  -- stack, and bob's Essence Scatter ({1}{U}) at it is not taxed.
+  Spec.it s "CR 109.2 an opponent's spell targeting alice's Merfolk SPELL costs no more" $ do
+    kopala <- S.printingOf s registry "Kopala, Warden of Waves"
+    merfolk <- S.printingOf s registry "Coral Merfolk"
+    scatter <- S.printingOf s registry "Essence Scatter"
+    island <- S.printingOf s registry "Island"
+    let (_, g1) = S.addPermanent kopala S.alice (S.landsFor island S.bob 4 (Setup.emptyGame S.threePlayers))
+        (merfolkSpell, g2) = S.spellOnStack merfolk S.alice g1
+        (scatterId, g3) = S.addHandCard scatter S.bob g2
+        after = S.runPure (targeting merfolkSpell) g3 (S.cast S.bob scatterId)
+    Spec.assertEqWith s "CR 109.2 the Scatter at the Merfolk spell cost {1}{U}: two Islands" (S.tappedCount S.bob after) 2
+    Spec.assertEqWith s "and it is on the stack above the Merfolk" (length (GameState.stack after)) 2
+
+-- Battlefield Thaumaturge {1}{U} Creature -- Human Wizard 2/1 (Oracle text
+-- checked against Scryfall 2026-10-10): "Each instant and sorcery spell you cast
+-- costs {1} less to cast for each creature it targets." CR 109.2: a creature
+-- is a permanent, so a creature CARD in a graveyard is not one. The pair differs
+-- in what the instant targets: Doom Blade ({1}{B}) at bob's Goblin Piker, and
+-- Unbury ({1}{B}) at a creature card in alice's graveyard.
+battlefieldThaumaturgeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+battlefieldThaumaturgeSpec s registry = Spec.describe s "Battlefield Thaumaturge" $ do
+  Spec.it s "CR 109.2 a creature card in a graveyard is not a creature it targets" $ do
+    thaumaturge <- S.printingOf s registry "Battlefield Thaumaturge"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    blade <- S.printingOf s registry "Doom Blade"
+    unbury <- S.printingOf s registry "Unbury"
+    let (_, g1) = S.addPermanent thaumaturge S.alice (S.landsFor swamp S.alice 2 (Setup.emptyGame S.bothPlayers))
+        (pikerId, g2) = S.addPermanent piker S.bob g1
+        (deadPiker, g3) = S.addGraveyardCard piker S.alice g2
+        (bladeId, g4) = S.addHandCard blade S.alice g3
+        (unburyId, g5) = S.addHandCard unbury S.alice g4
+        firstMode :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+        firstMode victim p = case p of
+          Prompt.ChooseModes {} -> Seq.fromList [ModeIndex.MkModeIndex 0]
+          _ -> targeting victim p
+        bladed = S.runPure (targeting pikerId) g5 (S.cast S.alice bladeId)
+        unburied = S.runPure (firstMode deadPiker) g5 (S.cast S.alice unburyId)
+    Spec.assertEqWith s "CR 601.2f Doom Blade at bob's Piker cost {B}: one Swamp" (S.tappedCount S.alice bladed) 1
+    Spec.assertEqWith s "CR 109.2 Unbury at the Piker card cost {1}{B}: two Swamps" (S.tappedCount S.alice unburied) 2
+    Spec.assertEqWith s "and both were cast" (fmap (length . GameState.stack) [bladed, unburied]) [1, 1]

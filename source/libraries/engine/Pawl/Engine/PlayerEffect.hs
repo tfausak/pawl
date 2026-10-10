@@ -1377,7 +1377,7 @@ spellCostReadsTargets pid oid gs =
 -- CR 601.2c / 601.2f: how many times a per-target cost change applies -- the
 -- DISTINCT objects and players among the announced `targets` that `wanted`
 -- matches, against each one's own view with the effect's source framing it and
--- the caster as CR 109.5's "you". Distinct, not per instance of the word: CR
+-- `targetPerspective`'s "you". Distinct, not per instance of the word: CR
 -- 601.2c's "the chosen objects and/or players each become a target", and Hinata,
 -- Dawn-Crowned's ruling counts a creature chosen for two words once. So
 -- Filter.View's `targetCount`, which counts instances, is not this. Merging by
@@ -1399,7 +1399,7 @@ perTargetMatches pid source gs wanted r =
 -- you control" under a row scoped to that controller's opponents. Not the
 -- target's own controller, which would make Professor Hojo's "a creature you
 -- control" true of every creature, and not the paying player, who is Kopala's
--- opponent. Pawl.PlayerEffectSpec's Kopala group on three seats proves it.
+-- opponent. Pawl.CostSpec's kopalaSpec on three seats proves it.
 --
 -- The paying player where the source has no controller to read -- a stored
 -- row whose spell has left the stack -- which coincides with the source's
@@ -3540,7 +3540,11 @@ spentByCast = spentGrants castUse
 -- spell" is the proof.
 castUse :: PlayerEffect -> Maybe (Filter Keyword)
 castUse effect = case effect of
-  PlayerEffect.ModifyCost modifier | CostModifier.subject modifier == CostSubject.Spells -> Just (CostModifier.matching modifier)
+  -- A row reading the spell's TARGETS answers Nothing, so Pawl.EffectLintSpec
+  -- refuses it a one-shot duration: `matching` alone would spend it on a spell
+  -- its target criteria never reached. No card in `data/cards/` writes one.
+  PlayerEffect.ModifyCost modifier
+    | CostModifier.subject modifier == CostSubject.Spells && Maybe.isNothing (CostModifier.whichTargets modifier) && Maybe.isNothing (CostModifier.perTarget modifier) -> Just (CostModifier.matching modifier)
   _ -> castFlashGrant effect
 
 -- CR 611.2a / 601.1a's other half: the rows `pid` would spend by playing `oid`
