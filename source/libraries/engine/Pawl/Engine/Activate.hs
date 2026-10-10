@@ -451,7 +451,7 @@ activateAbilityWith runSubgame pid srcId ability = Event.announcing $ do
               adjustments <- Cost.announceReductions pid srcId gs announcedCost targeted
               -- Cast.castProposed's lock of a computed amount, one road over.
               boundGs <- State.get
-              let paidCost = Cost.fixComputedIn (fmap Activatable.recipientObjects chosen) boundGs (Cost.totalWith adjustments announcedCost)
+              let paidCost = Cost.fixComputedIn chosen boundGs (Cost.totalWith adjustments announcedCost)
               -- CR 602.2: log the activation as BEGUN, before its payment, so a
               -- mana ability activated to pay it is logged after it (Tezzeret,
               -- Betrayer of Flesh's ruling) -- and off `announced`, CR 601.2c's

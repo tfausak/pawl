@@ -439,7 +439,7 @@ collect sources floating =
         Just condition ->
           Condition.holds
             (Projection.fullView sources)
-            (Projection.framedBySlots sources (ActiveReplacement.slots active) Map.empty (SourceContext.sourceContext sources (Just (ActiveReplacement.controller active)) (ActiveReplacement.source active)))
+            (Projection.framedBySlots sources (fmap (Set.map Recipient.ToObject) (ActiveReplacement.slots active)) (SourceContext.sourceContext sources (Just (ActiveReplacement.controller active)) (ActiveReplacement.source active)))
             (Projection.boardAsEntering sources)
             (ActiveReplacement.source active)
             condition
@@ -1575,7 +1575,7 @@ matchesZoneOwner gs candidate rel oid = relationHolds gs candidate rel (fmap Obj
 -- The source's frame rides along (SourceContext.framedBy), CR 607.2d's
 -- link from "choose a creature type" to a cost printed beside it: Doom Cannon's
 -- "Sacrifice a creature of the chosen type" (Pawl.CostSpec's Doom Cannon group).
-matchesPermanent :: (ObjectId -> Filter.View) -> GameState -> Maybe PlayerId -> Map.Map SlotName.SlotName (Set ObjectId) -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
+matchesPermanent :: (ObjectId -> Filter.View) -> GameState -> Maybe PlayerId -> Map.Map SlotName.SlotName (Set Recipient.Recipient) -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
 matchesPermanent viewOf gs you slots source filter_ oid =
   let base = Projection.contextWithSlots gs you source slots
       context = maybe base (\asking -> SourceContext.framedBy asking gs base) source
@@ -1616,7 +1616,7 @@ matchesPermanent viewOf gs you slots source filter_ oid =
 -- entering permanent, who is also `pid` there, but the edict's CONTROLLER rather
 -- than its victim. data/scenarios/grim-hireling-sacrifices-x-treasures.json
 -- proves the cost reading.
-sacrificeCandidates :: Maybe PlayerId -> Map.Map SlotName.SlotName (Set ObjectId) -> PlayerId -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+sacrificeCandidates :: Maybe PlayerId -> Map.Map SlotName.SlotName (Set Recipient.Recipient) -> PlayerId -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 sacrificeCandidates you slots pid source filter_ gs =
   let viewOf = Projection.viewsOf gs
       matching = List.sort (filter (matchesPermanent viewOf gs you slots source filter_) (Projection.controls pid gs))
@@ -1722,8 +1722,7 @@ candidateContext gs candidate =
       choices = Maybe.fromMaybe (SourceContext.choicesOf source gs) (ReplacementCandidate.choices candidate)
    in Projection.framedBySlots
         gs
-        (ReplacementCandidate.slots candidate)
-        Map.empty
+        (fmap (Set.map Recipient.ToObject) (ReplacementCandidate.slots candidate))
         (SourceContext.framedWith choices source gs (SourceContext.sourceContext gs (ReplacementCandidate.controller candidate) source))
           { Filter.carrierChosenPlayer = Game.lookupObject source gs >>= Object.chosenPlayer
           }

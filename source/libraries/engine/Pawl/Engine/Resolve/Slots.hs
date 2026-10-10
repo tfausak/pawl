@@ -1980,17 +1980,11 @@ damageRewriteFilters rewrite = case rewrite of
   -- the rewrite's own.
   DamageRewrite.RunEffects _ -> []
 
--- One Filter's slot reads, each at the arity its atom reads it with: One for
--- Filter.singularSlots' atoms, which answer nothing for a slot naming several,
--- and Many for every other slot Filter.boundSlots reports, whose atom takes
--- the whole set -- since Binding.objectsBySlot, a multi-target slot is the set
--- of its targets at resolution too. The same shape modeSlots folds over a
--- mode's target-slot Filters.
+-- One Filter's slot reads, each at the arity its atom reads it with
+-- (Filter.slotArities): Many for an atom taking the whole set, which since
+-- Binding.objectsBySlot is every target of a multi-target slot at resolution too.
 filterSlotsOf :: Filter.Type.Filter Keyword.Type.Keyword -> Map.Map SlotName SlotArity
-filterSlotsOf predicate =
-  Map.union
-    (Map.fromSet (const SlotArity.One) (Filter.singularSlots predicate))
-    (Map.fromSet (const SlotArity.Many) (Filter.boundSlots predicate))
+filterSlotsOf = Filter.slotArities
 
 -- A CR 615.5 rider's slot reads, less the reserved amount and source slots that
 -- Pawl.Engine.Resolve.Effect.runPreventionRider binds as the rider runs.
@@ -3282,8 +3276,7 @@ effectContext :: GameState -> PlayerId -> ObjectId -> Map.Map SlotName (Set Reci
 effectContext gs controller source legal bindings =
   Projection.framedBySlots
     gs
-    (Binding.objectsBySlot legal bindings)
-    (Binding.playersBySlot legal)
+    (Binding.recipientsBySlot legal bindings)
     -- CR 607.2d: the SOURCE's choices (CR 113.7), read LIVE for the group
     -- half's reason: CR 608.2c has the clauses carried out in order, so the
     -- name an earlier clause chose is part of the state a later one is read
@@ -3324,6 +3317,18 @@ effectContext gs controller source legal bindings =
         -- left, and "this spell" is a reference the trigger already made.
         Filter.sourceNames = foldMap Filter.names (Projection.viewWithLastKnownAnywhere gs source)
       }
+
+-- effectContext with `slot` naming `oid` alone, for an effect applied once per
+-- object -- CR 701.10b's "that creature" under ModifyTarget's `each`. Re-framed
+-- through Projection.framedBySlots with the narrowed map rather than by
+-- overriding slotObjects, so every slot-derived field (names, controllers,
+-- toughness) reads that one object too.
+effectContextNaming :: SlotName -> ObjectId -> GameState -> PlayerId -> ObjectId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName Binding.Type.Binding -> Filter.Context
+effectContextNaming slot oid gs controller source legal bindings =
+  Projection.framedBySlots
+    gs
+    (Map.insert slot (Set.singleton (Recipient.ToObject oid)) (Binding.recipientsBySlot legal bindings))
+    (effectContext gs controller source legal bindings)
 
 -- Every object a resolution's TARGET slots name, CR 608.2b's legal ones only:
 -- what effectViewOf below answers through CR 608.2h's last-known reader.

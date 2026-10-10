@@ -90,6 +90,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Engine.Resolve.Slots as Slots
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
@@ -523,10 +524,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   fromTheRubbleSpec s registry
   -- CR 110.2 / 601.2c: SameControllerAsBound against a sibling slot. A slot
   -- answered with a PLAYER names no object and so no controller, and the atom
-  -- refuses; only a slot nobody has answered yet is absent, where it widens.
-  -- Projection.framedBySlots keys every target slot to tell the two apart. No
-  -- card in data/cards/ aims the atom at a slot that can hold a player, so this
-  -- reads the target-slot context directly.
+  -- refuses; so does an "up to one" slot answered with none. Only a slot nobody
+  -- has answered yet is absent, where it widens. Binding.recipientsBySlot keys
+  -- every slot the announcement bound to tell them apart. No card in
+  -- data/cards/ aims the atom at a slot that can hold a player or be answered
+  -- empty, so this reads the target-slot context directly.
   Spec.it s "CR 110.2 SameControllerAsBound refuses a slot answered with a player and widens on an unanswered one" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (pikerId, gs) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
@@ -535,9 +537,43 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         admits bindings = Filter.matches (context bindings) (Projection.viewOfObject pikerId gs) (Filter.Type.SameControllerAsBound slot)
     Spec.assertEqWith
       s
-      "a slot holding bob refuses bob's Piker, and an unanswered slot admits it"
-      (admits (Map.singleton slot (Binding.toPlayer S.bob)), admits Map.empty)
+      "a slot holding bob refuses bob's Piker, so does a slot answered with none, and an unanswered slot admits it"
+      (admits (Map.singleton slot (Binding.toPlayer S.bob)), admits (Map.singleton slot (Binding.toRecipients Set.empty)), admits Map.empty)
+      (False, False, True)
+  -- The same keying for a COST's candidate pool, which reads the recipient map
+  -- Pawl.Engine.Cost carries (Projection.contextWithSlots): a slot the
+  -- announcement answered with a player refuses there too.
+  Spec.it s "CR 110.2 a cost pool's SameControllerAsBound refuses a slot holding a player" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (pikerId, gs) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
+        slot = SlotName.MkSlotName (Text.pack "who")
+        admits slots = Filter.matches (Projection.contextWithSlots gs (Just S.alice) Nothing slots) (Projection.viewOfObject pikerId gs) (Filter.Type.SameControllerAsBound slot)
+    Spec.assertEqWith
+      s
+      "a pool whose slot holds bob refuses bob's Piker, and one with no such slot admits it"
+      (admits (Map.singleton slot (Set.singleton (Recipient.ToPlayer S.bob))), admits Map.empty)
       (False, True)
+  -- CR 701.10b's "that creature" under ModifyTarget's `each`: the slot is
+  -- narrowed to one of its two targets per freeze, and every slot-derived field
+  -- must follow it -- the names as much as the objects. Two Goblin Pikers and
+  -- two Hill Giants, the slot naming one of each: narrowed to the Piker, the
+  -- other Piker shares its name and the other Giant does not.
+  Spec.it s "CR 701.10b a slot narrowed to one object answers that object's name alone" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    giant <- S.printingOf s registry "Hill Giant"
+    let (pikerA, g1) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
+        (pikerB, g2) = S.addPermanent piker S.bob g1
+        (giantA, g3) = S.addPermanent giant S.alice g2
+        (giantB, gs) = S.addPermanent giant S.bob g3
+        slot = SlotName.MkSlotName (Text.pack "each")
+        legal = Map.singleton slot (Set.fromList [Recipient.ToObject pikerA, Recipient.ToObject giantA])
+        context = Slots.effectContextNaming slot pikerA gs S.alice S.noSource legal Map.empty
+        sharesName oid = Filter.matches context (Projection.viewOfObject oid gs) (Filter.Type.SameNameAsBound slot)
+    Spec.assertEqWith
+      s
+      "bob's Piker shares the narrowed Piker's name and bob's Giant does not"
+      (sharesName pikerB, sharesName giantB)
+      (True, False)
   -- CR 702.18a: "Shroud is a static ability. 'Shroud' means 'This permanent or
   -- player can't be the target of spells or abilities.'" Doom Blade is "target
   -- nonblack creature" and the Mongoose is green, so its Filter admits the

@@ -926,11 +926,11 @@ setAnnouncedTargets chosen =
    in if Set.null objects then id else Map.insert announcedTargets (toObjects (Seq.fromList (Set.toAscList objects)))
 
 -- A gate's aiming with announcedTargets added, the shape Cost.announcedSlots
--- reads off a stamped object.
-withAnnouncedTargets :: Map SlotName (Set ObjectId) -> Map SlotName (Set ObjectId)
+-- reads off a stamped object: every OBJECT the aiming names, as a group.
+withAnnouncedTargets :: Map SlotName (Set Recipient) -> Map SlotName (Set Recipient)
 withAnnouncedTargets aiming =
-  let objects = Set.unions (Map.elems aiming)
-   in if Set.null objects then aiming else Map.insert announcedTargets objects aiming
+  let objects = Set.unions (Map.elems (objectsOfSlots aiming))
+   in if Set.null objects then aiming else Map.insert announcedTargets (Set.map Recipient.ToObject objects) aiming
 
 -- CR 601.2c: the reserved slot under which the SPELL OR ABILITY THAT DID THE
 -- TARGETING is bound -- rule 702.21a's "that spell or ability", which ward
@@ -1492,27 +1492,39 @@ groupsOf = Map.mapMaybe Binding.objects
 slotObjects :: Map SlotName Binding -> Map SlotName (Set ObjectId)
 slotObjects m = objectsBySlot (targetsOf m) m
 
--- THE answer to "which objects does each slot name", for every
--- Pawl.Engine.Filter.Context: every object recipient of a target slot,
--- WHATEVER its count (CR 601.2c lets one slot hold several), and every member
--- of a group (CR 115.10a). A reader that can take no more than one narrows
--- through Pawl.Engine.Filter.slotOneObject; IsBound and Count's OverBound take
--- the set, so Command the Dreadhorde's "those cards" is both of its targets.
+-- THE answer to "what does each slot name", for every
+-- Pawl.Engine.Filter.Context (Pawl.Engine.Projection.framedBySlots): every
+-- recipient of a target slot, WHATEVER its count (CR 601.2c lets one slot hold
+-- several), every member of a group (CR 115.10a) as an object recipient, and a
+-- key for every slot the environment bound at all -- so an "up to one" slot
+-- answered with none (CR 601.2c) is present and EMPTY, apart from a slot nobody
+-- has answered yet, which is absent.
 --
 -- `targets` is the caller's, and WHICH targets is the one rules difference
 -- between callers: the announcement's own at CR 601.2c (Pawl.Engine.Target),
 -- the recipients CR 608.2b left legal at resolution
--- (Pawl.Engine.Resolve.Slots.effectContext). An empty set is dropped, so an
--- absent key and "names nothing" stay the same question.
+-- (Pawl.Engine.Resolve.Slots.effectContext). Only the KEYS of `bindings` are
+-- read beside its groups, so a target CR 608.2b dropped stays dropped.
+recipientsBySlot :: Map SlotName (Set Recipient) -> Map SlotName Binding -> Map SlotName (Set Recipient)
+recipientsBySlot targets bindings =
+  Map.unionsWith
+    Set.union
+    [ targets,
+      fmap (Set.fromList . fmap Recipient.ToObject . Foldable.toList) (groupsOf bindings),
+      Set.empty <$ bindings
+    ]
+
+-- The objects each slot names, recipientsBySlot's object half: a slot naming
+-- none is absent, so `Map.member` and "names an object" are one question. A
+-- reader that can take no more than one narrows through
+-- Pawl.Engine.Filter.slotOneObject; IsBound and Count's OverBound take the set,
+-- so Command the Dreadhorde's "those cards" is both of its targets.
 objectsBySlot :: Map SlotName (Set Recipient) -> Map SlotName Binding -> Map SlotName (Set ObjectId)
-objectsBySlot targets bindings =
-  Map.filter
-    (not . Set.null)
-    ( Map.unionWith
-        Set.union
-        (fmap (Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList) targets)
-        (fmap (Set.fromList . Foldable.toList) (groupsOf bindings))
-    )
+objectsBySlot targets bindings = objectsOfSlots (recipientsBySlot targets bindings)
+
+-- The object half of a recipient map, a slot naming no object dropped.
+objectsOfSlots :: Map SlotName (Set Recipient) -> Map SlotName (Set ObjectId)
+objectsOfSlots = Map.filter (not . Set.null) . fmap (Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList)
 
 -- The copy snapshot stored on an object, if any (CR 707.2).
 copyOf :: Map SlotName Binding -> Maybe ProjectedCharacteristics

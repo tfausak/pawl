@@ -1356,7 +1356,7 @@ totalManas adjustments =
 -- rather than the object, which is what lets rule 701.67b scope it to one
 -- component of the total: `waterbendOffers` caps it at the waterbend cost's own
 -- generic amount where a keyword's offer is capped only by the symbol.
-manaSubstitutions :: [CostComponent.CostComponent Keyword.Type.Keyword] -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [(Keyword.Substitute, Natural)])]
+manaSubstitutions :: [CostComponent.CostComponent Keyword.Type.Keyword] -> Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [(Keyword.Substitute, Natural)])]
 manaSubstitutions components slots pid oid gs =
   let keywords = Map.keysSet (spellKeywords pid oid gs)
    in substitutionsOffering (\symbol -> fmap (\substitute -> (substitute, Nothing)) (Keyword.manaSubstitutesFor symbol keywords) <> waterbendOffers components symbol) slots pid oid gs
@@ -1371,7 +1371,7 @@ manaSubstitutions components slots pid oid gs =
 -- The answer for a cost stating no waterbend is exactly one entry substituting
 -- nothing -- `offers` is empty, so the product is the empty vector -- which is
 -- the answer every such payment had before rule 701.67a arrived.
-waterbendSubstitutions :: [CostComponent.CostComponent Keyword.Type.Keyword] -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [(Keyword.Substitute, Natural)])]
+waterbendSubstitutions :: [CostComponent.CostComponent Keyword.Type.Keyword] -> Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [(Keyword.Substitute, Natural)])]
 waterbendSubstitutions components = substitutionsOffering (waterbendOffers components)
 
 -- CR 701.67a as an offer, and CR 701.67b as the CEILING on it: "for each generic
@@ -1405,7 +1405,7 @@ waterbendCriterion =
 -- cover. Each offer carries its own CEILING beside the symbol's own count -- rule
 -- 701.67b's, or Nothing where the rule stating the substitute bounds it by the
 -- symbol alone.
-substitutionsOffering :: (ManaSymbol.ManaSymbol -> [(Keyword.Substitute, Maybe Natural)]) -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [(Keyword.Substitute, Natural)])]
+substitutionsOffering :: (ManaSymbol.ManaSymbol -> [(Keyword.Substitute, Maybe Natural)]) -> Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [(Keyword.Substitute, Natural)])]
 substitutionsOffering offersFor slots pid oid gs manaCost =
   let -- The cost's symbols as one entry per KIND, a Generic counting for its own
       -- amount (CR 107.4b) where every other symbol is one mana.
@@ -1439,7 +1439,7 @@ substitutionsOffering offersFor slots pid oid gs manaCost =
 -- and CR 702.126a's out of the battlefield, CR 702.66a's out of the payer's own
 -- graveyard. Read for its SIZE by `substitutionsOffering` above, which is how
 -- many of a symbol kind the offer can reach.
-substituteCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Keyword.Substitute -> GameState -> [ObjectId]
+substituteCandidates :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> Keyword.Substitute -> GameState -> [ObjectId]
 substituteCandidates slots pid oid substitute gs = case substitute of
   Keyword.TapUntapped criterion -> tapCandidates slots pid oid criterion gs
   Keyword.TapToConvoke criterion -> tapCandidates slots pid oid criterion gs
@@ -1519,7 +1519,7 @@ withoutMana kind n (ManaCost.MkManaCost symbols) =
 -- questions the mana-side gates pair with `Mana.canPayCommittingGiven`, shared so
 -- that a gate and an offer cannot ask different ones of a set of components one
 -- of them assembled.
-componentsPayable :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> GameState -> Bool
+componentsPayable :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> GameState -> Bool
 componentsPayable slots pid oid components gs =
   all (\component -> canPayComponent slots pid oid component gs) components
     && jointlyPayable slots pid oid components gs
@@ -2406,7 +2406,7 @@ countersOn kind oid gs =
 -- a card in a hand is folded exactly as a permanent is, and Putrid Raptor's
 -- "discard a Zombie card" morph cost is payable with a creature card printed as
 -- something else under Maskwood Nexus (Pawl.CostSpec's Putrid Raptor pair).
-discardCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+discardCandidates :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 discardCandidates slots pid oid criterion gs =
   let context = SourceContext.framedBy oid gs (Projection.contextWithSlots gs (Just pid) Nothing slots)
       viewOf = Projection.viewsOf gs
@@ -2424,7 +2424,7 @@ discardCandidates slots pid oid criterion gs =
 -- where the object the cost is on is a trigger or a spell already on the stack
 -- and so not in a hand at all -- and it is kept anyway so the two hand-reading
 -- pools cannot disagree about what a hand holds.
-putOntoBattlefieldCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+putOntoBattlefieldCandidates :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 putOntoBattlefieldCandidates = discardCandidates
 
 -- The cards this player may exile to pay an ExileCardFromHand component on
@@ -2435,7 +2435,7 @@ putOntoBattlefieldCandidates = discardCandidates
 --
 -- `oid` is excluded, discardCandidates' CR 601.2a exclusion: a card being cast is
 -- on the stack and not in the hand this reads.
-exileFromHandCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+exileFromHandCandidates :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 exileFromHandCandidates = discardCandidates
 
 -- The cards this player may reveal to pay a RevealCardFromHand component on
@@ -2446,7 +2446,7 @@ exileFromHandCandidates = discardCandidates
 -- `oid` is excluded, discardCandidates' CR 601.2a exclusion: Living Destiny is on
 -- the stack by the time its own additional cost is paid, and a spell cannot
 -- reveal itself out of a hand it has left.
-revealFromHandCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+revealFromHandCandidates :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 revealFromHandCandidates = discardCandidates
 
 -- The objects this player may behold to pay a Behold component on `oid`: CR
@@ -2462,7 +2462,7 @@ revealFromHandCandidates = discardCandidates
 -- Matched through the same CR 613 projection on both sides, `discardCandidates`'
 -- reading, and against a context built the same way on both, so the hand half and
 -- the battlefield half cannot read the criterion differently.
-beholdCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+beholdCandidates :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 beholdCandidates slots pid oid criterion gs =
   let context = SourceContext.framedBy oid gs (Projection.contextWithSlots gs (Just pid) Nothing slots)
       viewOf = Projection.viewsOf gs
@@ -2483,7 +2483,7 @@ beholdCandidates slots pid oid criterion gs =
 --
 -- Each is revealed where it is in the hand, conditioned on the ZONE rather than
 -- on which half the answer came from, so the two halves cannot disagree.
-beholdObjects :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Natural -> Filter.Type.Filter Keyword.Type.Keyword -> Game (Maybe [ObjectId])
+beholdObjects :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> Natural -> Filter.Type.Filter Keyword.Type.Keyword -> Game (Maybe [ObjectId])
 beholdObjects slots pid oid n criterion = do
   gs <- State.get
   let pool = beholdCandidates slots pid oid criterion gs
@@ -2521,7 +2521,7 @@ beholdObjects slots pid oid n criterion = do
 -- which is the exclusion the callers asking BEFORE CR 601.2a's move need and the
 -- only one CR 601.2a states -- Loathsome Chimera is not among the cards its own
 -- escape cost can exile.
-exileCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+exileCandidates :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 exileCandidates slots pid oid criterion gs =
   let context = SourceContext.framedBy oid gs (Projection.contextWithSlots gs (Just pid) Nothing slots)
       viewOf = Projection.viewsOf gs
@@ -2542,7 +2542,7 @@ exileCandidates slots pid oid criterion gs =
 -- pool: rule 702.167a exiles this permanent as part of the same cost, so it is
 -- never among its own [materials] -- a payment that took it as a material would
 -- leave the ExileThis component nothing to exile.
-materialCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+materialCandidates :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 materialCandidates slots pid oid criterion gs =
   let context = SourceContext.framedBy oid gs (Projection.contextWithSlots gs (Just pid) Nothing slots)
       viewOf = Projection.viewsOf gs
@@ -2557,7 +2557,7 @@ materialCandidates slots pid oid criterion gs =
 -- top and Game.insertIntoZone appends, the opposite end from a library. No
 -- prompt, and that is CR 404.2 rather than an elision: a graveyard's order is not
 -- the player's to change, so "the top creature card" names exactly one.
-topExileCandidate :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> Maybe ObjectId
+topExileCandidate :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> Maybe ObjectId
 topExileCandidate slots pid oid criterion gs =
   Maybe.listToMaybe (reverse (exileCandidates slots pid oid criterion gs))
 
@@ -2567,7 +2567,7 @@ topExileCandidate slots pid oid criterion gs =
 -- criterion rather than a stand-in for one. Game.beingCast's exclusion rides along
 -- from there, and is CR 601.2a for the offer paths that ask before the card
 -- moves.
-evidenceCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> GameState -> [ObjectId]
+evidenceCandidates :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> GameState -> [ObjectId]
 evidenceCandidates slots pid oid = exileCandidates slots pid oid (Filter.Type.And [])
 
 -- CR 202.3's mana value of one card, read off its CR 613 projection --
@@ -2587,7 +2587,7 @@ evidenceValue candidate gs = Maybe.fromMaybe 0 (Filter.manaValue (Projection.vie
 -- colours (CR 702.78a). Both read the PAYER as "you" and the permanent
 -- whose ability is being paid for as the source -- without it a Vehicle that has
 -- already become a creature could crew itself.
-tapCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+tapCandidates :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 tapCandidates slots pid oid criterion gs =
   let -- CR 702.122d's prohibition rides the CONTEXT rather than narrowing the
       -- pool here, and that is what confines rule 702.122d to a CREW cost: the
@@ -2637,7 +2637,7 @@ tapCandidates slots pid oid criterion gs =
 -- -o:"you control"`, 2026-09-02, no hit, and the same query over "as an
 -- additional cost" none either: every printed return cost states it today, so
 -- the two pools coincide for every printing, `data/cards/` included.
-returnCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+returnCandidates :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 returnCandidates = tapCandidates
 
 -- The permanents this player may take `n` counters of the kinds `which` reaches
@@ -2651,7 +2651,7 @@ returnCandidates = tapCandidates
 -- its reason: CR 118.1 asks only that the payer carry out the instruction, so a
 -- card that wants the restriction prints it (Zameck Guildmage's criterion carries
 -- `ControlledBy You`).
-counterRemovalCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Natural -> WhichCounters.WhichCounters Keyword.Type.Keyword -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+counterRemovalCandidates :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> Natural -> WhichCounters.WhichCounters Keyword.Type.Keyword -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 counterRemovalCandidates slots pid oid n which criterion gs =
   filter (\candidate -> sum (removableCounters which candidate gs) >= n) (tapCandidates slots pid oid criterion gs)
 
@@ -2659,14 +2659,14 @@ counterRemovalCandidates slots pid oid n which criterion gs =
 -- (CounterSpread.FromAmong): every admitted permanent carrying at least one
 -- counter `which` reaches, with how many it carries, since CR 118.3 now asks of
 -- the total rather than of any one permanent.
-spreadRemovalCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> WhichCounters.WhichCounters Keyword.Type.Keyword -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> Map.Map ObjectId Natural
+spreadRemovalCandidates :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> WhichCounters.WhichCounters Keyword.Type.Keyword -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> Map.Map ObjectId Natural
 spreadRemovalCandidates slots pid oid which criterion gs =
   fmap sum (mixedRemovalCandidates slots pid oid which criterion gs)
 
 -- `spreadRemovalCandidates` kept BY KIND, for a cost naming none (CR 122.1:
 -- counters of different names are not interchangeable, so which kind comes off
 -- is the payer's choice as well as which permanent).
-mixedRemovalCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> WhichCounters.WhichCounters Keyword.Type.Keyword -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> Map.Map ObjectId (Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural)
+mixedRemovalCandidates :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> WhichCounters.WhichCounters Keyword.Type.Keyword -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> Map.Map ObjectId (Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural)
 mixedRemovalCandidates slots pid oid which criterion gs =
   Map.filter (not . Map.null) (Map.fromList [(candidate, removableCounters which candidate gs) | candidate <- tapCandidates slots pid oid criterion gs])
 
@@ -2805,7 +2805,7 @@ tapObject = Event.tap
 -- where no announcement is behind the payment at all.
 --
 -- EXHAUSTIVE with no wildcard, this module's posture, and -Werror makes it.
-claimOf :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> GameState -> Maybe Claim
+claimOf :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> GameState -> Maybe Claim
 claimOf slots pid oid component gs =
   let claim a p n = Just (Claim.Type.MkClaim {Claim.Type.axis = a, Claim.Type.pool = p, Claim.Type.count = n, Claim.Type.threshold = Nothing})
       -- One selection of `candidates` whose amounts reach `needed`.
@@ -3012,14 +3012,14 @@ claimOf slots pid oid component gs =
 -- Lord's "Sacrifice a Swamp and a Forest" beside one Bayou tells the two readings
 -- apart. Pawl.Engine.Claim.satisfiable carries the per-axis grouping and Hall's
 -- condition; this module's part is which components claim, and on which axis.
-jointlyPayable :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> GameState -> Bool
+jointlyPayable :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> GameState -> Bool
 jointlyPayable slots pid oid components gs = Claim.satisfiable (claimsOf slots pid oid components gs)
 
 -- Everything these components will spend out of a pool of objects, on whichever
 -- axis each spends it (Pawl.Types.ClaimAxis) -- what `jointlyPayable` asks
 -- Hall's condition of, and what the MANA side is handed to ask it of these
 -- claims and its sources' together.
-claimsOf :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> GameState -> [Claim]
+claimsOf :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> GameState -> [Claim]
 claimsOf slots pid oid components gs = Maybe.mapMaybe (\component -> claimOf slots pid oid component gs) components
 
 -- CR 118.3: a player can't pay a cost without the resources to pay it fully. The
@@ -3054,7 +3054,7 @@ canPay = canPayReading Map.empty
 -- resolution-time payment: the resolving object's slots, so Calim, Djinn
 -- Emperor's "two OTHER cards named Calim" can exclude the card its own discard
 -- cost moved (Binding.discardedCard). `payReading` is the payment it measures.
-canPayReading :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PaymentSubject.PaymentSubject -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Bool
+canPayReading :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PaymentSubject.PaymentSubject -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Bool
 canPayReading slots subject pid oid cost gs = case Cost.mana cost of
   Nothing -> False
   Just manaCost ->
@@ -3555,7 +3555,7 @@ lifeTotalOf pid gs = case Map.lookup pid (GameState.players gs) of
 -- (`manaSubstitutions`), and this asks `any` of those too. A CAST passes
 -- `manaSubstitutions` and an ACTIVATION `waterbendSubstitutions`, which is
 -- the waterbend half alone; `canPayReading` asks the latter's the same way.
-canPaySomeCompletion :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> (ManaCost.ManaCost -> [(ManaCost.ManaCost, [(Keyword.Substitute, Natural)])]) -> Cost Keyword.Type.Keyword -> GameState -> Bool
+canPaySomeCompletion :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> (ManaCost.ManaCost -> [(ManaCost.ManaCost, [(Keyword.Substitute, Natural)])]) -> Cost Keyword.Type.Keyword -> GameState -> Bool
 canPaySomeCompletion slots subject spending pid oid total_ substitute cost gs =
   let pcs = Projection.projectAll gs
    in canPaySomeCompletionGiven slots subject spending (supplyManaSourcesGiven (Projection.controlGrants gs) pcs pid gs) pcs pid oid total_ substitute cost gs
@@ -3639,7 +3639,7 @@ midPayment capacity measure pcs pid oid cost restrictions ability gs =
 -- COMPONENTS are still asked through canPayComponent, whose Sacrifice,
 -- TapForTotalPower and CollectEvidence arms make per-object walks of their own
 -- (#1448).
-canPaySomeCompletionGiven :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> (ManaCost.ManaCost -> [(ManaCost.ManaCost, [(Keyword.Substitute, Natural)])]) -> Cost Keyword.Type.Keyword -> GameState -> Bool
+canPaySomeCompletionGiven :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> (ManaCost.ManaCost -> [(ManaCost.ManaCost, [(Keyword.Substitute, Natural)])]) -> Cost Keyword.Type.Keyword -> GameState -> Bool
 canPaySomeCompletionGiven slots subject spending sources pcs pid oid total_ substitute cost gs = case Cost.mana cost of
   Nothing -> False
   Just (ManaCost.MkManaCost symbols) ->
@@ -3719,10 +3719,10 @@ fixHalfLife pid gs cost =
 -- DISTINCT object once, so an artifact creature named by two of its slots counts
 -- once, and only those still on the battlefield, which is what a permanent is
 -- (CR 110.1). A player target has no mana value and is not in `slots`.
-fixComputed :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> GameState -> CostComponent.CostComponent Keyword.Type.Keyword -> CostComponent.CostComponent Keyword.Type.Keyword
+fixComputed :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> GameState -> CostComponent.CostComponent Keyword.Type.Keyword -> CostComponent.CostComponent Keyword.Type.Keyword
 fixComputed slots gs component
   | targetComputed component =
-      let permanents = Set.filter (\candidate -> Game.zoneOf candidate gs == Just Zone.Battlefield) (Set.unions (Map.elems slots))
+      let permanents = Set.filter (\candidate -> Game.zoneOf candidate gs == Just Zone.Battlefield) (Set.unions (Map.elems (Binding.objectsOfSlots slots)))
        in CostComponent.CollectEvidence (Integer.toNaturalSaturating (sum (fmap (`evidenceValue` gs) (Set.toList permanents))))
   | otherwise = component
 
@@ -3730,7 +3730,7 @@ fixComputed slots gs component
 -- the targets are chosen and before any of the cost is paid, which is where
 -- Pawl.Engine.Cast.castProposed and Pawl.Engine.Activate.activateAbility call
 -- this.
-fixComputedIn :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> GameState -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
+fixComputedIn :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> GameState -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
 fixComputedIn slots gs cost = cost {Cost.components = fmap (fixComputed slots gs) (Cost.components cost)}
 
 -- Is this component's amount computed from the targets? EXHAUSTIVE with no
@@ -3969,7 +3969,7 @@ countersOwedByComponent component = case component of
 -- CR 118.3 for ONE component. `slots` is what CR 601.2c has bound, or would bind
 -- under the announcement the caller is measuring; every criterion below is read
 -- against it, so a gate and CR 601.2h's payment answer one question.
-canPayComponent :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> GameState -> Bool
+canPayComponent :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> GameState -> Bool
 canPayComponent slots pid oid component gs = case component of
   -- CR 107.5: a permanent that's already tapped can't be tapped again to pay the
   -- cost.
@@ -4270,10 +4270,10 @@ canPayComponent slots pid oid component gs = case component of
 --
 -- Pawl.Engine.Binding.slotObjects rather than the raw bindings, so a batch slot
 -- is visible whole -- the same map every resolution-time Context carries.
-announcedSlots :: Maybe ObjectId -> GameState -> Map.Map SlotName.SlotName (Set.Set ObjectId)
+announcedSlots :: Maybe ObjectId -> GameState -> Map.Map SlotName.SlotName (Set.Set Recipient.Recipient)
 announcedSlots announced gs = case announced >>= \a -> Game.lookupObject a gs of
   Nothing -> Map.empty
-  Just obj -> Binding.slotObjects (Object.bindings obj)
+  Just obj -> Binding.recipientsBySlot (Binding.targetsOf (Object.bindings obj)) (Object.bindings obj)
 
 -- Does this cost's payability DEPEND on what CR 601.2c binds? A criterion that
 -- names no slot answers the same against every slot map, so a gate measuring
@@ -4801,14 +4801,14 @@ restoreKeepingLibraryActions before = do
 -- cost with their components folded in: CR 702.51c's record is of the
 -- creatures tapped THIS way, and Binding.tappedPermanent names every permanent
 -- any tap component of the cost took (`paySubstituting`).
-announceSubstitutions :: ([CostComponent.CostComponent Keyword.Type.Keyword] -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [(Keyword.Substitute, Natural)])]) -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, [(Keyword.Substitute, Natural)])
+announceSubstitutions :: ([CostComponent.CostComponent Keyword.Type.Keyword] -> Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [(Keyword.Substitute, Natural)])]) -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, [(Keyword.Substitute, Natural)])
 announceSubstitutions substituting pid oid cost = do
   slots <- State.gets (announcedSlots (Just oid))
   announceSubstitutionsReading slots substituting pid oid cost
 
 -- `announceSubstitutions` with the slot map its component criteria read handed
 -- in (`payReading`).
-announceSubstitutionsReading :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> ([CostComponent.CostComponent Keyword.Type.Keyword] -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [(Keyword.Substitute, Natural)])]) -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, [(Keyword.Substitute, Natural)])
+announceSubstitutionsReading :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> ([CostComponent.CostComponent Keyword.Type.Keyword] -> Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [(Keyword.Substitute, Natural)])]) -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, [(Keyword.Substitute, Natural)])
 announceSubstitutionsReading slots substituting pid oid cost = case Cost.mana cost of
   -- CR 118.6: an unpayable cost states no symbol to substitute for.
   Nothing -> pure (cost, [])
@@ -4961,7 +4961,7 @@ actionPayableAt subject x pid oid cost = canPay subject pid oid (substituteX x c
 -- CR 701.67a's taps are offered against the same `slots`: The Unagi of Kyoshi
 -- Island's ward and Waterbending Lesson's unless cost are waterbend costs paid
 -- here (Pawl.CostSpec's groups of those names).
-payReading :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> ManaAbilityPerformer.ManaAbilityPerformer -> GameState -> PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
+payReading :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> ManaAbilityPerformer.ManaAbilityPerformer -> GameState -> PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
 payReading slots perform began moment subject spending pid oid cost = fmap fst (paySubstitutingReading slots perform began [] moment subject Nothing spending pid oid (announceSubstitutionsReading slots waterbendSubstitutions pid oid) cost)
 
 -- `pay` with CR 702.51a's, CR 702.66a's and CR 702.126a's substitution offered
@@ -5003,7 +5003,7 @@ paySubstituting perform began earlier moment subject announced spending pid oid 
 
 -- `paySubstituting` with the slot map its component criteria read handed in
 -- rather than read off `announced` (`payReading`).
-paySubstitutingReading :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> ManaAbilityPerformer.ManaAbilityPerformer -> GameState -> [ManaWindow.ManaWindow] -> PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, [(Keyword.Substitute, Natural)])) -> Cost Keyword.Type.Keyword -> Game (Payment.Payment, Map.Map SlotName.SlotName Binding.Type.Binding)
+paySubstitutingReading :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> ManaAbilityPerformer.ManaAbilityPerformer -> GameState -> [ManaWindow.ManaWindow] -> PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, [(Keyword.Substitute, Natural)])) -> Cost Keyword.Type.Keyword -> Game (Payment.Payment, Map.Map SlotName.SlotName Binding.Type.Binding)
 paySubstitutingReading slots perform began earlier moment subject announced spending pid oid substituting cost =
   case Cost.mana cost of
     -- CR 118.6: attempting to pay an unpayable cost is an illegal action, and
@@ -5349,7 +5349,7 @@ revealsLibraryCard opened closed =
 --
 -- FILTERED, NOT TRUSTED: Game.permute keeps the printed order for an answer that
 -- is not a permutation of the offered indices.
-payComponents :: PaymentMoment.PaymentMoment -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Game Payment.Payment
+payComponents :: PaymentMoment.PaymentMoment -> Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Game Payment.Payment
 payComponents moment slots pid oid components = do
   let (second, first) = List.partition paidInSecondPass components
   outcome <- payPass moment slots pid oid first
@@ -5359,7 +5359,7 @@ payComponents moment slots pid oid components = do
 
 -- ONE of CR 601.2h's two passes: the payer orders it where the order is
 -- observable, then it is paid in that order.
-payPass :: PaymentMoment.PaymentMoment -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Game Payment.Payment
+payPass :: PaymentMoment.PaymentMoment -> Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Game Payment.Payment
 payPass moment slots pid oid components = payInOrder moment slots pid oid =<< orderPass pid oid components
 
 -- The payer's order for one pass, asked only where it is observable.
@@ -5451,7 +5451,7 @@ paidInSecondPass component = case component of
   -- library, so the header's first pass holds it.
   CostComponent.BeholdAndExile _ -> False
 
-payInOrder :: PaymentMoment.PaymentMoment -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Game Payment.Payment
+payInOrder :: PaymentMoment.PaymentMoment -> Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Game Payment.Payment
 payInOrder moment slots pid oid components = case components of
   [] -> pure bindsNothing
   component : rest -> do
@@ -6447,7 +6447,7 @@ stampChosenPlayer oid pid =
 -- Pawl.CostSpec's Hanweir Battlements, Ashnod's Altar, Brittle Effigy and
 -- Trumpeting Carnosaur groups and Pawl.ActivateSpec's "CR 601.2h energy an
 -- Aether Hub spends mid-payment is not there for Pay X {E}" are the proofs.
-payComponent :: PaymentMoment.PaymentMoment -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> Game Payment.Payment
+payComponent :: PaymentMoment.PaymentMoment -> Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> Game Payment.Payment
 payComponent moment slots pid oid component = do
   gs <- State.get
   if canPayComponent slots pid oid component gs
@@ -6455,7 +6455,7 @@ payComponent moment slots pid oid component = do
     else pure Payment.Unpaid
 
 -- `payComponent`'s arms, each reached only once CR 118.3 holds.
-payPayable :: PaymentMoment.PaymentMoment -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> Game Payment.Payment
+payPayable :: PaymentMoment.PaymentMoment -> Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> Game Payment.Payment
 payPayable moment slots pid oid component = case component of
   -- CR 701.26a through tapObject; CR 107.5's "already tapped" is `payComponent`'s
   -- guard.
