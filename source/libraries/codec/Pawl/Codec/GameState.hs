@@ -8,17 +8,14 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Codec.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Codec.ActiveActivationProhibition as ActiveActivationProhibition
 import qualified Pawl.Codec.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Codec.ActiveAttackRequirement as ActiveAttackRequirement
-import qualified Pawl.Codec.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Codec.ActiveBlockRequirement as ActiveBlockRequirement
 import qualified Pawl.Codec.ActiveCopy as ActiveCopy
 import qualified Pawl.Codec.ActiveEvasion as ActiveEvasion
+import qualified Pawl.Codec.ActiveObjectProhibition as ActiveObjectProhibition
 import qualified Pawl.Codec.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Codec.ActiveReplacement as ActiveReplacement
-import qualified Pawl.Codec.ActiveUnregeneratable as ActiveUnregeneratable
-import qualified Pawl.Codec.ActiveUntapProhibition as ActiveUntapProhibition
 import qualified Pawl.Codec.Arrival as Arrival
 import qualified Pawl.Codec.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Codec.BattlefieldCandidate as BattlefieldCandidate
@@ -164,11 +161,8 @@ codec resolve = Fields.object $ do
   playerEffects <- Fields.defaulted "playerEffects" [] (Common.list ActivePlayerEffect.codec) GameState.playerEffects
   blockRequirements <- Fields.defaulted "blockRequirements" [] (Common.list ActiveBlockRequirement.codec) GameState.blockRequirements
   attackRequirements <- Fields.defaulted "attackRequirements" [] (Common.list ActiveAttackRequirement.codec) GameState.attackRequirements
-  unregeneratables <- Fields.defaulted "unregeneratables" [] (Common.list ActiveUnregeneratable.codec) GameState.unregeneratables
-  blockProhibitions <- Fields.defaulted "blockProhibitions" [] (Common.list ActiveBlockProhibition.codec) GameState.blockProhibitions
+  objectProhibitions <- Fields.defaulted "objectProhibitions" [] (Common.list ActiveObjectProhibition.codec) GameState.objectProhibitions
   attackProhibitions <- Fields.defaulted "attackProhibitions" [] (Common.list ActiveAttackProhibition.codec) GameState.attackProhibitions
-  activationProhibitions <- Fields.defaulted "activationProhibitions" [] (Common.list ActiveActivationProhibition.codec) GameState.activationProhibitions
-  untapProhibitions <- Fields.defaulted "untapProhibitions" [] (Common.list ActiveUntapProhibition.codec) GameState.untapProhibitions
   evasions <- Fields.defaulted "evasions" [] (Common.list ActiveEvasion.codec) GameState.evasions
   ignoredAbilities <- Fields.defaulted "ignoredAbilities" [] (Common.list IgnoredAbility.codec) GameState.ignoredAbilities
   turnOrder <- Fields.required "turnOrder" (Common.list PlayerId.codec) GameState.turnOrder
@@ -279,11 +273,8 @@ codec resolve = Fields.object $ do
         GameState.playerEffects = playerEffects,
         GameState.blockRequirements = blockRequirements,
         GameState.attackRequirements = attackRequirements,
-        GameState.unregeneratables = unregeneratables,
-        GameState.blockProhibitions = blockProhibitions,
+        GameState.objectProhibitions = objectProhibitions,
         GameState.attackProhibitions = attackProhibitions,
-        GameState.activationProhibitions = activationProhibitions,
-        GameState.untapProhibitions = untapProhibitions,
         GameState.evasions = evasions,
         GameState.ignoredAbilities = ignoredAbilities,
         GameState.turnOrder = turnOrder,

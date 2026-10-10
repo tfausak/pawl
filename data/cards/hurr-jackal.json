@@ -18,7 +18,7 @@
                   {
                     "effects": [
                       {
-                        "type": "CantBeRegenerated",
+                        "type": "Prohibit",
                         "value": {
                           "duration": {
                             "type": "UntilEndOfTurn"
@@ -26,6 +26,9 @@
                           "ref": {
                             "type": "InSlot",
                             "value": "target"
+                          },
+                          "what": {
+                            "type": "Regenerate"
                           }
                         }
                       }

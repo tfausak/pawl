@@ -96,10 +96,9 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - `move:pile-target`: a target naming a face-down pile
 - `check:prompt-count`: how many times a prompt is asked
 - `check:continuous-effects`: the continuous effects stored
-- `board:blockprohibitions`
+- `board:objectprohibitions`
 - `board:object-goadedby`
 - `board:zone-phasedout`
-- `board:unregeneratables`
 - `board:object-unlockedhalves`
 - `board:schemedecks`
 - `check:mana-types`: the mana types a permanent can produce
@@ -166,8 +165,8 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 ### `ActivationProhibitionSpec`
 
-- CR 400.7 whole cards: a Troll bounced by Unsummon and replayed the same turn is no longer prohibited | `check:other-GameState.activationProhibitions`
-- CR 602.2 whole cards: the Troll Deadlock Trap named cannot be activated, and its twin can | `check:other-GameState.activationProhibitions`
+- CR 400.7 whole cards: a Troll bounced by Unsummon and replayed the same turn is no longer prohibited | `check:other-GameState.objectProhibitions`
+- CR 602.2 whole cards: the Troll Deadlock Trap named cannot be activated, and its twin can | `check:other-GameState.objectProhibitions`
 
 ### `ArchenemySpec`
 
@@ -425,13 +424,13 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 509.1a a Mountain is not a legal blocker, flier or no flier | `check:other-Combat.legalBlockers`
 - CR 509.1a a creature that is also a battle is not offered as a blocker either | `check:other-Combat.legalBlockers`
 - CR 509.1b Wan Shi Tong's Spirit tokens can't block a non-Spirit, and can block a Spirit | `move:expect-rejected`
-- CR 509.1b aimed elsewhere, both of bob's twins block | `board:blockprohibitions`
+- CR 509.1b aimed elsewhere, both of bob's twins block | `board:objectprohibitions`
 - CR 509.1b an enchanted creature can't block either, and the Piker beside it still can | `check:other-Combat.canBlock` `check:other-Combat.legalBlockers` `move:expect-rejected`
-- CR 509.1b the creature Zirda named cannot block, and its twin still does | `board:blockprohibitions`
-- CR 509.1c a required blocker the restriction covers may decline after all | `board:blockprohibitions`
+- CR 509.1b the creature Zirda named cannot block, and its twin still does | `board:objectprohibitions`
+- CR 509.1c a required blocker the restriction covers may decline after all | `board:objectprohibitions`
 - CR 509.1c a threshold blocking requirement bites only once the gate holds | `check:other-Combat.forcedBlockDeclaration` `move:expect-rejected`
 - CR 509.1c two requirements on ONE pair count twice | `check:other-Combat.forcedBlockDeclaration` `move:expect-rejected`
-- CR 514.2 the restriction ends at cleanup | `check:other-Combat.canBlock` `check:other-Expiry.dropAtCleanup` `check:other-GameState.blockProhibitions`
+- CR 514.2 the restriction ends at cleanup | `check:other-Combat.canBlock` `check:other-Expiry.dropAtCleanup` `check:other-GameState.objectProhibitions`
 - CR 601.2c announcing X as one leaves the second creature blocking | `move:expect-rejected`
 - CR 611.2a and cannot attack once that turn has begun | `board:attackprohibitions`
 - CR 611.2a the restriction outlasts every other seat's turn and ends as alice's begins | `check:other-GameState.attackProhibitions` `move:expect-rejected`
@@ -1118,8 +1117,8 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `PreventionSpec`
 
 - CR 400.7c the shield follows the chosen permanent spell onto the battlefield | `check:prompt-offers`
-- CR 603.7 the creature the resolution named is exiled when it dies, and no other is | `board:delayed-trigger` `board:player-effect` `board:unregeneratables`
-- CR 603.7b the entry is gone by the next turn, so the same death exiles nothing | `board:delayed-trigger` `board:player-effect` `board:unregeneratables`
+- CR 603.7 the creature the resolution named is exiled when it dies, and no other is | `board:delayed-trigger` `board:player-effect` `board:objectprohibitions`
+- CR 603.7b the entry is gone by the next turn, so the same death exiles nothing | `board:delayed-trigger` `board:player-effect` `board:objectprohibitions`
 - CR 609.7a a slot the installing resolution bound but the row never names is not offered | `move:name-departed-object`
 - CR 609.7a a source only a waiting ability still refers to is offered, and shields the damage it deals | `ref:departed-object`
 - CR 609.7a a source only a waiting delayed trigger still refers to is offered | `board:delayed-trigger` `board:entered-with` `board:graveyard`
@@ -1131,7 +1130,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 614.1b Eon Hub replaces the upkeep step with nothing | `check:helper-began` `check:other-GameState.remaining`
 - CR 615.7 a shield naming NO source watches every source, and asks nothing | `check:helper-answersFor` `check:helper-chosenSourcesIn` `check:other-Stack.resolveTop`
 - CR 615.7 a shield that covers the whole batch asks nothing | `check:helper-amounts` `check:helper-answersFor` `check:helper-wasAskedToAllocateDamage` `check:other-Damage.applyDamage` `check:other-GameState.replacements`
-- CR 700.4 the same creature exiled from the battlefield instead fires nothing | `board:delayed-trigger` `board:player-effect` `board:unregeneratables`
+- CR 700.4 the same creature exiled from the battlefield instead fires nothing | `board:delayed-trigger` `board:player-effect` `board:objectprohibitions`
 
 ### `ProjectionSpec`
 

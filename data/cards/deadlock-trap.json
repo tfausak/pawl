@@ -32,7 +32,7 @@
                         }
                       },
                       {
-                        "type": "ForbidActivation",
+                        "type": "Prohibit",
                         "value": {
                           "duration": {
                             "type": "UntilEndOfTurn"
@@ -40,6 +40,9 @@
                           "ref": {
                             "type": "InSlot",
                             "value": "target"
+                          },
+                          "what": {
+                            "type": "Activate"
                           }
                         }
                       }

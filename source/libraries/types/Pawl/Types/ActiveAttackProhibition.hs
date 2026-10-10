@@ -27,7 +27,7 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- sees one.
 --
 -- 'affected' holds ids where the printed carrier (Pawl.Types.ForbidAttack) holds
--- an ObjectRef, for Pawl.Types.ActiveBlockProhibition's reason: the ref is read
+-- an ObjectRef, for Pawl.Types.ActiveObjectProhibition's reason: the ref is read
 -- ONCE, as the ability resolves. Its Matching arm is CR 611.2c's carve-out and
 -- stays a Filter, re-read at each declaration against the live board.
 --
@@ -45,7 +45,7 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- Pawl.Engine.CombatRestriction.liveAttackProhibitions, which drops a row whose
 -- turn has not come. Pawl.Types.Expiry names the carriers that ask.
 --
--- `timestamp` is stored for ActiveBlockProhibition's reason: CR 613.11 orders by
+-- `timestamp` is stored for ActiveObjectProhibition's reason: CR 613.11 orders by
 -- CR 613.7 timestamp, and nothing observes this one because two prohibitions
 -- cannot conflict -- CR 508.1c has no degrees.
 --

@@ -11,7 +11,6 @@ import qualified Pawl.Types.AttachBound as AttachBound
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.Blight as Blight
-import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.ChangeText as ChangeText
@@ -49,11 +48,8 @@ import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ForEachNumber as ForEachNumber
-import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBeingBlocked as ForbidBeingBlocked
-import qualified Pawl.Types.ForbidBlock as ForbidBlock
-import qualified Pawl.Types.ForbidUntap as ForbidUntap
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.GainControl as GainControl
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
@@ -79,6 +75,7 @@ import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Types.PreventNextDamageInstance as PreventNextDamageInstance
+import qualified Pawl.Types.Prohibit as Prohibit
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.PutSticker as PutSticker
@@ -556,32 +553,19 @@ data Effect card ability
     -- duration, one instance per (blocker, attacker) pair -- provoke (CR
     -- 702.39a) is this opcode.
     RequireBlock RequireBlock.RequireBlock
-  | -- | CR 701.19c / 611.1: install a stored regeneration prohibition over the
-    -- permanents the ref names, for a duration (Hurr Jackal); the printed
-    -- one-destruction form is Pawl.Types.Regenerability instead.
-    CantBeRegenerated CantBeRegenerated.CantBeRegenerated
   | -- | CR 508.1d / 613.11: install a stored attacking requirement for a
     -- duration (Alluring Siren), one instance per (attacker, defender) pair --
     -- rule 508.1d's two axes being a creature and what CR 508.1b lets it attack.
     RequireAttack RequireAttack.RequireAttack
-  | -- | CR 509.1b / 613.11: install a stored blocking restriction for a duration
-    -- (Zirda, the Dawnwaker). A rules modification (CR 613.11) rather than a
-    -- Modification, so Pawl.Engine.Projection never sees it.
-    ForbidBlock ForbidBlock.ForbidBlock
+  | -- | CR 611.2a / 613.11: install a stored prohibition over the permanents
+    -- the ref names, for a duration (Hurr Jackal, Zirda, Deadlock Trap).
+    Prohibit Prohibit.Prohibit
   | -- | CR 508.1c / 613.11: install a stored attacking restriction for a
-    -- duration (Netter en-Dal), ForbidBlock's twin one rule over.
+    -- duration (Netter en-Dal).
     ForbidAttack ForbidAttack.ForbidAttack
   | -- | CR 509.1b / 611.2c: install a stored restriction that a class of
     -- attackers can't be blocked, for a duration (Veiling Oddity).
     ForbidBeingBlocked ForbidBeingBlocked.ForbidBeingBlocked
-  | -- | CR 602.2 / 613.11: install a stored activation prohibition over the
-    -- permanents the ref names, for a duration (Deadlock Trap). The printed form
-    -- gathered live off a source is Pawl.Types.ActivationProhibition instead.
-    ForbidActivation ForbidActivation.ForbidActivation
-  | -- | CR 502.3 / 613.11: install a stored untap prohibition over the
-    -- permanents the ref names, for a duration (Wall of Stolen Identity). The
-    -- printed form gathered live off a source is Pawl.Types.UntapRestriction.
-    ForbidUntap ForbidUntap.ForbidUntap
   | -- | CR 114.2: the resolving controller gets an emblem with the given
     -- abilities, put into the command zone. Targetless; the abilities ride a
     -- Card so the emblem reuses the whole ability pipeline.

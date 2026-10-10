@@ -68,7 +68,6 @@ import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.CandidateId as CandidateId
 import qualified Pawl.Types.CantAttackPlayer as CantAttackPlayer
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
-import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.CantBlockCreatures as CantBlockCreatures
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardPutIntoGraveyard as CardPutIntoGraveyard
@@ -193,11 +192,8 @@ import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.FloatingCandidate as FloatingCandidate
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ForEachNumber as ForEachNumber
-import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBeingBlocked as ForbidBeingBlocked
-import qualified Pawl.Types.ForbidBlock as ForbidBlock
-import qualified Pawl.Types.ForbidUntap as ForbidUntap
 import qualified Pawl.Types.ForetellCost as ForetellCost
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.FromReference as FromReference
@@ -282,6 +278,7 @@ import qualified Pawl.Types.PreventNextDamageInstance as PreventNextDamageInstan
 import qualified Pawl.Types.Prevention as Prevention
 import qualified Pawl.Types.PreventionRider as PreventionRider
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
+import qualified Pawl.Types.Prohibit as Prohibit
 import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Types.ProliferateR as ProliferateR
 import qualified Pawl.Types.Protection as Protection
@@ -754,10 +751,6 @@ cantAttackPlayerNames asking x = case x of
 cantBeBlockedByNames :: Asking -> CantBeBlockedBy.CantBeBlockedBy -> Bool
 cantBeBlockedByNames asking x = case x of
   CantBeBlockedBy.MkCantBeBlockedBy affected blockers unless _name -> affectedNames asking affected || filterNames asking blockers || any (conditionNames asking) unless
-
-cantBeRegeneratedNames :: Asking -> CantBeRegenerated.CantBeRegenerated -> Bool
-cantBeRegeneratedNames asking x = case x of
-  CantBeRegenerated.MkCantBeRegenerated duration ref -> durationNames asking duration || objectRefNames asking ref
 
 cantBlockCreaturesNames :: Asking -> CantBlockCreatures.CantBlockCreatures -> Bool
 cantBlockCreaturesNames asking x = case x of
@@ -1325,13 +1318,10 @@ effectNames asking onCard onAbility x = case x of
   Effect.ArmDelayedTrigger armDelayedTrigger -> armDelayedTriggerNames asking onAbility armDelayedTrigger
   Effect.AffectPlayers affectPlayers -> affectPlayersNames asking affectPlayers
   Effect.RequireBlock requireBlock -> requireBlockNames asking requireBlock
-  Effect.CantBeRegenerated cantBeRegenerated -> cantBeRegeneratedNames asking cantBeRegenerated
   Effect.RequireAttack requireAttack -> requireAttackNames asking requireAttack
-  Effect.ForbidBlock forbidBlock -> forbidBlockNames asking forbidBlock
+  Effect.Prohibit prohibit -> prohibitNames asking prohibit
   Effect.ForbidAttack forbidAttack -> forbidAttackNames asking forbidAttack
   Effect.ForbidBeingBlocked forbidBeingBlocked -> forbidBeingBlockedNames asking forbidBeingBlocked
-  Effect.ForbidActivation forbidActivation -> forbidActivationNames asking forbidActivation
-  Effect.ForbidUntap forbidUntap -> forbidUntapNames asking forbidUntap
   Effect.CreateEmblem card -> onCard card
   Effect.BecomeMonarch monarchTarget -> monarchTargetNames asking monarchTarget
   Effect.TakeTheInitiative _initiativeTarget -> False
@@ -1568,10 +1558,6 @@ forEachNumberNames :: Asking -> (effect -> Bool) -> ForEachNumber.ForEachNumber 
 forEachNumberNames asking onEffect x = case x of
   ForEachNumber.MkForEachNumber upTo slot body -> quantityNames asking upTo || slotNames asking slot || any onEffect body
 
-forbidActivationNames :: Asking -> ForbidActivation.ForbidActivation -> Bool
-forbidActivationNames asking x = case x of
-  ForbidActivation.MkForbidActivation duration ref -> durationNames asking duration || objectRefNames asking ref
-
 forbidAttackNames :: Asking -> ForbidAttack.ForbidAttack -> Bool
 forbidAttackNames asking x = case x of
   ForbidAttack.MkForbidAttack duration affected aimedAt -> durationNames asking duration || restrictedCreaturesNames asking (objectRefNames asking) affected || any (aimedAtNames asking) aimedAt
@@ -1579,14 +1565,6 @@ forbidAttackNames asking x = case x of
 forbidBeingBlockedNames :: Asking -> ForbidBeingBlocked.ForbidBeingBlocked -> Bool
 forbidBeingBlockedNames asking x = case x of
   ForbidBeingBlocked.MkForbidBeingBlocked duration affected -> durationNames asking duration || filterNames asking affected
-
-forbidBlockNames :: Asking -> ForbidBlock.ForbidBlock -> Bool
-forbidBlockNames asking x = case x of
-  ForbidBlock.MkForbidBlock duration ref -> durationNames asking duration || objectRefNames asking ref
-
-forbidUntapNames :: Asking -> ForbidUntap.ForbidUntap -> Bool
-forbidUntapNames asking x = case x of
-  ForbidUntap.MkForbidUntap duration ref -> durationNames asking duration || objectRefNames asking ref
 
 foretellCostNames :: Asking -> (keyword -> Bool) -> ForetellCost.ForetellCost keyword -> Bool
 foretellCostNames asking onKeyword x = case x of
@@ -2312,6 +2290,11 @@ projectedCharacteristicsNames asking x = case x of
 proliferateRNames :: Asking -> ProliferateR.ProliferateR -> Bool
 proliferateRNames asking x = case x of
   ProliferateR.MkProliferateR whose _rewrite -> controllerRelationNames asking whose
+
+-- What is prohibited names no object.
+prohibitNames :: Asking -> Prohibit.Prohibit -> Bool
+prohibitNames asking x = case x of
+  Prohibit.MkProhibit _what duration ref -> durationNames asking duration || objectRefNames asking ref
 
 protectionNames :: Asking -> Protection.Protection keyword -> Bool
 protectionNames asking x = case x of

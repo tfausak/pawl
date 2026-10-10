@@ -94,7 +94,6 @@ import qualified Pawl.Types.BlockPermission as BlockPermission
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.CantAttackPlayer as CantAttackPlayer
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
-import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.CantBlockCreatures as CantBlockCreatures
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
@@ -202,11 +201,8 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ForEachNumber as ForEachNumber
-import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBeingBlocked as ForbidBeingBlocked
-import qualified Pawl.Types.ForbidBlock as ForbidBlock
-import qualified Pawl.Types.ForbidUntap as ForbidUntap
 import qualified Pawl.Types.ForetellCost as ForetellCost
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.FromReference as FromReference
@@ -294,6 +290,8 @@ import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Types.PreventNextDamageInstance as PreventNextDamageInstance
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Prohibit as Prohibit
+import qualified Pawl.Types.Prohibition as Prohibition
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.PutCounters as PutCounters
@@ -679,13 +677,10 @@ objectRefPositions =
         ("remove-from-combat", Effect.RemoveFromCombat (plantedRef "rc"), [plantedRef "rc"]),
         ("gain-control", Effect.GainControl (GainControl.MkGainControl Duration.UntilEndOfTurn (plantedRef "gc") (PlayerRef.Relative PlayerRelation.You)), [plantedRef "gc"]),
         ("require-block", Effect.RequireBlock (RequireBlock.MkRequireBlock Duration.UntilEndOfTurn (plantedRef "rb-blocker") (plantedRef "rb-attacker")), [plantedRef "rb-blocker", plantedRef "rb-attacker"]),
-        ("cant-be-regenerated", Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated Duration.UntilEndOfTurn (plantedRef "cb")), [plantedRef "cb"]),
+        ("prohibit", Effect.Prohibit (Prohibit.MkProhibit Prohibition.Regenerate Duration.UntilEndOfTurn (plantedRef "cb")), [plantedRef "cb"]),
         ("require-attack", Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (RestrictedCreatures.Named (plantedRef "ra")) (AttackTargetRef.Players (PlayerRef.Relative PlayerRelation.You))), [plantedRef "ra"]),
         ("require-attack-permanent", Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (RestrictedCreatures.Named (plantedRef "rp-attacker")) (AttackTargetRef.Permanents (plantedRef "rp-defender"))), [plantedRef "rp-attacker", plantedRef "rp-defender"]),
-        ("forbid-block", Effect.ForbidBlock (ForbidBlock.MkForbidBlock Duration.UntilEndOfTurn (plantedRef "fb")), [plantedRef "fb"]),
         ("forbid-attack", Effect.ForbidAttack (ForbidAttack.MkForbidAttack Duration.UntilEndOfTurn (RestrictedCreatures.Named (plantedRef "fa")) Nothing), [plantedRef "fa"]),
-        ("forbid-activation", Effect.ForbidActivation (ForbidActivation.MkForbidActivation Duration.UntilEndOfTurn (plantedRef "fv")), [plantedRef "fv"]),
-        ("forbid-untap", Effect.ForbidUntap (ForbidUntap.MkForbidUntap Duration.UntilEndOfTurn (plantedRef "fu")), [plantedRef "fu"]),
         ("unsuspect", Effect.Unsuspect (plantedRef "us"), [plantedRef "us"]),
         ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary Nothing (NonEmpty.singleton (plantedRef "sl"))), [plantedRef "sl"]),
         ("ante", Effect.Ante (Ante.MkAnte (PlayerRef.Relative PlayerRelation.You) (plantedRef "an") Nothing), [plantedRef "an"]),
@@ -1406,10 +1401,7 @@ ownCounts effect = case effect of
   Effect.ArmDelayedTrigger arm -> foldMap triggeredAbilityCounts (Game.carriedDelayedAbility arm)
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ _) -> durationCounts duration
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration _ _) -> durationCounts duration
-  Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration _) -> durationCounts duration
-  Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration _) -> durationCounts duration
-  Effect.ForbidActivation (ForbidActivation.MkForbidActivation duration _) -> durationCounts duration
-  Effect.ForbidUntap (ForbidUntap.MkForbidUntap duration _) -> durationCounts duration
+  Effect.Prohibit (Prohibit.MkProhibit _ duration _) -> durationCounts duration
   Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration _ _) -> durationCounts duration
   Effect.ForbidBeingBlocked (ForbidBeingBlocked.MkForbidBeingBlocked duration _) -> durationCounts duration
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) -> durationCounts duration
@@ -1921,12 +1913,9 @@ effectNestedEffects effect = case effect of
   Effect.ArmDelayedTrigger arm -> foldMap (Modal.allEffects . TriggeredAbility.modal) (Game.carriedDelayedAbility arm)
   Effect.AffectPlayers {} -> []
   Effect.RequireBlock {} -> []
-  Effect.CantBeRegenerated {} -> []
-  Effect.ForbidBlock {} -> []
+  Effect.Prohibit {} -> []
   Effect.ForbidAttack {} -> []
   Effect.ForbidBeingBlocked {} -> []
-  Effect.ForbidActivation {} -> []
-  Effect.ForbidUntap {} -> []
   Effect.RequireAttack {} -> []
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary {} -> []
@@ -2451,12 +2440,9 @@ effectReplacements effect = case effect of
   Effect.ArmDelayedTrigger arm -> concatMap effectReplacements (foldMap (Modal.allEffects . TriggeredAbility.modal) (Game.carriedDelayedAbility arm))
   Effect.AffectPlayers {} -> []
   Effect.RequireBlock {} -> []
-  Effect.CantBeRegenerated {} -> []
-  Effect.ForbidBlock {} -> []
+  Effect.Prohibit {} -> []
   Effect.ForbidAttack {} -> []
   Effect.ForbidBeingBlocked {} -> []
-  Effect.ForbidActivation {} -> []
-  Effect.ForbidUntap {} -> []
   Effect.RequireAttack {} -> []
   Effect.BecomeMonarch _ -> []
   Effect.TakeTheInitiative _ -> []
@@ -2976,12 +2962,9 @@ effectMintedFaces effect = case effect of
   Effect.ArmDelayedTrigger arm -> concatMap effectMintedFaces (foldMap (Modal.allEffects . TriggeredAbility.modal) (Game.carriedDelayedAbility arm))
   Effect.AffectPlayers {} -> []
   Effect.RequireBlock {} -> []
-  Effect.CantBeRegenerated {} -> []
-  Effect.ForbidBlock {} -> []
+  Effect.Prohibit {} -> []
   Effect.ForbidAttack {} -> []
   Effect.ForbidBeingBlocked {} -> []
-  Effect.ForbidActivation {} -> []
-  Effect.ForbidUntap {} -> []
   Effect.RequireAttack {} -> []
   Effect.BecomeMonarch _ -> []
   Effect.TakeTheInitiative _ -> []
@@ -5977,13 +5960,8 @@ effectFilters effect = case effect of
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ playerEffect) -> frame Unframed (durationFilters duration) <> fmap ((,) StoredPlayerEffectFramed) (playerEffectFilters playerEffect)
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration blocker attacker) -> frame Unframed (durationFilters duration) <> frame SourceHostFramed (objectRefFilters blocker <> objectRefFilters attacker)
   -- RequireBlock's arm one axis narrower.
-  Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration ref) -> frame Unframed (durationFilters duration) <> frame SourceHostFramed (objectRefFilters ref)
-  -- CantBeRegenerated's arm, the same one axis.
-  Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration ref) -> frame Unframed (durationFilters duration) <> frame SourceHostFramed (objectRefFilters ref)
-  -- ForbidBlock's arm again, one rule away.
-  Effect.ForbidActivation (ForbidActivation.MkForbidActivation duration ref) -> frame Unframed (durationFilters duration) <> frame SourceHostFramed (objectRefFilters ref)
-  Effect.ForbidUntap (ForbidUntap.MkForbidUntap duration ref) -> frame Unframed (durationFilters duration) <> frame SourceHostFramed (objectRefFilters ref)
-  -- The Named arm is CantBeRegenerated's ref; the Matching arm's class is read
+  Effect.Prohibit (Prohibit.MkProhibit _ duration ref) -> frame Unframed (durationFilters duration) <> frame SourceHostFramed (objectRefFilters ref)
+  -- The Named arm is Prohibit's ref; the Matching arm's class is read
   -- through a bare Filter.contextFor at
   -- Pawl.Engine.CombatRestriction.storedSubjects, so it is Unframed. The AimedAt
   -- is a PlayerScope and CR 506.3 kinds, no Filter in either.

@@ -11,7 +11,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 
--- | A bare object keyed by the record's field names, Pawl.Codec.ForbidBlock's
+-- | A bare object keyed by the record's field names, Pawl.Codec.Prohibit's
 -- shape with "affected" tagged where that codec's "ref" is bare, and "aimedAt"
 -- elided for the restriction on attacking at all. The tag that picks it is
 -- written by Pawl.Codec.Effect's ForbidAttack arm.

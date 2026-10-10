@@ -24,7 +24,7 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- graph is what decides it: the payload is a whole ProjectedCharacteristics, and
 -- Pawl.Types.Modification cannot name that type -- the cycle runs Modification ->
 -- ProjectedCharacteristics -> Card -> Face -> StaticAbility -> Modification. So
--- this joins the Active* carriers (ActiveUnregeneratable and its siblings), which
+-- this joins the Active* carriers (ActiveObjectProhibition and its siblings), which
 -- is how pawl already stores every continuous effect whose payload the
 -- Modification vocabulary does not hold. CR 613 is unbothered: layer 1a is read
 -- as the layer fold's SEED (Pawl.Engine.Projection.copiableCharacteristics)
@@ -32,7 +32,7 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- be in either carrier.
 --
 -- A bare id SET where the printed carrier holds an ObjectRef, for
--- ActiveUnregeneratable's reason and CR 611.2c's: the ref is swept ONCE, as the
+-- ActiveObjectProhibition's reason and CR 611.2c's: the ref is swept ONCE, as the
 -- ability resolves, and the objects it named are what the effect covers
 -- thereafter.
 --
