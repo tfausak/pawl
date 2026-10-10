@@ -150,6 +150,8 @@ import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PayBranch as PayBranch
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PayObligation as PayObligation
+import qualified Pawl.Types.PermanentActed as PermanentActed
+import qualified Pawl.Types.PermanentAction as PermanentAction
 import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
@@ -6055,8 +6057,9 @@ graft =
 -- CR 702.100c then falls out: a permanent that is not a creature has no power or
 -- toughness (CR 208.3), and Condition.holds reads an unanswerable side as False.
 --
--- Effect.Evolve rather than Effect.PutCounters, which is rule 702.100b: one opcode
--- is what ties the "evolves" marker to the placement. Renegade Krasis reads it.
+-- Effect.CounterAndMark rather than Effect.PutCounters, which is rule 702.100b:
+-- one opcode is what ties the "evolves" marker to the placement. Renegade Krasis
+-- reads it.
 
 -- CR 702.95a: soulbond, two triggered abilities. Bushido's shape -- one keyword,
 -- two conditions, and a TriggeredAbility carries one each -- with the pair of
@@ -6171,7 +6174,7 @@ soulbondOtherEnters =
 
 evolve :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 evolve =
-  let effect = Effect.Evolve Binding.triggerSource
+  let effect = Effect.CounterAndMark (PermanentActed.MkPermanentActed PermanentAction.Evolve Binding.triggerSource)
       entrantExceeds quantity =
         Condition.Compares
           ( Compares.MkCompares
@@ -6539,12 +6542,12 @@ mentorTarget = SlotName.MkSlotName (Text.pack "mentored")
 -- that dies in response still leaves the counter. "Other" is the condition's own,
 -- an identity check the Filter has no atom for.
 --
--- Through Effect.Train, evolve's opcode one rule over: rule 702.149c makes "when
+-- Through Effect.CounterAndMark, evolve's opcode: rule 702.149c makes "when
 -- this creature trains" mean the placement, so it has to be distinguishable from
 -- any other +1/+1 counter arriving.
 training :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 training =
-  let effect = Effect.Train Binding.triggerSource
+  let effect = Effect.CounterAndMark (PermanentActed.MkPermanentActed PermanentAction.Train Binding.triggerSource)
    in Mint.trigger
         ( TriggerCondition.SelfAttacksWithAnother
             (Filter.And [Filter.HasCardType CardType.Creature, Filter.PowerGreaterThanSource])

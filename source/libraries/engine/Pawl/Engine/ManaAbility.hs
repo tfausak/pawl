@@ -440,12 +440,11 @@ manaProduced effect = case effect of
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> Nothing
   Effect.Unsuspect _ -> Nothing
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> Nothing
-  Effect.Evolve _ -> Nothing
+  Effect.CounterAndMark _ -> Nothing
   Effect.BecomeProtector _ -> Nothing
   Effect.Mentor _ -> Nothing
   Effect.Exploit -> Nothing
   Effect.GiveGift -> Nothing
-  Effect.Train _ -> Nothing
   Effect.ItBecomes _ -> Nothing
   Effect.ExileHaunting {} -> Nothing
   Effect.Attach _ -> Nothing
@@ -631,12 +630,11 @@ playerChoice effect = case effect of
   Effect.SetClassLevel {} -> Nothing
   Effect.Unsuspect _ -> Nothing
   Effect.SetHalfLocked {} -> Nothing
-  Effect.Evolve _ -> Nothing
+  Effect.CounterAndMark _ -> Nothing
   Effect.BecomeProtector _ -> Nothing
   Effect.Mentor _ -> Nothing
   Effect.Exploit -> Nothing
   Effect.GiveGift -> Nothing
-  Effect.Train _ -> Nothing
   Effect.ItBecomes _ -> Nothing
   Effect.ExileHaunting {} -> Nothing
   Effect.Attach _ -> Nothing
@@ -917,12 +915,11 @@ movesLibraryCard effect = case effect of
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> False
   Effect.Unsuspect _ -> False
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> False
-  Effect.Evolve _ -> False
+  Effect.CounterAndMark _ -> False
   Effect.BecomeProtector _ -> False
   Effect.Mentor _ -> False
   Effect.Exploit -> False
   Effect.GiveGift -> False
-  Effect.Train _ -> False
   Effect.ItBecomes _ -> False
   Effect.ExileHaunting {} -> False
   Effect.Attach _ -> False

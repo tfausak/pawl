@@ -137,6 +137,8 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.OutsideDestination as OutsideDestination
+import qualified Pawl.Types.PermanentActed as PermanentActed
+import qualified Pawl.Types.PermanentAction as PermanentAction
 import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
@@ -2156,13 +2158,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked False True (SlotName.MkSlotName (Text.pack "target"))))
       " {\"type\":\"SetHalfLocked\",\"value\":{\"every\":false,\"locked\":true,\"slot\":\"target\"}} "
-  Spec.it s "Evolve" $
+  -- CR 702.100b's counter and marker: the action rides PermanentActed's codec,
+  -- the slot written where its ObjectId would be.
+  Spec.it s "CounterAndMark" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.Evolve (SlotName.MkSlotName (Text.pack "self")))
-      " {\"type\":\"Evolve\",\"value\":\"self\"} "
+      (Effect.CounterAndMark (PermanentActed.MkPermanentActed PermanentAction.Evolve (SlotName.MkSlotName (Text.pack "self"))))
+      " {\"type\":\"CounterAndMark\",\"value\":{\"action\":{\"type\":\"Evolve\"},\"permanent\":\"self\"}} "
   Spec.it s "BecomeProtector" $
     Common.assertJsonCodec
       s
@@ -2171,7 +2175,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       (Effect.BecomeProtector (SlotName.MkSlotName (Text.pack "target")))
       " {\"type\":\"BecomeProtector\",\"value\":\"target\"} "
   -- CR 702.134a's counter and CR 702.134c's marker. The slot is the ability's
-  -- chosen target rather than "self", which is what parts it from Evolve above.
+  -- chosen target rather than "self".
   Spec.it s "Mentor" $
     Common.assertJsonCodec
       s
@@ -2179,8 +2183,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Mentor (SlotName.MkSlotName (Text.pack "mentored")))
       " {\"type\":\"Mentor\",\"value\":\"mentored\"} "
-  -- CR 702.110a's sacrifice and CR 702.110b's marker. Nullary where the two above
-  -- take a slot: rule 702.110a names no parameter and chooses rather than targets.
+  -- CR 702.110a's sacrifice and CR 702.110b's marker. Nullary where Mentor above
+  -- takes a slot: rule 702.110a names no parameter and chooses rather than targets.
   Spec.it s "Exploit" $
     Common.assertJsonCodec
       s
@@ -2195,15 +2199,6 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       Effect.GiveGift
       " {\"type\":\"GiveGift\"} "
-  -- CR 702.149a's counter and CR 702.149c's marker. Back to Evolve's "self": rule
-  -- 702.149a puts its counter on the training creature itself.
-  Spec.it s "Train" $
-    Common.assertJsonCodec
-      s
-      toJson
-      fromJson
-      (Effect.Train (SlotName.MkSlotName (Text.pack "self")))
-      " {\"type\":\"Train\",\"value\":\"self\"} "
   -- CR 702.189a's mana and CR 702.189b's marker, AddMana's payload: firebending
   -- 2's two retained {R}.
   Spec.it s "Firebend" $

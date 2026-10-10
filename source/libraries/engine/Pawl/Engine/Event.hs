@@ -4692,9 +4692,9 @@ strengthen gs oid regenerability =
 --
 -- ANSWERS how many counters actually landed, which is not what was asked for: CR
 -- 614.16 may have grown or erased the placement, and an object that is no longer
--- there takes none. Only the two rules that say "one or more +1/+1 counters" read
--- it -- CR 702.100b and CR 702.149c, at Pawl.Engine.Resolve's Effect.Evolve and
--- Effect.Train arms; every other caller places and moves on.
+-- there takes none. CR 702.100b's and CR 702.149c's "one or more +1/+1 counters"
+-- read it at Pawl.Engine.Resolve.Effect's Effect.CounterAndMark arm, and a move of
+-- counters reads it to count what crossed.
 putCounters :: CounterCause.CounterCause -> ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game Natural
 putCounters cause oid kind n = do
   resolved <- resolveCounters cause oid kind n

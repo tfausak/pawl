@@ -702,7 +702,7 @@ data Keyword
     Cleave (Cost.Cost Keyword)
   | -- | 702.149a: whenever this creature and at least one other creature with
     -- greater power attack, put a +1/+1 counter on this creature. The counter
-    -- goes on through Effect.Train, so CR 702.149c's "whenever this creature
+    -- goes on through Effect.CounterAndMark, so CR 702.149c's "whenever this creature
     -- trains" can tell it from any other.
     Training
   | -- | 702.150a: a planeswalker entering with loyalty counters enters with two
