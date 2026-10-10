@@ -106,7 +106,6 @@ import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.DrawR as DrawR
 import qualified Pawl.Types.DrawRewrite as DrawRewrite
 import qualified Pawl.Types.Duration as Duration
-import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.EachCardInHand as EachCardInHand
@@ -137,7 +136,7 @@ import qualified Pawl.Types.ForbidUntap as ForbidUntap
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.FromReference as FromReference
 import qualified Pawl.Types.FullText as FullText
-import qualified Pawl.Types.GiveControl as GiveControl
+import qualified Pawl.Types.GainControl as GainControl
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -872,9 +871,8 @@ rewriteEffect pairs effect = case effect of
   Effect.AddPhases _ -> effect
   Effect.EndTurn -> effect
   Effect.EndCombatPhase -> effect
-  Effect.GainControl (DurationRef.MkDurationRef duration ref) -> Effect.GainControl (DurationRef.MkDurationRef (rewriteDuration pairs duration) (rewriteObjectRef pairs ref))
-  -- The player is a PlayerRef, which names its seat structurally.
-  Effect.GiveControl (GiveControl.MkGiveControl player ref) -> Effect.GiveControl (GiveControl.MkGiveControl player (rewriteObjectRef pairs ref))
+  -- The new controller is a PlayerRef, which names its seat structurally.
+  Effect.GainControl (GainControl.MkGainControl duration ref to) -> Effect.GainControl (GainControl.MkGainControl (rewriteDuration pairs duration) (rewriteObjectRef pairs ref) to)
   -- A slot NAME is not a word rule 612 can swap, ExchangeLifeTotals' reason.
   Effect.ExchangeControl _ -> effect
   -- CR 612.1 through the only half that holds printed words: CR 603.7b's stated

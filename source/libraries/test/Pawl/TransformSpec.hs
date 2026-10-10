@@ -73,7 +73,6 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
-import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate

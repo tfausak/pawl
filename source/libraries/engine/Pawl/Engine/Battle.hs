@@ -82,7 +82,6 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.SelfCountersRemoved as SelfCountersRemoved
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
-import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
@@ -292,7 +291,7 @@ siegeDefeat =
           ( MoveToZone.MkMoveToZone
               (ObjectRef.InSlot Binding.triggerSource)
               Zone.Exile
-              EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = Nothing, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.attachedTo = Nothing, EntryRiders.faceDown = Nothing, EntryRiders.noted = False, EntryRiders.characteristics = Seq.empty}
+              EntryRiders.defaultValue
               (Just Binding.became)
               Nothing
               LibraryPlacement.defaultValue

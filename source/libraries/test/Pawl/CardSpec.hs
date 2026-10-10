@@ -28,7 +28,6 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.CastOffer as CastOffer
-import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
@@ -171,7 +170,6 @@ import qualified Pawl.Types.DrawR as DrawR
 import qualified Pawl.Types.DrawRewrite as DrawRewrite
 import qualified Pawl.Types.DungeonRoom as DungeonRoom
 import qualified Pawl.Types.Duration as Duration
-import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.EachCardInHand as EachCardInHand
@@ -211,8 +209,8 @@ import qualified Pawl.Types.ForetellCost as ForetellCost
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.FromReference as FromReference
 import qualified Pawl.Types.FullText as FullText
+import qualified Pawl.Types.GainControl as GainControl
 import qualified Pawl.Types.GameState as GameState
-import qualified Pawl.Types.GiveControl as GiveControl
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -635,7 +633,7 @@ refCounts = concatMap quantityCounts . Resolve.objectRefQuantities
 -- compile. This list is where that shows up.
 objectRefPositions :: [(String, Effect.Effect () (), [ObjectRef.ObjectRef])]
 objectRefPositions =
-  let plainRiders = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = Nothing, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.attachedTo = Nothing, EntryRiders.faceDown = Nothing, EntryRiders.noted = False, EntryRiders.characteristics = Seq.empty}
+  let plainRiders = EntryRiders.defaultValue
       handChoice = ChosenCardInHand.MkChosenCardInHand (plantedPlayer "xh") (Filter.Type.And [])
    in [ ("deal-damage", Effect.DealDamage (DealDamage.MkDealDamage (Seq.fromList [DamagePart.MkDamagePart (plantedRef "dd1") (Quantity.Type.Literal 1), DamagePart.MkDamagePart (plantedRef "dd2") (Quantity.Type.Literal 1)]) Nothing Nothing), [plantedRef "dd1", plantedRef "dd2"]),
         ("modify-target", Effect.ModifyTarget (ModifyTarget.MkModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Flying) (plantedRef "mt") Nothing), [plantedRef "mt"]),
@@ -679,8 +677,7 @@ objectRefPositions =
         ("phase-out", Effect.PhaseOut (plantedRef "po"), [plantedRef "po"]),
         ("turn-face-down", Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown (plantedRef "tf") FaceDownCharacteristics.defaultValue), [plantedRef "tf"]),
         ("remove-from-combat", Effect.RemoveFromCombat (plantedRef "rc"), [plantedRef "rc"]),
-        ("gain-control", Effect.GainControl (DurationRef.MkDurationRef Duration.UntilEndOfTurn (plantedRef "gc")), [plantedRef "gc"]),
-        ("give-control", Effect.GiveControl (GiveControl.MkGiveControl (PlayerRef.Relative PlayerRelation.You) (plantedRef "gv")), [plantedRef "gv"]),
+        ("gain-control", Effect.GainControl (GainControl.MkGainControl Duration.UntilEndOfTurn (plantedRef "gc") (PlayerRef.Relative PlayerRelation.You)), [plantedRef "gc"]),
         ("require-block", Effect.RequireBlock (RequireBlock.MkRequireBlock Duration.UntilEndOfTurn (plantedRef "rb-blocker") (plantedRef "rb-attacker")), [plantedRef "rb-blocker", plantedRef "rb-attacker"]),
         ("cant-be-regenerated", Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated Duration.UntilEndOfTurn (plantedRef "cb")), [plantedRef "cb"]),
         ("require-attack", Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (RestrictedCreatures.Named (plantedRef "ra")) (AttackTargetRef.Players (PlayerRef.Relative PlayerRelation.You))), [plantedRef "ra"]),
@@ -747,7 +744,7 @@ playerRefPositions =
         ("gain-player-counters", Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters (plantedPlayer "gp") PlayerCounterKind.Rad one), [plantedPlayer "gp"]),
         ("remove-player-counters", Effect.RemovePlayerCounters (RemovePlayerCounters.MkRemovePlayerCounters (plantedPlayer "rp") PlayerCounterKind.Rad one Nothing), [plantedPlayer "rp"]),
         ("require-attack", Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (RestrictedCreatures.Named (plantedRef "ra")) (AttackTargetRef.Players (plantedPlayer "ra-defender"))), [plantedPlayer "ra-defender"]),
-        ("give-control", Effect.GiveControl (GiveControl.MkGiveControl (plantedPlayer "gv") (plantedRef "gv")), [plantedPlayer "gv"]),
+        ("gain-control", Effect.GainControl (GainControl.MkGainControl Duration.Indefinite (plantedRef "gc") (plantedPlayer "gc")), [plantedPlayer "gc"]),
         ("blight", Effect.Blight (Blight.MkBlight (plantedPlayer "bl") one Nothing), [plantedPlayer "bl"]),
         ("take-extra-turn", Effect.TakeExtraTurn TakeExtraTurn.MkTakeExtraTurn {TakeExtraTurn.player = plantedPlayer "te", TakeExtraTurn.skips = Set.empty, TakeExtraTurn.count = Quantity.Type.Literal 1}, [plantedPlayer "te"]),
         ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary (Just (plantedPlayer "si")) (NonEmpty.singleton (plantedRef "si"))), [plantedPlayer "si"]),
@@ -1427,8 +1424,7 @@ ownCounts effect = case effect of
   Effect.AddPhases _ -> []
   Effect.EndTurn -> []
   Effect.EndCombatPhase -> []
-  Effect.GainControl (DurationRef.MkDurationRef duration _) -> durationCounts duration
-  Effect.GiveControl _ -> []
+  Effect.GainControl (GainControl.MkGainControl duration _ _) -> durationCounts duration
   Effect.ExchangeControl _ -> []
   Effect.ArmDelayedTrigger arm -> foldMap triggeredAbilityCounts (Game.carriedDelayedAbility arm)
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ _) -> durationCounts duration
@@ -1920,7 +1916,6 @@ effectNestedEffects effect = case effect of
   Effect.EndTurn -> []
   Effect.EndCombatPhase -> []
   Effect.GainControl {} -> []
-  Effect.GiveControl {} -> []
   Effect.ExchangeControl _ -> []
   Effect.Unsuspect {} -> []
   Effect.SetHalfLocked {} -> []
@@ -2474,8 +2469,7 @@ effectReplacements effect = case effect of
   Effect.AddPhases _ -> []
   Effect.EndTurn -> []
   Effect.EndCombatPhase -> []
-  Effect.GainControl (DurationRef.MkDurationRef _ _) -> []
-  Effect.GiveControl _ -> []
+  Effect.GainControl (GainControl.MkGainControl {}) -> []
   Effect.ExchangeControl _ -> []
   Effect.ArmDelayedTrigger arm -> concatMap effectReplacements (foldMap (Modal.allEffects . TriggeredAbility.modal) (Game.carriedDelayedAbility arm))
   Effect.AffectPlayers {} -> []
@@ -3000,8 +2994,7 @@ effectMintedFaces effect = case effect of
   Effect.AddPhases _ -> []
   Effect.EndTurn -> []
   Effect.EndCombatPhase -> []
-  Effect.GainControl (DurationRef.MkDurationRef _ _) -> []
-  Effect.GiveControl _ -> []
+  Effect.GainControl (GainControl.MkGainControl {}) -> []
   Effect.ExchangeControl _ -> []
   Effect.ArmDelayedTrigger arm -> concatMap effectMintedFaces (foldMap (Modal.allEffects . TriggeredAbility.modal) (Game.carriedDelayedAbility arm))
   Effect.AffectPlayers {} -> []
@@ -6047,8 +6040,7 @@ effectFilters effect = case effect of
   Effect.AddPhases _ -> []
   Effect.EndTurn -> []
   Effect.EndCombatPhase -> []
-  Effect.GainControl (DurationRef.MkDurationRef duration ref) -> frame Unframed (durationFilters duration) <> frame SourceHostFramed (objectRefFilters ref)
-  Effect.GiveControl (GiveControl.MkGiveControl _ ref) -> frame SourceHostFramed (objectRefFilters ref)
+  Effect.GainControl (GainControl.MkGainControl duration ref _) -> frame Unframed (durationFilters duration) <> frame SourceHostFramed (objectRefFilters ref)
   Effect.ExchangeControl _ -> []
   Effect.ArmDelayedTrigger arm@(ArmDelayedTrigger.MkArmDelayedTrigger _ _ mDuration _) -> frame Unframed (concatMap durationFilters (Maybe.maybeToList mDuration)) <> foldMap triggeredAbilityFilters (Game.carriedDelayedAbility arm)
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ playerEffect) -> frame Unframed (durationFilters duration) <> fmap ((,) StoredPlayerEffectFramed) (playerEffectFilters playerEffect)

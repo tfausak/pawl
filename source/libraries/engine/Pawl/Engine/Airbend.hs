@@ -24,7 +24,6 @@
 module Pawl.Engine.Airbend where
 
 import qualified Data.Map.Strict as Map
-import qualified Data.Sequence as Seq
 import qualified Pawl.Engine.Binding as Binding
 import Pawl.Types.Card (Card)
 import Pawl.Types.Effect (Effect)
@@ -54,9 +53,8 @@ import qualified Pawl.Types.Zone as Zone
 -- Pawl.Engine.Resolve.Effect's executor, so the exile runs exactly as the same
 -- instruction printed on a card would -- ONE batch, which is CR 608.2f.
 --
--- Every rider is Pawl.Codec.EntryRiders.defaultValue's, written out because that
--- value lives in the codec library: rule 701.65a states nothing about how the
--- objects arrive, and exile has no tapped, attacking or attached reading anyway.
+-- Every rider is the default: rule 701.65a states nothing about how the objects
+-- arrive, and exile has no tapped, attacking or attached reading anyway.
 --
 -- The arrivals are bound under Binding.airbentObjects, which is how the
 -- permission below finds them: rule 701.65a's "for each card exiled this way" is
@@ -70,19 +68,7 @@ exile ref =
       { MoveToZone.ref = ref,
         MoveToZone.zone = Zone.Exile,
         MoveToZone.riders =
-          EntryRiders.MkEntryRiders
-            { EntryRiders.tapped = TapState.Untapped,
-              EntryRiders.attacking = Nothing,
-              EntryRiders.blocking = Nothing,
-              EntryRiders.transformed = False,
-              EntryRiders.counters = Map.empty,
-              EntryRiders.underOwner = False,
-              EntryRiders.exiledFaceDown = False,
-              EntryRiders.attachedTo = Nothing,
-              EntryRiders.faceDown = Nothing,
-              EntryRiders.noted = False,
-              EntryRiders.characteristics = Seq.empty
-            },
+          EntryRiders.defaultValue,
         MoveToZone.slot = Just Binding.airbentObjects,
         MoveToZone.origin = Nothing,
         MoveToZone.placement = LibraryPlacement.defaultValue,

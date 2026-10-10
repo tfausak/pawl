@@ -255,7 +255,6 @@ import qualified Pawl.Codec.DrawSpec
 import qualified Pawl.Codec.DrewSpec
 import qualified Pawl.Codec.DungeonRoomSpec
 import qualified Pawl.Codec.DuplicateCardSpec
-import qualified Pawl.Codec.DurationRefSpec
 import qualified Pawl.Codec.DurationSpec
 import qualified Pawl.Codec.DuringPhaseSpec
 import qualified Pawl.Codec.EachCardFromAmongSpec
@@ -317,10 +316,10 @@ import qualified Pawl.Codec.ForbidUntapSpec
 import qualified Pawl.Codec.ForetellCostSpec
 import qualified Pawl.Codec.FromOutsideTheGameSpec
 import qualified Pawl.Codec.FromReferenceSpec
+import qualified Pawl.Codec.GainControlSpec
 import qualified Pawl.Codec.GameEventSpec
 import qualified Pawl.Codec.GameSettingsSpec
 import qualified Pawl.Codec.GiftSpec
-import qualified Pawl.Codec.GiveControlSpec
 import qualified Pawl.Codec.GrantLookAtExiledSpec
 import qualified Pawl.Codec.GrantPlayFromExileSpec
 import qualified Pawl.Codec.GrantedAbilitySpec
@@ -1093,7 +1092,6 @@ spec s registry = do
   Pawl.Codec.DrewSpec.spec s
   Pawl.Codec.DungeonRoomSpec.spec s
   Pawl.Codec.DuplicateCardSpec.spec s
-  Pawl.Codec.DurationRefSpec.spec s
   Pawl.Codec.DurationSpec.spec s
   Pawl.Codec.DuringPhaseSpec.spec s
   Pawl.Codec.EachCardFromAmongSpec.spec s
@@ -1163,7 +1161,7 @@ spec s registry = do
   Pawl.Codec.FromReferenceSpec.spec s
   Pawl.Codec.GameEventSpec.spec s
   Pawl.Codec.GameSettingsSpec.spec s
-  Pawl.Codec.GiveControlSpec.spec s
+  Pawl.Codec.GainControlSpec.spec s
   Pawl.Codec.GiftSpec.spec s
   Pawl.Codec.GraveyardOrderSpec.spec s
   Pawl.Codec.GrantLookAtExiledSpec.spec s

@@ -153,7 +153,6 @@ import qualified Pawl.Types.DrawR as DrawR
 import qualified Pawl.Types.DrawRewrite as DrawRewrite
 import qualified Pawl.Types.DungeonRoom as DungeonRoom
 import qualified Pawl.Types.Duration as Duration
-import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.EachCardInHand as EachCardInHand
@@ -200,7 +199,7 @@ import qualified Pawl.Types.ForetellCost as ForetellCost
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.FromReference as FromReference
 import qualified Pawl.Types.FullText as FullText
-import qualified Pawl.Types.GiveControl as GiveControl
+import qualified Pawl.Types.GainControl as GainControl
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -1191,10 +1190,6 @@ durationNames asking x = case x of
   Duration.UntilPaid cost -> costNames asking (keywordNames asking) cost
   Duration.UntilUsed -> False
 
-durationRefNames :: Asking -> DurationRef.DurationRef -> Bool
-durationRefNames asking x = case x of
-  DurationRef.MkDurationRef duration ref -> durationNames asking duration || objectRefNames asking ref
-
 eachCardFromAmongNames :: Asking -> EachCardFromAmong.EachCardFromAmong -> Bool
 eachCardFromAmongNames asking x = case x of
   EachCardFromAmong.MkEachCardFromAmong slot filter_ -> slotNames asking slot || filterNames asking filter_
@@ -1304,8 +1299,7 @@ effectNames asking onCard onAbility x = case x of
   Effect.AddPhases _items -> False
   Effect.EndTurn -> False
   Effect.EndCombatPhase -> False
-  Effect.GainControl durationRef -> durationRefNames asking durationRef
-  Effect.GiveControl giveControl -> giveControlNames asking giveControl
+  Effect.GainControl gainControl -> gainControlNames asking gainControl
   Effect.ExchangeControl controlSides -> controlSidesNames asking controlSides
   Effect.ArmDelayedTrigger armDelayedTrigger -> armDelayedTriggerNames asking onAbility armDelayedTrigger
   Effect.AffectPlayers affectPlayers -> affectPlayersNames asking affectPlayers
@@ -1586,9 +1580,9 @@ fullTextNames :: Asking -> (ability -> Bool) -> FullText.FullText ability -> Boo
 fullTextNames asking onAbility x = case x of
   FullText.MkFullText graveyard alsoHas -> playerRefNames asking graveyard || any onAbility alsoHas
 
-giveControlNames :: Asking -> GiveControl.GiveControl -> Bool
-giveControlNames asking x = case x of
-  GiveControl.MkGiveControl player ref -> playerRefNames asking player || objectRefNames asking ref
+gainControlNames :: Asking -> GainControl.GainControl -> Bool
+gainControlNames asking x = case x of
+  GainControl.MkGainControl duration ref to -> durationNames asking duration || objectRefNames asking ref || playerRefNames asking to
 
 grantLookAtExiledNames :: Asking -> GrantLookAtExiled.GrantLookAtExiled -> Bool
 grantLookAtExiledNames asking x = case x of

@@ -2,8 +2,6 @@
 
 module Pawl.Codec.EntryRiders where
 
-import qualified Data.Map.Strict as Map
-import qualified Data.Sequence as Seq
 import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.EntryAttack as EntryAttack
@@ -21,12 +19,6 @@ import qualified Pawl.Types.CounterKind as CounterKind.Type
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.Quantity as Quantity.Type
-import qualified Pawl.Types.TapState as TapState
-
--- | CR 110.5b's default, which is what a Create or a MoveToZone that says
--- nothing about tapped-ness means.
-defaultTapped :: TapState.TapState
-defaultTapped = TapState.Untapped
 
 -- | One counter kind and the count an object enters with, which is a Quantity
 -- rather than a number (CR 122.6, CR 107.3c): Printlifter Ooze's "X +1/+1
@@ -44,17 +36,17 @@ counter = Fields.object $ do
 -- object -- and their own key is then elided by whichever effect carries them.
 codec :: (Typeable.Typeable ability, Eq ability) => Codec.Codec ability -> Codec.Codec (EntryRiders.EntryRiders Quantity.Type.Quantity ability)
 codec abilityCodec = Fields.object $ do
-  tapped <- Fields.defaulted "tapped" defaultTapped TapState.codec EntryRiders.tapped
-  attacking <- Fields.defaulted "attacking" Nothing (Common.maybe EntryAttack.codec) EntryRiders.attacking
-  blocking <- Fields.defaulted "blocking" Nothing (Common.maybe EntryBlock.codec) EntryRiders.blocking
-  transformed <- Fields.defaulted "transformed" False Common.boolean EntryRiders.transformed
-  counters <- Fields.defaulted "counters" Map.empty (Common.keyedList counter) EntryRiders.counters
-  underOwner <- Fields.defaulted "underOwner" False Common.boolean EntryRiders.underOwner
-  exiledFaceDown <- Fields.defaulted "exiledFaceDown" False Common.boolean EntryRiders.exiledFaceDown
-  attachedTo <- Fields.defaulted "attachedTo" Nothing (Common.maybe SlotName.codec) EntryRiders.attachedTo
-  faceDown <- Fields.defaulted "faceDown" Nothing (Common.maybe (FaceDownState.codec abilityCodec)) EntryRiders.faceDown
-  noted <- Fields.defaulted "noted" False Common.boolean EntryRiders.noted
-  characteristics <- Fields.defaulted "characteristics" Seq.empty (Common.seq (Modification.codec abilityCodec)) EntryRiders.characteristics
+  tapped <- Fields.defaulted "tapped" (EntryRiders.tapped EntryRiders.defaultValue) TapState.codec EntryRiders.tapped
+  attacking <- Fields.defaulted "attacking" (EntryRiders.attacking EntryRiders.defaultValue) (Common.maybe EntryAttack.codec) EntryRiders.attacking
+  blocking <- Fields.defaulted "blocking" (EntryRiders.blocking EntryRiders.defaultValue) (Common.maybe EntryBlock.codec) EntryRiders.blocking
+  transformed <- Fields.defaulted "transformed" (EntryRiders.transformed EntryRiders.defaultValue) Common.boolean EntryRiders.transformed
+  counters <- Fields.defaulted "counters" (EntryRiders.counters EntryRiders.defaultValue) (Common.keyedList counter) EntryRiders.counters
+  underOwner <- Fields.defaulted "underOwner" (EntryRiders.underOwner EntryRiders.defaultValue) Common.boolean EntryRiders.underOwner
+  exiledFaceDown <- Fields.defaulted "exiledFaceDown" (EntryRiders.exiledFaceDown EntryRiders.defaultValue) Common.boolean EntryRiders.exiledFaceDown
+  attachedTo <- Fields.defaulted "attachedTo" (EntryRiders.attachedTo EntryRiders.defaultValue) (Common.maybe SlotName.codec) EntryRiders.attachedTo
+  faceDown <- Fields.defaulted "faceDown" (EntryRiders.faceDown EntryRiders.defaultValue) (Common.maybe (FaceDownState.codec abilityCodec)) EntryRiders.faceDown
+  noted <- Fields.defaulted "noted" (EntryRiders.noted EntryRiders.defaultValue) Common.boolean EntryRiders.noted
+  characteristics <- Fields.defaulted "characteristics" (EntryRiders.characteristics EntryRiders.defaultValue) (Common.seq (Modification.codec abilityCodec)) EntryRiders.characteristics
   pure
     EntryRiders.MkEntryRiders
       { EntryRiders.tapped = tapped,
@@ -69,28 +61,3 @@ codec abilityCodec = Fields.object $ do
         EntryRiders.noted = noted,
         EntryRiders.characteristics = characteristics
       }
-
--- | The value every carrier elides: a card file carries riders only when the
--- effect really does say otherwise (CR 110.5b for tapped, CR 508.4 for a
--- creature put onto the battlefield attacking, CR 509.4 for one put onto the
--- battlefield blocking, CR 303.4i for the object it arrives attached to, CR
--- 712.14 for the front face a
--- double-faced card enters showing by default, CR 122.6 for the counters an
--- object enters with, CR 110.2a for who it enters under, CR 406.3 for an exiled
--- card being kept face up, CR 110.5b for a permanent entering face up, CR
--- 611.2e for a permanent entering under no effect of the instruction's).
-defaultValue :: EntryRiders.EntryRiders count ability
-defaultValue =
-  EntryRiders.MkEntryRiders
-    { EntryRiders.tapped = defaultTapped,
-      EntryRiders.attacking = Nothing,
-      EntryRiders.blocking = Nothing,
-      EntryRiders.transformed = False,
-      EntryRiders.counters = Map.empty,
-      EntryRiders.underOwner = False,
-      EntryRiders.exiledFaceDown = False,
-      EntryRiders.attachedTo = Nothing,
-      EntryRiders.faceDown = Nothing,
-      EntryRiders.noted = False,
-      EntryRiders.characteristics = Seq.empty
-    }
