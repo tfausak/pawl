@@ -11,24 +11,32 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "ReduceSpellCost",
+            "type": "ModifyCost",
             "value": {
-              "reduction": [
-                {
-                  "type": "MonocoloredHybrid",
-                  "value": {
-                    "type": "Colored",
-                    "value": {
-                      "type": "Black"
+              "change": {
+                "type": "Reduce",
+                "value": {
+                  "amount": [
+                    {
+                      "type": "MonocoloredHybrid",
+                      "value": {
+                        "type": "Colored",
+                        "value": {
+                          "type": "Black"
+                        }
+                      }
                     }
-                  }
+                  ]
                 }
-              ],
-              "whichSpells": {
+              },
+              "matching": {
                 "type": "HasColor",
                 "value": {
                   "type": "Black"
                 }
+              },
+              "subject": {
+                "type": "Spells"
               }
             }
           },

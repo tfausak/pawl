@@ -11,32 +11,40 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "ReduceSpellCost",
+            "type": "ModifyCost",
             "value": {
-              "reduction": [
-                {
-                  "type": "Hybrid",
-                  "value": {
-                    "left": {
-                      "type": "Colored",
+              "change": {
+                "type": "Reduce",
+                "value": {
+                  "amount": [
+                    {
+                      "type": "Hybrid",
                       "value": {
-                        "type": "White"
-                      }
-                    },
-                    "right": {
-                      "type": "Colored",
-                      "value": {
-                        "type": "Black"
+                        "left": {
+                          "type": "Colored",
+                          "value": {
+                            "type": "White"
+                          }
+                        },
+                        "right": {
+                          "type": "Colored",
+                          "value": {
+                            "type": "Black"
+                          }
+                        }
                       }
                     }
-                  }
+                  ]
                 }
-              ],
-              "whichSpells": {
+              },
+              "matching": {
                 "type": "HasColor",
                 "value": {
                   "type": "Black"
                 }
+              },
+              "subject": {
+                "type": "Spells"
               }
             }
           },

@@ -13,16 +13,15 @@
 -- says is not printed -- every room ability's trigger condition.
 module Pawl.Engine.Dungeon where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
-import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Card as Card
-import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mint as Mint
@@ -189,11 +188,9 @@ enterable quality gs printingId = case fmap Card.frontFace (Game.cardOfPrinting 
 -- brought back in after it is finished.
 --
 -- CR 309.2a's "they choose a dungeon card they own from outside the game" is the
--- prompt. FILTERED, NOT TRUSTED, `advance`'s and Ring.tempt's posture: an answer
--- naming a printing this player does not own falls back to the first offered,
--- since entering is mandatory. Raised only for two or more, one `enterable`
--- dungeon leaving nothing to ask -- which is how CR 701.49d normally costs a
--- prompt rather than adding one.
+-- prompt, asked through Game.chooseAmong, since entering is mandatory. One
+-- `enterable` dungeon leaves nothing to ask -- which is how CR 701.49d normally
+-- costs a prompt rather than adding one.
 --
 -- Ascending by interned id, so both the single-dungeon shortcut and a transcript
 -- are deterministic -- `advance`'s ordering for its arrows.
@@ -209,34 +206,28 @@ enter pid quality = do
   gs0 <- State.get
   let owned = maybe Set.empty Player.dungeons (Map.lookup pid (GameState.players gs0))
       eligible = Set.filter (enterable quality gs0) owned
-  case NonEmpty.nonEmpty (Set.toAscList eligible) of
-    Nothing -> pure ()
-    Just offered -> do
-      printingId <- case offered of
-        only NonEmpty.:| [] -> pure only
-        first NonEmpty.:| _ -> do
-          answer <- Game.choose (Prompt.ChooseDungeon (Decide.deciderFor pid gs0) pid offered)
-          pure (if List.elem answer (NonEmpty.toList offered) then answer else first)
-      -- Re-read, because Game.choose above wrote the answer into the transcript:
-      -- gs0 is the state before the prompt and minting off it would drop that.
-      gs <- State.get
-      let (oid, gs1) = Game.freshObjectId gs
-          (ts, gs2) = Game.freshTimestamp gs1
-          obj =
-            (Object.newSettled pid (Source.OfCard printingId) Zone.Command ts)
-              { Object.identity = Just (Game.mintIdentity oid pid),
-                -- CR 309.4a: "as a player puts a dungeon they own into the command
-                -- zone, they put their venture marker on the topmost room".
-                Object.ventureRoom = Just RoomIndex.topmost
-              }
-          gs3 =
-            Game.insertIntoZone
-              Zone.Command
-              LibraryPosition.defaultValue
-              pid
-              oid
-              gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2)}
-      State.put (Event.recordEvent (GameEvent.VentureMarkerEntered (VentureMarkerEntered.MkVentureMarkerEntered pid oid RoomIndex.topmost)) gs3)
+  picked <- Game.chooseAmong Prompt.ChooseDungeon pid (Set.toAscList eligible)
+  Monad.forM_ picked $ \printingId -> do
+    -- Re-read, because the choice above wrote the answer into the transcript:
+    -- gs0 is the state before the prompt and minting off it would drop that.
+    gs <- State.get
+    let (oid, gs1) = Game.freshObjectId gs
+        (ts, gs2) = Game.freshTimestamp gs1
+        obj =
+          (Object.newSettled pid (Source.OfCard printingId) Zone.Command ts)
+            { Object.identity = Just (Game.mintIdentity oid pid),
+              -- CR 309.4a: "as a player puts a dungeon they own into the command
+              -- zone, they put their venture marker on the topmost room".
+              Object.ventureRoom = Just RoomIndex.topmost
+            }
+        gs3 =
+          Game.insertIntoZone
+            Zone.Command
+            LibraryPosition.defaultValue
+            pid
+            oid
+            gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2)}
+    State.put (Event.recordEvent (GameEvent.VentureMarkerEntered (VentureMarkerEntered.MkVentureMarkerEntered pid oid RoomIndex.topmost)) gs3)
 
 -- CR 309.5b \/ 701.49c: remove a finished dungeon card from the game. Also the
 -- CR 704.5t state-based action's action, which is why it takes an id rather than a
@@ -290,27 +281,20 @@ remove oid gs = case Game.lookupObject oid gs of
 -- CR 701.49b: move the marker along one arrow out of the room it is on.
 --
 -- The arrow is the player's choice where there are several (CR 309.5a) and no
--- choice at all where there is one. FILTERED, NOT TRUSTED, Ring.tempt's posture:
--- an answer naming a room no arrow leads to falls back to the first offered, since
--- the move is mandatory.
+-- choice at all where there is one, asked through Game.chooseAmong, since the
+-- move is mandatory.
 advance :: PlayerId -> ObjectId -> RoomIndex.RoomIndex -> Game ()
 advance pid oid room = do
   -- Ascending, so both the single-arrow shortcut and a transcript are
   -- deterministic -- Ring.tempt's posture.
-  let nonEmptyExits = NonEmpty.nonEmpty . Set.toAscList
   gs <- State.get
-  case roomAt room (roomsOf oid gs) >>= (nonEmptyExits . DungeonRoom.exits) of
-    Nothing -> pure ()
-    Just offered -> do
-      chosen <- case offered of
-        only NonEmpty.:| [] -> pure only
-        first NonEmpty.:| _ -> do
-          answer <- Game.choose (Prompt.ChooseRoom (Decide.deciderFor pid gs) pid oid offered)
-          pure (if List.elem answer (NonEmpty.toList offered) then answer else first)
-      State.modify' $ \g ->
-        Event.recordEvent
-          (GameEvent.VentureMarkerEntered (VentureMarkerEntered.MkVentureMarkerEntered pid oid chosen))
-          g {GameState.objects = Map.adjust (\o -> o {Object.ventureRoom = Just chosen}) oid (GameState.objects g)}
+  let exits = foldMap (Set.toAscList . DungeonRoom.exits) (roomAt room (roomsOf oid gs))
+  picked <- Game.chooseAmong (\decider asked -> Prompt.ChooseRoom decider asked oid) pid exits
+  Monad.forM_ picked $ \chosen ->
+    State.modify' $ \g ->
+      Event.recordEvent
+        (GameEvent.VentureMarkerEntered (VentureMarkerEntered.MkVentureMarkerEntered pid oid chosen))
+        g {GameState.objects = Map.adjust (\o -> o {Object.ventureRoom = Just chosen}) oid (GameState.objects g)}
 
 -- | CR 701.49: venture into the dungeon.
 --

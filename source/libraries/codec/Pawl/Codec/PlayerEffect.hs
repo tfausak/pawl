@@ -1,15 +1,12 @@
 module Pawl.Codec.PlayerEffect where
 
-import qualified Pawl.Codec.AddActivationCost as AddActivationCost
-import qualified Pawl.Codec.AddSpellCost as AddSpellCost
 import qualified Pawl.Codec.AlternativeActivationCost as AlternativeActivationCost
 import qualified Pawl.Codec.CantSearchLibraries as CantSearchLibraries
 import qualified Pawl.Codec.CastFromZone as CastFromZone
+import qualified Pawl.Codec.CostModifier as CostModifier
 import qualified Pawl.Codec.DamagePattern as DamagePattern
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.InZone as InZone
-import qualified Pawl.Codec.IncreaseActivationCost as IncreaseActivationCost
-import qualified Pawl.Codec.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.KeywordDesignator as KeywordDesignator
 import qualified Pawl.Codec.ManaFilter as ManaFilter
@@ -17,8 +14,6 @@ import qualified Pawl.Codec.ModifiedRoll as ModifiedRoll
 import qualified Pawl.Codec.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Codec.PlayerScope as PlayerScope
 import qualified Pawl.Codec.PlotFromZone as PlotFromZone
-import qualified Pawl.Codec.ReduceActivationCost as ReduceActivationCost
-import qualified Pawl.Codec.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Codec.SpendManaAsThough as SpendManaAsThough
 import qualified Pawl.Codec.StatedFlip as StatedFlip
 import qualified Pawl.JsonCodec.Arm as Arm
@@ -36,13 +31,8 @@ codec =
         [ Arm.nullary "CantCastSpells" PlayerEffect.CantCastSpells,
           Arm.payload "CantActivateAbilities" (Common.maybe KeywordDesignator.codec) PlayerEffect.CantActivateAbilities (\x -> case x of PlayerEffect.CantActivateAbilities y -> Just y; _ -> Nothing),
           Arm.payload "CantCastMoreThan" Common.natural PlayerEffect.CantCastMoreThan (\x -> case x of PlayerEffect.CantCastMoreThan y -> Just y; _ -> Nothing),
-          Arm.payload "IncreaseSpellCost" IncreaseSpellCost.codec PlayerEffect.IncreaseSpellCost (\x -> case x of PlayerEffect.IncreaseSpellCost y -> Just y; _ -> Nothing),
-          Arm.payload "IncreaseActivationCost" IncreaseActivationCost.codec PlayerEffect.IncreaseActivationCost (\x -> case x of PlayerEffect.IncreaseActivationCost y -> Just y; _ -> Nothing),
-          Arm.payload "ReduceSpellCost" ReduceSpellCost.codec PlayerEffect.ReduceSpellCost (\x -> case x of PlayerEffect.ReduceSpellCost y -> Just y; _ -> Nothing),
-          Arm.payload "ReduceActivationCost" ReduceActivationCost.codec PlayerEffect.ReduceActivationCost (\x -> case x of PlayerEffect.ReduceActivationCost y -> Just y; _ -> Nothing),
-          Arm.payload "AddActivationCost" AddActivationCost.codec PlayerEffect.AddActivationCost (\x -> case x of PlayerEffect.AddActivationCost y -> Just y; _ -> Nothing),
+          Arm.payload "ModifyCost" CostModifier.codec PlayerEffect.ModifyCost (\x -> case x of PlayerEffect.ModifyCost y -> Just y; _ -> Nothing),
           Arm.payload "AlternativeActivationCost" AlternativeActivationCost.codec PlayerEffect.AlternativeActivationCost (\x -> case x of PlayerEffect.AlternativeActivationCost y -> Just y; _ -> Nothing),
-          Arm.payload "AddSpellCost" AddSpellCost.codec PlayerEffect.AddSpellCost (\x -> case x of PlayerEffect.AddSpellCost y -> Just y; _ -> Nothing),
           Arm.payload "PlayAdditionalLands" Common.natural PlayerEffect.PlayAdditionalLands (\x -> case x of PlayerEffect.PlayAdditionalLands y -> Just y; _ -> Nothing),
           Arm.nullary "NoMaximumHandSize" PlayerEffect.NoMaximumHandSize,
           Arm.payload "SetMaximumHandSize" Common.natural PlayerEffect.SetMaximumHandSize (\x -> case x of PlayerEffect.SetMaximumHandSize y -> Just y; _ -> Nothing),
@@ -85,13 +75,8 @@ tagOf x = case x of
   PlayerEffect.CantCastSpells {} -> "CantCastSpells"
   PlayerEffect.CantActivateAbilities {} -> "CantActivateAbilities"
   PlayerEffect.CantCastMoreThan {} -> "CantCastMoreThan"
-  PlayerEffect.IncreaseSpellCost {} -> "IncreaseSpellCost"
-  PlayerEffect.IncreaseActivationCost {} -> "IncreaseActivationCost"
-  PlayerEffect.ReduceSpellCost {} -> "ReduceSpellCost"
-  PlayerEffect.ReduceActivationCost {} -> "ReduceActivationCost"
-  PlayerEffect.AddActivationCost {} -> "AddActivationCost"
+  PlayerEffect.ModifyCost {} -> "ModifyCost"
   PlayerEffect.AlternativeActivationCost {} -> "AlternativeActivationCost"
-  PlayerEffect.AddSpellCost {} -> "AddSpellCost"
   PlayerEffect.PlayAdditionalLands {} -> "PlayAdditionalLands"
   PlayerEffect.NoMaximumHandSize {} -> "NoMaximumHandSize"
   PlayerEffect.SetMaximumHandSize {} -> "SetMaximumHandSize"

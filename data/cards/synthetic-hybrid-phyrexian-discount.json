@@ -11,26 +11,34 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "ReduceSpellCost",
+            "type": "ModifyCost",
             "value": {
-              "reduction": [
-                {
-                  "type": "HybridPhyrexian",
-                  "value": {
-                    "left": {
-                      "type": "Green"
-                    },
-                    "right": {
-                      "type": "Blue"
+              "change": {
+                "type": "Reduce",
+                "value": {
+                  "amount": [
+                    {
+                      "type": "HybridPhyrexian",
+                      "value": {
+                        "left": {
+                          "type": "Green"
+                        },
+                        "right": {
+                          "type": "Blue"
+                        }
+                      }
                     }
-                  }
+                  ]
                 }
-              ],
-              "whichSpells": {
+              },
+              "matching": {
                 "type": "HasColor",
                 "value": {
                   "type": "Green"
                 }
+              },
+              "subject": {
+                "type": "Spells"
               }
             }
           },

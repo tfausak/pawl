@@ -30,22 +30,32 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "AddActivationCost",
+            "type": "ModifyCost",
             "value": {
-              "components": [
-                {
-                  "type": "AddLoyaltyToThis",
-                  "value": 1
+              "change": {
+                "type": "Add",
+                "value": {
+                  "components": [
+                    {
+                      "type": "AddLoyaltyToThis",
+                      "value": 1
+                    }
+                  ]
                 }
-              ],
-              "whichAbilities": {
+              },
+              "matching": {
                 "type": "HasCardType",
                 "value": {
                   "type": "Planeswalker"
                 }
               },
-              "whichLoyalty": {
-                "type": "LoyaltyAbility"
+              "subject": {
+                "type": "Activations",
+                "value": {
+                  "whichLoyalty": {
+                    "type": "LoyaltyAbility"
+                  }
+                }
               }
             }
           },

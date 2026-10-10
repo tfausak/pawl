@@ -41,7 +41,7 @@
 -- loyalty cost to somebody else's loyalty ability, which is what makes CR 606.5
 -- observable. Only the second sentence is read here; the first -- the
 -- enters-or-planeswalker-dies trigger -- is Pawl.MassEffectSpec's CarthTheLion
--- group. Its "loyalty abilities" is AddActivationCost.whichLoyalty, which asks CR
+-- group. Its "loyalty abilities" is ActivationCriteria.whichLoyalty, which asks CR
 -- 606.2 of the ability being activated where whichAbilities can only ask about
 -- the source permanent; data/scenarios/planeswalker is what proves the two are
 -- not the same question.

@@ -18,7 +18,7 @@ module Pawl.Types.LoyaltyKind where
 -- A TYPE and not a Bool, and read at two different scales, which is why one type
 -- serves both: Pawl.Engine.PlayerEffect.activationCostAdjustmentsGiven is told
 -- which kind the ability being adjusted IS, and
--- Pawl.Types.AddActivationCost.whichLoyalty says which kind an adjustment
+-- Pawl.Types.ActivationCriteria.whichLoyalty says which kind an adjustment
 -- APPLIES to.
 data LoyaltyKind
   = -- | CR 606.2: a loyalty symbol in the ability's cost.

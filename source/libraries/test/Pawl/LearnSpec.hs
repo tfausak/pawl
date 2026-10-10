@@ -17,6 +17,7 @@
 module Pawl.LearnSpec where
 
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Numeric.Natural as Natural
@@ -158,3 +159,24 @@ spec s registry = Spec.describe s "Learn" $ do
     Spec.assertEqWith s "CR 701.48a nothing was discarded" (discardedBy cram after) []
     Spec.assertEqWith s "CR 701.48a and the pool is untouched" (poolOf S.alice after) (poolOf S.alice before)
     Spec.assertEqWith s "and the spell still resolved" (lifeOf S.alice after) (lifeOf S.alice before + 4)
+  -- The first branch's board with a second card in her hand, so the discard is
+  -- a choice. S.addHandCard puts the Ornithopter in FRONT of the Hill Giant, so
+  -- the answer below, the last card offered, names the Giant: a learn that took
+  -- the offered set's front would discard the Ornithopter instead.
+  Spec.it s "CR 701.48a with two cards in hand the learner chooses which to discard" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    cram <- S.printingOf s registry "Cram Session"
+    giant <- S.printingOf s registry "Hill Giant"
+    plains <- S.printingOf s registry "Plains"
+    lesson <- S.printingOf s registry "Airbending Lesson"
+    sorcery <- S.printingOf s registry "Sign in Blood"
+    flier <- S.printingOf s registry "Ornithopter"
+    let (spell, bare) = board swamp cram giant plains lesson sorcery
+        (_, before) = S.addHandCard flier S.alice bare
+        taking p = case p of
+          Prompt.ChooseCardInHand _ _ _ cards -> NonEmpty.last cards
+          _ -> learning (Just LearnMode.DiscardAndDraw) p
+        cast = S.runPure taking before (S.cast S.alice spell)
+        after = S.runPure taking cast Stack.resolveTop
+    Spec.assertEqWith s "CR 701.48a the chosen Hill Giant is in her graveyard" (discardedBy cram after) [giant]
+    Spec.assertEqWith s "and the Ornithopter stayed in her hand beside the drawn Plains" (List.sort (printingsIn Zone.Hand S.alice after)) (List.sort [flier, plains])

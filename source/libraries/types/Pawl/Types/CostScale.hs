@@ -3,7 +3,7 @@ module Pawl.Types.CostScale where
 import qualified Pawl.Types.Color as Color
 
 -- | CR 601.2f: how many times an effect's added components join the cost it is
--- adjusting. Rides Pawl.Types.AddActivationCost and Pawl.Types.AddSpellCost,
+-- adjusting. Rides Pawl.Types.CostAddition,
 -- and is cashed by Pawl.Engine.Cost.plusComponents against the cost CR 601.2b
 -- announced -- before CR 601.2f's reductions, which is the ordering that rule
 -- states.

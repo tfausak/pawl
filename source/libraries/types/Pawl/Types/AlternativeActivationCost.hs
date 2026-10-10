@@ -14,7 +14,7 @@ data AlternativeActivationCost = MkAlternativeActivationCost
     -- EQUIP cost", compared through Pawl.Types.ActivatedAbility.keyword.
     grantedBy :: KeywordDesignator.KeywordDesignator,
     -- | "Of the FIRST equip ability you activate each turn", read exactly as
-    -- Pawl.Types.ReduceActivationCost.onlyFirst is. Nothing is every matching
+    -- Pawl.Types.CostModifier.onlyFirst is. Nothing is every matching
     -- activation.
     onlyFirst :: Maybe TurnScope.TurnScope,
     -- | What is paid instead: the {0}.

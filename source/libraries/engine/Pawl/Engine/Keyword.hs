@@ -5478,7 +5478,7 @@ printedZone keyword = case keyword of
   _ -> Nothing
 
 -- CR 702: does a card's designator name the keyword whose rules this ability is
--- under? The comparison Pawl.Types.ReduceActivationCost.grantedBy is put through,
+-- under? The comparison Pawl.Types.ActivationCriteria.grantedBy is put through,
 -- against the stamp Pawl.Types.ActivatedAbility.keyword carries.
 --
 -- TWO ARMS because rule 702 writes ability-bearing keywords two ways; see

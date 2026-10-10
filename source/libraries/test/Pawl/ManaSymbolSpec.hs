@@ -1111,6 +1111,21 @@ totalCostSpec s registry = Spec.describe s "TotalCost" $ do
     Spec.assertEqWith s "CR 601.2f no life paid: both Swamps paid both symbols" (S.lifeOf S.alice resolved) (Just 20)
     Spec.assertEqWith s "both symbols were asked" (phyrexianAnnouncements asked) [PhyrexianPayment.PaysMana, PhyrexianPayment.PaysMana]
     Spec.assertEqWith s "and both Swamps tapped" (S.tappedCount S.alice resolved) 2
+  -- The INCREASE the other way round: bob's Kopala, Warden of Waves taxes the
+  -- only legal target, so Dismember costs {3}{B/P}{B/P} and three Swamps pay it
+  -- only with life for both symbols. Priced with no target it would cost
+  -- {1}{B/P}{B/P}, and the first symbol's mana route would be offered though no
+  -- legal aiming can pay it.
+  Spec.it s "CR 601.2c Dismember at a Merfolk under Kopala is priced with its target" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    kopala <- S.printingOf s registry "Kopala, Warden of Waves"
+    dismember <- S.printingOf s registry "Dismember"
+    let (_, withKopala) = S.addPermanent kopala S.bob (S.landsInPlay swamp 3)
+        (gs, dismemberId) = S.handOne dismember withKopala
+        (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysMana) gs dismemberId
+    Spec.assertEqWith s "CR 601.2f neither symbol was a choice: both were forced to life" (phyrexianAnnouncements asked) []
+    Spec.assertEqWith s "4 life paid them" (S.lifeOf S.alice resolved) (Just 16)
+    Spec.assertEqWith s "and three Swamps paid {3}" (S.tappedCount S.alice resolved) 3
 
 -- Dismember ({1}{B/P}{B/P}) -- the first card in the pool with more than one
 -- Phyrexian mana symbol, and so the first to exercise CR 601.2b's "for each of

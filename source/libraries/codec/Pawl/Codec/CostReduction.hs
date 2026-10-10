@@ -15,7 +15,7 @@ import qualified Pawl.Types.CostDirection as CostDirection.Type
 import qualified Pawl.Types.CostReduction as CostReduction
 
 -- | A bare object keyed by the record's field names, the shape
--- Pawl.Codec.ReduceSpellCost takes.
+-- Pawl.Codec.AppliedReduction takes.
 --
 -- 'amount' and 'perEach' are REQUIRED: Ertai's Scorn's fixed reduction spells
 -- its Literal 1 'perEach' out rather than leaning on a default. An absent

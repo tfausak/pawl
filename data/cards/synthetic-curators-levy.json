@@ -20,25 +20,33 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "AddSpellCost",
+            "type": "ModifyCost",
             "value": {
-              "components": [
-                {
-                  "type": "DiscardCards",
-                  "value": {
-                    "count": 1,
-                    "whichCards": {
-                      "type": "HasCardType",
+              "change": {
+                "type": "Add",
+                "value": {
+                  "components": [
+                    {
+                      "type": "DiscardCards",
                       "value": {
-                        "type": "Creature"
+                        "count": 1,
+                        "whichCards": {
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Creature"
+                          }
+                        }
                       }
                     }
-                  }
+                  ]
                 }
-              ],
-              "whichSpells": {
+              },
+              "matching": {
                 "type": "And",
                 "value": []
+              },
+              "subject": {
+                "type": "Spells"
               }
             }
           },

@@ -141,22 +141,20 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "ReduceActivationCost",
+            "type": "ModifyCost",
             "value": {
-              "floor": 0,
-              "grantedBy": {
-                "type": "OfNullary",
+              "change": {
+                "type": "Reduce",
                 "value": {
-                  "type": "Exhaust"
+                  "amount": [
+                    {
+                      "type": "Generic",
+                      "value": 2
+                    }
+                  ]
                 }
               },
-              "reduction": [
-                {
-                  "type": "Generic",
-                  "value": 2
-                }
-              ],
-              "whichAbilities": {
+              "matching": {
                 "type": "And",
                 "value": [
                   {
@@ -172,6 +170,17 @@
                     }
                   }
                 ]
+              },
+              "subject": {
+                "type": "Activations",
+                "value": {
+                  "grantedBy": {
+                    "type": "OfNullary",
+                    "value": {
+                      "type": "Exhaust"
+                    }
+                  }
+                }
               }
             }
           },

@@ -287,7 +287,7 @@ recordActivation srcId ability gs =
         ((if prints ActivationRestriction.OnlyOnce then perGame else id) gs)
 
 -- CR 602.2: log that `pid` began activating an ability of `srcId` aimed at
--- `targets`, for Pawl.Types.ReduceActivationCost.onlyFirst to count. The source
+-- `targets`, for Pawl.Types.CostModifier.onlyFirst to count. The source
 -- and targets are snapshotted off `asOf`, the board the activation began on, so
 -- a cost that sacrificed the source still leaves it recorded as it was.
 --

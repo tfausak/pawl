@@ -151,21 +151,31 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "ReduceActivationCost",
+            "type": "ModifyCost",
             "value": {
-              "floor": 1,
-              "reduction": [
-                {
-                  "type": "Generic",
-                  "value": 2
+              "change": {
+                "type": "Reduce",
+                "value": {
+                  "amount": [
+                    {
+                      "type": "Generic",
+                      "value": 2
+                    }
+                  ],
+                  "atLeast": 1
                 }
-              ],
-              "whichAbilities": {
+              },
+              "matching": {
                 "type": "And",
                 "value": []
               },
-              "whichKind": {
-                "type": "NonManaAbility"
+              "subject": {
+                "type": "Activations",
+                "value": {
+                  "whichKind": {
+                    "type": "NonManaAbility"
+                  }
+                }
               }
             }
           },

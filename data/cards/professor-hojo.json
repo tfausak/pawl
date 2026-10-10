@@ -21,21 +21,29 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "ReduceActivationCost",
+            "type": "ModifyCost",
             "value": {
-              "floor": 0,
+              "change": {
+                "type": "Reduce",
+                "value": {
+                  "amount": [
+                    {
+                      "type": "Generic",
+                      "value": 2
+                    }
+                  ]
+                }
+              },
+              "matching": {
+                "type": "And",
+                "value": []
+              },
               "onlyFirst": {
                 "type": "ControllersTurn"
               },
-              "reduction": [
-                {
-                  "type": "Generic",
-                  "value": 2
-                }
-              ],
-              "whichAbilities": {
-                "type": "And",
-                "value": []
+              "subject": {
+                "type": "Activations",
+                "value": {}
               },
               "whichTargets": {
                 "type": "And",

@@ -11,18 +11,26 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "ReduceSpellCost",
+            "type": "ModifyCost",
             "value": {
-              "reduction": [
-                {
-                  "type": "Snow"
+              "change": {
+                "type": "Reduce",
+                "value": {
+                  "amount": [
+                    {
+                      "type": "Snow"
+                    }
+                  ]
                 }
-              ],
-              "whichSpells": {
+              },
+              "matching": {
                 "type": "HasColor",
                 "value": {
                   "type": "Green"
                 }
+              },
+              "subject": {
+                "type": "Spells"
               }
             }
           },
