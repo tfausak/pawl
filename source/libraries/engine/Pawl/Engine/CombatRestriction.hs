@@ -42,7 +42,6 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.RuleAbilities as RuleAbilities.Engine
-import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
@@ -219,7 +218,7 @@ storedSubjects :: [ObjectId] -> GameState -> ActiveAttackProhibition.ActiveAttac
 storedSubjects candidates gs active = case ActiveAttackProhibition.affected active of
   RestrictedCreatures.Named oid -> filter (== oid) candidates
   RestrictedCreatures.Matching f ->
-    let context = SourceContext.sourceContext gs (Just (ActiveAttackProhibition.controller active)) (ActiveAttackProhibition.source active)
+    let context = Projection.sourceContext gs (Just (ActiveAttackProhibition.controller active)) (ActiveAttackProhibition.source active)
      in filter (\oid -> Filter.matches context (Projection.viewOfObject oid gs) f) candidates
 
 -- CR 509.1b / 611.1: the candidates a stored, resolution-generated restriction
@@ -739,7 +738,7 @@ lifted defending gs (source, changes, restriction) = case gate restriction of
   Just condition ->
     Condition.holds
       (Projection.fullView gs)
-      (SourceContext.sourceContext gs (Projection.controllerOf source gs) source)
+      (Projection.sourceContext gs (Projection.controllerOf source gs) source)
         { Filter.defendingPlayers = Maybe.maybeToList defending
         }
       gs
@@ -939,7 +938,7 @@ cantBeBlockedBy defending blockers attackers gs =
               -- attacker (Affected.Matching Filter.IsSource), so the chosen
               -- player comes off the same object the power does.
               context attacker =
-                (Filter.contextComparingPower (Game.teams gs) (Projection.controllerOf attacker gs) attacker (Projection.powerOf attacker gs) (Projection.toughnessOf attacker gs))
+                (Projection.pairwiseContext gs attacker)
                   { Filter.carrierChosenPlayer = Game.lookupObject attacker gs >>= Object.chosenPlayer
                   }
               matched attacker blocker = Filter.matches (context attacker) (Projection.viewOfObject blocker gs) wanted
@@ -987,7 +986,7 @@ barredBlocks blockers attackers gs =
 storedEvasions :: [ObjectId] -> [ObjectId] -> GameState -> Set (ObjectId, ObjectId)
 storedEvasions blockers attackers gs =
   let evading active =
-        let context = SourceContext.sourceContext gs (Just (ActiveEvasion.controller active)) (ActiveEvasion.source active)
+        let context = Projection.sourceContext gs (Just (ActiveEvasion.controller active)) (ActiveEvasion.source active)
          in filter (\oid -> Filter.matches context (Projection.viewOfObject oid gs) (ActiveEvasion.affected active)) attackers
       evaders = concatMap evading (GameState.evasions gs)
    in Set.fromList [(blocker, attacker) | attacker <- evaders, blocker <- blockers]
@@ -1011,7 +1010,7 @@ cantBlockCreatures defending blockers attackers gs =
         Just (affected, criterion) ->
           let subject = if null changes then affected else Projection.rewriteAffected changes affected
               wanted = if null changes then criterion else Filter.rewrite changes criterion
-              context blocker = Filter.contextComparingPower (Game.teams gs) (Projection.controllerOf blocker gs) blocker (Projection.powerOf blocker gs) (Projection.toughnessOf blocker gs)
+              context = Projection.pairwiseContext gs
               matched blocker attacker = Filter.matches (context blocker) (Projection.viewOfObject attacker gs) wanted
               barred blocker = fmap (\attacker -> (blocker, attacker)) (filter (matched blocker) attackers)
               -- CR 116.2d, `cantBeBlockedBy`'s filter with the BLOCKERS as the

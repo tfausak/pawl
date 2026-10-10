@@ -454,8 +454,8 @@ triggerConditionAtoms tag value = case value of
   Value.Number _ -> 0
 
 -- How many `tag` atoms sit in a wish's filter -- the payload of a
--- "FromOutsideTheGame" arm, an effect's or a draw rewrite's -- the one position
--- Pawl.Engine.Event.eligible matches with the source's power filled.
+-- "FromOutsideTheGame" arm, an effect's or a draw rewrite's -- the position
+-- Pawl.Engine.Event.eligible matches (Synthetic Wishful Djinn).
 wishFilterAtoms :: Text.Text -> Value.Value -> Int
 wishFilterAtoms tag value = case value of
   Value.Object o ->
@@ -901,7 +901,7 @@ sameNameAsBoundCounts card =
 -- Pawl.Engine.Target.admittedGiven, matching a MODE's target slot Filter, and
 -- Pawl.Engine.Resolve.Slots.effectContext, which all but one of a resolution's
 -- positions go through -- the search filter and the mill tally among them.
--- Filter.contextFor and Filter.contextComparingPower leave it empty, so
+-- Filter.contextFor leaves it empty, so
 -- Filter.SameNameAsBound in a Count filter read outside a resolution, an
 -- affected set or a cost criterion is a silent False rather than a rejected card. This is where that is made loud.
 --
@@ -2512,13 +2512,11 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
       ]
   -- The source-power comparisons are answerable only where the CONTEXT
   -- supplies a source power (or, for PowerAtLeastSourceToughness, a source
-  -- toughness, filled by the same callers): Filter.Context.sourcePower is filled by
-  -- Pawl.Engine.Target.admittedGiven for a target slot (CR 702.134a), by
-  -- Pawl.Engine.Event.matchesTrigger for CR 702.149a's condition and by
-  -- Pawl.Engine.CombatRestriction's two CR 509.1b pairwise walks, and (power
-  -- alone) by Pawl.Engine.Event.eligible for a wish's filter, and is Nothing
-  -- everywhere else -- so either atom in a card's affected set, Count filter or
-  -- search filter would be a silent False. Outside a face's own pairwise
+  -- toughness): Pawl.Engine.Projection.withCharacteristicsOf fills both, for
+  -- every context Projection.sourceContext frames and for CR 509.1b's pairwise
+  -- walks, and they are Nothing inside the CR 613 layer fold and in a bare
+  -- Filter.contextFor -- so either atom in a card's affected set or static
+  -- condition would be a silent False. Outside a face's own pairwise
   -- position (Spitfire Handler's, Ironclaw Curse's) and a wish's filter
   -- (Synthetic Wishful Djinn's), only Pawl.Engine.Keyword's mentor and
   -- training and Pawl.Engine.Ring's emblem write them, and this is what keeps
@@ -2566,11 +2564,8 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                 Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buriedToughness))) Seq.empty
             }
     Spec.assertEqWith s "and so is the toughness comparison" (toughness plantedToughness) 1
-  -- CR 702.85a's comparison is the pair above's one characteristic over, and
-  -- narrower still: Filter.Context.sourceManaValue is filled by
-  -- Pawl.Engine.Resolve.Slots.effectContext and, for a trigger condition, by
-  -- Pawl.Engine.Event.Match's bearer context, so the atom would be a silent False
-  -- in a card's target slot, affected set, Count filter or search filter. Only
+  -- CR 702.85a's comparison is the pair above's one characteristic over,
+  -- filled by the same filler and empty in the same positions. Only
   -- Pawl.Engine.Keyword writes it -- cascade, and the equality atom below that CR
   -- 702.53a's transmute and CR 702.71a's transfigure search with -- and this is
   -- what keeps that true.
@@ -2595,8 +2590,8 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
             }
     Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
   -- The pair above's comparison one operator over, which a CARD may write -- but
-  -- only in a triggered ability's own condition, the one position where
-  -- Pawl.Engine.Event.Match fills the source's mana value. Kami of Mourning's
+  -- only in a triggered ability's own condition, the one position a printing
+  -- needs it in. Kami of Mourning's
   -- granted "a creature you control with greater mana value than this card" is
   -- the producer, and it is also what keeps the sweep from being vacuous.
   Spec.it s "CR 202.3 a greater-mana-value-than-source comparison is written only in a trigger condition" $ do
@@ -2608,12 +2603,9 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "no card writes it outside a trigger condition" (fmap (S.nameOf . Printing.card) offenders) []
     kami <- S.printingOf s registry "Kami of Mourning"
     Spec.assertEqWith s "and Kami of Mourning writes it in one" (triggerConditionAtoms tag (encoded (S.combinedFace kami))) 1
-  -- CR 702.60a's comparison sits in the pair above's position and is filled by
-  -- the same one caller (Pawl.Engine.Resolve.Slots.effectContext), so it is
-  -- answerable only inside a resolution's own references and would be a silent
-  -- False in a card's target slot, affected set, Count filter or search filter.
-  -- Only Pawl.Engine.Keyword writes it -- ripple -- and this is what keeps that
-  -- true.
+  -- CR 702.60a's comparison is filled by the same filler and empty in the same
+  -- positions. Only Pawl.Engine.Keyword writes it -- ripple -- and this is what
+  -- keeps that true.
   Spec.it s "CR 702.60a no card writes a source-name comparison" $ do
     ps <- S.allPrintings s
     let atoms c = jsonAtoms (Text.pack "SameNameAsSource") (Codec.encode (Face.Codec.codec Card.codec) c)
@@ -2629,7 +2621,26 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                 Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buried))) Seq.empty
             }
     Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
-  -- CR 702.140a's comparison is the atom above's sibling one characteristic over,
+  -- CR 702.78a's comparison is the atom above's sibling one characteristic
+  -- over, filled by the same filler and empty in the same positions. Only
+  -- Pawl.Engine.Keyword writes it -- conspire -- and this is what keeps that
+  -- true.
+  Spec.it s "CR 702.78a no card writes a source-colour comparison" $ do
+    ps <- S.allPrintings s
+    let atoms c = jsonAtoms (Text.pack "SharesColorWithSource") (Codec.encode (Face.Codec.codec Card.codec) c)
+        offenders = filter (anyFace (\c -> atoms c /= 0) . Printing.card) ps
+    Spec.assertEqWith s "the atom is the engine's alone" (fmap (S.nameOf . Printing.card) offenders) []
+    -- NOT vacuous, the sweeps above's reason: the same counter over a hand-built
+    -- face that DOES carry the atom finds it.
+    piker <- S.printingOf s registry "Goblin Piker"
+    let buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.SharesColorWithSource]]
+        planted =
+          (S.combinedFace piker)
+            { Face.spell =
+                Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buried))) Seq.empty
+            }
+    Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
+  -- CR 702.140a's comparison is the source-name atom's sibling one characteristic over,
   -- and its one filler is Pawl.Engine.Target.slotContext -- so it is answerable
   -- only inside a TARGET SLOT's own filter and would be a silent False in an
   -- affected set, a Count filter, a cost criterion or a search filter. Only

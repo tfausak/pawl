@@ -289,7 +289,7 @@ printedRows gs =
               Just c ->
                 Condition.holds
                   (Projection.fullView gs)
-                  ((SourceContext.sourceContext gs (Just controller) oid) {Filter.recipient = Just pid})
+                  ((Projection.sourceContext gs (Just controller) oid) {Filter.recipient = Just pid})
                   gs
                   oid
                   (Condition.forCandidate pid (if null changes then c else Projection.rewriteCondition changes c))
@@ -1204,7 +1204,7 @@ contextFrom src oid gs = contextFor (Projection.controllerOf oid gs) src gs
 -- contextFrom with the perspective supplied, which matchesObjectFor above is the
 -- one caller of.
 --
--- A printed row's CR 607.2d choices come from SourceContext.framedBy, read
+-- A printed row's CR 607.2d choices come from Projection.framedBy, read
 -- through CR 608.2h's last known information. A stored row's are its own
 -- instead, baked as it began (RowSource.choices): CR 608.2h determines them
 -- once, so Cheering Fanatic naming a second card leaves the first row's alone
@@ -1216,7 +1216,7 @@ contextFrom src oid gs = contextFor (Projection.controllerOf oid gs) src gs
 contextFor :: Maybe PlayerId -> RowSource -> GameState -> Filter.Context
 contextFor you row gs =
   let src = RowSource.object row
-      frame s = SourceContext.framedWith (Maybe.fromMaybe (SourceContext.choicesOf s gs) (RowSource.choices row)) s gs
+      frame s = Projection.framedWith (Maybe.fromMaybe (SourceContext.choicesOf s gs) (RowSource.choices row)) s gs
    in maybe id frame src (Filter.contextFor (Game.teams gs) you src)
 
 -- CR 601.3a's LOOKAHEAD, asked of a prohibition that matches the spell as it

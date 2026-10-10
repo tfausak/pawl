@@ -353,7 +353,7 @@ manaRoutesOfGiven pcs oid gs =
               (\manaType -> (intrinsicManaCost, [], Nothing, [(intrinsicManaClause manaType, [intrinsicManaAddition manaType])]))
               (Maybe.mapMaybe Subtype.Engine.subtypeMana (Set.toList (PC.subtypes pc)))
         | otherwise = []
-      context = SourceContext.sourceContext gs (Projection.controllerOf oid gs) oid
+      context = Projection.sourceContext gs (Projection.controllerOf oid gs) oid
       applies = maybe True (Condition.holds (Projection.fullView gs) context gs oid) . Clause.condition
       selectionRoutes ability =
         fmap
@@ -670,7 +670,7 @@ pricedOptionsGiven paid pcs oid gs =
       --
       -- The PRICED half reads the same quantity with the payment's slots bound,
       -- and an offer reading one of them reads 0.
-      countContext = SourceContext.sourceContext gs (Projection.controllerOf oid gs) oid
+      countContext = Projection.sourceContext gs (Projection.controllerOf oid gs) oid
       pricedContext = (Projection.framedByBindings gs paid countContext) {Filter.boundAmounts = Map.mapMaybe Binding.Type.amount paid}
       howManyIn context addition = max 0 (Integer.toIntSaturating (Maybe.fromMaybe 0 (Quantity.evaluate (Projection.fullView gs) context gs oid (ManaAddition.count addition))))
       -- CR 105.4's choice is per INSTRUCTION, so the count replicates the unit

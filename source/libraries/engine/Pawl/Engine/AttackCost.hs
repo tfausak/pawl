@@ -22,7 +22,6 @@ import qualified Data.Set as Set
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
-import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackCostScope as AttackCostScope
@@ -140,7 +139,7 @@ costsOn attacker target gs =
       shareOf source ac = case AttackCost.perAttacker ac of
         PerCreature.Fixed cost -> [cost]
         PerCreature.Counted quantity ->
-          let context = SourceContext.sourceContext gs (Projection.controllerOf source gs) source
+          let context = Projection.sourceContext gs (Projection.controllerOf source gs) source
               generic n = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic (Integer.toNaturalSaturating n)])) []
            in Maybe.maybeToList (fmap generic (Quantity.evaluate (Projection.fullView gs) context gs source quantity))
       fromCost source ac =

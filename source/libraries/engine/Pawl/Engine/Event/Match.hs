@@ -24,7 +24,6 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection.View
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.Saga as Saga
-import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AbilityAddsMana as AbilityAddsMana
@@ -2871,17 +2870,17 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- keeps an earlier combat phase's declarations, where the combat record is
   -- cleared per phase.
   --
-  -- The source's power is supplied here rather than left Nothing, which is what
-  -- makes CR 702.149a's PowerGreaterThanSource evaluable at a trigger match at
-  -- all; it is a thunk for the reason Target.admittedGiven's is. Both it and each
-  -- candidate view read through the bearer's last known information (CR 608.2h),
+  -- The source's power comes with Projection.sourceContext, which is what makes
+  -- CR 702.149a's PowerGreaterThanSource evaluable at a trigger match at all.
+  -- Both it and each candidate view read through the bearer's last known
+  -- information (CR 608.2h),
   -- a REGRESSION FENCE rather than a live path: the bearer was declared an
   -- attacker a moment ago and nothing has had priority since.
   TriggerCondition.SelfAttacksWithAnother f -> case event of
     GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _ _ _)
       | oid == bearer ->
           let viewOf = Projection.viewWithLastKnown bearer gs
-              context = SourceContext.framedBy bearer gs (Filter.contextComparingPower (Game.teams gs) (Just you) bearer (Filter.power =<< viewOf bearer) (Filter.toughness =<< viewOf bearer))
+              context = Projection.sourceContext gs (Just you) bearer
               -- Rule 702.149a's "OTHER". Not independently observable while the
               -- Filter's comparison is strict -- nothing has power greater than
               -- its own -- so dropping it leaves the suite green; it is here
@@ -15015,16 +15014,13 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     -- effect named, The Ruinous Powers' "a spell [cast] this way". `bindings`
     -- is empty for every other trigger, so their slot atoms stay vacuous.
     --
-    -- The bearer's mana value too (CR 202.3), lazily, for a condition comparing
-    -- against "this card" (Filter.ManaValueGreaterThanSource): live for a bearer
-    -- in a graveyard, and its last known information for one the event itself
-    -- removed, CR 603.10a's look back. Pawl.ZoneTriggerSpec's "CR 113.6m a Kami
-    -- of Mourning grant returns the card when a greater creature dies" proves
-    -- it.
-    bearerContext =
-      (Projection.framedByBindings gs bindings (SourceContext.sourceContext gs (Just you) bearer))
-        { Filter.sourceManaValue = Filter.manaValue =<< Projection.viewWithLastKnown bearer gs bearer
-        }
+    -- The bearer's mana value too (CR 202.3, Projection.sourceContext), for a
+    -- condition comparing against "this card"
+    -- (Filter.ManaValueGreaterThanSource): live for a bearer in a graveyard,
+    -- and its last known information for one the event itself removed, CR
+    -- 603.10a's look back. Pawl.ZoneTriggerSpec's "CR 113.6m a Kami of
+    -- Mourning grant returns the card when a greater creature dies" proves it.
+    bearerContext = Projection.framedByBindings gs bindings (Projection.sourceContext gs (Just you) bearer)
 
 -- CR 106.12a's second half: did an activation that produced @produced@ produce
 -- the mana this condition specified? The narrowing half of the

@@ -1,0 +1,30 @@
+{
+  "description": "CR 608.2b a mentor killed in response still mentors",
+  "note": "CR 608.2b re-checks rule 702.134a's power comparison as the ability resolves, using the source's last known information once it has left the zone it was in. Alice bolts her own Blade Instructor with its mentor trigger on the stack; its power as it last existed, 3, is still greater than the Goblin Piker's 2, so the Piker takes the counter (Blade Instructor's 2018-10-05 ruling). An engine reading the departed source live would find no power and fizzle the trigger. Readings are taken at the combat damage step, before damage.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Blade Instructor", "label": "mentor", "ready": true },
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Mountain", "label": "mountain", "ready": true }
+        ],
+        "hand": [{ "card": "Lightning Bolt", "label": "bolt" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$mentor", "$piker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "$mentor", "do": { "ChooseTargets": { "mentored": ["$piker"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Cast": { "object": "$bolt", "targets": ["$mentor"], "mana": ["$mountain"] } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "check": { "Counters": { "object": "$piker", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "check": { "PowerToughness": { "object": "$piker", "power": 3, "toughness": 2 } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Blade Instructor", "count": 1 } } }
+  ]
+}
