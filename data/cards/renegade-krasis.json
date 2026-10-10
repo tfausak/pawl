@@ -43,7 +43,15 @@
       "triggeredAbilities": [
         {
           "condition": {
-            "type": "SelfEvolves"
+            "type": "PermanentActs",
+            "value": {
+              "action": {
+                "type": "Evolve"
+              },
+              "permanent": {
+                "type": "Self"
+              }
+            }
           },
           "modal": {
             "modes": [

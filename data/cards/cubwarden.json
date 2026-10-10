@@ -63,7 +63,15 @@
       "triggeredAbilities": [
         {
           "condition": {
-            "type": "SelfMutates"
+            "type": "PermanentActs",
+            "value": {
+              "action": {
+                "type": "Mutate"
+              },
+              "permanent": {
+                "type": "Self"
+              }
+            }
           },
           "modal": {
             "modes": [

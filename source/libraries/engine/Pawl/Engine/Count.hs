@@ -748,14 +748,11 @@ snapshotView viewOf gs shape event = case event of
   GameEvent.AbilityCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
-  GameEvent.TurnedFaceDown _ -> Nothing
+  GameEvent.PermanentActed _ -> Nothing
   GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
-  GameEvent.Evolved _ -> Nothing
-  GameEvent.Mutated _ -> Nothing
   GameEvent.Mentored {} -> Nothing
   GameEvent.Exploited {} -> Nothing
-  GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
   GameEvent.Convoked _ -> Nothing
   GameEvent.Saddled _ -> Nothing
@@ -796,9 +793,6 @@ snapshotView viewOf gs shape event = case event of
   GameEvent.SchemeSetInMotion _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
-  GameEvent.Explored _ -> Nothing
-  GameEvent.Connived _ -> Nothing
-  GameEvent.Exerted _ -> Nothing
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
   GameEvent.BecameTapped _ -> Nothing

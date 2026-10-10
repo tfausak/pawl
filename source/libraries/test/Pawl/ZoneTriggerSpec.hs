@@ -35,6 +35,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilityAddsMana as AbilityAddsMana
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
+import qualified Pawl.Types.ActingPermanent as ActingPermanent
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackedPlayer as AttackedPlayer
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
@@ -113,6 +114,7 @@ import qualified Pawl.Types.OwnedZone as OwnedZone
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
+import qualified Pawl.Types.PermanentActed as PermanentActed
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentDealsCombatDamageToPlayer as PermanentDealsCombatDamageToPlayer
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
@@ -2174,23 +2176,16 @@ representativeEvents cond =
         -- is instantiated with below is the trivial one, which admits whatever the
         -- id resolves to.
         TriggerCondition.PermanentTurnedFaceUp _ -> one (GameEvent.TurnedFaceUp TurnedFaceUp.MkTurnedFaceUp {TurnedFaceUp.object = departed, TurnedFaceUp.announcedX = Just 3})
-        -- CR 701.27b's event for the other direction, on `departed` for the arm
-        -- above's reason.
-        TriggerCondition.PermanentTurnedFaceDown _ -> one (GameEvent.TurnedFaceDown departed)
+        -- CR 603.2's own event, carrying the watched action, on `departed`: under
+        -- the trivial Filter the pair really matches, and under Self it does not,
+        -- which pins the floor for a matching pair too, this arm binding nothing
+        -- either way.
+        TriggerCondition.PermanentActs watched -> one (GameEvent.PermanentActed (PermanentActed.MkPermanentActed (PermanentActed.action watched) departed))
         -- CR 708.9's reveal, the only event this condition admits.
         TriggerCondition.FaceDownPermanentLeavesRevealed -> one (GameEvent.Revealed (Revealed.MkRevealed S.alice departed RevealCause.LeavingFaceDown S.emptyCharacteristics))
         -- CR 702.112b's own event, and the only one this condition admits, on
         -- `departed` for the arm above's reason.
         TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated d _) -> one (GameEvent.BecameDesignated (BecameDesignated.MkBecameDesignated d departed))
-        -- CR 702.100b's own event, and the only one this condition admits. The
-        -- pair does NOT match -- the condition is self-scoped and `departed` is
-        -- not the bearer -- which pins the floor for a matching pair too, since
-        -- this arm binds nothing either way.
-        TriggerCondition.SelfEvolves -> one (GameEvent.Evolved departed)
-        -- CR 702.140d's own event, and the only one this condition admits.
-        -- `departed` for SelfEvolves' reason: the pair does not match, which
-        -- pins the floor for a matching pair too.
-        TriggerCondition.SelfMutates -> one (GameEvent.Mutated departed)
         -- CR 702.134c's own event, and the only one this condition admits. TWO
         -- distinct ids, which is what the pin needs here: eventBindings stamps the
         -- SECOND under `thatMentoredCreature`, so an arm that bound the mentor
@@ -2214,7 +2209,7 @@ representativeEvents cond =
         TriggerCondition.AttachedCreatureBecomesTapped -> one (GameEvent.BecameTapped departed)
         TriggerCondition.PermanentsBecomeTapped _ -> one (GameEvent.BecameTapped departed)
         -- CR 701.26b's own event, and the only one this condition admits, on
-        -- `departed` for SelfEvolves' reason: the pair does not match, which
+        -- `departed`, which is not the bearer: the pair does not match, which
         -- pins the floor for a matching pair too, this arm binding nothing
         -- either way.
         TriggerCondition.SelfBecomesUntapped -> one (GameEvent.BecameUntapped departed)
@@ -2227,19 +2222,15 @@ representativeEvents cond =
         -- reason; the arm binds nothing either way.
         TriggerCondition.AbilityAddsMana {} -> one (GameEvent.ManaAdded (ManaAdded.MkManaAdded {ManaAdded.player = S.alice, ManaAdded.source = departed, ManaAdded.mana = Set.singleton (ManaType.Colored Color.Green), ManaAdded.cause = ManaAddedCause.ManaAbility}))
         TriggerCondition.SelfManaAbilityResolves -> one (GameEvent.ManaAbilityResolved (ManaAbilityResolved.MkManaAbilityResolved {ManaAbilityResolved.permanent = departed, ManaAbilityResolved.amount = 1}))
-        -- CR 702.149c's own event, and the only one this condition admits, on
-        -- `departed` for SelfEvolves' reason: the pair does not match, which pins
-        -- the floor for a matching pair too, this arm binding nothing either way.
-        TriggerCondition.SelfTrains -> one (GameEvent.Trained departed)
         -- CR 702.110b's own event, and the only one this condition admits, on
-        -- `departed` for SelfTrains' reason above. BOTH ids are `departed`, so the
+        -- `departed`, which is not the bearer. BOTH ids are `departed`, so the
         -- exploiter side matches whichever way the arm reads the pair.
         TriggerCondition.SelfExploits -> one (GameEvent.Exploited (Exploited.MkExploited departed departed))
         -- The bystander reading of the same event, `departed` on both sides for
         -- the arm above's reason; the slot it binds is SelfExploits' too.
         TriggerCondition.CreatureExploits {} -> one (GameEvent.Exploited (Exploited.MkExploited departed departed))
         -- CR 702.122e's own event, and the only one this condition admits, on
-        -- `departed` for SelfTrains' reason above.
+        -- `departed`, which is not the bearer.
         TriggerCondition.SelfBecomesCrewed _ -> one (GameEvent.BecameCrewed (Crewing.MkCrewing departed (Set.singleton departed)))
         -- CR 702.122b's own event, with `departed` on BOTH sides so the pair
         -- matches whichever side the arm reads.
@@ -2343,15 +2334,6 @@ representativeEvents cond =
         -- does not match, which pins the floor for a matching pair too, this
         -- condition binding nothing either way.
         TriggerCondition.SelfBecomesPlotted -> one (GameEvent.Plotted departed)
-        -- CR 701.44b's own event, and the only one this condition admits, on
-        -- `departed` for the arm above's reason.
-        TriggerCondition.PermanentExplores _ -> one (GameEvent.Explored departed)
-        TriggerCondition.PermanentConnives _ -> one (GameEvent.Connived departed)
-        -- CR 701.43a's own event, and the only one this condition admits, on
-        -- `departed` for SelfEvolves' reason: the pair does not match, which pins
-        -- the floor for a matching pair too, this condition binding nothing
-        -- either way.
-        TriggerCondition.SelfExerted -> one (GameEvent.Exerted departed)
         -- CR 701.3a's own event, and the only one this condition admits. The HOST
         -- is `departed`, the bearer position, so the pair really matches; the
         -- attachment is `arrived`, and the Filter this condition is instantiated
@@ -2529,11 +2511,8 @@ everyTriggerCondition =
     TriggerCondition.SelfTransformedInto (CardName.MkCardName (Text.pack "Blightsower Thallid")),
     TriggerCondition.PermanentTransforms (Filter.Type.And []),
     TriggerCondition.PermanentTurnedFaceUp (Filter.Type.And []),
-    TriggerCondition.PermanentTurnedFaceDown (Filter.Type.And []),
     TriggerCondition.FaceDownPermanentLeavesRevealed,
     TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated Designation.Renowned (Filter.Type.And [])),
-    TriggerCondition.SelfEvolves,
-    TriggerCondition.SelfMutates,
     TriggerCondition.AttachedCreatureMentors,
     TriggerCondition.AttachedCreatureDies,
     TriggerCondition.AttachedCreatureBecomesTapped,
@@ -2559,7 +2538,6 @@ everyTriggerCondition =
     TriggerCondition.AbilityAddsMana (AbilityAddsMana.MkAbilityAddsMana PlayerRelation.Opponent (Filter.Type.And []) ManaSpecification.AnyMana),
     TriggerCondition.AbilityAddsMana (AbilityAddsMana.MkAbilityAddsMana PlayerRelation.AnyPlayer (Filter.Type.And []) ManaSpecification.AnyMana),
     TriggerCondition.SelfManaAbilityResolves,
-    TriggerCondition.SelfTrains,
     TriggerCondition.SelfExploits,
     TriggerCondition.CreatureExploits (CreatureExploits.MkCreatureExploits (Filter.Type.And []) (Filter.Type.And [])),
     TriggerCondition.SelfBecomesCrewed TriggerFrequency.EveryTime,
@@ -2602,9 +2580,6 @@ everyTriggerCondition =
     TriggerCondition.PlayerLosesCoinFlip PlayerRelation.You,
     TriggerCondition.PlayerLosesCoinFlip PlayerRelation.Opponent,
     TriggerCondition.SelfBecomesPlotted,
-    TriggerCondition.PermanentExplores (Filter.Type.And []),
-    TriggerCondition.PermanentConnives (Filter.Type.And []),
-    TriggerCondition.SelfExerted,
     TriggerCondition.SelfBecomesAttachedBy (Filter.Type.And []),
     TriggerCondition.SelfBecomesAttachedTo (Filter.Type.And []),
     TriggerCondition.SelfBecomesUnattachedFrom (Filter.Type.And []),
@@ -2616,6 +2591,8 @@ everyTriggerCondition =
     -- reasoning: an eventBindings arm that had cased on either field and stamped
     -- nothing under one value would go unseen if only one were listed.
     <> [TriggerCondition.PlayerActs (PlayerActed.MkPlayerActed action relation) | action <- [minBound .. maxBound], relation <- [minBound .. maxBound]]
+    -- EVERY permanent action under both subjects, for the same reason.
+    <> [TriggerCondition.PermanentActs (PermanentActed.MkPermanentActed action subject) | action <- [minBound .. maxBound], subject <- [ActingPermanent.Self, ActingPermanent.Matching (Filter.Type.And [])]]
 
 -- CR 702.46 soulshift N, the first minted keyword ability that TARGETS A CARD IN
 -- A GRAVEYARD -- CR 115.2's clause (a) pool, which until now only card data

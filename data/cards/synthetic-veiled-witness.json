@@ -28,11 +28,19 @@
       "triggeredAbilities": [
         {
           "condition": {
-            "type": "PermanentTurnedFaceDown",
+            "type": "PermanentActs",
             "value": {
-              "type": "ControlledBy",
-              "value": {
-                "type": "You"
+              "action": {
+                "type": "TurnFaceDown"
+              },
+              "permanent": {
+                "type": "Matching",
+                "value": {
+                  "type": "ControlledBy",
+                  "value": {
+                    "type": "You"
+                  }
+                }
               }
             }
           },

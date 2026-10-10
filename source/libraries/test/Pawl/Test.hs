@@ -32,6 +32,7 @@ import qualified Pawl.Codec.AbilityAddsManaSpec
 import qualified Pawl.Codec.AbilityKindSpec
 import qualified Pawl.Codec.AbilityNameSpec
 import qualified Pawl.Codec.AbilityTriggeredSpec
+import qualified Pawl.Codec.ActingPermanentSpec
 import qualified Pawl.Codec.ActivateManaAbilitiesSpec
 import qualified Pawl.Codec.ActivatedAbilitySourceSpec
 import qualified Pawl.Codec.ActivatedAbilitySpec
@@ -433,6 +434,7 @@ import qualified Pawl.Codec.PayingSpec
 import qualified Pawl.Codec.PaymentDecisionSpec
 import qualified Pawl.Codec.PendingDamageEffectSpec
 import qualified Pawl.Codec.PendingEntryEffectSpec
+import qualified Pawl.Codec.PermanentActionSpec
 import qualified Pawl.Codec.PermanentBecomesDesignatedSpec
 import qualified Pawl.Codec.PermanentCandidateSpec
 import qualified Pawl.Codec.PermanentDealsCombatDamageToPlayerSpec
@@ -874,6 +876,7 @@ spec s registry = do
   Pawl.Codec.AbilityNameSpec.spec s
   Pawl.Codec.AbilityTriggeredSpec.spec s
   Pawl.Codec.ActivatedAbilitySourceSpec.spec s
+  Pawl.Codec.ActingPermanentSpec.spec s
   Pawl.Codec.ActivatedAbilitySpec.spec s
   Pawl.Codec.ActivationProhibitionSpec.spec s
   Pawl.Codec.ActivationRestrictionSpec.spec s
@@ -1316,6 +1319,7 @@ spec s registry = do
   Pawl.Codec.PlayerCounterKindSpec.spec s
   Pawl.Codec.StickerKindSpec.spec s
   Pawl.Codec.StickerSheetSpec.spec s
+  Pawl.Codec.PermanentActionSpec.spec s
   Pawl.Codec.PlayerActionSpec.spec s
   Pawl.Codec.PlayerAttacksPlayerSpec.spec s
   Pawl.Codec.PlayerAttacksWithSpec.spec s

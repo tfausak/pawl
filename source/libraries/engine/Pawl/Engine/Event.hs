@@ -182,6 +182,8 @@ import qualified Pawl.Types.PendingDamageEffect as PendingDamageEffect
 import qualified Pawl.Types.PendingEntryEffect as PendingEntryEffect
 import Pawl.Types.PendingTrigger (PendingTrigger)
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
+import qualified Pawl.Types.PermanentActed as PermanentActed
+import qualified Pawl.Types.PermanentAction as PermanentAction
 import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
 import Pawl.Types.PhaseSelector (PhaseSelector)
 import qualified Pawl.Types.Player as Player
@@ -756,14 +758,11 @@ damageOf event = case event of
   GameEvent.AbilityCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
-  GameEvent.TurnedFaceDown _ -> Nothing
+  GameEvent.PermanentActed _ -> Nothing
   GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
-  GameEvent.Evolved _ -> Nothing
-  GameEvent.Mutated _ -> Nothing
   GameEvent.Mentored {} -> Nothing
   GameEvent.Exploited {} -> Nothing
-  GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
   GameEvent.Convoked _ -> Nothing
   GameEvent.Saddled _ -> Nothing
@@ -792,9 +791,6 @@ damageOf event = case event of
   GameEvent.SchemeSetInMotion _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
-  GameEvent.Explored _ -> Nothing
-  GameEvent.Connived _ -> Nothing
-  GameEvent.Exerted _ -> Nothing
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
   GameEvent.BecameTapped _ -> Nothing
@@ -831,14 +827,11 @@ revealOf event = case event of
   GameEvent.AbilityCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
-  GameEvent.TurnedFaceDown _ -> Nothing
+  GameEvent.PermanentActed _ -> Nothing
   GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
-  GameEvent.Evolved _ -> Nothing
-  GameEvent.Mutated _ -> Nothing
   GameEvent.Mentored {} -> Nothing
   GameEvent.Exploited {} -> Nothing
-  GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
   GameEvent.Convoked _ -> Nothing
   GameEvent.Saddled _ -> Nothing
@@ -867,9 +860,6 @@ revealOf event = case event of
   GameEvent.SchemeSetInMotion _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
-  GameEvent.Explored _ -> Nothing
-  GameEvent.Connived _ -> Nothing
-  GameEvent.Exerted _ -> Nothing
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
   GameEvent.BecameTapped _ -> Nothing
@@ -8277,7 +8267,7 @@ merge sid target side = do
                           (GameState.objects u)
                     }
           )
-        State.modify' (recordEvent (GameEvent.Mutated target))
+        State.modify' (recordEvent (GameEvent.PermanentActed (PermanentActed.MkPermanentActed PermanentAction.Mutate target)))
         pure True
       _ -> pure False
     _ -> pure False
@@ -8905,12 +8895,15 @@ controllerTurnScoped cond = case cond of
   -- CR 104.3 names no turn either.
   TriggerCondition.PlayerLosesGame _ -> False
   TriggerCondition.PlayerPlaysLand _ -> False
-  -- None of these keyword-action conditions names a turn either: CR 701.62,
-  -- CR 702.170, CR 701.44 and CR 701.50 each state when their event happens.
+  -- None of these keyword-action conditions names a turn either: CR 701.62
+  -- and CR 702.170 each state when their event happens.
   TriggerCondition.PlayerManifestsDread _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
-  TriggerCondition.PermanentExplores _ -> False
-  TriggerCondition.PermanentConnives _ -> False
+  -- No PermanentAction's rule names a turn. Where the act can only happen on the
+  -- ACTIVE player's turn -- CR 508.1g's exert, the attack CR 508.1a makes
+  -- training fire on -- that is still not CR 109.5's "you": a stolen creature is
+  -- exerted, or trains, on its thief's turn. The SelfAttacks arm below settles it.
+  TriggerCondition.PermanentActs _ -> False
   TriggerCondition.PlacesSticker _ -> False
   -- CR 706.2 names no turn either.
   TriggerCondition.PlayerRollsResult _ -> False
@@ -8920,11 +8913,6 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.SetInMotion -> False
   TriggerCondition.PlayerWinsCoinFlip _ -> False
   TriggerCondition.PlayerLosesCoinFlip _ -> False
-  -- False for the SelfAttacks arm's reason below, which is exactly this case one
-  -- rule earlier: CR 508.1g exerts on the ACTIVE player's turn, and CR 109.5's
-  -- "you" is the ability's controller, so a stolen Glory-Bound Initiate is
-  -- exerted on its thief's turn rather than on its owner's.
-  TriggerCondition.SelfExerted -> False
   -- CR 701.3a names no turn: an Aura can be cast, and an Equipment equipped, on
   -- any turn its controller has priority for.
   TriggerCondition.SelfBecomesAttachedBy _ -> False
@@ -8979,15 +8967,11 @@ controllerTurnScoped cond = case cond of
   -- player take the action on any turn, and the watcher is not even the player
   -- taking it.
   TriggerCondition.PermanentTurnedFaceUp _ -> False
-  TriggerCondition.PermanentTurnedFaceDown _ -> False
   TriggerCondition.FaceDownPermanentLeavesRevealed -> False
   -- CR 702.112a's ability fires on combat damage to a player, which any player's
   -- turn can carry, and the watcher's turn is not asked about at all.
   TriggerCondition.PermanentBecomesDesignated {} -> False
-  -- Rule 702.100b names no turn either: a creature can evolve on anyone's.
-  TriggerCondition.SelfEvolves -> False
-  TriggerCondition.SelfMutates -> False
-  -- Rule 702.134c names none either. CR 508.1 does make every mentoring happen on
+  -- Rule 702.134c names no turn either. CR 508.1 does make every mentoring happen on
   -- the mentor's controller's turn, but that is a consequence of what mentor
   -- watches rather than a narrowing this condition states, and the Equipment's
   -- controller need not be that player.
@@ -9013,10 +8997,6 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.AbilityAddsMana {} -> False
   -- Nor does CR 605.3b: a creature's mana ability resolves on anyone's turn.
   TriggerCondition.SelfManaAbilityResolves -> False
-  -- Rule 702.149c names no turn either, and the SelfAttacks arm below settles the
-  -- consequence: CR 508.1a makes the training happen on the ACTIVE player's turn,
-  -- which is not CR 109.5's "you" -- a stolen creature trains on its thief's turn.
-  TriggerCondition.SelfTrains -> False
   TriggerCondition.SelfExploits -> False
   TriggerCondition.CreatureExploits {} -> False
   -- Rule 702.122e names no turn either: a Vehicle may be crewed at instant speed
@@ -9447,14 +9427,11 @@ abilityTriggeredOf event = case event of
   GameEvent.SpellCopied _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
-  GameEvent.TurnedFaceDown _ -> Nothing
+  GameEvent.PermanentActed _ -> Nothing
   GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
-  GameEvent.Evolved _ -> Nothing
-  GameEvent.Mutated _ -> Nothing
   GameEvent.Mentored {} -> Nothing
   GameEvent.Exploited {} -> Nothing
-  GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
   GameEvent.Convoked _ -> Nothing
   GameEvent.Saddled _ -> Nothing
@@ -9498,9 +9475,6 @@ abilityTriggeredOf event = case event of
   GameEvent.SchemeSetInMotion _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
-  GameEvent.Explored _ -> Nothing
-  GameEvent.Connived _ -> Nothing
-  GameEvent.Exerted _ -> Nothing
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
   GameEvent.BecameTapped _ -> Nothing

@@ -35,6 +35,7 @@ import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Milled as Milled
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PermanentActed as PermanentActed
 import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
 import qualified Pawl.Types.PlanarDieRolled as PlanarDieRolled
 import qualified Pawl.Types.PlayerActed as PlayerActed
@@ -293,8 +294,6 @@ data GameEvent
     -- a change to copiable values rather than a zone change, so no Moved event
     -- describes it.
     TurnedFaceUp TurnedFaceUp.TurnedFaceUp
-  | -- | CR 708.2 / 701.27b: a face-up permanent was turned face down.
-    TurnedFaceDown ObjectId.ObjectId
   | -- | CR 701.27a: a double-faced permanent TRANSFORMED. CR 701.27b makes that a
     -- different game action from TurnedFaceUp above and CR 712.18 keeps it the
     -- same object, so nothing else in this list carries it. Recorded through
@@ -312,28 +311,12 @@ data GameEvent
     -- written, and only on a TRANSITION. One direction only: the rules let only
     -- suspected end (CR 701.60a), and no printed card triggers on that.
     BecameDesignated BecameDesignated.BecameDesignated
-  | -- | CR 702.100b: a creature EVOLVED -- "one or more +1/+1 counters are put on
-    -- it as a result of its evolve ability resolving", so the placement must
-    -- actually have landed some. Distinct from the CountersPut event the same
-    -- placement records: that one says +1/+1 counters arrived, this one says the
-    -- evolve ability put them.
-    Evolved ObjectId.ObjectId
-  | -- | CR 702.140d / 730.2: a creature MUTATED -- a mutating creature spell
-    -- merged with it (CR 702.140c), naming the merged permanent. ONE id,
-    -- Evolved's shape above: CR 730.2b keeps the permanent the same object, so
-    -- the spell that merged into it has no id of its own left to name.
-    Mutated ObjectId.ObjectId
   | -- | CR 702.134c: a creature MENTORED another. TWO ids, in the rule's own
     -- order, the second not being derivable from the first since CR 603.3d
     -- chooses rule 702.134a's target. Emitted on the ability RESOLVING and gated
-    -- on nothing else, unlike Evolved above: a CR 122.6 replacement that reduces
+    -- on nothing else, unlike PermanentAction.Evolve: a CR 122.6 replacement that reduces
     -- the placement to nothing still mentors.
     Mentored Mentored.Mentored
-  | -- | CR 702.149c: a creature TRAINED -- "a resolving training ability puts one
-    -- or more +1/+1 counters on this creature", so it sides with Evolved's gate
-    -- rather than Mentored's. ONE id, rule 702.149a putting its counter on the
-    -- training creature itself.
-    Trained ObjectId.ObjectId
   | -- | CR 702.110b: a creature EXPLOITED another -- its controller sacrificed a
     -- creature as rule 702.110a's ability resolved. TWO ids, in the rule's own
     -- order, Mentored's shape and reasoning: the exploited creature is chosen as
@@ -462,32 +445,6 @@ data GameEvent
     -- Pawl.Engine.Plot.becomePlotted: CR 116.2k's special action and CR 702.170c's
     -- spells and abilities.
     Plotted ObjectId.ObjectId
-  | -- | CR 701.44b: this permanent completed CR 701.44a's explore, recorded after
-    -- the whole process and "even if some or all of those actions were
-    -- impossible". The explorer's id alone, CR 701.44c making last known
-    -- information answer who controlled it. Distinct from the Revealed, Moved and
-    -- CountersPut entries the explore's own steps record, none of which says an
-    -- explore completed.
-    Explored ObjectId.ObjectId
-  | -- | CR 701.50f: this permanent completed CR 701.50a's or CR 701.50d's
-    -- connive, recorded after the whole process and "even if some or all of
-    -- those actions were impossible". Explored's shape and reasoning: the
-    -- conniver's id alone, CR 701.50b making last known information answer who
-    -- controlled it, and distinct from the Drew, Discarded and CountersPut
-    -- entries the connive's own steps record. CR 701.50e is why a connive 0
-    -- records nothing at all.
-    Connived ObjectId.ObjectId
-  | -- | CR 701.43a: this permanent was EXERTED, recorded by
-    -- Pawl.Engine.Combat.declareAttackers at CR 508.1g and watched by CR 701.43d's
-    -- linked "when you do" trigger. The permanent's id alone; the PROHIBITION
-    -- outlives the moment and a control change can separate the two, so
-    -- Object.exertedBy records the player instead.
-    --
-    -- Distinct from the AttackerDeclared event the same step records, which every
-    -- attacker writes where this one fires only when the optional cost was PAID.
-    -- CR 701.43b lets a permanent be exerted more than once, so a second exert is
-    -- a second event.
-    Exerted ObjectId.ObjectId
   | -- | CR 701.26a: this permanent BECAME TAPPED. Appended by
     -- Pawl.Engine.Event.tap alone, the funnel every tapping route goes through,
     -- and only for a permanent that was untapped -- that rule's second sentence.
@@ -564,6 +521,8 @@ data GameEvent
     -- above is. Two firings of one CR 603.7 delayed ability share the entry's
     -- createdAt, so they are one key too.
     TriggeredAbilityResolved TriggeredAbilitySource.TriggeredAbilitySource
+  | -- | CR 603.2: a permanent performed a Pawl.Types.PermanentAction.
+    PermanentActed (PermanentActed.PermanentActed ObjectId.ObjectId)
   | -- | CR 603.2: a player performed a Pawl.Types.PlayerAction.
     PlayerActed (PlayerActed.PlayerActed PlayerId.PlayerId)
   | -- | CR 123.3.

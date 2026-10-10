@@ -28,6 +28,7 @@ import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AbilityAddsMana as AbilityAddsMana
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
+import qualified Pawl.Types.ActingPermanent as ActingPermanent
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackedPlayer as AttackedPlayer
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
@@ -90,6 +91,7 @@ import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.OwnedZone as OwnedZone
+import qualified Pawl.Types.PermanentActed as PermanentActed
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentDealsCombatDamageToPlayer as PermanentDealsCombatDamageToPlayer
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
@@ -282,9 +284,7 @@ countersRemovedFrom bearer wanted event = case event of
   GameEvent.SchemeSetInMotion _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
-  GameEvent.Explored _ -> Nothing
-  GameEvent.Connived _ -> Nothing
-  GameEvent.Exerted _ -> Nothing
+  GameEvent.PermanentActed _ -> Nothing
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
   GameEvent.BecameTapped _ -> Nothing
@@ -317,14 +317,10 @@ countersRemovedFrom bearer wanted event = case event of
   GameEvent.AbilityCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
-  GameEvent.TurnedFaceDown _ -> Nothing
   GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
-  GameEvent.Evolved _ -> Nothing
-  GameEvent.Mutated _ -> Nothing
   GameEvent.Mentored {} -> Nothing
   GameEvent.Exploited {} -> Nothing
-  GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
   GameEvent.Convoked _ -> Nothing
   GameEvent.Saddled _ -> Nothing
@@ -374,14 +370,11 @@ boundDeparts bindings destinations slot event = case event of
   GameEvent.AbilityCountered _ -> False
   GameEvent.HalfUnlocked {} -> False
   GameEvent.TurnedFaceUp _ -> False
-  GameEvent.TurnedFaceDown _ -> False
+  GameEvent.PermanentActed _ -> False
   GameEvent.Transformed {} -> False
   GameEvent.BecameDesignated {} -> False
-  GameEvent.Evolved _ -> False
-  GameEvent.Mutated _ -> False
   GameEvent.Mentored {} -> False
   GameEvent.Exploited {} -> False
-  GameEvent.Trained _ -> False
   GameEvent.BecameCrewed _ -> False
   GameEvent.Convoked _ -> False
   GameEvent.Saddled _ -> False
@@ -410,9 +403,6 @@ boundDeparts bindings destinations slot event = case event of
   GameEvent.SchemeSetInMotion _ -> False
   GameEvent.ClassLevelSet _ -> False
   GameEvent.Plotted _ -> False
-  GameEvent.Explored _ -> False
-  GameEvent.Connived _ -> False
-  GameEvent.Exerted _ -> False
   GameEvent.BecameAttacked _ -> False
   GameEvent.AttackersDeclared _ -> False
   GameEvent.BecameTapped _ -> False
@@ -486,14 +476,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -522,9 +509,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -575,14 +559,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -611,9 +592,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -654,14 +632,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -690,9 +665,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -731,14 +703,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -767,9 +736,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -816,14 +782,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -852,9 +815,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -902,14 +862,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -938,9 +895,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -977,14 +931,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -1013,9 +964,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -1061,14 +1009,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -1097,9 +1042,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -1155,14 +1097,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -1191,9 +1130,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -1229,14 +1165,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -1265,9 +1198,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -1304,14 +1234,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -1340,9 +1267,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -1378,14 +1302,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -1414,9 +1335,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -1453,14 +1371,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -1488,9 +1403,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -1540,14 +1452,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -1576,9 +1485,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -1637,14 +1543,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -1673,9 +1576,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -1719,14 +1619,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -1755,9 +1652,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -1800,14 +1694,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -1836,9 +1727,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -1890,14 +1778,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -1926,9 +1811,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -1981,14 +1863,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -2017,9 +1896,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -2068,14 +1944,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -2104,9 +1977,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -2154,14 +2024,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -2190,9 +2057,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -2241,14 +2105,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -2277,9 +2138,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -2340,14 +2198,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -2376,9 +2231,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -2437,14 +2289,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -2473,9 +2322,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -2526,14 +2372,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -2562,9 +2405,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -2613,14 +2453,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -2649,9 +2486,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -2695,14 +2529,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -2731,9 +2562,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -2810,14 +2638,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -2845,9 +2670,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
   -- CR 508.3c: the player the payload names declared at least the payload's
   -- number of attackers the Filter admits. The arm above narrowed, against the
@@ -2918,14 +2740,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -2953,9 +2772,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
   -- CR 508.3b: the player this ability's source is attached to was attacked.
   -- CreatureAttacksYou's question asked once per DECLARATION instead, which is
@@ -2997,14 +2813,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -3033,9 +2846,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
@@ -3085,14 +2895,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -3121,9 +2928,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
@@ -3198,14 +3002,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -3234,9 +3035,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
@@ -3290,14 +3088,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -3326,9 +3121,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -3394,14 +3186,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -3430,9 +3219,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -3468,14 +3254,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -3504,9 +3287,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -3546,14 +3326,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -3582,9 +3359,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -3648,14 +3422,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -3684,9 +3455,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -3728,14 +3496,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -3764,9 +3529,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -3825,14 +3587,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -3861,9 +3620,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -3909,14 +3665,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -3945,9 +3698,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -4004,14 +3754,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -4040,9 +3787,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -4094,14 +3838,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -4130,9 +3871,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -4245,14 +3983,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.AbilityCountered _ -> False
           GameEvent.HalfUnlocked {} -> False
           GameEvent.TurnedFaceUp _ -> False
-          GameEvent.TurnedFaceDown _ -> False
+          GameEvent.PermanentActed _ -> False
           GameEvent.Transformed {} -> False
           GameEvent.BecameDesignated {} -> False
-          GameEvent.Evolved _ -> False
-          GameEvent.Mutated _ -> False
           GameEvent.Mentored {} -> False
           GameEvent.Exploited {} -> False
-          GameEvent.Trained _ -> False
           GameEvent.BecameCrewed _ -> False
           GameEvent.Convoked _ -> False
           GameEvent.Saddled _ -> False
@@ -4281,9 +4016,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.SchemeSetInMotion _ -> False
           GameEvent.ClassLevelSet _ -> False
           GameEvent.Plotted _ -> False
-          GameEvent.Explored _ -> False
-          GameEvent.Connived _ -> False
-          GameEvent.Exerted _ -> False
           GameEvent.BecameAttacked _ -> False
           GameEvent.AttackersDeclared _ -> False
           GameEvent.BecameTapped _ -> False
@@ -4399,14 +4131,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.AbilityCountered _ -> False
           GameEvent.HalfUnlocked {} -> False
           GameEvent.TurnedFaceUp _ -> False
-          GameEvent.TurnedFaceDown _ -> False
+          GameEvent.PermanentActed _ -> False
           GameEvent.Transformed {} -> False
           GameEvent.BecameDesignated {} -> False
-          GameEvent.Evolved _ -> False
-          GameEvent.Mutated _ -> False
           GameEvent.Mentored {} -> False
           GameEvent.Exploited {} -> False
-          GameEvent.Trained _ -> False
           GameEvent.BecameCrewed _ -> False
           GameEvent.Convoked _ -> False
           GameEvent.Saddled _ -> False
@@ -4435,9 +4164,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.SchemeSetInMotion _ -> False
           GameEvent.ClassLevelSet _ -> False
           GameEvent.Plotted _ -> False
-          GameEvent.Explored _ -> False
-          GameEvent.Connived _ -> False
-          GameEvent.Exerted _ -> False
           GameEvent.BecameAttacked _ -> False
           GameEvent.AttackersDeclared _ -> False
           GameEvent.BecameTapped _ -> False
@@ -4481,14 +4207,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -4517,9 +4240,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -4563,14 +4283,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -4599,9 +4316,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -4646,14 +4360,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -4682,9 +4393,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -4734,14 +4442,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -4770,9 +4475,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -4830,14 +4532,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -4866,9 +4565,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -4954,14 +4650,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.AbilityCountered _ -> False
           GameEvent.HalfUnlocked {} -> False
           GameEvent.TurnedFaceUp _ -> False
-          GameEvent.TurnedFaceDown _ -> False
+          GameEvent.PermanentActed _ -> False
           GameEvent.Transformed {} -> False
           GameEvent.BecameDesignated {} -> False
-          GameEvent.Evolved _ -> False
-          GameEvent.Mutated _ -> False
           GameEvent.Mentored {} -> False
           GameEvent.Exploited {} -> False
-          GameEvent.Trained _ -> False
           GameEvent.BecameCrewed _ -> False
           GameEvent.Convoked _ -> False
           GameEvent.Saddled _ -> False
@@ -4990,9 +4683,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.SchemeSetInMotion _ -> False
           GameEvent.ClassLevelSet _ -> False
           GameEvent.Plotted _ -> False
-          GameEvent.Explored _ -> False
-          GameEvent.Connived _ -> False
-          GameEvent.Exerted _ -> False
           GameEvent.BecameAttacked _ -> False
           GameEvent.AttackersDeclared _ -> False
           GameEvent.BecameTapped _ -> False
@@ -5171,14 +4861,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -5207,9 +4894,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.CoinFlipped {} -> False
@@ -5248,14 +4932,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -5284,9 +4965,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.CoinFlipped {} -> False
@@ -5310,14 +4988,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     -- different event; nothing folds the two together.
     GameEvent.BecameTapped _ -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -5345,9 +5020,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.TappedForMana _ -> False
@@ -5412,14 +5084,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -5448,9 +5117,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.CoinFlipped {} -> False
@@ -5514,14 +5180,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -5550,9 +5213,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.CoinFlipped {} -> False
@@ -5595,14 +5255,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -5631,9 +5288,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.CoinFlipped {} -> False
@@ -5679,14 +5333,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -5715,9 +5366,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.CoinFlipped {} -> False
@@ -5762,9 +5410,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -5796,14 +5442,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -5845,9 +5487,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -5879,14 +5519,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -5934,9 +5570,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.SchemeSetInMotion _ -> False
           GameEvent.ClassLevelSet _ -> False
           GameEvent.Plotted _ -> False
-          GameEvent.Explored _ -> False
-          GameEvent.Connived _ -> False
-          GameEvent.Exerted _ -> False
+          GameEvent.PermanentActed _ -> False
           GameEvent.BecameAttacked _ -> False
           GameEvent.AttackersDeclared _ -> False
           GameEvent.BecameTapped _ -> False
@@ -5968,14 +5602,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.AbilityCountered _ -> False
           GameEvent.HalfUnlocked {} -> False
           GameEvent.TurnedFaceUp _ -> False
-          GameEvent.TurnedFaceDown _ -> False
           GameEvent.Transformed {} -> False
           GameEvent.BecameDesignated {} -> False
-          GameEvent.Evolved _ -> False
-          GameEvent.Mutated _ -> False
           GameEvent.Mentored {} -> False
           GameEvent.Exploited {} -> False
-          GameEvent.Trained _ -> False
           GameEvent.BecameCrewed _ -> False
           GameEvent.Convoked _ -> False
           GameEvent.Saddled _ -> False
@@ -6033,9 +5663,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.SchemeSetInMotion _ -> False
           GameEvent.ClassLevelSet _ -> False
           GameEvent.Plotted _ -> False
-          GameEvent.Explored _ -> False
-          GameEvent.Connived _ -> False
-          GameEvent.Exerted _ -> False
+          GameEvent.PermanentActed _ -> False
           GameEvent.BecameAttacked _ -> False
           GameEvent.AttackersDeclared _ -> False
           GameEvent.BecameTapped _ -> False
@@ -6067,14 +5695,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.AbilityCountered _ -> False
           GameEvent.HalfUnlocked {} -> False
           GameEvent.TurnedFaceUp _ -> False
-          GameEvent.TurnedFaceDown _ -> False
           GameEvent.Transformed {} -> False
           GameEvent.BecameDesignated {} -> False
-          GameEvent.Evolved _ -> False
-          GameEvent.Mutated _ -> False
           GameEvent.Mentored {} -> False
           GameEvent.Exploited {} -> False
-          GameEvent.Trained _ -> False
           GameEvent.BecameCrewed _ -> False
           GameEvent.Convoked _ -> False
           GameEvent.Saddled _ -> False
@@ -6153,9 +5777,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.SchemeSetInMotion _ -> False
           GameEvent.ClassLevelSet _ -> False
           GameEvent.Plotted _ -> False
-          GameEvent.Explored _ -> False
-          GameEvent.Connived _ -> False
-          GameEvent.Exerted _ -> False
+          GameEvent.PermanentActed _ -> False
           GameEvent.BecameAttacked _ -> False
           GameEvent.AttackersDeclared _ -> False
           GameEvent.BecameTapped _ -> False
@@ -6187,14 +5809,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.AbilityCountered _ -> False
           GameEvent.HalfUnlocked {} -> False
           GameEvent.TurnedFaceUp _ -> False
-          GameEvent.TurnedFaceDown _ -> False
           GameEvent.Transformed {} -> False
           GameEvent.BecameDesignated {} -> False
-          GameEvent.Evolved _ -> False
-          GameEvent.Mutated _ -> False
           GameEvent.Mentored {} -> False
           GameEvent.Exploited {} -> False
-          GameEvent.Trained _ -> False
           GameEvent.BecameCrewed _ -> False
           GameEvent.Convoked _ -> False
           GameEvent.Saddled _ -> False
@@ -6268,14 +5886,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.AbilityCountered _ -> False
           GameEvent.HalfUnlocked {} -> False
           GameEvent.TurnedFaceUp _ -> False
-          GameEvent.TurnedFaceDown _ -> False
+          GameEvent.PermanentActed _ -> False
           GameEvent.Transformed {} -> False
           GameEvent.BecameDesignated {} -> False
-          GameEvent.Evolved _ -> False
-          GameEvent.Mutated _ -> False
           GameEvent.Mentored {} -> False
           GameEvent.Exploited {} -> False
-          GameEvent.Trained _ -> False
           GameEvent.BecameCrewed _ -> False
           GameEvent.Convoked _ -> False
           GameEvent.Saddled _ -> False
@@ -6304,9 +5919,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.SchemeSetInMotion _ -> False
           GameEvent.ClassLevelSet _ -> False
           GameEvent.Plotted _ -> False
-          GameEvent.Explored _ -> False
-          GameEvent.Connived _ -> False
-          GameEvent.Exerted _ -> False
           GameEvent.BecameAttacked _ -> False
           GameEvent.AttackersDeclared _ -> False
           GameEvent.BecameTapped _ -> False
@@ -6354,14 +5966,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -6390,9 +5999,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -6439,14 +6045,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -6475,9 +6078,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -6546,14 +6146,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -6582,9 +6179,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -6645,14 +6239,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -6681,9 +6272,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -6741,14 +6329,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -6776,9 +6361,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -6836,14 +6418,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -6871,9 +6450,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -6933,9 +6509,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -6968,14 +6542,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -7025,9 +6595,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.PlanarDieRolled _ -> False
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -7060,14 +6628,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -7151,9 +6715,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -7186,14 +6748,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -7270,14 +6828,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
               && admits copier copy
           GameEvent.HalfUnlocked {} -> False
           GameEvent.TurnedFaceUp _ -> False
-          GameEvent.TurnedFaceDown _ -> False
+          GameEvent.PermanentActed _ -> False
           GameEvent.Transformed {} -> False
           GameEvent.BecameDesignated {} -> False
-          GameEvent.Evolved _ -> False
-          GameEvent.Mutated _ -> False
           GameEvent.Mentored {} -> False
           GameEvent.Exploited {} -> False
-          GameEvent.Trained _ -> False
           GameEvent.BecameCrewed _ -> False
           GameEvent.Convoked _ -> False
           GameEvent.Saddled _ -> False
@@ -7302,9 +6857,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.SchemeSetInMotion _ -> False
           GameEvent.ClassLevelSet _ -> False
           GameEvent.Plotted _ -> False
-          GameEvent.Explored _ -> False
-          GameEvent.Connived _ -> False
-          GameEvent.Exerted _ -> False
           GameEvent.BecameAttacked _ -> False
           GameEvent.AttackersDeclared _ -> False
           GameEvent.BecameTapped _ -> False
@@ -7370,14 +6922,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -7406,9 +6955,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -7451,9 +6997,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -7486,14 +7030,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -7543,9 +7083,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -7578,14 +7116,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -7645,9 +7179,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -7680,14 +7212,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -7715,14 +7243,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   TriggerCondition.SelfHalfUnlocked half -> case event of
     GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked oid _ name _) -> oid == bearer && name == half
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -7749,9 +7274,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -7799,14 +7321,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- CR 708.8's last sentence fall out rather than needing a clause.
   TriggerCondition.SelfTurnedFaceUp -> case event of
     GameEvent.TurnedFaceUp t -> TurnedFaceUp.object t == bearer
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -7834,9 +7353,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -7887,13 +7403,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   TriggerCondition.SelfTransformedInto name -> case event of
     GameEvent.Transformed transformed -> Transformed.object transformed == bearer && Set.member name (PC.names (Transformed.characteristics transformed))
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -7921,9 +7434,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -8008,13 +7518,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
                     sampled {Filter.attachedViews = Maybe.mapMaybe (Projection.viewWithLastKnownAnywhere gs) (Set.toAscList (Transformed.attachments transformed))}
                     f
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -8042,9 +7549,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -8110,14 +7614,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp t -> case Projection.viewWithLastKnown (TurnedFaceUp.object t) gs (TurnedFaceUp.object t) of
       Nothing -> False
       Just view -> Filter.matches bearerContext view f
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -8145,9 +7646,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -8180,30 +7678,59 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
     GameEvent.LifeGained {} -> False
-  -- CR 701.27b: PermanentTurnedFaceUp's arm in the other direction, read live
-  -- for the same reason. The permanent is face down by now, so the Filter sees
-  -- CR 708.2's listed characteristics, never the card's.
-  TriggerCondition.PermanentTurnedFaceDown f -> case event of
-    GameEvent.TurnedFaceDown oid -> case Projection.viewWithLastKnown oid gs oid of
-      Nothing -> False
-      Just view -> Filter.matches bearerContext view f
+  -- CR 603.2: a permanent performed the watched action. The EVENT and nothing
+  -- else -- each action's own rule places the moment it is recorded
+  -- (Pawl.Types.PermanentAction), and CR 701.44b and CR 701.50f fire even where
+  -- some or all of the action was impossible.
+  --
+  -- The Self subject is a bare id comparison with no view, so a bearer that has
+  -- since left is still answered about the event. A Filter subject describes
+  -- the ACTOR, so the bearer only frames the match (the Filter.Context's source,
+  -- its controller CR 109.5's "you"), and the actor is read through
+  -- viewWithLastKnown: CR 701.44c and CR 701.50b ask for a gone actor as it last
+  -- was, and the permanent turned face down is seen with CR 708.2's listed
+  -- characteristics. An actor that is gone AND filed no last known information
+  -- answers False.
+  TriggerCondition.PermanentActs watched -> case event of
+    GameEvent.PermanentActed acted ->
+      PermanentActed.action acted == PermanentActed.action watched && case PermanentActed.permanent watched of
+        ActingPermanent.Self -> PermanentActed.permanent acted == bearer
+        ActingPermanent.Matching f ->
+          let actor = PermanentActed.permanent acted
+           in maybe False (\view -> Filter.matches bearerContext view f) (Projection.viewWithLastKnown actor gs actor)
+    GameEvent.TookInitiative _ -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
-    GameEvent.HalfUnlocked {} -> False
-    GameEvent.SpellCast {} -> False
-    GameEvent.SpellCopied _ -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
@@ -8222,9 +7749,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -8237,38 +7761,16 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
-    GameEvent.CountersPut {} -> False
     GameEvent.Moved {} -> False
-    GameEvent.DamageDealt _ -> False
-    GameEvent.DamagePrevented {} -> False
-    GameEvent.StepBegan {} -> False
-    GameEvent.BecameMonarch _ -> False
-    GameEvent.TookInitiative _ -> False
-    GameEvent.Discarded {} -> False
-    GameEvent.Drew {} -> False
-    GameEvent.Revealed {} -> False
-    GameEvent.AttackerDeclared {} -> False
-    GameEvent.BecameBlocking {} -> False
-    GameEvent.BlocksDeclared {} -> False
-    GameEvent.AttackerBlocked {} -> False
-    GameEvent.AttackerUnblocked _ -> False
-    GameEvent.SpellCountered _ -> False
-    GameEvent.AbilityCountered _ -> False
-    GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost {} -> False
-    GameEvent.LifeGained {} -> False
   -- CR 708.9: the cause alone. The permanent is gone by the scan (CR 400.7) and
   -- the condition names nothing else, so there is no view to read.
   TriggerCondition.FaceDownPermanentLeavesRevealed -> case event of
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -8296,9 +7798,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -8331,163 +7830,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
     GameEvent.LifeGained {} -> False
-  -- CR 702.112b: a permanent the Filter admits was given the renowned designation.
-  -- PermanentTurnedFaceUp's arm above, line for line, and for its reasons: the
-  -- permanent is read as it stands (viewWithLastKnown for CR 608.2h, a designation
-  -- being no zone change), and the bearer contributes only CR 109.5's perspective
-  -- and the Filter.Context's source -- which is what makes Filter.IsSource the
-  -- self-scoped reading.
-  -- CR 702.100b: the BEARER evolved. SelfEnters' arm -- a bare id comparison, no
-  -- view and no Filter -- which is what makes it answerable for a creature that
-  -- has since left: the marker is about an event, not about the object now.
-  TriggerCondition.SelfEvolves -> case event of
-    GameEvent.Evolved oid -> oid == bearer
-    GameEvent.Mutated _ -> False
-    GameEvent.Mentored {} -> False
-    GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
-    GameEvent.BecameCrewed _ -> False
-    GameEvent.Convoked _ -> False
-    GameEvent.Saddled _ -> False
-    GameEvent.Crewed _ -> False
-    GameEvent.BecameDesignated {} -> False
-    GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
-    GameEvent.Transformed {} -> False
-    GameEvent.PermanentSacrificed {} -> False
-    GameEvent.AbilityTriggered {} -> False
-    GameEvent.HalfUnlocked {} -> False
-    GameEvent.SpellCast {} -> False
-    GameEvent.SpellCopied _ -> False
-    GameEvent.CountersRemoved {} -> False
-    GameEvent.ControlChanged {} -> False
-    GameEvent.VentureMarkerEntered {} -> False
-    GameEvent.BecameTarget {} -> False
-    GameEvent.BecameAttached {} -> False
-    GameEvent.BecameUnattached {} -> False
-    GameEvent.LeftTheGame _ -> False
-    GameEvent.Milled {} -> False
-    GameEvent.PlayerActed _ -> False
-    GameEvent.LandPlayed {} -> False
-    GameEvent.LostTheGame _ -> False
-    GameEvent.ManifestedDread {} -> False
-    GameEvent.DieResultSettled _ -> False
-    GameEvent.RolledToVisit _ -> False
-    GameEvent.PlanarDieRolled _ -> False
-    GameEvent.SchemeSetInMotion _ -> False
-    GameEvent.ClassLevelSet _ -> False
-    GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
-    GameEvent.BecameAttacked _ -> False
-    GameEvent.AttackersDeclared _ -> False
-    GameEvent.BecameTapped _ -> False
-    GameEvent.BecameUntapped _ -> False
-    GameEvent.TappedForMana _ -> False
-    GameEvent.ManaAdded _ -> False
-    GameEvent.ManaAbilityResolved _ -> False
-    GameEvent.CoinFlipped {} -> False
-    GameEvent.StickerPut _ -> False
-    GameEvent.ActivatedAbilityResolved _ -> False
-    GameEvent.TriggeredAbilityResolved _ -> False
-    GameEvent.CardArrived _ -> False
-    GameEvent.CountersPut {} -> False
-    GameEvent.Moved {} -> False
-    GameEvent.DamageDealt _ -> False
-    GameEvent.DamagePrevented {} -> False
-    GameEvent.StepBegan {} -> False
-    GameEvent.BecameMonarch _ -> False
-    GameEvent.TookInitiative _ -> False
-    GameEvent.Discarded {} -> False
-    GameEvent.Drew {} -> False
-    GameEvent.Revealed {} -> False
-    GameEvent.AttackerDeclared {} -> False
-    GameEvent.BecameBlocking {} -> False
-    GameEvent.BlocksDeclared {} -> False
-    GameEvent.AttackerBlocked {} -> False
-    GameEvent.AttackerUnblocked _ -> False
-    GameEvent.SpellCountered _ -> False
-    GameEvent.AbilityCountered _ -> False
-    GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost {} -> False
-    GameEvent.LifeGained {} -> False
-  -- CR 702.140d: the BEARER mutated. SelfEvolves' arm above, line for line and
-  -- for its reasons -- a bare id comparison, no view and no Filter, so a merged
-  -- permanent that has since left the battlefield is still answered about the
-  -- event.
-  TriggerCondition.SelfMutates -> case event of
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated oid -> oid == bearer
-    GameEvent.Mentored {} -> False
-    GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
-    GameEvent.BecameCrewed _ -> False
-    GameEvent.Convoked _ -> False
-    GameEvent.Saddled _ -> False
-    GameEvent.Crewed _ -> False
-    GameEvent.BecameDesignated {} -> False
-    GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
-    GameEvent.Transformed {} -> False
-    GameEvent.PermanentSacrificed {} -> False
-    GameEvent.AbilityTriggered {} -> False
-    GameEvent.HalfUnlocked {} -> False
-    GameEvent.SpellCast {} -> False
-    GameEvent.SpellCopied _ -> False
-    GameEvent.CountersRemoved {} -> False
-    GameEvent.ControlChanged {} -> False
-    GameEvent.VentureMarkerEntered {} -> False
-    GameEvent.BecameTarget {} -> False
-    GameEvent.BecameAttached {} -> False
-    GameEvent.BecameUnattached {} -> False
-    GameEvent.LeftTheGame _ -> False
-    GameEvent.Milled {} -> False
-    GameEvent.PlayerActed _ -> False
-    GameEvent.LandPlayed {} -> False
-    GameEvent.LostTheGame _ -> False
-    GameEvent.ManifestedDread {} -> False
-    GameEvent.DieResultSettled _ -> False
-    GameEvent.RolledToVisit _ -> False
-    GameEvent.PlanarDieRolled _ -> False
-    GameEvent.SchemeSetInMotion _ -> False
-    GameEvent.ClassLevelSet _ -> False
-    GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
-    GameEvent.BecameAttacked _ -> False
-    GameEvent.AttackersDeclared _ -> False
-    GameEvent.BecameTapped _ -> False
-    GameEvent.BecameUntapped _ -> False
-    GameEvent.TappedForMana _ -> False
-    GameEvent.ManaAdded _ -> False
-    GameEvent.ManaAbilityResolved _ -> False
-    GameEvent.CoinFlipped {} -> False
-    GameEvent.StickerPut _ -> False
-    GameEvent.ActivatedAbilityResolved _ -> False
-    GameEvent.TriggeredAbilityResolved _ -> False
-    GameEvent.CardArrived _ -> False
-    GameEvent.CountersPut {} -> False
-    GameEvent.Moved {} -> False
-    GameEvent.DamageDealt _ -> False
-    GameEvent.DamagePrevented {} -> False
-    GameEvent.StepBegan {} -> False
-    GameEvent.BecameMonarch _ -> False
-    GameEvent.TookInitiative _ -> False
-    GameEvent.Discarded {} -> False
-    GameEvent.Drew {} -> False
-    GameEvent.Revealed {} -> False
-    GameEvent.AttackerDeclared {} -> False
-    GameEvent.BecameBlocking {} -> False
-    GameEvent.BlocksDeclared {} -> False
-    GameEvent.AttackerBlocked {} -> False
-    GameEvent.AttackerUnblocked _ -> False
-    GameEvent.SpellCountered _ -> False
-    GameEvent.AbilityCountered _ -> False
-    GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost {} -> False
-    GameEvent.LifeGained {} -> False
   -- CR 702.134c: the creature the BEARER IS ATTACHED TO mentored another. The
   -- event's first id is rule 702.134c's "first creature", the mentor, and this arm
   -- asks only whether that is the bearer's host -- the pairing with the second
@@ -8506,16 +7848,13 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Mentored (Mentored.MkMentored mentor _) ->
       (Recipient.objectOf =<< Object.attachedTo =<< Game.lookupObject bearer gs) == Just mentor
     GameEvent.Exploited {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
-    GameEvent.Trained _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -8540,9 +7879,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -8565,87 +7901,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Discarded {} -> False
     GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
-    GameEvent.AttackerDeclared {} -> False
-    GameEvent.BecameBlocking {} -> False
-    GameEvent.BlocksDeclared {} -> False
-    GameEvent.AttackerBlocked {} -> False
-    GameEvent.AttackerUnblocked _ -> False
-    GameEvent.SpellCountered _ -> False
-    GameEvent.AbilityCountered _ -> False
-    GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost {} -> False
-    GameEvent.LifeGained {} -> False
-  -- CR 702.149c: the BEARER trained. SelfEvolves' arm above, line for line and for
-  -- its reasons -- a bare id comparison, no view and no Filter, so a creature that
-  -- has since left the battlefield is still answered about the event.
-  TriggerCondition.SelfTrains -> case event of
-    GameEvent.Trained oid -> oid == bearer
-    GameEvent.BecameCrewed _ -> False
-    GameEvent.Convoked _ -> False
-    GameEvent.Saddled _ -> False
-    GameEvent.Crewed _ -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
-    GameEvent.Mentored {} -> False
-    GameEvent.Exploited {} -> False
-    GameEvent.BecameDesignated {} -> False
-    GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
-    GameEvent.Transformed {} -> False
-    GameEvent.PermanentSacrificed {} -> False
-    GameEvent.AbilityTriggered {} -> False
-    GameEvent.HalfUnlocked {} -> False
-    GameEvent.SpellCast {} -> False
-    GameEvent.SpellCopied _ -> False
-    GameEvent.CountersRemoved {} -> False
-    GameEvent.ControlChanged {} -> False
-    GameEvent.VentureMarkerEntered {} -> False
-    GameEvent.BecameTarget {} -> False
-    GameEvent.BecameAttached {} -> False
-    GameEvent.BecameUnattached {} -> False
-    GameEvent.LeftTheGame _ -> False
-    GameEvent.Milled {} -> False
-    GameEvent.PlayerActed _ -> False
-    GameEvent.LandPlayed {} -> False
-    GameEvent.LostTheGame _ -> False
-    GameEvent.ManifestedDread {} -> False
-    GameEvent.DieResultSettled _ -> False
-    GameEvent.RolledToVisit _ -> False
-    GameEvent.PlanarDieRolled _ -> False
-    GameEvent.SchemeSetInMotion _ -> False
-    GameEvent.ClassLevelSet _ -> False
-    GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
-    GameEvent.BecameAttacked _ -> False
-    GameEvent.AttackersDeclared _ -> False
-    GameEvent.BecameTapped _ -> False
-    GameEvent.BecameUntapped _ -> False
-    GameEvent.TappedForMana _ -> False
-    GameEvent.ManaAdded _ -> False
-    GameEvent.ManaAbilityResolved _ -> False
-    GameEvent.CoinFlipped {} -> False
-    GameEvent.StickerPut _ -> False
-    GameEvent.ActivatedAbilityResolved _ -> False
-    GameEvent.TriggeredAbilityResolved _ -> False
-    GameEvent.CardArrived _ -> False
-    -- The event the RULE distinguishes this condition from: +1/+1 counters arriving
-    -- say nothing about what put them, which is why rule 702.149c needs a marker at
-    -- all.
-    GameEvent.CountersPut {} -> False
-    GameEvent.Moved {} -> False
-    GameEvent.DamageDealt _ -> False
-    GameEvent.DamagePrevented {} -> False
-    GameEvent.StepBegan {} -> False
-    GameEvent.BecameMonarch _ -> False
-    GameEvent.TookInitiative _ -> False
-    GameEvent.Discarded {} -> False
-    GameEvent.Drew {} -> False
-    GameEvent.Revealed {} -> False
-    -- Nor the declaration rule 702.149a's own trigger reads: training FIRES on an
-    -- attack and this condition fires on that ability resolving, so an ability
-    -- removed before it resolves (CR 608.2b) trains nothing.
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BecameBlocking {} -> False
     GameEvent.BlocksDeclared {} -> False
@@ -8657,21 +7912,19 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LifeLost {} -> False
     GameEvent.LifeGained {} -> False
   -- CR 702.110b: the BEARER exploited a creature -- its controller sacrificed one
-  -- as rule 702.110a's ability resolved. SelfTrains' arm above, line for line and
-  -- for its reasons: a bare id comparison on the exploiter, no view and no Filter.
+  -- as rule 702.110a's ability resolved. PermanentActs' Self reading, line for
+  -- line and for its reasons: a bare id comparison on the exploiter, no view
+  -- and no Filter.
   TriggerCondition.SelfExploits -> case event of
-    GameEvent.Trained _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited (Exploited.MkExploited exploiter _) -> exploiter == bearer
     GameEvent.BecameDesignated {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -8696,9 +7949,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -8750,17 +8000,14 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
       let context = bearerContext
           admits oid f = maybe False (\view -> Filter.matches context view f) (Projection.viewWithLastKnown oid gs oid)
        in admits exploiter exploiterFilter && admits exploited exploitedFilter
-    GameEvent.Trained _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -8785,9 +8032,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -8821,8 +8065,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LifeLost {} -> False
     GameEvent.LifeGained {} -> False
   -- CR 702.122e: the BEARER became crewed, which that rule defines as a crew
-  -- ability of the bearer RESOLVING. SelfTrains' arm above, line for line and
-  -- for its reasons -- a bare id comparison, no view and no Filter, so a Vehicle
+  -- ability of the bearer RESOLVING. PermanentActs' Self reading, line for line
+  -- and for its reasons -- a bare id comparison, no view and no Filter, so a Vehicle
   -- that has since left the battlefield is still answered about the event.
   TriggerCondition.SelfBecomesCrewed frequency -> case event of
     GameEvent.BecameCrewed ev ->
@@ -8837,14 +8081,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
-    GameEvent.Trained _ -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -8869,9 +8110,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -8917,14 +8155,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Saddled _ -> False
     GameEvent.Crewed ev -> Set.member bearer (Crewing.crewedBy ev)
     GameEvent.BecameCrewed _ -> False
-    GameEvent.Trained _ -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -8949,9 +8184,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -8984,6 +8216,12 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
     GameEvent.LifeGained {} -> False
+  -- CR 702.112b: a permanent the Filter admits was given the renowned designation.
+  -- PermanentTurnedFaceUp's arm above, line for line, and for its reasons: the
+  -- permanent is read as it stands (viewWithLastKnown for CR 608.2h, a designation
+  -- being no zone change), and the bearer contributes only CR 109.5's perspective
+  -- and the Filter.Context's source -- which is what makes Filter.IsSource the
+  -- self-scoped reading.
   TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated wanted f) -> case event of
     -- The designations must MATCH, not merely both be present: Valeron Wardens'
     -- renown trigger must not fire when a creature you control becomes monstrous.
@@ -8992,17 +8230,14 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
       | otherwise -> case Projection.viewWithLastKnown oid gs oid of
           Nothing -> False
           Just view -> Filter.matches bearerContext view f
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -9027,9 +8262,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -9085,14 +8317,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked _ actor _ fully) ->
       fully && PlayerRelation.holds (Game.teams gs) relation you actor
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -9119,9 +8348,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -9185,14 +8411,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -9218,9 +8441,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -9309,14 +8529,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
              )
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -9342,9 +8559,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -9417,9 +8631,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -9435,14 +8647,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityTriggered {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -9494,9 +8702,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -9513,14 +8719,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityTriggered {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -9578,14 +8780,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -9613,9 +8812,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -9654,14 +8850,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -9690,9 +8883,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -9729,14 +8919,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -9771,9 +8958,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -9810,14 +8994,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -9846,9 +9027,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -9885,14 +9063,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -9923,9 +9098,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -9963,14 +9135,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -10002,9 +9171,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -10040,14 +9206,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -10076,9 +9239,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -10114,14 +9274,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -10150,9 +9307,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -10188,14 +9342,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -10224,9 +9375,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion e -> SchemeSetInMotion.scheme e == bearer
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -10268,14 +9416,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -10304,9 +9449,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -10348,14 +9490,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -10384,9 +9523,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -10428,14 +9564,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -10464,254 +9597,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted plotted -> plotted == bearer
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
-    GameEvent.BecameAttacked _ -> False
-    GameEvent.AttackersDeclared _ -> False
-    GameEvent.BecameTapped _ -> False
-    GameEvent.BecameUntapped _ -> False
-    GameEvent.TappedForMana _ -> False
-    GameEvent.ManaAdded _ -> False
-    GameEvent.ManaAbilityResolved _ -> False
-    GameEvent.CoinFlipped {} -> False
-    GameEvent.StickerPut _ -> False
-    GameEvent.ActivatedAbilityResolved _ -> False
-    GameEvent.TriggeredAbilityResolved _ -> False
-    GameEvent.CardArrived _ -> False
-  -- CR 701.44b: a permanent the Filter admits completed an explore.
-  -- Wildgrowth Walker's "a creature you control" describes the EXPLORER, so
-  -- the bearer only frames the match: it is the Filter.Context's source and
-  -- its controller is CR 109.5's "you".
-  --
-  -- viewWithLastKnown aimed at the explorer twice over, PermanentDies' posture
-  -- and CR 701.44c's instruction in as many words: a permanent that explored
-  -- and has since left is read as it last was, so "you control" answers with
-  -- the player who controlled it rather than CR 108.4a's owner substitute.
-  --
-  -- Nothing is an explorer that is gone AND filed no last known information,
-  -- about which no Filter can honestly answer.
-  TriggerCondition.PermanentExplores f -> case event of
-    GameEvent.Moved {} -> False
-    GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan {} -> False
-    GameEvent.SpellCast {} -> False
-    GameEvent.SpellCopied _ -> False
-    GameEvent.DamagePrevented {} -> False
-    GameEvent.BecameMonarch _ -> False
-    GameEvent.TookInitiative _ -> False
-    GameEvent.Discarded {} -> False
-    GameEvent.Drew {} -> False
-    GameEvent.Revealed {} -> False
-    GameEvent.AttackerDeclared {} -> False
-    GameEvent.BecameBlocking {} -> False
-    GameEvent.BlocksDeclared {} -> False
-    GameEvent.AttackerBlocked {} -> False
-    GameEvent.AttackerUnblocked _ -> False
-    GameEvent.SpellCountered _ -> False
-    GameEvent.AbilityCountered _ -> False
-    GameEvent.HalfUnlocked {} -> False
-    GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
-    GameEvent.Transformed {} -> False
-    GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
-    GameEvent.Mentored {} -> False
-    GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
-    GameEvent.BecameCrewed _ -> False
-    GameEvent.Convoked _ -> False
-    GameEvent.Saddled _ -> False
-    GameEvent.Crewed _ -> False
-    GameEvent.PermanentSacrificed {} -> False
-    GameEvent.AbilityTriggered {} -> False
-    GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost {} -> False
-    GameEvent.LifeGained {} -> False
-    GameEvent.CountersPut {} -> False
-    GameEvent.CountersRemoved {} -> False
-    GameEvent.ControlChanged {} -> False
-    GameEvent.VentureMarkerEntered {} -> False
-    GameEvent.BecameTarget {} -> False
-    GameEvent.BecameAttached {} -> False
-    GameEvent.BecameUnattached {} -> False
-    GameEvent.LeftTheGame _ -> False
-    GameEvent.Milled {} -> False
-    GameEvent.PlayerActed _ -> False
-    GameEvent.LandPlayed {} -> False
-    GameEvent.LostTheGame _ -> False
-    GameEvent.ManifestedDread {} -> False
-    GameEvent.DieResultSettled _ -> False
-    GameEvent.RolledToVisit _ -> False
-    GameEvent.PlanarDieRolled _ -> False
-    GameEvent.SchemeSetInMotion _ -> False
-    GameEvent.ClassLevelSet _ -> False
-    GameEvent.Plotted _ -> False
-    GameEvent.Explored explorer -> case Projection.viewWithLastKnown explorer gs explorer of
-      Nothing -> False
-      Just view -> Filter.matches bearerContext view f
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
-    GameEvent.BecameAttacked _ -> False
-    GameEvent.AttackersDeclared _ -> False
-    GameEvent.BecameTapped _ -> False
-    GameEvent.BecameUntapped _ -> False
-    GameEvent.TappedForMana _ -> False
-    GameEvent.ManaAdded _ -> False
-    GameEvent.ManaAbilityResolved _ -> False
-    GameEvent.CoinFlipped {} -> False
-    GameEvent.StickerPut _ -> False
-    GameEvent.ActivatedAbilityResolved _ -> False
-    GameEvent.TriggeredAbilityResolved _ -> False
-    GameEvent.CardArrived _ -> False
-  -- CR 701.50f: a permanent the Filter admits completed a connive. Iron Monger,
-  -- Sadistic Tycoon's "a creature you control" describes the CONNIVER, so the
-  -- bearer only frames the match, PermanentExplores' arm above line for line --
-  -- including viewWithLastKnown aimed at the conniver twice over, which CR
-  -- 701.50b asks for in as many words.
-  --
-  -- CR 701.50e keeps a connive 0 out of here by recording no event at all, so
-  -- nothing filters it here.
-  TriggerCondition.PermanentConnives f -> case event of
-    GameEvent.Moved {} -> False
-    GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan {} -> False
-    GameEvent.SpellCast {} -> False
-    GameEvent.SpellCopied _ -> False
-    GameEvent.DamagePrevented {} -> False
-    GameEvent.BecameMonarch _ -> False
-    GameEvent.TookInitiative _ -> False
-    GameEvent.Discarded {} -> False
-    GameEvent.Drew {} -> False
-    GameEvent.Revealed {} -> False
-    GameEvent.AttackerDeclared {} -> False
-    GameEvent.BecameBlocking {} -> False
-    GameEvent.BlocksDeclared {} -> False
-    GameEvent.AttackerBlocked {} -> False
-    GameEvent.AttackerUnblocked _ -> False
-    GameEvent.SpellCountered _ -> False
-    GameEvent.AbilityCountered _ -> False
-    GameEvent.HalfUnlocked {} -> False
-    GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
-    GameEvent.Transformed {} -> False
-    GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
-    GameEvent.Mentored {} -> False
-    GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
-    GameEvent.BecameCrewed _ -> False
-    GameEvent.Convoked _ -> False
-    GameEvent.Saddled _ -> False
-    GameEvent.Crewed _ -> False
-    GameEvent.PermanentSacrificed {} -> False
-    GameEvent.AbilityTriggered {} -> False
-    GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost {} -> False
-    GameEvent.LifeGained {} -> False
-    GameEvent.CountersPut {} -> False
-    GameEvent.CountersRemoved {} -> False
-    GameEvent.ControlChanged {} -> False
-    GameEvent.VentureMarkerEntered {} -> False
-    GameEvent.BecameTarget {} -> False
-    GameEvent.BecameAttached {} -> False
-    GameEvent.BecameUnattached {} -> False
-    GameEvent.LeftTheGame _ -> False
-    GameEvent.Milled {} -> False
-    GameEvent.PlayerActed _ -> False
-    GameEvent.LandPlayed {} -> False
-    GameEvent.LostTheGame _ -> False
-    GameEvent.ManifestedDread {} -> False
-    GameEvent.DieResultSettled _ -> False
-    GameEvent.RolledToVisit _ -> False
-    GameEvent.PlanarDieRolled _ -> False
-    GameEvent.SchemeSetInMotion _ -> False
-    GameEvent.ClassLevelSet _ -> False
-    GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived conniver -> case Projection.viewWithLastKnown conniver gs conniver of
-      Nothing -> False
-      Just view -> Filter.matches bearerContext view f
-    GameEvent.Exerted _ -> False
-    GameEvent.BecameAttacked _ -> False
-    GameEvent.AttackersDeclared _ -> False
-    GameEvent.BecameTapped _ -> False
-    GameEvent.BecameUntapped _ -> False
-    GameEvent.TappedForMana _ -> False
-    GameEvent.ManaAdded _ -> False
-    GameEvent.ManaAbilityResolved _ -> False
-    GameEvent.CoinFlipped {} -> False
-    GameEvent.StickerPut _ -> False
-    GameEvent.ActivatedAbilityResolved _ -> False
-    GameEvent.TriggeredAbilityResolved _ -> False
-    GameEvent.CardArrived _ -> False
-  -- CR 701.43d / 607.2h: the BEARER was exerted. SelfEvolves' arm above, line
-  -- for line: CR 701.43a records the event only for the permanent actually
-  -- exerted, so WHOSE exert it was is the whole question, and CR 607.2h's
-  -- linkage needs nothing more because Pawl.Engine.Combat.declareAttackers
-  -- records the event only where the static ability offered the cost.
-  TriggerCondition.SelfExerted -> case event of
-    GameEvent.Moved {} -> False
-    GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan {} -> False
-    GameEvent.SpellCast {} -> False
-    GameEvent.SpellCopied _ -> False
-    GameEvent.DamagePrevented {} -> False
-    GameEvent.BecameMonarch _ -> False
-    GameEvent.TookInitiative _ -> False
-    GameEvent.Discarded {} -> False
-    GameEvent.Drew {} -> False
-    GameEvent.Revealed {} -> False
-    GameEvent.AttackerDeclared {} -> False
-    GameEvent.BecameBlocking {} -> False
-    GameEvent.BlocksDeclared {} -> False
-    GameEvent.AttackerBlocked {} -> False
-    GameEvent.AttackerUnblocked _ -> False
-    GameEvent.SpellCountered _ -> False
-    GameEvent.AbilityCountered _ -> False
-    GameEvent.HalfUnlocked {} -> False
-    GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
-    GameEvent.Transformed {} -> False
-    GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
-    GameEvent.Mentored {} -> False
-    GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
-    GameEvent.BecameCrewed _ -> False
-    GameEvent.Convoked _ -> False
-    GameEvent.Saddled _ -> False
-    GameEvent.Crewed _ -> False
-    GameEvent.PermanentSacrificed {} -> False
-    GameEvent.AbilityTriggered {} -> False
-    GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost {} -> False
-    GameEvent.LifeGained {} -> False
-    GameEvent.CountersPut {} -> False
-    GameEvent.CountersRemoved {} -> False
-    GameEvent.ControlChanged {} -> False
-    GameEvent.VentureMarkerEntered {} -> False
-    GameEvent.BecameTarget {} -> False
-    GameEvent.BecameAttached {} -> False
-    GameEvent.BecameUnattached {} -> False
-    GameEvent.LeftTheGame _ -> False
-    GameEvent.Milled {} -> False
-    GameEvent.PlayerActed _ -> False
-    GameEvent.LandPlayed {} -> False
-    GameEvent.LostTheGame _ -> False
-    GameEvent.ManifestedDread {} -> False
-    GameEvent.DieResultSettled _ -> False
-    GameEvent.RolledToVisit _ -> False
-    GameEvent.PlanarDieRolled _ -> False
-    GameEvent.SchemeSetInMotion _ -> False
-    GameEvent.ClassLevelSet _ -> False
-    GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted oid -> oid == bearer
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -10761,14 +9646,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -10802,9 +9684,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -10851,14 +9730,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -10894,9 +9770,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -10938,14 +9811,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -10981,9 +9851,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -11019,14 +9886,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.PermanentActed _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
     GameEvent.Saddled _ -> False
@@ -11055,9 +9919,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SchemeSetInMotion _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False

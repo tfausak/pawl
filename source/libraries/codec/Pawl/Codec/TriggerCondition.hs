@@ -1,6 +1,7 @@
 module Pawl.Codec.TriggerCondition where
 
 import qualified Pawl.Codec.AbilityAddsMana as AbilityAddsMana
+import qualified Pawl.Codec.ActingPermanent as ActingPermanent
 import qualified Pawl.Codec.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.CardPutIntoGraveyard as CardPutIntoGraveyard
@@ -15,6 +16,7 @@ import qualified Pawl.Codec.DieResult as DieResult
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.OwnedZone as OwnedZone
+import qualified Pawl.Codec.PermanentActed as PermanentActed
 import qualified Pawl.Codec.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Codec.PermanentDealsCombatDamageToPlayer as PermanentDealsCombatDamageToPlayer
 import qualified Pawl.Codec.PermanentSacrificed as PermanentSacrificed
@@ -155,15 +157,12 @@ codec =
           Arm.payload "SelfTransformedInto" CardName.codec TriggerCondition.SelfTransformedInto (\x -> case x of TriggerCondition.SelfTransformedInto y -> Just y; _ -> Nothing),
           Arm.payload "PermanentTransforms" filterCodec TriggerCondition.PermanentTransforms (\x -> case x of TriggerCondition.PermanentTransforms y -> Just y; _ -> Nothing),
           Arm.payload "PermanentTurnedFaceUp" filterCodec TriggerCondition.PermanentTurnedFaceUp (\x -> case x of TriggerCondition.PermanentTurnedFaceUp y -> Just y; _ -> Nothing),
-          Arm.payload "PermanentTurnedFaceDown" filterCodec TriggerCondition.PermanentTurnedFaceDown (\x -> case x of TriggerCondition.PermanentTurnedFaceDown y -> Just y; _ -> Nothing),
+          Arm.payload "PermanentActs" (PermanentActed.codec ActingPermanent.codec) TriggerCondition.PermanentActs (\x -> case x of TriggerCondition.PermanentActs y -> Just y; _ -> Nothing),
           Arm.nullary "FaceDownPermanentLeavesRevealed" TriggerCondition.FaceDownPermanentLeavesRevealed,
           Arm.payload "PermanentBecomesDesignated" PermanentBecomesDesignated.codec TriggerCondition.PermanentBecomesDesignated (\x -> case x of TriggerCondition.PermanentBecomesDesignated y -> Just y; _ -> Nothing),
-          Arm.nullary "SelfEvolves" TriggerCondition.SelfEvolves,
-          Arm.nullary "SelfMutates" TriggerCondition.SelfMutates,
           Arm.nullary "AttachedCreatureMentors" TriggerCondition.AttachedCreatureMentors,
           Arm.nullary "SelfExploits" TriggerCondition.SelfExploits,
           Arm.payload "CreatureExploits" CreatureExploits.codec TriggerCondition.CreatureExploits (\x -> case x of TriggerCondition.CreatureExploits y -> Just y; _ -> Nothing),
-          Arm.nullary "SelfTrains" TriggerCondition.SelfTrains,
           Arm.payload "SelfBecomesCrewed" TriggerFrequency.codec TriggerCondition.SelfBecomesCrewed (\x -> case x of TriggerCondition.SelfBecomesCrewed y -> Just y; _ -> Nothing),
           Arm.nullary "SelfCrewsVehicle" TriggerCondition.SelfCrewsVehicle,
           Arm.payload "PermanentSacrificed" PermanentSacrificed.codec TriggerCondition.PermanentSacrificed (\x -> case x of TriggerCondition.PermanentSacrificed y -> Just y; _ -> Nothing),
@@ -185,9 +184,6 @@ codec =
           Arm.payload "PlayerWinsCoinFlip" PlayerRelation.codec TriggerCondition.PlayerWinsCoinFlip (\x -> case x of TriggerCondition.PlayerWinsCoinFlip y -> Just y; _ -> Nothing),
           Arm.payload "PlayerLosesCoinFlip" PlayerRelation.codec TriggerCondition.PlayerLosesCoinFlip (\x -> case x of TriggerCondition.PlayerLosesCoinFlip y -> Just y; _ -> Nothing),
           Arm.nullary "SelfBecomesPlotted" TriggerCondition.SelfBecomesPlotted,
-          Arm.payload "PermanentExplores" filterCodec TriggerCondition.PermanentExplores (\x -> case x of TriggerCondition.PermanentExplores y -> Just y; _ -> Nothing),
-          Arm.payload "PermanentConnives" filterCodec TriggerCondition.PermanentConnives (\x -> case x of TriggerCondition.PermanentConnives y -> Just y; _ -> Nothing),
-          Arm.nullary "SelfExerted" TriggerCondition.SelfExerted,
           Arm.nullary "Reflexive" TriggerCondition.Reflexive,
           Arm.payload "SelfBecomesAttachedBy" filterCodec TriggerCondition.SelfBecomesAttachedBy (\x -> case x of TriggerCondition.SelfBecomesAttachedBy y -> Just y; _ -> Nothing),
           -- CR 701.3a read from the attachment, and CR 701.3d's mirror of it. Same
@@ -304,15 +300,12 @@ tagOf x = case x of
   TriggerCondition.SelfTransformedInto {} -> "SelfTransformedInto"
   TriggerCondition.PermanentTransforms {} -> "PermanentTransforms"
   TriggerCondition.PermanentTurnedFaceUp {} -> "PermanentTurnedFaceUp"
-  TriggerCondition.PermanentTurnedFaceDown {} -> "PermanentTurnedFaceDown"
+  TriggerCondition.PermanentActs {} -> "PermanentActs"
   TriggerCondition.FaceDownPermanentLeavesRevealed {} -> "FaceDownPermanentLeavesRevealed"
   TriggerCondition.PermanentBecomesDesignated {} -> "PermanentBecomesDesignated"
-  TriggerCondition.SelfEvolves {} -> "SelfEvolves"
-  TriggerCondition.SelfMutates {} -> "SelfMutates"
   TriggerCondition.AttachedCreatureMentors {} -> "AttachedCreatureMentors"
   TriggerCondition.SelfExploits {} -> "SelfExploits"
   TriggerCondition.CreatureExploits {} -> "CreatureExploits"
-  TriggerCondition.SelfTrains {} -> "SelfTrains"
   TriggerCondition.SelfBecomesCrewed {} -> "SelfBecomesCrewed"
   TriggerCondition.SelfCrewsVehicle {} -> "SelfCrewsVehicle"
   TriggerCondition.PermanentSacrificed {} -> "PermanentSacrificed"
@@ -334,9 +327,6 @@ tagOf x = case x of
   TriggerCondition.PlayerWinsCoinFlip {} -> "PlayerWinsCoinFlip"
   TriggerCondition.PlayerLosesCoinFlip {} -> "PlayerLosesCoinFlip"
   TriggerCondition.SelfBecomesPlotted {} -> "SelfBecomesPlotted"
-  TriggerCondition.PermanentExplores {} -> "PermanentExplores"
-  TriggerCondition.PermanentConnives {} -> "PermanentConnives"
-  TriggerCondition.SelfExerted {} -> "SelfExerted"
   TriggerCondition.Reflexive {} -> "Reflexive"
   TriggerCondition.SelfBecomesAttachedBy {} -> "SelfBecomesAttachedBy"
   TriggerCondition.SelfBecomesAttachedTo {} -> "SelfBecomesAttachedTo"

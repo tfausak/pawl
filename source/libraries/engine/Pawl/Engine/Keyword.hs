@@ -564,7 +564,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.ClassLevel _ -> []
   -- CR 701.43d's static ability mints NO triggered ability: the rule lets a card
   -- print a linked "when you do" beside it without saying what that ability does,
-  -- so each printing authors its own on TriggerCondition.SelfExerted.
+  -- so each printing authors its own on TriggerCondition.PermanentActs.
   Keyword.Exert -> []
   -- CR 702.154b's triggered ability is minted, but not here: it is linked to the
   -- CR 508.1g cost, so it exists only where that cost was paid. Pawl.Engine.Combat
