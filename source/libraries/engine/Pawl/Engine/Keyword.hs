@@ -444,6 +444,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Cycling {} -> []
   Keyword.Kicker _ -> []
   Keyword.Multikicker _ -> []
+  Keyword.StickerKicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
   Keyword.Mutate _ -> []
@@ -674,6 +675,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Renown _ -> []
   Keyword.Kicker _ -> []
   Keyword.Multikicker _ -> []
+  Keyword.StickerKicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
   Keyword.Mutate _ -> []
@@ -1229,6 +1231,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Renown _ -> []
   Keyword.Kicker _ -> []
   Keyword.Multikicker _ -> []
+  Keyword.StickerKicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
   Keyword.Mutate _ -> []
@@ -1843,6 +1846,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Renown _ -> []
   Keyword.Kicker _ -> []
   Keyword.Multikicker _ -> []
+  Keyword.StickerKicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
   Keyword.Mutate _ -> []
@@ -2621,6 +2625,7 @@ permissionsFor cardTypes keyword = case keyword of
   -- shape one clause below.
   Keyword.Kicker _ -> []
   Keyword.Multikicker _ -> []
+  Keyword.StickerKicker _ -> []
   Keyword.Entwine _ -> []
   -- CR 702.27a's "as you cast this spell" is kicker's shape above: an additional
   -- cost announced at CR 601.2b, never a permission to cast.
@@ -3539,6 +3544,20 @@ disguiseCosts keywords =
         _ -> Nothing
    in Set.toAscList (Set.fromList (Maybe.mapMaybe costOf (Set.toAscList keywords)))
 
+-- | CR 702.33d: a kicker cost of any kind, multikicker's and sticker kicker's
+-- among them (CR 702.33c, 702.33h).
+isKicker :: Keyword -> Bool
+isKicker keyword = familyOf keyword == Just KeywordFamily.Kicker
+
+-- | CR 702.33e: a Kicker or Multikicker keyword, printed or granted, which an
+-- object's "if kicked" reads; a sticker kicker (CR 702.33h) is not one. A
+-- wildcard, optionalCost's posture.
+isPrintedKicker :: Keyword -> Bool
+isPrintedKicker keyword = case keyword of
+  Keyword.Kicker _ -> True
+  Keyword.Multikicker _ -> True
+  _ -> False
+
 -- CR 601.2b: the OPTIONAL additional cost this keyword ability lets its spell's
 -- controller pay as they cast it, paired with how many times its rule lets it be
 -- paid -- Just 1 for kicker (CR 702.33a), offspring (CR 702.175a), casualty (CR
@@ -3559,6 +3578,8 @@ optionalCost :: Keyword -> Maybe (Cost Keyword, Maybe Natural)
 optionalCost keyword = case keyword of
   Keyword.Kicker cost -> Just (cost, Just 1)
   Keyword.Multikicker cost -> Just (cost, Nothing)
+  -- CR 702.33h: "means Kicker [cost]", so payable once.
+  Keyword.StickerKicker cost -> Just (cost, Just 1)
   Keyword.Squad cost -> Just (cost, Nothing)
   Keyword.Offspring cost -> Just (cost, Just 1)
   -- Minted rather than printed, bargain's and conspire's reason: rule 702.174a
@@ -4444,6 +4465,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Cycling {} -> []
   Keyword.Kicker _ -> []
   Keyword.Multikicker _ -> []
+  Keyword.StickerKicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
   Keyword.Mutate _ -> []
@@ -4830,6 +4852,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Cycling {} -> []
   Keyword.Kicker _ -> []
   Keyword.Multikicker _ -> []
+  Keyword.StickerKicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
   Keyword.Mutate _ -> []
@@ -5180,6 +5203,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Cycling {} -> []
   Keyword.Kicker _ -> []
   Keyword.Multikicker _ -> []
+  Keyword.StickerKicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
   Keyword.Mutate _ -> []
@@ -5460,6 +5484,10 @@ familyOf keyword = case keyword of
   -- CR 702.33c's last sentence, "a multikicker cost is a kicker cost", is why
   -- this answers the SAME family rather than owing one of its own.
   Keyword.Multikicker _ -> Just KeywordFamily.Kicker
+  -- CR 702.33h: sticker kicker "means Kicker [cost]", so a "spell with
+  -- kicker" or "kicked" reader matches it; Quantity.WasKicked's linked read
+  -- does not (isPrintedKicker).
+  Keyword.StickerKicker _ -> Just KeywordFamily.Kicker
   Keyword.Flashback _ -> Just KeywordFamily.Flashback
   Keyword.Bestow _ -> Just KeywordFamily.Bestow
   Keyword.Mutate _ -> Just KeywordFamily.Mutate

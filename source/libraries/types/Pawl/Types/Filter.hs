@@ -689,6 +689,9 @@ data Filter keyword
     -- at; this atom is the per-candidate one a static ability's Affected filter
     -- needs. Vacuously False for a player and for everything nothing paid for.
     TagWasSpent ProductionTag.ProductionTag
+  | -- | CR 702.33d: the spell was kicked, by any kicker cost, a sticker
+    -- kicker's among them (CR 702.33h).
+    Kicked
   | And [Filter keyword]
   | Or [Filter keyword]
   | Not (Filter keyword)

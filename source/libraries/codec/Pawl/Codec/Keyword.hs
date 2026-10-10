@@ -87,6 +87,7 @@ codec =
       Arm.payload "Fading" Common.natural Keyword.Fading (\x -> case x of Keyword.Fading y -> Just y; _ -> Nothing),
       Arm.payload "Kicker" (Cost.codec codec) Keyword.Kicker (\x -> case x of Keyword.Kicker y -> Just y; _ -> Nothing),
       Arm.payload "Multikicker" (Cost.codec codec) Keyword.Multikicker (\x -> case x of Keyword.Multikicker y -> Just y; _ -> Nothing),
+      Arm.payload "StickerKicker" (Cost.codec codec) Keyword.StickerKicker (\x -> case x of Keyword.StickerKicker y -> Just y; _ -> Nothing),
       Arm.payload "Flashback" (Cost.codec codec) Keyword.Flashback (\x -> case x of Keyword.Flashback y -> Just y; _ -> Nothing),
       Arm.nullary "Fear" Keyword.Fear,
       Arm.nullary "Intimidate" Keyword.Intimidate,
@@ -303,6 +304,7 @@ tagOf x = case x of
   Keyword.Fading {} -> "Fading"
   Keyword.Kicker {} -> "Kicker"
   Keyword.Multikicker {} -> "Multikicker"
+  Keyword.StickerKicker {} -> "StickerKicker"
   Keyword.Flashback {} -> "Flashback"
   Keyword.Fear {} -> "Fear"
   Keyword.Intimidate {} -> "Intimidate"

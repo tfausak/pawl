@@ -114,6 +114,7 @@ encode p answer = case p of
   Prompt.ChooseCardsFromAmong {} -> Response.ChoseCardsFromAmong answer
   Prompt.ChooseDungeon {} -> Response.ChoseDungeon answer
   Prompt.ChooseSticker {} -> Response.ChoseSticker answer
+  Prompt.ChooseStickerOrNone {} -> Response.ChoseStickerOrNone answer
   Prompt.ChooseNamePosition {} -> Response.ChoseNamePosition answer
   Prompt.ChooseCompanion {} -> Response.ChoseCompanion answer
   Prompt.ChooseFromOutsideTheGame {} -> Response.ChoseFromOutsideTheGame answer
@@ -178,6 +179,7 @@ encode p answer = case p of
   Prompt.OrderCostComponents {} -> Response.OrderedCostComponents answer
   Prompt.OrderCombatTolls {} -> Response.OrderedCombatTolls answer
   Prompt.OrderComponentCards {} -> Response.OrderedComponentCards answer
+  Prompt.ChooseStickerKeeper {} -> Response.ChoseStickerKeeper answer
   Prompt.OrderForEach {} -> Response.OrderedForEach answer
   Prompt.ChooseLoopMembers {} -> Response.ChoseLoopMembers answer
   Prompt.ChooseRepeat {} -> Response.ChoseRepeat answer
@@ -413,6 +415,9 @@ decode p response = case p of
   Prompt.ChooseDungeon {} -> case response of
     Response.ChoseDungeon printingId -> Just printingId
     _ -> Nothing
+  Prompt.ChooseStickerOrNone {} -> case response of
+    Response.ChoseStickerOrNone ref -> Just ref
+    _ -> Nothing
   Prompt.ChooseSticker {} -> case response of
     Response.ChoseSticker ref -> Just ref
     _ -> Nothing
@@ -556,6 +561,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.OrderComponentCards {} -> case response of
     Response.OrderedComponentCards order -> Just order
+    _ -> Nothing
+  Prompt.ChooseStickerKeeper {} -> case response of
+    Response.ChoseStickerKeeper index -> Just index
     _ -> Nothing
   Prompt.OrderForEach {} -> case response of
     Response.OrderedForEach order -> Just order
@@ -960,6 +968,7 @@ defaultAnswer p = case p of
   Prompt.ChooseDungeon _ _ candidates -> NonEmpty.head candidates
   -- CR 123.3: asked only at two or more, every one available.
   Prompt.ChooseSticker _ _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseStickerOrNone {} -> Nothing
   -- CR 123.6b: the start of the name is always a position.
   Prompt.ChooseNamePosition _ _ _ positions -> NonEmpty.head positions
   -- CR 103.2b's "if any players WISH to reveal": declining is the answer that
@@ -1152,6 +1161,9 @@ defaultAnswer p = case p of
   -- rule says "MAY arrange", so this identity is a real answer rather than a
   -- stand-in for one.
   Prompt.OrderComponentCards _ _ _ components -> zipWith const [0 ..] components
+  -- CR 123.5c: the first object, the one the melded or merged permanent's split
+  -- names first.
+  Prompt.ChooseStickerKeeper {} -> 0
   -- CR 608.2f: likewise, and it is the engine's own APNAP-then-ascending sweep
   -- order -- what pawl walked in before the intra-seat key became the resolving
   -- controller's to choose.

@@ -356,6 +356,9 @@ data Prompt r where
   -- | CR 123.3: which available sticker the placer puts on this object.
   -- ChooseDungeon's posture: asked at two or more, filtered rather than trusted.
   ChooseSticker :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty StickerRef.StickerRef -> Prompt StickerRef.StickerRef
+  -- | CR 702.33h: ChooseSticker with declining added ("you may put"); raised
+  -- for one candidate too, and an unoffered sticker reads as declining.
+  ChooseStickerOrNone :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty StickerRef.StickerRef -> Prompt (Maybe StickerRef.StickerRef)
   -- | CR 123.6b: after how many words of this object's name the controller
   -- puts a name sticker's word.
   ChooseNamePosition :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty Natural.Natural -> Prompt Natural.Natural
@@ -820,6 +823,10 @@ data Prompt r where
   -- the sentence again for a merged permanent, so the name is the
   -- leaving permanent's components rather than meld's.
   OrderComponentCards :: Decider.Decider -> PlayerId.PlayerId -> Zone.Zone -> [PrintingId.PrintingId] -> Prompt [Natural.Natural]
+  -- | CR 123.5c: which of the objects a melded or merged permanent becomes in a
+  -- public zone keeps its stickers, by index; an index past the end reads as
+  -- the first.
+  ChooseStickerKeeper :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty PrintingId.PrintingId -> Prompt Natural.Natural
   -- | The relative order of a per-object batch over one player's objects, a
   -- permutation of the indices; the chooser is CR 608.2f's resolving
   -- controller, CR 701.44d's exploring seat, or CR 707.10d's copying

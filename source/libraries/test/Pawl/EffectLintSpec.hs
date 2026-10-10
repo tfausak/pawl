@@ -1239,13 +1239,17 @@ data Asks
     -- it" -- through the same chooseCardsInHand the move gather uses, and falls
     -- through to the pure sweep for every other arm.
     AsksLookAtArm
-  | -- | Pawl.Engine.Resolve's Effect.Pair, Effect.ModifyTarget and
-    -- Effect.PutSticker arms. Each asks the chosen-permanent arm through
-    -- chosenPermanentOf -- CR 702.95a's "another unpaired creature you control",
-    -- Mirkwood Trapper's "that player chooses an attacking creature", Proficient
-    -- Pyrodancer's "a nonland permanent you own" -- and falls through to the pure
-    -- sweep for everything else.
+  | -- | Pawl.Engine.Resolve's Effect.Pair and Effect.ModifyTarget arms. Each
+    -- asks the chosen-permanent arm through chosenPermanentOf -- CR 702.95a's
+    -- "another unpaired creature you control", Mirkwood Trapper's "that player
+    -- chooses an attacking creature" -- and falls through to the pure sweep for
+    -- everything else.
     AsksChosenPermanent
+  | -- | Pawl.Engine.Resolve's Effect.PutSticker arm: AsksChosenPermanent's
+    -- chosenPermanentOf (Proficient Pyrodancer's "a nonland permanent you own"),
+    -- plus chosenCardsInGraveyard (Scampire's "a creature card in your
+    -- graveyard").
+    AsksPutStickerArm
   | -- | Pawl.Engine.Resolve's Effect.ExchangeWithCardInHand arm, which asks
     -- its one hand chooser through chooseCardsInHand.
     AsksExchangeArm
@@ -1338,11 +1342,14 @@ asksFor asks ref = case asks of
     ObjectRef.ChosenCardInHand {} -> True
     _ -> False
   -- One arm and one only, for AsksTransformGather's reason: Resolve's
-  -- Effect.Pair, Effect.ModifyTarget and Effect.PutSticker arms route
-  -- ObjectRef.ChosenPermanent through chosenPermanentOf and read every other arm
-  -- off the pure sweep.
+  -- Effect.Pair and Effect.ModifyTarget arms route ObjectRef.ChosenPermanent
+  -- through chosenPermanentOf and read every other arm off the pure sweep.
   AsksChosenPermanent -> case ref of
     ObjectRef.ChosenPermanent {} -> True
+    _ -> False
+  AsksPutStickerArm -> case ref of
+    ObjectRef.ChosenPermanent {} -> True
+    ObjectRef.ChosenCardInGraveyard {} -> True
     _ -> False
   AsksExchangeArm -> case ref of
     ObjectRef.ChosenCardInHand {} -> True
@@ -1571,7 +1578,7 @@ effectObjectRefs effect =
         Effect.TakeExtraTurn {} -> []
         Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ refs) -> read_ (NonEmpty.toList refs)
         Effect.Ante (Ante.MkAnte _ ref _) -> read_ [ref]
-        Effect.PutSticker (PutSticker.MkPutSticker _ ref _ _ _ _) -> [(AsksChosenPermanent, ref)]
+        Effect.PutSticker (PutSticker.MkPutSticker _ ref _ _ _ _) -> [(AsksPutStickerArm, ref)]
         Effect.SetOwner (SetOwner.MkSetOwner _ ref) -> read_ [ref]
         Effect.ExchangeOwnership (ExchangeOwnership.MkExchangeOwnership one other) -> read_ [one, other]
         Effect.ExchangeWithTopOfLibrary (ExchangeWithTopOfLibrary.MkExchangeWithTopOfLibrary ref _) -> read_ [ref]
