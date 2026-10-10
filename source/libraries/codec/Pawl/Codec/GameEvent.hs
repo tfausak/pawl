@@ -43,6 +43,7 @@ import qualified Pawl.Codec.Moved as Moved
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PermanentWasSacrificed as PermanentWasSacrificed
 import qualified Pawl.Codec.PlanarDieRolled as PlanarDieRolled
+import qualified Pawl.Codec.PlayerActed as PlayerActed
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.Revealed as Revealed
 import qualified Pawl.Codec.Saddling as Saddling
@@ -118,21 +119,13 @@ codec =
       Arm.payload "BecameUnattached" BecameUnattached.codec GameEvent.BecameUnattached (\x -> case x of GameEvent.BecameUnattached y -> Just y; _ -> Nothing),
       Arm.payload "LeftTheGame" LeftTheGame.codec GameEvent.LeftTheGame (\x -> case x of GameEvent.LeftTheGame y -> Just y; _ -> Nothing),
       Arm.payload "LostTheGame" PlayerId.codec GameEvent.LostTheGame (\x -> case x of GameEvent.LostTheGame y -> Just y; _ -> Nothing),
-      Arm.payload "Scried" PlayerId.codec GameEvent.Scried (\x -> case x of GameEvent.Scried y -> Just y; _ -> Nothing),
+      Arm.payload "PlayerActed" (PlayerActed.codec PlayerId.codec) GameEvent.PlayerActed (\x -> case x of GameEvent.PlayerActed y -> Just y; _ -> Nothing),
       Arm.payload "LandPlayed" LandPlayed.codec GameEvent.LandPlayed (\x -> case x of GameEvent.LandPlayed y -> Just y; _ -> Nothing),
-      -- CR 309.7's completion, with only the completing player on the wire: the
-      -- rule names no card, so there is nothing else to carry.
-      Arm.payload "DungeonCompleted" PlayerId.codec GameEvent.DungeonCompleted (\x -> case x of GameEvent.DungeonCompleted y -> Just y; _ -> Nothing),
-      Arm.payload "Surveiled" PlayerId.codec GameEvent.Surveiled (\x -> case x of GameEvent.Surveiled y -> Just y; _ -> Nothing),
-      Arm.payload "Proliferated" PlayerId.codec GameEvent.Proliferated (\x -> case x of GameEvent.Proliferated y -> Just y; _ -> Nothing),
       Arm.payload "ManifestedDread" ManifestedDread.codec GameEvent.ManifestedDread (\x -> case x of GameEvent.ManifestedDread y -> Just y; _ -> Nothing),
-      Arm.payload "DiceRolled" PlayerId.codec GameEvent.DiceRolled (\x -> case x of GameEvent.DiceRolled y -> Just y; _ -> Nothing),
       Arm.payload "DieResultSettled" (DieResult.codec PlayerId.codec) GameEvent.DieResultSettled (\x -> case x of GameEvent.DieResultSettled y -> Just y; _ -> Nothing),
       Arm.payload "RolledToVisit" (DieResult.codec PlayerId.codec) GameEvent.RolledToVisit (\x -> case x of GameEvent.RolledToVisit y -> Just y; _ -> Nothing),
       Arm.payload "PlanarDieRolled" PlanarDieRolled.codec GameEvent.PlanarDieRolled (\x -> case x of GameEvent.PlanarDieRolled y -> Just y; _ -> Nothing),
       Arm.payload "SchemeSetInMotion" SchemeSetInMotion.codec GameEvent.SchemeSetInMotion (\x -> case x of GameEvent.SchemeSetInMotion y -> Just y; _ -> Nothing),
-      Arm.payload "AttractionOpened" PlayerId.codec GameEvent.AttractionOpened (\x -> case x of GameEvent.AttractionOpened y -> Just y; _ -> Nothing),
-      Arm.payload "PrizeClaimed" PlayerId.codec GameEvent.PrizeClaimed (\x -> case x of GameEvent.PrizeClaimed y -> Just y; _ -> Nothing),
       Arm.payload "ClassLevelSet" ClassLevelChange.codec GameEvent.ClassLevelSet (\x -> case x of GameEvent.ClassLevelSet y -> Just y; _ -> Nothing),
       Arm.payload "Plotted" ObjectId.codec GameEvent.Plotted (\x -> case x of GameEvent.Plotted y -> Just y; _ -> Nothing),
       Arm.payload "Explored" ObjectId.codec GameEvent.Explored (\x -> case x of GameEvent.Explored y -> Just y; _ -> Nothing),
@@ -144,22 +137,6 @@ codec =
       Arm.payload "ManaAdded" ManaAdded.codec GameEvent.ManaAdded (\x -> case x of GameEvent.ManaAdded y -> Just y; _ -> Nothing),
       Arm.payload "ManaAbilityResolved" ManaAbilityResolved.codec GameEvent.ManaAbilityResolved (\x -> case x of GameEvent.ManaAbilityResolved y -> Just y; _ -> Nothing),
       Arm.payload "CoinFlipped" CoinFlipped.codec GameEvent.CoinFlipped (\x -> case x of GameEvent.CoinFlipped y -> Just y; _ -> Nothing),
-      -- CR 701.54d. One player id, Scried's shape above: the rule names the
-      -- tempted player and nothing else.
-      Arm.payload "RingTempted" PlayerId.codec GameEvent.RingTempted (\x -> case x of GameEvent.RingTempted y -> Just y; _ -> Nothing),
-      -- CR 701.68d. One player id, the arm above's shape: the rule names the
-      -- blighting player and nothing else.
-      Arm.payload "Blighted" PlayerId.codec GameEvent.Blighted (\x -> case x of GameEvent.Blighted y -> Just y; _ -> Nothing),
-      -- CR 701.61a. One player id, the arm above's shape: the rule's two halves
-      -- write their own Moved events, so the forager is all this carries.
-      Arm.payload "Foraged" PlayerId.codec GameEvent.Foraged (\x -> case x of GameEvent.Foraged y -> Just y; _ -> Nothing),
-      Arm.payload "Foretold" PlayerId.codec GameEvent.Foretold (\x -> case x of GameEvent.Foretold y -> Just y; _ -> Nothing),
-      Arm.payload "CollectedEvidence" PlayerId.codec GameEvent.CollectedEvidence (\x -> case x of GameEvent.CollectedEvidence y -> Just y; _ -> Nothing),
-      Arm.payload "GaveGift" PlayerId.codec GameEvent.GaveGift (\x -> case x of GameEvent.GaveGift y -> Just y; _ -> Nothing),
-      Arm.payload "Earthbent" PlayerId.codec GameEvent.Earthbent (\x -> case x of GameEvent.Earthbent y -> Just y; _ -> Nothing),
-      Arm.payload "Waterbent" PlayerId.codec GameEvent.Waterbent (\x -> case x of GameEvent.Waterbent y -> Just y; _ -> Nothing),
-      Arm.payload "Airbent" PlayerId.codec GameEvent.Airbent (\x -> case x of GameEvent.Airbent y -> Just y; _ -> Nothing),
-      Arm.payload "Firebent" PlayerId.codec GameEvent.Firebent (\x -> case x of GameEvent.Firebent y -> Just y; _ -> Nothing),
       Arm.payload "StickerPut" StickerPut.codec GameEvent.StickerPut (\x -> case x of GameEvent.StickerPut y -> Just y; _ -> Nothing),
       -- CR 608.2n. The source object and the ability, which is the pair CR
       -- 707.10b counts by, so the payload is the same record Pawl.Types.Source's
@@ -220,19 +197,13 @@ tagOf x = case x of
   GameEvent.BecameUnattached {} -> "BecameUnattached"
   GameEvent.LeftTheGame {} -> "LeftTheGame"
   GameEvent.LostTheGame {} -> "LostTheGame"
-  GameEvent.Scried {} -> "Scried"
   GameEvent.LandPlayed {} -> "LandPlayed"
-  GameEvent.DungeonCompleted {} -> "DungeonCompleted"
-  GameEvent.Surveiled {} -> "Surveiled"
-  GameEvent.Proliferated {} -> "Proliferated"
+  GameEvent.PlayerActed {} -> "PlayerActed"
   GameEvent.ManifestedDread {} -> "ManifestedDread"
-  GameEvent.DiceRolled {} -> "DiceRolled"
   GameEvent.DieResultSettled {} -> "DieResultSettled"
   GameEvent.RolledToVisit {} -> "RolledToVisit"
   GameEvent.PlanarDieRolled {} -> "PlanarDieRolled"
   GameEvent.SchemeSetInMotion {} -> "SchemeSetInMotion"
-  GameEvent.AttractionOpened {} -> "AttractionOpened"
-  GameEvent.PrizeClaimed {} -> "PrizeClaimed"
   GameEvent.ClassLevelSet {} -> "ClassLevelSet"
   GameEvent.Plotted {} -> "Plotted"
   GameEvent.Explored {} -> "Explored"
@@ -244,16 +215,6 @@ tagOf x = case x of
   GameEvent.ManaAdded {} -> "ManaAdded"
   GameEvent.ManaAbilityResolved {} -> "ManaAbilityResolved"
   GameEvent.CoinFlipped {} -> "CoinFlipped"
-  GameEvent.RingTempted {} -> "RingTempted"
-  GameEvent.Blighted {} -> "Blighted"
-  GameEvent.Foraged {} -> "Foraged"
-  GameEvent.Foretold {} -> "Foretold"
-  GameEvent.CollectedEvidence {} -> "CollectedEvidence"
-  GameEvent.GaveGift {} -> "GaveGift"
-  GameEvent.Earthbent {} -> "Earthbent"
-  GameEvent.Waterbent {} -> "Waterbent"
-  GameEvent.Airbent {} -> "Airbent"
-  GameEvent.Firebent {} -> "Firebent"
   GameEvent.StickerPut {} -> "StickerPut"
   GameEvent.ActivatedAbilityResolved {} -> "ActivatedAbilityResolved"
   GameEvent.TriggeredAbilityResolved {} -> "TriggeredAbilityResolved"

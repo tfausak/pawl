@@ -54,9 +54,14 @@
         },
         {
           "condition": {
-            "type": "RingTemptsPlayer",
+            "type": "PlayerActs",
             "value": {
-              "type": "You"
+              "action": {
+                "type": "TemptedByRing"
+              },
+              "player": {
+                "type": "You"
+              }
             }
           },
           "modal": {

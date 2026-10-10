@@ -980,6 +980,9 @@ library codec
     Pawl.Codec.PlanarDieRolled
     Pawl.Codec.PlanarDieRolledSpec
     Pawl.Codec.Player
+    Pawl.Codec.PlayerActed
+    Pawl.Codec.PlayerAction
+    Pawl.Codec.PlayerActionSpec
     Pawl.Codec.PlayerAttacksPlayer
     Pawl.Codec.PlayerAttacksPlayerSpec
     Pawl.Codec.PlayerAttacksWith
@@ -2497,6 +2500,8 @@ library types
     Pawl.Types.PlanarDieFace
     Pawl.Types.PlanarDieRolled
     Pawl.Types.Player
+    Pawl.Types.PlayerActed
+    Pawl.Types.PlayerAction
     Pawl.Types.PlayerAttacksPlayer
     Pawl.Types.PlayerAttacksWith
     Pawl.Types.PlayerControl

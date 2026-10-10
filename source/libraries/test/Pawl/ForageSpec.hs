@@ -4,7 +4,7 @@
 -- Covers: CR 701.61 FORAGE -- Pawl.Engine.Forage, Effect.Forage's two arms in
 -- Pawl.Engine.Resolve.Effect (the executing one and effectIsImpossible's),
 -- Prompt.ChooseForage, CostComponent.Forage's arms in Pawl.Engine.Cost, and the
--- GameEvent.Foraged that TriggerCondition.PlayerForages watches.
+-- PlayerAction.Forage that TriggerCondition.PlayerActs watches.
 --
 -- THREE FIXTURES, one per provenance rule 701.61a can be reached from. Treetop
 -- Sentries for the instructed forage (below); Thornvault Forager ({1}{G}

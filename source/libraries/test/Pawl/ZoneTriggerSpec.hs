@@ -126,6 +126,7 @@ import qualified Pawl.Types.PlacesSticker as PlacesSticker
 import qualified Pawl.Types.PlanarDieFace as PlanarDieFace
 import qualified Pawl.Types.PlanarDieRolled as PlanarDieRolled
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerActed as PlayerActed
 import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -2303,48 +2304,21 @@ representativeEvents cond =
         -- condition binds nothing from the log, which is what
         -- Event.eventBindingSlots claims for it.
         TriggerCondition.RoomEntered _ -> one (GameEvent.VentureMarkerEntered (VentureMarkerEntered.MkVentureMarkerEntered S.alice departed RoomIndex.topmost))
-        -- CR 701.22d's own event, and the only one this condition admits. bob
-        -- rather than the perspective player, on the PlayerBecomesMonarch arm's
-        -- reasoning: an arm that stamped CR 109.5's "you" instead of the scrying
-        -- player would still agree with eventBindingSlots here if the two
-        -- coincided.
-        TriggerCondition.PlayerScries _ -> one (GameEvent.Scried S.bob)
-        -- CR 603.9's own event, the PlayerScries arm's shape and reasoning.
+        -- CR 603.2's own event, carrying the watched action. bob rather than the
+        -- perspective player, on the PlayerBecomesMonarch arm's reasoning: an arm
+        -- that stamped CR 109.5's "you" instead of the acting player would still
+        -- agree with eventBindingSlots here if the two coincided.
+        TriggerCondition.PlayerActs watched -> one (GameEvent.PlayerActed (PlayerActed.MkPlayerActed (PlayerActed.action watched) S.bob))
+        -- CR 603.9's own event, the PlayerActs arm's shape and reasoning.
         TriggerCondition.PlayerLosesGame _ -> one (GameEvent.LostTheGame S.bob)
-        -- CR 701.54d's own event, the PlayerScries arm's shape and reasoning.
-        TriggerCondition.RingTemptsPlayer _ -> one (GameEvent.RingTempted S.bob)
-        -- CR 701.68d's own event, the arm above's shape and reasoning. A
-        -- DISTINCT event once more: an arm matching a temptation here would
-        -- claim the floor for the wrong keyword action.
-        TriggerCondition.PlayerBlights _ -> one (GameEvent.Blighted S.bob)
-        -- CR 701.61a's own event, the arm above's shape and reasoning, and
-        -- DISTINCT from it: an arm matching a blight here would claim the floor
-        -- for the wrong keyword action.
-        TriggerCondition.PlayerForages _ -> one (GameEvent.Foraged S.bob)
-        TriggerCondition.PlayerForetells _ -> one (GameEvent.Foretold S.bob)
-        TriggerCondition.PlayerCollectsEvidence _ -> one (GameEvent.CollectedEvidence S.bob)
-        TriggerCondition.PlayerGivesGift _ -> one (GameEvent.GaveGift S.bob)
-        TriggerCondition.PlayerEarthbends _ -> one (GameEvent.Earthbent S.bob)
-        TriggerCondition.PlayerWaterbends _ -> one (GameEvent.Waterbent S.bob)
-        TriggerCondition.PlayerAirbends _ -> one (GameEvent.Airbent S.bob)
-        TriggerCondition.PlayerFirebends _ -> one (GameEvent.Firebent S.bob)
         TriggerCondition.PlacesSticker _ -> one (GameEvent.StickerPut StickerPut.MkStickerPut {StickerPut.placer = S.bob, StickerPut.object = departed, StickerPut.kind = StickerKind.Art})
-        -- CR 309.7's own event, and the only one this condition admits. bob
-        -- rather than the perspective player, on the PlayerScries arm's reasoning.
-        TriggerCondition.PlayerCompletesDungeon _ -> one (GameEvent.DungeonCompleted S.bob)
-        -- CR 701.25d's own event, the arm above's twin. A DISTINCT event, which
-        -- is what keeps this pin honest: an arm matching a scry here would claim
-        -- the floor for the wrong keyword action.
-        TriggerCondition.PlayerSurveils _ -> one (GameEvent.Surveiled S.bob)
         -- CR 305.1's own event: a land play binds nothing.
         TriggerCondition.PlayerPlaysLand p -> one (GameEvent.LandPlayed (LandPlayed.MkLandPlayed S.bob departed (PlaysLand.from p)))
-        TriggerCondition.PlayerProliferates _ -> one (GameEvent.Proliferated S.bob)
         -- TWO: CR 701.62b's manifest dread that binned nothing, and one that
         -- binned a card, which is what parts the floor from the ceiling.
         TriggerCondition.PlayerManifestsDread _ ->
           noTable (GameEvent.ManifestedDread (ManifestedDread.MkManifestedDread S.bob Seq.empty))
             NonEmpty.:| [noTable (GameEvent.ManifestedDread (ManifestedDread.MkManifestedDread S.bob (Seq.singleton arrived)))]
-        TriggerCondition.PlayerRollsDice _ -> one (GameEvent.DiceRolled S.bob)
         -- CR 706.2's per-die event, carrying the number the condition states.
         TriggerCondition.PlayerRollsResult watched -> one (GameEvent.DieResultSettled DieResult.MkDieResult {DieResult.roller = S.bob, DieResult.result = DieResult.result watched})
         -- CR 701.52a's own event, and the only one this condition admits.
@@ -2355,14 +2329,10 @@ representativeEvents cond =
         TriggerCondition.PlayerRollsPlaneswalker _ -> one (GameEvent.PlanarDieRolled (PlanarDieRolled.MkPlanarDieRolled S.bob PlanarDieFace.Planeswalker))
         -- CR 701.32's own event, and the only one this condition admits.
         TriggerCondition.SetInMotion -> one (GameEvent.SchemeSetInMotion (SchemeSetInMotion.MkSchemeSetInMotion S.bob departed))
-        -- CR 701.51c's and CR 702.159b's own events, each the only one its
-        -- condition admits.
-        TriggerCondition.PlayerOpensAttraction _ -> one (GameEvent.AttractionOpened S.bob)
-        TriggerCondition.PlayerClaimsPrize _ -> one (GameEvent.PrizeClaimed S.bob)
         -- CR 705.2's own event, and the only one this condition admits. A WON
         -- flip, since neither a lost one nor rule 705.2's winnerless one matches
         -- at all -- and bob rather than the perspective player, on the
-        -- PlayerScries arm's reasoning.
+        -- PlayerActs arm's reasoning.
         TriggerCondition.PlayerWinsCoinFlip _ -> one (GameEvent.CoinFlipped CoinFlipped.MkCoinFlipped {CoinFlipped.flipper = S.bob, CoinFlipped.won = Just True})
         -- The mirror, and the only representative event its arm admits: a flip
         -- bob called and missed. Just False rather than Nothing, which CR 705.2's
@@ -2617,22 +2587,9 @@ everyTriggerCondition =
     -- PlayerBecomesMonarch pair's reasoning.
     TriggerCondition.PlayerLosesGame PlayerRelation.AnyPlayer,
     TriggerCondition.PlayerLosesGame PlayerRelation.Opponent,
-    -- BOTH relations for each of the two, on the PlayerBecomesMonarch pair's
-    -- reasoning: an eventBindings arm that had cased on the relation and stamped
-    -- nothing under one of them would go unseen if only one were listed.
-    TriggerCondition.PlayerCompletesDungeon PlayerRelation.You,
-    TriggerCondition.PlayerCompletesDungeon PlayerRelation.Opponent,
-    TriggerCondition.PlayerScries PlayerRelation.You,
-    TriggerCondition.PlayerScries PlayerRelation.Opponent,
-    TriggerCondition.PlayerSurveils PlayerRelation.You,
-    TriggerCondition.PlayerSurveils PlayerRelation.Opponent,
     TriggerCondition.PlayerPlaysLand (PlaysLand.MkPlaysLand PlayerRelation.You Zone.Exile (Filter.Type.And [])),
-    TriggerCondition.PlayerProliferates PlayerRelation.You,
-    TriggerCondition.PlayerProliferates PlayerRelation.Opponent,
     TriggerCondition.PlayerManifestsDread PlayerRelation.You,
     TriggerCondition.PlayerManifestsDread PlayerRelation.Opponent,
-    TriggerCondition.PlayerRollsDice PlayerRelation.You,
-    TriggerCondition.PlayerRollsDice PlayerRelation.Opponent,
     TriggerCondition.PlayerRollsResult DieResult.MkDieResult {DieResult.roller = PlayerRelation.You, DieResult.result = 6},
     TriggerCondition.PlayerRollsResult DieResult.MkDieResult {DieResult.roller = PlayerRelation.Opponent, DieResult.result = 6},
     TriggerCondition.Visit,
@@ -2640,10 +2597,6 @@ everyTriggerCondition =
     TriggerCondition.PlayerRollsPlaneswalker PlayerRelation.You,
     TriggerCondition.PlayerRollsPlaneswalker PlayerRelation.Opponent,
     TriggerCondition.SetInMotion,
-    TriggerCondition.PlayerOpensAttraction PlayerRelation.You,
-    TriggerCondition.PlayerOpensAttraction PlayerRelation.Opponent,
-    TriggerCondition.PlayerClaimsPrize PlayerRelation.You,
-    TriggerCondition.PlayerClaimsPrize PlayerRelation.Opponent,
     TriggerCondition.PlayerWinsCoinFlip PlayerRelation.You,
     TriggerCondition.PlayerWinsCoinFlip PlayerRelation.Opponent,
     TriggerCondition.PlayerLosesCoinFlip PlayerRelation.You,
@@ -2656,43 +2609,13 @@ everyTriggerCondition =
     TriggerCondition.SelfBecomesAttachedTo (Filter.Type.And []),
     TriggerCondition.SelfBecomesUnattachedFrom (Filter.Type.And []),
     TriggerCondition.Reflexive,
-    TriggerCondition.RingTemptsPlayer PlayerRelation.You,
-    TriggerCondition.RingTemptsPlayer PlayerRelation.Opponent,
     TriggerCondition.PermanentBecomesBlockedBy (Filter.Type.And []),
-    -- ALL THREE relations, the PlayerAttacksWith rows' reasoning: Blight
-    -- Chronicler prints AnyPlayer, and the other two are readings a card could
-    -- take of the same condition.
-    TriggerCondition.PlayerBlights PlayerRelation.You,
-    TriggerCondition.PlayerBlights PlayerRelation.Opponent,
-    TriggerCondition.PlayerBlights PlayerRelation.AnyPlayer,
-    -- ALL THREE again, and for the rows above's reason: Corpseberry Cultivator
-    -- prints You, and the other two are readings a card could take.
-    TriggerCondition.PlayerForages PlayerRelation.You,
-    TriggerCondition.PlayerForages PlayerRelation.Opponent,
-    TriggerCondition.PlayerForages PlayerRelation.AnyPlayer,
-    TriggerCondition.PlayerForetells PlayerRelation.You,
-    TriggerCondition.PlayerForetells PlayerRelation.Opponent,
-    TriggerCondition.PlayerForetells PlayerRelation.AnyPlayer,
-    TriggerCondition.PlayerCollectsEvidence PlayerRelation.You,
-    TriggerCondition.PlayerCollectsEvidence PlayerRelation.Opponent,
-    TriggerCondition.PlayerCollectsEvidence PlayerRelation.AnyPlayer,
-    TriggerCondition.PlayerGivesGift PlayerRelation.You,
-    TriggerCondition.PlayerGivesGift PlayerRelation.Opponent,
-    TriggerCondition.PlayerGivesGift PlayerRelation.AnyPlayer,
-    TriggerCondition.PlayerEarthbends PlayerRelation.You,
-    TriggerCondition.PlayerEarthbends PlayerRelation.Opponent,
-    TriggerCondition.PlayerEarthbends PlayerRelation.AnyPlayer,
-    TriggerCondition.PlayerWaterbends PlayerRelation.You,
-    TriggerCondition.PlayerWaterbends PlayerRelation.Opponent,
-    TriggerCondition.PlayerWaterbends PlayerRelation.AnyPlayer,
-    TriggerCondition.PlayerAirbends PlayerRelation.You,
-    TriggerCondition.PlayerAirbends PlayerRelation.Opponent,
-    TriggerCondition.PlayerAirbends PlayerRelation.AnyPlayer,
-    TriggerCondition.PlayerFirebends PlayerRelation.You,
-    TriggerCondition.PlayerFirebends PlayerRelation.Opponent,
-    TriggerCondition.PlayerFirebends PlayerRelation.AnyPlayer,
     TriggerCondition.PlacesSticker (PlacesSticker.MkPlacesSticker PlayerRelation.You (Set.singleton StickerKind.Art) (Filter.Type.And []))
   ]
+    -- EVERY action under EVERY relation, on the PlayerBecomesMonarch pair's
+    -- reasoning: an eventBindings arm that had cased on either field and stamped
+    -- nothing under one value would go unseen if only one were listed.
+    <> [TriggerCondition.PlayerActs (PlayerActed.MkPlayerActed action relation) | action <- [minBound .. maxBound], relation <- [minBound .. maxBound]]
 
 -- CR 702.46 soulshift N, the first minted keyword ability that TARGETS A CARD IN
 -- A GRAVEYARD -- CR 115.2's clause (a) pool, which until now only card data

@@ -28,9 +28,14 @@
       "triggeredAbilities": [
         {
           "condition": {
-            "type": "PlayerBlights",
+            "type": "PlayerActs",
             "value": {
-              "type": "AnyPlayer"
+              "action": {
+                "type": "Blight"
+              },
+              "player": {
+                "type": "AnyPlayer"
+              }
             }
           },
           "modal": {

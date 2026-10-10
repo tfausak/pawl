@@ -31,6 +31,8 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerActed as PlayerActed
+import qualified Pawl.Types.PlayerAction as PlayerAction
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
@@ -143,7 +145,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
     -- trigger matches is recorded here too. It cannot be driven to a trigger on
     -- this board, the pool's one observer (Nazgul) being a creature its own
     -- controller would then have to choose.
-    Spec.assertBool s (elem (GameEvent.RingTempted S.alice) (S.eventsOf after)) "and it recorded the temptation all the same"
+    Spec.assertBool s (elem (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.TemptedByRing S.alice)) (S.eventsOf after)) "and it recorded the temptation all the same"
 
   -- CR 701.54c's "if a player doesn't have an emblem named The Ring". The count
   -- climbs while the emblem does not multiply, which is what makes the two separate
@@ -198,7 +200,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
   -- CR 701.54d's ability-facing half: "some abilities trigger 'Whenever the Ring
   -- tempts you'". Nazgul is its own tempt source and its own observer, so one
   -- printing drives the whole path -- the CR 603.6a entry trigger, the temptation
-  -- it performs, the GameEvent.RingTempted that records it, and the trigger that
+  -- it performs, the GameEvent.PlayerActed that records it, and the trigger that
   -- reads it back.
   --
   -- TWO Nazgul and one Goblin Piker, which is what makes the counters

@@ -312,6 +312,8 @@ import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerActed as PlayerActed
+import qualified Pawl.Types.PlayerAction as PlayerAction
 import qualified Pawl.Types.PlayerControl as PlayerControl
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import Pawl.Types.PlayerId (PlayerId)
@@ -4518,7 +4520,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- CR 706.2b's two steps are taken in the rule's order: `rerolling` below,
   -- per die on its natural result, and then `adjusting`, once every die is up.
   --
-  -- CR 706.1's roll is also the event TriggerCondition.PlayerRollsDice watches
+  -- CR 706.1's roll is also the PlayerAction.RollDice TriggerCondition.PlayerActs watches
   -- (Feywild Trickster). Recorded under each ROLLER, not `source`: rule 706.1's
   -- instruction is aimed at a PLAYER, RollDie's `roller`, read against CR
   -- 109.5's "you" -- the resolving controller. Several rollers throw in APNAP
@@ -4652,7 +4654,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       again <- Game.ask (Prompt.RollDie dieSides)
       let face = if again >= 1 && again <= dieSides then again else 1
       State.modify' (\g -> g {GameState.rerolledTo = Just face})
-      State.modify' (Event.recordEvent (GameEvent.DiceRolled controller))
+      State.modify' (Event.recordEvent (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.RollDice controller)))
   -- CR 706.8b: the controller chooses which of the slot's stored results to
   -- reroll, rolls one die of each noted kind per result through throwDice --
   -- so CR 706.2's modifiers and CR 614.1a's replacements reach it, and each
@@ -6363,7 +6365,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     Monad.mapM_ (\(pid, order) -> Monad.forM_ order (State.modify' . reorderLibrary pid)) decided
     -- CR 701.22d: recorded once the process is complete, and for a scry whose
     -- move was impossible too.
-    Monad.mapM_ (\(pid, _) -> State.modify' (Event.recordEvent (GameEvent.Scried pid))) decided
+    Monad.mapM_ (\(pid, _) -> State.modify' (Event.recordEvent (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.Scry pid)))) decided
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
@@ -6386,7 +6388,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           _ -> pure Nothing
     Monad.mapM_ applySurveil decided
     -- CR 701.25d, scry's placement and for its rule.
-    Monad.mapM_ (\(pid, _) -> State.modify' (Event.recordEvent (GameEvent.Surveiled pid))) decided
+    Monad.mapM_ (\(pid, _) -> State.modify' (Event.recordEvent (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.Surveil pid)))) decided
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
@@ -8636,7 +8638,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       State.modify' (Event.recordEvent (GameEvent.Exploited (Exploited.MkExploited source victim)))
   -- CR 702.174c's marker, Firebend's reading of who gives it: `controller`
   -- controls the resolving gift spell or gift triggered ability.
-  Effect.GiveGift -> State.modify' (Event.recordEvent (GameEvent.GaveGift controller))
+  Effect.GiveGift -> State.modify' (Event.recordEvent (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.GiveGift controller)))
   -- CR 731.1: the GAME gains the designation; what that entails is
   -- Pawl.Engine.Daytime's. Nobody is named and nothing is prompted.
   Effect.ItBecomes designation -> do
@@ -9796,7 +9798,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       --
       -- `controller` is CR 109.5's "you", which rule 701.66a's "target land YOU
       -- control" and CR 603.7d's controller of the delayed ability agree on.
-      State.modify' (Event.recordEvent (GameEvent.Earthbent controller))
+      State.modify' (Event.recordEvent (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.Earthbend controller)))
   -- CR 701.65a: "airbend" -- the whole keyword action, whose exile
   -- Pawl.Engine.Airbend writes as an Effect and this arm runs through the SAME
   -- executor a card's own instructions run through. Nothing here reads which
@@ -9825,12 +9827,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- one or more objects -- the binding accumulates across a resolution, so an
     -- earlier airbend's arrivals are not this one's. A regression fence: no
     -- card in data/cards/ airbends twice in one resolution.
-    Monad.unless (Set.null (Set.difference exiled before)) (State.modify' (Event.recordEvent (GameEvent.Airbent controller)))
+    Monad.unless (Set.null (Set.difference exiled before)) (State.modify' (Event.recordEvent (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.Airbend controller))))
   -- CR 702.189a's mana through AddMana's own arm, then CR 702.189b's marker:
   -- this is a firebending ability resolving, and `controller` is who controls it.
   Effect.Firebend addition -> do
     applyEffectWith runSubgame resolving source controller legal chosen (Effect.AddMana addition)
-    State.modify' (Event.recordEvent (GameEvent.Firebent controller))
+    State.modify' (Event.recordEvent (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.Firebend controller)))
   -- CR 701.47a: the resolving controller amasses; the keyword action is
   -- Pawl.Engine.Amass.amass's, and this arm evaluates only the printed N.
   --
@@ -9873,9 +9875,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- state-based actions until a player would get priority, and no replacement in
   -- data/cards reads a counter tally across permanents.
   --
-  -- CR 701.68d's GameEvent.Blighted is written per blighter inside
+  -- CR 701.68d's GameEvent.PlayerActed is written per blighter inside
   -- Pawl.Engine.Blight.blight, one per seat that actually blighted -- the
-  -- bracket groups them, which changes nothing here, PlayerBlights not being a
+  -- bracket groups them, which changes nothing here, PlayerActs not being a
   -- CR 603.2c batch condition (Pawl.Engine.Event.Trigger.batchScoped).
   Effect.Blight (Blight.Type.MkBlight ref quantity mSlot) -> do
     gs <- State.get
@@ -9909,7 +9911,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.Abandon -> Archenemy.abandon source
   -- CR 702.159b: the prize's actions are the effects after this one, so the
   -- claim itself is only the event "whenever you claim the prize" reads.
-  Effect.ClaimPrize -> State.modify' (Event.recordEvent (GameEvent.PrizeClaimed controller))
+  Effect.ClaimPrize -> State.modify' (Event.recordEvent (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.ClaimPrize controller)))
   -- CR 701.61a: the resolving controller forages; the keyword action is
   -- Pawl.Engine.Forage.forage's, prompts and all.
   Effect.Forage -> Monad.void (Forage.forage controller resolving)
@@ -10462,7 +10464,7 @@ proliferateOnce controller = do
           Monad.void (Event.putPlayerCounters (CounterCause.ByEffect controller) pid kind 1)
   -- "Whenever you proliferate" fires even when nothing was chosen (Tekuthal,
   -- Inquiry Dominus's ruling), so the event is recorded outside the guard.
-  State.modify' (Event.recordEvent (GameEvent.Proliferated controller))
+  State.modify' (Event.recordEvent (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.Proliferate controller)))
 
 -- CR 603.7c: stamp the land an earthbend animated onto the resolving object, so
 -- the environment the arming opcode captures next carries it. Pawl.Engine.Earthbend's
@@ -10731,7 +10733,7 @@ storeOn target sides results gs =
 -- settled.
 recordRoll :: PlayerId -> [PlayerId] -> [Natural] -> Game ()
 recordRoll controller throwers results = do
-  State.modify' (Event.recordEvent (GameEvent.DiceRolled controller))
+  State.modify' (Event.recordEvent (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.RollDice controller)))
   -- CR 706.2's final number, one entry per die the instruction kept, for
   -- "whenever you roll a 6" -- after every modifier, and never for an ignored
   -- roll (CR 706.6). Recorded under the player who threw the die's final
@@ -10828,7 +10830,7 @@ throwDice runSubgame controller sides named perDie = do
                     -- The roller throws it: Clam-I-Am's "you may reroll
                     -- it", Wall of Fortune's "have any player reroll a die
                     -- that player rolled".
-                    State.modify' (Event.recordEvent (GameEvent.DiceRolled controller))
+                    State.modify' (Event.recordEvent (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.RollDice controller)))
                     rerolling controller (faceOf again)
               (OptionalDecision.Exercises, Right (oid, ability)) -> do
                 rerolled <- duringRoll $ do

@@ -32,15 +32,25 @@
             "type": "AnyOf",
             "value": [
               {
-                "type": "PlayerScries",
+                "type": "PlayerActs",
                 "value": {
-                  "type": "You"
+                  "action": {
+                    "type": "Scry"
+                  },
+                  "player": {
+                    "type": "You"
+                  }
                 }
               },
               {
-                "type": "PlayerSurveils",
+                "type": "PlayerActs",
                 "value": {
-                  "type": "You"
+                  "action": {
+                    "type": "Surveil"
+                  },
+                  "player": {
+                    "type": "You"
+                  }
                 }
               }
             ]

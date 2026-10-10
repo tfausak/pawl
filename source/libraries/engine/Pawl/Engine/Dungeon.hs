@@ -38,6 +38,8 @@ import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerActed as PlayerActed
+import qualified Pawl.Types.PlayerAction as PlayerAction
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Prompt as Prompt
@@ -252,7 +254,7 @@ enter pid quality = do
 -- face while the object still exists, which is the last moment it can be read at
 -- all: removal is from the GAME, so nothing afterwards can say which card left.
 --
--- GameEvent.DungeonCompleted is recorded here too, which is what lets Dungeon
+-- GameEvent.PlayerActed is recorded here too, which is what lets Dungeon
 -- Crawler's "whenever you complete a dungeon" trigger (CR 309.7). Recorded on the
 -- stripped state, so a trigger gathered from it cannot see the dungeon card.
 --
@@ -275,7 +277,7 @@ remove oid gs = case Game.lookupObject oid gs of
             }
         stripped = Game.deleteObject oid gs
      in Event.recordEvent
-          (GameEvent.DungeonCompleted owner)
+          (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.CompleteDungeon owner))
           stripped {GameState.players = Map.adjust completed owner (GameState.players stripped)}
 
 -- CR 701.49b: move the marker along one arrow out of the room it is on.

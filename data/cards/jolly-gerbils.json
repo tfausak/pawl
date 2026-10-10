@@ -29,9 +29,14 @@
       "triggeredAbilities": [
         {
           "condition": {
-            "type": "PlayerGivesGift",
+            "type": "PlayerActs",
             "value": {
-              "type": "You"
+              "action": {
+                "type": "GiveGift"
+              },
+              "player": {
+                "type": "You"
+              }
             }
           },
           "modal": {

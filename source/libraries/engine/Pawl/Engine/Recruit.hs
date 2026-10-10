@@ -10,7 +10,7 @@
 --
 -- Rule 701.70 has no second clause, so there is no "whenever a player recruits",
 -- no GameEvent and no trigger condition to hang one on -- Pawl.Engine.Forage
--- writes GameEvent.Foraged only because CR 701.61b's counterpart exists.
+-- records its PlayerAction.Forage only because Corpseberry Cultivator watches it.
 -- Scryfall @o:"recruits"@, 2026-09-18, returns no card; a printing worded that
 -- way is what would need one.
 module Pawl.Engine.Recruit where

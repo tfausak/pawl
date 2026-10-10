@@ -6,8 +6,8 @@
 -- Engine.runTurnBasedActions as CR 703.4g's action), CR 702.159a's
 -- TriggerCondition.Visit, CR 717.6's junkyard (Event.toJunkyard), the
 -- Attraction deck across CR 727's restart and CR 729's subgames, and the two
--- Attraction triggers: CR 701.51c's PlayerOpensAttraction and CR 702.159b's
--- Effect.ClaimPrize read by PlayerClaimsPrize.
+-- Attraction triggers: CR 701.51c's PlayerAction.OpenAttraction and CR 702.159b's
+-- Effect.ClaimPrize read as PlayerAction.ClaimPrize.
 --
 -- Deadbeat Attendant ("When this creature enters, open an Attraction") and
 -- Bumper Cars ("Visit -- Target creature must be blocked this turn if able") are

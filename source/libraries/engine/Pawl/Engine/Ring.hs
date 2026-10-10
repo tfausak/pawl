@@ -66,6 +66,8 @@ import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.PermanentDealsCombatDamageToPlayer as PermanentDealsCombatDamageToPlayer
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerActed as PlayerActed
+import qualified Pawl.Types.PlayerAction as PlayerAction
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -550,7 +552,7 @@ designate pid oid =
 -- AttachTarget and PlayerSacrifices posture. Creature-ness is the PROJECTED question (CR 613.1d), so an
 -- Opalescence'd enchantment is a legal choice.
 --
--- CR 701.54d's GameEvent.RingTempted goes in beside the count, at the one place
+-- CR 701.54d's GameEvent.PlayerActed goes in beside the count, at the one place
 -- that raises it, so a temptation a "Whenever the Ring tempts you" ability sees
 -- and one the count remembers cannot come apart. Recorded outside the branch
 -- that designates, which is that rule's "even if some or all of those actions
@@ -577,7 +579,7 @@ tempt pid = do
   State.modify'
     ( \g ->
         Event.recordEvent
-          (GameEvent.RingTempted pid)
+          (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.TemptedByRing pid))
           g
             { GameState.players =
                 Map.adjust (\p -> p {Player.ringTemptations = Player.ringTemptations p + 1}) pid (GameState.players g)

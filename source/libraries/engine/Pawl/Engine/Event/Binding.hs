@@ -1325,23 +1325,21 @@ eventBindingSlots cond = case cond of
   -- than in the event's bindings. The dungeon card itself arrives under CR 113.7a's
   -- reserved source slot, which every borne trigger gets at placement.
   TriggerCondition.RoomEntered _ -> Set.empty
-  -- Nothing either: CR 309.7 names the completing player, and Dungeon Crawler's
-  -- payload points at no one -- it returns itself.
-  TriggerCondition.PlayerCompletesDungeon _ -> Set.empty
+  -- Nothing either: the event names the acting player, and no printed payload
+  -- points at them -- Matoya, Archon Elder draws, Dungeon Crawler returns itself,
+  -- Synthetic Blight Chronicler drains for its own controller. A card printing
+  -- "that player" is what would earn a slot. CR 701.68c's "blighted creature"
+  -- and CR 706.2's result are not this condition's to bind: the INSTRUCTING
+  -- effect binds each at its own slot (Pawl.Types.Blight, Pawl.Types.RollDie).
+  TriggerCondition.PlayerActs _ -> Set.empty
   -- Nothing: Withengar Unbound's payload points at no one -- it grows itself.
   TriggerCondition.PlayerLosesGame _ -> Set.empty
-  -- Nothing, for all four keyword actions. CR 701.22d and CR 701.25d name a
-  -- player and CR 702.170a and CR 701.44b an object, but no printed payload
-  -- under any of them points at one: Matoya, Archon Elder draws, Aloe
-  -- Alchemist targets a creature of its controller's choosing and Wildgrowth
-  -- Walker grows itself. A card printing "that player" or "that creature" is
-  -- what would earn a slot, and eventBindings has no arm for any of the four
-  -- until one does.
-  TriggerCondition.PlayerScries _ -> Set.empty
-  TriggerCondition.RingTemptsPlayer _ -> Set.empty
-  TriggerCondition.PlayerSurveils _ -> Set.empty
+  -- Nothing: CR 305.1's land play binds nothing.
   TriggerCondition.PlayerPlaysLand _ -> Set.empty
-  TriggerCondition.PlayerProliferates _ -> Set.empty
+  -- Nothing, for these keyword actions. CR 702.170a and CR 701.44b name an
+  -- object, but no printed payload points at it: Aloe Alchemist targets a
+  -- creature of its controller's choosing and Wildgrowth Walker grows itself. A
+  -- card printing "that creature" is what would earn a slot.
   TriggerCondition.SelfBecomesPlotted -> Set.empty
   TriggerCondition.PermanentExplores _ -> Set.empty
   TriggerCondition.PermanentConnives _ -> Set.empty
@@ -1349,40 +1347,13 @@ eventBindingSlots cond = case cond of
   -- the graveyard, which binds nothing. The `became` it binds otherwise is
   -- eventBindingSlotsSometimes'.
   TriggerCondition.PlayerManifestsDread _ -> Set.empty
-  -- Nothing here either, and for the group above's reason: CR 701.68d's event
-  -- names the blighting player, and Synthetic Blight Chronicler's payload points
-  -- at no one -- it draws and drains its own controller. CR 701.68c's "blighted
-  -- creature" is not this condition's to bind: it is a later clause of the
-  -- INSTRUCTING effect, which binds it at Pawl.Types.Blight's own slot.
-  TriggerCondition.PlayerBlights _ -> Set.empty
-  -- Nothing here either, and for the arm above's reason: CR 701.61a's event names
-  -- the foraging player, and Corpseberry Cultivator's payload points at no one --
-  -- it puts a counter on itself. Which half of rule 701.61a the forager took is
-  -- no binding of this condition: nothing printed names it.
-  TriggerCondition.PlayerForages _ -> Set.empty
-  TriggerCondition.PlayerForetells _ -> Set.empty
-  TriggerCondition.PlayerCollectsEvidence _ -> Set.empty
-  TriggerCondition.PlayerGivesGift _ -> Set.empty
-  TriggerCondition.PlayerEarthbends _ -> Set.empty
-  TriggerCondition.PlayerWaterbends _ -> Set.empty
-  TriggerCondition.PlayerAirbends _ -> Set.empty
-  TriggerCondition.PlayerFirebends _ -> Set.empty
   -- The object the sticker went on, for Tusk and Whiskers' "that creature".
   TriggerCondition.PlacesSticker _ -> Set.singleton Binding.became
-  -- Nothing here either. CR 706.1's event names the roller, but Feywild
-  -- Trickster's payload points at no one -- it creates a token for its own
-  -- controller -- and a card printing "that player" is what would earn a slot.
-  -- The roll's numerical RESULT is not a binding of this condition at all:
-  -- Pawl.Engine.Resolve binds it at Pawl.Types.RollDie's own slot, during the
-  -- roller's own resolution, for a later effect of THAT ability to read.
-  TriggerCondition.PlayerRollsDice _ -> Set.empty
   TriggerCondition.PlayerRollsResult _ -> Set.empty
   TriggerCondition.Visit -> Set.empty
   TriggerCondition.ChaosEnsues -> Set.empty
   TriggerCondition.PlayerRollsPlaneswalker _ -> Set.empty
   TriggerCondition.SetInMotion -> Set.empty
-  TriggerCondition.PlayerOpensAttraction _ -> Set.empty
-  TriggerCondition.PlayerClaimsPrize _ -> Set.empty
   TriggerCondition.PlayerWinsCoinFlip _ -> Set.empty
   TriggerCondition.PlayerLosesCoinFlip _ -> Set.empty
   -- Empty for the same reason, and CR 701.43d is what settles it: the linked

@@ -53,6 +53,8 @@ import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.PlanarDieFace as PlanarDieFace
 import qualified Pawl.Types.PlanarDieRolled as PlanarDieRolled
+import qualified Pawl.Types.PlayerActed as PlayerActed
+import qualified Pawl.Types.PlayerAction as PlayerAction
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Prompt as Prompt
@@ -214,7 +216,7 @@ faceOf n = case n of
   _ -> PlanarDieFace.Blank
 
 -- | CR 116.2i / 901.9: pay, then roll the planar die. The roll records
--- DiceRolled (CR 901.9d) and PlanarDieRolled, which is what CR 311.7's chaos
+-- PlayerAction.RollDice (CR 901.9d) and PlanarDieRolled, which is what CR 311.7's chaos
 -- abilities and CR 901.8's planeswalking ability trigger on.
 -- A payment that fails restores the state, Pawl.Engine.Companion.take's
 -- posture, and nothing is rolled.
@@ -226,7 +228,7 @@ roll perform pid = do
     paid <- Cost.payAction perform before PaymentSubject.ForNeither 0 pid noSource (rollCost pid before)
     Monad.forM_ paid $ \_ -> do
       rolled <- Game.ask (Prompt.RollDie 6)
-      State.modify' (Event.recordEvent (GameEvent.DiceRolled pid))
+      State.modify' (Event.recordEvent (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.RollDice pid)))
       State.modify' (Event.recordEvent (GameEvent.PlanarDieRolled (PlanarDieRolled.MkPlanarDieRolled pid (faceOf rolled))))
 
 -- | CR 901.8: the planeswalking ability, paired with each player, for

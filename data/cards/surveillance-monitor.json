@@ -64,9 +64,14 @@
         },
         {
           "condition": {
-            "type": "PlayerCollectsEvidence",
+            "type": "PlayerActs",
             "value": {
-              "type": "You"
+              "action": {
+                "type": "CollectEvidence"
+              },
+              "player": {
+                "type": "You"
+              }
             }
           },
           "modal": {

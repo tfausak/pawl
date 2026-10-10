@@ -88,9 +88,14 @@
         },
         {
           "condition": {
-            "type": "PlayerForages",
+            "type": "PlayerActs",
             "value": {
-              "type": "You"
+              "action": {
+                "type": "Forage"
+              },
+              "player": {
+                "type": "You"
+              }
             }
           },
           "modal": {

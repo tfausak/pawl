@@ -73,6 +73,8 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerActed as PlayerActed
+import qualified Pawl.Types.PlayerAction as PlayerAction
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -632,8 +634,8 @@ scrySpec s registry = Spec.describe s "Scry" $ do
     Spec.assertEqWith
       s
       "CR 701.22d: each seat scried"
-      (filter (`elem` fmap GameEvent.Scried seats) (S.eventsOf after))
-      (fmap GameEvent.Scried seats)
+      (filter (`elem` fmap (GameEvent.PlayerActed . PlayerActed.MkPlayerActed PlayerAction.Scry) seats) (S.eventsOf after))
+      (fmap (GameEvent.PlayerActed . PlayerActed.MkPlayerActed PlayerAction.Scry) seats)
     Spec.assertEqWith s "CR 603.6a: the enters trigger, and nothing else, was on the stack" (length (GameState.stack onStack)) 1
 
 -- The elision half. Each case counts the scry prompts one activation raises,
@@ -694,7 +696,7 @@ scryPromptSpec s registry = Spec.describe s "ScryPrompt" $ do
         Spec.assertEqWith s "CR 614.6: two cards were drawn" (S.handSize S.alice after) 2
         Spec.assertEqWith s "and the rest stayed put" (scryLibrary after) [mountain, forest]
         Spec.assertEqWith s "nothing was looked at" looked []
-        Spec.assertBool s (notElem (GameEvent.Scried S.alice) (S.eventsOf after)) "CR 614.6 no scry happened"
+        Spec.assertBool s (notElem (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.Scry S.alice)) (S.eventsOf after)) "CR 614.6 no scry happened"
       _ -> Spec.assertFailure s "expected four library cards"
   -- CR 701.22b: scry 0 is no scry event, so there is nothing for Kenessos to
   -- enlarge: nothing is looked at. Scry 1 is the pair's other half, enlarged to

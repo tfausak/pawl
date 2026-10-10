@@ -944,7 +944,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- CR 309.7: how many dungeons that player has completed. LifeTotal's arm in
         -- ARITY -- one player's tally, so a reference naming several answers "whose?"
         -- rather than a sum -- and in SOURCE: read straight off the player, because
-        -- Dungeon.remove writes it there and the log GameEvent.DungeonCompleted goes
+        -- Dungeon.remove writes it there and the log GameEvent.PlayerActed goes
         -- into is cleared at every turn handoff.
         --
         -- LIVE, which is what CR 604.2 needs: Gloom Stalker's "as long as you've

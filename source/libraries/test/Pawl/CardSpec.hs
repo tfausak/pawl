@@ -1152,43 +1152,25 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.BoundDiesOrIsExiled _ -> []
   TriggerCondition.BoundDies _ -> []
   TriggerCondition.RoomEntered _ -> []
-  -- CR 309.7's condition carries a PlayerRelation, which is no Count.
-  TriggerCondition.PlayerCompletesDungeon _ -> []
+  -- CR 603.2's PlayerActs carries a PlayerAction and a PlayerRelation, neither
+  -- a Count.
+  TriggerCondition.PlayerActs _ -> []
   -- CR 603.9's too.
   TriggerCondition.PlayerLosesGame _ -> []
-  -- CR 701.22d and CR 701.25d carry a PlayerRelation and CR 702.170a nothing
-  -- at all, so none of the three holds a Count. CR 701.44b holds a Filter, and
-  -- a Filter holds no Count for PermanentEnters' reason above.
-  TriggerCondition.PlayerScries _ -> []
-  TriggerCondition.RingTemptsPlayer _ -> []
-  TriggerCondition.PlayerSurveils _ -> []
   TriggerCondition.PlayerPlaysLand _ -> []
-  TriggerCondition.PlayerProliferates _ -> []
   TriggerCondition.PlayerManifestsDread _ -> []
-  TriggerCondition.PlayerRollsDice _ -> []
   TriggerCondition.PlayerRollsResult _ -> []
   TriggerCondition.Visit -> []
   TriggerCondition.ChaosEnsues -> []
   TriggerCondition.PlayerRollsPlaneswalker _ -> []
   TriggerCondition.SetInMotion -> []
-  TriggerCondition.PlayerOpensAttraction _ -> []
-  TriggerCondition.PlayerClaimsPrize _ -> []
   TriggerCondition.PlayerWinsCoinFlip _ -> []
   TriggerCondition.PlayerLosesCoinFlip _ -> []
+  -- CR 702.170a carries nothing at all, so holds no Count. CR 701.44b holds a
+  -- Filter, and a Filter holds no Count for PermanentEnters' reason above.
   TriggerCondition.SelfBecomesPlotted -> []
   TriggerCondition.PermanentExplores _ -> []
   TriggerCondition.PermanentConnives _ -> []
-  -- CR 701.68d's and CR 701.61a's each carry a PlayerRelation, which is no
-  -- Count.
-  TriggerCondition.PlayerBlights _ -> []
-  TriggerCondition.PlayerForages _ -> []
-  TriggerCondition.PlayerForetells _ -> []
-  TriggerCondition.PlayerCollectsEvidence _ -> []
-  TriggerCondition.PlayerGivesGift _ -> []
-  TriggerCondition.PlayerEarthbends _ -> []
-  TriggerCondition.PlayerWaterbends _ -> []
-  TriggerCondition.PlayerAirbends _ -> []
-  TriggerCondition.PlayerFirebends _ -> []
   TriggerCondition.PlacesSticker _ -> []
   -- CR 701.43d carries nothing at all, so no Count either.
   TriggerCondition.SelfExerted -> []
@@ -4566,40 +4548,21 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.BoundDiesOrIsExiled _ -> []
   TriggerCondition.BoundDies _ -> []
   TriggerCondition.RoomEntered _ -> []
-  -- CR 309.7's condition carries a PlayerRelation, which is no Filter.
-  TriggerCondition.PlayerCompletesDungeon _ -> []
+  -- CR 603.2's PlayerActs carries a PlayerAction and a PlayerRelation, neither
+  -- a Filter.
+  TriggerCondition.PlayerActs _ -> []
   -- CR 603.9's too.
   TriggerCondition.PlayerLosesGame _ -> []
-  -- CR 701.22d and CR 701.25d carry a PlayerRelation and CR 702.170a nothing,
-  -- so none of them holds a Filter.
-  TriggerCondition.PlayerScries _ -> []
-  TriggerCondition.RingTemptsPlayer _ -> []
-  TriggerCondition.PlayerSurveils _ -> []
   TriggerCondition.PlayerPlaysLand payload -> unframed [PlaysLand.filter payload]
-  TriggerCondition.PlayerProliferates _ -> []
   TriggerCondition.PlayerManifestsDread _ -> []
-  TriggerCondition.PlayerRollsDice _ -> []
   TriggerCondition.PlayerRollsResult _ -> []
   TriggerCondition.Visit -> []
   TriggerCondition.ChaosEnsues -> []
   TriggerCondition.PlayerRollsPlaneswalker _ -> []
   TriggerCondition.SetInMotion -> []
-  TriggerCondition.PlayerOpensAttraction _ -> []
-  TriggerCondition.PlayerClaimsPrize _ -> []
   TriggerCondition.PlayerWinsCoinFlip _ -> []
   TriggerCondition.PlayerLosesCoinFlip _ -> []
   TriggerCondition.SelfBecomesPlotted -> []
-  -- CR 701.68d's and CR 701.61a's each carry a PlayerRelation, which is no
-  -- Filter.
-  TriggerCondition.PlayerBlights _ -> []
-  TriggerCondition.PlayerForages _ -> []
-  TriggerCondition.PlayerForetells _ -> []
-  TriggerCondition.PlayerCollectsEvidence _ -> []
-  TriggerCondition.PlayerGivesGift _ -> []
-  TriggerCondition.PlayerEarthbends _ -> []
-  TriggerCondition.PlayerWaterbends _ -> []
-  TriggerCondition.PlayerAirbends _ -> []
-  TriggerCondition.PlayerFirebends _ -> []
   TriggerCondition.PlacesSticker placesSticker -> unframed [PlacesSticker.object placesSticker]
   -- CR 701.44b DOES carry one, a predicate over the explorer -- Wildgrowth
   -- Walker's "a creature you control" -- which the card lint must sweep.
@@ -4821,32 +4784,16 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   -- own ability targeted.
   TriggerCondition.BoundDies slot -> [slot]
   TriggerCondition.RoomEntered _ -> []
-  TriggerCondition.PlayerScries _ -> []
+  TriggerCondition.PlayerActs _ -> []
   TriggerCondition.PlayerLosesGame _ -> []
-  TriggerCondition.RingTemptsPlayer _ -> []
-  TriggerCondition.PlayerBlights _ -> []
-  TriggerCondition.PlayerForages _ -> []
-  TriggerCondition.PlayerForetells _ -> []
-  TriggerCondition.PlayerCollectsEvidence _ -> []
-  TriggerCondition.PlayerGivesGift _ -> []
-  TriggerCondition.PlayerEarthbends _ -> []
-  TriggerCondition.PlayerWaterbends _ -> []
-  TriggerCondition.PlayerAirbends _ -> []
-  TriggerCondition.PlayerFirebends _ -> []
   TriggerCondition.PlacesSticker _ -> []
-  TriggerCondition.PlayerCompletesDungeon _ -> []
-  TriggerCondition.PlayerSurveils _ -> []
   TriggerCondition.PlayerPlaysLand _ -> []
-  TriggerCondition.PlayerProliferates _ -> []
   TriggerCondition.PlayerManifestsDread _ -> []
-  TriggerCondition.PlayerRollsDice _ -> []
   TriggerCondition.PlayerRollsResult _ -> []
   TriggerCondition.Visit -> []
   TriggerCondition.ChaosEnsues -> []
   TriggerCondition.PlayerRollsPlaneswalker _ -> []
   TriggerCondition.SetInMotion -> []
-  TriggerCondition.PlayerOpensAttraction _ -> []
-  TriggerCondition.PlayerClaimsPrize _ -> []
   TriggerCondition.PlayerWinsCoinFlip _ -> []
   TriggerCondition.PlayerLosesCoinFlip _ -> []
   TriggerCondition.SelfBecomesPlotted -> []

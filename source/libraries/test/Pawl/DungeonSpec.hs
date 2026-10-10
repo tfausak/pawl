@@ -50,6 +50,8 @@ import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerActed as PlayerActed
+import qualified Pawl.Types.PlayerAction as PlayerAction
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
@@ -699,7 +701,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Dungeon" $ do
     Spec.assertBool s (not (Set.member crawlerName (namesIn Zone.Hand S.alice short))) "and out of hand"
     Spec.assertEqWith s "because the dungeon is still in the command zone" (length (dungeonsOf S.alice short)) 1
     Spec.assertEqWith s "where four ventures removed it" (dungeonsOf S.alice completed) []
-    Spec.assertBool s (elem (GameEvent.DungeonCompleted S.alice) (S.eventsOf completed)) "and the completion was recorded as an event"
+    Spec.assertBool s (elem (GameEvent.PlayerActed (PlayerActed.MkPlayerActed PlayerAction.CompleteDungeon S.alice)) (S.eventsOf completed)) "and the completion was recorded as an event"
   -- CR 309.7 read of a NAMED dungeon. Acererak the Archlich {2}{B} Legendary
   -- Creature -- Zombie Wizard 5\/5, "When Acererak enters, if you haven't
   -- completed Tomb of Annihilation, return Acererak to its owner's hand and

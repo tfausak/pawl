@@ -78,9 +78,14 @@
         },
         {
           "condition": {
-            "type": "PlayerProliferates",
+            "type": "PlayerActs",
             "value": {
-              "type": "You"
+              "action": {
+                "type": "Proliferate"
+              },
+              "player": {
+                "type": "You"
+              }
             }
           },
           "modal": {
