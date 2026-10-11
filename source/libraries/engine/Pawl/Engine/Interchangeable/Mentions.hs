@@ -1463,7 +1463,7 @@ entryRidersNames asking onCount onAbility x = case x of
 
 equipNames :: Asking -> (keyword -> Bool) -> Equip.Equip keyword -> Bool
 equipNames asking onKeyword x = case x of
-  Equip.MkEquip cost quality -> costNames asking onKeyword cost || any (filterNames asking) quality
+  Equip.MkEquip cost quality _target -> costNames asking onKeyword cost || any (filterNames asking) quality
 
 exchangeBlocksNames :: Asking -> ExchangeBlocks.ExchangeBlocks -> Bool
 exchangeBlocksNames asking x = case x of
@@ -1627,7 +1627,6 @@ keywordNames asking x = case x of
   Keyword.Defender -> False
   Keyword.DoubleStrike -> False
   Keyword.Equip equip -> equipNames asking (keywordNames asking) equip
-  Keyword.EquipPlaneswalker cost -> costNames asking (keywordNames asking) cost
   Keyword.FirstStrike -> False
   Keyword.Flash -> False
   Keyword.Flying -> False
