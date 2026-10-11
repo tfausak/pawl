@@ -18,6 +18,7 @@ import qualified Pawl.Types.Devour as Devour
 import qualified Pawl.Types.DevourCount as DevourCount
 import qualified Pawl.Types.Emerge as Emerge
 import qualified Pawl.Types.Equip as Equip
+import qualified Pawl.Types.EquipTarget as EquipTarget
 import qualified Pawl.Types.ExileMaterials as ExileMaterials
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ForetellCost as ForetellCost
@@ -528,8 +529,8 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
   -- guards the encode, since Arm.tagged forces a constructor's TAG and not its
   -- arm, so a missing arm compiles.
   Spec.it s "Equip carries its cost and its quality" $ do
-    let equip n = Keyword.Equip (Equip.MkEquip (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) []) Nothing)
-        equipHuman n = Keyword.Equip (Equip.MkEquip (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) []) (Just (Filter.HasSubtype Subtype.Human)))
+    let equip n = Keyword.Equip (Equip.MkEquip (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) []) Nothing EquipTarget.Creature)
+        equipHuman n = Keyword.Equip (Equip.MkEquip (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) []) (Just (Filter.HasSubtype Subtype.Human)) EquipTarget.Creature)
     Common.assertCodec
       s
       Keyword.codec
@@ -547,16 +548,7 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       (fortify 3)
       " {\"type\":\"Fortify\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]}} "
-    Spec.assertBool s (Codec.encode Keyword.codec (fortify 3) /= Codec.encode Keyword.codec (Keyword.Equip (Equip.MkEquip (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) []) Nothing))) "and is not equip"
-  -- CR 702.6e's payload is fortify's bare Cost, under its own tag.
-  Spec.it s "EquipPlaneswalker carries its cost" $ do
-    let equipPlaneswalker n = Keyword.EquipPlaneswalker (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
-    Common.assertCodec
-      s
-      Keyword.codec
-      (equipPlaneswalker 1)
-      " {\"type\":\"EquipPlaneswalker\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
-    Spec.assertBool s (Codec.encode Keyword.codec (equipPlaneswalker 3) /= Codec.encode Keyword.codec (Keyword.Fortify (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) []))) "and is not fortify"
+    Spec.assertBool s (Codec.encode Keyword.codec (fortify 3) /= Codec.encode Keyword.codec (Keyword.Equip (Equip.MkEquip (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) []) Nothing EquipTarget.Creature))) "and is not equip"
   -- CR 702.49a's payload is a bare Cost, fortify's shape, and the arm is
   -- Arm.tagged: a Keyword constructor ships with no wire format and nothing red
   -- unless a case like this one is written (#1715).
