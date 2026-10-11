@@ -292,6 +292,10 @@ Each of these has shipped a green-but-meaningless test in this repository:
 - **An answerer can silently repair the assertion.** One that searches for a
   legal option finds the right one again after your mutation. Pin the answer by
   index, and check the assertion reads the engine's output.
+- **An answer that matches the default proves nothing about the prompt.**
+  When the chosen option is also the one the engine falls back to (often index
+  0, `Replay.defaultAnswer`), a mutation that ignores the answer stays green.
+  Pick an option the fallback would not.
 - **An answerer that BUILDS a recipient silently loses the target.** A
   `Prompt.ChooseTargets` over `Pool.Creatures` offers `Recipient.ToCreature`; a
   hand-built `Recipient.ToObject` of the same permanent is a different

@@ -185,6 +185,11 @@ to agents as written. What it doesn't say:
   `oracleText` and names on stderr each pool card that disagrees with MTGJSON;
   re-run it after adding cards by hand.
 
+- `Filter.HasCardType` matches in every zone, but "a creature" with no zone,
+  "card" or "spell" means a permanent (CR 109.2). Where nothing else confines
+  a filter to the battlefield --- a trigger's object filter, say --- conjoin
+  `IsInZone Battlefield`.
+
 - When no printing can reach the rule, write `data/cards/synthetic-*.json`.
   Search first: a real card wins whenever one exists, in the order regular >
   Arena > playtest > un-set > synthetic (`docs/design.md` section 6), and a
