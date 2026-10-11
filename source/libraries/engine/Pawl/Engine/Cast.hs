@@ -46,7 +46,6 @@ import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.CastingRestriction as CastingRestriction
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Compares as Compares
-import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Convoking as Convoking
@@ -585,10 +584,10 @@ payableCostAtGiven modes pcs sources x extra spending pid oid gs cost =
 --
 -- Inert on today's pool: this map is built only for a cost whose criterion
 -- names a slot (Cost.readsBoundSlot), and no card in `data/cards/` has both
--- that and a target slot bounded by X. Filter.ManaValueAtMostAmount,
--- Filter.ManaValueEqualToAmount and Filter.PowerAtMostAmount are the atoms that
--- read boundUnannounced, so their cards are the whole list (Spawnbroker, the
--- power atom's one card, bounds a triggered ability's slot); grepped
+-- that and a target slot bounded by X. Filter.Measures' EnclosingAmount
+-- operand is what reads boundUnannounced, so its cards are the whole list
+-- (Spawnbroker and Nihiloor, its power comparisons, bound triggered abilities'
+-- slots); grepped
 -- over data/cards/ on 2026-09-14 the SPELLS among them are Stir the Grave,
 -- Synthetic Borrowed Exhumation and Synthetic Measured Refrain, each a bare
 -- mana cost with no component to carry a criterion; the rest of that list --
@@ -2765,10 +2764,7 @@ clauseAppliesAt pid sid gs clause = case Clause.condition clause of
 holdsForCandidate :: Maybe Keyword -> Condition.Type.Condition -> Bool
 holdsForCandidate castFor condition = case condition of
   Condition.Type.Compares c -> case (candidateQuantity castFor (Compares.measured c), candidateQuantity castFor (Compares.threshold c)) of
-    (Just n, Just t) -> case Compares.comparison c of
-      Comparison.Exactly -> n == t
-      Comparison.AtLeast -> n >= t
-      Comparison.AtMost -> n <= t
+    (Just n, Just t) -> Filter.compares (Compares.comparison c) n t
     _ -> False
   Condition.Type.Any conditions -> any (holdsForCandidate castFor) conditions
   Condition.Type.All conditions -> all (holdsForCandidate castFor) conditions

@@ -2547,7 +2547,7 @@ celestineGraveyard piker wolves bolt gained =
 -- card out of range on one board is in range on another that differs only in how
 -- much life was gained, and a board with no gain at all admits nothing.
 celestineSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-celestineSpec s registry = Spec.describe s "ManaValueAtMostAmount (CR 202.3)" $ do
+celestineSpec s registry = Spec.describe s "EnclosingAmount (CR 202.3)" $ do
   -- THE PROVING CASE, and the MOVING-BOUND control in one: the same graveyard
   -- judged at two life totals. At 2 the Wolves are out of range; at 4 they are in
   -- it, with nothing else about the board changed.
@@ -2678,7 +2678,7 @@ warsingerSpec s registry =
             fought = S.runPure (warsingerPlan [tyrantId, wolvesId, boltId]) atDamage Damage.dealCombatDamage
             placed = S.runPure (warsingerPlan [tyrantId, wolvesId, boltId]) fought Engine.settleForPriority
         pure (mine, pikerId, shrunk, placed, S.runPure (warsingerPlan [tyrantId, wolvesId, boltId]) placed Engine.priorityLoop)
-   in Spec.describe s "ManaValueAtMostAmount (CR 202.3)" $ do
+   in Spec.describe s "EnclosingAmount (CR 202.3)" $ do
         -- The announcement itself, read off the placed ability rather than
         -- inferred from what happened -- so this says what the event stamped and
         -- what the slot ADMITTED against it.
@@ -2736,7 +2736,7 @@ stirTheGraveSpec s registry =
         let (gs0, stirId) = S.boltInHand swamp stir swamps Phase.PrecombatMain
             (ids, gs1) = List.foldl' (\(acc, g) c -> let (oid, g2) = S.addGraveyardCard c S.alice g in (acc <> [oid], g2)) ([], gs0) cards
         pure (stirId, ids, gs1)
-   in Spec.describe s "ManaValueAtMostAmount (CR 202.3)" $ do
+   in Spec.describe s "EnclosingAmount (CR 202.3)" $ do
         -- CR 700.2a asked before CR 601.2b exists, as a pair of boards differing in
         -- their one graveyard card: the same three Swamps either way, a mana value
         -- 4 CREATURE card on one and an instant on the other. A gate that read the
@@ -2768,10 +2768,11 @@ stirTheGraveSpec s registry =
 -- judged (Target.jointlyJudged, because its pool is CR 400.1's graveyard scoped
 -- to whatever the player slot names) AND its CR 202.3 computed bound reads CR
 -- 601.2b's announced X. The offer is computed against the seed carrying that X;
--- the joint check re-derives the same slot, and it is handed the same seed. Given
--- the chosen targets alone the bound reads no number, Filter.ManaValueAtMostAmount
--- is vacuously False, the card the caster was OFFERED is not in the re-derived
--- set, and CR 601.2e reverses a casting rule 601.2c allows; see #2676.
+-- the joint check re-derives the same slot, and it is handed the same seed.
+-- Given the chosen targets alone the bound reads no number, the EnclosingAmount
+-- comparison is vacuously False, the card the caster was OFFERED is not in the
+-- re-derived set, and CR 601.2e reverses a casting rule 601.2c allows; see
+-- #2676.
 --
 -- THREE SEATS for Dwell on the Past's reason: with alice and bob alone, "bob's
 -- graveyard" and "not the caster's graveyard" pick out the same cards.
@@ -2780,7 +2781,7 @@ stirTheGraveSpec s registry =
 -- creature card sits in. Both announce X = 2, both name bob in the player slot,
 -- both pay the same {2}{B} off the same three Swamps, off one board.
 borrowedExhumationSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-borrowedExhumationSpec s registry = Spec.describe s "ManaValueAtMostAmount (CR 202.3)" $ do
+borrowedExhumationSpec s registry = Spec.describe s "EnclosingAmount (CR 202.3)" $ do
   Spec.it s "CR 601.2c the joint check re-derives a jointly judged slot against the announced X" $ do
     swamp <- S.printingOf s registry "Swamp"
     piker <- S.printingOf s registry "Goblin Piker"

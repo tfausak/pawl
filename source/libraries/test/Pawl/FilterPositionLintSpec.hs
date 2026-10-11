@@ -43,6 +43,7 @@ import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackCostScope as AttackCostScope
 import qualified Pawl.Types.BlockCost as BlockCost
+import qualified Pawl.Types.BoundMeasure as BoundMeasure
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
 import qualified Pawl.Types.CantBlockCreatures as CantBlockCreatures
 import qualified Pawl.Types.Card as Card.Type
@@ -98,6 +99,8 @@ import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.Measure as Measure
+import qualified Pawl.Types.Measures as Measures
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Modal as Modal
@@ -108,6 +111,7 @@ import qualified Pawl.Types.MoveCounters as MoveCounters
 import qualified Pawl.Types.MovedKinds as MovedKinds
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.Operand as Operand
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.OutsideDestination as OutsideDestination
 import qualified Pawl.Types.PayBranch as PayBranch
@@ -233,14 +237,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.HasName _ -> 0
   Filter.Type.NameWordsAtLeast _ -> 0
   Filter.Type.HasNameOriginallyPrintedIn _ -> 0
-  Filter.Type.PowerAtLeast _ -> 0
-  Filter.Type.PowerAtMost _ -> 0
-  Filter.Type.ToughnessGreaterThanPower -> 0
-  Filter.Type.PowerLessThanSource -> 0
-  Filter.Type.PowerGreaterThanSource -> 0
-  Filter.Type.PowerAtLeastSourceToughness -> 0
-  Filter.Type.PowerIsAmountInSlot _ -> 0
-  Filter.Type.PowerAtLeastAmountInSlot _ -> 0
+  Filter.Type.Measures _ -> 0
   Filter.Type.ControlledByDefendingPlayer -> 0
   -- Zero for ControlledBy's reason: one carries a slot name and the other a
   -- PlayerId, and neither holds a Filter for a card author to reach.
@@ -249,14 +246,7 @@ canHostSubjects predicate = case predicate of
   -- Zero for the two above's reason: a nullary atom holds no Filter for a card
   -- author to reach.
   Filter.Type.ControlledByRecipient -> 0
-  Filter.Type.ManaValueAtMost _ -> 0
-  Filter.Type.ManaValueLessThanSource -> 0
-  Filter.Type.ManaValueGreaterThanSource -> 0
-  Filter.Type.ManaValueEqualToSource -> 0
   Filter.Type.ManaValueIsEven -> 0
-  Filter.Type.ManaValueAtMostAmount -> 0
-  Filter.Type.ManaValueEqualToAmount -> 0
-  Filter.Type.PowerAtMostAmount -> 0
   Filter.Type.ControlledBy _ -> 0
   -- Zero for ControlledBy's reason: CR 108.3's owner atom carries a
   -- PlayerRelation, which holds no Filter for a card author to reach.
@@ -282,7 +272,6 @@ canHostSubjects predicate = case predicate of
   Filter.Type.SameControllerAsBound _ -> 0
   Filter.Type.SameControllerAsHostOfBound _ -> 0
   Filter.Type.SharesCreatureTypeWithBound _ -> 0
-  Filter.Type.ToughnessLessThanBound _ -> 0
   Filter.Type.HasChosenName -> 0
   Filter.Type.HasChosenColor -> 0
   Filter.Type.HasChosenSubtype -> 0
@@ -426,9 +415,9 @@ canHostSubjectCounts card =
 -- positive, and a loud one rather than a silent miss).
 --
 -- Parameterized because several atoms want it: CR 701.3a's and CR 709.4a's,
--- counted here for their traversal cross-checks, and CR 702.134a's
--- Filter.PowerLessThanSource, which a card may carry only in a wish or a pairwise
--- combat restriction.
+-- counted here for their traversal cross-checks, and CR 702.134a's OfSource
+-- operand, which a card may carry only in a wish, a trigger condition or a
+-- pairwise combat restriction.
 jsonAtoms :: Text.Text -> Value.Value -> Int
 jsonAtoms tag value = case value of
   Value.String s -> if String.unwrap s == tag then 1 else 0
@@ -509,14 +498,34 @@ isTargetStrays value = case value of
 isTargetOffends :: Face.Face Card.Type.Card -> Bool
 isTargetOffends = (/= 0) . isTargetStrays . Codec.encode (Face.Codec.codec Card.codec)
 
--- The CR 202.3 computed-bound tag, spelled once.
-manaValueAtMostAmountTag :: Text.Text
-manaValueAtMostAmountTag = Text.pack "ManaValueAtMostAmount"
+-- The CR 202.3 computed-bound operand's tag, spelled once.
+enclosingAmountTag :: Text.Text
+enclosingAmountTag = Text.pack "EnclosingAmount"
 
--- The same bound at EQUALITY (Chthonian Nightmare's "with mana value X"), which
--- needs the same position and so the same count.
-manaValueEqualToAmountTag :: Text.Text
-manaValueEqualToAmountTag = Text.pack "ManaValueEqualToAmount"
+-- How many comparisons reading the candidate's MANA VALUE one encoded Filter
+-- holds whose operand's tag `wanted` accepts, at any depth: a mana value measure,
+-- or an Own ManaValue operand reading it from the other side.
+manaValueComparisons :: (Text.Text -> Bool) -> Value.Value -> Int
+manaValueComparisons wanted value = case value of
+  Value.Object o ->
+    let pairs = Object.unwrap o
+        named k = [Pair.value p | p <- pairs, String.unwrap (Pair.name p) == Text.pack k]
+        tagOf v = case v of
+          Value.Object x -> [t | p <- Object.unwrap x, String.unwrap (Pair.name p) == Text.pack "type", Value.String t <- [Pair.value p]]
+          _ -> []
+        isManaValue v = fmap String.unwrap (tagOf v) == [Text.pack "ManaValue"]
+        operandTags = concatMap (fmap String.unwrap . tagOf) (named "operand")
+        ownManaValue = case named "operand" of
+          [Value.Object x] -> Text.pack "Own" `elem` operandTags && any isManaValue [Pair.value p | p <- Object.unwrap x, String.unwrap (Pair.name p) == Text.pack "value"]
+          _ -> False
+        measured = any isManaValue (named "measure") || ownManaValue
+        here = if measured && any wanted operandTags then 1 else 0 :: Int
+     in here + sum (fmap (manaValueComparisons wanted . Pair.value) pairs)
+  Value.Array a -> sum (fmap (manaValueComparisons wanted) (Array.unwrap a))
+  Value.String _ -> 0
+  Value.Null _ -> 0
+  Value.Boolean _ -> 0
+  Value.Number _ -> 0
 
 -- CR 702.122d's atom, which no card may write.
 cantCrewVehiclesTag :: Text.Text
@@ -535,8 +544,7 @@ cantCrewVehiclesTag = Text.pack "CantCrewVehicles"
 -- position's own "filter" subtree is counted, which is sound because a Filter
 -- holds neither: nothing nests below it to be double-counted.
 --
--- Parameterized by the TAG for jsonAtoms' reason: the order bound and the
--- equality bound want the same position and so the same count.
+-- Parameterized by the TAG for jsonAtoms' reason.
 amountedSlotAtoms :: Text.Text -> Value.Value -> Int
 amountedSlotAtoms tag value = case value of
   Value.Array a -> sum (fmap (amountedSlotAtoms tag) (Array.unwrap a))
@@ -565,29 +573,20 @@ amountedReferenceAtoms tag value = case value of
      in if null (keyed "amount") then 0 else sum (fmap (jsonAtoms tag) (keyed "filter"))
   _ -> 0
 
--- How many CR 202.3 computed-bound atoms this card carries in a target slot that
--- names an amount, and how many anywhere else. The second number is the offence;
--- the first is what Celestine, the Living Saint legitimately has one of.
+-- How many CR 202.3 computed-bound operands this card carries in a target slot
+-- or reference pick that names an amount, and how many anywhere else. The second
+-- number is the offence; the first is what Celestine, the Living Saint
+-- legitimately has one of.
 --
 -- Pawl.Engine.Target.slotContext fills Filter.Context.slotAmount off the SLOT's
--- own Quantity, so the atom in a slot that names none -- or in a Count filter, an
--- affected set, a search filter, a cost criterion -- is a silent False rather than
--- a rejected card. This is where that is made loud.
-manaValueAtMostAmountCounts :: Face.Face Card.Type.Card -> (Int, Int)
-manaValueAtMostAmountCounts = amountedCounts manaValueAtMostAmountTag
+-- own Quantity, so the operand in a slot that names none -- or in a Count filter,
+-- an affected set, a search filter, a cost criterion -- is a silent False rather
+-- than a rejected card. This is where that is made loud.
+enclosingAmountCounts :: Face.Face Card.Type.Card -> (Int, Int)
+enclosingAmountCounts = amountedCounts enclosingAmountTag
 
-manaValueAtMostAmountOffends :: Face.Face Card.Type.Card -> Bool
-manaValueAtMostAmountOffends card = snd (manaValueAtMostAmountCounts card) /= 0
-
--- The pair above for the EQUALITY bound, whose position claim is the same one:
--- Pawl.Engine.Target.slotContext fills Filter.Context.slotAmount off the slot, so
--- Chthonian Nightmare's "with mana value X" written anywhere else is a silent
--- False too.
-manaValueEqualToAmountCounts :: Face.Face Card.Type.Card -> (Int, Int)
-manaValueEqualToAmountCounts = amountedCounts manaValueEqualToAmountTag
-
-manaValueEqualToAmountOffends :: Face.Face Card.Type.Card -> Bool
-manaValueEqualToAmountOffends card = snd (manaValueEqualToAmountCounts card) /= 0
+enclosingAmountOffends :: Face.Face Card.Type.Card -> Bool
+enclosingAmountOffends card = snd (enclosingAmountCounts card) /= 0
 
 -- How many of `tag` sit in a slot that names an amount, and how many anywhere
 -- else -- the second number being the offence.
@@ -952,33 +951,33 @@ sharesCreatureTypeOffends card =
   let (framed, elsewhere) = sharesCreatureTypeCounts card
    in elsewhere /= 0 || framed + elsewhere /= jsonAtoms sharesCreatureTypeTag (Codec.encode (Face.Codec.codec Card.codec) card)
 
--- The CR 208.1 tag, spelled once.
-toughnessLessThanBoundTag :: Text.Text
-toughnessLessThanBoundTag = Text.pack "ToughnessLessThanBound"
+-- The CR 608.2c bound-object operand's tag, spelled once.
+ofBoundTag :: Text.Text
+ofBoundTag = Text.pack "OfBound"
 
--- How many CR 208.1 bound-toughness atoms this card carries in a resolution's own
+-- How many bound-object operands this card carries in a resolution's own
 -- positions and how many anywhere else, sharesCreatureTypeCounts' shape one
 -- Filter.Context field over: Pawl.Engine.Resolve.Slots.effectContext is the one
--- filler of Filter.Context.slotToughnesses too, so the atom is a silent False
+-- filler of Filter.Context.slotMeasures too, so the operand is a silent False
 -- elsewhere. The second number is the offence.
-toughnessLessThanBoundCounts :: Face.Face Card.Type.Card -> (Int, Int)
-toughnessLessThanBoundCounts card =
-  let total wanted = sum (fmap (\(_, f) -> filterAtoms toughnessLessThanBoundTag f) (filter (\(framing, _) -> elem framing [SourceHostFramed, ClauseGateFramed, SearchFramed, MillTallyFramed, HandSweepFramed] == wanted) (cardFilters card)))
+ofBoundCounts :: Face.Face Card.Type.Card -> (Int, Int)
+ofBoundCounts card =
+  let total wanted = sum (fmap (\(_, f) -> filterAtoms ofBoundTag f) (filter (\(framing, _) -> elem framing [SourceHostFramed, ClauseGateFramed, SearchFramed, MillTallyFramed, HandSweepFramed] == wanted) (cardFilters card)))
    in (total True, total False)
 
 -- The atom outside those positions, or the traversal and the codec disagreeing
 -- about how many the card holds -- sharesCreatureTypeOffends' two offences.
-toughnessLessThanBoundOffends :: Face.Face Card.Type.Card -> Bool
-toughnessLessThanBoundOffends card =
-  let (framed, elsewhere) = toughnessLessThanBoundCounts card
-   in elsewhere /= 0 || framed + elsewhere /= jsonAtoms toughnessLessThanBoundTag (Codec.encode (Face.Codec.codec Card.codec) card)
+ofBoundOffends :: Face.Face Card.Type.Card -> Bool
+ofBoundOffends card =
+  let (framed, elsewhere) = ofBoundCounts card
+   in elsewhere /= 0 || framed + elsewhere /= jsonAtoms ofBoundTag (Codec.encode (Face.Codec.codec Card.codec) card)
 
 -- The CR 110.2 / 303.4b tag, spelled once.
 sameControllerAsHostOfBoundTag :: Text.Text
 sameControllerAsHostOfBoundTag = Text.pack "SameControllerAsHostOfBound"
 
 -- How many CR 110.2-of-the-host atoms this card carries in a resolution's own
--- positions and how many anywhere else, toughnessLessThanBoundCounts' shape one
+-- positions and how many anywhere else, ofBoundCounts' shape one
 -- Filter.Context field over -- Pawl.Engine.Resolve.Slots.effectContext is the
 -- one filler of Filter.Context.slotHostControllers too. The ATTACH DESTINATION
 -- is admitted alongside its siblings and they do not admit it: that position
@@ -1589,22 +1588,22 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (sharesCreatureTypeOffends restricted) "the atom in an affected set offends"
     Spec.assertEqWith s "counted outside the admitted positions" (sharesCreatureTypeCounts restricted) (1, 1)
   -- CR 208.1's bound comparison in the arm above's frame, one Filter.Context field
-  -- over: answerable only where effectContext fills Filter.Context.slotToughnesses.
-  -- See toughnessLessThanBoundOffends for the two offences.
-  Spec.it s "CR 208.1 no card asks ToughnessLessThanBound outside a resolution's own positions" $ do
+  -- over: answerable only where effectContext fills Filter.Context.slotMeasures.
+  -- See ofBoundOffends for the two offences.
+  Spec.it s "CR 208.1 no card compares against a bound object outside a resolution's own positions" $ do
     ps <- S.allPrintings s
-    let offenders = filter (anyFace toughnessLessThanBoundOffends . Printing.card) ps
-    Spec.assertEqWith s "the atom sits only where the resolution fills the toughnesses" (fmap (S.nameOf . Printing.card) offenders) []
+    let offenders = filter (anyFace ofBoundOffends . Printing.card) ps
+    Spec.assertEqWith s "the operand sits only where the resolution fills the bound measures" (fmap (S.nameOf . Printing.card) offenders) []
     -- NOT vacuous: the pool authors the atom, and the card that does is ACCEPTED.
     profaner <- S.printingOf s registry "Profaner of the Dead"
     let face = S.combinedFace profaner
-        atom = Filter.Type.ToughnessLessThanBound (SlotName.MkSlotName (Text.pack "thatExploitedCreature"))
+        atom = Filter.Type.Measures (Measures.MkMeasures Measure.Toughness Comparison.LessThan (Operand.OfBound (BoundMeasure.MkBoundMeasure (SlotName.MkSlotName (Text.pack "thatExploitedCreature")) Measure.Toughness)))
         restricted = face {Face.counterRestrictions = [CounterRestriction.MkCounterRestriction (Affected.Matching atom) Nothing]}
-    Spec.assertEqWith s "Profaner of the Dead's one atom is in its ObjectRef" (toughnessLessThanBoundCounts face) (1, 0)
+    Spec.assertEqWith s "Profaner of the Dead's one atom is in its ObjectRef" (ofBoundCounts face) (1, 0)
     -- The lint's own proof, the pair differing in one position: the same atom in
     -- a static restriction's affected set, read through a bare contextFor.
-    Spec.assertBool s (toughnessLessThanBoundOffends restricted) "the atom in an affected set offends"
-    Spec.assertEqWith s "counted outside the admitted positions" (toughnessLessThanBoundCounts restricted) (1, 1)
+    Spec.assertBool s (ofBoundOffends restricted) "the atom in an affected set offends"
+    Spec.assertEqWith s "counted outside the admitted positions" (ofBoundCounts restricted) (1, 1)
   -- CR 110.2 asked of the bound object's HOST (CR 303.4b), the arm above's frame
   -- one Filter.Context field over and one position wider: effectContext fills
   -- Filter.Context.slotHostControllers, and the attach destination is one of its
@@ -1712,157 +1711,101 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "the same atom in a static ability's affected set is an offence" (sameControllerAsBoundCounts planted) (0, 1)
     Spec.assertBool s (sameControllerAsBoundOffends planted) "and the lint says so"
     Spec.assertBool s (not (sameControllerAsBoundOffends (S.combinedFace piker))) "where the ungrafted card is accepted"
+  -- CR 601.3a's lookahead (Pawl.Engine.Filter.manaValueThresholds) bounds its
+  -- sample by the mana value LITERALS a prohibition compares against, so a
+  -- player effect comparing a mana value against any other operand would leave
+  -- the sample too short with nothing failing. The position lints above keep the
+  -- source, bound-object and enclosing-amount operands out of a player effect;
+  -- this keeps the rest out too.
+  Spec.it s "CR 601.3a no player effect compares a mana value against anything but a literal" $ do
+    ps <- S.allPrintings s
+    let encode = Codec.encode (Filter.Codec.codec Keyword.Codec.codec)
+        inPlayerEffects wanted c = sum [manaValueComparisons wanted (encode f) | (framing, f) <- cardFilters c, elem framing [PlayerEffectFramed, StoredPlayerEffectFramed]]
+        nonLiteral = (/= Text.pack "Literal")
+        offenders = filter (anyFace ((/= 0) . inPlayerEffects nonLiteral) . Printing.card) ps
+    Spec.assertEqWith s "every player effect's mana value comparison is against a literal" (fmap (S.nameOf . Printing.card) offenders) []
+    -- NOT vacuous: the traversal reaches the pool's literal ones, and the
+    -- counter sees a non-literal one buried under a combinator.
+    Spec.assertBool s (sum (fmap (sum . fmap (inPlayerEffects (== Text.pack "Literal")) . Card.Type.faces . Printing.card) ps) /= 0) "the pool's player effects compare mana values against literals"
+    Spec.assertEqWith s "a planted comparison against the candidate's own power is counted" (manaValueComparisons nonLiteral (encode (Filter.Type.Not (Filter.Type.Measures (Measures.MkMeasures Measure.ManaValue Comparison.AtMost (Operand.Own Measure.Power)))))) 1
+    -- And the same read from the other side: power against the candidate's own
+    -- mana value varies with X exactly as the measure would.
+    Spec.assertEqWith s "so is one reading the mana value through the operand" (manaValueComparisons nonLiteral (encode (Filter.Type.Measures (Measures.MkMeasures Measure.Power Comparison.GreaterThan (Operand.Own Measure.ManaValue))))) 1
+    Spec.assertEqWith s "and a power literal is not" (manaValueComparisons nonLiteral (encode (Filter.Type.Measures (Measures.MkMeasures Measure.Power Comparison.AtLeast (Operand.Literal 4))))) 0
   -- CR 202.3's computed bound is CR 709.4a's atom one axis over once more, and the
   -- axis is the SLOT rather than the Framing: Pawl.Engine.Target.slotContext fills
-  -- Filter.Context.slotAmount off the target slot's own Quantity, so the atom in a
-  -- slot naming no amount -- or anywhere that is not a target slot at all -- is a
-  -- silent False. See manaValueAtMostAmountCounts.
-  Spec.it s "CR 202.3 no card asks ManaValueAtMostAmount outside a slot that names an amount" $ do
+  -- Filter.Context.slotAmount off the target slot's own Quantity, so an
+  -- EnclosingAmount operand in a slot naming no amount -- or anywhere that is not
+  -- a target slot or a conjure's reference pick at all -- is a silent False. See
+  -- enclosingAmountCounts.
+  Spec.it s "CR 202.3 no card compares against an enclosing amount outside a slot that names one" $ do
     ps <- S.allPrintings s
-    let offenders = filter (anyFace manaValueAtMostAmountOffends . Printing.card) ps
-    Spec.assertEqWith s "the atom sits only where the slot supplies the bound" (fmap (S.nameOf . Printing.card) offenders) []
-    -- NOT vacuous: the pool authors the atom, and the card that does is ACCEPTED
-    -- here rather than skipped.
-    celestine <- S.printingOf s registry "Celestine, the Living Saint"
-    Spec.assertEqWith
-      s
-      "Celestine's one atom is in the slot that names its bound"
-      (manaValueAtMostAmountCounts (S.combinedFace celestine))
-      (1, 0)
-    -- Ratchet, Field Medic is the pool's second author of the atom, and the one
-    -- that reaches it through a DELAYED ability rather than a triggered one --
-    -- CR 603.12's reflexive, whose slot is baked and matched exactly as an
-    -- ordinary trigger's is.
-    ratchet <- S.printingOf s registry "Ratchet, Field Medic"
-    Spec.assertEqWith
-      s
-      "Ratchet's reflexive slot names its bound too"
-      (manaValueAtMostAmountCounts (S.combinedFace ratchet))
-      (1, 0)
-    -- The pool's third author, and the one whose bound is a slot rather than a
-    -- board tally: Venerable Warsinger's X is CR 603.2's own event amount. The
-    -- position claim is the same one -- what varies is what answers the Quantity.
-    warsinger <- S.printingOf s registry "Venerable Warsinger"
-    Spec.assertEqWith
-      s
-      "the Warsinger's slot names its bound as well"
-      (manaValueAtMostAmountCounts (S.combinedFace warsinger))
-      (1, 0)
-    -- The pool's fourth author, and the first on a SPELL: Stir the Grave's bound
-    -- is CR 601.2b's announced X, which the caster names one step before CR
-    -- 601.2c chooses the target (Pawl.Engine.Cast.castProposed's seed).
-    stir <- S.printingOf s registry "Stir the Grave"
-    Spec.assertEqWith
-      s
-      "Stir the Grave's slot names its bound as well"
-      (manaValueAtMostAmountCounts (S.combinedFace stir))
-      (1, 0)
-    -- The pool's fifth author, and the first whose slot is also JOINTLY JUDGED
-    -- (Pawl.Engine.Target.jointlyJudged): Synthetic Borrowed Exhumation reads the
-    -- same announced X off a pool scoped to what its sibling slot targets, so CR
-    -- 601.2c's joint check re-derives the bound rather than merely offering it.
-    exhumation <- S.printingOf s registry "Synthetic Borrowed Exhumation"
-    Spec.assertEqWith
-      s
-      "the Exhumation's slot names its bound as well"
-      (manaValueAtMostAmountCounts (S.combinedFace exhumation))
-      (1, 0)
-    -- The pool's sixth author, jointly judged through the BOUND itself rather
-    -- than through the pool beside it: Synthetic Measured Refrain's bound folds
-    -- over what a sibling slot names (Scope.OverBound), which is the read CR
-    -- 700.2d's per-occurrence rename has to follow -- Pawl.TargetSpec's "CR 700.2d
-    -- a repeated mode's computed bound measures its own occurrence's sibling
-    -- slot".
-    measured <- S.printingOf s registry "Synthetic Measured Refrain"
-    Spec.assertEqWith
-      s
-      "the Refrain's slot names its bound as well"
-      (manaValueAtMostAmountCounts (S.combinedFace measured))
-      (1, 0)
-    -- The pool's seventh author, and the first on an ACTIVATED ability: Blighted
-    -- Nightmare's bound is the X announced through CR 602.2b, which its activator
-    -- names one step before CR 601.2c chooses the target
-    -- (Pawl.Engine.Activate.activateAbility's post-announcement map).
-    nightmare <- S.printingOf s registry "Blighted Nightmare"
-    Spec.assertEqWith
-      s
-      "the Nightmare's slot names its bound as well"
-      (manaValueAtMostAmountCounts (S.combinedFace nightmare))
-      (1, 0)
-    -- The eighth, the same position on the paper printing: Tameshi, Reality
-    -- Architect's {X}{W} announces through the same road.
-    tameshi <- S.printingOf s registry "Tameshi, Reality Architect"
-    Spec.assertEqWith
-      s
-      "Tameshi's slot names its bound as well"
-      (manaValueAtMostAmountCounts (S.combinedFace tameshi))
-      (1, 0)
+    let offenders = filter (anyFace enclosingAmountOffends . Printing.card) ps
+    Spec.assertEqWith s "the operand sits only where the slot supplies the bound" (fmap (S.nameOf . Printing.card) offenders) []
+    -- NOT vacuous: the pool authors the operand, and every card that does is
+    -- ACCEPTED here rather than skipped.
+    --
+    -- At most, against the mana value: Celestine, the Living Saint; Ratchet,
+    -- Field Medic, through a DELAYED ability (CR 603.12's reflexive, whose slot is
+    -- baked and matched exactly as an ordinary trigger's is); Venerable
+    -- Warsinger, whose X is CR 603.2's own event amount; Stir the Grave, the first
+    -- on a SPELL, whose X CR 601.2b announces one step before CR 601.2c chooses the
+    -- target; Synthetic Borrowed Exhumation, the first whose slot is also JOINTLY
+    -- JUDGED (Pawl.Engine.Target.jointlyJudged); Synthetic Measured Refrain, whose
+    -- bound folds over what a sibling slot names (Pawl.TargetSpec's "CR 700.2d a
+    -- repeated mode's computed bound measures its own occurrence's sibling
+    -- slot"); and Blighted Nightmare and Tameshi, Reality Architect, on ACTIVATED
+    -- abilities, whose X CR 602.2b announces.
+    --
+    -- Exactly, against the mana value: Chthonian Nightmare, Tamiyo, Compleated
+    -- Sage and Synthetic Counted Verdict in a slot, and Fear of Change and Ornate
+    -- Imitations in a reference pick, at the top level and inside a ForEachNumber
+    -- body.
+    --
+    -- At most, against the power: Spawnbroker's `theirs` slot and Nihiloor's.
+    let authors =
+          [ "Celestine, the Living Saint",
+            "Ratchet, Field Medic",
+            "Venerable Warsinger",
+            "Stir the Grave",
+            "Synthetic Borrowed Exhumation",
+            "Synthetic Measured Refrain",
+            "Blighted Nightmare",
+            "Tameshi, Reality Architect",
+            "Chthonian Nightmare",
+            "Tamiyo, Compleated Sage",
+            "Synthetic Counted Verdict",
+            "Fear of Change",
+            "Ornate Imitations",
+            "Spawnbroker",
+            "Nihiloor"
+          ]
+    counted <- traverse (\name -> fmap (\p -> (name, enclosingAmountCounts (S.combinedFace p))) (S.printingOf s registry name)) authors
+    Spec.assertEqWith s "each author's one operand is in the slot that names its bound" counted (fmap (\name -> (name, (1, 0))) authors)
     Spec.assertEqWith
       s
       "and they are the pool's only ones"
-      (sum (fmap (uncurry (+) . manaValueAtMostAmountCounts . S.combinedFace) ps))
-      8
+      (sum (fmap (uncurry (+) . enclosingAmountCounts . S.combinedFace) ps))
+      (length authors)
     -- The rejected side, which the sweep above cannot show while the pool has no
     -- offender: the SAME atom, buried under all three combinators, in a target
     -- slot that names no amount -- the position a card author would most plausibly
     -- reach for, since it differs from the accepted one by an absent key alone.
     piker <- S.printingOf s registry "Goblin Piker"
-    let buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.ManaValueAtMostAmount]]
+    let buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not (Filter.Type.Measures (Measures.MkMeasures Measure.ManaValue Comparison.AtMost Operand.EnclosingAmount))]]
         slotWith slot =
           (S.combinedFace piker)
             { Face.spell =
                 Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) slot) Seq.empty
             }
         amountless = slotWith (TargetSlot.required Pool.Creatures (Just buried))
-    Spec.assertEqWith s "a planted atom in an amountless slot is an offence" (manaValueAtMostAmountCounts amountless) (0, 1)
-    Spec.assertBool s (manaValueAtMostAmountOffends amountless) "and the lint says so"
+    Spec.assertEqWith s "a planted atom in an amountless slot is an offence" (enclosingAmountCounts amountless) (0, 1)
+    Spec.assertBool s (enclosingAmountOffends amountless) "and the lint says so"
     -- And the pair that differs in exactly one thing: the same face with the same
     -- filter, in a slot that DOES name an amount, is accepted -- so the lint is
     -- reading the amount key rather than rejecting every planted atom.
     let amounted = slotWith (TargetSlot.withAmount (Quantity.Type.LifeGainedThisTurn (PlayerRef.Relative PlayerRelation.You)) (TargetSlot.required Pool.Creatures (Just buried)))
-    Spec.assertEqWith s "the same atom in a slot that names one is not" (manaValueAtMostAmountCounts amounted) (1, 0)
-  -- The same claim for the EQUALITY bound, which needs the same position for the
-  -- same reason and gets no protection from the lint above: the two atoms are
-  -- distinct tags, so a card writing "with mana value X" outside a slot that names
-  -- an amount would be a silent False that the at-most sweep never sees.
-  Spec.it s "CR 202.3 no card asks ManaValueEqualToAmount outside a slot that names an amount" $ do
-    ps <- S.allPrintings s
-    let offenders = filter (anyFace manaValueEqualToAmountOffends . Printing.card) ps
-    Spec.assertEqWith s "the atom sits only where the slot supplies the bound" (fmap (S.nameOf . Printing.card) offenders) []
-    -- NOT vacuous: Chthonian Nightmare, Tamiyo, Compleated Sage, Synthetic
-    -- Counted Verdict, Fear of Change and Ornate Imitations are the pool's authors
-    -- of the atom -- three slots, and a reference pick at the top level and inside
-    -- a ForEachNumber body -- and all are ACCEPTED here rather than skipped.
-    nightmare <- S.printingOf s registry "Chthonian Nightmare"
-    tamiyo <- S.printingOf s registry "Tamiyo, Compleated Sage"
-    fear <- S.printingOf s registry "Fear of Change"
-    ornate <- S.printingOf s registry "Ornate Imitations"
-    verdict <- S.printingOf s registry "Synthetic Counted Verdict"
-    Spec.assertEqWith
-      s
-      "the Nightmare's, Tamiyo's and the Verdict's slots name their bound, and so do Fear of Change's and Ornate Imitations' reference picks"
-      (manaValueEqualToAmountCounts (S.combinedFace nightmare), manaValueEqualToAmountCounts (S.combinedFace tamiyo), manaValueEqualToAmountCounts (S.combinedFace verdict), manaValueEqualToAmountCounts (S.combinedFace fear), manaValueEqualToAmountCounts (S.combinedFace ornate))
-      ((1, 0), (1, 0), (1, 0), (1, 0), (1, 0))
-    Spec.assertEqWith
-      s
-      "and they are the pool's only ones"
-      (sum (fmap (uncurry (+) . manaValueEqualToAmountCounts . S.combinedFace) ps))
-      5
-    -- The rejected side, the at-most lint's pair one operator over: the same atom
-    -- buried under all three combinators, in a target slot that names no amount.
-    piker <- S.printingOf s registry "Goblin Piker"
-    let buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.ManaValueEqualToAmount]]
-        slotWith slot =
-          (S.combinedFace piker)
-            { Face.spell =
-                Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) slot) Seq.empty
-            }
-        amountless = slotWith (TargetSlot.required Pool.Creatures (Just buried))
-    Spec.assertEqWith s "a planted atom in an amountless slot is an offence" (manaValueEqualToAmountCounts amountless) (0, 1)
-    Spec.assertBool s (manaValueEqualToAmountOffends amountless) "and the lint says so"
-    -- And the pair that differs in exactly one thing, as above.
-    let amounted = slotWith (TargetSlot.withAmount (Quantity.Type.LifeGainedThisTurn (PlayerRef.Relative PlayerRelation.You)) (TargetSlot.required Pool.Creatures (Just buried)))
-    Spec.assertEqWith s "the same atom in a slot that names one is not" (manaValueEqualToAmountCounts amounted) (1, 0)
+    Spec.assertEqWith s "the same atom in a slot that names one is not" (enclosingAmountCounts amounted) (1, 0)
     -- The same pair at the other position: a conjure's reference pick, which
     -- fills the bound only where it names one.
     let conjuring amount =
@@ -1870,26 +1813,8 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
             { Face.spell =
                 Mint.oneMode (Seq.singleton (Effect.Conjure (Conjure.MkConjure Conjure.defaultQuantity (ConjureCards.Reference (FromReference.MkFromReference buried amount)) Conjure.defaultSelection (ConjureDestination.Battlefield ConjureEntry.defaultValue) Nothing)))
             }
-    Spec.assertEqWith s "a planted atom in a reference pick naming no amount is an offence" (manaValueEqualToAmountCounts (conjuring Nothing)) (0, 1)
-    Spec.assertEqWith s "and one naming an amount is not" (manaValueEqualToAmountCounts (conjuring (Just (Quantity.Type.Literal 4)))) (1, 0)
-  -- The same claim for the POWER bound, a distinct tag the two sweeps above
-  -- never see.
-  Spec.it s "CR 208.1 no card asks PowerAtMostAmount outside a slot that names an amount" $ do
-    ps <- S.allPrintings s
-    let counts = amountedCounts (Text.pack "PowerAtMostAmount")
-        offenders = filter (anyFace ((/= 0) . snd . counts) . Printing.card) ps
-    Spec.assertEqWith s "the atom sits only where the slot supplies the bound" (fmap (S.nameOf . Printing.card) offenders) []
-    -- NOT vacuous: Spawnbroker's `theirs` slot is accepted rather than skipped.
-    spawnbroker <- S.printingOf s registry "Spawnbroker"
-    Spec.assertEqWith s "Spawnbroker's slot names its bound" (counts (S.combinedFace spawnbroker)) (1, 0)
-    piker <- S.printingOf s registry "Goblin Piker"
-    let planted amount =
-          (S.combinedFace piker)
-            { Face.spell =
-                Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (amount (TargetSlot.required Pool.Creatures (Just Filter.Type.PowerAtMostAmount)))) Seq.empty
-            }
-    Spec.assertEqWith s "a planted atom in an amountless slot is an offence" (counts (planted id)) (0, 1)
-    Spec.assertEqWith s "and the same atom in a slot that names one is not" (counts (planted (TargetSlot.withAmount (Quantity.Type.Literal 2)))) (1, 0)
+    Spec.assertEqWith s "a planted atom in a reference pick naming no amount is an offence" (enclosingAmountCounts (conjuring Nothing)) (0, 1)
+    Spec.assertEqWith s "and one naming an amount is not" (enclosingAmountCounts (conjuring (Just (Quantity.Type.Literal 4)))) (1, 0)
   -- CR 303.4b's Filter.IsHostOfSource is CR 709.4a's atom one axis over again:
   -- answerable only in the positions `hostFramed` admits. See hostOfSourceOffends for the two offences.
   Spec.it s "CR 303.4b no card asks IsHostOfSource where the source's host is unknown" $ do
@@ -2513,99 +2438,50 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         (ManaRestrictionFramed, [bound]),
         (TriggerConditionFramed, [bound])
       ]
-  -- The source-power comparisons are answerable only where the CONTEXT
-  -- supplies a source power (or, for PowerAtLeastSourceToughness, a source
-  -- toughness): Pawl.Engine.Projection.withCharacteristicsOf fills both, for
-  -- every context Projection.sourceContext frames and for CR 509.1b's pairwise
-  -- walks, and they are Nothing inside the CR 613 layer fold and in a bare
-  -- Filter.contextFor -- so either atom in a card's affected set or static
-  -- condition would be a silent False. Outside a face's own pairwise
-  -- position (Spitfire Handler's, Ironclaw Curse's) and a wish's filter
-  -- (Synthetic Wishful Djinn's), only Pawl.Engine.Keyword's mentor and
-  -- training and Pawl.Engine.Ring's emblem write them, and this is what keeps
-  -- that true.
-  Spec.it s "CR 702.134a / CR 702.149a no card writes a source-power comparison" $ do
+  -- A comparison against the SOURCE's measure is answerable only where the
+  -- CONTEXT supplies the source's power, toughness and mana value:
+  -- Pawl.Engine.Projection.withCharacteristicsOf fills all three, for every
+  -- context Projection.sourceContext frames and for CR 509.1b's pairwise walks,
+  -- and they are Nothing inside the CR 613 layer fold and in a bare
+  -- Filter.contextFor -- so the operand in a card's affected set or static
+  -- condition would be a silent False. Outside a face's own pairwise position
+  -- (Spitfire Handler's, Ironclaw Curse's), a wish's filter (Synthetic Wishful
+  -- Djinn's) and a triggered ability's own condition (Kami of Mourning's), only
+  -- Pawl.Engine.Keyword's mentor, training, cascade, transmute and transfigure
+  -- and Pawl.Engine.Ring's emblem write it, and this is what keeps that true.
+  Spec.it s "CR 702.134a / CR 702.85a no card compares against the source outside the positions that fill it" $ do
     ps <- S.allPrintings s
-    let pairwise tag c = sum (fmap (filterAtoms (Text.pack tag)) (concatMap pairwiseFilters (Face.combatRestrictions c)))
+    let tag = Text.pack "OfSource"
+        encoded = Codec.encode (Face.Codec.codec Card.codec)
+        pairwise c = sum (fmap (filterAtoms tag) (concatMap pairwiseFilters (Face.combatRestrictions c)))
         pairwiseFilters r = case r of
           CombatRestriction.CantBeBlockedBy x -> [CantBeBlockedBy.blockers x]
           CombatRestriction.CantBlockCreatures x -> [CantBlockCreatures.attackers x]
           _ -> []
-        wish tag c = wishFilterAtoms (Text.pack tag) (Codec.encode (Face.Codec.codec Card.codec) c)
-        atoms c = jsonAtoms (Text.pack "PowerLessThanSource") (Codec.encode (Face.Codec.codec Card.codec) c) - pairwise "PowerLessThanSource" c - wish "PowerLessThanSource" c
-        greater c = jsonAtoms (Text.pack "PowerGreaterThanSource") (Codec.encode (Face.Codec.codec Card.codec) c) - pairwise "PowerGreaterThanSource" c - wish "PowerGreaterThanSource" c
-        toughness c = jsonAtoms (Text.pack "PowerAtLeastSourceToughness") (Codec.encode (Face.Codec.codec Card.codec) c) - pairwise "PowerAtLeastSourceToughness" c
-        offenders = filter (anyFace (\c -> atoms c /= 0 || greater c /= 0 || toughness c /= 0) . Printing.card) ps
-    Spec.assertEqWith s "the atoms are the engine's alone" (fmap (S.nameOf . Printing.card) offenders) []
-    -- The wish exemption is not vacuous either: the Djinn's one atom is in it.
+        admitted c = (pairwise c, wishFilterAtoms tag (encoded c), triggerConditionAtoms tag (encoded c))
+        outside c = let (p, w, t) = admitted c in jsonAtoms tag (encoded c) - p - w - t
+        offenders = filter (anyFace (\c -> outside c /= 0) . Printing.card) ps
+    Spec.assertEqWith s "the operand is written only where the source is filled" (fmap (S.nameOf . Printing.card) offenders) []
+    -- NOT vacuous: each admitted position has its author, and each is accepted.
     djinn <- S.printingOf s registry "Synthetic Wishful Djinn"
-    Spec.assertEqWith s "the Djinn writes it in a wish's filter" (wish "PowerLessThanSource" (S.combinedFace djinn), atoms (S.combinedFace djinn)) (1, 0)
-    -- NOT vacuous, the way the sweep above would be on its own: the same counter
-    -- over a hand-built face that DOES carry the atom -- buried under all three
-    -- combinators, in a target slot, the one position a card author would reach
-    -- for -- finds it.
+    kami <- S.printingOf s registry "Kami of Mourning"
+    spitfire <- S.printingOf s registry "Spitfire Handler"
+    Spec.assertEqWith
+      s
+      "the Djinn's is in a wish, the Kami's in a trigger condition, the Handler's pairwise"
+      (fmap (\p -> (admitted (S.combinedFace p), outside (S.combinedFace p))) [djinn, kami, spitfire])
+      [((0, 1, 0), 0), ((0, 0, 1), 0), ((1, 0, 0), 0)]
+    -- NOT vacuous the other way either: the same counter over a hand-built face
+    -- that DOES carry the operand -- buried under all three combinators, in a
+    -- target slot, the one position a card author would reach for -- finds it.
     piker <- S.printingOf s registry "Goblin Piker"
-    let buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.PowerLessThanSource]]
-        targetSlot = TargetSlot.required Pool.Creatures (Just buried)
-        planted =
-          (S.combinedFace piker)
-            { Face.spell =
-                Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) targetSlot) Seq.empty
-            }
-    Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
-    let buriedGreater = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.PowerGreaterThanSource]]
-        plantedGreater =
-          planted
-            { Face.spell =
-                Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buriedGreater))) Seq.empty
-            }
-    Spec.assertEqWith s "and so is its sibling" (greater plantedGreater) 1
-    let buriedToughness = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.PowerAtLeastSourceToughness]]
-        plantedToughness =
-          planted
-            { Face.spell =
-                Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buriedToughness))) Seq.empty
-            }
-    Spec.assertEqWith s "and so is the toughness comparison" (toughness plantedToughness) 1
-  -- CR 702.85a's comparison is the pair above's one characteristic over,
-  -- filled by the same filler and empty in the same positions. Only
-  -- Pawl.Engine.Keyword writes it -- cascade, and the equality atom below that CR
-  -- 702.53a's transmute and CR 702.71a's transfigure search with -- and this is
-  -- what keeps that true.
-  Spec.it s "CR 702.85a no card writes a source-mana-value comparison" $ do
-    ps <- S.allPrintings s
-    let atoms c = jsonAtoms (Text.pack "ManaValueLessThanSource") (Codec.encode (Face.Codec.codec Card.codec) c)
-        offenders = filter (anyFace (\c -> atoms c /= 0) . Printing.card) ps
-    Spec.assertEqWith s "the atom is the engine's alone" (fmap (S.nameOf . Printing.card) offenders) []
-    -- CR 702.53a and CR 702.71a's atom sits in the same position and is filled by
-    -- the same one caller, so the same sweep is owed it.
-    let equalAtoms c = jsonAtoms (Text.pack "ManaValueEqualToSource") (Codec.encode (Face.Codec.codec Card.codec) c)
-        equalOffenders = filter (anyFace (\c -> equalAtoms c /= 0) . Printing.card) ps
-    Spec.assertEqWith s "the equality atom is the engine's alone" (fmap (S.nameOf . Printing.card) equalOffenders) []
-    -- NOT vacuous, the sweep above's reason: the same counter over a hand-built
-    -- face that DOES carry the atom finds it.
-    piker <- S.printingOf s registry "Goblin Piker"
-    let buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.ManaValueLessThanSource]]
+    let buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not (Filter.Type.Measures (Measures.MkMeasures Measure.Power Comparison.LessThan (Operand.OfSource Measure.Power)))]]
         planted =
           (S.combinedFace piker)
             { Face.spell =
                 Mint.oneModeTargeting (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buried))) Seq.empty
             }
-    Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
-  -- The pair above's comparison one operator over, which a CARD may write -- but
-  -- only in a triggered ability's own condition, the one position a printing
-  -- needs it in. Kami of Mourning's
-  -- granted "a creature you control with greater mana value than this card" is
-  -- the producer, and it is also what keeps the sweep from being vacuous.
-  Spec.it s "CR 202.3 a greater-mana-value-than-source comparison is written only in a trigger condition" $ do
-    ps <- S.allPrintings s
-    let tag = Text.pack "ManaValueGreaterThanSource"
-        encoded = Codec.encode (Face.Codec.codec Card.codec)
-        outside c = jsonAtoms tag (encoded c) - triggerConditionAtoms tag (encoded c)
-        offenders = filter (anyFace (\c -> outside c /= 0) . Printing.card) ps
-    Spec.assertEqWith s "no card writes it outside a trigger condition" (fmap (S.nameOf . Printing.card) offenders) []
-    kami <- S.printingOf s registry "Kami of Mourning"
-    Spec.assertEqWith s "and Kami of Mourning writes it in one" (triggerConditionAtoms tag (encoded (S.combinedFace kami))) 1
+    Spec.assertEqWith s "a planted operand is seen" (outside planted) 1
   -- CR 702.60a's comparison is filled by the same filler and empty in the same
   -- positions. Only Pawl.Engine.Keyword writes it -- ripple -- and this is what
   -- keeps that true.

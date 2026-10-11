@@ -109,8 +109,19 @@
                               }
                             },
                             {
-                              "type": "PowerIsAmountInSlot",
-                              "value": "paid"
+                              "type": "Measures",
+                              "value": {
+                                "comparison": {
+                                  "type": "Exactly"
+                                },
+                                "measure": {
+                                  "type": "Power"
+                                },
+                                "operand": {
+                                  "type": "AmountInSlot",
+                                  "value": "paid"
+                                }
+                              }
                             }
                           ]
                         }

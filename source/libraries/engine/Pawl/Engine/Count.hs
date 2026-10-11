@@ -342,22 +342,8 @@ bakePerspective viewOf context gs candidate predicate =
         Filter.Type.HasNameOriginallyPrintedIn _ -> predicate
         Filter.Type.HasKeyword _ -> predicate
         Filter.Type.HasKeywordFamily _ -> predicate
-        Filter.Type.PowerAtLeast _ -> predicate
-        Filter.Type.PowerAtMost _ -> predicate
-        Filter.Type.ToughnessGreaterThanPower -> predicate
-        Filter.Type.PowerLessThanSource -> predicate
-        Filter.Type.PowerGreaterThanSource -> predicate
-        Filter.Type.PowerAtLeastSourceToughness -> predicate
-        Filter.Type.PowerIsAmountInSlot _ -> predicate
-        Filter.Type.PowerAtLeastAmountInSlot _ -> predicate
-        Filter.Type.ManaValueAtMost _ -> predicate
-        Filter.Type.ManaValueLessThanSource -> predicate
-        Filter.Type.ManaValueGreaterThanSource -> predicate
-        Filter.Type.ManaValueEqualToSource -> predicate
+        Filter.Type.Measures _ -> predicate
         Filter.Type.ManaValueIsEven -> predicate
-        Filter.Type.ManaValueAtMostAmount -> predicate
-        Filter.Type.ManaValueEqualToAmount -> predicate
-        Filter.Type.PowerAtMostAmount -> predicate
         Filter.Type.ControlledBy _ -> predicate
         Filter.Type.ControlledByDefendingPlayer -> predicate
         Filter.Type.ControlledByBound _ -> predicate
@@ -386,7 +372,6 @@ bakePerspective viewOf context gs candidate predicate =
         Filter.Type.SameControllerAsBound _ -> predicate
         Filter.Type.SameControllerAsHostOfBound _ -> predicate
         Filter.Type.SharesCreatureTypeWithBound _ -> predicate
-        Filter.Type.ToughnessLessThanBound _ -> predicate
         Filter.Type.HasChosenName -> predicate
         Filter.Type.HasChosenColor -> predicate
         Filter.Type.HasChosenSubtype -> predicate

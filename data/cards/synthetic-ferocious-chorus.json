@@ -65,8 +65,19 @@
                           }
                         },
                         {
-                          "type": "PowerAtLeast",
-                          "value": 4
+                          "type": "Measures",
+                          "value": {
+                            "comparison": {
+                              "type": "AtLeast"
+                            },
+                            "measure": {
+                              "type": "Power"
+                            },
+                            "operand": {
+                              "type": "Literal",
+                              "value": 4
+                            }
+                          }
                         }
                       ]
                     },
@@ -108,8 +119,19 @@
                           }
                         },
                         {
-                          "type": "PowerAtLeast",
-                          "value": 4
+                          "type": "Measures",
+                          "value": {
+                            "comparison": {
+                              "type": "AtLeast"
+                            },
+                            "measure": {
+                              "type": "Power"
+                            },
+                            "operand": {
+                              "type": "Literal",
+                              "value": 4
+                            }
+                          }
                         }
                       ]
                     },

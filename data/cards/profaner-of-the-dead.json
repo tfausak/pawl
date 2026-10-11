@@ -63,8 +63,24 @@
                                   }
                                 },
                                 {
-                                  "type": "ToughnessLessThanBound",
-                                  "value": "thatExploitedCreature"
+                                  "type": "Measures",
+                                  "value": {
+                                    "comparison": {
+                                      "type": "LessThan"
+                                    },
+                                    "measure": {
+                                      "type": "Toughness"
+                                    },
+                                    "operand": {
+                                      "type": "OfBound",
+                                      "value": {
+                                        "measure": {
+                                          "type": "Toughness"
+                                        },
+                                        "slot": "thatExploitedCreature"
+                                      }
+                                    }
+                                  }
                                 }
                               ]
                             }

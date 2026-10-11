@@ -12,7 +12,7 @@ data FromReference = MkFromReference
   { -- | Which of the reference\'s cards are candidates, matched against the
     -- PRINTED card since none of them is in the game (CR 400.11).
     filter :: Filter.Filter Keyword.Keyword,
-    -- | The bound 'Pawl.Types.Filter.ManaValueEqualToAmount' reads -- Fear of
+    -- | The bound 'Pawl.Types.Operand.EnclosingAmount' reads -- Fear of
     -- Change\'s "where X is 2 plus the exiled creature\'s mana value". Nothing
     -- where the filter names no amount.
     amount :: Maybe Quantity.Quantity

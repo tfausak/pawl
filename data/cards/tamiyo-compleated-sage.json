@@ -168,7 +168,18 @@
                           ]
                         },
                         {
-                          "type": "ManaValueEqualToAmount"
+                          "type": "Measures",
+                          "value": {
+                            "comparison": {
+                              "type": "Exactly"
+                            },
+                            "measure": {
+                              "type": "ManaValue"
+                            },
+                            "operand": {
+                              "type": "EnclosingAmount"
+                            }
+                          }
                         }
                       ]
                     },

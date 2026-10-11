@@ -3715,7 +3715,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- CR 613 projection, whose layer 7a is where CR 208.2a's number is filled in.
   --
   -- THE CANDIDATE SET IS THE ASSERTION, not what was found: with Filter.power
-  -- Nothing for every card off the battlefield, CR 208.1's PowerAtMost answered
+  -- Nothing for every card off the battlefield, CR 208.1's AtMost answered
   -- False for all three creature cards and the set was EMPTY, which "the search
   -- found a card" cannot tell from a set that admitted everything. So the set has
   -- one card in for CR 208.2b's 0 (Primal Plasma, a printed */* with no CDA), one

@@ -29,6 +29,9 @@ import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaSpecification as ManaSpecification
+import qualified Pawl.Types.Measure as Measure
+import qualified Pawl.Types.Measures as Measures
+import qualified Pawl.Types.Operand as Operand
 import qualified Pawl.Types.OwnedZone as OwnedZone
 import qualified Pawl.Types.PermanentActed as PermanentActed
 import qualified Pawl.Types.PermanentAction as PermanentAction
@@ -307,8 +310,8 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
     Common.assertCodec
       s
       TriggerCondition.codec
-      (TriggerCondition.SelfAttacksWithAnother Filter.PowerGreaterThanSource)
-      " {\"type\":\"SelfAttacksWithAnother\",\"value\":{\"type\":\"PowerGreaterThanSource\"}} "
+      (TriggerCondition.SelfAttacksWithAnother (Filter.Measures (Measures.MkMeasures Measure.Power Comparison.GreaterThan (Operand.OfSource Measure.Power))))
+      " {\"type\":\"SelfAttacksWithAnother\",\"value\":{\"type\":\"Measures\",\"value\":{\"measure\":{\"type\":\"Power\"},\"comparison\":{\"type\":\"GreaterThan\"},\"operand\":{\"type\":\"OfSource\",\"value\":{\"type\":\"Power\"}}}}} "
   -- CR 508.3a's second sentence. A Filter over the PERMANENT attacked, so the
   -- same wire shape as the arm above over a different subject -- Thrashing
   -- Frontliner's "a battle".

@@ -138,8 +138,19 @@
                                     }
                                   },
                                   {
-                                    "type": "ManaValueAtMost",
-                                    "value": 4
+                                    "type": "Measures",
+                                    "value": {
+                                      "comparison": {
+                                        "type": "AtMost"
+                                      },
+                                      "measure": {
+                                        "type": "ManaValue"
+                                      },
+                                      "operand": {
+                                        "type": "Literal",
+                                        "value": 4
+                                      }
+                                    }
                                   }
                                 ]
                               },

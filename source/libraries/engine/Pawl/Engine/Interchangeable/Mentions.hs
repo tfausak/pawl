@@ -65,6 +65,7 @@ import qualified Pawl.Types.Blight as Blight
 import qualified Pawl.Types.BlockCost as BlockCost
 import qualified Pawl.Types.BlockPermission as BlockPermission
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
+import qualified Pawl.Types.BoundMeasure as BoundMeasure
 import qualified Pawl.Types.CandidateId as CandidateId
 import qualified Pawl.Types.CantAttackPlayer as CantAttackPlayer
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
@@ -223,6 +224,7 @@ import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaCount as ManaCount
 import qualified Pawl.Types.ManaRestriction as ManaRestriction
 import qualified Pawl.Types.ManaRider as ManaRider
+import qualified Pawl.Types.Measures as Measures
 import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillCountR as MillCountR
@@ -242,6 +244,7 @@ import qualified Pawl.Types.MovedKinds as MovedKinds
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
+import qualified Pawl.Types.Operand as Operand
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.OrElse as OrElse
 import qualified Pawl.Types.PaidExpiry as PaidExpiry
@@ -406,7 +409,7 @@ contextNames asking = case slots asking of
 --     MilledThisTurn, DealtDamageThisTurn, EnteredThisTurn, the
 --     crewed/convoked/saddled-the-source atoms) and EnteredWithSource
 --     (GameState.enteredWith) read a record kept per object id.
---   * A RESOLUTION CONTEXT: the slot atoms, the target-slot amount atoms, the
+--   * A RESOLUTION CONTEXT: the slot atoms, the slot and amount operands, the
 --     attach and search subject atoms, CantCrewVehicles and
 --     AttachedNoLaterThanSource's baked set, answered by slotNames and
 --     contextNames.
@@ -431,22 +434,8 @@ filterNames asking criterion = case criterion of
   Filter.HasNameOriginallyPrintedIn _expansion -> False
   Filter.HasKeyword _keyword -> False
   Filter.HasKeywordFamily _family -> False
-  Filter.PowerAtLeast _n -> False
-  Filter.PowerAtMost _n -> False
-  Filter.ToughnessGreaterThanPower -> False
-  Filter.PowerLessThanSource -> False
-  Filter.PowerGreaterThanSource -> False
-  Filter.PowerAtLeastSourceToughness -> False
-  Filter.PowerIsAmountInSlot slot -> slotNames asking slot
-  Filter.PowerAtLeastAmountInSlot slot -> slotNames asking slot
-  Filter.ManaValueAtMost _n -> False
-  Filter.ManaValueLessThanSource -> False
-  Filter.ManaValueGreaterThanSource -> False
-  Filter.ManaValueEqualToSource -> False
+  Filter.Measures measures -> measuresNames asking measures
   Filter.ManaValueIsEven -> False
-  Filter.ManaValueAtMostAmount -> contextNames asking
-  Filter.ManaValueEqualToAmount -> contextNames asking
-  Filter.PowerAtMostAmount -> contextNames asking
   Filter.ControlledBy _relation -> False
   Filter.ControlledByDefendingPlayer -> False
   Filter.ControlledByBound slot -> slotNames asking slot
@@ -470,7 +459,6 @@ filterNames asking criterion = case criterion of
   Filter.SameControllerAsBound slot -> slotNames asking slot
   Filter.SameControllerAsHostOfBound slot -> slotNames asking slot
   Filter.SharesCreatureTypeWithBound slot -> slotNames asking slot
-  Filter.ToughnessLessThanBound slot -> slotNames asking slot
   Filter.HasChosenName -> False
   Filter.HasChosenColor -> False
   Filter.HasChosenSubtype -> False
@@ -738,6 +726,10 @@ blockPermissionNames asking x = case x of
 blockRequirementNames :: Asking -> BlockRequirement.BlockRequirement -> Bool
 blockRequirementNames asking x = case x of
   BlockRequirement.MkBlockRequirement subject attacker while _arity -> any (affectedNames asking) subject || any (affectedNames asking) attacker || any (conditionNames asking) while
+
+boundMeasureNames :: Asking -> BoundMeasure.BoundMeasure -> Bool
+boundMeasureNames asking x = case x of
+  BoundMeasure.MkBoundMeasure slot _measure -> slotNames asking slot
 
 candidateIdNames :: Asking -> CandidateId.CandidateId -> Bool
 candidateIdNames asking x = case x of
@@ -1903,6 +1895,10 @@ manaRiderNames :: Asking -> ManaRider.ManaRider -> Bool
 manaRiderNames asking x = case x of
   ManaRider.MkManaRider condition _effect -> filterNames asking condition
 
+measuresNames :: Asking -> Measures.Measures -> Bool
+measuresNames asking x = case x of
+  Measures.MkMeasures _measure _comparison operand -> operandNames asking operand
+
 meldNames :: Asking -> (card -> Bool) -> Meld.Meld card -> Bool
 meldNames asking onCard x = case x of
   Meld.MkMeld objects result -> objectRefNames asking objects || onCard result
@@ -2058,6 +2054,15 @@ objectRefNames asking x = case x of
 offerCastNames :: Asking -> OfferCast.OfferCast -> Bool
 offerCastNames asking x = case x of
   OfferCast.MkOfferCast ref caster _optionality _verb offer repetition _copied _controlWhileResolving slot -> objectRefNames asking ref || playerRefNames asking caster || castOfferNames asking offer || castRepetitionNames asking repetition || any (slotNames asking) slot
+
+operandNames :: Asking -> Operand.Operand -> Bool
+operandNames asking x = case x of
+  Operand.Literal _integer -> False
+  Operand.OfSource _measure -> False
+  Operand.Own _measure -> False
+  Operand.OfBound bound -> boundMeasureNames asking bound
+  Operand.AmountInSlot slot -> slotNames asking slot
+  Operand.EnclosingAmount -> contextNames asking
 
 optionalityNames :: Asking -> Optionality.Optionality -> Bool
 optionalityNames asking x = case x of

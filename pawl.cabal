@@ -243,6 +243,8 @@ library codec
     Pawl.Codec.BlocksDeclaredSpec
     Pawl.Codec.Board
     Pawl.Codec.BoardSpec
+    Pawl.Codec.BoundMeasure
+    Pawl.Codec.BoundMeasureSpec
     Pawl.Codec.CandidateId
     Pawl.Codec.CandidateIdSpec
     Pawl.Codec.CantAttackPlayer
@@ -812,6 +814,10 @@ library codec
     Pawl.Codec.ManaUnitSpec
     Pawl.Codec.ManifestedDread
     Pawl.Codec.ManifestedDreadSpec
+    Pawl.Codec.Measure
+    Pawl.Codec.Measures
+    Pawl.Codec.MeasureSpec
+    Pawl.Codec.MeasuresSpec
     Pawl.Codec.Meld
     Pawl.Codec.MeldSource
     Pawl.Codec.MeldSourceSpec
@@ -887,6 +893,8 @@ library codec
     Pawl.Codec.OfferCastSpec
     Pawl.Codec.Onset
     Pawl.Codec.OnsetSpec
+    Pawl.Codec.Operand
+    Pawl.Codec.OperandSpec
     Pawl.Codec.OptionalDecision
     Pawl.Codec.OptionalDecisionSpec
     Pawl.Codec.Optionality
@@ -2074,6 +2082,7 @@ library types
     Pawl.Types.BlockRequirement
     Pawl.Types.BlocksDeclared
     Pawl.Types.Board
+    Pawl.Types.BoundMeasure
     Pawl.Types.BuybackDecision
     Pawl.Types.CandidateCost
     Pawl.Types.CandidateId
@@ -2398,6 +2407,8 @@ library types
     Pawl.Types.ManaUnit
     Pawl.Types.ManaWindow
     Pawl.Types.ManifestedDread
+    Pawl.Types.Measure
+    Pawl.Types.Measures
     Pawl.Types.Meld
     Pawl.Types.MeldSource
     Pawl.Types.Mentored
@@ -2441,6 +2452,7 @@ library types
     Pawl.Types.ObjectSnapshot
     Pawl.Types.OfferCast
     Pawl.Types.Onset
+    Pawl.Types.Operand
     Pawl.Types.OptionalDecision
     Pawl.Types.Optionality
     Pawl.Types.OrElse

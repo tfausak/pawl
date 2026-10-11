@@ -1960,7 +1960,7 @@ stifleSpec s registry = Spec.describe s "Stifle" $ do
 -- THE PROVING TEST for CR 202.3a's 0 on an ability on the stack. Synthetic Weigh
 -- the Trigger ({1}{U} Instant, "Counter target activated or triggered ability
 -- with mana value 2 or less", data/cards/synthetic-weigh-the-trigger.json) is
--- Stifle's Pool.Abilities slot with a Filter.ManaValueAtMost on it and nothing
+-- Stifle's Pool.Abilities slot with a mana value bound on it and nothing
 -- else, so the bound is the only thing standing between the spell and its
 -- target. Synthetic because no printing bounds the mana value of an ability on
 -- the stack: Scryfall o:"ability with mana value" and o:"ability with converted

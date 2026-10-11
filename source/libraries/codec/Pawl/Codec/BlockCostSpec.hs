@@ -9,10 +9,14 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.BlockCost as BlockCost
+import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.Measure as Measure
+import qualified Pawl.Types.Measures as Measures
+import qualified Pawl.Types.Operand as Operand
 import qualified Pawl.Types.PerCreature as PerCreature
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -37,7 +41,7 @@ spec s = Spec.describe s "Pawl.Codec.BlockCost" $ do
       ( BlockCost.MkBlockCost
           (Affected.Matching Filter.IsSource)
           (PerCreature.Fixed (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []))
-          (Just (Filter.PowerAtLeast 3))
+          (Just (Filter.Measures (Measures.MkMeasures Measure.Power Comparison.AtLeast (Operand.Literal 3))))
       )
-      " {\"attackers\":{\"type\":\"PowerAtLeast\",\"value\":3},\"perBlocker\":{\"type\":\"Fixed\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}},\"subject\":{\"type\":\"Matching\",\"value\":{\"type\":\"IsSource\"}}} "
+      " {\"attackers\":{\"type\":\"Measures\",\"value\":{\"measure\":{\"type\":\"Power\"},\"comparison\":{\"type\":\"AtLeast\"},\"operand\":{\"type\":\"Literal\",\"value\":3}}},\"perBlocker\":{\"type\":\"Fixed\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}},\"subject\":{\"type\":\"Matching\",\"value\":{\"type\":\"IsSource\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s BlockCost.codec

@@ -84,11 +84,14 @@ import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaUnit as ManaUnit
+import qualified Pawl.Types.Measure as Measure
+import qualified Pawl.Types.Measures as Measures
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.NameInsertion as NameInsertion
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.Operand as Operand
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
@@ -1203,7 +1206,7 @@ viewWithLastKnownAnywhere gs = Count.orLastKnown (fullView gs) gs
 -- answers an EMPTY set and SameControllerAsBound and
 -- SharesCreatureTypeWithBound refuse there; only a slot nobody has answered yet
 -- is absent, where they widen. slotObjects keeps only the slots naming an
--- object, its own doctrine. Toughness only for a slot naming exactly ONE
+-- object, its own doctrine. Measures only for a slot naming exactly ONE
 -- object: no printed comparison asks a group for one. All thunks: a filter
 -- naming none of the atoms forces no projection.
 framedBySlots :: GameState -> Map SlotName (Set Recipient.Recipient) -> Filter.Context -> Filter.Context
@@ -1215,16 +1218,25 @@ framedBySlots gs recipients context =
       hostController oid = case Game.hostOf oid gs of
         Just host | Set.member host (GameState.battlefield gs) -> maybe Set.empty Set.singleton (controllerOf host gs)
         _ -> Set.empty
-      oneToughness named = case Set.toList named of
-        [oid] -> Filter.toughness =<< lastKnown oid
+      oneObject named = case Set.toList named of
+        [oid] -> Just oid
         _ -> Nothing
+      measures =
+        Map.fromList
+          [ ((slot, measure), n)
+          | (slot, named) <- Map.toList objects,
+            Just oid <- [oneObject named],
+            Just view <- [lastKnown oid],
+            measure <- [minBound .. maxBound],
+            Just n <- [Filter.measureOf measure view]
+          ]
    in context
         { Filter.slotObjects = objects,
           Filter.slotPlayers = Binding.playersBySlot recipients,
           Filter.slotNames = over Filter.names,
           Filter.slotControllers = over (maybe Set.empty Set.singleton . Filter.controller),
           Filter.slotCreatureTypes = over (Set.filter Subtype.isCreatureType . Filter.subtypes),
-          Filter.slotToughnesses = Map.mapMaybe oneToughness objects,
+          Filter.slotMeasures = measures,
           Filter.slotHostControllers = fmap (foldMap hostController . objectsOf) recipients
         }
 
@@ -1265,12 +1277,11 @@ framedWith choices source gs = withCharacteristicsOf source gs . SourceContext.f
 -- `context` with `object`'s projected power, toughness, mana value, colours and
 -- names as the source's (CR 613), through its last known information once it
 -- has left (viewWithLastKnownAnywhere): CR 608.2b's re-check and CR 608.2h's
--- effects alike: the fields the
--- source-comparison atoms read (Filter.PowerLessThanSource,
--- Filter.ManaValueLessThanSource, Filter.SharesColorWithSource,
--- Filter.SameNameAsSource and their siblings). Leaves every other field alone,
--- so CR 509.1b's pairwise restrictions, framed by the creature being compared
--- rather than by an ability's source, take these and not its choices.
+-- effects alike: the fields the source-comparison atoms read (Filter.Measures'
+-- OfSource operand, Filter.SharesColorWithSource, Filter.SameNameAsSource and
+-- their siblings). Leaves every other field alone, so CR 509.1b's pairwise
+-- restrictions, framed by the creature being compared rather than by an
+-- ability's source, take these and not its choices.
 --
 -- All thunks over one view: a filter naming none of the atoms projects
 -- nothing. pairwiseContext is the CR 509.1b framing.
@@ -3566,6 +3577,14 @@ data Aspect
 everyAspect :: Set Aspect
 everyAspect = Set.fromList [minBound .. maxBound]
 
+-- CR 208.1 / 613.4: power and toughness are layer 7's; CR 202.3 reads the
+-- printed mana cost, which no Modification writes.
+measureReads :: Measure.Measure -> Set Aspect
+measureReads measure = case measure of
+  Measure.Power -> Set.singleton PowerA
+  Measure.Toughness -> Set.singleton PowerA
+  Measure.ManaValue -> Set.empty
+
 -- Which aspects a Filter reads. Exhaustive on purpose: a new Filter arm reading
 -- a projected characteristic must be classified here, or CR 613.8a would
 -- silently stop seeing dependencies through it.
@@ -3594,18 +3613,18 @@ filterReads f = case f of
   Filter.Type.HasKeyword _ -> Set.singleton Keywords
   -- The same aspect, read one step coarser.
   Filter.Type.HasKeywordFamily _ -> Set.singleton Keywords
-  Filter.Type.PowerAtLeast _ -> Set.singleton PowerA
-  Filter.Type.PowerAtMost _ -> Set.singleton PowerA
-  Filter.Type.ToughnessGreaterThanPower -> Set.singleton PowerA
-  -- The same aspect, covering BOTH powers the atom compares: Aspect names an
-  -- aspect of one object's projection, with no way to say "the source's".
-  Filter.Type.PowerLessThanSource -> Set.singleton PowerA
-  Filter.Type.PowerGreaterThanSource -> Set.singleton PowerA
-  Filter.Type.PowerAtLeastSourceToughness -> Set.singleton PowerA
-  -- The candidate's power alone: the number at the other end is a binding rather
-  -- than a projection.
-  Filter.Type.PowerIsAmountInSlot _ -> Set.singleton PowerA
-  Filter.Type.PowerAtLeastAmountInSlot _ -> Set.singleton PowerA
+  -- The candidate's measure, and the source's or its own other one where the
+  -- operand reads a projection: Aspect names an aspect of one object's
+  -- projection, with no way to say "the source's". A bound object's number
+  -- arrives on the Context already projected, and a slot's amount is a binding.
+  Filter.Type.Measures m ->
+    measureReads (Measures.measure m) <> case Measures.operand m of
+      Operand.OfSource measure -> measureReads measure
+      Operand.Own measure -> measureReads measure
+      Operand.OfBound _ -> Set.empty
+      Operand.Literal _ -> Set.empty
+      Operand.AmountInSlot _ -> Set.empty
+      Operand.EnclosingAmount -> Set.empty
   Filter.Type.ControlledBy _ -> Set.singleton Controller
   -- The candidate's controller; who defends is a combat-record fact.
   Filter.Type.ControlledByDefendingPlayer -> Set.singleton Controller
@@ -3648,9 +3667,6 @@ filterReads f = case f of
   Filter.Type.SameControllerAsHostOfBound _ -> Set.singleton Controller
   -- Reads the CANDIDATE's subtypes; the bound object's arrive on the Context.
   Filter.Type.SharesCreatureTypeWithBound _ -> Set.singleton Subtypes
-  -- Reads the CANDIDATE's toughness, the atom above's shape one characteristic
-  -- over; the bound object's toughness arrives on the Context, already projected.
-  Filter.Type.ToughnessLessThanBound _ -> Set.singleton PowerA
   -- Reads NAMES at both ends too, HasName's answer one indirection along: the
   -- chosen half is not a projection at all, and the other has no Aspect.
   Filter.Type.HasChosenName -> Set.empty
@@ -3872,14 +3888,7 @@ filterReads f = case f of
   Filter.Type.HasSticker _ -> Set.empty
   Filter.Type.Stickered -> Set.empty
   -- CR 202.3 reads the printed mana cost, which no Modification writes.
-  Filter.Type.ManaValueAtMost _ -> Set.empty
-  Filter.Type.ManaValueLessThanSource -> Set.empty
-  Filter.Type.ManaValueGreaterThanSource -> Set.empty
-  Filter.Type.ManaValueEqualToSource -> Set.empty
   Filter.Type.ManaValueIsEven -> Set.empty
-  Filter.Type.ManaValueAtMostAmount -> Set.empty
-  Filter.Type.ManaValueEqualToAmount -> Set.empty
-  Filter.Type.PowerAtMostAmount -> Set.singleton PowerA
   Filter.Type.And fs -> foldMap filterReads fs
   Filter.Type.Or fs -> foldMap filterReads fs
   Filter.Type.Not g -> filterReads g
@@ -3952,18 +3961,10 @@ filterReadsPeers f = case f of
   Filter.Type.HasNameOriginallyPrintedIn _ -> False
   Filter.Type.HasKeyword _ -> False
   Filter.Type.HasKeywordFamily _ -> False
-  Filter.Type.PowerAtLeast _ -> False
-  Filter.Type.PowerAtMost _ -> False
-  Filter.Type.ToughnessGreaterThanPower -> False
-  -- The SOURCE's power arrives on the Context, which affectsGiven builds with
-  -- Filter.contextFor -- no projection of a second object is read.
-  Filter.Type.PowerLessThanSource -> False
-  Filter.Type.PowerGreaterThanSource -> False
-  Filter.Type.PowerAtLeastSourceToughness -> False
-  -- The bound arrives on the Context as a number, so no second projection is
-  -- read.
-  Filter.Type.PowerIsAmountInSlot _ -> False
-  Filter.Type.PowerAtLeastAmountInSlot _ -> False
+  -- The SOURCE's and a bound object's numbers arrive on the Context, which
+  -- affectsGiven builds with Filter.contextFor -- no projection of a second
+  -- object is read.
+  Filter.Type.Measures _ -> False
   Filter.Type.ControlledBy _ -> False
   Filter.Type.ControlledByDefendingPlayer -> False
   Filter.Type.ControlledByBound _ -> False
@@ -3993,7 +3994,6 @@ filterReadsPeers f = case f of
   -- than through the candidate's `peers` view.
   Filter.Type.SameControllerAsHostOfBound _ -> False
   Filter.Type.SharesCreatureTypeWithBound _ -> False
-  Filter.Type.ToughnessLessThanBound _ -> False
   Filter.Type.HasChosenName -> False
   -- The source's chosen colour arrives on the Context, read off Object.chosenColors
   -- rather than off a projection; the candidate's own colours come from its
@@ -4056,16 +4056,7 @@ filterReadsPeers f = case f of
   Filter.Type.HasCountersOfAnyKind -> False
   Filter.Type.HasSticker _ -> False
   Filter.Type.Stickered -> False
-  Filter.Type.ManaValueAtMost _ -> False
-  -- The SOURCE's mana value arrives on the Context, PowerLessThanSource's answer
-  -- above: no projection of a second object is read.
-  Filter.Type.ManaValueLessThanSource -> False
-  Filter.Type.ManaValueGreaterThanSource -> False
-  Filter.Type.ManaValueEqualToSource -> False
   Filter.Type.ManaValueIsEven -> False
-  Filter.Type.ManaValueAtMostAmount -> False
-  Filter.Type.ManaValueEqualToAmount -> False
-  Filter.Type.PowerAtMostAmount -> False
 
 -- filterReadsPeers through an affected set. TheseObjects names ids (CR 611.2c)
 -- and Attached reads its source's attachment (CR 303.4m); neither builds a view.

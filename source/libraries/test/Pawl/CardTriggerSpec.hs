@@ -1078,7 +1078,7 @@ ezuriExperienceSpec s registry =
           Spec.assertEqWith s "the ability went on the stack anyway" (length (GameState.stack settled)) 1
           Spec.assertEqWith s "no +1/+1 counter was put" (countersOn targetId combat) (Just 0)
           Spec.assertEqWith s "so the Construct keeps its printed 2/1" (S.powerToughnessOf targetId combat) (Just (2, 1))
-        -- "WITH POWER 2 OR LESS", the Filter.PowerAtMost arm. Hill Giant is 3/3
+        -- "WITH POWER 2 OR LESS", a power AtMost comparison. Hill Giant is 3/3
         -- and Goblin Piker is 2/1, so the same Ezuri pays one experience counter
         -- for the second and nothing for the first. BOTH halves are here, because
         -- a filter that always rejected and one that always admitted are told
@@ -2641,7 +2641,7 @@ aimAtPlaneswalker jaceId p = case p of
 -- CR 702.110b's "a creature" read as an OBJECT rather than as an occurrence: the
 -- creature a rule 702.110a sacrifice fed to the exploiter, bound under
 -- Pawl.Engine.Binding.exploitedCreature and compared against by
--- Filter.ToughnessLessThanBound (CR 208.1).
+-- Filter.Measures' OfBound operand (CR 208.1).
 --
 -- Profaner of the Dead {3}{U} Creature -- Snake Wizard 3/3 is the card, whole:
 -- "Exploit / When this creature exploits a creature, return to their owners'
