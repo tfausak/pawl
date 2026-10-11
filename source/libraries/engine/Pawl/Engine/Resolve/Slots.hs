@@ -57,7 +57,7 @@ import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
-import qualified Pawl.Types.ChosenPermanent as ChosenPermanent
+import qualified Pawl.Types.ChosenPermanents as ChosenPermanents
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.CoinFlipR as CoinFlipR
 import qualified Pawl.Types.Compares as Compares
@@ -136,6 +136,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.HowMany as HowMany
 import qualified Pawl.Types.InitiativeTarget as InitiativeTarget
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
@@ -531,14 +532,10 @@ objectRefSlots ref = joinTwo (joinSlots (fmap playerRefSlots (objectRefPlayerRef
   -- that arm's is, and the COUNT is TopOfLibrary's read.
   ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary _ _ count) -> quantitySlots count
   -- EachMatching's answer: the candidates come off the battlefield, so no slot
-  -- names them and the chooser is CR 608.2c's resolving controller. The
-  -- CEILING is TopOfLibrary's read.
-  ObjectRef.AnyNumberMatching (AnyNumberMatching.MkAnyNumberMatching _ atMost) -> maybe Map.empty quantitySlots atMost
-  -- The arm above's answer for the CANDIDATES, which come off the battlefield so
-  -- that no slot names them; the CHOOSER's slots are the generic playerRefSlots
-  -- fold this case is joined into, ChosenCardFromAmong's route above, which is
-  -- what makes Wormfang Crab's ChoosePlayer slot a read.
-  ObjectRef.ChosenPermanent _ -> Map.empty
+  -- names them. The CHOOSER's slots are the generic playerRefSlots fold this
+  -- case is joined into, ChosenCardFromAmong's route above, which is what makes
+  -- Wormfang Crab's ChoosePlayer slot a read. The CEILING is TopOfLibrary's read.
+  ObjectRef.ChosenPermanents choice -> maybe Map.empty quantitySlots (HowMany.quantity (ChosenPermanents.count choice))
   -- The arm above's answer, for its reason: neither the source nor the
   -- candidates come out of a slot.
   ObjectRef.SourceAndChosenPermanent _ -> Map.empty
@@ -601,8 +598,7 @@ objectRefQuantities ref = case ref of
   ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary _ _ count) -> [count]
   -- At most how many permanents are chosen -- Teferi, Hero of Dominaria's
   -- printed two.
-  ObjectRef.AnyNumberMatching (AnyNumberMatching.MkAnyNumberMatching _ atMost) -> Foldable.toList atMost
-  ObjectRef.ChosenPermanent _ -> []
+  ObjectRef.ChosenPermanents choice -> Foldable.toList (HowMany.quantity (ChosenPermanents.count choice))
   ObjectRef.SourceAndChosenPermanent _ -> []
   ObjectRef.AttachedToBound _ -> []
   ObjectRef.FromAnywhere _ -> []
@@ -655,13 +651,12 @@ objectRefPlayerRefs ref = case ref of
   ObjectRef.RandomCardInGraveyard (RandomCardInGraveyard.MkRandomCardInGraveyard _ _ _) -> []
   -- RandomCardInHand's answer: the one seat whose library is reached.
   ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary player _ _) -> [player]
-  ObjectRef.AnyNumberMatching _ -> []
-  -- The seat that picks one permanent off the battlefield -- Wormfang Crab's
-  -- opponent, and by default CR 608.2c's resolving controller. Reported for
+  -- The seat that picks off the battlefield -- Wormfang Crab's opponent, and
+  -- by default CR 608.2c's resolving controller. Reported for
   -- ChosenCardFromAmong's reason above, and a regression fence for its reason too:
   -- the only card whose chooser names a slot fills that slot with its own mode's
   -- ChoosePlayer, which the D4 dataflow lint subtracts from both sides.
-  ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent _ chooser) -> [chooser]
+  ObjectRef.ChosenPermanents choice -> [ChosenPermanents.chooser choice]
   -- No chooser to report: the arm below names the source alongside ONE permanent,
   -- and CR 608.2c's resolving controller is the only seat that picks it.
   ObjectRef.SourceAndChosenPermanent _ -> []
@@ -1069,7 +1064,7 @@ effectPlayerRefs effect = case effect of
   Effect.ChoosePlayer {} -> []
   Effect.ChoosePlayerAtRandom {} -> []
   -- The seat that picks -- Archfiend of Depravity's "that player".
-  Effect.ChoosePermanents choice -> [ChoosePermanents.chooser choice]
+  Effect.ChoosePermanents choice -> [ChosenPermanents.chooser (ChoosePermanents.permanents choice)]
   Effect.RollDie {} -> []
   Effect.FlipCoin {} -> []
   Effect.ExileHandThenDraw -> []
@@ -1493,8 +1488,8 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.ChoosePlayerAtRandom _ -> Map.empty
   -- The slot is a DEFINITION; the reads are the ceiling's and the Filter's, and
   -- the chooser is a PlayerRef, reported at the head with every other one.
-  Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents _ (AnyNumberMatching.MkAnyNumberMatching filter_ atMost) _) ->
-    joinTwo (maybe Map.empty quantitySlots atMost) (filterSlotsOf filter_)
+  Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents (ChosenPermanents.MkChosenPermanents filter_ _ count) _) ->
+    joinTwo (maybe Map.empty quantitySlots (HowMany.quantity count)) (filterSlotsOf filter_)
   -- A DEFINITION for the result slot (boundSlots below), but CR 706.2's modifier
   -- is a READ: the instruction's own Quantity may name a slot an earlier effect
   -- of this same resolution bound, CR 608.2c following the list in written order.
@@ -2208,7 +2203,7 @@ ownSlotsAreExhaustive effect = case effect of
   -- PlaySubgame's answer: a definition reads no slot.
   Effect.ChoosePlayer _ -> True
   Effect.ChoosePlayerAtRandom _ -> True
-  Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents _ (AnyNumberMatching.MkAnyNumberMatching _ atMost) _) -> all Quantity.slotsAreExhaustive atMost
+  Effect.ChoosePermanents choice -> all Quantity.slotsAreExhaustive (HowMany.quantity (ChosenPermanents.count (ChoosePermanents.permanents choice)))
   Effect.RollDie rollDie -> Quantity.slotsAreExhaustive (RollDie.count rollDie) && all Quantity.slotsAreExhaustive (RollDie.modifier rollDie)
   Effect.FlipCoin flipCoin -> Quantity.slotsAreExhaustive (FlipCoin.count flipCoin)
   Effect.TakeExtraTurn takeExtraTurn -> Quantity.slotsAreExhaustive (TakeExtraTurn.count takeExtraTurn)
@@ -2449,7 +2444,7 @@ readsX =
         Effect.PlaySubgame _ -> False
         Effect.ChoosePlayer _ -> False
         Effect.ChoosePlayerAtRandom _ -> False
-        Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents _ (AnyNumberMatching.MkAnyNumberMatching _ atMost) _) -> any Quantity.readsX atMost
+        Effect.ChoosePermanents choice -> any Quantity.readsX (HowMany.quantity (ChosenPermanents.count (ChoosePermanents.permanents choice)))
         -- CR 706.2's modifier and CR 706.1's count are ordinary Quantities, so
         -- either may be the X the caster announced (CR 601.2b; Neverwinter
         -- Hydra's "roll X dice").
@@ -2766,7 +2761,7 @@ resolutionReads legal controller gs =
 
 -- CR 109.2's battlefield, narrowed by an effect-borne Filter and sorted into CR
 -- 608.2f's APNAP order. ObjectRef.EachMatching's whole answer, and the
--- CANDIDATES ObjectRef.AnyNumberMatching offers -- shared so a card cannot find
+-- CANDIDATES ObjectRef.ChosenPermanents offers -- shared so a card cannot find
 -- the sweep and the offer disagreeing about what matches.
 --
 -- CR 303.4b's host is supplied here and for EachCardInGraveyard below. Read
@@ -2794,7 +2789,7 @@ battlefieldMatching legal resolving controller source gs filter_ =
       baked = Filter.bakeBound (Binding.playerSlots (slotBindings resolving gs)) filter_
       grants = Projection.controlGrants gs
       -- CR 801.10 / 801.5a: only permanents in the controller's range, so the
-      -- sweep, the AnyNumberMatching offer and the ChosenPermanent offer agree.
+      -- sweep and the ChosenPermanents offer agree.
       matching =
         filter
           (\oid -> Filter.matches context (viewOf oid) baked && Projection.objectInRangeGiven grants controller oid gs)
@@ -2819,7 +2814,7 @@ battlefieldMatching legal resolving controller source gs filter_ =
 -- EachMatching folds the battlefield (CR 109.2) against the projection, so a
 -- permanent that is a creature only by a layer-4 effect is in the set -- through
 -- battlefieldMatching above, which is that fold and is shared with the
--- AnyNumberMatching offer. The filter context is this effect's own -- CR 109.5's
+-- ChosenPermanents offer. The filter context is this effect's own -- CR 109.5's
 -- "you" is the ability's controller -- because the filter IS the ability's card
 -- text. EachCardInGraveyard is the same
 -- fold over CR 400.1's per-player graveyards (CR 109.2a).
@@ -2852,18 +2847,12 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- A CR 608.2d question, so this pure sweep answers nothing for it: the
   -- candidates are battlefieldMatching's, but WHICH of them the instruction names
   -- is the chooser's, and two gathers reach the Game monad to ask --
-  -- permanentsGathered, which Effect.Transform, Effect.Convert, Effect.AttachAll,
-  -- Effect.Unattach and Effect.Untap share, and the Effect.MoveToZone gather. Under any other
-  -- opcode this empty answer is an inert card-data error, which
-  -- Pawl.EffectLintSpec's inertChoosers rejects at load time --
-  -- ChosenCardInGraveyard's note below is the shape.
-  ObjectRef.AnyNumberMatching _ -> []
-  -- The arm above's answer, for its reason: a CR 608.2d question, so this pure
-  -- sweep answers nothing for it. The Effect.MoveToZone gather is the one arm
-  -- that reaches the Game monad to ask it; under any other opcode this empty
-  -- answer is an inert card-data error, which Pawl.CardSpec's inertChoosers
-  -- rejects at load time.
-  ObjectRef.ChosenPermanent _ -> []
+  -- Resolve.Effect.permanentsGathered, which the opcodes acting on permanents
+  -- share, and the Effect.MoveToZone gather. Under any other opcode this empty
+  -- answer is an inert card-data error, which Pawl.EffectLintSpec's
+  -- inertChoosers rejects at load time -- ChosenCardInGraveyard's note below is
+  -- the shape.
+  ObjectRef.ChosenPermanents _ -> []
   -- The arm above's answer, for its reason: a CR 608.2d question, so this pure
   -- sweep answers nothing for it -- the source half included, which no reader may
   -- take without the counterpart the one instruction names alongside it.

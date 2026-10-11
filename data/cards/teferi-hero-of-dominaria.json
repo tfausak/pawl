@@ -218,11 +218,14 @@
                       {
                         "type": "Untap",
                         "value": {
-                          "type": "AnyNumberMatching",
+                          "type": "ChosenPermanents",
                           "value": {
-                            "atMost": {
-                              "type": "Literal",
-                              "value": 2
+                            "count": {
+                              "type": "UpTo",
+                              "value": {
+                                "type": "Literal",
+                                "value": 2
+                              }
                             },
                             "filter": {
                               "type": "HasCardType",

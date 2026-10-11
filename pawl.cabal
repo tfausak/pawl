@@ -316,7 +316,7 @@ library codec
     Pawl.Codec.ChosenCardInGraveyardSpec
     Pawl.Codec.ChosenCardInHand
     Pawl.Codec.ChosenCardInHandSpec
-    Pawl.Codec.ChosenPermanent
+    Pawl.Codec.ChosenPermanents
     Pawl.Codec.ClassLevel
     Pawl.Codec.ClassLevelChange
     Pawl.Codec.ClassLevelChangeSpec
@@ -698,6 +698,7 @@ library codec
     Pawl.Codec.HalvedSpec
     Pawl.Codec.HandAction
     Pawl.Codec.HandActionSpec
+    Pawl.Codec.HowMany
     Pawl.Codec.Hybrid
     Pawl.Codec.HybridPhyrexian
     Pawl.Codec.HybridSpec
@@ -2122,7 +2123,7 @@ library types
     Pawl.Types.ChosenCardFromAmong
     Pawl.Types.ChosenCardInGraveyard
     Pawl.Types.ChosenCardInHand
-    Pawl.Types.ChosenPermanent
+    Pawl.Types.ChosenPermanents
     Pawl.Types.Claim
     Pawl.Types.ClaimAxis
     Pawl.Types.ClassLevel
@@ -2338,6 +2339,7 @@ library types
     Pawl.Types.HandActionIndex
     Pawl.Types.HandActionPerformer
     Pawl.Types.HandWindowCap
+    Pawl.Types.HowMany
     Pawl.Types.Hybrid
     Pawl.Types.HybridPayment
     Pawl.Types.HybridPhyrexian

@@ -1334,7 +1334,7 @@ affectedSets = fmap ContinuousEffect.affected . GameState.continuousEffects
 attackerIds :: GameState.GameState -> [ObjectId.ObjectId]
 attackerIds = Map.keys . Combat.Type.attackers . GameState.combat
 
--- ObjectRef.AnyNumberMatching under Effect.MoveToZone: the CR 608.2d subset a
+-- ObjectRef.ChosenPermanents under Effect.MoveToZone: the CR 608.2d subset a
 -- MOVE names, where Tovolar's is the subset a CR 701.27a turn names.
 --
 -- Glorious Protector {2}{W}{W} Creature -- Angel Cleric 3/4 (flash, flying,
@@ -2662,7 +2662,7 @@ corrosiveGaleSpec s registry = Spec.describe s "CorrosiveGale" $ do
 -- Teferi, Hero of Dominaria {3}{W}{U} Legendary Planeswalker -- Teferi, loyalty
 -- 4: "+1: Draw a card. At the beginning of the next end step, untap up to two
 -- lands." (Oracle text checked against api.scryfall.com 2026-09-27.) CR 608.2d's
--- "up to two": ObjectRef.AnyNumberMatching with a ceiling, chosen as the delayed
+-- "up to two": ObjectRef.ChosenPermanents with a ceiling, chosen as the delayed
 -- ability resolves rather than targeted.
 --
 -- Five tapped lands, three alice's Islands and two bob's Mountains -- the

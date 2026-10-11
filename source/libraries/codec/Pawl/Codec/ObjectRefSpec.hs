@@ -8,18 +8,18 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityName as AbilityName
-import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
 import qualified Pawl.Types.AttachedToBound as AttachedToBound
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
-import qualified Pawl.Types.ChosenPermanent as ChosenPermanent
+import qualified Pawl.Types.ChosenPermanents as ChosenPermanents
 import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.EachCardInHand as EachCardInHand
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.HowMany as HowMany
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -397,39 +397,42 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       (Either.isLeft (Common.parse (Text.pack " {\"type\":\"RandomCardInHand\",\"value\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"}} ") >>= Codec.decode ObjectRef.codec))
       "a bare player reference is rejected"
   -- The one Arm.tagged risk this file exists for -- a tag its tag function names
-  -- with no arm beside it: a MISSING codec arm would compile and only this case
-  -- would notice. The distinct-tag case below is what catches the other half --
-  -- an arm copying EachMatching's tag, which would turn Tovolar's choice into a
-  -- sweep of every match.
-  Spec.it s "AnyNumberMatching" $
-    Common.assertCodec
-      s
-      ObjectRef.codec
-      (ObjectRef.AnyNumberMatching (AnyNumberMatching.MkAnyNumberMatching (Filter.HasCardType CardType.Creature) Nothing))
-      " {\"type\":\"AnyNumberMatching\",\"value\":{\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
-  -- The arm above's singular, and the same Arm.tagged risk: a missing
-  -- codec arm would compile and only this case would notice, and a tag copied
-  -- from a sibling would turn one permanent into a sweep or into a subset.
+  -- with no arm beside it: a MISSING codec arm would compile and only these
+  -- cases would notice. The distinct-tag case below is what catches the other
+  -- half -- an arm copying EachMatching's tag, which would turn Tovolar's choice
+  -- into a sweep of every match.
   --
-  -- @chooser@ is defaulted, so the choice addressed to CR 608.2c's resolving
-  -- controller writes the filter alone; the case below is what proves another
-  -- seat survives the round trip.
-  Spec.it s "ChosenPermanent" $
+  -- @chooser@ and @count@ are defaulted, so one permanent chosen by CR 608.2c's
+  -- resolving controller writes the filter alone; the cases after it are what
+  -- prove another seat and "any number" survive the round trip.
+  Spec.it s "ChosenPermanents" $
     Common.assertCodec
       s
       ObjectRef.codec
-      (ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent (Filter.HasCardType CardType.Creature) (PlayerRef.Relative PlayerRelation.You)))
-      " {\"type\":\"ChosenPermanent\",\"value\":{\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
-  Spec.it s "ChosenPermanent carries a chooser other than the resolving controller" $
+      (ObjectRef.ChosenPermanents (ChosenPermanents.MkChosenPermanents (Filter.HasCardType CardType.Creature) (PlayerRef.Relative PlayerRelation.You) HowMany.One))
+      " {\"type\":\"ChosenPermanents\",\"value\":{\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+  Spec.it s "ChosenPermanents carries a chooser other than the resolving controller" $
     Common.assertCodec
       s
       ObjectRef.codec
-      (ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent (Filter.HasCardType CardType.Creature) (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "opponent")))))
-      " {\"type\":\"ChosenPermanent\",\"value\":{\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"chooser\":{\"type\":\"InSlot\",\"value\":\"opponent\"}}} "
-  -- The arm above with the source named alongside the choice, and a fourth arm
-  -- whose payload is a bare Filter, so the same Arm.tagged risk: a
-  -- missing codec arm would compile, and a tag copied from any of the three would
-  -- lose the source half without a decode error.
+      (ObjectRef.ChosenPermanents (ChosenPermanents.MkChosenPermanents (Filter.HasCardType CardType.Creature) (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "opponent"))) HowMany.One))
+      " {\"type\":\"ChosenPermanents\",\"value\":{\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"chooser\":{\"type\":\"InSlot\",\"value\":\"opponent\"}}} "
+  Spec.it s "ChosenPermanents takes any number" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      (ObjectRef.ChosenPermanents (ChosenPermanents.MkChosenPermanents (Filter.HasCardType CardType.Creature) (PlayerRef.Relative PlayerRelation.You) (HowMany.UpTo Nothing)))
+      " {\"type\":\"ChosenPermanents\",\"value\":{\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"count\":{\"type\":\"UpTo\"}}} "
+  Spec.it s "ChosenPermanents takes up to a ceiling" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      (ObjectRef.ChosenPermanents (ChosenPermanents.MkChosenPermanents (Filter.HasCardType CardType.Land) (PlayerRef.Relative PlayerRelation.You) (HowMany.UpTo (Just (Quantity.Literal 2)))))
+      " {\"type\":\"ChosenPermanents\",\"value\":{\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}},\"count\":{\"type\":\"UpTo\",\"value\":{\"type\":\"Literal\",\"value\":2}}}} "
+  -- The arm above with the source named alongside the choice, and an arm whose
+  -- payload is a bare Filter, so the same Arm.tagged risk: a missing codec arm
+  -- would compile, and a tag copied from its sibling would lose the source half
+  -- without a decode error.
   Spec.it s "SourceAndChosenPermanent" $
     Common.assertCodec
       s
@@ -459,7 +462,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
   Spec.it s "every arm carries a distinct tag" $
     Spec.assertEqWith
       s
-      "a slot, a battlefield sweep, a graveyard sweep, your own hand sweep, a scoped hand sweep, your own library sweep, every card you own, the linked exile sweep, the stack's spells, the stack's abilities, the whole stack, the player sweep, the opponent sweep, the chosen player, an indirection to a seat, a library's top cards, a walk of a library, a graveyard's top card, a chosen graveyard card, a chosen card in hand, a chosen card from among a group, every card from among a group, a random card in hand, a random card in a graveyard, a random card in a library, a chosen subset of the battlefield, one chosen permanent, the source with one chosen permanent and what is attached to a bound object all encode differently"
+      "a slot, a battlefield sweep, a graveyard sweep, your own hand sweep, a scoped hand sweep, your own library sweep, every card you own, the linked exile sweep, the stack's spells, the stack's abilities, the whole stack, the player sweep, the opponent sweep, the chosen player, an indirection to a seat, a library's top cards, a walk of a library, a graveyard's top card, a chosen graveyard card, a chosen card in hand, a chosen card from among a group, every card from among a group, a random card in hand, a random card in a graveyard, a random card in a library, a battlefield choice, the source with one chosen permanent and what is attached to a bound object all encode differently"
       ( Set.size
           ( Set.fromList
               [ Codec.encode ObjectRef.codec (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
@@ -487,14 +490,13 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
                 Codec.encode ObjectRef.codec (ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand (PlayerRef.Relative PlayerRelation.You) (Filter.And []) (Quantity.Literal 1))),
                 Codec.encode ObjectRef.codec (ObjectRef.RandomCardInGraveyard (RandomCardInGraveyard.MkRandomCardInGraveyard (ZoneScope.Scoped (PlayerScope.Related PlayerRelation.You)) (Filter.And []) (Quantity.Literal 1))),
                 Codec.encode ObjectRef.codec (ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary (PlayerRef.Relative PlayerRelation.You) (Filter.And []) (Quantity.Literal 1))),
-                Codec.encode ObjectRef.codec (ObjectRef.AnyNumberMatching (AnyNumberMatching.MkAnyNumberMatching (Filter.HasCardType CardType.Creature) Nothing)),
-                Codec.encode ObjectRef.codec (ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent (Filter.HasCardType CardType.Creature) (PlayerRef.Relative PlayerRelation.You))),
+                Codec.encode ObjectRef.codec (ObjectRef.ChosenPermanents (ChosenPermanents.MkChosenPermanents (Filter.HasCardType CardType.Creature) (PlayerRef.Relative PlayerRelation.You) HowMany.One)),
                 Codec.encode ObjectRef.codec (ObjectRef.SourceAndChosenPermanent (Filter.HasCardType CardType.Creature)),
                 Codec.encode ObjectRef.codec (ObjectRef.AttachedToBound (AttachedToBound.MkAttachedToBound (SlotName.MkSlotName (Text.pack "target")) (Filter.HasCardType CardType.Creature)))
               ]
           )
       )
-      29
+      28
   -- A tag the decoder does not know is an error rather than a silent slot. The
   -- tag has to be one no arm will ever claim -- @EachOpponent@ stood here until
   -- that became a real arm, and the case then failed rather than going quiet,
