@@ -81,6 +81,26 @@ find the sites `-Werror` will *not* name (`CLAUDE.md`, "Before you consider a
 change done"), and say in the PR which ones you read and why each is correct.
 "I read all of them" is a finding; silence is not.
 
+## Parameters, not siblings
+
+The cheapest way to make one card pass is a new constructor shaped exactly like
+its text, and that is how the engine grew a power, toughness or mana value
+comparison per card shape, a trigger per player action and a sweep per stored
+row, each later folded into one at real cost. Before adding a constructor, a field
+or a function, grep for one the new thing is an instance of:
+
+- the same reading against another number, comparison or object:
+  `Filter.Measures`, `Pawl.Types.Arithmetic`;
+- the same event for another action or actor: `GameEvent.PlayerActed`,
+  `GameEvent.PermanentActed`;
+- the same rule over another subject: `CostModifier`, `Effect.Prohibit`;
+- another row in a list something already walks: `Expiry.traverseExpiries`.
+
+If one exists, extend it --- a new arm of its parameter, not a new sibling ---
+and say in the PR body which sibling you extended. If the existing one cannot
+carry it because the CR makes the difference observable, say that, with the
+citation. A sibling added anyway is a finding an audit should send back.
+
 ## Prose the compiler cannot check
 
 A comment asserting a limit the engine used to have becomes false the moment

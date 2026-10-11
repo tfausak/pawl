@@ -363,6 +363,16 @@ project-specific rules it doesn't cover:
 - Short names, disambiguated by module --- `Pawl.Types.Mana`, imported as
   `Mana`, rather than long prefixes.
 
+- A constructor, field or function that differs from an existing one only by a
+  parameter --- a number, a comparison, a measure, which object it reads, which
+  action it reports --- IS that parameter on the existing one. Find the
+  sibling before adding, extend it, and name it in the PR body.
+  `docs/agents/implementing.md`, "Parameters, not siblings", has the rule.
+
+- An exhaustive list --- of constructors, of fields, of the `GameState` rows
+  something walks --- exists once. A second hand-kept copy goes stale exactly
+  as item 4's traps do; derive it from the first or add to the first.
+
 - A new `Pawl.Types.Keyword` constructor that CARRIES A PAYLOAD owes a matching
   `Pawl.Types.KeywordFamily` constructor in the same change --- that type is how
   a card says "a creature with toxic" rather than "with toxic 2". `-Werror`
