@@ -2,22 +2,14 @@
 -- may case on Pawl.Types.Expiry -- the standing Pawl.Engine.Resolve has over
 -- Effect and Pawl.Engine.Projection over Modification. It owns the
 -- transformation from the PRINTED Duration to the STORED Expiry (`arm`) and
--- every sweep that ends one, over seven carriers that share one expiry
--- vocabulary and so share one sweep. Two of the seven carry MAYBE an expiry
--- rather than one outright, for different reasons: a delayed trigger may state
--- no duration at all (CR 603.7b), and an object's play permission (CR 601.3,
--- Object.playableFromExile) is usually absent entirely -- so where the other
--- five carriers are DROPPED from a list, the permission is CLEARED on an object
--- that stays.
+-- every sweep that ends one, over the carriers traverseExpiries names, which
+-- share one expiry vocabulary and so share one sweep.
 --
--- One of them, CR 116.2d's ignore, is the one that SUPPRESSES rather than adds;
--- its duration is a duration all the same, and it is swept as one.
---
--- TWO MORE carriers hold no Expiry at all and are swept here anyway: rule
--- 701.35a fixes a detain's duration and rule 701.15a fixes a goad's, so
--- Object.detainedUntil and Object.goadedBy are sets of seats rather than
--- vocabularies of durations, and dropAtTurnOf is the only sweep either can
--- reach. See clearedDetentions and clearedGoads.
+-- Carriers that hold no Expiry at all are swept here anyway: rule 701.35a fixes
+-- a detain's duration, rule 701.15a a goad's and rule 702.171b a saddle's, so
+-- each is a field on an object rather than a vocabulary of durations, and one
+-- sweep alone reaches it. See clearedDetentions, clearedGoads and
+-- clearedSaddles.
 --
 -- CR 800.4c is NOT asked here, and deliberately: a sweep that ends a
 -- control-changing effect leaves the object reading as controlled by its CR
@@ -29,6 +21,8 @@ module Pawl.Engine.Expiry where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
+import qualified Data.Functor.Const as Const
+import qualified Data.Functor.Identity as Identity
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -383,37 +377,12 @@ dropAtCleanup gs =
         -- CR 611.2a: every printed producer also says "this turn", so cleanup
         -- ends an unused grant exactly as it ends AtCleanup's.
         Expiry.WhenUsed -> False
-      keepEffect eff = survives (ContinuousEffect.expiry eff)
-      keepCopy active = survives (ActiveCopy.expiry active)
-      keepReplacement active = survives (ActiveReplacement.expiry active)
-      keepPlayerEffect active = survives (ActivePlayerEffect.expiry active)
-      keepBlockRequirement active = survives (ActiveBlockRequirement.expiry active)
-      keepAttackRequirement active = survives (ActiveAttackRequirement.expiry active)
-      keepObjectProhibition active = survives (ActiveObjectProhibition.expiry active)
-      keepAttackProhibition active = survives (ActiveAttackProhibition.expiry active)
-      keepEvasion active = survives (ActiveEvasion.expiry active)
-      keepDelayed = maybe True survives . DelayedTrigger.expiry
-      -- CR 116.2d: an ignore is stored "for a duration" like every carrier
-      -- above, and every printed one says until end of turn -- so Leonin Arbiter
-      -- stops the next turn's searches again, with nothing to reinstate.
-      keepIgnored = survives . IgnoredAbility.expiry
-   in gs
-        { GameState.continuousEffects = filter keepEffect (GameState.continuousEffects gs),
-          GameState.copyEffects = filter keepCopy (GameState.copyEffects gs),
-          GameState.replacements = filter keepReplacement (GameState.replacements gs),
-          GameState.playerEffects = filter keepPlayerEffect (GameState.playerEffects gs),
-          GameState.blockRequirements = filter keepBlockRequirement (GameState.blockRequirements gs),
-          GameState.attackRequirements = filter keepAttackRequirement (GameState.attackRequirements gs),
-          GameState.objectProhibitions = filter keepObjectProhibition (GameState.objectProhibitions gs),
-          GameState.attackProhibitions = filter keepAttackProhibition (GameState.attackProhibitions gs),
-          GameState.evasions = filter keepEvasion (GameState.evasions gs),
-          GameState.ignoredAbilities = filter keepIgnored (GameState.ignoredAbilities gs),
-          GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs),
-          -- Two writers over one field, composed rather than merged: the
-          -- permission sweep reads the GameState and rule 702.171b's mark reads
-          -- only the objects.
-          GameState.objects = clearedSaddles (clearedPermissions (survives . ExilePlayPermission.expiry) gs)
-        }
+      -- CR 116.2d's ignores are among the rows swept: every printed one says
+      -- until end of turn, so Leonin Arbiter stops the next turn's searches
+      -- again, with nothing to reinstate.
+      swept = keepSurvivors survives gs
+   in -- Rule 702.171b's mark holds no Expiry, so traverseExpiries does not walk it.
+      swept {GameState.objects = clearedSaddles (GameState.objects swept)}
 
 -- CR 611.2b: drop every While whose condition has stopped holding. The effect
 -- is DELETED, not masked: the duration is one continuous period, so an effect
@@ -424,12 +393,9 @@ dropAtCleanup gs =
 -- settleForPriority runs at exactly the points where the board can change, so
 -- checking here is indistinguishable from checking continuously.
 --
--- `filter` only removes elements and preserves the survivors' order, so a
--- LENGTH compare is equivalent to a deep structural `/=` and cheaper. The
--- permission carrier answers the same question with anyPermissionEnded, which is
--- a scan and not a rebuild.
--- `State.put` is skipped when nothing changed, so a no-op sweep does not
--- rewrite the GameState.
+-- `changed` is a scan over sourcedExpiries rather than a compare of rebuilt
+-- carriers, and `State.put` is skipped when nothing changed, so a no-op sweep
+-- -- the usual one, since this runs at every settle -- rewrites nothing.
 sweepConditional :: Game Bool
 sweepConditional = do
   gs <- State.get
@@ -452,99 +418,22 @@ sweepConditional = do
         -- Consumed only by Pawl.Engine.PlayerEffect.spentByCast/spentByLandPlay,
         -- which run outside this sweep.
         Expiry.WhenUsed -> True
-      keepEffect eff = survives (ContinuousEffect.source eff) (ContinuousEffect.expiry eff)
-      keepCopy active = survives (ActiveCopy.source active) (ActiveCopy.expiry active)
-      keepReplacement active = survives (ActiveReplacement.source active) (ActiveReplacement.expiry active)
-      keepPlayerEffect active = survives (ActivePlayerEffect.source active) (ActivePlayerEffect.expiry active)
-      keepBlockRequirement active = survives (ActiveBlockRequirement.source active) (ActiveBlockRequirement.expiry active)
-      keepAttackRequirement active = survives (ActiveAttackRequirement.source active) (ActiveAttackRequirement.expiry active)
-      keepObjectProhibition active = survives (ActiveObjectProhibition.source active) (ActiveObjectProhibition.expiry active)
-      keepAttackProhibition active = survives (ActiveAttackProhibition.source active) (ActiveAttackProhibition.expiry active)
-      keepEvasion active = survives (ActiveEvasion.source active) (ActiveEvasion.expiry active)
-      keepDelayed entry = maybe True (survives (DelayedTrigger.source entry)) (DelayedTrigger.expiry entry)
-      keptEffects = filter keepEffect (GameState.continuousEffects gs)
-      keptCopies = filter keepCopy (GameState.copyEffects gs)
-      keptReplacements = filter keepReplacement (GameState.replacements gs)
-      keptPlayerEffects = filter keepPlayerEffect (GameState.playerEffects gs)
-      keptBlockRequirements = filter keepBlockRequirement (GameState.blockRequirements gs)
-      keptAttackRequirements = filter keepAttackRequirement (GameState.attackRequirements gs)
-      keptObjectProhibitions = filter keepObjectProhibition (GameState.objectProhibitions gs)
-      keptAttackProhibitions = filter keepAttackProhibition (GameState.attackProhibitions gs)
-      keptEvasions = filter keepEvasion (GameState.evasions gs)
-      keptDelayed = Seq.filter keepDelayed (GameState.delayedTriggers gs)
-      keepIgnored ignored = survives (IgnoredAbility.source ignored) (IgnoredAbility.expiry ignored)
-      keptIgnored = filter keepIgnored (GameState.ignoredAbilities gs)
-      keepPermission permission = survives (ExilePlayPermission.source permission) (ExilePlayPermission.expiry permission)
-      keptObjects = clearedPermissions keepPermission gs
-      changed =
-        length keptEffects /= length (GameState.continuousEffects gs)
-          || length keptCopies /= length (GameState.copyEffects gs)
-          || length keptReplacements /= length (GameState.replacements gs)
-          || length keptPlayerEffects /= length (GameState.playerEffects gs)
-          || length keptBlockRequirements /= length (GameState.blockRequirements gs)
-          || length keptAttackRequirements /= length (GameState.attackRequirements gs)
-          || length keptObjectProhibitions /= length (GameState.objectProhibitions gs)
-          || length keptAttackProhibitions /= length (GameState.attackProhibitions gs)
-          || length keptEvasions /= length (GameState.evasions gs)
-          || Seq.length keptDelayed /= Seq.length (GameState.delayedTriggers gs)
-          || length keptIgnored /= length (GameState.ignoredAbilities gs)
-          -- Omitting this term would be silent: settleForPriority would not run
-          -- again, and a permission whose loss changes what a player may do would
-          -- be observed one settle late.
-          || anyPermissionEnded keepPermission gs
-  Monad.when changed $
-    State.put
-      gs
-        { GameState.continuousEffects = keptEffects,
-          GameState.copyEffects = keptCopies,
-          GameState.replacements = keptReplacements,
-          GameState.playerEffects = keptPlayerEffects,
-          GameState.blockRequirements = keptBlockRequirements,
-          GameState.attackRequirements = keptAttackRequirements,
-          GameState.objectProhibitions = keptObjectProhibitions,
-          GameState.attackProhibitions = keptAttackProhibitions,
-          GameState.evasions = keptEvasions,
-          GameState.ignoredAbilities = keptIgnored,
-          GameState.delayedTriggers = keptDelayed,
-          GameState.objects = keptObjects
-        }
+      changed = not (all (uncurry survives) (sourcedExpiries gs))
+  Monad.when changed $ State.put (keepWhere survives gs)
   pure changed
-
--- Has any permission on the board ended under this test? The question the whole
--- carrier is asked through, and it is a SCAN rather than a rebuild: almost every
--- board carries no permission at all, and sweepConditional runs at every settle.
-anyPermissionEnded :: (ExilePlayPermission.ExilePlayPermission -> Bool) -> GameState -> Bool
-anyPermissionEnded survives gs =
-  any (maybe False (not . survives) . Object.playableFromExile) (GameState.objects gs)
-
--- CR 601.3's permission, ended. CLEARED rather than dropped, which is the one
--- way this carrier differs from the other four: they are entries in a list that
--- goes away, and this is a field on an object that stays. Nothing else about the
--- object is touched, an object with no permission is left exactly as it was, and
--- the map is rebuilt only when something actually ended.
-clearedPermissions :: (ExilePlayPermission.ExilePlayPermission -> Bool) -> GameState -> Map.Map ObjectId Object.Object
-clearedPermissions survives gs =
-  let clear object =
-        if maybe True survives (Object.playableFromExile object)
-          then object
-          else object {Object.playableFromExile = Nothing}
-   in if anyPermissionEnded survives gs
-        then Map.map clear (GameState.objects gs)
-        else GameState.objects gs
 
 -- CR 701.35a's duration, ended: a detain lasts "until the next turn of the
 -- controller of that spell or ability", which is dropAtTurnOf's own moment, so
 -- that seat is dropped from every permanent detained until it. CLEARED rather
--- than dropped, clearedPermissions' posture and for its reason -- the carrier is
--- a field on an object that stays.
+-- than dropped: the carrier is a field on an object that stays.
 --
--- The EIGHTH carrier, and the one that holds no Pawl.Types.Expiry: rule 701.35a
--- fixes the duration, so Object.detainedUntil remembers only whose turn ends it
--- and this sweep is the only one that can reach it. A permanent detained by two
--- players loses one seat here and stays detained by the other.
+-- Rule 701.35a fixes the duration, so Object.detainedUntil holds no
+-- Pawl.Types.Expiry, remembers only whose turn ends it, and this sweep is the
+-- only one that can reach it. A permanent detained by two players loses one
+-- seat here and stays detained by the other.
 --
--- Scanned before rebuilding, anyPermissionEnded's reason: almost every board has
--- nothing detained, and this runs at every seat of every handoff.
+-- Scanned before rebuilding: almost every board has nothing detained, and this
+-- runs at every seat of every handoff.
 clearedDetentions :: PlayerId -> Map.Map ObjectId Object.Object -> Map.Map ObjectId Object.Object
 clearedDetentions pid objects =
   if any (Set.member pid . Object.detainedUntil) objects
@@ -626,31 +515,8 @@ dropAtTurnOf pid gs =
         Expiry.WhenPaid _ -> True
         -- No seat's turn beginning is a use.
         Expiry.WhenUsed -> True
-      keepEffect eff = survives (ContinuousEffect.expiry eff)
-      keepCopy active = survives (ActiveCopy.expiry active)
-      keepReplacement active = survives (ActiveReplacement.expiry active)
-      keepPlayerEffect active = survives (ActivePlayerEffect.expiry active)
-      keepBlockRequirement active = survives (ActiveBlockRequirement.expiry active)
-      keepAttackRequirement active = survives (ActiveAttackRequirement.expiry active)
-      keepObjectProhibition active = survives (ActiveObjectProhibition.expiry active)
-      keepAttackProhibition active = survives (ActiveAttackProhibition.expiry active)
-      keepEvasion active = survives (ActiveEvasion.expiry active)
-      keepDelayed = maybe True survives . DelayedTrigger.expiry
-      keepIgnored = survives . IgnoredAbility.expiry
-   in gs
-        { GameState.continuousEffects = filter keepEffect (GameState.continuousEffects gs),
-          GameState.copyEffects = filter keepCopy (GameState.copyEffects gs),
-          GameState.replacements = filter keepReplacement (GameState.replacements gs),
-          GameState.playerEffects = filter keepPlayerEffect (GameState.playerEffects gs),
-          GameState.blockRequirements = filter keepBlockRequirement (GameState.blockRequirements gs),
-          GameState.attackRequirements = filter keepAttackRequirement (GameState.attackRequirements gs),
-          GameState.objectProhibitions = filter keepObjectProhibition (GameState.objectProhibitions gs),
-          GameState.attackProhibitions = filter keepAttackProhibition (GameState.attackProhibitions gs),
-          GameState.evasions = filter keepEvasion (GameState.evasions gs),
-          GameState.ignoredAbilities = filter keepIgnored (GameState.ignoredAbilities gs),
-          GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs),
-          GameState.objects = clearedGoads pid (clearedDetentions pid (clearedPermissions (survives . ExilePlayPermission.expiry) gs))
-        }
+      swept = keepSurvivors survives gs
+   in swept {GameState.objects = clearedGoads pid (clearedDetentions pid (GameState.objects swept))}
 
 -- CR 611.2a: "during its controller's next turn" pinned to a seat as a declare
 -- attackers step ends on a turn that is its window (`windowReached`). From here
@@ -689,24 +555,73 @@ windowReached gs afterObjectTurn =
         && Set.member oid (GameState.battlefield gs)
         && maybe False (Turn.isActive gs) (View.controllerOf oid gs)
 
--- Every stored expiry rewritten in place, over every carrier sourcedExpiries
--- reads.
+-- CR 611.2: every stored row that carries an expiry, walked once. The ONE
+-- place that names the carriers: every sweep, the rewrite and the offer in this
+-- module go through it, so a carrier added here reaches all of them and one
+-- left out reaches none. `edit` is handed each row's source and expiry and
+-- answers the expiry the row keeps, or Nothing to end it.
+--
+-- A row ended is DROPPED from its list, except an object's play permission
+-- (CR 601.3, Object.playableFromExile), which is CLEARED on an object that
+-- stays. A delayed trigger stating no duration (CR 603.7b) has no expiry to
+-- hand over, so `edit` never sees it and it is kept.
+traverseExpiries :: (Applicative f) => (ObjectId -> Expiry -> f (Maybe Expiry)) -> GameState -> f GameState
+traverseExpiries edit gs =
+  let delayed x = case DelayedTrigger.expiry x of
+        Nothing -> pure (Just x)
+        Just e -> fmap (fmap (\e' -> x {DelayedTrigger.expiry = Just e'})) (edit (DelayedTrigger.source x) e)
+      object o = case Object.playableFromExile o of
+        Nothing -> pure o
+        Just p ->
+          fmap
+            (\kept -> o {Object.playableFromExile = fmap (\e -> p {ExilePlayPermission.expiry = e}) kept})
+            (edit (ExilePlayPermission.source p) (ExilePlayPermission.expiry p))
+      set ce co re pe br ar op ap ev ia dt ob =
+        gs
+          { GameState.continuousEffects = ce,
+            GameState.copyEffects = co,
+            GameState.replacements = re,
+            GameState.playerEffects = pe,
+            GameState.blockRequirements = br,
+            GameState.attackRequirements = ar,
+            GameState.objectProhibitions = op,
+            GameState.attackProhibitions = ap,
+            GameState.evasions = ev,
+            GameState.ignoredAbilities = ia,
+            GameState.delayedTriggers = dt,
+            GameState.objects = ob
+          }
+   in set
+        <$> rows edit ContinuousEffect.source ContinuousEffect.expiry (\x e -> x {ContinuousEffect.expiry = e}) (GameState.continuousEffects gs)
+        <*> rows edit ActiveCopy.source ActiveCopy.expiry (\x e -> x {ActiveCopy.expiry = e}) (GameState.copyEffects gs)
+        <*> rows edit ActiveReplacement.source ActiveReplacement.expiry (\x e -> x {ActiveReplacement.expiry = e}) (GameState.replacements gs)
+        <*> rows edit ActivePlayerEffect.source ActivePlayerEffect.expiry (\x e -> x {ActivePlayerEffect.expiry = e}) (GameState.playerEffects gs)
+        <*> rows edit ActiveBlockRequirement.source ActiveBlockRequirement.expiry (\x e -> x {ActiveBlockRequirement.expiry = e}) (GameState.blockRequirements gs)
+        <*> rows edit ActiveAttackRequirement.source ActiveAttackRequirement.expiry (\x e -> x {ActiveAttackRequirement.expiry = e}) (GameState.attackRequirements gs)
+        <*> rows edit ActiveObjectProhibition.source ActiveObjectProhibition.expiry (\x e -> x {ActiveObjectProhibition.expiry = e}) (GameState.objectProhibitions gs)
+        <*> rows edit ActiveAttackProhibition.source ActiveAttackProhibition.expiry (\x e -> x {ActiveAttackProhibition.expiry = e}) (GameState.attackProhibitions gs)
+        <*> rows edit ActiveEvasion.source ActiveEvasion.expiry (\x e -> x {ActiveEvasion.expiry = e}) (GameState.evasions gs)
+        <*> rows edit IgnoredAbility.source IgnoredAbility.expiry (\x e -> x {IgnoredAbility.expiry = e}) (GameState.ignoredAbilities gs)
+        <*> fmap (Seq.fromList . Maybe.catMaybes) (traverse delayed (Foldable.toList (GameState.delayedTriggers gs)))
+        <*> traverse object (GameState.objects gs)
+
+-- One carrier's list under traverseExpiries' edit, survivors in order.
+rows :: (Applicative f) => (ObjectId -> Expiry -> f (Maybe Expiry)) -> (r -> ObjectId) -> (r -> Expiry) -> (r -> Expiry -> r) -> [r] -> f [r]
+rows edit source expiry set =
+  fmap Maybe.catMaybes . traverse (\x -> fmap (fmap (set x)) (edit (source x) (expiry x)))
+
+-- traverseExpiries under Identity: each row kept under the expiry `edit`
+-- answers, or ended.
+editExpiries :: (ObjectId -> Expiry -> Maybe Expiry) -> GameState -> GameState
+editExpiries edit = Identity.runIdentity . traverseExpiries (\source -> Identity.Identity . edit source)
+
+-- Every stored expiry rewritten in place.
 mapExpiries :: (Expiry -> Expiry) -> GameState -> GameState
-mapExpiries f gs =
-  gs
-    { GameState.continuousEffects = fmap (\x -> x {ContinuousEffect.expiry = f (ContinuousEffect.expiry x)}) (GameState.continuousEffects gs),
-      GameState.copyEffects = fmap (\x -> x {ActiveCopy.expiry = f (ActiveCopy.expiry x)}) (GameState.copyEffects gs),
-      GameState.replacements = fmap (\x -> x {ActiveReplacement.expiry = f (ActiveReplacement.expiry x)}) (GameState.replacements gs),
-      GameState.playerEffects = fmap (\x -> x {ActivePlayerEffect.expiry = f (ActivePlayerEffect.expiry x)}) (GameState.playerEffects gs),
-      GameState.blockRequirements = fmap (\x -> x {ActiveBlockRequirement.expiry = f (ActiveBlockRequirement.expiry x)}) (GameState.blockRequirements gs),
-      GameState.attackRequirements = fmap (\x -> x {ActiveAttackRequirement.expiry = f (ActiveAttackRequirement.expiry x)}) (GameState.attackRequirements gs),
-      GameState.objectProhibitions = fmap (\x -> x {ActiveObjectProhibition.expiry = f (ActiveObjectProhibition.expiry x)}) (GameState.objectProhibitions gs),
-      GameState.attackProhibitions = fmap (\x -> x {ActiveAttackProhibition.expiry = f (ActiveAttackProhibition.expiry x)}) (GameState.attackProhibitions gs),
-      GameState.evasions = fmap (\x -> x {ActiveEvasion.expiry = f (ActiveEvasion.expiry x)}) (GameState.evasions gs),
-      GameState.ignoredAbilities = fmap (\x -> x {IgnoredAbility.expiry = f (IgnoredAbility.expiry x)}) (GameState.ignoredAbilities gs),
-      GameState.delayedTriggers = fmap (\x -> x {DelayedTrigger.expiry = fmap f (DelayedTrigger.expiry x)}) (GameState.delayedTriggers gs),
-      GameState.objects = fmap (\o -> o {Object.playableFromExile = fmap (\p -> p {ExilePlayPermission.expiry = f (ExilePlayPermission.expiry p)}) (Object.playableFromExile o)}) (GameState.objects gs)
-    }
+mapExpiries f = editExpiries (const (Just . f))
+
+-- CR 611.2a: a sweep whose survivors are named by the row's source and expiry.
+keepWhere :: (ObjectId -> Expiry -> Bool) -> GameState -> GameState
+keepWhere survives = editExpiries (\source expiry -> if survives source expiry then Just expiry else Nothing)
 
 -- CR 500.5's first clause: effects lasting until the end of a step or phase
 -- expire as it ends. The window that is ending is passed in, because only the
@@ -772,45 +687,20 @@ dropAtUpkeepOf pid =
     Expiry.WhenPaid _ -> True
     Expiry.WhenUsed -> True
 
--- CR 611.2a: a sweep whose survivors are named by the expiry alone, over every
--- carrier. Shared by dropAtEndOf and dropAtUpkeepOf.
+-- CR 611.2a: keepWhere for a sweep whose survivors are named by the expiry
+-- alone.
 keepSurvivors :: (Expiry -> Bool) -> GameState -> GameState
-keepSurvivors survives gs =
-  let keepEffect eff = survives (ContinuousEffect.expiry eff)
-      keepCopy active = survives (ActiveCopy.expiry active)
-      keepReplacement active = survives (ActiveReplacement.expiry active)
-      keepPlayerEffect active = survives (ActivePlayerEffect.expiry active)
-      keepBlockRequirement active = survives (ActiveBlockRequirement.expiry active)
-      keepAttackRequirement active = survives (ActiveAttackRequirement.expiry active)
-      keepObjectProhibition active = survives (ActiveObjectProhibition.expiry active)
-      keepAttackProhibition active = survives (ActiveAttackProhibition.expiry active)
-      keepEvasion active = survives (ActiveEvasion.expiry active)
-      keepDelayed = maybe True survives . DelayedTrigger.expiry
-      keepIgnored = survives . IgnoredAbility.expiry
-   in gs
-        { GameState.continuousEffects = filter keepEffect (GameState.continuousEffects gs),
-          GameState.copyEffects = filter keepCopy (GameState.copyEffects gs),
-          GameState.replacements = filter keepReplacement (GameState.replacements gs),
-          GameState.playerEffects = filter keepPlayerEffect (GameState.playerEffects gs),
-          GameState.blockRequirements = filter keepBlockRequirement (GameState.blockRequirements gs),
-          GameState.attackRequirements = filter keepAttackRequirement (GameState.attackRequirements gs),
-          GameState.objectProhibitions = filter keepObjectProhibition (GameState.objectProhibitions gs),
-          GameState.attackProhibitions = filter keepAttackProhibition (GameState.attackProhibitions gs),
-          GameState.evasions = filter keepEvasion (GameState.evasions gs),
-          GameState.ignoredAbilities = filter keepIgnored (GameState.ignoredAbilities gs),
-          GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs),
-          GameState.objects = clearedPermissions (survives . ExilePlayPermission.expiry) gs
-        }
+keepSurvivors survives = keepWhere (const survives)
 
 -- CR 116.2c: every offer a payment could end right now, paired with the object
 -- that stored it. The one reader of Expiry.WhenPaid outside the sweeps, and the
 -- reason that arm is not Expiry.Never -- a duration nothing ends by time still
 -- has to be FINDABLE by the player who may end it.
 --
--- Every carrier, not just the continuous effects: Pawl.Types.Duration is one
+-- Every carrier, through sourcedExpiries: Pawl.Types.Duration is one
 -- vocabulary and any opcode taking a duration could print this one, so a carrier
--- left out here would hold an effect that is offered to nobody and ends never.
--- The pair is the source and the offer -- the price and CR 109.5's seat, which
+-- left out would hold an effect that is offered to nobody and ends never. The
+-- pair is the source and the offer -- the price and CR 109.5's seat, which
 -- is all CR 116.2c needs. WHICH of the source's effects is not asked, since one
 -- printed sentence stores several and the rule ends the sentence.
 paidExpiries :: GameState -> [(ObjectId, PaidExpiry.PaidExpiry)]
@@ -832,23 +722,10 @@ paidExpiries gs =
         Expiry.WhenUsed -> []
    in concatMap paid (sourcedExpiries gs)
 
--- Every stored expiry in the game, paired with the object it came from. Shared
--- by the offer above and the sweep below so the two cannot disagree about which
--- carriers exist.
+-- Every stored expiry in the game, paired with the object it came from:
+-- traverseExpiries read rather than rebuilt.
 sourcedExpiries :: GameState -> [(ObjectId, Expiry)]
-sourcedExpiries gs =
-  fmap (\x -> (ContinuousEffect.source x, ContinuousEffect.expiry x)) (GameState.continuousEffects gs)
-    <> fmap (\x -> (ActiveCopy.source x, ActiveCopy.expiry x)) (GameState.copyEffects gs)
-    <> fmap (\x -> (ActiveReplacement.source x, ActiveReplacement.expiry x)) (GameState.replacements gs)
-    <> fmap (\x -> (ActivePlayerEffect.source x, ActivePlayerEffect.expiry x)) (GameState.playerEffects gs)
-    <> fmap (\x -> (ActiveBlockRequirement.source x, ActiveBlockRequirement.expiry x)) (GameState.blockRequirements gs)
-    <> fmap (\x -> (ActiveAttackRequirement.source x, ActiveAttackRequirement.expiry x)) (GameState.attackRequirements gs)
-    <> fmap (\x -> (ActiveObjectProhibition.source x, ActiveObjectProhibition.expiry x)) (GameState.objectProhibitions gs)
-    <> fmap (\x -> (ActiveAttackProhibition.source x, ActiveAttackProhibition.expiry x)) (GameState.attackProhibitions gs)
-    <> fmap (\x -> (ActiveEvasion.source x, ActiveEvasion.expiry x)) (GameState.evasions gs)
-    <> fmap (\x -> (IgnoredAbility.source x, IgnoredAbility.expiry x)) (GameState.ignoredAbilities gs)
-    <> Maybe.mapMaybe (\x -> fmap ((,) (DelayedTrigger.source x)) (DelayedTrigger.expiry x)) (Foldable.toList (GameState.delayedTriggers gs))
-    <> Maybe.mapMaybe (fmap (\p -> (ExilePlayPermission.source p, ExilePlayPermission.expiry p)) . Object.playableFromExile) (Map.elems (GameState.objects gs))
+sourcedExpiries = Const.getConst . traverseExpiries (\source expiry -> Const.Const [(source, expiry)])
 
 -- CR 116.2c's payment, made: end every effect this object stored under a
 -- pay-to-end duration. dropAtEndOf's shape, with the source in the test --
@@ -878,32 +755,7 @@ dropWhenPaidBy oid gs =
         Expiry.AtEndOf _ -> True
         Expiry.AtEndOfCombatOn _ -> True
         Expiry.WhenUsed -> True
-      keepEffect x = survives (ContinuousEffect.source x) (ContinuousEffect.expiry x)
-      keepCopy x = survives (ActiveCopy.source x) (ActiveCopy.expiry x)
-      keepReplacement x = survives (ActiveReplacement.source x) (ActiveReplacement.expiry x)
-      keepPlayerEffect x = survives (ActivePlayerEffect.source x) (ActivePlayerEffect.expiry x)
-      keepBlockRequirement x = survives (ActiveBlockRequirement.source x) (ActiveBlockRequirement.expiry x)
-      keepAttackRequirement x = survives (ActiveAttackRequirement.source x) (ActiveAttackRequirement.expiry x)
-      keepObjectProhibition x = survives (ActiveObjectProhibition.source x) (ActiveObjectProhibition.expiry x)
-      keepAttackProhibition x = survives (ActiveAttackProhibition.source x) (ActiveAttackProhibition.expiry x)
-      keepEvasion x = survives (ActiveEvasion.source x) (ActiveEvasion.expiry x)
-      keepIgnored x = survives (IgnoredAbility.source x) (IgnoredAbility.expiry x)
-      keepDelayed x = maybe True (survives (DelayedTrigger.source x)) (DelayedTrigger.expiry x)
-      keepPermission x = survives (ExilePlayPermission.source x) (ExilePlayPermission.expiry x)
-   in gs
-        { GameState.continuousEffects = filter keepEffect (GameState.continuousEffects gs),
-          GameState.copyEffects = filter keepCopy (GameState.copyEffects gs),
-          GameState.replacements = filter keepReplacement (GameState.replacements gs),
-          GameState.playerEffects = filter keepPlayerEffect (GameState.playerEffects gs),
-          GameState.blockRequirements = filter keepBlockRequirement (GameState.blockRequirements gs),
-          GameState.attackRequirements = filter keepAttackRequirement (GameState.attackRequirements gs),
-          GameState.objectProhibitions = filter keepObjectProhibition (GameState.objectProhibitions gs),
-          GameState.attackProhibitions = filter keepAttackProhibition (GameState.attackProhibitions gs),
-          GameState.evasions = filter keepEvasion (GameState.evasions gs),
-          GameState.ignoredAbilities = filter keepIgnored (GameState.ignoredAbilities gs),
-          GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs),
-          GameState.objects = clearedPermissions keepPermission gs
-        }
+   in keepWhere survives gs
 
 -- CR 611.2a: does this expiry end when the effect carrying it is exercised,
 -- rather than only at a moment the clock or a payment could name? The one
