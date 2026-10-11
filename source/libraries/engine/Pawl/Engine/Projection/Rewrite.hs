@@ -64,7 +64,7 @@ import qualified Pawl.Types.ChoosePermanents as ChoosePermanents
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
-import qualified Pawl.Types.ChosenPermanent as ChosenPermanent
+import qualified Pawl.Types.ChosenPermanents as ChosenPermanents
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Compares as Compares
@@ -139,6 +139,7 @@ import qualified Pawl.Types.GainControl as GainControl
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.HowMany as HowMany
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LifeLoss as LifeLoss
@@ -965,8 +966,8 @@ rewriteEffect pairs effect = case effect of
   Effect.PlaySubgame _ -> effect
   Effect.ChoosePlayer _ -> effect
   Effect.ChoosePlayerAtRandom _ -> effect
-  Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents chooser (AnyNumberMatching.MkAnyNumberMatching f n) slot) ->
-    Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents chooser (AnyNumberMatching.MkAnyNumberMatching (Filter.rewrite pairs f) (fmap (rewriteQuantity pairs) n)) slot)
+  Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents choice slot) ->
+    Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents (rewriteChosenPermanents pairs choice) slot)
   -- CR 706.1's number of sides is a numeral rather than a computed count; how
   -- many dice, and the modifier added to each result, are the Quantities,
   -- PutCounters' descent above. The slots no word rule 612 can swap.
@@ -1167,11 +1168,18 @@ rewriteObjectRef pairs ref = case ref of
   -- The arm above's regression fence, for its reason: the Gates' "nonland" is a
   -- card type and no printing changes their text.
   ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary p f c) -> ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary p (Filter.rewrite pairs f) (rewriteQuantity pairs c))
-  ObjectRef.AnyNumberMatching (AnyNumberMatching.MkAnyNumberMatching f n) -> ObjectRef.AnyNumberMatching (AnyNumberMatching.MkAnyNumberMatching (Filter.rewrite pairs f) (fmap (rewriteQuantity pairs) n))
-  ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent f w) -> ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent (Filter.rewrite pairs f) w)
+  ObjectRef.ChosenPermanents choice -> ObjectRef.ChosenPermanents (rewriteChosenPermanents pairs choice)
   ObjectRef.AttachedToBound (AttachedToBound.MkAttachedToBound slot f) -> ObjectRef.AttachedToBound (AttachedToBound.MkAttachedToBound slot (Filter.rewrite pairs f))
   ObjectRef.FromAnywhere slot -> ObjectRef.FromAnywhere slot
   ObjectRef.SourceAndChosenPermanent f -> ObjectRef.SourceAndChosenPermanent (Filter.rewrite pairs f)
+
+-- CR 612.1 through a battlefield choice: its Filter and its ceiling are card
+-- text, and its chooser names a seat, never a subtype.
+rewriteChosenPermanents :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ChosenPermanents.ChosenPermanents -> ChosenPermanents.ChosenPermanents
+rewriteChosenPermanents pairs (ChosenPermanents.MkChosenPermanents f chooser count) =
+  ChosenPermanents.MkChosenPermanents (Filter.rewrite pairs f) chooser $ case count of
+    HowMany.One -> HowMany.One
+    HowMany.UpTo n -> HowMany.UpTo (fmap (rewriteQuantity pairs) n)
 
 -- CR 612.1 through CR 707.10d's description of the copies' candidates, which is
 -- card text like any other ref's. The other two answers name nothing a land-type

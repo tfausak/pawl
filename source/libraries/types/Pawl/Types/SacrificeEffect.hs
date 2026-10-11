@@ -9,7 +9,7 @@ import qualified Pawl.Types.SlotName as SlotName
 --
 -- Distinct from Pawl.Types.Sacrifice, which is the same keyword action as a COST
 -- -- that one counts matching permanents its payer chooses, where this one names
--- the permanents through its ObjectRef, whose AnyNumberMatching arm is the one
+-- the permanents through its ObjectRef, whose ChosenPermanents arm is the one
 -- choice (CR 608.2d, God-Eternal Bontu).
 data SacrificeEffect = MkSacrificeEffect
   { -- | ObjectRef and not a bare SlotName so a filtered sweep of the battlefield

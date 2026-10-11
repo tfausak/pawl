@@ -143,7 +143,7 @@ import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
-import qualified Pawl.Types.ChosenPermanent as ChosenPermanent
+import qualified Pawl.Types.ChosenPermanents as ChosenPermanents
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
 import qualified Pawl.Types.Clause as Clause
@@ -244,6 +244,7 @@ import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.HandActionPerformer as HandActionPerformer
+import qualified Pawl.Types.HowMany as HowMany
 import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
 import qualified Pawl.Types.InitiativeTarget as InitiativeTarget
 import qualified Pawl.Types.Keyword as Keyword.Type
@@ -697,21 +698,46 @@ oneSeat legal controller gs ref = case playerRefPlayers legal controller gs ref 
 -- Game.stillPlaying and so has already dropped a departed seat rather than
 -- reassigning its answer.
 
--- CR 608.2d's singular battlefield choice, hoisted so that every opcode making
--- one asks it the same way: the candidates are the ability's own reading of the
--- Filter whoever chooses, asked through Game.chooseAmong. The chooser is
--- named only when two or more candidates make it a real choice, so CR 800.4g's
--- reassignment is not asked for a choice that has one answer.
-chosenPermanentOf :: Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> PlayerRef -> Game [ObjectId]
-chosenPermanentOf legal resolving controller source filter_ chooser = do
+-- CR 608.2d's battlefield choice, hoisted so that every opcode making one asks
+-- it the same way: the candidates are the ability's own reading of the Filter
+-- whoever chooses (CR 109.5), battlefieldMatching's sweep read live off the
+-- board before the instruction acts (CR 608.2c), and the chooser is reached
+-- through askedChooser, CR 800.4g included. The chooser is named only where the
+-- count leaves a real choice, so CR 800.4g's reassignment is never asked for a
+-- choice with one answer.
+--
+-- One: skipped at fewer than two candidates, where CR 608.2d leaves one legal
+-- announcement (Pawl.Types.Prompt.ChoosePermanent's posture). UpTo: skipped at
+-- no candidate and at a ceiling of zero, where the empty set is the only answer
+-- (CR 101.3, CR 609.3), and asked at ONE candidate: "any number" and "up to
+-- two" both leave two distinguishable answers there. The ceiling is evaluated
+-- here too -- Teferi, Hero of Dominaria's "up to two lands".
+--
+-- FILTERED, not trusted (#222): an answer naming a permanent that was never
+-- offered would otherwise be acted on, and one naming more than the ceiling
+-- keeps only its first that many. Filtering rather than taking the answer also
+-- keeps CR 608.2f's APNAP order, which the candidate list carries and a Set does
+-- not.
+chosenPermanents :: Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId -> ObjectId -> ChosenPermanents.ChosenPermanents -> Game [ObjectId]
+chosenPermanents legal resolving controller source (ChosenPermanents.MkChosenPermanents filter_ chooser count) = do
   gs <- State.get
-  case battlefieldMatching legal resolving controller source gs filter_ of
-    candidates@(_ : _ : _) -> do
-      asked <- askedChooser source controller legal chooser
-      case asked of
-        Just who -> fmap Maybe.maybeToList (Game.chooseAmong (\decider answerer -> Prompt.ChoosePermanent decider answerer source) who candidates)
-        Nothing -> pure []
-    atMostOne -> pure atMostOne
+  let candidates = battlefieldMatching legal resolving controller source gs filter_
+      context = effectContext gs controller source legal (slotBindings resolving gs)
+      ceilingOf = maybe 0 Integer.toNaturalSaturating . Quantity.evaluateFor (effectViewOf source legal gs) context gs resolving source
+      asking ask = askedChooser source controller legal chooser >>= maybe (pure []) ask
+  case count of
+    HowMany.One -> case candidates of
+      _ : _ : _ -> asking (\who -> fmap Maybe.maybeToList (Game.chooseAmong (\decider answerer -> Prompt.ChoosePermanent decider answerer source) who candidates))
+      atMostOne -> pure atMostOne
+    HowMany.UpTo atMost ->
+      let ceiling_ = fmap ceilingOf atMost
+          capped = maybe id (take . Natural.toIntSaturating) ceiling_
+       in if null candidates || ceiling_ == Just 0
+            then pure []
+            else asking $ \who -> do
+              gs' <- State.get
+              answer <- Game.choose (Prompt.ChooseAnyNumberOfPermanents (Decide.deciderFor who gs') who source candidates ceiling_)
+              pure (capped (filter (`Set.member` answer) candidates))
 
 askedChooser :: ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> PlayerRef -> Game (Maybe PlayerId)
 askedChooser source controller legal ref = do
@@ -748,7 +774,8 @@ attachTogether movers recipient = do
 -- together: the one ref that is a CR 608.2d question rather than a read has to
 -- be answered in the Game monad, and every other is objectRefObjects' pure
 -- sweep. Shared by turnPermanentsOver, Effect.AttachAll, Effect.Unattach,
--- Effect.Untap and Effect.Sacrifice.
+-- Effect.Untap, Effect.Sacrifice, Effect.ModifyTarget, Effect.Pair and
+-- Effect.PutSticker.
 permanentsGathered ::
   Map.Map SlotName (Set Recipient) ->
   ObjectId ->
@@ -762,59 +789,11 @@ permanentsGathered legal resolving controller source ref = case ref of
   -- EachMatching's sweep of the same Filter, read live off the board before the
   -- instruction acts (CR 608.2c) -- which for Tovolar is a board CR 702.145c has
   -- already turned him over on, so his own back face is no longer a Human
-  -- Werewolf to offer. anyNumberMatching is the ask.
-  ObjectRef.AnyNumberMatching choice -> anyNumberMatching legal resolving controller source choice
+  -- Werewolf to offer. chosenPermanents is the ask.
+  ObjectRef.ChosenPermanents choice -> chosenPermanents legal resolving controller source choice
   _ -> do
     gs <- State.get
     pure (objectRefObjects legal resolving controller source gs ref)
-
--- CR 608.2d: the permanents ObjectRef.AnyNumberMatching names, asked of the
--- resolving controller (CR 608.2c) out of battlefieldMatching's sweep of the
--- Filter, read live off the board before the instruction acts. The ceiling,
--- where there is one, is evaluated here too -- Teferi, Hero of Dominaria's "up
--- to two lands".
---
--- Skipped at no candidate and at a ceiling of zero, where the empty set is the
--- only answer (CR 101.3, CR 609.3), and asked at ONE candidate, unlike the
--- counted choices: "any number" and "up to two" both leave two distinguishable
--- answers there.
---
--- FILTERED, not trusted (#222): an answer naming a permanent that was never
--- offered would otherwise be acted on, and one naming more than the ceiling
--- keeps only its first that many. Filtering rather than taking the answer also
--- keeps CR 608.2f's APNAP order, which the candidate list carries and a Set does
--- not.
-anyNumberMatching ::
-  Map.Map SlotName (Set Recipient) ->
-  ObjectId ->
-  PlayerId ->
-  ObjectId ->
-  AnyNumberMatching.AnyNumberMatching ->
-  Game [ObjectId]
-anyNumberMatching legal resolving controller = anyNumberMatchingBy controller legal resolving controller
-
--- anyNumberMatching asked of the seat named first, the candidates still read
--- from the ability's perspective (CR 109.5) -- Effect.ChoosePermanents' road.
-anyNumberMatchingBy ::
-  PlayerId ->
-  Map.Map SlotName (Set Recipient) ->
-  ObjectId ->
-  PlayerId ->
-  ObjectId ->
-  AnyNumberMatching.AnyNumberMatching ->
-  Game [ObjectId]
-anyNumberMatchingBy chooser legal resolving controller source (AnyNumberMatching.MkAnyNumberMatching filter_ atMost) = do
-  gs <- State.get
-  let candidates = battlefieldMatching legal resolving controller source gs filter_
-      context = effectContext gs controller source legal (slotBindings resolving gs)
-      ceiling_ = fmap (maybe 0 Integer.toNaturalSaturating . Quantity.evaluateFor (effectViewOf source legal gs) context gs resolving source) atMost
-      capped :: [a] -> [a]
-      capped = maybe id (take . Natural.toIntSaturating) ceiling_
-  if null candidates || ceiling_ == Just 0
-    then pure []
-    else do
-      answer <- Game.choose (Prompt.ChooseAnyNumberOfPermanents (Decide.deciderFor chooser gs) chooser source candidates ceiling_)
-      pure (capped (filter (`Set.member` answer) candidates))
 
 -- CR 701.9a's move for every Effect.Discard arm, once the cards are named:
 -- each seat's cards through the shared discard funnel, so the discard is
@@ -1160,12 +1139,9 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.RandomCardInGraveyard _ -> []
   -- No recipients, for the same reason: only randomCardsInLibrary can ask.
   ObjectRef.RandomCardInLibrary _ -> []
-  -- No recipients: the answer needs the chooser asked, and only
-  -- turnPermanentsOver's gather and the Effect.MoveToZone gather can ask.
-  ObjectRef.AnyNumberMatching _ -> []
-  -- No recipients: the arm above's answer, for its reason -- only a gather that
-  -- reaches the Game monad can ask the chooser.
-  ObjectRef.ChosenPermanent _ -> []
+  -- No recipients: the answer needs the chooser asked, and only a gather that
+  -- reaches the Game monad can ask.
+  ObjectRef.ChosenPermanents _ -> []
   ObjectRef.SourceAndChosenPermanent _ -> []
   -- A read, so the sweep answers it.
   ObjectRef.AttachedToBound _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
@@ -3532,13 +3508,13 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
           Nothing -> False
      in not (null anteing) && not (any theirs named)
   -- CR 608.2d / 123.3: no placer has a sticker of an allowed kind it can put
-  -- on a named object it owns, at its cost and cap. The ChosenPermanent and
-  -- ChosenCardInGraveyard reads are the candidate sets chosenPermanentOf and
+  -- on a named object it owns, at its cost and cap. The ChosenPermanents and
+  -- ChosenCardInGraveyard reads are the candidate sets chosenPermanents and
   -- chosenCardsInGraveyard offer, the pure sweep answering nothing for them.
   Effect.PutSticker (PutSticker.MkPutSticker player ref kinds cap free _) ->
     let placers = playerRefPlayers legal controller gs player
         named = case ref of
-          ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent filter_ _) -> battlefieldMatching legal resolving controller source gs filter_
+          ObjectRef.ChosenPermanents choice -> battlefieldMatching legal resolving controller source gs (ChosenPermanents.filter choice)
           ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard chooser scope filter_ _) -> case chooser of
             Chooser.BoundInSlot slot -> case playerRefPlayers legal controller gs (PlayerRef.InSlot slot) of
               [pid] | List.elem pid (Target.zoneScopePlayers (Just controller) legal scope gs) -> graveyardCardsOf context gs pid filter_
@@ -3583,8 +3559,8 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
     -- permanent is an instruction to choose one, and an empty pool leaves
     -- nothing to choose. Each pool is its asking arm's own read
     -- (chooseCardsInHand, MoveToZone's ChosenCardInGraveyard gather,
-    -- chooseCardFromAmong, chosenPermanentOf); a ref naming no chooser, and
-    -- every ref that reads, answers False.
+    -- chooseCardFromAmong, chosenPermanents); a ref naming no chooser, a choice
+    -- the empty answer satisfies, and every ref that reads, answers False.
     choosesFromNothing ref = case ref of
       ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand player filter_) ->
         let choosers = handChoosers legal controller gs player
@@ -3598,7 +3574,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
           Chooser.BoundInSlot _ -> False
       ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong slot filter_ count _ _) ->
         positive count && maybe False (null . matchingFromAmong legal resolving controller source gs filter_) (fromAmongBound slot)
-      ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent filter_ _) -> null (battlefieldMatching legal resolving controller source gs filter_)
+      ObjectRef.ChosenPermanents (ChosenPermanents.MkChosenPermanents filter_ _ HowMany.One) -> null (battlefieldMatching legal resolving controller source gs filter_)
       _ -> False
     positive quantity = maybe False (> 0) (Quantity.evaluateFor viewOf context gs resolving source quantity)
     -- fromAmongMembers' three reads, pure, with a fourth answer: a slot nothing
@@ -3789,13 +3765,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- ObjectRef-taking opcode uses. Nothing to affect (an illegal slot per CR
     -- 608.2b, a set that matched nothing) arrives as the empty list.
     --
-    -- The CHOSEN ref is asked through chosenPermanentOf instead, Effect.Pair's
+    -- The CHOSEN ref is asked through permanentsGathered instead, Effect.Pair's
     -- reason: CR 608.2d's choice is an ask, which the pure sweep cannot make.
     -- Mirkwood Trapper's "that player chooses an attacking creature. It gets
     -- +2/+0" is the reader.
-    affected <- case ref of
-      ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent filter_ chooser) -> chosenPermanentOf legal resolving controller source filter_ chooser
-      _ -> fmap (\gs -> objectRefObjects legal resolving controller source gs ref) State.get
+    affected <- permanentsGathered legal resolving controller source ref
     State.modify' $ \gs ->
       case frozenAffected gs affected of
         [] -> gs
@@ -4518,13 +4492,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- permanents -- Archfiend of Depravity's "that player chooses up to two
   -- creatures they control" -- and the pick is bound as a group for a later
   -- instruction to act on, through Filter.IsBound ("the rest") or InSlot.
-  -- askedChooser is ChosenPermanent's road to the seat, CR 800.4g included; a
+  -- chosenPermanents is ObjectRef.ChosenPermanents' ask, CR 800.4g included; a
   -- ref naming nobody asks nobody and binds nothing (CR 101.3). Proved by
   -- Pawl.BoardEffectSpec's "CR 608.2d that player chooses the two they keep and
   -- sacrifices the rest".
-  Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents chooser choice slot) -> do
-    asked <- askedChooser source controller legal chooser
-    picked <- maybe (pure []) (\who -> anyNumberMatchingBy who legal resolving controller source choice) asked
+  Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents choice slot) -> do
+    picked <- chosenPermanents legal resolving controller source choice
     Monad.unless (null picked) (State.modify' (bindObjectsSlot resolving slot (Seq.fromList picked)))
   -- CR 706.1: roll a die of the stated kind, and bind CR 706.4's result at the
   -- slot for a later effect of this same resolution to read (Ancient Copper
@@ -4932,7 +4905,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     --
     -- The victims come from permanentsGathered, objectRefObjects' sweep plus
     -- CR 608.2d's asked ref: Golgothian Sylex's EachMatching sweeps the
-    -- battlefield, and God-Eternal Bontu's AnyNumberMatching is asked here.
+    -- battlefield, and God-Eternal Bontu's ChosenPermanents is asked here.
     -- Its InSlot arm keeps what a bare SlotName did: a slot a Create bound to a
     -- GROUP names every token at once, in mint order, ahead of the target read
     -- and owing CR 608.2b nothing; an illegal slot (CR 608.2b) and a player
@@ -5161,19 +5134,6 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- card offering "a permanent card from among them" (Midnight Tilling)
         -- offers only what an earlier clause of this resolution named.
         chooseContext g = effectContext g controller source legal (slotBindings resolving g)
-        -- CR 608.2d's singular choice, shared by the two arms that make it, so a
-        -- card cannot find "a creature named Hanweir Garrison" offered one way
-        -- when the source rides along and another way when it does not.
-        --
-        -- The CANDIDATES are the ability's own reading whoever chooses -- CR
-        -- 109.5's "you" in Wormfang Crab's "a permanent you control" is the Crab's
-        -- controller -- so the chooser reaches the ask and not battlefieldMatching.
-        -- A chooser naming anything but ONE seat names no permanent either, and
-        -- that share of the instruction is ignored (CR 101.3), chooseCardFromAmong's
-        -- reading; it is read AFTER the two elided cases, since neither asks
-        -- anybody anything, and through askedChooser, so CR 800.4g hands the
-        -- choice on where the seat it names has left the game.
-        chosenPermanent = chosenPermanentOf legal resolving controller source
         -- CR 400.7j: bind what arrived into the resolving object's live bindings,
         -- where a later effect of this resolution or a delayed ability it arms
         -- (CR 603.7c) can name it. The shape follows how many arrived: one takes
@@ -5377,30 +5337,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- revealed, and CR 701.9a discards out of a hand.
               ObjectRef.RandomCardInLibrary random -> randomCardsInLibrary resolving source controller legal random
               -- CR 608.2d: Glorious Protector's "any number of non-Angel creatures
-              -- you control", announced while the effect is applied and so asked
-              -- HERE rather than read by objectRefObjects. turnPermanentsOver asks
-              -- the same question for CR 701.27a's turn, and this gather owes it the
-              -- same posture, so both go through anyNumberMatching, read off the
-              -- pre-move board (CR 608.2c).
-              ObjectRef.AnyNumberMatching choice -> anyNumberMatching legal resolving controller source choice
-              -- CR 608.2d's singular of the arm above: "a creature named Hanweir
-              -- Garrison" in Hanweir Battlements' "exile them, then meld them",
-              -- announced while the effect is applied. The candidates are
-              -- EachMatching's sweep of the same Filter, read live off the pre-move
-              -- board (CR 608.2c), so the sweep and the offer cannot disagree about
-              -- what matches.
-              --
-              -- Asked only at TWO or more candidates, which is the whole of what
-              -- parts this from the arm above: CR 608.2d admits only a legal
-              -- option, so one candidate leaves one legal announcement and no
-              -- decision to put to anybody, and none makes the instruction
-              -- impossible -- CR 101.3 ignores that part and CR 609.3 leaves the
-              -- rest of the effect to do as much as it can.
-              -- Pawl.Types.Prompt.ChoosePermanent is where that posture is written.
-              --
-              -- FILTERED, not trusted (#222), the hand arm's reason: an answer
-              -- naming a permanent that was never offered would otherwise be moved.
-              ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent filter_ chooser) -> chosenPermanent filter_ chooser
+              -- you control" and Hanweir Battlements' "a creature named Hanweir
+              -- Garrison", announced while the effect is applied and so asked HERE
+              -- rather than read by objectRefObjects, through chosenPermanents --
+              -- turnPermanentsOver's posture, read off the pre-move board (CR
+              -- 608.2c).
+              ObjectRef.ChosenPermanents choice -> chosenPermanents legal resolving controller source choice
               -- The arm above's choice with the SOURCE named alongside it: Hanweir
               -- Battlements' "exile them", where "them" is this land and the
               -- Garrison the Filter admits. One instruction over two objects, so
@@ -5426,7 +5368,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- ref: this arm's own sentence prints no other seat, and no ref it
               -- could is written.
               ObjectRef.SourceAndChosenPermanent filter_ -> do
-                counterpart <- chosenPermanent filter_ (PlayerRef.Relative PlayerRelation.You)
+                counterpart <- chosenPermanents legal resolving controller source (ChosenPermanents.MkChosenPermanents filter_ (PlayerRef.Relative PlayerRelation.You) HowMany.One)
                 gs <- State.get
                 pure (counterpart <> battlefieldMatching legal resolving controller source gs Filter.Type.IsSource)
               -- Swept once from the PRE-MOVE state, EachMatching's reason.
@@ -5702,9 +5644,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- so happenedBetween reads it as not having happened.
   Effect.PutSticker (PutSticker.MkPutSticker player ref kinds cap free bound) -> do
     named <- case ref of
-      ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent filter_ chooser) -> chosenPermanentOf legal resolving controller source filter_ chooser
       ObjectRef.ChosenCardInGraveyard fromGraveyard -> chosenCardsInGraveyard legal resolving controller source fromGraveyard
-      _ -> fmap (\gs -> objectRefObjects legal resolving controller source gs ref) State.get
+      _ -> permanentsGathered legal resolving controller source ref
     placers <- State.gets (\gs -> playerRefPlayers legal controller gs player)
     Monad.forM_ placers $ \placer -> Monad.forM_ (ListUtils.nubOrd named) $ \oid -> do
       gs <- State.get
@@ -6515,7 +6456,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- this effect's context, so its "you" is CR 109.5's.
   --
   -- Skipped at no candidate and at a ceiling of zero, where the empty set is the
-  -- only answer, and asked at ONE, anyNumberMatching's posture: "any number"
+  -- only answer, and asked at ONE, chosenPermanents' posture: "any number"
   -- leaves two distinguishable answers there. FILTERED, not trusted (#222), and
   -- capped at the ceiling.
   Effect.Discard (Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard ref (AnyNumberMatching.MkAnyNumberMatching filter_ atMost) mDiscarded)) -> do
@@ -9967,11 +9908,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- limit are Soulbond.pair's, read off the board as the effect applies rather
     -- than off anything the trigger captured.
     --
-    -- The CHOSEN ref goes through chosenPermanentOf and not the pure sweep: CR
+    -- The CHOSEN ref goes through permanentsGathered and not the pure sweep: CR
     -- 608.2d's choice is an ask, which objectRefObjects cannot make.
-    partners <- case ref of
-      ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent filter_ chooser) -> chosenPermanentOf legal resolving controller source filter_ chooser
-      _ -> fmap (\gs -> objectRefObjects legal resolving controller source gs ref) State.get
+    partners <- permanentsGathered legal resolving controller source ref
     State.modify' $ \gs -> case partners of
       [partner] -> Soulbond.pair controller source partner gs
       _ -> gs

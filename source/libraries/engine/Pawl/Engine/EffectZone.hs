@@ -129,8 +129,7 @@ zoneFunctionedAgainst itself delayed effect = case effect of
     ObjectRef.RandomCardInHand _ -> Nothing
     ObjectRef.RandomCardInGraveyard _ -> Nothing
     ObjectRef.RandomCardInLibrary _ -> Nothing
-    ObjectRef.AnyNumberMatching _ -> Nothing
-    ObjectRef.ChosenPermanent _ -> Nothing
+    ObjectRef.ChosenPermanents _ -> Nothing
     ObjectRef.SourceAndChosenPermanent _ -> Nothing
     ObjectRef.AttachedToBound _ -> Nothing
     -- The object may be in any zone by now.
