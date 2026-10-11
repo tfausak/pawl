@@ -8,6 +8,7 @@ import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Designation as Designation
 import qualified Pawl.Codec.Expansion as Expansion
+import qualified Pawl.Codec.KeywordDesignator as KeywordDesignator
 import qualified Pawl.Codec.KeywordFamily as KeywordFamily
 import qualified Pawl.Codec.Measures as Measures
 import qualified Pawl.Codec.ObjectId as ObjectId
@@ -24,6 +25,8 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.KeywordDesignator as KeywordDesignator.Type
+import qualified Pawl.Types.KeywordFamily as KeywordFamily.Type
 
 -- | Recursive, mirroring Quantity's toJson/fromJson: And/Or carry their
 -- operands as a JSON Array, Not as a single nested object, and each atom
@@ -159,7 +162,9 @@ codec keywordCodec =
       Arm.payload "IsInZone" Zone.codec Filter.IsInZone (\x -> case x of Filter.IsInZone y -> Just y; _ -> Nothing),
       Arm.payload "WasCastFrom" Zone.codec Filter.WasCastFrom (\x -> case x of Filter.WasCastFrom y -> Just y; _ -> Nothing),
       Arm.payload "TagWasSpent" ProductionTag.codec Filter.TagWasSpent (\x -> case x of Filter.TagWasSpent y -> Just y; _ -> Nothing),
-      Arm.nullary "Kicked" Filter.Kicked,
+      Arm.payload "Paid" (KeywordDesignator.codec keywordCodec) Filter.Paid (\x -> case x of Filter.Paid y -> Just y; _ -> Nothing),
+      -- Temporary decode-only alias for the old tag.
+      Arm.nullary "Kicked" (Filter.Paid (KeywordDesignator.Type.OfFamily KeywordFamily.Type.Kicker)),
       Arm.payload "And" (Common.list (codec keywordCodec)) Filter.And (\x -> case x of Filter.And y -> Just y; _ -> Nothing),
       Arm.payload "Or" (Common.list (codec keywordCodec)) Filter.Or (\x -> case x of Filter.Or y -> Just y; _ -> Nothing),
       Arm.payload "Not" (codec keywordCodec) Filter.Not (\x -> case x of Filter.Not y -> Just y; _ -> Nothing)
@@ -276,7 +281,7 @@ tagOf x = case x of
   Filter.IsInZone {} -> "IsInZone"
   Filter.WasCastFrom {} -> "WasCastFrom"
   Filter.TagWasSpent {} -> "TagWasSpent"
-  Filter.Kicked {} -> "Kicked"
+  Filter.Paid {} -> "Paid"
   Filter.And {} -> "And"
   Filter.Or {} -> "Or"
   Filter.Not {} -> "Not"

@@ -334,8 +334,8 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.CantActivateAbilities (Just (KeywordDesignator.OfNullary Keyword.PowerUp)))
-      " {\"type\":\"CantActivateAbilities\",\"value\":{\"type\":\"OfNullary\",\"value\":{\"type\":\"PowerUp\"}}} "
+      (PlayerEffect.CantActivateAbilities (Just (KeywordDesignator.OfKeyword Keyword.PowerUp)))
+      " {\"type\":\"CantActivateAbilities\",\"value\":{\"type\":\"OfKeyword\",\"value\":{\"type\":\"PowerUp\"}}} "
   -- CR 305.1 / City in a Bottle's land half, whose Filter names the land
   -- (Damping Engine's writes the empty And instead).
   Spec.it s "CantPlayLands" $

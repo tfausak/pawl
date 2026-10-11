@@ -1434,7 +1434,7 @@ targetQuestions pid gs r =
 -- GameState.activationsThisTurn's snapshots rather than the live board, with the
 -- criteria Pawl.Types.CostModifier carries; `source` is the
 -- asking effect's own permanent, which Filter.IsSource reads.
-firstActivation :: PlayerId -> RowSource -> Filter Keyword -> Maybe KeywordDesignator.KeywordDesignator -> Maybe AbilityKind.AbilityKind -> Maybe (Filter Keyword) -> GameState -> TurnScope.TurnScope -> Bool
+firstActivation :: PlayerId -> RowSource -> Filter Keyword -> Maybe (KeywordDesignator.KeywordDesignator Keyword) -> Maybe AbilityKind.AbilityKind -> Maybe (Filter Keyword) -> GameState -> TurnScope.TurnScope -> Bool
 firstActivation pid source criterion granted wantedKind aimedAt gs scope =
   let snapshotView snapshot =
         (Count.viewOfSnapshot False (ObjectSnapshot.controller snapshot) (Just (ObjectSnapshot.owner snapshot)) False Map.empty (ObjectSnapshot.characteristics snapshot))

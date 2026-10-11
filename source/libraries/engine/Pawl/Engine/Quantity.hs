@@ -583,32 +583,24 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- as level 1 for every rule and effect that asks, so the default belongs at the
         -- one read rather than in the field Filter.classLevel reports.
         Quantity.ClassLevel -> fmap (toInteger . ClassLevel.defaulted . Filter.classLevel) mView
-        -- CR 702.33d's designation as a 0/1, HasDesignation's arm in every respect,
-        -- for the "if kicked" CR 702.33e links to kicker or multikicker: Kicker and
-        -- Multikicker keys only (isPrintedKicker). A sticker kicker (CR 702.33h) is
-        -- in the family but not linked (Wicker Picker's ruling), nor is a squad or offspring payment a
-        -- kick. Pawl.StickerSpec's Faerie Squadron case proves it. The object it
-        -- reads is the RESOLVING SPELL, which is still on the stack while its own
-        -- clause conditions are gated (Pawl.Engine.Resolve.gateHolds).
-        Quantity.WasKicked -> fmap (\view -> if any (> 0) (Map.filterWithKey (\keyword _ -> Keyword.isPrintedKicker keyword) (Filter.paidCosts view)) then 1 else 0) mView
-        -- CR 702.143c's "if this spell was foretold" as a 0/1, off the view for
-        -- WasKicked's reason: the resolving spell is still on the stack while its
-        -- clause conditions are gated.
+        -- CR 702.143c's "if this spell was foretold" as a 0/1, off the view: the
+        -- object it reads is the RESOLVING SPELL, which is still on the stack while
+        -- its own clause conditions are gated (Pawl.Engine.Resolve.gateHolds).
         Quantity.WasForetold -> fmap (\view -> if Filter.foretold view then 1 else 0) mView
-        -- CR 702.33f's "kicked with its [A] kicker", CR 702.33c's count and CR
-        -- 702.157a's "for each time", which are one read: how many times THIS
-        -- ability's cost was declared, zero for one the spell's controller declined
-        -- and for one the card does not print.
-        -- CR 702.104b's yes-or-no as a 0/1, WasKicked's arm two above in every
+        -- CR 702.104b's yes-or-no as a 0/1, WasForetold's arm above in every
         -- respect. The object it reads is the PERMANENT the tribute creature is,
         -- which the card's own enters trigger asks about at CR 603.4 and again at
         -- CR 608.2a.
         Quantity.TributeWasPaid -> fmap (\view -> if Filter.tributePaid view then 1 else 0) mView
-        Quantity.TimesPaid keyword -> fmap (toInteger . Map.findWithDefault 0 keyword . Filter.paidCosts) mView
+        -- CR 702.33e's "if it was kicked", CR 702.33f's "kicked with its [A]
+        -- kicker", CR 702.33c's count and CR 702.157a's "for each time", which are
+        -- one read: how many times the designated costs were declared, zero for one
+        -- the spell's controller declined and for one the card does not print.
+        Quantity.TimesPaid designator -> fmap (toInteger . Keyword.timesPaid designator . Filter.paidCosts) mView
         -- CR 601.2b / 400.7d: was the candidate this object was cast for
-        -- offered by that family's keyword? Off the view, WasKicked's read.
+        -- offered by that family's keyword? Off the view, WasForetold's read.
         Quantity.CastUsing family -> fmap (\view -> if fmap Keyword.familyOf (Filter.castUsing view) == Just (Just family) then 1 else 0) mView
-        -- CR 107.4h's third sentence as a 0/1, WasKicked's arm in every respect --
+        -- CR 107.4h's third sentence as a 0/1, WasForetold's arm in every respect --
         -- including the object it reads, which for Berg Strider is the PERMANENT the
         -- spell became (CR 400.7d) and for Forsworn Paladin is the CR 602.2a ability
         -- object an AgainstSlot aimed it at.
@@ -632,7 +624,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- rather than a 0/1: rule 702.191a's "the amount of mana spent to cast that
         -- spell". Zero for a spell cast for no mana, which is an ordinary answer.
         Quantity.ManaSpent -> fmap (toInteger . Filter.manaSpentAmount) mView
-        -- CR 111.6's status as a 0/1, WasKicked's arm in every respect. Filter.token
+        -- CR 111.6's status as a 0/1, WasForetold's arm in every respect. Filter.token
         -- rather than Game.isToken: reading the object directly answers False for an
         -- id naming nothing, which is the whole case this arm exists for; see #1102.
         Quantity.WasToken -> fmap (\view -> if Filter.token view then 1 else 0) mView
@@ -1305,13 +1297,10 @@ objectSlots quantity = case quantity of
   Quantity.DesignationValue _ -> Set.empty
   Quantity.StoredResultsOfSameValue -> Set.empty
   Quantity.ClassLevel -> Set.empty
-  Quantity.WasKicked -> Set.empty
   Quantity.WasForetold -> Set.empty
   Quantity.TributeWasPaid -> Set.empty
-  -- CR 601.2b's per-keyword read, WasKicked's arm above in every respect: the
-  -- Keyword it carries is the IDENTIFIER of one ability's cost, matched against
-  -- the spell's own record by equality, never an instruction this traversal
-  -- descends into.
+  -- CR 601.2b: the keywords it designates are identifiers Keyword.designates
+  -- matches, never instructions this traversal descends into.
   Quantity.TimesPaid _ -> Set.empty
   Quantity.CastUsing _ -> Set.empty
   Quantity.TagWasSpent {} -> Set.empty
@@ -1578,13 +1567,10 @@ readsX quantity = case quantity of
   Quantity.DesignationValue _ -> False
   Quantity.StoredResultsOfSameValue -> False
   Quantity.ClassLevel -> False
-  Quantity.WasKicked -> False
   Quantity.WasForetold -> False
   Quantity.TributeWasPaid -> False
-  -- CR 601.2b's per-keyword read, WasKicked's arm above in every respect: the
-  -- Keyword it carries is the IDENTIFIER of one ability's cost, matched against
-  -- the spell's own record by equality, never an instruction this traversal
-  -- descends into.
+  -- CR 601.2b: the keywords it designates are identifiers Keyword.designates
+  -- matches, never instructions this traversal descends into.
   Quantity.TimesPaid _ -> False
   Quantity.CastUsing _ -> False
   Quantity.TagWasSpent {} -> False

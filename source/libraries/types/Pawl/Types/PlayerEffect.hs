@@ -46,7 +46,7 @@ data PlayerEffect
     -- Nothing is every ability; Just a designator narrows it to the abilities
     -- under that rule-702 keyword (Pawl.Types.ActivatedAbility.keyword), Kang the
     -- Conqueror's "power-up abilities can't be activated".
-    CantActivateAbilities (Maybe KeywordDesignator.KeywordDesignator)
+    CantActivateAbilities (Maybe (KeywordDesignator.KeywordDesignator Keyword.Keyword))
   | -- | CR 601.3 / Rule of Law: this player can't cast more than this many spells
     -- each turn.
     CantCastMoreThan Natural.Natural
@@ -101,7 +101,7 @@ data PlayerEffect
     MayPlayAsThoughItHadFlash (Filter.Filter Keyword.Keyword)
   | -- | CR 602.5d / 602.5e / Leonin Shikari: this player may activate abilities
     -- under this rule-702 keyword any time they could cast an instant.
-    ActivateKeywordAtInstantSpeed KeywordDesignator.KeywordDesignator
+    ActivateKeywordAtInstantSpeed (KeywordDesignator.KeywordDesignator Keyword.Keyword)
   | -- | CR 606.3 / The Wandering Emperor: this player may activate the loyalty
     -- abilities of a matching permanent any time they could cast an instant.
     ActivateLoyaltyAtInstantSpeed (Filter.Filter Keyword.Keyword)

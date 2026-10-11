@@ -61,9 +61,12 @@
                     "measured": {
                       "type": "TimesPaid",
                       "value": {
-                        "type": "Gift",
+                        "type": "OfKeyword",
                         "value": {
-                          "type": "Treasure"
+                          "type": "Gift",
+                          "value": {
+                            "type": "Treasure"
+                          }
                         }
                       }
                     },

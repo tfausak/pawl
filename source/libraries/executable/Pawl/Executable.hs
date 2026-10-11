@@ -49,6 +49,10 @@ main = do
     ["schema", "scenario"] -> scenarioSchema
     ["deck", path] -> deck path
     ["ingest", path] -> ingest path
+    ["reencode"] -> do
+      root <- Registry.defaultRoot
+      loaded <- Registry.loadRoot root
+      mapM_ (\(file, parsed) -> either (\e -> IO.hPutStrLn IO.stderr (file <> show e)) (writeCard file) parsed) loaded
     "scenario" : paths@(_ : _) -> scenario paths
     "bench" : rest -> Environment.withArgs rest Pawl.Benchmark.main
     "test" : rest -> Environment.withArgs rest Pawl.Test.main

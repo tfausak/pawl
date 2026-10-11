@@ -7,6 +7,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Expansion as Expansion
+import qualified Pawl.Types.KeywordDesignator as KeywordDesignator
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.Measures as Measures
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -617,9 +618,10 @@ data Filter keyword
     -- at; this atom is the per-candidate one a static ability's Affected filter
     -- needs. Vacuously False for a player and for everything nothing paid for.
     TagWasSpent ProductionTag.ProductionTag
-  | -- | CR 702.33d: the spell was kicked, by any kicker cost, a sticker
-    -- kicker's among them (CR 702.33h).
-    Kicked
+  | -- | CR 601.2b: a cost the designated keywords offer was declared for the
+    -- candidate, Quantity.TimesPaid's read at least once -- Hallar's "if that
+    -- spell was kicked" is CR 702.33d's whole family, sticker kicker among it.
+    Paid (KeywordDesignator.KeywordDesignator keyword)
   | And [Filter keyword]
   | Or [Filter keyword]
   | Not (Filter keyword)

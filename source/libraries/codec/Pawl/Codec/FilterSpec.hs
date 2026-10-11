@@ -16,6 +16,7 @@ import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Expansion as Expansion
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.KeywordDesignator as KeywordDesignator
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.Measure as Measure
 import qualified Pawl.Types.Measures as Measures
@@ -658,12 +659,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       (Filter.TagWasSpent ProductionTag.Artifact)
       " {\"type\":\"TagWasSpent\",\"value\":{\"type\":\"Artifact\"}} "
   -- Hallar, the Firefletcher's "if that spell was kicked".
-  Spec.it s "Kicked" $
+  Spec.it s "Paid" $
     Common.assertCodec
       s
       codec
-      Filter.Kicked
-      " {\"type\":\"Kicked\"} "
+      (Filter.Paid (KeywordDesignator.OfFamily KeywordFamily.Kicker))
+      " {\"type\":\"Paid\",\"value\":{\"type\":\"OfFamily\",\"value\":{\"type\":\"Kicker\"}}} "
   Spec.it s "HasDesignation Renowned" $
     Common.assertCodec
       s

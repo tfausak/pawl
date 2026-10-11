@@ -4118,7 +4118,6 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.DesignationValue _ -> []
   Quantity.Type.StoredResultsOfSameValue -> []
   Quantity.Type.ClassLevel -> []
-  Quantity.Type.WasKicked -> []
   Quantity.Type.WasForetold -> []
   Quantity.Type.TributeWasPaid -> []
   Quantity.Type.TimesPaid {} -> []

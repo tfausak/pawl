@@ -58,7 +58,7 @@ data ManaRestriction = MkManaRestriction
     -- | CR 602.2b again, asked of the ABILITY rather than its source: an
     -- activation of an ability that keyword indicates, whatever its source --
     -- CR 716.2c's "to gain a Class level" (Sorcerer Class).
-    keywordActivations :: Maybe KeywordDesignator.KeywordDesignator,
+    keywordActivations :: Maybe (KeywordDesignator.KeywordDesignator Keyword.Keyword),
     -- | CR 116.2m \/ 709.5e: the unlock cost of a locked half, paid as a special
     -- action. The filter is evaluated against the PERMANENT being unlocked.
     unlocks :: Maybe (Filter.Filter Keyword.Keyword),

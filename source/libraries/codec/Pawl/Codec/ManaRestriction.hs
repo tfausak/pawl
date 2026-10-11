@@ -26,7 +26,7 @@ codec :: Codec.Codec ManaRestriction.ManaRestriction
 codec = Fields.object $ do
   casts <- Fields.defaulted "casts" Nothing (Common.maybe (Filter.codec Keyword.codec)) ManaRestriction.casts
   activations <- Fields.defaulted "activations" Nothing (Common.maybe (Filter.codec Keyword.codec)) ManaRestriction.activations
-  keywordActivations <- Fields.defaulted "keywordActivations" Nothing (Common.maybe KeywordDesignator.codec) ManaRestriction.keywordActivations
+  keywordActivations <- Fields.defaulted "keywordActivations" Nothing (Common.maybe (KeywordDesignator.codec Keyword.codec)) ManaRestriction.keywordActivations
   unlocks <- Fields.defaulted "unlocks" Nothing (Common.maybe (Filter.codec Keyword.codec)) ManaRestriction.unlocks
   turnsFaceUp <- Fields.defaulted "turnsFaceUp" Nothing (Common.maybe (Filter.codec Keyword.codec)) ManaRestriction.turnsFaceUp
   prohibits <- Fields.defaulted "prohibits" False Common.boolean ManaRestriction.prohibits
