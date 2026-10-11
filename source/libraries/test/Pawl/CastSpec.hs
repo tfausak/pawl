@@ -982,7 +982,7 @@ entwineSpec s registry = Spec.describe s "Entwine" $ do
 -- Burst Lightning's one mode is "Burst Lightning deals 2 damage to any target",
 -- slot "target" (CR 702.33 / data/cards/burst-lightning.json), plus "Kicker {4}"
 -- and the CR 702.33e ability that reads it -- "if this spell was kicked, it deals
--- 4 damage instead", written as two clauses conditioned on Quantity.WasKicked.
+-- 4 damage instead", written as two clauses conditioned on Quantity.TimesPaid.
 --
 -- The board: alice has `mountains` untapped Mountains, bob has a Hill Giant, and
 -- Burst Lightning is in alice's hand. THREE toughness is what makes the kicked and

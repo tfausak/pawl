@@ -71,23 +71,26 @@
               "measured": {
                 "type": "TimesPaid",
                 "value": {
-                  "type": "Kicker",
+                  "type": "OfKeyword",
                   "value": {
-                    "mana": [
-                      {
-                        "type": "Generic",
-                        "value": 1
-                      },
-                      {
-                        "type": "OfType",
-                        "value": {
-                          "type": "Colored",
+                    "type": "Kicker",
+                    "value": {
+                      "mana": [
+                        {
+                          "type": "Generic",
+                          "value": 1
+                        },
+                        {
+                          "type": "OfType",
                           "value": {
-                            "type": "Green"
+                            "type": "Colored",
+                            "value": {
+                              "type": "Green"
+                            }
                           }
                         }
-                      }
-                    ]
+                      ]
+                    }
                   }
                 }
               },
@@ -137,19 +140,22 @@
               "measured": {
                 "type": "TimesPaid",
                 "value": {
-                  "type": "Kicker",
+                  "type": "OfKeyword",
                   "value": {
-                    "mana": [
-                      {
-                        "type": "OfType",
-                        "value": {
-                          "type": "Colored",
+                    "type": "Kicker",
+                    "value": {
+                      "mana": [
+                        {
+                          "type": "OfType",
                           "value": {
-                            "type": "White"
+                            "type": "Colored",
+                            "value": {
+                              "type": "White"
+                            }
                           }
                         }
-                      }
-                    ]
+                      ]
+                    }
                   }
                 }
               },

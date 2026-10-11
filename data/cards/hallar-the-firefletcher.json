@@ -55,7 +55,13 @@
                     }
                   },
                   {
-                    "type": "Kicked"
+                    "type": "Paid",
+                    "value": {
+                      "type": "OfFamily",
+                      "value": {
+                        "type": "Kicker"
+                      }
+                    }
                   }
                 ]
               },

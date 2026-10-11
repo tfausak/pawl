@@ -1,6 +1,7 @@
 module Pawl.Types.ActivationCriteria where
 
 import qualified Pawl.Types.AbilityKind as AbilityKind
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordDesignator as KeywordDesignator
 import qualified Pawl.Types.LoyaltyKind as LoyaltyKind
 
@@ -15,7 +16,7 @@ data ActivationCriteria = MkActivationCriteria
     -- Fluctuator's "cycling abilities", Bureau Headmaster's "equip abilities".
     -- Spell-free because a spell's keywords are the spell's, which the Filter
     -- reads.
-    grantedBy :: Maybe KeywordDesignator.KeywordDesignator,
+    grantedBy :: Maybe (KeywordDesignator.KeywordDesignator Keyword.Keyword),
     -- | CR 605.1a: Zirda, the Dawnwaker's "that aren't mana abilities",
     -- Suppression Field's "unless they're mana abilities". Spell-free because
     -- rule 605.1a classifies only abilities.

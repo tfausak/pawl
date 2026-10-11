@@ -53,13 +53,10 @@ substituteStar star quantity = case quantity of
   Quantity.DesignationValue _ -> quantity
   Quantity.StoredResultsOfSameValue -> quantity
   Quantity.ClassLevel -> quantity
-  Quantity.WasKicked -> quantity
   Quantity.WasForetold -> quantity
   Quantity.TributeWasPaid -> quantity
-  -- CR 601.2b's per-keyword read, WasKicked's arm above in every respect: the
-  -- Keyword it carries is the IDENTIFIER of one ability's cost, matched against
-  -- the spell's own record by equality, never an instruction this traversal
-  -- descends into.
+  -- CR 601.2b: the keywords it designates are identifiers Keyword.designates
+  -- matches, never instructions this traversal descends into.
   Quantity.TimesPaid _ -> quantity
   Quantity.CastUsing _ -> quantity
   Quantity.TagWasSpent {} -> quantity

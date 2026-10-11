@@ -23,6 +23,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.KeywordDesignator as KeywordDesignator
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -322,37 +323,29 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       Quantity.ClassLevel
       " {\"type\":\"ClassLevel\"} "
-  -- CR 702.33d, with nothing on the wire: a spell's kicked flag is not a member of
-  -- Pawl.Types.Designation, so it keeps a tag of its own.
-  Spec.it s "WasKicked" $
-    Common.assertCodec
-      s
-      Quantity.codec
-      Quantity.WasKicked
-      " {\"type\":\"WasKicked\"} "
   Spec.it s "WasForetold" $
     Common.assertCodec
       s
       Quantity.codec
       Quantity.WasForetold
       " {\"type\":\"WasForetold\"} "
-  -- CR 702.104b, with nothing on the wire for WasKicked's reason: the object is
-  -- whichever one the quantity is evaluated against.
+  -- CR 702.104b, with nothing on the wire: the object is whichever one the
+  -- quantity is evaluated against.
   Spec.it s "TributeWasPaid" $
     Common.assertCodec
       s
       Quantity.codec
       Quantity.TributeWasPaid
       " {\"type\":\"TributeWasPaid\"} "
-  -- CR 702.33f, with the KEYWORD on the wire: which of the spell's additional
+  -- CR 702.33f, with the DESIGNATOR on the wire: which of the spell's additional
   -- costs is asked about is the whole of what the card names, the object being
   -- whichever one the quantity is evaluated against.
   Spec.it s "TimesPaid" $
     Common.assertCodec
       s
       Quantity.codec
-      (Quantity.TimesPaid (Keyword.Kicker (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [])))
-      " {\"type\":\"TimesPaid\",\"value\":{\"type\":\"Kicker\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}}} "
+      (Quantity.TimesPaid (KeywordDesignator.OfKeyword (Keyword.Kicker (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) []))))
+      " {\"type\":\"TimesPaid\",\"value\":{\"type\":\"OfKeyword\",\"value\":{\"type\":\"Kicker\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}}}} "
   -- CR 702.74a / 702.138b, with the keyword FAMILY on the wire. Both families,
   -- so a payload codec that ignored its argument cannot round-trip them.
   Spec.it s "CastUsing" $ do
@@ -367,7 +360,7 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       (Quantity.CastUsing KeywordFamily.Escape)
       " {\"type\":\"CastUsing\",\"value\":{\"type\":\"Escape\"}} "
   -- CR 107.4h's third sentence, with the tag on the wire and the object still
-  -- implicit for WasKicked's reason. BOTH tags, since the wire shape is the whole
+  -- implicit for WasForetold's reason. BOTH tags, since the wire shape is the whole
   -- of what this arm adds and a payload codec that ignored its argument would
   -- round-trip one of them alone.
   Spec.it s "TagWasSpent" $
@@ -395,14 +388,14 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.TagWasSpentOfOwnColor ProductionTag.Snow)
       " {\"type\":\"TagWasSpentOfOwnColor\",\"value\":{\"type\":\"Snow\"}} "
-  -- CR 202.1a's amount, nothing on the wire for WasKicked's reason.
+  -- CR 202.1a's amount, nothing on the wire for WasForetold's reason.
   Spec.it s "ManaSpent" $
     Common.assertCodec
       s
       Quantity.codec
       Quantity.ManaSpent
       " {\"type\":\"ManaSpent\"} "
-  -- CR 111.6 and CR 509.1g, with nothing on the wire for WasKicked's reason: the
+  -- CR 111.6 and CR 509.1g, with nothing on the wire for WasForetold's reason: the
   -- object is whichever one the quantity is evaluated against.
   Spec.it s "WasToken" $
     Common.assertCodec

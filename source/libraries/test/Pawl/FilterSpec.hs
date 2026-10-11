@@ -19,6 +19,7 @@ import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Expansion as Expansion
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.KeywordDesignator as KeywordDesignator
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -2076,13 +2077,14 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
 
   -- CR 702.33d / 702.33h. The gameplay-level proof is Pawl.StickerSpec's Hallar,
   -- the Firefletcher case; these pin the atom over each kicker kind.
-  Spec.describe s "Kicked" $ do
+  Spec.describe s "Paid" $ do
     let one = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []
         paid keyword n = blackCreature {Filter.paidCosts = Map.singleton keyword n}
+        kicked = Filter.Type.Paid (KeywordDesignator.OfFamily KeywordFamily.Kicker)
     Spec.it s "a kicker, multikicker or sticker kicker payment kicks; a declined one or a squad payment does not" $ do
-      Spec.assertBool s (all (\k -> Filter.matches self (paid k 1) Filter.Type.Kicked) [Keyword.Kicker one, Keyword.Multikicker one, Keyword.StickerKicker one]) "each kicker kind"
-      Spec.assertBool s (not (Filter.matches self (paid (Keyword.Kicker one) 0) Filter.Type.Kicked)) "and not when declined"
-      Spec.assertBool s (not (Filter.matches self (paid (Keyword.Squad one) 1) Filter.Type.Kicked)) "nor squad"
+      Spec.assertBool s (all (\k -> Filter.matches self (paid k 1) kicked) [Keyword.Kicker one, Keyword.Multikicker one, Keyword.StickerKicker one]) "each kicker kind"
+      Spec.assertBool s (not (Filter.matches self (paid (Keyword.Kicker one) 0) kicked)) "and not when declined"
+      Spec.assertBool s (not (Filter.matches self (paid (Keyword.Squad one) 1) kicked)) "nor squad"
 
   Spec.describe s "IsToken" $ do
     Spec.it s "matches a view whose object is a token" $ do

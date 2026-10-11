@@ -12,6 +12,7 @@ import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Devotion as Devotion
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.KeywordDesignator as KeywordDesignator
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.ManaCount as ManaCount
 import qualified Pawl.Types.PlayerCounterTally as PlayerCounterTally
@@ -140,11 +141,6 @@ data Quantity
   | -- | CR 716.2b: the level of the object this quantity is evaluated against;
     -- no level reads 1 (CR 716.2d, Pawl.Types.ClassLevel.defaulted).
     ClassLevel
-  | -- | CR 702.33d/e: 1 if the spell this quantity is evaluated against was
-    -- kicked with a Kicker or Multikicker cost, not a sticker kicker's (CR
-    -- 702.33h), else 0; a permanent answers for the spell that became it (CR
-    -- 400.7d).
-    WasKicked
   | -- | CR 702.143c: 1 if the spell this quantity is evaluated against was a
     -- foretold card before it was cast, whatever cost it was cast for, else 0.
     WasForetold
@@ -152,13 +148,14 @@ data Quantity
     -- evaluated against -- the opponent its controller chose had it enter with
     -- rule 702.104a's +1/+1 counters -- else 0.
     --
-    -- The arm above's shape one rule over, off Object.tributePaid rather than off
-    -- the counters, for the reason that field gives.
+    -- Off Object.tributePaid rather than off the counters, for the reason that
+    -- field gives.
     TributeWasPaid
-  | -- | CR 601.2b / 400.7d: how many times the additional cost that keyword
-    -- ability offers was declared for the spell this quantity is evaluated
-    -- against, or the spell that became it -- CR 702.33c/f, 702.157a, 702.175a.
-    TimesPaid Keyword.Keyword
+  | -- | CR 601.2b / 400.7d: how many times the additional costs the keywords
+    -- that designator names offer were declared for the spell this quantity is
+    -- evaluated against, or the spell that became it -- CR 702.33c/e/f, 702.157a,
+    -- 702.175a.
+    TimesPaid (KeywordDesignator.KeywordDesignator Keyword.Keyword)
   | -- | CR 601.2b / 400.7d: 1 if the spell this quantity is evaluated against, or
     -- the spell that became it, was cast for the cost that keyword ability
     -- offers -- CR 702.74a's "if its evoke cost was paid", CR 702.138b's

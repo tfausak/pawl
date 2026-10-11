@@ -65,9 +65,12 @@
                     "measured": {
                       "type": "TimesPaid",
                       "value": {
-                        "type": "Gift",
+                        "type": "OfKeyword",
                         "value": {
-                          "type": "Food"
+                          "type": "Gift",
+                          "value": {
+                            "type": "Food"
+                          }
                         }
                       }
                     },

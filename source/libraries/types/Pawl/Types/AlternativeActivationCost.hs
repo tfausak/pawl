@@ -1,5 +1,6 @@
 module Pawl.Types.AlternativeActivationCost where
 
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordDesignator as KeywordDesignator
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.TurnScope as TurnScope
@@ -12,7 +13,7 @@ import qualified Pawl.Types.TurnScope as TurnScope
 data AlternativeActivationCost = MkAlternativeActivationCost
   { -- | The rule 702 keyword whose ability it replaces the cost of -- "the
     -- EQUIP cost", compared through Pawl.Types.ActivatedAbility.keyword.
-    grantedBy :: KeywordDesignator.KeywordDesignator,
+    grantedBy :: KeywordDesignator.KeywordDesignator Keyword.Keyword,
     -- | "Of the FIRST equip ability you activate each turn", read exactly as
     -- Pawl.Types.CostModifier.onlyFirst is. Nothing is every matching
     -- activation.

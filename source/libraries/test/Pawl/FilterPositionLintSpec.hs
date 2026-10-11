@@ -341,7 +341,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsInZone _ -> 0
   Filter.Type.WasCastFrom _ -> 0
   Filter.Type.TagWasSpent _ -> 0
-  Filter.Type.Kicked -> 0
+  Filter.Type.Paid _ -> 0
   Filter.Type.IsRingBearer -> 0
   Filter.Type.IsPaired -> 0
   Filter.Type.IsPairedWithSource -> 0
@@ -1146,16 +1146,26 @@ timesPaidTag = Text.pack "TimesPaid"
 --
 -- The tagged arm and not the bare tag, jsonAtoms' distinction: only an object
 -- whose "type" is the tag contributes, and what it contributes is the "value"
--- beside it -- Pawl.JsonCodec.Common's shape for an Arm.payload.
+-- beside it -- Pawl.JsonCodec.Common's shape for an Arm.payload -- taken once
+-- for TimesPaid's designator and again for its OfKeyword arm.
 timesPaidKeywords :: Value.Value -> [Value.Value]
 timesPaidKeywords value = case value of
   Value.Array a -> concatMap timesPaidKeywords (Array.unwrap a)
+  Value.Object o -> concatMap (taggedValues (Text.pack "OfKeyword")) (taggedValues timesPaidTag value) <> concatMap (timesPaidKeywords . Pair.value) (Object.unwrap o)
+  Value.String _ -> []
+  Value.Null _ -> []
+  Value.Boolean _ -> []
+  Value.Number _ -> []
+
+-- The "value" of an object whose "type" is that tag, or nothing.
+taggedValues :: Text.Text -> Value.Value -> [Value.Value]
+taggedValues tag value = case value of
   Value.Object o ->
     let pairs = Object.unwrap o
         keyed k = fmap Pair.value (filter (\pair -> String.unwrap (Pair.name pair) == Text.pack k) pairs)
-        tagged = Maybe.mapMaybe (\v -> case v of Value.String t | String.unwrap t == timesPaidTag -> Just (); _ -> Nothing) (keyed "type")
-        here = if null tagged then [] else keyed "value"
-     in here <> concatMap (timesPaidKeywords . Pair.value) pairs
+        tagged = Maybe.mapMaybe (\v -> case v of Value.String t | String.unwrap t == tag -> Just (); _ -> Nothing) (keyed "type")
+     in if null tagged then [] else keyed "value"
+  Value.Array _ -> []
   Value.String _ -> []
   Value.Null _ -> []
   Value.Boolean _ -> []

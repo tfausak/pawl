@@ -71,6 +71,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Keyword as Keyword.Type
+import qualified Pawl.Types.KeywordDesignator as KeywordDesignator
 import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.LandPlayed as LandPlayed
 import qualified Pawl.Types.Mana as Mana.Type
@@ -836,9 +837,9 @@ announceOptionalCosts modes spending pid sid candidates offers gs =
    in Monad.foldM ask Map.empty offers
 
 -- CR 601.2b's record, written onto the spell's own stack incarnation -- CR
--- 702.33d's "that spell has been kicked" among it. Read back by Quantity.WasKicked
--- and Quantity.TimesPaid through the CR 613 projection, which is how the card's
--- own CR 702.33e ability and CR 702.157a's trigger see it.
+-- 702.33d's "that spell has been kicked" among it. Read back by Quantity.TimesPaid
+-- through the CR 613 projection, which is how the card's own CR 702.33e ability
+-- and CR 702.157a's trigger see it.
 --
 -- A write of a field no layer computes, and one direction only: rule 702.33d gives
 -- no way to unkick a spell, and CR 400.7 ends the designation with the incarnation
@@ -2684,9 +2685,9 @@ followIntoPools old new gs =
    in gs {GameState.manaPool = fmap (Mana.Type.MkMana . fmap follow . Mana.Type.unwrap) (GameState.manaPool gs)}
 
 -- CR 702.33g/702.113b's own scope: a Quantity naming a CAST-ANNOUNCEMENT fact
--- rather than a board or resolution one -- Quantity.WasKicked (CR 702.33d's
--- "kicked" as CR 702.33e links it to kicker or multikicker, the only reading a
--- bare if-clause needs), Quantity.CastUsing (which ALTERNATIVE cost candidate CR
+-- rather than a board or resolution one -- Quantity.TimesPaid PrintedKicker (CR
+-- 702.33d's "kicked" as CR 702.33e links it to kicker or multikicker, the only
+-- reading a bare if-clause needs), Quantity.CastUsing (which ALTERNATIVE cost candidate CR
 -- 601.2b's announcement settled on -- awaken, cleave, overload and the other
 -- CR 601.3-listed candidates), and Quantity.Literal, the threshold side of
 -- every such comparison. Nothing else qualifies, on purpose: rule 702.33g/113b
@@ -2697,10 +2698,10 @@ followIntoPools old new gs =
 -- group are what this line fixes over the first cut, which read every
 -- Condition and wrongly collapsed all three to False.
 --
--- Quantity.TimesPaid -- CR 702.33c's multikicker COUNT and rule 702.33f's "if
--- kicked with its [A] kicker" -- is deliberately excluded, not merely
--- unhandled: it answers a per-cost or per-count question this early narrowing
--- cannot yet ask (kicker's declaration is settled by CR 601.2c, but WHICH of
+-- Quantity.TimesPaid's other designators -- CR 702.33c's multikicker COUNT and
+-- rule 702.33f's "if kicked with its [A] kicker" -- are deliberately excluded,
+-- not merely unhandled: they answer a per-cost or per-count question this early
+-- narrowing cannot yet ask (kicker's declaration is settled by CR 601.2c, but WHICH of
 -- several named kicker costs, or how many times, is a detail this function
 -- has no board to re-derive), so a clause built from it falls through to the
 -- conservative "applies" default below rather than being misjudged. No card in
@@ -2708,7 +2709,7 @@ followIntoPools old new gs =
 isCastAnnouncementQuantity :: Quantity.Quantity -> Bool
 isCastAnnouncementQuantity q = case q of
   Quantity.Literal _ -> True
-  Quantity.WasKicked -> True
+  Quantity.TimesPaid KeywordDesignator.PrintedKicker -> True
   Quantity.CastUsing _ -> True
   _ -> False
 
@@ -2727,7 +2728,7 @@ isCastAnnouncementCondition condition = case condition of
 -- REACHED, narrowed to what is answerable this early and to what rule 702.33g's
 -- family actually covers (isCastAnnouncementCondition above). Kicker's and
 -- awaken's announcements (stampPaidCosts, stampCastUsing) are both settled above
--- this step, so a Quantity.WasKicked or Quantity.CastUsing condition reads the
+-- this step, so a Quantity.TimesPaid or Quantity.CastUsing condition reads the
 -- real decision. Anything else -- a board read, a resolution-time random result,
 -- CR 601.2b's own X (announced only AFTER this step) -- is treated as APPLYING,
 -- the same as an unconditioned clause: this function only ever NARROWS the old
@@ -2749,7 +2750,7 @@ clauseAppliesAt pid sid gs clause = case Clause.condition clause of
 -- Answered from that candidate alone rather than through Condition.holds/a
 -- GameState, since neither exists at this question's moment.
 --
---   * Quantity.WasKicked reads 0 UNCONDITIONALLY -- CR 702.33a's kicker is
+--   * Quantity.TimesPaid PrintedKicker reads 0 UNCONDITIONALLY -- CR 702.33a's kicker is
 --     optional under every candidate (CR 118.9b), so a kicked-only target must
 --     never be REQUIRED to offer a cast at all; the player may always decline
 --     it. Cast.castProposed's own clauseAppliesAt (the live, post-announcement
@@ -2773,13 +2774,13 @@ holdsForCandidate castFor condition = case condition of
   Condition.Type.During _ -> False
 
 -- holdsForCandidate's per-Quantity read, total only over
--- isCastAnnouncementQuantity's three constructors -- everything else answers
+-- isCastAnnouncementQuantity's three shapes -- everything else answers
 -- Nothing, which holdsForCandidate's Compares arm collapses to False exactly
 -- as Condition.holds' own undeterminable-quantity reading does.
 candidateQuantity :: Maybe Keyword -> Quantity.Quantity -> Maybe Integer
 candidateQuantity castFor q = case q of
   Quantity.Literal n -> Just n
-  Quantity.WasKicked -> Just 0
+  Quantity.TimesPaid KeywordDesignator.PrintedKicker -> Just 0
   Quantity.CastUsing family -> Just (if (Keyword.familyOf =<< castFor) == Just family then 1 else 0)
   _ -> Nothing
 

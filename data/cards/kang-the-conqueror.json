@@ -84,7 +84,7 @@
                           "effect": {
                             "type": "CantActivateAbilities",
                             "value": {
-                              "type": "OfNullary",
+                              "type": "OfKeyword",
                               "value": {
                                 "type": "PowerUp"
                               }

@@ -25,7 +25,7 @@
             "value": {
               "cost": [],
               "grantedBy": {
-                "type": "OfNullary",
+                "type": "OfKeyword",
                 "value": {
                   "type": "PowerUp"
                 }

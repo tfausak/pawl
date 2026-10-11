@@ -152,13 +152,10 @@ overSlots f quantity =
         Quantity.DesignationValue _ -> pure quantity
         Quantity.StoredResultsOfSameValue -> pure quantity
         Quantity.ClassLevel -> pure quantity
-        Quantity.WasKicked -> pure quantity
         Quantity.WasForetold -> pure quantity
         Quantity.TributeWasPaid -> pure quantity
-        -- CR 601.2b's per-keyword read, WasKicked's arm above in every respect: the
-        -- Keyword it carries is the IDENTIFIER of one ability's cost, matched against
-        -- the spell's own record by equality, never an instruction this traversal
-        -- descends into.
+        -- CR 601.2b: the keywords it designates are identifiers Keyword.designates
+        -- matches, never instructions this traversal descends into.
         Quantity.TimesPaid _ -> pure quantity
         Quantity.CastUsing _ -> pure quantity
         Quantity.TagWasSpent {} -> pure quantity
@@ -342,13 +339,10 @@ nestedRefs quantity = case quantity of
   Quantity.DesignationValue _ -> Set.empty
   Quantity.StoredResultsOfSameValue -> Set.empty
   Quantity.ClassLevel -> Set.empty
-  Quantity.WasKicked -> Set.empty
   Quantity.WasForetold -> Set.empty
   Quantity.TributeWasPaid -> Set.empty
-  -- CR 601.2b's per-keyword read, WasKicked's arm above in every respect: the
-  -- Keyword it carries is the IDENTIFIER of one ability's cost, matched against
-  -- the spell's own record by equality, never an instruction this traversal
-  -- descends into.
+  -- CR 601.2b: the keywords it designates are identifiers Keyword.designates
+  -- matches, never instructions this traversal descends into.
   Quantity.TimesPaid _ -> Set.empty
   Quantity.CastUsing _ -> Set.empty
   Quantity.TagWasSpent {} -> Set.empty
@@ -454,7 +448,6 @@ nestedCounts quantity = case quantity of
   Quantity.DesignationValue _ -> []
   Quantity.StoredResultsOfSameValue -> []
   Quantity.ClassLevel -> []
-  Quantity.WasKicked -> []
   Quantity.WasForetold -> []
   Quantity.TributeWasPaid -> []
   -- CR 601.2b's per-keyword tally reads a Keyword off the spell's own
@@ -694,13 +687,10 @@ mapPlayerRefs f intoCount quantity =
         Quantity.DesignationValue _ -> quantity
         Quantity.StoredResultsOfSameValue -> quantity
         Quantity.ClassLevel -> quantity
-        Quantity.WasKicked -> quantity
         Quantity.WasForetold -> quantity
         Quantity.TributeWasPaid -> quantity
-        -- CR 601.2b's per-keyword read, WasKicked's arm above in every respect: the
-        -- Keyword it carries is the IDENTIFIER of one ability's cost, matched against
-        -- the spell's own record by equality, never an instruction this traversal
-        -- descends into.
+        -- CR 601.2b: the keywords it designates are identifiers Keyword.designates
+        -- matches, never instructions this traversal descends into.
         Quantity.TimesPaid _ -> quantity
         Quantity.CastUsing _ -> quantity
         Quantity.TagWasSpent {} -> quantity

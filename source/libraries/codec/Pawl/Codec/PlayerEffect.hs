@@ -29,7 +29,7 @@ codec =
    in Arm.tagged
         tagOf
         [ Arm.nullary "CantCastSpells" PlayerEffect.CantCastSpells,
-          Arm.payload "CantActivateAbilities" (Common.maybe KeywordDesignator.codec) PlayerEffect.CantActivateAbilities (\x -> case x of PlayerEffect.CantActivateAbilities y -> Just y; _ -> Nothing),
+          Arm.payload "CantActivateAbilities" (Common.maybe (KeywordDesignator.codec Keyword.codec)) PlayerEffect.CantActivateAbilities (\x -> case x of PlayerEffect.CantActivateAbilities y -> Just y; _ -> Nothing),
           Arm.payload "CantCastMoreThan" Common.natural PlayerEffect.CantCastMoreThan (\x -> case x of PlayerEffect.CantCastMoreThan y -> Just y; _ -> Nothing),
           Arm.payload "ModifyCost" CostModifier.codec PlayerEffect.ModifyCost (\x -> case x of PlayerEffect.ModifyCost y -> Just y; _ -> Nothing),
           Arm.payload "AlternativeActivationCost" AlternativeActivationCost.codec PlayerEffect.AlternativeActivationCost (\x -> case x of PlayerEffect.AlternativeActivationCost y -> Just y; _ -> Nothing),
@@ -44,7 +44,7 @@ codec =
           Arm.payload "CantBeTargetedBy" PlayerScope.codec PlayerEffect.CantBeTargetedBy (\x -> case x of PlayerEffect.CantBeTargetedBy y -> Just y; _ -> Nothing),
           Arm.payload "CastAsThoughItHadFlash" filterCodec PlayerEffect.CastAsThoughItHadFlash (\x -> case x of PlayerEffect.CastAsThoughItHadFlash y -> Just y; _ -> Nothing),
           Arm.payload "MayPlayAsThoughItHadFlash" filterCodec PlayerEffect.MayPlayAsThoughItHadFlash (\x -> case x of PlayerEffect.MayPlayAsThoughItHadFlash y -> Just y; _ -> Nothing),
-          Arm.payload "ActivateKeywordAtInstantSpeed" KeywordDesignator.codec PlayerEffect.ActivateKeywordAtInstantSpeed (\x -> case x of PlayerEffect.ActivateKeywordAtInstantSpeed y -> Just y; _ -> Nothing),
+          Arm.payload "ActivateKeywordAtInstantSpeed" (KeywordDesignator.codec Keyword.codec) PlayerEffect.ActivateKeywordAtInstantSpeed (\x -> case x of PlayerEffect.ActivateKeywordAtInstantSpeed y -> Just y; _ -> Nothing),
           Arm.payload "ActivateLoyaltyAtInstantSpeed" filterCodec PlayerEffect.ActivateLoyaltyAtInstantSpeed (\x -> case x of PlayerEffect.ActivateLoyaltyAtInstantSpeed y -> Just y; _ -> Nothing),
           Arm.payload "CantBeCountered" filterCodec PlayerEffect.CantBeCountered (\x -> case x of PlayerEffect.CantBeCountered y -> Just y; _ -> Nothing),
           Arm.payload "DamageCantBePrevented" DamagePattern.codec PlayerEffect.DamageCantBePrevented (\x -> case x of PlayerEffect.DamageCantBePrevented y -> Just y; _ -> Nothing),

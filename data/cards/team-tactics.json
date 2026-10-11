@@ -60,8 +60,11 @@
                     "measured": {
                       "type": "TimesPaid",
                       "value": {
-                        "type": "Teamwork",
-                        "value": 1
+                        "type": "OfKeyword",
+                        "value": {
+                          "type": "Teamwork",
+                          "value": 1
+                        }
                       }
                     },
                     "threshold": {

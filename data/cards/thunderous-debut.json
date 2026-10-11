@@ -98,7 +98,10 @@
                     "measured": {
                       "type": "TimesPaid",
                       "value": {
-                        "type": "Bargain"
+                        "type": "OfKeyword",
+                        "value": {
+                          "type": "Bargain"
+                        }
                       }
                     },
                     "threshold": {
@@ -132,7 +135,10 @@
                     "measured": {
                       "type": "TimesPaid",
                       "value": {
-                        "type": "Bargain"
+                        "type": "OfKeyword",
+                        "value": {
+                          "type": "Bargain"
+                        }
                       }
                     },
                     "threshold": {

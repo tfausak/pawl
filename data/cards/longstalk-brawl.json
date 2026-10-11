@@ -36,9 +36,12 @@
                     "measured": {
                       "type": "TimesPaid",
                       "value": {
-                        "type": "Gift",
+                        "type": "OfKeyword",
                         "value": {
-                          "type": "TappedFish"
+                          "type": "Gift",
+                          "value": {
+                            "type": "TappedFish"
+                          }
                         }
                       }
                     },

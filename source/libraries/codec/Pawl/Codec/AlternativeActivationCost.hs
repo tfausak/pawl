@@ -2,6 +2,7 @@
 
 module Pawl.Codec.AlternativeActivationCost where
 
+import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.KeywordDesignator as KeywordDesignator
 import qualified Pawl.Codec.ManaCost as ManaCost
 import qualified Pawl.Codec.TurnScope as TurnScope
@@ -15,7 +16,7 @@ import qualified Pawl.Types.AlternativeActivationCost as AlternativeActivationCo
 -- `onlyFirst` is defaulted to Nothing, every matching activation.
 codec :: Codec.Codec AlternativeActivationCost.AlternativeActivationCost
 codec = Fields.object $ do
-  grantedBy <- Fields.required "grantedBy" KeywordDesignator.codec AlternativeActivationCost.grantedBy
+  grantedBy <- Fields.required "grantedBy" (KeywordDesignator.codec Keyword.codec) AlternativeActivationCost.grantedBy
   onlyFirst <- Fields.defaulted "onlyFirst" Nothing (Common.maybe TurnScope.codec) AlternativeActivationCost.onlyFirst
   cost <- Fields.required "cost" ManaCost.codec AlternativeActivationCost.cost
   pure

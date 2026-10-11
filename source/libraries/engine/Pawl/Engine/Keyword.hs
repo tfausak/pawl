@@ -3521,20 +3521,6 @@ disguiseCosts keywords =
         _ -> Nothing
    in Set.toAscList (Set.fromList (Maybe.mapMaybe costOf (Set.toAscList keywords)))
 
--- | CR 702.33d: a kicker cost of any kind, multikicker's and sticker kicker's
--- among them (CR 702.33c, 702.33h).
-isKicker :: Keyword -> Bool
-isKicker keyword = familyOf keyword == Just KeywordFamily.Kicker
-
--- | CR 702.33e: a Kicker or Multikicker keyword, printed or granted, which an
--- object's "if kicked" reads; a sticker kicker (CR 702.33h) is not one. A
--- wildcard, optionalCost's posture.
-isPrintedKicker :: Keyword -> Bool
-isPrintedKicker keyword = case keyword of
-  Keyword.Kicker _ -> True
-  Keyword.Multikicker _ -> True
-  _ -> False
-
 -- CR 601.2b: the OPTIONAL additional cost this keyword ability lets its spell's
 -- controller pay as they cast it, paired with how many times its rule lets it be
 -- paid -- Just 1 for kicker (CR 702.33a), offspring (CR 702.175a), casualty (CR
@@ -5406,22 +5392,32 @@ printedZone keyword = case keyword of
   Keyword.Forecast -> Just Zone.Hand
   _ -> Nothing
 
--- CR 702: does a card's designator name the keyword whose rules this ability is
--- under? The comparison Pawl.Types.ActivationCriteria.grantedBy is put through,
--- against the stamp Pawl.Types.ActivatedAbility.keyword carries.
+-- CR 702: does a card's designator name this keyword? Asked of the stamp
+-- Pawl.Types.ActivatedAbility.keyword carries (ActivationCriteria.grantedBy) and
+-- of the keys of Object.paidCosts (timesPaid below).
 --
--- TWO ARMS because rule 702 writes ability-bearing keywords two ways; see
--- Pawl.Types.KeywordDesignator. A family drops the payload, so Fluctuator's
--- "cycling abilities you activate" reaches cycling {2} and cycling {1}{U} alike.
--- A nullary keyword has no payload to drop and no family, so Boom Scholar's
--- "exhaust abilities of other permanents you control" compares CR 702.177a's
--- keyword itself.
+-- A family drops the payload, so Fluctuator's "cycling abilities you activate"
+-- reaches cycling {2} and cycling {1}{U} alike. A keyword is compared whole, so
+-- Boom Scholar's "exhaust abilities" names CR 702.177a's keyword and Sunscape
+-- Battlemage's "its {1}{G} kicker" one of its two kicker costs (CR 702.33f).
 --
 -- A CITATION compared to a citation: nothing here reads what the ability does.
-designates :: KeywordDesignator.KeywordDesignator -> Keyword -> Bool
+designates :: KeywordDesignator.KeywordDesignator Keyword -> Keyword -> Bool
 designates designator keyword = case designator of
   KeywordDesignator.OfFamily family -> familyOf keyword == Just family
-  KeywordDesignator.OfNullary nullary -> nullary == keyword
+  KeywordDesignator.OfKeyword whole -> whole == keyword
+  -- A sticker kicker is in the Kicker family but not linked (CR 702.33h,
+  -- Wicker Picker's ruling); Pawl.StickerSpec's Faerie Squadron case proves it.
+  KeywordDesignator.PrintedKicker -> case keyword of
+    Keyword.Kicker _ -> True
+    Keyword.Multikicker _ -> True
+    _ -> False
+
+-- | CR 601.2b: how many times the costs of the keywords a designator names were
+-- declared, summed over a paidCosts record -- Quantity.TimesPaid's count, and
+-- Filter.Paid's when it is above zero.
+timesPaid :: KeywordDesignator.KeywordDesignator Keyword -> Map Keyword Natural -> Natural
+timesPaid designator = sum . Map.filterWithKey (\keyword _ -> designates designator keyword)
 
 -- CR 702: WHICH KEYWORD this is, with its payload dropped -- the classification
 -- Filter.HasKeywordFamily matches on, so that Flensing Raptor's "creature you
@@ -5456,8 +5452,8 @@ familyOf keyword = case keyword of
   -- this answers the SAME family rather than owing one of its own.
   Keyword.Multikicker _ -> Just KeywordFamily.Kicker
   -- CR 702.33h: sticker kicker "means Kicker [cost]", so a "spell with
-  -- kicker" or "kicked" reader matches it; Quantity.WasKicked's linked read
-  -- does not (isPrintedKicker).
+  -- kicker" or "kicked" reader matches it; CR 702.33e's linked read does not
+  -- (KeywordDesignator.PrintedKicker).
   Keyword.StickerKicker _ -> Just KeywordFamily.Kicker
   Keyword.Flashback _ -> Just KeywordFamily.Flashback
   Keyword.Bestow _ -> Just KeywordFamily.Bestow
@@ -5633,7 +5629,7 @@ familyOf keyword = case keyword of
   Keyword.Storied -> Nothing
   Keyword.Assist -> Nothing
   -- CR 702.177a's exhaust is NULLARY, so it has no family: the keyword itself
-  -- is what Pawl.Types.KeywordDesignator.OfNullary names.
+  -- is what Pawl.Types.KeywordDesignator.OfKeyword names.
   Keyword.Exhaust -> Nothing
   Keyword.Boast -> Nothing
   Keyword.Forecast -> Nothing
@@ -6865,7 +6861,7 @@ evoke =
 -- was paid, create a token that's a copy of it for each time its squad cost was
 -- paid."
 squad :: Cost Keyword -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
-squad cost = paidTokenCopies (Keyword.Squad cost) (Quantity.TimesPaid (Keyword.Squad cost)) []
+squad cost = paidTokenCopies (Keyword.Squad cost) (Quantity.TimesPaid (KeywordDesignator.OfKeyword (Keyword.Squad cost))) []
 
 -- CR 702.175a's triggered ability: "When this permanent enters, if its offspring
 -- cost was paid, create a token that's a copy of it, except it's 1/1." CR 707.9b
@@ -6894,7 +6890,7 @@ gift :: Gift.Gift -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 gift something =
   Mint.triggerIf
     TriggerCondition.SelfEnters
-    (Condition.Compares (Compares.MkCompares (Quantity.TimesPaid (Keyword.Gift something)) Comparison.AtLeast (Quantity.Literal 1)))
+    (Condition.Compares (Compares.MkCompares (Quantity.TimesPaid (KeywordDesignator.OfKeyword (Keyword.Gift something))) Comparison.AtLeast (Quantity.Literal 1)))
     (Seq.fromList [giftEffect something, Effect.GiveGift])
 
 -- CR 702.174d-i's "[effect]": what the [something] the card printed means, which
@@ -6963,7 +6959,7 @@ paidTokenCopies keyword quantity exceptions =
             }
    in Mint.triggerIf
         TriggerCondition.SelfEnters
-        (Condition.Compares (Compares.MkCompares (Quantity.TimesPaid keyword) Comparison.AtLeast (Quantity.Literal 1)))
+        (Condition.Compares (Compares.MkCompares (Quantity.TimesPaid (KeywordDesignator.OfKeyword keyword)) Comparison.AtLeast (Quantity.Literal 1)))
         (Seq.singleton copied)
 
 -- CR 702.135a: afterlife N, on the same CR 700.4 dies event `returns` watches.
@@ -7933,7 +7929,7 @@ stackAbilitiesFor keyword count = case keyword of
 -- A wildcard rather than an exhaustive case, entwineCosts' reason.
 stackCopyTrigger :: Keyword -> Maybe (TriggeredAbility Card (GrantedAbility.GrantedAbility Card))
 stackCopyTrigger keyword = case keyword of
-  Keyword.Replicate _ -> Just (paidSpellCopies keyword (Quantity.TimesPaid keyword))
+  Keyword.Replicate _ -> Just (paidSpellCopies keyword (Quantity.TimesPaid (KeywordDesignator.OfKeyword keyword)))
   Keyword.Casualty _ -> Just (paidSpellCopies keyword (Quantity.Literal 1))
   -- CR 702.78a's second ability, casualty's above in shape: one copy, gated on
   -- this very conspire cost having been paid.
@@ -7986,7 +7982,7 @@ paidSpellCopies :: Keyword -> Quantity.Quantity -> TriggeredAbility Card (Grante
 paidSpellCopies keyword quantity =
   Mint.triggerOf
     TriggerCondition.SelfCast
-    (Just (Condition.Compares (Compares.MkCompares (Quantity.TimesPaid keyword) Comparison.AtLeast (Quantity.Literal 1))))
+    (Just (Condition.Compares (Compares.MkCompares (Quantity.TimesPaid (KeywordDesignator.OfKeyword keyword)) Comparison.AtLeast (Quantity.Literal 1))))
     (copiesOf quantity)
 
 -- CR 702.40a: "When you cast this spell, copy it for each other spell that was

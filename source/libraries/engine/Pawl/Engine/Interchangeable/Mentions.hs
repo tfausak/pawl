@@ -522,7 +522,7 @@ filterNames asking criterion = case criterion of
   Filter.IsInZone _zone -> False
   Filter.WasCastFrom _zone -> False
   Filter.TagWasSpent _tag -> False
-  Filter.Kicked -> False
+  Filter.Paid _keywordDesignator -> False
   Filter.And nested -> any (filterNames asking) nested
   Filter.Or nested -> any (filterNames asking) nested
   Filter.Not nested -> filterNames asking nested
@@ -1828,10 +1828,11 @@ keywordCountNames asking x = case x of
   KeywordCount.Tally keywordTally -> keywordTallyNames asking keywordTally
   KeywordCount.PlayerCounters playerCounterTally -> playerCounterTallyNames asking playerCounterTally
 
-keywordDesignatorNames :: Asking -> KeywordDesignator.KeywordDesignator -> Bool
+keywordDesignatorNames :: Asking -> KeywordDesignator.KeywordDesignator Keyword.Keyword -> Bool
 keywordDesignatorNames asking x = case x of
   KeywordDesignator.OfFamily _keywordFamily -> False
-  KeywordDesignator.OfNullary keyword -> keywordNames asking keyword
+  KeywordDesignator.OfKeyword keyword -> keywordNames asking keyword
+  KeywordDesignator.PrintedKicker -> False
 
 keywordTallyNames :: Asking -> KeywordTally.KeywordTally keyword -> Bool
 keywordTallyNames asking x = case x of
@@ -2345,10 +2346,9 @@ quantityNames asking x = case x of
   Quantity.DesignationValue _designation -> False
   Quantity.StoredResultsOfSameValue -> False
   Quantity.ClassLevel -> False
-  Quantity.WasKicked -> False
   Quantity.WasForetold -> False
   Quantity.TributeWasPaid -> False
-  Quantity.TimesPaid keyword -> keywordNames asking keyword
+  Quantity.TimesPaid designator -> keywordDesignatorNames asking designator
   Quantity.CastUsing _keywordFamily -> False
   Quantity.TagWasSpent _productionTag -> False
   Quantity.TagWasSpentOfOwnColor _productionTag -> False

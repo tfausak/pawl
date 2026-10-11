@@ -11,6 +11,7 @@ import qualified Pawl.Codec.Devotion as Devotion
 import qualified Pawl.Codec.Halved as Halved
 import qualified Pawl.Codec.InZone as InZone
 import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.Codec.KeywordDesignator as KeywordDesignator
 import qualified Pawl.Codec.KeywordFamily as KeywordFamily
 import qualified Pawl.Codec.ManaCount as ManaCount
 import qualified Pawl.Codec.PlayerCounterTally as PlayerCounterTally
@@ -99,16 +100,15 @@ codec =
       -- HasDesignation above carries: which mark's value is asked is a value.
       Arm.nullary "StoredResultsOfSameValue" Quantity.StoredResultsOfSameValue,
       Arm.payload "DesignationValue" Designation.codec Quantity.DesignationValue (\x -> case x of Quantity.DesignationValue y -> Just y; _ -> Nothing),
-      Arm.nullary "WasKicked" Quantity.WasKicked,
-      -- CR 702.143c, nothing on the wire for WasKicked's reason.
+      -- CR 702.143c, nothing on the wire: the object is whichever one the
+      -- quantity is evaluated against.
       Arm.nullary "WasForetold" Quantity.WasForetold,
-      -- CR 702.104b's yes-or-no, with nothing on the wire for WasKicked's reason:
-      -- the object is whichever one the quantity is evaluated against.
+      -- CR 702.104b's yes-or-no, with nothing on the wire for WasForetold's reason.
       Arm.nullary "TributeWasPaid" Quantity.TributeWasPaid,
-      -- CR 702.33f's "kicked with its [A] kicker", with the KEYWORD on the wire
-      -- and the object still implicit: which ability's cost is asked about is
+      -- CR 702.33f's "kicked with its [A] kicker", with the KEYWORDS on the wire
+      -- and the object still implicit: which abilities' costs are asked about is
       -- the whole of what the card names (Pawl.Types.Quantity).
-      Arm.payload "TimesPaid" Keyword.codec Quantity.TimesPaid (\x -> case x of Quantity.TimesPaid y -> Just y; _ -> Nothing),
+      Arm.payload "TimesPaid" (KeywordDesignator.codec Keyword.codec) Quantity.TimesPaid (\x -> case x of Quantity.TimesPaid y -> Just y; _ -> Nothing),
       -- CR 601.2b's candidate, with the keyword FAMILY on the wire: "if its evoke
       -- cost was paid" names the ability and never its cost.
       Arm.payload "CastUsing" KeywordFamily.codec Quantity.CastUsing (\x -> case x of Quantity.CastUsing y -> Just y; _ -> Nothing),
@@ -123,7 +123,7 @@ codec =
       -- whichever one the quantity is evaluated against.
       Arm.nullary "ManaSpent" Quantity.ManaSpent,
       -- CR 111.6's status and CR 508.1k / 509.1g's two combat facts, all with
-      -- nothing on the wire for WasKicked's reason: the object is whichever one the
+      -- nothing on the wire for WasForetold's reason: the object is whichever one the
       -- quantity is evaluated against.
       Arm.nullary "WasToken" Quantity.WasToken,
       Arm.nullary "WasAttacking" Quantity.WasAttacking,
@@ -268,7 +268,6 @@ tagOf x = case x of
   Quantity.HasDesignation {} -> "HasDesignation"
   Quantity.DesignationValue {} -> "DesignationValue"
   Quantity.StoredResultsOfSameValue {} -> "StoredResultsOfSameValue"
-  Quantity.WasKicked {} -> "WasKicked"
   Quantity.WasForetold {} -> "WasForetold"
   Quantity.TributeWasPaid {} -> "TributeWasPaid"
   Quantity.TimesPaid {} -> "TimesPaid"

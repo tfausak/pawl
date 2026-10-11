@@ -1016,7 +1016,7 @@ equipBoard s registry withHeadmaster = do
 -- Boom Scholar is the card that NAMES them: "Exhaust abilities of other
 -- permanents you control cost {2} less to activate", which reaches
 -- Pawl.Types.ActivationCriteria's `grantedBy` as a
--- KeywordDesignator.OfNullary, the arm a keyword with no family needs.
+-- KeywordDesignator.OfKeyword, the arm a keyword with no family needs.
 exhaustSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 exhaustSpec s registry = Spec.describe s "Exhaust (CR 702.177)" $ do
   -- CR 118.7 narrowed to one rule-702 keyword, on a board carrying both sides of
