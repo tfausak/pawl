@@ -84,8 +84,11 @@
                             "type": "UntilSourceLeavesTheBattlefield"
                           },
                           "ref": {
-                            "type": "AnyNumberMatching",
+                            "type": "ChosenPermanents",
                             "value": {
+                              "count": {
+                                "type": "UpTo"
+                              },
                               "filter": {
                                 "type": "And",
                                 "value": [

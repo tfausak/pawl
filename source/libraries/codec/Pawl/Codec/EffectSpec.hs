@@ -21,7 +21,6 @@ import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.Ante as Ante
-import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachBound as AttachBound
@@ -42,6 +41,7 @@ import qualified Pawl.Types.ChoosePermanents as ChoosePermanents
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Types.ChoosePlayerAtRandom as ChoosePlayerAtRandom
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
+import qualified Pawl.Types.ChosenPermanents as ChosenPermanents
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.CoinReading as CoinReading
 import qualified Pawl.Types.Color as Color
@@ -106,6 +106,7 @@ import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.GainControl as GainControl
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
+import qualified Pawl.Types.HowMany as HowMany
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.InitiativeTarget as InitiativeTarget
 import qualified Pawl.Types.Keyword as Keyword
@@ -2257,8 +2258,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))) (AnyNumberMatching.MkAnyNumberMatching (Filter.HasCardType CardType.Creature) (Just (Quantity.Literal 2))) (SlotName.MkSlotName (Text.pack "chosen"))))
-      " {\"type\":\"ChoosePermanents\",\"value\":{\"chooser\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"},\"permanents\":{\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"atMost\":{\"type\":\"Literal\",\"value\":2}},\"slot\":\"chosen\"}} "
+      (Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents (ChosenPermanents.MkChosenPermanents (Filter.HasCardType CardType.Creature) (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))) (HowMany.UpTo (Just (Quantity.Literal 2)))) (SlotName.MkSlotName (Text.pack "chosen"))))
+      " {\"type\":\"ChoosePermanents\",\"value\":{\"permanents\":{\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"chooser\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"},\"count\":{\"type\":\"UpTo\",\"value\":{\"type\":\"Literal\",\"value\":2}}},\"slot\":\"chosen\"}} "
   Spec.it s "RollDie" $
     Common.assertJsonCodec
       s

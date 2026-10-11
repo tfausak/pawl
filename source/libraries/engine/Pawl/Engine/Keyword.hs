@@ -44,7 +44,7 @@ import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
-import qualified Pawl.Types.ChosenPermanent as ChosenPermanent
+import qualified Pawl.Types.ChosenPermanents as ChosenPermanents
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
@@ -99,6 +99,7 @@ import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Equip as Equip
+import qualified Pawl.Types.EquipTarget as EquipTarget
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.Filter (Filter)
@@ -108,6 +109,7 @@ import Pawl.Types.ForetellCost (ForetellCost)
 import qualified Pawl.Types.Gift as Gift
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.HowMany as HowMany
 import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.IfTaken as IfTaken
 import qualified Pawl.Types.Impending as Impending
@@ -412,7 +414,6 @@ abilitiesFor keyword count = case keyword of
   Keyword.Equip _ -> []
   Keyword.Fortify _ -> []
   Keyword.AuraSwap _ -> []
-  Keyword.EquipPlaneswalker _ -> []
   Keyword.Ninjutsu _ -> []
   Keyword.Splice _ -> []
   Keyword.FirstStrike -> []
@@ -646,7 +647,6 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Equip _ -> []
   Keyword.Fortify _ -> []
   Keyword.AuraSwap _ -> []
-  Keyword.EquipPlaneswalker _ -> []
   Keyword.FirstStrike -> []
   Keyword.Flash -> []
   Keyword.Flying -> []
@@ -1203,7 +1203,6 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Equip _ -> []
   Keyword.Fortify _ -> []
   Keyword.AuraSwap _ -> []
-  Keyword.EquipPlaneswalker _ -> []
   Keyword.FirstStrike -> []
   Keyword.Flash -> []
   Keyword.Flying -> []
@@ -1805,7 +1804,6 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   -- abilities may be activated" -- so one ability per instance, crew's reading
   -- above.
   Keyword.Equip payload -> List.genericReplicate count (equip payload)
-  Keyword.EquipPlaneswalker cost -> List.genericReplicate count (equipPlaneswalker cost)
   -- CR 702.67c, in CR 702.6d's words: any of a Fortification's fortify
   -- abilities may be used, so one ability per instance as equip is.
   Keyword.Fortify cost -> List.genericReplicate count (fortify cost)
@@ -2317,10 +2315,21 @@ outlast cost =
 -- is the ControlledBy conjunct rule 702.6a already carries; the quality is
 -- appended to it rather than replacing it. Pawl.AuraSpec's "CR 702.6c" case is
 -- what proves the narrowing bites.
+--
+-- CR 702.6e's planeswalker variant is the same ability with a planeswalker where
+-- rule 702.6a has a creature: Pool.Permanents narrowed by Filter.HasCardType
+-- Planeswalker, fortify's shape, since there is no planeswalker pool, and
+-- Effect.AttachAsThoughCreature for "as though that planeswalker were a
+-- creature", which lets CR 301.5's legality test admit it at the move. Staying
+-- attached past CR 704.5n is the card's business (Luxior, Giada's Gift makes it
+-- a creature). The scenario "CR 702.6e equip planeswalker suits up Jace, and CR
+-- 704.5n leaves Luxior on him" proves both.
 equip :: Equip.Equip Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
 equip payload =
-  let slot = TargetSlot.required Pool.Creatures (Just (Filter.And (Filter.ControlledBy PlayerRelation.You : Maybe.maybeToList (Equip.quality payload))))
-      effect = Effect.Attach equipTarget
+  let narrowed kinds = Just (Filter.And (kinds <> (Filter.ControlledBy PlayerRelation.You : Maybe.maybeToList (Equip.quality payload))))
+      (slot, effect) = case Equip.target payload of
+        EquipTarget.Creature -> (TargetSlot.required Pool.Creatures (narrowed []), Effect.Attach equipTarget)
+        EquipTarget.Planeswalker -> (TargetSlot.required Pool.Permanents (narrowed [Filter.HasCardType CardType.Planeswalker]), Effect.AttachAsThoughCreature equipTarget)
    in ActivatedAbility.MkActivatedAbility
         { ActivatedAbility.cost = Equip.cost payload,
           ActivatedAbility.modal =
@@ -2342,41 +2351,6 @@ equip payload =
 -- The slot rule 702.6a's one target is chosen into, reinforceTarget's position.
 equipTarget :: SlotName.SlotName
 equipTarget = SlotName.MkSlotName (Text.pack "equipped")
-
--- CR 702.6e's whole ability: "[Cost]: Attach this permanent to target
--- planeswalker you control as though that planeswalker were a creature.
--- Activate only as a sorcery." `equip` above with a planeswalker where rule
--- 702.6a has a creature, and everything that function's haddock says about the
--- cost, CR 115.1e and CR 608.2b holds here word for word.
---
--- Pool.Permanents narrowed by Filter.HasCardType Planeswalker, fortify's shape,
--- since there is no planeswalker pool. "As though that planeswalker were a
--- creature" is Effect.AttachAsThoughCreature, which lets CR 301.5's legality
--- test admit the planeswalker at the move; staying attached past CR 704.5n is
--- the card's business (Luxior, Giada's Gift makes it a creature).
--- Pawl.AuraSpec's "CR 702.6e" case proves both.
-equipPlaneswalker :: Cost Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
-equipPlaneswalker cost =
-  let slot =
-        TargetSlot.required
-          Pool.Permanents
-          (Just (Filter.And [Filter.HasCardType CardType.Planeswalker, Filter.ControlledBy PlayerRelation.You]))
-      effect = Effect.AttachAsThoughCreature equipTarget
-   in ActivatedAbility.MkActivatedAbility
-        { ActivatedAbility.cost = cost,
-          ActivatedAbility.modal =
-            Mint.oneModeTargeting (Map.singleton equipTarget slot) (Seq.singleton effect),
-          -- CR 702.6e's "Activate only as a sorcery", which CR 307.5 spells out.
-          ActivatedAbility.maximumX = [],
-          ActivatedAbility.minimumX = 0,
-          ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
-          ActivatedAbility.activator = Activator.Controller,
-          ActivatedAbility.condition = Nothing,
-          ActivatedAbility.name = Nothing,
-          -- Nothing here and written by `mintedBy` at the roster, the one place that
-          -- knows the keyword by identity rather than by reconstructing it.
-          ActivatedAbility.keyword = Nothing
-        }
 
 -- CR 702.67a's whole ability: "[Cost]: Attach this Fortification to target land
 -- you control. Activate only as a sorcery." `equip` above with CR 301.6's land
@@ -2576,7 +2550,6 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Equip _ -> []
   Keyword.Fortify _ -> []
   Keyword.AuraSwap _ -> []
-  Keyword.EquipPlaneswalker _ -> []
   Keyword.Ninjutsu _ -> []
   Keyword.Splice _ -> []
   Keyword.FirstStrike -> []
@@ -4369,7 +4342,6 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Equip _ -> []
   Keyword.Fortify _ -> []
   Keyword.AuraSwap _ -> []
-  Keyword.EquipPlaneswalker _ -> []
   Keyword.Ninjutsu _ -> []
   Keyword.Splice _ -> []
   Keyword.FirstStrike -> []
@@ -4787,7 +4759,6 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Equip _ -> []
   Keyword.Fortify _ -> []
   Keyword.AuraSwap _ -> []
-  Keyword.EquipPlaneswalker _ -> []
   Keyword.Ninjutsu _ -> []
   Keyword.Splice _ -> []
   Keyword.FirstStrike -> []
@@ -5121,7 +5092,6 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Equip _ -> []
   Keyword.Fortify _ -> []
   Keyword.AuraSwap _ -> []
-  Keyword.EquipPlaneswalker _ -> []
   Keyword.Ninjutsu _ -> []
   Keyword.Splice _ -> []
   Keyword.FirstStrike -> []
@@ -5472,9 +5442,6 @@ familyOf keyword = case keyword of
   Keyword.Equip _ -> Just KeywordFamily.Equip
   Keyword.Fortify _ -> Just KeywordFamily.Fortify
   Keyword.AuraSwap _ -> Just KeywordFamily.AuraSwap
-  -- CR 702.6e calls it "a variant of the equip ability", so Bureau Headmaster's
-  -- "equip abilities" reach it.
-  Keyword.EquipPlaneswalker _ -> Just KeywordFamily.Equip
   Keyword.Ninjutsu _ -> Just KeywordFamily.Ninjutsu
   Keyword.Splice _ -> Just KeywordFamily.Splice
   Keyword.Hexproof _ -> Just KeywordFamily.Hexproof
@@ -6108,14 +6075,14 @@ atLeastOneMatching scope quality =
 -- creature with another unpaired creature you control".
 --
 -- The "may" is Optionality.Optional and not a PayGate, there being nothing to
--- pay; the partner is ObjectRef.ChosenPermanent, which is CR 608.2d's choice
+-- pay; the partner is ObjectRef.ChosenPermanents, which is CR 608.2d's choice
 -- rather than a target (rule 702.95a says "pair", never "target"), so it is asked
 -- only where two or more candidates make it a choice.
 soulbondSelfEnters :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 soulbondSelfEnters =
   let clause =
         Mint.youMay
-          (Seq.singleton (Effect.Pair (ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent unpairedOther (PlayerRef.Relative PlayerRelation.You)))))
+          (Seq.singleton (Effect.Pair (ObjectRef.ChosenPermanents (ChosenPermanents.MkChosenPermanents unpairedOther (PlayerRef.Relative PlayerRelation.You) HowMany.One))))
    in Mint.triggerOf
         TriggerCondition.SelfEnters
         ( Just
@@ -9017,7 +8984,7 @@ championEnters quality =
           ( Seq.singleton
               ( Effect.MoveToZone
                   ( MoveToZone.MkMoveToZone
-                      (ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent another (PlayerRef.Relative PlayerRelation.You)))
+                      (ObjectRef.ChosenPermanents (ChosenPermanents.MkChosenPermanents another (PlayerRef.Relative PlayerRelation.You) HowMany.One))
                       Zone.Exile
                       championRiders
                       Nothing

@@ -9,22 +9,28 @@
               "mana": [
                 {
                   "type": "Generic",
+                  "value": 1
+                }
+              ]
+            },
+            "quality": null,
+            "target": {
+              "type": "Planeswalker"
+            }
+          }
+        },
+        {
+          "type": "Equip",
+          "value": {
+            "cost": {
+              "mana": [
+                {
+                  "type": "Generic",
                   "value": 3
                 }
               ]
             },
             "quality": null
-          }
-        },
-        {
-          "type": "EquipPlaneswalker",
-          "value": {
-            "mana": [
-              {
-                "type": "Generic",
-                "value": 1
-              }
-            ]
           }
         }
       ],

@@ -774,27 +774,32 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
       Spec.assertBool s (not (Filter.matches (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 9))) aPlayer Filter.Type.TargetsSource)) "player"
       Spec.assertBool s (not (Filter.matches (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 9))) blackCreature Filter.Type.TargetsSource)) "a permanent targets nothing"
 
-  -- CR 115.1 with "only" on it: Zada, Hedron Grinder's trigger condition. The
-  -- gameplay-level proof is Pawl.CopySpec's Zada group; these cases pin the
-  -- atom, and the pair against TargetsSource above is what shows the two are
-  -- different questions -- the fixture spell targets creature 9 AND player 1,
-  -- which is "targets 9" and is not "targets only 9".
-  Spec.describe s "TargetsOnlySource" $ do
+  -- CR 115.1 with "only" on it, the nest naming the source: Zada, Hedron
+  -- Grinder's trigger condition. The gameplay-level proof is Pawl.CopySpec's
+  -- Zada group; these cases pin the atom, and the pair against TargetsSource
+  -- above is what shows the two are different questions -- the fixture spell
+  -- targets creature 9 AND player 1, which is "targets 9" and is not "targets
+  -- only 9".
+  Spec.describe s "TargetsOnlyOne IsSource" $ do
+    let zada = blackCreature {Filter.identity = Just (ObjectId.MkObjectId 9)}
+        fromZada = Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 9))
+        onlyZada = Filter.Type.TargetsOnlyOne Filter.Type.IsSource
+        aimedAtAll rs = targetingSpell {Filter.targets = Set.fromList (fmap fst rs), Filter.targetViews = Map.fromList rs}
     Spec.it s "matches only when every target is the source" $ do
-      Spec.assertBool s (Filter.matches (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 9))) (targetingSpell {Filter.targets = Set.singleton (Recipient.ToCreature (ObjectId.MkObjectId 9))}) Filter.Type.TargetsOnlySource) "the source is the only target"
-      Spec.assertBool s (not (Filter.matches (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 9))) targetingSpell Filter.Type.TargetsOnlySource)) "and not when a player is targeted beside it"
-      Spec.assertBool s (Filter.matches (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 9))) targetingSpell Filter.Type.TargetsSource) "which TargetsSource still admits"
+      Spec.assertBool s (Filter.matches fromZada (aimedAt (Recipient.ToCreature (ObjectId.MkObjectId 9)) zada) onlyZada) "the source is the only target"
+      Spec.assertBool s (not (Filter.matches fromZada (aimedAtAll [(Recipient.ToCreature (ObjectId.MkObjectId 9), zada), (Recipient.ToPlayer (PlayerId.MkPlayerId 1), aPlayer)]) onlyZada)) "and not when a player is targeted beside it"
+      Spec.assertBool s (Filter.matches fromZada targetingSpell Filter.Type.TargetsSource) "which TargetsSource still admits"
+      Spec.assertBool s (Filter.matches fromZada (aimedAtAll [(Recipient.ToCreature (ObjectId.MkObjectId 9), zada), (Recipient.ToObject (ObjectId.MkObjectId 9), zada)]) onlyZada) "and the source chosen through two pools is still one target"
 
     Spec.it s "no source in context, a player, and an object targeting nothing are vacuously false" $ do
-      Spec.assertBool s (not (Filter.matches self targetingSpell Filter.Type.TargetsOnlySource)) "no source"
-      Spec.assertBool s (not (Filter.matches (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 9))) aPlayer Filter.Type.TargetsOnlySource)) "player"
-      Spec.assertBool s (not (Filter.matches (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 9))) blackCreature Filter.Type.TargetsOnlySource)) "a permanent targets nothing"
+      Spec.assertBool s (not (Filter.matches self (aimedAt (Recipient.ToCreature (ObjectId.MkObjectId 9)) zada) onlyZada)) "no source"
+      Spec.assertBool s (not (Filter.matches fromZada aPlayer onlyZada)) "player"
+      Spec.assertBool s (not (Filter.matches fromZada blackCreature onlyZada)) "a permanent targets nothing"
 
   -- CR 115.1's "only" asked by DESCRIPTION rather than by identity: Leyline of
   -- Resonance's trigger condition. The gameplay-level proof is Pawl.CopySpec's
-  -- Leyline of Resonance group; these cases pin the atom, and the pair against
-  -- TargetsOnlySource above is what shows the two are different questions -- one
-  -- target the nest describes, whoever it is.
+  -- Leyline of Resonance group; these cases pin the atom over a nest that
+  -- describes the one target rather than naming it.
   Spec.describe s "TargetsOnlyOne" $ do
     Spec.it s "matches one target the nest describes, and nothing else" $ do
       Spec.assertBool s (Filter.matches self (aimedAt (Recipient.ToCreature (ObjectId.MkObjectId 9)) blackCreature) (Filter.Type.TargetsOnlyOne (Filter.Type.HasCardType CardType.Creature))) "one creature target"

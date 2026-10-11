@@ -130,17 +130,12 @@ data Filter keyword
     -- among its CR 601.2c targets (Terror of the Peaks' "spells ... that target
     -- this creature"); IsSource's posture, vacuously False off the stack.
     TargetsSource
-  | -- | CR 115.1 the atom above narrowed by "only": the candidate, a stack
-    -- object, targets the evaluation's source and nothing else (Zada, Hedron
-    -- Grinder's "an instant or sorcery spell that targets only Zada").
-    -- Vacuously False where the candidate targets nothing, a player target
-    -- alone being enough to fail it.
-    TargetsOnlySource
-  | -- | CR 115.1 the atom above by DESCRIPTION rather than by identity: the
-    -- candidate, a stack object, targets exactly one thing, and this Filter
-    -- matches that one target (Leyline of Resonance's "a spell that targets only
-    -- a single creature you control"). Vacuously False where the candidate
-    -- targets nothing.
+  | -- | CR 115.1 / 601.2c narrowed by "only": the candidate, a stack object,
+    -- targets exactly one thing, however many "target" words chose it, and this
+    -- Filter matches that one target (Leyline of Resonance's "a spell that
+    -- targets only a single creature you control"; Zada, Hedron Grinder's
+    -- "targets only Zada" is the nest IsSource). Vacuously False where the
+    -- candidate targets nothing.
     --
     -- The nest is matched against the TARGET's own view, so what CR 601.2c wrote
     -- on the spell's slot does not narrow it: a "target permanent" spell aimed at

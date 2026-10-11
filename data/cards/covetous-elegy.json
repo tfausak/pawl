@@ -40,14 +40,17 @@
                         {
                           "type": "ChoosePermanents",
                           "value": {
-                            "chooser": {
-                              "type": "InSlot",
-                              "value": "player"
-                            },
                             "permanents": {
-                              "atMost": {
-                                "type": "Literal",
-                                "value": 2
+                              "chooser": {
+                                "type": "InSlot",
+                                "value": "player"
+                              },
+                              "count": {
+                                "type": "UpTo",
+                                "value": {
+                                  "type": "Literal",
+                                  "value": 2
+                                }
                               },
                               "filter": {
                                 "type": "And",

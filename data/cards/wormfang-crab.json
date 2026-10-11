@@ -67,7 +67,7 @@
                         "type": "MoveToZone",
                         "value": {
                           "ref": {
-                            "type": "ChosenPermanent",
+                            "type": "ChosenPermanents",
                             "value": {
                               "chooser": {
                                 "type": "InSlot",

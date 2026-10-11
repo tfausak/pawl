@@ -890,7 +890,7 @@ nornsDecreeSpec s registry =
 -- +2/+0 until end of turn."
 --
 -- The second ability's chooser is CR 508.3d's attacking player, read through
--- Pawl.Types.ChosenPermanent's chooser rather than CR 109.5's "you"; its CR
+-- Pawl.Types.ChosenPermanents' chooser rather than CR 109.5's "you"; its CR
 -- 603.4 "if" counts that player's creatures attacking the Trapper's
 -- controller. Three seats: bob holds the Trapper, alice declares, and the
 -- declaration goes at carol or at bob.
