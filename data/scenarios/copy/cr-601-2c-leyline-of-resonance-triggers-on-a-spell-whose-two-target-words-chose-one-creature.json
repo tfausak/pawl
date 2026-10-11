@@ -1,0 +1,148 @@
+{
+  "board": {
+    "active": "alice",
+    "seats": [
+      {
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain1"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain2"
+          },
+          {
+            "card": "Leyline of Resonance",
+            "label": "leyline"
+          },
+          {
+            "card": "Memnite",
+            "label": "memnite"
+          },
+          {
+            "card": "Bonesplitter",
+            "label": "bonesplitter"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Explosive Entry",
+            "label": "entry"
+          }
+        ],
+        "name": "alice"
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "step": "PrecombatMain"
+  },
+  "description": "CR 601.2c Leyline of Resonance triggers on a spell whose two target words chose one creature",
+  "final": [
+    {
+      "Count": {
+        "card": "Memnite",
+        "count": 1,
+        "player": "alice",
+        "zone": "Graveyard"
+      }
+    },
+    {
+      "View": {
+        "is": [],
+        "of": "Stack"
+      }
+    }
+  ],
+  "note": "Explosive Entry's artifact and creature slots both choose alice's Memnite, so the spell targets only a single creature she controls, though each slot names it through a different pool.",
+  "timeline": [
+    {
+      "do": {
+        "Cast": {
+          "mana": [
+            "$mountain1",
+            "$mountain2"
+          ],
+          "object": "$entry",
+          "targetsBySlot": {
+            "artifact": [
+              "$memnite"
+            ],
+            "creature": [
+              "$memnite"
+            ]
+          }
+        }
+      },
+      "player": "alice",
+      "step": "PrecombatMain",
+      "turn": 1
+    },
+    {
+      "check": {
+        "View": {
+          "is": [
+            "trigger of $leyline",
+            "Explosive Entry"
+          ],
+          "of": "Stack"
+        }
+      },
+      "player": "alice",
+      "step": "PrecombatMain",
+      "turn": 1
+    },
+    {
+      "do": "Pass",
+      "player": "alice",
+      "step": "PrecombatMain",
+      "turn": 1
+    },
+    {
+      "do": {
+        "Answer": {
+          "prompt": "ChooseTargets",
+          "with": [
+            [
+              "artifact",
+              [
+                [
+                  "Object",
+                  "$memnite"
+                ]
+              ]
+            ],
+            [
+              "creature",
+              [
+                [
+                  "Creature",
+                  "$memnite"
+                ]
+              ]
+            ]
+          ]
+        }
+      },
+      "player": "alice",
+      "step": "PrecombatMain",
+      "turn": 1
+    },
+    {
+      "check": {
+        "View": {
+          "is": [
+            "Explosive Entry#2",
+            "Explosive Entry"
+          ],
+          "of": "Stack"
+        }
+      },
+      "player": "alice",
+      "step": "PrecombatMain",
+      "turn": 1
+    }
+  ]
+}
