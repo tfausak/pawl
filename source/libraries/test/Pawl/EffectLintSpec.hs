@@ -69,7 +69,7 @@ import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
-import qualified Pawl.Types.ChosenPermanent as ChosenPermanent
+import qualified Pawl.Types.ChosenPermanents as ChosenPermanents
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.ConjureCards as ConjureCards
@@ -124,6 +124,7 @@ import qualified Pawl.Types.GainControl as GainControl
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.HowMany as HowMany
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Layer as Layer
 import qualified Pawl.Types.Layout as Layout
@@ -414,7 +415,7 @@ ownQuantities effect = case effect of
   Effect.PlaySubgame _ -> []
   Effect.ChoosePlayer _ -> []
   Effect.ChoosePlayerAtRandom _ -> []
-  Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents _ (AnyNumberMatching.MkAnyNumberMatching _ atMost) _) -> Foldable.toList atMost
+  Effect.ChoosePermanents choice -> Foldable.toList (HowMany.quantity (ChosenPermanents.count (ChoosePermanents.permanents choice)))
   Effect.RollDie rollDie -> RollDie.count rollDie : Maybe.maybeToList (RollDie.modifier rollDie)
   Effect.FlipCoin flipCoin -> [FlipCoin.count flipCoin]
   Effect.TakeExtraTurn takeExtraTurn -> [TakeExtraTurn.count takeExtraTurn]
@@ -1229,24 +1230,19 @@ data Asks
     -- arm falls through to the pure sweep.
     AsksDiscardArm
   | -- | Pawl.Engine.Resolve's permanentsGathered, shared by Effect.Transform,
-    -- Effect.Convert, Effect.AttachAll, Effect.Unattach, Effect.Untap and
-    -- Effect.Sacrifice. It asks the any-number arm and nothing else: the four
-    -- card-shaped chosen arms name cards in a graveyard, a hand or a group, and
-    -- these instructions act on PERMANENTS.
-    AsksTransformGather
+    -- Effect.Convert, Effect.AttachAll, Effect.Unattach, Effect.Untap,
+    -- Effect.Sacrifice, Effect.ModifyTarget and Effect.Pair. It asks the
+    -- battlefield arm and nothing else: the four card-shaped chosen arms name
+    -- cards in a graveyard, a hand or a group, and these instructions act on
+    -- PERMANENTS.
+    AsksPermanentsGathered
   | -- | Pawl.Engine.Resolve's Effect.LookAt arm. It asks the hand chooser --
     -- Word of Command's "look at target opponent's hand and choose a card from
     -- it" -- through the same chooseCardsInHand the move gather uses, and falls
     -- through to the pure sweep for every other arm.
     AsksLookAtArm
-  | -- | Pawl.Engine.Resolve's Effect.Pair and Effect.ModifyTarget arms. Each
-    -- asks the chosen-permanent arm through chosenPermanentOf -- CR 702.95a's
-    -- "another unpaired creature you control", Mirkwood Trapper's "that player
-    -- chooses an attacking creature" -- and falls through to the pure sweep for
-    -- everything else.
-    AsksChosenPermanent
-  | -- | Pawl.Engine.Resolve's Effect.PutSticker arm: AsksChosenPermanent's
-    -- chosenPermanentOf (Proficient Pyrodancer's "a nonland permanent you own"),
+  | -- | Pawl.Engine.Resolve's Effect.PutSticker arm: AsksPermanentsGathered's
+    -- gather (Proficient Pyrodancer's "a nonland permanent you own"),
     -- plus chosenCardsInGraveyard (Scampire's "a creature card in your
     -- graveyard").
     AsksPutStickerArm
@@ -1256,7 +1252,7 @@ data Asks
   deriving (Eq, Show)
 
 -- Whether an ObjectRef arm is a resolution-time QUESTION rather than a read --
--- the five arms Pawl.Types.ObjectRef documents as such, and exactly the five
+-- the arms Pawl.Types.ObjectRef documents as such, and exactly the ones
 -- Pawl.Engine.Resolve.Slots.objectRefObjects answers [] for.
 --
 -- ObjectRef.ChosenPlayer is NOT one, despite the name: the seat was chosen on
@@ -1296,8 +1292,7 @@ chooserRef ref = case ref of
   ObjectRef.RandomCardInHand {} -> True
   ObjectRef.RandomCardInGraveyard {} -> True
   ObjectRef.RandomCardInLibrary {} -> True
-  ObjectRef.AnyNumberMatching {} -> True
-  ObjectRef.ChosenPermanent {} -> True
+  ObjectRef.ChosenPermanents {} -> True
   ObjectRef.SourceAndChosenPermanent {} -> True
   ObjectRef.AttachedToBound {} -> False
   ObjectRef.FromAnywhere {} -> False
@@ -1317,9 +1312,8 @@ asksFor asks ref = case asks of
     ObjectRef.RandomCardInHand {} -> True
     ObjectRef.RandomCardInGraveyard {} -> True
     ObjectRef.RandomCardInLibrary {} -> True
-    ObjectRef.ChosenPermanent {} -> True
+    ObjectRef.ChosenPermanents {} -> True
     ObjectRef.SourceAndChosenPermanent {} -> True
-    ObjectRef.AnyNumberMatching {} -> True
     _ -> False
   AsksRevealArm -> case ref of
     ObjectRef.ChosenCardFromAmong {} -> True
@@ -1332,23 +1326,17 @@ asksFor asks ref = case asks of
   -- One arm and one only, which is what keeps the widening from weakening the
   -- guarantee: this site asks for the battlefield subset and for nothing else,
   -- so every (site, arm) pair the four arms above classify is unmoved.
-  AsksTransformGather -> case ref of
-    ObjectRef.AnyNumberMatching {} -> True
+  AsksPermanentsGathered -> case ref of
+    ObjectRef.ChosenPermanents {} -> True
     _ -> False
-  -- One arm and one only, for AsksTransformGather's reason: Resolve's
+  -- One arm and one only, for AsksPermanentsGathered's reason: Resolve's
   -- Effect.LookAt arm routes the hand chooser through chooseCardsInHand and
   -- falls through to the pure sweep for everything else.
   AsksLookAtArm -> case ref of
     ObjectRef.ChosenCardInHand {} -> True
     _ -> False
-  -- One arm and one only, for AsksTransformGather's reason: Resolve's
-  -- Effect.Pair and Effect.ModifyTarget arms route ObjectRef.ChosenPermanent
-  -- through chosenPermanentOf and read every other arm off the pure sweep.
-  AsksChosenPermanent -> case ref of
-    ObjectRef.ChosenPermanent {} -> True
-    _ -> False
   AsksPutStickerArm -> case ref of
-    ObjectRef.ChosenPermanent {} -> True
+    ObjectRef.ChosenPermanents {} -> True
     ObjectRef.ChosenCardInGraveyard {} -> True
     _ -> False
   AsksExchangeArm -> case ref of
@@ -1380,9 +1368,9 @@ effectObjectRefs effect =
         Effect.AttachBound {} -> []
         -- The movers' gather is turnPermanentsOver's, shared through
         -- Resolve.permanentsGathered.
-        Effect.AttachAll (AttachAll.MkAttachAll ref _) -> [(AsksTransformGather, ref)]
+        Effect.AttachAll (AttachAll.MkAttachAll ref _) -> [(AsksPermanentsGathered, ref)]
         Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> read_ (fmap DamagePart.ref (Foldable.toList parts))
-        Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ _ ref _) -> [(AsksChosenPermanent, ref)]
+        Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ _ ref _) -> [(AsksPermanentsGathered, ref)]
         Effect.ChangeText {} -> []
         Effect.AddMana {} -> []
         Effect.Firebend {} -> []
@@ -1429,7 +1417,7 @@ effectObjectRefs effect =
         Effect.ControlPlayerNextTurn {} -> []
         Effect.ControlPlayerThisResolution {} -> []
         Effect.Destroy (Destroy.MkDestroy ref _ _ _ _) -> read_ [ref]
-        Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect ref _ _) -> [(AsksTransformGather, ref)]
+        Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect ref _ _) -> [(AsksPermanentsGathered, ref)]
         -- THE gather that asks every choosing arm.
         Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _ _) -> [(AsksMoveGather, ref)]
         Effect.Draw {} -> []
@@ -1483,7 +1471,7 @@ effectObjectRefs effect =
         Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance _ ref _ _) -> read_ [ref]
         Effect.RedirectDamage (RedirectDamage.MkRedirectDamage _ _ _ srcRef _ _ destRef _) -> read_ (Maybe.maybeToList srcRef <> [destRef])
         -- A READ and not an ask: CR 708.2's turning-over takes no choice of its own, and
-        -- this arm never reaches the Game monad, so an AnyNumberMatching ref written
+        -- this arm never reaches the Game monad, so a ChosenPermanents ref written
         -- here would name nothing. inertChoosers is what says so at load time.
         Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown ref _) -> read_ [ref]
         Effect.TurnFaceUp {} -> []
@@ -1512,20 +1500,20 @@ effectObjectRefs effect =
         Effect.PayAnyEnergy {} -> []
         Effect.ChooseNumber {} -> []
         Effect.Tap ref -> read_ [ref]
-        Effect.Untap ref -> [(AsksTransformGather, ref)]
-        Effect.Unattach ref -> [(AsksTransformGather, ref)]
+        Effect.Untap ref -> [(AsksPermanentsGathered, ref)]
+        Effect.Unattach ref -> [(AsksPermanentsGathered, ref)]
         Effect.Detain ref -> read_ [ref]
         Effect.Goad ref -> read_ [ref]
-        Effect.Pair ref -> [(AsksChosenPermanent, ref)]
+        Effect.Pair ref -> [(AsksPermanentsGathered, ref)]
         Effect.GrantLookAtExiled grant -> read_ [GrantLookAtExiled.cards grant]
         Effect.MakePlotted ref -> read_ [ref]
         Effect.MakeForetold x -> read_ [MakeForetold.cards x]
         Effect.MakeWarped ref -> read_ [ref]
         Effect.DoesNotUntapNext payload -> read_ [DoesNotUntapNext.ref payload]
-        Effect.Transform ref -> [(AsksTransformGather, ref)]
+        Effect.Transform ref -> [(AsksPermanentsGathered, ref)]
         -- The SAME gather, CR 701.28a routing a convert through CR 701.27a-f and
         -- Pawl.Engine.Resolve applying both opcodes through one turnPermanentsOver.
-        Effect.Convert ref -> [(AsksTransformGather, ref)]
+        Effect.Convert ref -> [(AsksPermanentsGathered, ref)]
         -- A plain READ, unlike the two above: CR 710 states no "any number" flip, and
         -- Pawl.Engine.Resolve's Flip arm sweeps the ref and asks nothing.
         Effect.Flip ref -> read_ [ref]
@@ -1995,13 +1983,13 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary player _ count) -> case count of
             Quantity.Type.Literal n -> n <= 1 && namesOneSeat player
             _ -> False
-          -- FALSE, EachCardFromAmong's answer over the battlefield: "any number"
-          -- states no bound, so nothing about the ref caps how many permanents
-          -- the chooser may name.
-          ObjectRef.AnyNumberMatching _ -> False
-          -- TRUE where the arm above is False, which is the whole difference
-          -- between them: the ref names exactly one permanent however many match.
-          ObjectRef.ChosenPermanent _ -> True
+          -- TRUE for one permanent however many match, and for a printed ceiling
+          -- of one, TopOfLibrary's answer; FALSE, EachCardFromAmong's answer
+          -- over the battlefield, where "any number" states no bound.
+          ObjectRef.ChosenPermanents (ChosenPermanents.MkChosenPermanents _ _ count) -> case count of
+            HowMany.One -> True
+            HowMany.UpTo (Just (Quantity.Type.Literal n)) -> n <= 1
+            HowMany.UpTo _ -> False
           -- FALSE where the arm above is True: the ref names the source
           -- ALONGSIDE the one permanent it picks, so a per-player count over it
           -- moves two.
@@ -2562,8 +2550,8 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
         atRandom = ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand (PlayerRef.Relative PlayerRelation.You) anyCard (Quantity.Type.Literal 1))
         atRandomInGraveyard = ObjectRef.RandomCardInGraveyard (RandomCardInGraveyard.MkRandomCardInGraveyard (ZoneScope.Scoped (PlayerScope.Related PlayerRelation.You)) anyCard (Quantity.Type.Literal 1))
         sought = ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary (PlayerRef.Relative PlayerRelation.You) anyCard (Quantity.Type.Literal 1))
-        anyNumber = ObjectRef.AnyNumberMatching (AnyNumberMatching.MkAnyNumberMatching anyCard Nothing)
-        onePermanent = ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent anyCard (PlayerRef.Relative PlayerRelation.You))
+        anyNumber = ObjectRef.ChosenPermanents (ChosenPermanents.MkChosenPermanents anyCard (PlayerRef.Relative PlayerRelation.You) (HowMany.UpTo Nothing))
+        onePermanent = ObjectRef.ChosenPermanents (ChosenPermanents.MkChosenPermanents anyCard (PlayerRef.Relative PlayerRelation.You) HowMany.One)
         sourceAndOne = ObjectRef.SourceAndChosenPermanent anyCard
         moves ref = Effect.MoveToZone (MoveToZone.MkMoveToZone ref Zone.Battlefield EntryRiders.defaultValue Nothing Nothing LibraryPlacement.defaultValue Nothing)
         reveals ref = Effect.Reveal (Reveal.MkReveal ref Nothing)
@@ -2606,17 +2594,13 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
       "the battlefield subset is asked by the transform, move and untap gathers and by neither other site"
       (inert [Effect.Transform anyNumber, moves anyNumber, Effect.Untap anyNumber, reveals anyNumber, Effect.Tap anyNumber])
       [False, False, False, True, True]
-    -- The singular of the arm above, asked by the MoveToZone gather alone --
-    -- Hanweir Battlements' "exile them, then meld them", the printing that wanted
-    -- it. Rejected under Transform and Reveal, the two other sites that ask any
-    -- chooser-shaped arm, and under Tap, an AsksNothing opcode. This also asserts
-    -- the arm reaches chooserRef at all -- an arm missing from THAT traversal
-    -- would answer False here at every site and no -Werror would name it.
+    -- The singular of the arm above -- Hanweir Battlements' "exile them, then
+    -- meld them" -- is the same arm at a count of one, so the same sites ask it.
     Spec.assertEqWith
       s
-      "one chosen permanent is asked by the move gather alone"
+      "one chosen permanent is asked by the transform and move gathers and by neither other site"
       (inert [Effect.Transform onePermanent, moves onePermanent, reveals onePermanent, Effect.Tap onePermanent])
-      [True, False, True, True]
+      [False, False, True, True]
     -- The arm above with the source named alongside the choice, and the same row:
     -- Hanweir Battlements' "exile them" is a move, so the MoveToZone gather is
     -- again the only site that asks it. Asserted separately rather than folded

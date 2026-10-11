@@ -44,7 +44,7 @@ import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
-import qualified Pawl.Types.ChosenPermanent as ChosenPermanent
+import qualified Pawl.Types.ChosenPermanents as ChosenPermanents
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
@@ -109,6 +109,7 @@ import Pawl.Types.ForetellCost (ForetellCost)
 import qualified Pawl.Types.Gift as Gift
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.HowMany as HowMany
 import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.IfTaken as IfTaken
 import qualified Pawl.Types.Impending as Impending
@@ -6078,14 +6079,14 @@ atLeastOneMatching scope quality =
 -- creature with another unpaired creature you control".
 --
 -- The "may" is Optionality.Optional and not a PayGate, there being nothing to
--- pay; the partner is ObjectRef.ChosenPermanent, which is CR 608.2d's choice
+-- pay; the partner is ObjectRef.ChosenPermanents, which is CR 608.2d's choice
 -- rather than a target (rule 702.95a says "pair", never "target"), so it is asked
 -- only where two or more candidates make it a choice.
 soulbondSelfEnters :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 soulbondSelfEnters =
   let clause =
         Mint.youMay
-          (Seq.singleton (Effect.Pair (ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent unpairedOther (PlayerRef.Relative PlayerRelation.You)))))
+          (Seq.singleton (Effect.Pair (ObjectRef.ChosenPermanents (ChosenPermanents.MkChosenPermanents unpairedOther (PlayerRef.Relative PlayerRelation.You) HowMany.One))))
    in Mint.triggerOf
         TriggerCondition.SelfEnters
         ( Just
@@ -8987,7 +8988,7 @@ championEnters quality =
           ( Seq.singleton
               ( Effect.MoveToZone
                   ( MoveToZone.MkMoveToZone
-                      (ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent another (PlayerRef.Relative PlayerRelation.You)))
+                      (ObjectRef.ChosenPermanents (ChosenPermanents.MkChosenPermanents another (PlayerRef.Relative PlayerRelation.You) HowMany.One))
                       Zone.Exile
                       championRiders
                       Nothing

@@ -183,8 +183,11 @@
                             "type": "IsSource"
                           },
                           "subjects": {
-                            "type": "AnyNumberMatching",
+                            "type": "ChosenPermanents",
                             "value": {
+                              "count": {
+                                "type": "UpTo"
+                              },
                               "filter": {
                                 "type": "And",
                                 "value": [

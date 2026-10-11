@@ -1,12 +1,11 @@
 module Pawl.Types.ObjectRef where
 
 import qualified Pawl.Types.AbilityName as AbilityName
-import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
 import qualified Pawl.Types.AttachedToBound as AttachedToBound
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
-import qualified Pawl.Types.ChosenPermanent as ChosenPermanent
+import qualified Pawl.Types.ChosenPermanents as ChosenPermanents
 import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.EachCardInHand as EachCardInHand
@@ -160,17 +159,11 @@ data ObjectRef
     -- Prompt.RandomObject -- no search, no reveal, no shuffle. Carried out by
     -- Effect.MoveToZone's gather, through randomCardsInLibrary.
     RandomCardInLibrary RandomCardInLibrary.RandomCardInLibrary
-  | -- | CR 608.2d / Tovolar, Dire Overlord, Teferi, Hero of Dominaria: any number
-    -- of the permanents on the battlefield matching the payload's Filter, up to
-    -- its ceiling where it has one, offered rather than swept, the empty answer
-    -- legal. Asked of CR 608.2c's resolving controller; another seat's pick is
-    -- Pawl.Types.Effect's ChoosePermanents, bound for the instruction to read.
-    AnyNumberMatching AnyNumberMatching.AnyNumberMatching
-  | -- | CR 608.2d / 701.42a / Hanweir Battlements, Wormfang Crab: exactly one of the
-    -- permanents on the battlefield matching the payload's Filter, chosen as the
-    -- effect runs by the seat its chooser names and not asked at a single
-    -- candidate, where CR 608.2d leaves one legal announcement.
-    ChosenPermanent ChosenPermanent.ChosenPermanent
+  | -- | CR 608.2d / 701.42a: the permanents on the battlefield matching the
+    -- payload's Filter that its chooser picks as the effect runs, one or up to a
+    -- ceiling (Hanweir Battlements, Wormfang Crab; Tovolar, Dire Overlord, Teferi,
+    -- Hero of Dominaria). Pawl.Engine.Resolve.Effect.chosenPermanents asks it.
+    ChosenPermanents ChosenPermanents.ChosenPermanents
   | -- | CR 608.2f / 701.42a / Hanweir Battlements: the effect's source together
     -- with exactly one permanent the Filter admits, named as one instruction so
     -- that the pair moves in one event -- proved by Pawl.MeldSpec's "CR 608.2f the
