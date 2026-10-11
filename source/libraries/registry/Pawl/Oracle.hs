@@ -118,7 +118,6 @@ printed keyword = case keyword of
   Keyword.Defender -> Just (Text.pack "Defender")
   Keyword.DoubleStrike -> Just (Text.pack "Double strike")
   Keyword.Equip {} -> Nothing
-  Keyword.EquipPlaneswalker {} -> Nothing
   Keyword.FirstStrike -> Just (Text.pack "First strike")
   Keyword.Flash -> Just (Text.pack "Flash")
   Keyword.Flying -> Just (Text.pack "Flying")

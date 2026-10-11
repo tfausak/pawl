@@ -101,7 +101,7 @@
       "refuse": {
         "Activate": {
           "object": "$luxior",
-          "ability": 1,
+          "ability": 0,
           "targets": [
             "$goblin"
           ],
@@ -119,7 +119,7 @@
       "refuse": {
         "Activate": {
           "object": "$luxior",
-          "ability": 0,
+          "ability": 1,
           "targets": [
             "Jace Beleren"
           ],
@@ -139,7 +139,7 @@
       "do": {
         "Activate": {
           "object": "$luxior",
-          "ability": 1,
+          "ability": 0,
           "targets": [
             "Jace Beleren"
           ],

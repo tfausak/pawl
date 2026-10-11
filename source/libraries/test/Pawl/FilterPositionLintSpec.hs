@@ -89,6 +89,7 @@ import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Equip as Equip
+import qualified Pawl.Types.EquipTarget as EquipTarget
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
@@ -1464,7 +1465,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         -- Buried under both combinators, so a lint reading only the top of a
         -- Filter would miss it.
         buried = Filter.Type.And [Filter.Type.Or [creatures, Filter.Type.OfChosenPlayer]]
-        equipping quality = Keyword.Equip (Equip.MkEquip (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) quality)
+        equipping quality = Keyword.Equip (Equip.MkEquip (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) quality EquipTarget.Creature)
         offending = base {Face.keywords = Map.singleton (equipping (Just buried)) 1}
         protecting = base {Face.keywords = Map.singleton (Keyword.Protection Protection.MkProtection {Protection.quality = buried, Protection.spares = Nothing}) 1}
     -- Ordered FIRST, and the assertion this framing exists for.

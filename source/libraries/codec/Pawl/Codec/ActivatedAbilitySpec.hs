@@ -18,6 +18,7 @@ import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.DuringPhase as DuringPhase
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Equip as Equip
+import qualified Pawl.Types.EquipTarget as EquipTarget
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -126,7 +127,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
           Activator.Controller
           Nothing
           Nothing
-          (Just (Keyword.Equip (Equip.MkEquip (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []) Nothing)))
+          (Just (Keyword.Equip (Equip.MkEquip (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []) Nothing EquipTarget.Creature)))
       )
       " {\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]},\"modal\":{\"modes\":[{}]},\"restrictions\":[{\"type\":\"SorcerySpeed\"}],\"keyword\":{\"type\":\"Equip\",\"value\":{\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]},\"quality\":null}}} "
   -- CR 602.2: no rider is the default for nearly every ability, so the key stays
