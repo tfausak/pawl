@@ -176,7 +176,10 @@ is what the three older findings had in common too.
 An audit round costs as much as an implementation, so its brief bounds what
 counts as a finding: behaviour that diverges from the CR, a rules-core arm that
 cases on an effect's identity, a false CR classification in a comment, a
-mutation the PR body reports that could not have reddened the named assertion.
+mutation the PR body reports that could not have reddened the named assertion,
+a new constructor, field or hand-kept list that should have been a parameter
+of an existing one (`docs/agents/implementing.md`, "Parameters, not
+siblings").
 Prose is not a finding. A wording nit, a haddock over one line, a stale
 citation that still points at the right rule: the auditor fixes none of these,
 reports none of these, and no "fix N comment nits" unit is dispatched for
