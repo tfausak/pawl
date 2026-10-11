@@ -446,7 +446,6 @@ filterNames asking criterion = case criterion of
   Filter.IsSource -> False
   Filter.IsObject named -> named == object asking
   Filter.TargetsSource -> False
-  Filter.TargetsOnlySource -> False
   Filter.TargetsOnlyOne nested -> filterNames asking nested
   Filter.HasSingleTarget -> False
   Filter.TargetsMatching nested -> filterNames asking nested

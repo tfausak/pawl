@@ -354,7 +354,6 @@ bakePerspective viewOf context gs candidate predicate =
         Filter.Type.IsSource -> predicate
         Filter.Type.IsObject _ -> predicate
         Filter.Type.TargetsSource -> predicate
-        Filter.Type.TargetsOnlySource -> predicate
         Filter.Type.HasSingleTarget -> predicate
         -- NOT descended into, for the reason AttachedTo below is not: `candidate` here
         -- is a PLAYER, and CR 115.1 puts no player on the stack, so

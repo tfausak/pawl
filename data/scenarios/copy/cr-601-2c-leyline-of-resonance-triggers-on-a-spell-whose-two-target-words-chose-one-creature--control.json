@@ -1,0 +1,81 @@
+{
+  "board": {
+    "active": "alice",
+    "seats": [
+      {
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain1"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain2"
+          },
+          {
+            "card": "Leyline of Resonance",
+            "label": "leyline"
+          },
+          {
+            "card": "Memnite",
+            "label": "memnite"
+          },
+          {
+            "card": "Bonesplitter",
+            "label": "bonesplitter"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Explosive Entry",
+            "label": "entry"
+          }
+        ],
+        "name": "alice"
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "step": "PrecombatMain"
+  },
+  "description": "CR 601.2c Leyline of Resonance triggers on a spell whose two target words chose one creature (control)",
+  "note": "The same cast with the artifact slot on alice's Bonesplitter instead: the spell targets two things, so Leyline of Resonance does not trigger.",
+  "timeline": [
+    {
+      "do": {
+        "Cast": {
+          "mana": [
+            "$mountain1",
+            "$mountain2"
+          ],
+          "object": "$entry",
+          "targetsBySlot": {
+            "artifact": [
+              "$bonesplitter"
+            ],
+            "creature": [
+              "$memnite"
+            ]
+          }
+        }
+      },
+      "player": "alice",
+      "step": "PrecombatMain",
+      "turn": 1
+    },
+    {
+      "check": {
+        "View": {
+          "is": [
+            "Explosive Entry"
+          ],
+          "of": "Stack"
+        }
+      },
+      "player": "alice",
+      "step": "PrecombatMain",
+      "turn": 1
+    }
+  ]
+}

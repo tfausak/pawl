@@ -1,5 +1,6 @@
 module Pawl.Engine.Filter where
 
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.Functor.Const as Const
 import qualified Data.Functor.Identity as Identity
 import qualified Data.List as List
@@ -1782,28 +1783,23 @@ matches context view predicate = case predicate of
   Filter.TargetsSource -> case source context of
     Just src -> any ((== Just src) . Recipient.objectOf) (targets view)
     Nothing -> False
-  -- The atom above with "only" on it, so ARITY is asked as well as membership:
-  -- every one of the candidate's targets is the source. A player target answers
-  -- Nothing to Recipient.objectOf and so fails, which is the rule -- "targets
-  -- only Zada" is false of a spell that also names a player. Vacuously False
-  -- where the candidate targets nothing at all, which the emptiness guard is:
-  -- `all` over an empty set is True and a permanent targets nothing.
-  Filter.TargetsOnlySource -> case source context of
-    Just src -> not (Set.null (targets view)) && all ((== Just src) . Recipient.objectOf) (targets view)
-    Nothing -> False
-  -- The atom above asked by DESCRIPTION, and ARITY is the whole of what "a
-  -- single" adds: exactly one recipient, and the nest matched against THAT
-  -- recipient's own view rather than against the tag CR 601.2c wrote on the
-  -- spell's slot. Needs no source, which is why it can sit where
-  -- TargetsOnlySource cannot.
+  -- CR 115.1 with "only" on it, asked by DESCRIPTION: the candidate targets
+  -- exactly one thing, and the nest matches that thing's own view rather than
+  -- the tag CR 601.2c wrote on the spell's slot. Zada, Hedron Grinder's "targets
+  -- only Zada" is the nest IsSource, judged in the SAME context the candidate
+  -- is; Leyline of Resonance's "a single creature YOU control" reads the
+  -- perspective the trigger's controller frames.
   --
-  -- The nest is judged in the SAME context the candidate is, so "a single
-  -- creature YOU control" (Leyline of Resonance) reads the perspective the
-  -- trigger's controller frames.
+  -- ONE THING, not one recipient: CR 601.2c lets each "target" word choose the
+  -- same object, and two words with different pools tag it differently
+  -- (ToCreature, ToObject), so the recipients are grouped by object first.
+  -- A spell aimed only at Zada with all of its targets still triggers it, per
+  -- the card's ruling. The scenario "CR 601.2c Leyline of Resonance triggers on
+  -- a spell whose two target words chose one creature" proves it.
   --
-  -- False where the one recipient has no view: CR 608.2b's gone target, which
-  -- answers no description at all.
-  Filter.TargetsOnlyOne f -> case Set.toList (targets view) of
+  -- False where the candidate targets nothing, and where the one recipient has
+  -- no view: CR 608.2b's gone target, which answers no description at all.
+  Filter.TargetsOnlyOne f -> case ListUtils.nubOrdOn (\r -> maybe (Right r) Left (Recipient.objectOf r)) (Set.toList (targets view)) of
     [r] -> maybe False (\target -> matches context target f) (Map.lookup r (targetViews view))
     _ -> False
   -- Arity alone, and counted per instance rather than per recipient: a spell
@@ -2310,7 +2306,6 @@ rewrite pairs predicate = case predicate of
   -- Untouched for IsSource's reason: a target relation is not a word CR 612.1
   -- swaps.
   Filter.TargetsSource -> predicate
-  Filter.TargetsOnlySource -> predicate
   Filter.HasSingleTarget -> predicate
   -- DESCENDED into, unlike the two atoms above: the nest describes an OBJECT and
   -- so may name a subtype -- Precursor Golem's "targets only a single Golem" is
@@ -3055,7 +3050,6 @@ bakeBound players predicate = case predicate of
   -- Untouched for IsSource's reason: both read the Context, and neither names a
   -- slot.
   Filter.TargetsSource -> predicate
-  Filter.TargetsOnlySource -> predicate
   Filter.HasSingleTarget -> predicate
   -- DESCENDED into for the reason AttachedTo below is: the nest is a description
   -- of another object and may name a bound slot, which this function's pairing
@@ -3234,7 +3228,6 @@ manaValueThresholds predicate = case predicate of
   Filter.IsSource -> []
   Filter.IsObject _ -> []
   Filter.TargetsSource -> []
-  Filter.TargetsOnlySource -> []
   Filter.HasSingleTarget -> []
   -- Descended into for AttachedTo's reason: the nest is a description of another
   -- object and may carry a mana-value bound of its own.
@@ -3396,7 +3389,6 @@ statesAQuality predicate = case predicate of
   -- CR 701.23b for IsSource's reason, and unreachable from a search besides: a
   -- card in a library targets nothing.
   Filter.TargetsSource -> True
-  Filter.TargetsOnlySource -> True
   Filter.HasSingleTarget -> True
   Filter.TargetsOnlyOne _ -> True
   Filter.TargetsMatching _ -> True
@@ -3557,7 +3549,6 @@ readsSourceValues predicate = case predicate of
   Filter.IsSource -> False
   Filter.IsObject _ -> False
   Filter.TargetsSource -> False
-  Filter.TargetsOnlySource -> False
   Filter.HasSingleTarget -> False
   Filter.TargetsOnlyOne f -> readsSourceValues f
   Filter.TargetsMatching f -> readsSourceValues f
@@ -3706,7 +3697,6 @@ overBoundSlotsWith f predicate = case predicate of
   Filter.IsSource -> pure predicate
   Filter.IsObject _ -> pure predicate
   Filter.TargetsSource -> pure predicate
-  Filter.TargetsOnlySource -> pure predicate
   Filter.HasSingleTarget -> pure predicate
   -- DESCENT, for AttachedTo's reason below: CR 115.1's atom carries the one
   -- target's description, which a card author writes like any other filter.

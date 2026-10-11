@@ -255,7 +255,6 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsSource -> 0
   Filter.Type.IsObject _ -> 0
   Filter.Type.TargetsSource -> 0
-  Filter.Type.TargetsOnlySource -> 0
   Filter.Type.HasSingleTarget -> 0
   -- A DESCENT and not a zero, for AttachedTo's reason below: CR 115.1's atom
   -- carries the one target's description, a Filter position a card author

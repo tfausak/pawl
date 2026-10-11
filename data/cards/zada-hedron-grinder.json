@@ -58,7 +58,10 @@
                     }
                   },
                   {
-                    "type": "TargetsOnlySource"
+                    "type": "TargetsOnlyOne",
+                    "value": {
+                      "type": "IsSource"
+                    }
                   }
                 ]
               },

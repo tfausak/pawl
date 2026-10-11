@@ -3641,7 +3641,6 @@ filterReads f = case f of
   -- CR 115.1 / 109.3: a target is a property of a stack object and no
   -- characteristic, so no Modification writes one.
   Filter.Type.TargetsSource -> Set.empty
-  Filter.Type.TargetsOnlySource -> Set.empty
   Filter.Type.HasSingleTarget -> Set.empty
   -- DESCENT where its siblings above read nothing: the nest is matched against
   -- the TARGET's view, so whatever aspect it asks of that object is an aspect a
@@ -3975,7 +3974,6 @@ filterReadsPeers f = case f of
   Filter.Type.IsSource -> False
   Filter.Type.IsObject _ -> False
   Filter.Type.TargetsSource -> False
-  Filter.Type.TargetsOnlySource -> False
   Filter.Type.HasSingleTarget -> False
   Filter.Type.TargetsPlayer _ -> False
   Filter.Type.IsBound _ -> False
