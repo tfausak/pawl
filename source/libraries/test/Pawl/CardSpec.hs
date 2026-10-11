@@ -111,7 +111,7 @@ import qualified Pawl.Types.ChoosePermanents as ChoosePermanents
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
-import qualified Pawl.Types.ChosenPermanent as ChosenPermanent
+import qualified Pawl.Types.ChosenPermanents as ChosenPermanents
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Color as Color
@@ -213,6 +213,7 @@ import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.HandAction as HandAction
+import qualified Pawl.Types.HowMany as HowMany
 import qualified Pawl.Types.Impending as Impending
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
@@ -750,7 +751,7 @@ playerRefPositions =
         ("shuffle", Effect.Shuffle (plantedPlayer "sh"), [plantedPlayer "sh"]),
         ("cloak", Effect.Cloak (plantedPlayer "ck"), [plantedPlayer "ck"]),
         ("manifestDread", Effect.ManifestDread (plantedPlayer "md"), [plantedPlayer "md"]),
-        ("choose-permanents", Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents (plantedPlayer "cp") (AnyNumberMatching.MkAnyNumberMatching (Filter.Type.And []) Nothing) (SlotName.MkSlotName (Text.pack "cp"))), [plantedPlayer "cp"]),
+        ("choose-permanents", Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents (ChosenPermanents.MkChosenPermanents (Filter.Type.And []) (plantedPlayer "cp") (HowMany.UpTo Nothing)) (SlotName.MkSlotName (Text.pack "cp"))), [plantedPlayer "cp"]),
         ("discard-any-number", Effect.Discard (Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard (plantedPlayer "da") (AnyNumberMatching.MkAnyNumberMatching (Filter.Type.And []) Nothing) Nothing)), [plantedPlayer "da"]),
         ("player-sacrifices", Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices (plantedPlayer "ps") (Filter.Type.And []) one), [plantedPlayer "ps"]),
         ("choose-card-name", Effect.ChooseCardName (ChooseCardName.MkChooseCardName (plantedPlayer "cn") (Filter.Type.And [])), [plantedPlayer "cn"]),
@@ -1430,7 +1431,7 @@ ownCounts effect = case effect of
   Effect.PlaySubgame _ -> []
   Effect.ChoosePlayer _ -> []
   Effect.ChoosePlayerAtRandom _ -> []
-  Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents _ (AnyNumberMatching.MkAnyNumberMatching _ atMost) _) -> foldMap quantityCounts atMost
+  Effect.ChoosePermanents choice -> foldMap quantityCounts (HowMany.quantity (ChosenPermanents.count (ChoosePermanents.permanents choice)))
   -- CR 706.2's modifier and CR 706.1's count are Quantities, so their Counts
   -- are reachable here.
   Effect.RollDie rollDie -> quantityCounts (RollDie.count rollDie) <> foldMap quantityCounts (RollDie.modifier rollDie)
@@ -4043,16 +4044,14 @@ objectRefFilters ref = case ref of
   -- The Gates' "seek a nonland card": RandomCardInHand's answer one hidden zone
   -- over, for its reason.
   ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary _ f _) -> unframed [f] <> refFilters ref
-  -- Tovolar's "any number of Human Werewolves you control": EachMatching's
-  -- Filter position exactly -- same zone, same sweep, the chooser standing
-  -- between the matches and the set -- so it is framed the same way.
-  ObjectRef.AnyNumberMatching (AnyNumberMatching.MkAnyNumberMatching f _) -> unframed [f]
-  -- The Garrison in Hanweir Battlements' "If you both own and control this land
-  -- and a creature named Hanweir Garrison": the arm above's Filter position, one
-  -- permanent instead of a subset, so it is framed the same way -- and the
-  -- ownership and control the card prints are conjuncts of that Filter, which is
-  -- what this traversal hands to the Filter lints.
-  ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent f _) -> unframed [f]
+  -- Tovolar's "any number of Human Werewolves you control" and the Garrison in
+  -- Hanweir Battlements' "If you both own and control this land and a creature
+  -- named Hanweir Garrison": EachMatching's Filter position exactly -- same
+  -- zone, same sweep, the chooser standing between the matches and the set --
+  -- so it is framed the same way. The ownership and control the card prints are
+  -- conjuncts of that Filter, which is what this traversal hands to the Filter
+  -- lints; the ceiling is reached through refFilters beside it.
+  ObjectRef.ChosenPermanents (ChosenPermanents.MkChosenPermanents f _ _) -> unframed [f] <> refFilters ref
   -- The arm above with the source riding along: the Filter still says which
   -- counterpart may be picked and nothing about the source, so it is framed the
   -- same way.
@@ -5825,7 +5824,7 @@ effectFilters effect = case effect of
     Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> frame Unframed (quantityFilters quantity)
     Discard.These (TheseDiscard.MkTheseDiscard ref _) -> frame SourceHostFramed (objectRefFilters ref)
     -- The card filter is a position a card author writes -- Borborygmos and
-    -- Fblthp's "land" -- read as ObjectRef.AnyNumberMatching's is.
+    -- Fblthp's "land" -- read as ObjectRef.ChosenPermanents' is.
     Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard _ (AnyNumberMatching.MkAnyNumberMatching f atMost) _) -> unframed [f] <> frame Unframed (foldMap quantityFilters atMost)
   Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _ _) -> frame LifeLossAmountFramed (quantityFilters quantity)
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
@@ -6009,7 +6008,7 @@ effectFilters effect = case effect of
   Effect.PlaySubgame _ -> []
   Effect.ChoosePlayer _ -> []
   Effect.ChoosePlayerAtRandom _ -> []
-  Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents _ (AnyNumberMatching.MkAnyNumberMatching f atMost) _) -> unframed [f] <> frame Unframed (foldMap quantityFilters atMost)
+  Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents (ChosenPermanents.MkChosenPermanents f _ count) _) -> unframed [f] <> frame Unframed (foldMap quantityFilters (HowMany.quantity count))
   -- CR 706.2's modifier is a Quantity, so its filters are reachable here.
   Effect.RollDie rollDie -> frame Unframed (quantityFilters (RollDie.count rollDie) <> foldMap quantityFilters (RollDie.modifier rollDie))
   -- CR 705.1's number of coins is a Quantity, so its filters are reachable here.

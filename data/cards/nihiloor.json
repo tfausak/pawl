@@ -181,9 +181,12 @@
                               "type": "ChoosePermanents",
                               "value": {
                                 "permanents": {
-                                  "atMost": {
-                                    "type": "Literal",
-                                    "value": 1
+                                  "count": {
+                                    "type": "UpTo",
+                                    "value": {
+                                      "type": "Literal",
+                                      "value": 1
+                                    }
                                   },
                                   "filter": {
                                     "type": "And",

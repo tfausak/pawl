@@ -88,7 +88,7 @@ import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
-import qualified Pawl.Types.ChosenPermanent as ChosenPermanent
+import qualified Pawl.Types.ChosenPermanents as ChosenPermanents
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.CoinFlipR as CoinFlipR
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
@@ -205,6 +205,7 @@ import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.HandAction as HandAction
+import qualified Pawl.Types.HowMany as HowMany
 import qualified Pawl.Types.Impending as Impending
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
@@ -796,7 +797,7 @@ chooseNumberNames asking x = case x of
 
 choosePermanentsNames :: Asking -> ChoosePermanents.ChoosePermanents -> Bool
 choosePermanentsNames asking x = case x of
-  ChoosePermanents.MkChoosePermanents chooser permanents slot -> playerRefNames asking chooser || anyNumberMatchingNames asking permanents || slotNames asking slot
+  ChoosePermanents.MkChoosePermanents permanents slot -> chosenPermanentsNames asking permanents || slotNames asking slot
 
 choosePlayerNames :: Asking -> ChoosePlayer.ChoosePlayer -> Bool
 choosePlayerNames asking x = case x of
@@ -824,9 +825,9 @@ chosenCardInHandNames :: Asking -> ChosenCardInHand.ChosenCardInHand -> Bool
 chosenCardInHandNames asking x = case x of
   ChosenCardInHand.MkChosenCardInHand player filter_ -> playerRefNames asking player || filterNames asking filter_
 
-chosenPermanentNames :: Asking -> ChosenPermanent.ChosenPermanent -> Bool
-chosenPermanentNames asking x = case x of
-  ChosenPermanent.MkChosenPermanent filter_ chooser -> filterNames asking filter_ || playerRefNames asking chooser
+chosenPermanentsNames :: Asking -> ChosenPermanents.ChosenPermanents -> Bool
+chosenPermanentsNames asking x = case x of
+  ChosenPermanents.MkChosenPermanents filter_ chooser count -> filterNames asking filter_ || playerRefNames asking chooser || any (quantityNames asking) (HowMany.quantity count)
 
 clauseNames :: Asking -> (card -> Bool) -> (ability -> Bool) -> Clause.Clause card ability -> Bool
 clauseNames asking onCard onAbility x = case x of
@@ -2045,8 +2046,7 @@ objectRefNames asking x = case x of
   ObjectRef.RandomCardInHand randomCardInHand -> randomCardInHandNames asking randomCardInHand
   ObjectRef.RandomCardInGraveyard randomCardInGraveyard -> randomCardInGraveyardNames asking randomCardInGraveyard
   ObjectRef.RandomCardInLibrary randomCardInLibrary -> randomCardInLibraryNames asking randomCardInLibrary
-  ObjectRef.AnyNumberMatching anyNumberMatching -> anyNumberMatchingNames asking anyNumberMatching
-  ObjectRef.ChosenPermanent chosenPermanent -> chosenPermanentNames asking chosenPermanent
+  ObjectRef.ChosenPermanents chosenPermanents -> chosenPermanentsNames asking chosenPermanents
   ObjectRef.SourceAndChosenPermanent filter_ -> filterNames asking filter_
   ObjectRef.AttachedToBound attachedToBound -> attachedToBoundNames asking attachedToBound
   ObjectRef.FromAnywhere slotName -> slotNames asking slotName

@@ -198,8 +198,11 @@
                       {
                         "type": "Transform",
                         "value": {
-                          "type": "AnyNumberMatching",
+                          "type": "ChosenPermanents",
                           "value": {
+                            "count": {
+                              "type": "UpTo"
+                            },
                             "filter": {
                               "type": "And",
                               "value": [

@@ -132,7 +132,7 @@
                             }
                           },
                           "ref": {
-                            "type": "ChosenPermanent",
+                            "type": "ChosenPermanents",
                             "value": {
                               "filter": {
                                 "type": "And",
