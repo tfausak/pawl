@@ -15,8 +15,6 @@ codec keywordCodec =
     tagOf
     [ Arm.payload "OfFamily" KeywordFamily.codec KeywordDesignator.OfFamily (\x -> case x of KeywordDesignator.OfFamily y -> Just y; _ -> Nothing),
       Arm.payload "OfKeyword" keywordCodec KeywordDesignator.OfKeyword (\x -> case x of KeywordDesignator.OfKeyword y -> Just y; _ -> Nothing),
-      -- Temporary decode-only alias for the old tag.
-      Arm.payload "OfNullary" keywordCodec KeywordDesignator.OfKeyword (const Nothing),
       Arm.nullary "PrintedKicker" KeywordDesignator.PrintedKicker
     ]
 

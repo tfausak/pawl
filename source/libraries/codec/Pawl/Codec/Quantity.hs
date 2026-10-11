@@ -25,8 +25,6 @@ import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Arithmetic as Arithmetic
-import qualified Pawl.Types.Keyword as Keyword.Type
-import qualified Pawl.Types.KeywordDesignator as KeywordDesignator.Type
 import qualified Pawl.Types.Quantity as Quantity
 
 -- | Quantity.Count's arm is tagged HERE, like every other arm. Pawl.Codec.Count
@@ -102,8 +100,6 @@ codec =
       -- HasDesignation above carries: which mark's value is asked is a value.
       Arm.nullary "StoredResultsOfSameValue" Quantity.StoredResultsOfSameValue,
       Arm.payload "DesignationValue" Designation.codec Quantity.DesignationValue (\x -> case x of Quantity.DesignationValue y -> Just y; _ -> Nothing),
-      -- Temporary decode-only alias for the old tag.
-      Arm.nullary "WasKicked" (Quantity.TimesPaid KeywordDesignator.Type.PrintedKicker),
       -- CR 702.143c, nothing on the wire: the object is whichever one the
       -- quantity is evaluated against.
       Arm.nullary "WasForetold" Quantity.WasForetold,
@@ -112,7 +108,7 @@ codec =
       -- CR 702.33f's "kicked with its [A] kicker", with the KEYWORDS on the wire
       -- and the object still implicit: which abilities' costs are asked about is
       -- the whole of what the card names (Pawl.Types.Quantity).
-      Arm.payload "TimesPaid" timesPaidAlias Quantity.TimesPaid (\x -> case x of Quantity.TimesPaid y -> Just y; _ -> Nothing),
+      Arm.payload "TimesPaid" (KeywordDesignator.codec Keyword.codec) Quantity.TimesPaid (\x -> case x of Quantity.TimesPaid y -> Just y; _ -> Nothing),
       -- CR 601.2b's candidate, with the keyword FAMILY on the wire: "if its evoke
       -- cost was paid" names the ability and never its cost.
       Arm.payload "CastUsing" KeywordFamily.codec Quantity.CastUsing (\x -> case x of Quantity.CastUsing y -> Just y; _ -> Nothing),
@@ -318,9 +314,3 @@ tagOf x = case x of
   -- CR 702.167c: AgainstCardsExiledWith's answer, over the craft link alone.
   Quantity.AgainstCraftMaterials {} -> "AgainstCraftMaterials"
   Quantity.StationMeasure {} -> "StationMeasure"
-
--- Temporary: decodes the old bare-keyword payload as OfKeyword.
-timesPaidAlias :: Codec.Codec (KeywordDesignator.Type.KeywordDesignator Keyword.Type.Keyword)
-timesPaidAlias =
-  let real = KeywordDesignator.codec Keyword.codec
-   in real {Codec.decode = \v -> either (const (fmap KeywordDesignator.Type.OfKeyword (Codec.decode Keyword.codec v))) Right (Codec.decode real v)}

@@ -25,8 +25,6 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.Filter as Filter
-import qualified Pawl.Types.KeywordDesignator as KeywordDesignator.Type
-import qualified Pawl.Types.KeywordFamily as KeywordFamily.Type
 
 -- | Recursive, mirroring Quantity's toJson/fromJson: And/Or carry their
 -- operands as a JSON Array, Not as a single nested object, and each atom
@@ -162,8 +160,6 @@ codec keywordCodec =
       Arm.payload "WasCastFrom" Zone.codec Filter.WasCastFrom (\x -> case x of Filter.WasCastFrom y -> Just y; _ -> Nothing),
       Arm.payload "TagWasSpent" ProductionTag.codec Filter.TagWasSpent (\x -> case x of Filter.TagWasSpent y -> Just y; _ -> Nothing),
       Arm.payload "Paid" (KeywordDesignator.codec keywordCodec) Filter.Paid (\x -> case x of Filter.Paid y -> Just y; _ -> Nothing),
-      -- Temporary decode-only alias for the old tag.
-      Arm.nullary "Kicked" (Filter.Paid (KeywordDesignator.Type.OfFamily KeywordFamily.Type.Kicker)),
       Arm.payload "And" (Common.list (codec keywordCodec)) Filter.And (\x -> case x of Filter.And y -> Just y; _ -> Nothing),
       Arm.payload "Or" (Common.list (codec keywordCodec)) Filter.Or (\x -> case x of Filter.Or y -> Just y; _ -> Nothing),
       Arm.payload "Not" (codec keywordCodec) Filter.Not (\x -> case x of Filter.Not y -> Just y; _ -> Nothing)
