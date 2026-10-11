@@ -21,15 +21,18 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.BlockRequirement as BlockRequirement
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as KeywordEngine
 import qualified Pawl.Engine.NameWords as NameWords
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Engine.Requirement as Requirement
 import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -1082,6 +1085,11 @@ spec s registry = Spec.describe s "Sticker" $ do
           _ -> (((), board), Map.empty)
     Spec.assertEqWith s "CR 509.1c bob's Piker must block the Bears" (fmap (\r -> (ActiveBlockRequirement.blocker r, ActiveBlockRequirement.attacker r)) (GameState.blockRequirements after)) [(pikerId, bearsId)]
     Spec.assertEqWith s "CR 115.1 the attacker slot offers only the Bears" (Map.lookup (SlotName.MkSlotName (Text.pack "attacker")) offered) (Just [bearsId])
+    -- "this turn": CR 514.2's sweep ends the requirement, read through the
+    -- engine's CR 509.1c reader.
+    let required = not . Requirement.vacuous . BlockRequirement.instances (\_ _ -> True) [pikerId] [bearsId]
+    Spec.assertBool s (required after) "CR 509.1c the Piker is required to block the attacking Bears this turn"
+    Spec.assertBool s (not (required (Expiry.dropAtCleanup after))) "CR 514.2 and is not once the turn's cleanup has run"
   -- Review Focus 3's waiver and cap: five tickets would pay for any of them.
   Spec.it s "CR 123.3c Pin Collection with X=3 offers seven ability stickers, spends no ticket, and its Bears flies" $ do
     sheets <- committedSheets
